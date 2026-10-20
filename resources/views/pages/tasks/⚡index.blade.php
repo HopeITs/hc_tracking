@@ -9,13 +9,14 @@ use App\Livewire\Concerns\Tasks\FiltersTaskDirectory;
 use App\Livewire\Concerns\Tasks\ManagesTaskDrawer;
 use App\Livewire\Concerns\Tasks\ProvidesTaskOptions;
 use App\Livewire\Concerns\Tasks\ReadsTaskViews;
+use Livewire\Attributes\Layout;
 use Livewire\Attributes\Session;
 use Livewire\Attributes\Title;
 use Livewire\Attributes\Url;
 use Livewire\Component;
 use Livewire\WithPagination;
 
-new #[Title('titles.tasks')] class extends Component
+new #[Layout('layouts::desk'), Title('titles.tasks')] class extends Component
 {
     use ComposesInlineTasks;
     use FiltersTaskDirectory;
@@ -106,54 +107,80 @@ new #[Title('titles.tasks')] class extends Component
     $canPickDepartment = auth()->user()->canViewAllTaskDepartments();
 @endphp
 
-<section class="admin-directory @container/directory flex min-h-full w-full flex-1 flex-col gap-5 bg-white text-secondary-dark dark:bg-surface-0 dark:text-ink" aria-labelledby="task-directory-heading">
-    <x-ui.page-header heading-id="task-directory-heading" :title="__('common.tasks')" :count="$this->taskStats['total']">
-        <x-slot:filters>
-            <x-ui.input type="search" icon="magnifying-glass" :label="__('tasks.search_tasks')" :placeholder="__('tasks.title_description_or_assignee')" wire:model.live.debounce.300ms="search" clearable />
-            <x-ui.header-filter-select :label="__('common.status')" wire:model.live="status" :value="$status">
-                <option value="">{{ __('common.all_statuses') }}</option>
-                @foreach (TaskStatus::cases() as $statusCase)
-                    <option value="{{ $statusCase->value }}">{{ $statusCase->label() }}</option>
+<x-desk.register
+    class="admin-directory @container/directory"
+    heading-id="task-directory-heading"
+    :title="__('common.tasks')"
+    :count="$this->taskStats['total']"
+    :view="$view"
+    :views="[
+        'list' => ['icon' => 'table', 'label' => __('desk.register.table'), 'test' => 'task-view-list'],
+        'board' => ['icon' => 'board', 'label' => __('desk.register.board'), 'test' => 'task-view-board'],
+        'calendar' => ['icon' => 'cal', 'label' => __('desk.register.calendar'), 'test' => 'task-view-calendar'],
+    ]"
+>
+    <x-slot:figures>
+        <span class="dk-good" data-test="task-stat-done"><b>{{ $this->taskStats['done'] }}</b>{{ TaskStatus::Done->label() }}</span>
+        <span class="dk-bad" data-test="task-stat-overdue"><b>{{ $this->taskStats['overdue'] }}</b>{{ __('tasks.overdue') }}</span>
+        <span class="dk-bad" data-test="task-stat-missed"><b>{{ $this->taskStats['missed'] }}</b>{{ __('tasks.missed') }}</span>
+        <span class="dk-warn" data-test="task-stat-due-soon"><b>{{ $this->taskStats['due_soon'] }}</b>{{ __('tasks.due_within_7_days') }}</span>
+    </x-slot:figures>
+    <x-slot:actions>
+        @can('create', App\Models\Task::class)
+            <button type="button" class="dk-btn dk-primary" wire:click="openCreateDrawer" data-test="create-task-button"><x-desk.icon name="plus" />{{ __('tasks.add_task') }}</button>
+        @endcan
+    </x-slot:actions>
+    <x-slot:search>
+        <x-desk.register-search :label="__('tasks.search_tasks')" :placeholder="__('tasks.title_description_or_assignee')" wire:model.live.debounce.300ms="search" />
+    </x-slot:search>
+    <x-slot:filters>
+        <x-ui.header-filter-select :label="__('common.status')" wire:model.live="status" :value="$status">
+            <option value="">{{ __('common.all_statuses') }}</option>
+            @foreach (TaskStatus::cases() as $statusCase)
+                <option value="{{ $statusCase->value }}">{{ $statusCase->label() }}</option>
+            @endforeach
+        </x-ui.header-filter-select>
+        <x-ui.header-filter-select :label="__('desk.register.due')" wire:model.live="dueFilter" :value="$dueFilter" data-test="task-due-filter">
+            <option value="">{{ __('desk.register.due_any') }}</option>
+            <option value="overdue">{{ __('tasks.overdue') }}</option>
+            <option value="missed">{{ __('tasks.missed') }}</option>
+            <option value="due_soon">{{ __('tasks.due_within_7_days') }}</option>
+        </x-ui.header-filter-select>
+        <x-ui.header-filter-select :label="__('tasks.priority')" wire:model.live="priority" :value="$priority">
+            <option value="">{{ __('tasks.all_priorities') }}</option>
+            @foreach (TaskPriority::cases() as $priorityCase)
+                <option value="{{ $priorityCase->value }}">{{ $priorityCase->label() }}</option>
+            @endforeach
+        </x-ui.header-filter-select>
+        <x-ui.header-filter-select :label="__('tasks.assignee')" wire:model.live="assignee" :value="$assignee" employees>
+            <option value="">{{ __('common.anyone') }}</option>
+        </x-ui.header-filter-select>
+        @if ($canPickDepartment)
+            <x-ui.header-filter-select :label="__('tasks.department')" wire:model.live="departmentId" :value="$departmentId" data-test="task-department-filter">
+                <option value="">{{ __('tasks.every_department') }}</option>
+                @foreach ($this->departmentOptions as $departmentOption)
+                    <option value="{{ $departmentOption['id'] }}">{{ $departmentOption['name'] }}</option>
                 @endforeach
             </x-ui.header-filter-select>
-            <x-ui.header-filter-select :label="__('tasks.priority')" wire:model.live="priority" :value="$priority">
-                <option value="">{{ __('tasks.all_priorities') }}</option>
-                @foreach (TaskPriority::cases() as $priorityCase)
-                    <option value="{{ $priorityCase->value }}">{{ $priorityCase->label() }}</option>
-                @endforeach
-            </x-ui.header-filter-select>
-            <x-ui.header-filter-select :label="__('tasks.assignee')" wire:model.live="assignee" :value="$assignee" employees>
-                <option value="">{{ __('common.anyone') }}</option>
-            </x-ui.header-filter-select>
-            @if ($canPickDepartment)
-                <x-ui.header-filter-select :label="__('tasks.department')" wire:model.live="departmentId" :value="$departmentId" data-test="task-department-filter">
-                    <option value="">{{ __('tasks.every_department') }}</option>
-                    @foreach ($this->departmentOptions as $departmentOption)
-                        <option value="{{ $departmentOption['id'] }}">{{ $departmentOption['name'] }}</option>
-                    @endforeach
-                </x-ui.header-filter-select>
-            @endif
-            <x-ui.header-filter-select :label="__('tasks.source_type')" wire:model.live="sourceType" :value="$sourceType">
+        @endif
+        <x-ui.header-filter-select :label="__('tasks.source_type')" wire:model.live="sourceType" :value="$sourceType">
+            <option value="">{{ __('common.select') }}</option>
+            @foreach ($this->sourceTypeOptions as $sourceTypeOption)
+                <option value="{{ $sourceTypeOption['value'] }}">{{ $sourceTypeOption['label'] }}</option>
+            @endforeach
+        </x-ui.header-filter-select>
+        @if ($sourceType !== '')
+            <x-ui.header-filter-select :label="__('tasks.source')" wire:model.live="sourceId" :value="$sourceId">
                 <option value="">{{ __('common.select') }}</option>
-                @foreach ($this->sourceTypeOptions as $sourceTypeOption)
-                    <option value="{{ $sourceTypeOption['value'] }}">{{ $sourceTypeOption['label'] }}</option>
+                @foreach ($this->filterSourceOptions as $sourceOption)
+                    <option value="{{ $sourceOption['id'] }}">{{ $sourceOption['name'] }}</option>
                 @endforeach
             </x-ui.header-filter-select>
-            @if ($sourceType !== '')
-                <x-ui.header-filter-select :label="__('tasks.source')" wire:model.live="sourceId" :value="$sourceId">
-                    <option value="">{{ __('common.select') }}</option>
-                    @foreach ($this->filterSourceOptions as $sourceOption)
-                        <option value="{{ $sourceOption['id'] }}">{{ $sourceOption['name'] }}</option>
-                    @endforeach
-                </x-ui.header-filter-select>
-            @endif
-        </x-slot:filters>
-        <x-slot:actions>
-            @can('create', App\Models\Task::class)
-                <x-ui.button tone="primary" icon="plus" class="min-h-11 self-end touch-manipulation @sm/directory:min-h-10" wire:click="openCreateDrawer" data-test="create-task-button">{{ __('tasks.add_task') }}</x-ui.button>
-            @endcan
-        </x-slot:actions>
-    </x-ui.page-header>
+        @endif
+        @if ($filtersAreActive)
+            <button type="button" class="dk-btn dk-ghost dk-sm" wire:click="clearFilters" data-test="task-clear-filters"><x-desk.icon name="x" />{{ __('desk.register.clear') }}</button>
+        @endif
+    </x-slot:filters>
 
     @include('pages.tasks._index-filters')
 
@@ -200,4 +227,4 @@ new #[Title('titles.tasks')] class extends Component
         :confirm-label="__('tasks.delete_task')"
         confirm-test="confirm-delete-task"
     />
-</section>
+</x-desk.register>

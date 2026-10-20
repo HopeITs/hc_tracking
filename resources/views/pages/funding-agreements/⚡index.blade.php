@@ -7,12 +7,13 @@ use App\Livewire\Concerns\FundingAgreements\ExportsAgreementRegister;
 use App\Livewire\Concerns\FundingAgreements\ReadsAgreementRegister;
 use App\Livewire\Concerns\ManagesAgreementForm;
 use App\Models\DonorProposal;
+use Livewire\Attributes\Layout;
 use Livewire\Attributes\Title;
 use Livewire\Attributes\Url;
 use Livewire\Component;
 use Livewire\WithPagination;
 
-new #[Title('titles.funding_agreements')] class extends Component {
+new #[Layout('layouts::desk'), Title('titles.funding_agreements')] class extends Component {
     use ChartsAgreementCalendar;
     use ExportsAgreementRegister;
     use FiltersFinanceRegister;
@@ -220,13 +221,15 @@ new #[Title('titles.funding_agreements')] class extends Component {
     ];
 @endphp
 
-<section class="@container/directory flex min-h-full w-full flex-1 flex-col gap-6 bg-white text-secondary-dark dark:bg-surface-0 dark:text-ink" aria-labelledby="agreement-directory-heading">
-    <x-ui.page-header
-        heading-id="agreement-directory-heading"
-        :title="__('common.funding_agreements')"
-        :count="$total"
-    >
-        <x-slot:actions>
+<x-desk.register
+    class="@container/directory"
+    heading-id="agreement-directory-heading"
+    :title="__('common.funding_agreements')"
+    :count="$total"
+    :view="$view"
+    :views="[ 'table' => ['icon' => 'table', 'label' => __('finance_tables.view_table')], 'overview' => ['icon' => 'chart', 'label' => __('finance_tables.view_overview')] ]"
+>
+    <x-slot:actions>
             <div class="flex flex-wrap items-center justify-end gap-2">
                 @if ($this->hasAnyAgreement)
                     <x-funding.filters :active="$activeFilterCount" :results="$total">
@@ -263,16 +266,6 @@ new #[Title('titles.funding_agreements')] class extends Component {
                     </x-funding.filters>
                 @endif
 
-                <x-ui.view-toggle
-                    :label="__('finance_tables.view_label')"
-                    wire-model="view"
-                    :active="$this->view"
-                    :options="[
-                        ['key' => 'table', 'label' => __('finance_tables.view_table'), 'icon' => 'table-cells'],
-                        ['key' => 'overview', 'label' => __('finance_tables.view_overview'), 'icon' => 'chart-bar'],
-                    ]"
-                />
-
                 @if ($this->hasAnyAgreement)
                     <x-ui.button tone="action" icon="arrow-down-tray" wire:click="exportCsv" wire:loading.attr="disabled" wire:target="exportCsv" data-test="export-csv">
                         {{ __('finance_tables.export_csv') }}
@@ -286,7 +279,7 @@ new #[Title('titles.funding_agreements')] class extends Component {
                 @endcan
             </div>
         </x-slot:actions>
-    </x-ui.page-header>
+
 
     @if (! $this->hasAnyAgreement)
         <x-ui.empty-state icon="banknotes" :heading="__('common.no_agreements_yet')" :body="__('funding_agreements.record_the_first_funding_agreement')" />
@@ -313,4 +306,4 @@ new #[Title('titles.funding_agreements')] class extends Component {
         :proposal-options="$showAgreementModal ? $this->proposalOptions : []"
         :locked-proposal-name="$showAgreementModal && $editingAgreementId !== null ? $this->agreementProposalLabel : null"
     />
-</section>
+</x-desk.register>

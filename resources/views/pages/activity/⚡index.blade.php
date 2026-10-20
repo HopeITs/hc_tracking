@@ -12,12 +12,13 @@ use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Pagination\LengthAwarePaginator;
 use Illuminate\Support\Collection;
 use Livewire\Attributes\Computed;
+use Livewire\Attributes\Layout;
 use Livewire\Attributes\Title;
 use Livewire\Attributes\Url;
 use Livewire\Component;
 use Livewire\WithPagination;
 
-new #[Title('titles.activity_log')] class extends Component {
+new #[Layout('layouts::desk'), Title('titles.activity_log')] class extends Component {
     use WithPagination;
 
     #[Url(except: '')]
@@ -219,10 +220,16 @@ new #[Title('titles.activity_log')] class extends Component {
     };
 @endphp
 
-<section class="@container/directory flex min-h-full w-full flex-1 flex-col gap-5 bg-white text-secondary-dark dark:bg-surface-0 dark:text-ink" aria-labelledby="activity-log-heading">
-    <x-ui.page-header heading-id="activity-log-heading" :title="__('activity.log_title')" :count="$this->activities->total()">
-        <x-slot:filters>
-            <x-ui.input type="search" icon="magnifying-glass" :label="__('activity.filters.search')" wire:model.live.debounce.300ms="search" clearable />
+<x-desk.register
+    class="@container/directory"
+    heading-id="activity-log-heading"
+    :title="__('activity.log_title')"
+    :count="$this->activities->total()"
+>
+    <x-slot:search>
+        <x-desk.register-search :label="__('activity.filters.search')" wire:model.live.debounce.300ms="search" />
+    </x-slot:search>
+    <x-slot:filters>
 
             <x-ui.header-filter-select :label="__('activity.filters.module')" wire:model.live="module" :value="$module">
                 <option value="">{{ __('activity.filters.all_modules') }}</option>
@@ -241,7 +248,7 @@ new #[Title('titles.activity_log')] class extends Component {
             <x-ui.input type="date" :label="__('activity.filters.from')" wire:model.live="from" />
             <x-ui.input type="date" :label="__('activity.filters.to')" wire:model.live="to" />
         </x-slot:filters>
-    </x-ui.page-header>
+
 
     {{-- The statement summary: today's running totals, read calmly before the ledger itself,
          independent of whatever the entries below are filtered to. --}}
@@ -390,4 +397,4 @@ new #[Title('titles.activity_log')] class extends Component {
 
         <flux:pagination :paginator="$this->activities" />
     @endif
-</section>
+</x-desk.register>

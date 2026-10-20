@@ -11,12 +11,13 @@ use Illuminate\Support\Facades\Gate;
 use Illuminate\Validation\Rule;
 use Livewire\Attributes\Computed;
 use Livewire\Attributes\Locked;
+use Livewire\Attributes\Layout;
 use Livewire\Attributes\Title;
 use Livewire\Attributes\Url;
 use Livewire\Component;
 use Livewire\WithPagination;
 
-new #[Title('titles.risks')] class extends Component {
+new #[Layout('layouts::desk'), Title('titles.risks')] class extends Component {
     use WithPagination;
 
     #[Url(except: '')]
@@ -30,6 +31,10 @@ new #[Title('titles.risks')] class extends Component {
 
     #[Url(except: false)]
     public bool $unmitigated = false;
+
+    /** The register view: the risk list, or a Board by whether the risk happened. */
+    #[Url(except: 'list')]
+    public string $view = 'list';
 
     public bool $showRiskModal = false;
 
@@ -111,6 +116,31 @@ new #[Title('titles.risks')] class extends Component {
     }
 
     /** @return LengthAwarePaginator<int, Risk> */
+    /**
+     * The Board view: potential risks, then the ones that happened, at most
+     * 40 cards each (desk.js).
+     *
+     * @return list<array{key: string, label: string, count: int, items: Illuminate\Support\Collection<int, Risk>}>
+     */
+    #[Computed]
+    public function boardColumns(): array
+    {
+        $risks = $this->filteredQuery()
+            ->select(['id', 'name', 'happened', 'project_id'])
+            ->with('project:id,name')
+            ->latest('updated_at')
+            ->get();
+
+        return collect([false => __('risks.potential_risks'), true => __('risks.challenges')])
+            ->map(function (string $label, int $happened) use ($risks): array {
+                $inColumn = $risks->where('happened', (bool) $happened)->values();
+
+                return ['key' => $happened === 1 ? 'happened' : 'potential', 'label' => $label, 'count' => $inColumn->count(), 'items' => $inColumn->take(40)];
+            })
+            ->values()
+            ->all();
+    }
+
     #[Computed]
     public function risks(): LengthAwarePaginator
     {
@@ -360,14 +390,26 @@ new #[Title('titles.risks')] class extends Component {
     $filtersAreActive = $search !== '' || $project !== '' || $materialisedOnly || $unmitigated;
 @endphp
 
-<section class="@container/directory flex min-h-full w-full flex-1 flex-col gap-4 bg-white text-secondary-dark dark:bg-surface-0 dark:text-ink" aria-labelledby="risk-register-heading">
-    <x-ui.page-header
-        heading-id="risk-register-heading"
-        :title="__('common.risks')"
-        :count="$this->risks->total()"
-    >
-        <x-slot:filters>
-            <x-ui.input type="search" icon="magnifying-glass" :label="__('risks.search_risks')" :placeholder="__('risks.risk_impact_or_project')" wire:model.live.debounce.300ms="search" clearable />
+<x-desk.register
+    class="@container/directory"
+    heading-id="risk-register-heading"
+    :title="__('common.risks')"
+    :count="$this->risks->total()"
+    :view="$view === 'board' ? 'board' : 'list'"
+    :views="[
+        'list' => ['icon' => 'table', 'label' => __('desk.register.table')],
+        'board' => ['icon' => 'board', 'label' => __('desk.register.board')],
+    ]"
+>
+    <x-slot:actions>
+        @can('create', App\Models\Risk::class)
+            <button type="button" class="dk-btn dk-primary" wire:click="openCreateModal" data-test="create-risk-button"><x-desk.icon name="plus" />{{ __('risks.log_risk') }}</button>
+        @endcan
+    </x-slot:actions>
+    <x-slot:search>
+        <x-desk.register-search :label="__('risks.search_risks')" :placeholder="__('risks.risk_impact_or_project')" wire:model.live.debounce.300ms="search" />
+    </x-slot:search>
+    <x-slot:filters>
 
             <x-ui.header-filter-select :label="__('common.project')" wire:model.live="project" :value="$project">
                 <option value="">{{ __('common.all_projects') }}</option>
@@ -375,48 +417,14 @@ new #[Title('titles.risks')] class extends Component {
                     <option value="{{ $projectOption->id }}">{{ $projectOption->name }}</option>
                 @endforeach
             </x-ui.header-filter-select>
+
+            <button type="button" class="dk-btn dk-sm" wire:click="toggleMaterialisedOnly" aria-pressed="{{ $materialisedOnly ? 'true' : 'false' }}" data-test="materialised-toggle">
+                {{ trans_choice('risks.challenges_count', $this->materialisedCount, ['count' => $this->materialisedCount]) }}
+            </button>
+            <button type="button" class="dk-btn dk-sm" wire:click="toggleUnmitigated" aria-pressed="{{ $unmitigated ? 'true' : 'false' }}" data-test="unmitigated-toggle">
+                {{ trans_choice('risks.challenges_without_solution', $this->unmitigatedCount, ['count' => $this->unmitigatedCount]) }}
+            </button>
         </x-slot:filters>
-
-        <x-slot:actions>
-            @can('create', App\Models\Risk::class)<x-ui.button tone="primary" icon="plus" class="min-h-11 self-end touch-manipulation @sm/directory:min-h-10" wire:click="openCreateModal" data-test="create-risk-button">
-                {{ __('risks.log_risk') }}
-            </x-ui.button>@endcan
-        </x-slot:actions>
-
-        <x-slot:summary>
-            <div class="flex flex-wrap items-center gap-2">
-                <button
-                    type="button"
-                    wire:click="toggleMaterialisedOnly"
-                    aria-pressed="{{ $materialisedOnly ? 'true' : 'false' }}"
-                    data-test="materialised-toggle"
-                    @class([
-                        'inline-flex shrink-0 items-center gap-1.5 rounded-md border px-2.5 py-1.5 text-xs font-semibold transition-colors focus-visible:outline-2 focus-visible:outline-primary',
-                        'border-primary bg-primary dark:bg-ink dark:text-surface-0 dark:border-ink text-white' => $materialisedOnly,
-                        'border-secondary-light text-secondary-medium hover:bg-secondary-soft dark:text-ink-muted dark:hover:bg-surface-2' => ! $materialisedOnly,
-                    ])
-                >
-                    <flux:icon.exclamation-triangle variant="micro" class="size-3.5" />
-                    {{ trans_choice('risks.challenges_count', $this->materialisedCount, ['count' => $this->materialisedCount]) }}
-                </button>
-
-                <button
-                    type="button"
-                    wire:click="toggleUnmitigated"
-                    aria-pressed="{{ $unmitigated ? 'true' : 'false' }}"
-                    data-test="unmitigated-toggle"
-                    @class([
-                        'inline-flex shrink-0 items-center gap-1.5 rounded-md border px-2.5 py-1.5 text-xs font-semibold transition-colors focus-visible:outline-2 focus-visible:outline-primary',
-                        'border-status-warn/30 bg-status-warn-soft text-status-warn' => $unmitigated,
-                        'border-secondary-light text-secondary-medium hover:bg-secondary-soft dark:text-ink-muted dark:hover:bg-surface-2' => ! $unmitigated,
-                    ])
-                >
-                    <flux:icon.shield-exclamation variant="micro" class="size-3.5" />
-                    {{ trans_choice('risks.challenges_without_solution', $this->unmitigatedCount, ['count' => $this->unmitigatedCount]) }}
-                </button>
-            </div>
-        </x-slot:summary>
-    </x-ui.page-header>
 
     @php $chart = $this->projectRiskChart; $landscape = $this->riskLandscape; @endphp
     @if (count($chart['categories']) > 0)
@@ -459,6 +467,27 @@ new #[Title('titles.risks')] class extends Component {
         </div>
     @endif
 
+    @if ($view === 'board')
+        <x-desk.board data-test="risk-board">
+            @foreach ($this->boardColumns as $column)
+                <x-desk.board-column :label="$column['label']" :count="$column['count']" :key="$column['key']" wire:key="risk-column-{{ $column['key'] }}">
+                    @foreach ($column['items'] as $boardRisk)
+                        @can('update', $boardRisk)
+                            <x-desk.board-card :click="'openEditModal('.$boardRisk->id.')'" wire:key="risk-card-{{ $boardRisk->id }}" data-test="risk-board-card-{{ $boardRisk->id }}">
+                                <strong>{{ $boardRisk->name }}</strong>
+                                <span class="dk-is">{{ $boardRisk->project?->name }}</span>
+                            </x-desk.board-card>
+                        @else
+                            <x-desk.board-card wire:key="risk-card-{{ $boardRisk->id }}" data-test="risk-board-card-{{ $boardRisk->id }}">
+                                <strong>{{ $boardRisk->name }}</strong>
+                                <span class="dk-is">{{ $boardRisk->project?->name }}</span>
+                            </x-desk.board-card>
+                        @endcan
+                    @endforeach
+                </x-desk.board-column>
+            @endforeach
+        </x-desk.board>
+    @else
     <x-ui.panel :subtitle="trans_choice('risks.count_matching_risk', $this->risks->total(), ['count' => $this->risks->total()])">
         <x-slot:toolbar>
             @if ($filtersAreActive)
@@ -579,6 +608,7 @@ new #[Title('titles.risks')] class extends Component {
             <flux:pagination :paginator="$this->risks" class="text-secondary-medium! dark:text-ink-muted!" scroll-to="#risk-register-heading" />
         </x-slot:footer>
     </x-ui.panel>
+    @endif
 
     <x-ui.modal
         wire:model="showRiskModal"
@@ -634,4 +664,4 @@ new #[Title('titles.risks')] class extends Component {
         :confirm-label="__('risks.delete_risk')"
         confirm-test="confirm-delete-risk"
     />
-</section>
+</x-desk.register>

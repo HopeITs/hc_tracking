@@ -12,11 +12,12 @@ use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Collection;
 use Livewire\Attributes\Computed;
 use Livewire\Attributes\On;
+use Livewire\Attributes\Layout;
 use Livewire\Attributes\Title;
 use Livewire\Attributes\Url;
 use Livewire\Component;
 
-new #[Title('titles.notifications')] class extends Component {
+new #[Layout('layouts::desk'), Title('titles.notifications')] class extends Component {
     use ManagesInbox;
 
     private const PageSize = 25;
@@ -269,28 +270,26 @@ new #[Title('titles.notifications')] class extends Component {
     $dotBase = 'relative z-[1] size-2.5 rounded-full ring-4 ring-white transition-transform duration-300 dark:ring-surface-1';
 @endphp
 
-<section
+<x-desk.register
+    class="@container/directory"
+    heading-id="notifications-heading"
+    :title="__('notifications.inbox')"
+    :count="$this->unreadCount"
     x-data="notificationInbox"
     x-on:keydown.window="onKey($event)"
     x-on:inbox-undoable.window="showUndo($event.detail)"
-    class="@container/directory flex min-h-full w-full flex-1 flex-col gap-6 bg-white text-secondary-dark dark:bg-surface-0 dark:text-ink"
-    aria-labelledby="notifications-heading"
     data-notification-inbox
 >
-    <x-ui.page-header heading-id="notifications-heading" :title="__('notifications.inbox')" :count="$this->unreadCount">
-        <x-slot:filters>
-            <div class="@3xl:col-span-2 @6xl:col-span-3">
-                <x-ui.input type="search" icon="magnifying-glass" :label="__('notifications.search')" wire:model.live.debounce.300ms="search" clearable x-ref="search" data-inbox-search />
-            </div>
-        </x-slot:filters>
-
-        <x-slot:actions>
+    <x-slot:actions>
             <div class="flex flex-wrap items-center gap-2">
                 <x-ui.button tone="ghost" icon="cog-6-tooth" :href="route('notification-settings.edit')" wire:navigate :aria-label="__('notifications.settings_link')" :title="__('notifications.settings_link')" />
                 <x-ui.button tone="primary" icon="check-circle" wire:click="markAllRead" :disabled="$this->unreadCount === 0">{{ __('notifications.mark_all_read') }}</x-ui.button>
             </div>
         </x-slot:actions>
-    </x-ui.page-header>
+    <x-slot:search>
+        <x-desk.register-search :label="__('notifications.search')" wire:model.live.debounce.300ms="search" x-ref="search" data-inbox-search />
+    </x-slot:search>
+
 
     <div class="grid gap-8 @4xl/directory:grid-cols-[15rem_minmax(0,1fr)] @6xl/directory:grid-cols-[16.5rem_minmax(0,1fr)] @6xl/directory:gap-14">
         {{-- Rail: the brief, then every filter as one click. --}}
@@ -640,4 +639,4 @@ new #[Title('titles.notifications')] class extends Component {
             </dl>
         </div>
     </div>
-</section>
+</x-desk.register>

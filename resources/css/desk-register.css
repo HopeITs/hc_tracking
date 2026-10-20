@@ -1,0 +1,175 @@
+/*
+ * Registers (Tracking Desk stage 2): the frame around every full list
+ * (x-desk.register). desk.css is generated from the artifact, so the few
+ * rules the real pages need on top of it live here instead.
+ */
+@layer components {
+    .dk-reg-tools { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+    .dk-reg-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+    .dk-reg-h h1 { flex-wrap: wrap; }
+
+    /* A line of figures under the title ("12 reached · 3 missed"), in place of stat tiles. */
+    .dk-reg-figs { display: flex; flex-wrap: wrap; gap: 4px 14px; margin-top: 6px; font-size: 13.5px; color: var(--ink-3); }
+    .dk-reg-figs b { color: var(--ink); font-weight: 800; font-variant-numeric: tabular-nums; margin-inline-end: 4px; }
+    .dk-reg-figs .dk-bad b { color: var(--bad); }
+    .dk-reg-figs .dk-warn b { color: var(--warn); }
+    .dk-reg-figs .dk-good b { color: var(--good); }
+
+    /* The page's own sub-bar (group/sort/my tasks) under the filter bar. */
+    .dk-reg-sub { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px; }
+
+    /* The list and whatever the page puts around it, stacked. */
+    .dk-reg-body { display: flex; flex-direction: column; gap: 16px; min-width: 0; }
+
+    /* A toggle in the bar ("Only happened") reads as pressed. */
+    .dk-reg-bar .dk-btn[aria-pressed="true"] { background: var(--ink); border-color: var(--ink); color: var(--paper); }
+
+    /* Board cards and calendar chips are links here (desk.js used buttons). */
+    a.dk-bcard, a.dk-cchip, span.dk-cchip { display: block; text-decoration: none; color: inherit; }
+    a.dk-bcard { display: grid; }
+    button.dk-bcard { width: 100%; text-align: start; font: inherit; color: inherit; }
+    a.dk-cchip, span.dk-cchip { color: var(--active); }
+    .dk-bcard strong { font-weight: 700; }
+    .dk-regcal .dk-more { color: var(--ink-3); font-weight: 700; padding-inline: 4px; }
+
+    /* Filter pickers sit inline in the bar: the label is read by screen readers only. */
+    .dk-reg-bar [data-header-filter-select] { flex: 0 1 190px; min-width: 150px; }
+    @media (max-width: 720px) {
+        .dk-reg-bar [data-header-filter-select] { flex: 1 1 calc(50% - 4px); min-width: 0; }
+        .dk-reg-q { max-width: none; }
+    }
+    .dk-reg-bar [data-header-filter-select] > label { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+}
+
+/*
+ * Flux colours its buttons with utilities, so the bar's picker trigger is
+ * restyled in the utilities layer (as flux-overrides.css does), one class
+ * more specific than .dark .filter-picker so both themes follow the Desk.
+ */
+@layer utilities {
+    .dk-scope .dk-reg-bar .filter-picker [data-flux-button] {
+        min-height: 36px;
+        height: 36px;
+        border-radius: 10px;
+        border-color: var(--line-2);
+        background-color: var(--paper);
+        color: var(--ink);
+        font-size: 12.5px;
+        font-weight: 600;
+        padding-inline: 10px;
+    }
+
+    .dk-scope .dk-reg-bar .filter-picker [data-flux-button]:hover {
+        border-color: var(--ink-3);
+        background-color: var(--paper);
+    }
+
+    /*
+     * The page's own actions (x-ui.button / flux:button, the funding Filters
+     * trigger) read as the Desk's .dk-btn. x-ui.button tones are !important
+     * utilities, so these are too, one frame class more specific.
+     */
+    .dk-scope [data-desk-register-actions] [data-flux-button] {
+        height: 36px !important;
+        min-height: 36px !important;
+        border-radius: 9px !important;
+        padding-inline: 14px !important;
+        border: 1px solid var(--line-2) !important;
+        background: var(--paper) !important;
+        color: var(--ink) !important;
+        box-shadow: none !important;
+        font-size: 13.5px !important;
+        font-weight: 700 !important;
+    }
+
+    .dk-scope [data-desk-register-actions] [data-flux-button]:hover { background: var(--sunk) !important; }
+
+    .dk-scope [data-desk-register-actions] [data-flux-button][class*="bg-primary!"] {
+        border-color: var(--brand) !important;
+        background: var(--brand) !important;
+        color: var(--on-brand) !important;
+    }
+
+    .dk-scope [data-desk-register-actions] [data-flux-button][class*="bg-primary!"]:hover {
+        border-color: var(--brand-hover) !important;
+        background: var(--brand-hover) !important;
+    }
+
+    .dk-scope [data-desk-register-actions] [data-flux-button].w-10,
+    .dk-scope [data-desk-register-actions] [data-flux-button][class*="size-"] { width: 36px !important; padding-inline: 0 !important; }
+
+    /*
+     * The register's own content wears the Desk's surfaces (desk.js
+     * .tbl-wrap/.tbl, .bcol, .cday): paper on the Desk ground, hairline
+     * borders, 12px corners, no drop shadows, small uppercase headings.
+     * Scoped to [data-desk-register] so pages outside a register keep their
+     * look until their stage.
+     */
+    [data-desk-register] [data-panel],
+    [data-desk-register] [data-data-table] {
+        border: 1px solid var(--line);
+        border-radius: 12px;
+        background: var(--paper);
+        box-shadow: none;
+    }
+
+    [data-desk-register] [data-data-table] thead { background: var(--paper); }
+    [data-desk-register] [data-data-table] thead th {
+        font-size: 11.5px;
+        font-weight: 800;
+        letter-spacing: .04em;
+        text-transform: uppercase;
+        color: var(--ink-3);
+        border-bottom: 1px solid var(--line-2);
+    }
+    [lang="ar"] [data-desk-register] [data-data-table] thead th { letter-spacing: 0; font-size: 12px; }
+    [data-desk-register] [data-data-table] tbody > tr { border-color: var(--line); }
+    [data-desk-register] [data-data-table] tbody > tr:hover { background: var(--tint); }
+
+    [data-desk-register] .register {
+        --register-ground: var(--paper);
+        --register-ink: var(--ink);
+        --register-muted: var(--ink-3);
+        --color-board-line: var(--line);
+        --color-board-head: var(--tint);
+        border: 1px solid var(--line);
+        border-radius: 12px;
+        overflow: hidden;
+    }
+    [data-desk-register] .register-scroll { border-block: 0; }
+    [data-desk-register] .register thead th {
+        background: var(--paper);
+        font-size: 11.5px;
+        font-weight: 800;
+        letter-spacing: .04em;
+        text-transform: uppercase;
+        border-bottom-color: var(--line-2);
+    }
+    [lang="ar"] [data-desk-register] .register thead th { letter-spacing: 0; font-size: 12px; }
+
+    /* Figures read as type on the page, not as boxed tiles. */
+    [data-desk-register] [data-stat-tile] {
+        border: 0;
+        border-inline-start: 1px solid var(--line);
+        border-radius: 0;
+        background: none;
+        box-shadow: none;
+        padding-block: 4px;
+    }
+    [data-desk-register] [data-stat-tile]:hover { transform: none; box-shadow: none; }
+
+    /* The pages' own boards and calendars (tasks, milestones, projects, my calendar). */
+    [data-desk-register] [data-test^="task-board-column-"],
+    [data-desk-register] [data-test^="milestone-board-column-"] {
+        border: 0;
+        border-radius: 12px;
+        background: var(--sunk);
+    }
+    [data-desk-register] [data-test^="task-calendar-day-"],
+    [data-desk-register] [data-test^="milestone-calendar-day-"],
+    [data-desk-register] [data-test^="calendar-day-"] {
+        border-color: var(--line);
+        border-radius: 10px;
+        background: var(--paper);
+    }
+}

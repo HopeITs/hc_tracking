@@ -9,12 +9,13 @@ use App\Livewire\Concerns\Targets\NarrowsTargetFormOptions;
 use App\Livewire\Concerns\Targets\ReadsTargets;
 use App\Models\Indicator;
 use Illuminate\Support\Facades\Gate;
+use Livewire\Attributes\Layout;
 use Livewire\Attributes\Title;
 use Livewire\Attributes\Url;
 use Livewire\Component;
 use Livewire\WithPagination;
 
-new #[Title('titles.targets')] class extends Component {
+new #[Layout('layouts::desk'), Title('titles.targets')] class extends Component {
     use ChecksFinanceVisibility;
     use FiltersTargets;
     use ManagesTargetForm;
@@ -107,14 +108,21 @@ new #[Title('titles.targets')] class extends Component {
     $groups = $this->targets->groupBy(fn ($target) => $target->indicator->result_id);
 @endphp
 
-<section class="@container/directory admin-directory flex min-h-full w-full flex-1 flex-col gap-8 bg-white text-secondary-dark dark:bg-surface-0 dark:text-ink" aria-labelledby="target-directory-heading">
-    <x-ui.page-header
-        heading-id="target-directory-heading"
-        :title="__('common.targets')"
-        :count="$this->matchingCount"
-    >
-        <x-slot:filters>
-            <x-ui.input type="search" icon="magnifying-glass" :label="__('targets.search_targets')" :placeholder="__('common.indicator_name')" wire:model.live.debounce.300ms="search" clearable />
+<x-desk.register
+    class="@container/directory admin-directory"
+    heading-id="target-directory-heading"
+    :title="__('common.targets')"
+    :count="$this->matchingCount"
+>
+    <x-slot:actions>
+            @can('targets.create')<x-ui.button tone="primary" icon="plus" class="min-h-11 self-end touch-manipulation @sm/directory:min-h-10" wire:click="openCreateModal" data-test="create-target-button">
+                {{ __('targets.commit_target') }}
+            </x-ui.button>@endcan
+        </x-slot:actions>
+    <x-slot:search>
+        <x-desk.register-search :label="__('targets.search_targets')" :placeholder="__('common.indicator_name')" wire:model.live.debounce.300ms="search" />
+    </x-slot:search>
+    <x-slot:filters>
 
             <x-ui.header-filter-select :label="__('targets.committed_in')" wire:model.live="sourceType" :value="$sourceType">
                 <option value="">{{ __('targets.any_source') }}</option>
@@ -160,12 +168,6 @@ new #[Title('titles.targets')] class extends Component {
             </x-ui.header-filter-select>
         </x-slot:filters>
 
-        <x-slot:actions>
-            @can('targets.create')<x-ui.button tone="primary" icon="plus" class="min-h-11 self-end touch-manipulation @sm/directory:min-h-10" wire:click="openCreateModal" data-test="create-target-button">
-                {{ __('targets.commit_target') }}
-            </x-ui.button>@endcan
-        </x-slot:actions>
-    </x-ui.page-header>
 
     {{-- Pulse: the filtered portfolio as one sentence and one proportional bar. --}}
     @include('pages.targets._index-pulse')
@@ -183,4 +185,4 @@ new #[Title('titles.targets')] class extends Component {
         :confirm-label="__('targets.delete_target')"
         confirm-test="confirm-delete-target"
     />
-</section>
+</x-desk.register>

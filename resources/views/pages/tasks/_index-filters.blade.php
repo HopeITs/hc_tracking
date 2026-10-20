@@ -1,28 +1,9 @@
 {{--
-    What sits between the page header and the task views: the stat tiles (each
-    a quick filter), the "My Tasks" rail, and the view switcher with the
-    group/sort controls and the reset and "my tasks only" toggles. Included by
+    What sits between the register bar and the task views: the "My Tasks" rail,
+    then the list's group/sort controls and the "my tasks only" toggle. (The
+    view switch, filters and Clear live in the x-desk.register frame.) Included by
     ⚡index.blade.php, whose top PHP block defines $filtersAreActive.
 --}}
-@use('App\Enums\TaskStatus')
-    <div class="grid gap-3 @2xl/directory:grid-cols-2 @4xl/directory:grid-cols-3 @6xl/directory:grid-cols-5">
-        <button type="button" wire:click="clearFilters" data-test="task-stat-total" @class(['text-start transition-transform', 'scale-[0.98]' => ! $filtersAreActive])>
-            <x-ui.stat-tile :label="__('tasks.total_tasks')" :value="$this->taskStats['total']" icon="clipboard-document-check" />
-        </button>
-        <button type="button" wire:click="toggleStatusFilter('{{ TaskStatus::Done->value }}')" data-test="task-stat-done" @class(['text-start transition-transform', 'scale-[0.98] ring-2 ring-status-good rounded-xl' => $status === TaskStatus::Done->value])>
-            <x-ui.stat-tile :label="TaskStatus::Done->label()" :value="$this->taskStats['done']" icon="check-circle" tone="good" />
-        </button>
-        <button type="button" wire:click="toggleDueFilter('overdue')" data-test="task-stat-overdue" @class(['text-start transition-transform', 'scale-[0.98] ring-2 ring-status-critical rounded-xl' => $dueFilter === 'overdue'])>
-            <x-ui.stat-tile :label="__('tasks.overdue')" :value="$this->taskStats['overdue']" icon="exclamation-triangle" tone="critical" />
-        </button>
-        <button type="button" wire:click="toggleDueFilter('missed')" data-test="task-stat-missed" @class(['text-start transition-transform', 'scale-[0.98] ring-2 ring-status-critical rounded-xl' => $dueFilter === 'missed'])>
-            <x-ui.stat-tile :label="__('tasks.missed')" :value="$this->taskStats['missed']" icon="exclamation-circle" tone="critical" />
-        </button>
-        <button type="button" wire:click="toggleDueFilter('due_soon')" data-test="task-stat-due-soon" @class(['text-start transition-transform', 'scale-[0.98] ring-2 ring-status-warn rounded-xl' => $dueFilter === 'due_soon'])>
-            <x-ui.stat-tile :label="__('tasks.due_within_7_days')" :value="$this->taskStats['due_soon']" icon="clock" tone="warn" />
-        </button>
-    </div>
-
     <div class="flex flex-col gap-3 rounded-2xl border border-secondary-soft bg-secondary-soft/20 p-4 dark:border-line dark:bg-white/[0.03]" data-test="my-tasks-rail">
         <div class="flex items-center justify-between gap-3">
             <div class="flex items-center gap-2">
@@ -99,29 +80,8 @@
         @endif
     </div>
 
-    <div class="flex flex-wrap items-center justify-between gap-3">
-        <div class="inline-flex flex-wrap gap-1 rounded-lg border border-secondary-soft bg-secondary-soft/40 p-1 dark:border-line dark:bg-surface-2" role="group" aria-label="{{ __('tasks.view') }}">
-            @foreach ([
-                'list' => ['icon' => 'queue-list', 'label' => __('tasks.list_view')],
-                'board' => ['icon' => 'view-columns', 'label' => __('tasks.board_view')],
-                'calendar' => ['icon' => 'calendar-days', 'label' => __('tasks.calendar_view')],
-            ] as $viewOption => $viewMeta)
-                <button
-                    type="button"
-                    wire:click="$set('view', '{{ $viewOption }}')"
-                    aria-pressed="{{ $view === $viewOption ? 'true' : 'false' }}"
-                    data-test="task-view-{{ $viewOption }}"
-                    @class([
-                        'inline-flex min-h-9 cursor-pointer items-center gap-1.5 rounded-md px-3 text-sm font-semibold transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary',
-                        'bg-white text-secondary-dark shadow-sm dark:bg-surface-3 dark:shadow-raised dark:text-ink' => $view === $viewOption,
-                        'text-secondary-medium hover:text-secondary-dark dark:text-ink-muted dark:hover:text-ink' => $view !== $viewOption,
-                    ])
-                >
-                    <flux:icon :name="$viewMeta['icon']" variant="micro" class="size-4" aria-hidden="true" />
-                    {{ $viewMeta['label'] }}
-                </button>
-            @endforeach
-        </div>
+    <div class="dk-reg-sub">
+        <span></span>
 
         <div class="flex shrink-0 flex-wrap items-center gap-2">
             @if ($view === 'list')
@@ -148,10 +108,6 @@
                 >
                     <flux:icon :name="$sortDirection === 'asc' ? 'bars-arrow-up' : 'bars-arrow-down'" variant="micro" class="size-4" aria-hidden="true" />
                 </x-ui.button>
-            @endif
-
-            @if ($filtersAreActive)
-                <flux:button size="sm" variant="ghost" class="self-end" wire:click="clearFilters">{{ __('common.reset_filters') }}</flux:button>
             @endif
 
             <button

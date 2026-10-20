@@ -114,3 +114,23 @@ test('the page renders in Arabic from the lang files', function () {
         ->assertSee(__('reporting_duties.state_open', [], 'ar'))
         ->assertSee(__('donor_reports.mark_submitted', [], 'ar'));
 });
+
+test('the board splits my duties into late, to submit and submitted, and the calendar shows due dates', function () {
+    $late = Activity::withoutRecording(fn () => DonorReport::factory()->create(['donor_proposal_id' => $this->agreement->id, 'title' => 'Late financial', 'type' => 'financial', 'due_on' => '2026-11-01', 'responsible_employee_id' => $this->employeeId]));
+    $sent = Activity::withoutRecording(fn () => DonorReport::factory()->submitted()->create(['donor_proposal_id' => $this->agreement->id, 'title' => 'Sent report', 'due_on' => '2026-11-10', 'responsible_employee_id' => $this->employeeId]));
+
+    $page = Livewire::actingAs($this->responsible)->test('pages::reporting-duties.index')
+        ->set('state', 'all')
+        ->set('view', 'board')
+        ->assertSeeHtml('data-test="duty-board-card-'.$this->mine->id.'"')
+        ->assertDontSee('Someone else report');
+
+    $columns = collect($page->instance()->boardColumns)->keyBy('key');
+    expect($columns['late']['items']->pluck('id')->all())->toBe([$late->id])
+        ->and($columns['open']['items']->pluck('id')->all())->toBe([$this->mine->id])
+        ->and($columns['submitted']['items']->pluck('id')->all())->toBe([$sent->id]);
+
+    $page->set('view', 'calendar')
+        ->assertSeeHtml('data-desk-calendar="2026-11"')
+        ->assertSeeHtml('href="'.route('donor-reports.show', $this->mine).'"');
+});

@@ -14,12 +14,13 @@ use App\Models\Donor;
 use Flux\Flux;
 use Illuminate\Support\Facades\Gate;
 use Livewire\Attributes\Locked;
+use Livewire\Attributes\Layout;
 use Livewire\Attributes\Title;
 use Livewire\Attributes\Url;
 use Livewire\Component;
 use Livewire\WithPagination;
 
-new #[Title('titles.donors')] class extends Component {
+new #[Layout('layouts::desk'), Title('titles.donors')] class extends Component {
     use ChartsDonorPortfolio;
     use ChecksFinanceVisibility;
     use ExportsDonorRegister;
@@ -265,17 +266,16 @@ new #[Title('titles.donors')] class extends Component {
     ]));
 @endphp
 
-<section
-    class="@container/directory flex min-h-full w-full flex-1 flex-col gap-4 bg-white text-secondary-dark dark:bg-surface-0 dark:text-ink"
-    aria-labelledby="donor-directory-heading"
+<x-desk.register
+    class="@container/directory"
+    heading-id="donor-directory-heading"
+    :title="__('common.donors')"
+    :count="$total"
     x-data="{ focus: null, lit(id) { return this.focus === null || this.focus === id } }"
+    :view="$view"
+    :views="[ 'table' => ['icon' => 'table', 'label' => __('finance_tables.view_table')], 'overview' => ['icon' => 'chart', 'label' => __('finance_tables.view_overview')] ]"
 >
-    <x-ui.page-header
-        heading-id="donor-directory-heading"
-        :title="__('common.donors')"
-        :count="$total"
-    >
-        <x-slot:actions>
+    <x-slot:actions>
             <div class="flex flex-wrap items-center justify-end gap-2">
                 @if ($this->hasAnyDonor)
                     <x-funding.filters :active="$activeFilterCount" :results="$total">
@@ -314,16 +314,6 @@ new #[Title('titles.donors')] class extends Component {
                     </x-funding.filters>
                 @endif
 
-                <x-ui.view-toggle
-                    :label="__('finance_tables.view_label')"
-                    wire-model="view"
-                    :active="$this->view"
-                    :options="[
-                        ['key' => 'table', 'label' => __('finance_tables.view_table'), 'icon' => 'table-cells'],
-                        ['key' => 'overview', 'label' => __('finance_tables.view_overview'), 'icon' => 'chart-bar'],
-                    ]"
-                />
-
                 @if ($this->hasAnyDonor)
                     <x-ui.button tone="action" icon="arrow-down-tray" wire:click="exportCsv" wire:loading.attr="disabled" wire:target="exportCsv" data-test="export-csv">
                         {{ __('finance_tables.export_csv') }}
@@ -337,7 +327,7 @@ new #[Title('titles.donors')] class extends Component {
                 @endcan
             </div>
         </x-slot:actions>
-    </x-ui.page-header>
+
 
     @if (! $this->hasAnyDonor)
         <x-ui.empty-state icon="building-library" :heading="__('donors.no_donors_yet')" :body="__('donors.add_the_first_donor')" />
@@ -360,4 +350,4 @@ new #[Title('titles.donors')] class extends Component {
         :confirm-label="__('donors.delete_donor')"
         confirm-test="confirm-delete-donor"
     />
-</section>
+</x-desk.register>

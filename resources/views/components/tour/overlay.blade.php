@@ -64,9 +64,9 @@
     $steps = [
         $welcome,
         ...$blockSteps->where('key', "{$routeKey}-detail")->all(),
-        $step('page', ['[data-page-header] [data-flux-heading]'], sources: ['page', '']),
-        $step('filters', ['[data-page-header-filters]'], sources: ['page', '']),
-        $step('actions', ['[data-page-header-actions]'], sources: ['page', '']),
+        $step('page', ['[data-desk-register] .dk-reg-h h1', '[data-page-header] [data-flux-heading]'], sources: ['page', '']),
+        $step('filters', ['[data-desk-register-bar]', '[data-page-header-filters]'], sources: ['page', '']),
+        $step('actions', ['[data-desk-register-actions]', '[data-page-header-actions]'], sources: ['page', '']),
         ...$extraSteps->all(),
         ...$blockSteps->where('key', '!=', "{$routeKey}-detail")->all(),
     ];

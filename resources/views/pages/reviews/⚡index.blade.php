@@ -3,11 +3,12 @@
 use App\Models\ProposalReviewer;
 use Illuminate\Support\Collection;
 use Livewire\Attributes\Computed;
+use Livewire\Attributes\Layout;
 use Livewire\Attributes\Title;
 use Livewire\Attributes\Url;
 use Livewire\Component;
 
-new #[Title('titles.my_reviews')] class extends Component {
+new #[Layout('layouts::desk'), Title('titles.my_reviews')] class extends Component {
     #[Url(except: 'awaiting')]
     public string $state = 'awaiting';
 
@@ -39,15 +40,20 @@ new #[Title('titles.my_reviews')] class extends Component {
 };
 ?>
 
-<section class="@container/directory flex min-h-full w-full flex-1 flex-col gap-5 bg-white text-secondary-dark dark:bg-surface-0 dark:text-ink" aria-labelledby="my-reviews-heading" data-my-reviews>
-    <x-ui.page-header heading-id="my-reviews-heading" :title="__('titles.my_reviews')" :count="$this->reviews->count()">
-        <x-slot:filters>
+<x-desk.register
+    class="@container/directory"
+    heading-id="my-reviews-heading"
+    :title="__('titles.my_reviews')"
+    :count="$this->reviews->count()"
+    data-my-reviews
+>
+    <x-slot:filters>
             <x-ui.header-filter-select :label="__('common.state')" wire:model.live="state" :value="$state === 'all' ? 'all' : 'awaiting'">
                 <option value="awaiting">{{ __('proposals.my_reviews_awaiting') }}</option>
                 <option value="all">{{ __('proposals.my_reviews_all') }}</option>
             </x-ui.header-filter-select>
         </x-slot:filters>
-    </x-ui.page-header>
+
 
     @if ($this->reviews->isEmpty())
         <x-ui.empty-state
@@ -104,4 +110,4 @@ new #[Title('titles.my_reviews')] class extends Component {
             @endforeach
         </x-ui.data-table>
     @endif
-</section>
+</x-desk.register>

@@ -12,11 +12,12 @@ use Carbon\CarbonImmutable;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Collection;
 use Livewire\Attributes\Computed;
+use Livewire\Attributes\Layout;
 use Livewire\Attributes\Title;
 use Livewire\Attributes\Url;
 use Livewire\Component;
 
-new #[Title('titles.monthly_reports')] class extends Component {
+new #[Layout('layouts::desk'), Title('titles.monthly_reports')] class extends Component {
     #[Url(except: '')]
     public string $tab = '';
 
@@ -232,12 +233,19 @@ new #[Title('titles.monthly_reports')] class extends Component {
     $filtersAreActive = $city !== '' || $project !== '' || $month !== '' || $status !== 'submitted';
 @endphp
 
-<section class="@container/directory flex min-h-full w-full flex-1 flex-col gap-6 bg-white text-secondary-dark dark:bg-surface-0 dark:text-ink" aria-labelledby="monthly-reports-heading" data-monthly-reports-intro>
-    <x-ui.page-header
-        :title="__('titles.monthly_reports')"
-        heading-id="monthly-reports-heading"
-        :count="$tab === 'validate' ? $this->filteredQueue->count() : null"
-    >
+<x-desk.register
+    class="@container/directory"
+    heading-id="monthly-reports-heading"
+    :title="__('titles.monthly_reports')"
+    :count="$tab === 'validate' ? $this->filteredQueue->count() : null"
+    data-monthly-reports-intro
+    :view="$tab"
+    view-model="tab"
+    :views="[
+        'mine' => ['icon' => 'file', 'label' => __('monthly_reports.tab_mine')],
+        'validate' => ['icon' => 'check', 'label' => __('monthly_reports.tab_validate')],
+    ]"
+>
         @if ($tab === 'validate')
             <x-slot:filters>
                 <x-ui.header-filter-select :label="__('common.city')" wire:model.live="city" :value="$city">
@@ -266,25 +274,17 @@ new #[Title('titles.monthly_reports')] class extends Component {
                     <option value="validated">{{ MonthlyReportStatus::Validated->label() }}</option>
                     <option value="all">{{ __('monthly_reports.status_all') }}</option>
                 </x-ui.header-filter-select>
+
+                @if ($filtersAreActive)
+                    <button type="button" class="dk-btn dk-ghost dk-sm" wire:click="clearFilters"><x-desk.icon name="x" />{{ __('desk.register.clear') }}</button>
+                @endif
             </x-slot:filters>
         @endif
 
-        <x-slot:actions>
-            <x-ui.view-toggle
-                wire-model="tab"
-                :active="$tab"
-                :label="__('monthly_reports.tabs_label')"
-                :options="[
-                    ['key' => 'mine', 'label' => __('monthly_reports.tab_mine'), 'icon' => 'document-text'],
-                    ['key' => 'validate', 'label' => __('monthly_reports.tab_validate'), 'icon' => 'check-badge'],
-                ]"
-            />
-        </x-slot:actions>
-    </x-ui.page-header>
 
     @if ($tab === 'validate')
         @include('pages.monthly-reports._index-validate')
     @else
         @include('pages.monthly-reports._index-mine')
     @endif
-</section>
+</x-desk.register>

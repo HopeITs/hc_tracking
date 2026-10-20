@@ -43,3 +43,6 @@ Money data (amounts, budgets, agreements, transfers, donor reports, bank data, A
 
 ## Split pages into partials and components
 Page-only sections go in `_<index|show>-<section>` partials; markup used by two or more pages goes in an `x-` component with props; a page file stays ≤ 750 lines.
+
+## Registers keep the old page logic inside x-desk.register (supersedes page-header rule for index pages)
+User decision 2026-10-20 (Desk stage 2, option A): every list/index page renders inside <x-desk.register> on layouts::desk (back link to the Desk, title + count, Table/Board/Calendar switch via `views`/`view-model`, search via x-desk.register-search, filters as x-ui.header-filter-select in the bar, actions slot). The page keeps its Livewire logic, drawers, modals and data-test hooks. Stat tiles become the `figures` line; quick-filter tiles become a bar filter. Frame attributes are data-desk-register* (data-register belongs to the finance table). x-ui.page-header stays only on pages not yet moved (Settings/Story stages).

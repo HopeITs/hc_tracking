@@ -10,16 +10,18 @@ use App\Livewire\Concerns\Proposals\DeletesProposals;
 use App\Livewire\Concerns\Proposals\ExportsProposalRegister;
 use App\Livewire\Concerns\Proposals\ManagesProposalForm;
 use App\Livewire\Concerns\Proposals\ManagesProposalStatus;
+use App\Livewire\Concerns\Proposals\ReadsProposalBoard;
 use App\Livewire\Concerns\Proposals\ReadsProposalRegister;
 use App\Models\Proposal;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Number;
+use Livewire\Attributes\Layout;
 use Livewire\Attributes\Title;
 use Livewire\Attributes\Url;
 use Livewire\Component;
 use Livewire\WithPagination;
 
-new #[Title('titles.proposals')] class extends Component {
+new #[Layout('layouts::desk'), Title('titles.proposals')] class extends Component {
     use ChartsProposalPipeline;
     use ChecksFinanceVisibility;
     use DeletesProposals;
@@ -27,6 +29,7 @@ new #[Title('titles.proposals')] class extends Component {
     use FiltersFinanceRegister;
     use ManagesProposalForm;
     use ManagesProposalStatus;
+    use ReadsProposalBoard;
     use ReadsProposalRegister;
     use WithPagination;
 
@@ -81,6 +84,16 @@ new #[Title('titles.proposals')] class extends Component {
                 $this->openCreateModal($projectId);
             }
         }
+    }
+
+    /**
+     * Table, Board, Calendar and Overview (SwitchesFundingView).
+     *
+     * @return list<string>
+     */
+    protected function fundingViews(): array
+    {
+        return ['table', 'board', 'calendar', 'overview'];
     }
 
     protected function proposalSaved(Proposal $proposal, bool $wasCreated): void
@@ -207,13 +220,20 @@ new #[Title('titles.proposals')] class extends Component {
     ]));
 @endphp
 
-<section class="@container/directory flex min-h-full w-full flex-1 flex-col gap-4 bg-white text-secondary-dark dark:bg-surface-0 dark:text-ink" aria-labelledby="proposal-pipeline-heading">
-    <x-ui.page-header
-        heading-id="proposal-pipeline-heading"
-        :title="__('common.proposals')"
-        :count="$total"
-    >
-        <x-slot:actions>
+<x-desk.register
+    class="@container/directory"
+    heading-id="proposal-pipeline-heading"
+    :title="__('common.proposals')"
+    :count="$total"
+    :view="$view"
+    :views="[
+        'table' => ['icon' => 'table', 'label' => __('desk.register.table')],
+        'board' => ['icon' => 'board', 'label' => __('desk.register.board')],
+        'calendar' => ['icon' => 'cal', 'label' => __('desk.register.calendar')],
+        'overview' => ['icon' => 'chart', 'label' => __('finance_tables.view_overview')],
+    ]"
+>
+    <x-slot:actions>
             <div class="flex flex-wrap items-center justify-end gap-2">
                 @if ($this->hasAnyProposal)
                     <x-funding.filters :active="$activeFilterCount" :results="$total">
@@ -262,16 +282,6 @@ new #[Title('titles.proposals')] class extends Component {
                     </x-funding.filters>
                 @endif
 
-                <x-ui.view-toggle
-                    :label="__('finance_tables.view_label')"
-                    wire-model="view"
-                    :active="$this->view"
-                    :options="[
-                        ['key' => 'table', 'label' => __('finance_tables.view_table'), 'icon' => 'table-cells'],
-                        ['key' => 'overview', 'label' => __('finance_tables.view_overview'), 'icon' => 'chart-bar'],
-                    ]"
-                />
-
                 @if ($this->hasAnyProposal)
                     <x-ui.button tone="action" icon="arrow-down-tray" wire:click="exportCsv" wire:loading.attr="disabled" wire:target="exportCsv" data-test="export-csv">
                         {{ __('finance_tables.export_csv') }}
@@ -285,12 +295,16 @@ new #[Title('titles.proposals')] class extends Component {
                 @endcan
             </div>
         </x-slot:actions>
-    </x-ui.page-header>
+
 
     @if (! $this->hasAnyProposal)
         <x-ui.empty-state icon="document-text" :heading="__('proposals.no_proposals_yet')" :body="__('proposals.add_the_first_proposal_to_open_the_pipeline')" />
     @elseif ($showsOverview)
         @include('pages.proposals._overview')
+    @elseif ($view === 'board')
+        @include('pages.proposals._index-board')
+    @elseif ($view === 'calendar')
+        <x-desk.month-calendar :month="$this->calendarMonthStart()->toDateString()" :items="$this->calendarItems" />
     @elseif ($this->rows->isEmpty())
         <x-ui.empty-state icon="document-text" :heading="__('proposals.no_matching_proposals')" :body="__('common.change_the_search_or_filters_and_try_again')" />
     @else
@@ -311,4 +325,4 @@ new #[Title('titles.proposals')] class extends Component {
         :confirm-label="__('proposals.delete_proposal')"
         confirm-test="confirm-delete-proposal"
     />
-</section>
+</x-desk.register>

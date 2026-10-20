@@ -6,21 +6,24 @@ use App\Livewire\Concerns\ManagesTransferForm;
 use App\Livewire\Concerns\Transfers\ExportsTransferRegister;
 use App\Livewire\Concerns\Transfers\FiltersTransferRegister;
 use App\Livewire\Concerns\Transfers\PresentsTransferRegister;
+use App\Livewire\Concerns\Transfers\ReadsTransferBoard;
 use App\Livewire\Concerns\Transfers\ReadsTransferLedger;
 use App\Livewire\Concerns\Transfers\ReadsTransferRegister;
 use App\Models\DonorProposal;
 use App\Models\TransfersTracking;
+use Livewire\Attributes\Layout;
 use Livewire\Attributes\Title;
 use Livewire\Attributes\Url;
 use Livewire\Component;
 use Livewire\WithPagination;
 
-new #[Title('titles.transfers')] class extends Component {
+new #[Layout('layouts::desk'), Title('titles.transfers')] class extends Component {
     use ExportsTransferRegister;
     use FiltersFinanceRegister;
     use FiltersTransferRegister;
     use ManagesTransferForm;
     use PresentsTransferRegister;
+    use ReadsTransferBoard;
     use ReadsTransferLedger;
     use ReadsTransferRegister;
     use WithPagination;
@@ -114,6 +117,16 @@ new #[Title('titles.transfers')] class extends Component {
      */
     #[Url(as: 'edit', except: '')]
     public string $editTransfer = '';
+
+    /**
+     * Table, Board, Calendar and Overview (SwitchesFundingView).
+     *
+     * @return list<string>
+     */
+    protected function fundingViews(): array
+    {
+        return ['table', 'board', 'calendar', 'overview'];
+    }
 
     /**
      * Everything here arrives from the URL, so a hand-typed value would
@@ -267,16 +280,20 @@ new #[Title('titles.transfers')] class extends Component {
     ];
 @endphp
 
-<section
-    class="@container/ladder flex min-h-full w-full flex-1 flex-col gap-6 bg-white text-secondary-dark dark:bg-surface-0 dark:text-ink"
-    aria-labelledby="transfer-ladder-heading"
+<x-desk.register
+    class="@container/ladder"
+    heading-id="transfer-ladder-heading"
+    :title="__('common.transfers')"
+    :count="$total"
+    :view="$view"
+    :views="[
+        'table' => ['icon' => 'table', 'label' => __('desk.register.table')],
+        'board' => ['icon' => 'board', 'label' => __('desk.register.board')],
+        'calendar' => ['icon' => 'cal', 'label' => __('desk.register.calendar')],
+        'overview' => ['icon' => 'chart', 'label' => __('finance_tables.view_overview')],
+    ]"
 >
-    <x-ui.page-header
-        heading-id="transfer-ladder-heading"
-        :title="__('common.transfers')"
-        :count="$total"
-    >
-        <x-slot:actions>
+    <x-slot:actions>
             <div class="flex flex-wrap items-center justify-end gap-2">
                 @if ($this->hasAnyTransfer)
                     <x-funding.filters :active="$activeFilterCount" :results="$total">
@@ -335,16 +352,6 @@ new #[Title('titles.transfers')] class extends Component {
                     </x-funding.filters>
                 @endif
 
-                <x-ui.view-toggle
-                    :label="__('finance_tables.view_label')"
-                    wire-model="view"
-                    :active="$this->view"
-                    :options="[
-                        ['key' => 'table', 'label' => __('finance_tables.view_table'), 'icon' => 'table-cells'],
-                        ['key' => 'overview', 'label' => __('finance_tables.view_overview'), 'icon' => 'chart-bar'],
-                    ]"
-                />
-
                 @if ($this->hasAnyTransfer)
                     <x-ui.button tone="action" icon="arrow-down-tray" wire:click="exportCsv" wire:loading.attr="disabled" wire:target="exportCsv" data-test="export-csv">
                         {{ __('finance_tables.export_csv') }}
@@ -358,7 +365,7 @@ new #[Title('titles.transfers')] class extends Component {
                 @endcan
             </div>
         </x-slot:actions>
-    </x-ui.page-header>
+
 
     @if (! $this->hasAnyTransfer)
         <x-ui.empty-state
@@ -369,6 +376,10 @@ new #[Title('titles.transfers')] class extends Component {
         />
     @elseif ($showsOverview)
         @include('pages.transfers._overview')
+    @elseif ($view === 'board')
+        @include('pages.transfers._index-board')
+    @elseif ($view === 'calendar')
+        <x-desk.month-calendar :month="$this->calendarMonthStart()->toDateString()" :items="$this->calendarItems" />
     @elseif ($this->rows->isEmpty())
         <x-ui.empty-state
             class="rtl:[&_svg]:-scale-x-100"
@@ -387,4 +398,4 @@ new #[Title('titles.transfers')] class extends Component {
         :account-options="$showTransferModal ? $this->accountOptions : []"
         :confirming-delete="$confirmingTransferDelete"
     />
-</section>
+</x-desk.register>

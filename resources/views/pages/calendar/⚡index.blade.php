@@ -13,11 +13,12 @@ use App\Livewire\Concerns\NavigatesCalendarPeriods;
 use App\Models\Project;
 use Illuminate\Database\Eloquent\Collection;
 use Livewire\Attributes\Computed;
+use Livewire\Attributes\Layout;
 use Livewire\Attributes\Title;
 use Livewire\Attributes\Url;
 use Livewire\Component;
 
-new #[Title('titles.calendar')] class extends Component {
+new #[Layout('layouts::desk'), Title('titles.calendar')] class extends Component {
     use BuildsCalendarGrid;
     use ChecksFinanceVisibility;
     use FiltersCalendarTypes;
@@ -147,8 +148,12 @@ new #[Title('titles.calendar')] class extends Component {
     };
 @endphp
 
-<section class="admin-directory @container/directory flex min-h-full w-full flex-1 flex-col gap-5 bg-white text-secondary-dark dark:bg-surface-0 dark:text-ink" aria-labelledby="calendar-heading">
-    <x-ui.page-header heading-id="calendar-heading" :title="__('common.my_calendar')" />
+<x-desk.register
+    class="admin-directory @container/directory"
+    heading-id="calendar-heading"
+    :title="__('common.my_calendar')"
+>
+
 
     @include('pages.calendar._index-toolbar')
 
@@ -216,4 +221,4 @@ new #[Title('titles.calendar')] class extends Component {
     @include('pages.calendar._index-task-modal')
 
     @include('pages.calendar._index-day-modal')
-</section>
+</x-desk.register>

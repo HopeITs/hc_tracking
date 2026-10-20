@@ -9,6 +9,7 @@ use App\Livewire\Concerns\ManagesTransferForm;
 use App\Livewire\Concerns\Transfers\ExportsTransferRegister;
 use App\Livewire\Concerns\Transfers\FiltersTransferRegister;
 use App\Livewire\Concerns\Transfers\PresentsTransferRegister;
+use App\Livewire\Concerns\Transfers\ReadsTransferBoard;
 use App\Livewire\Concerns\Transfers\ReadsTransferLedger;
 use App\Livewire\Concerns\Transfers\ReadsTransferRegister;
 use Livewire\Component;
@@ -29,6 +30,7 @@ abstract class TransfersIndexPageHost extends Component
     use FiltersTransferRegister;
     use ManagesTransferForm;
     use PresentsTransferRegister;
+    use ReadsTransferBoard;
     use ReadsTransferLedger;
     use ReadsTransferRegister;
     use WithPagination;
