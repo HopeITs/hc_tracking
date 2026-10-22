@@ -170,7 +170,10 @@ new #[Layout('layouts::desk'), Title('titles.dashboard')] class extends Componen
         @foreach ($layout as $i => $entry)
             <livewire:is :component="'desk.panels.'.$entry['panel']" :size="$entry['size']" :index="$i" :total="count($layout)" :wire:key="'panel-'.$entry['panel']" />
         @endforeach
+    </div>
 
+    {{-- Outside the dense grid so it can never be backfilled into a gap: always the last card. --}}
+    <div class="dk-grid dk-grid-tail">
         <button type="button" class="dk-addtile" x-on:click="$dispatch('dk-customize-open')" data-desk-add>
             <x-desk.icon name="plus" />
             <span>{{ __('desk.add_panel') }}</span>
