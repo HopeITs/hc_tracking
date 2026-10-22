@@ -38,11 +38,15 @@ return new class extends Migration
         });
     }
 
+    /**
+     * The foreign key goes first: MySQL and MariaDB refuse to drop the unique
+     * index while the key still uses it (error 1553).
+     */
     public function down(): void
     {
         Schema::table('transfers_tracking', function (Blueprint $table): void {
-            $table->dropUnique('transfers_tracking_installment_id_unique');
             $table->dropForeign('transfers_tracking_installment_id_foreign');
+            $table->dropUnique('transfers_tracking_installment_id_unique');
             $table->dropColumn(['source', 'installment_id', 'arrival_date']);
         });
     }
