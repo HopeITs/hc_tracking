@@ -135,7 +135,7 @@ new class extends Component {
     $stages = __('desk.stages');
 @endphp
 
-<x-desk.panel id="projects" register="projects.index" :size="$size" :index="$index" :total="$total" :count="$list->count()">
+<x-desk.panel id="projects" :register="$shownLens === 'dates' ? 'timeline.index' : 'projects.index'" :size="$size" :index="$index" :total="$total" :count="$list->count()">
     <x-slot:tools>
         <div class="dk-seg" role="group">
             @foreach ($lenses as $key)

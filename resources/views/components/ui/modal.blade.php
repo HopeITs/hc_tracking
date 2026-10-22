@@ -24,7 +24,7 @@
      * the user leaves.
      *
      * By default it is a Tracking Desk side sheet (Flux's flyout behaviour with the bare variant, so
-     * no physical ml-auto/rtl:mr-auto classes; forms.css docks it to the inline-end edge
+     * no physical margin classes; forms.css docks it to the inline-end edge
      * with logical margins: right in LTR, left in RTL; width by size in forms.css).
      * `:sheet="false"` keeps the small centered dialog that confirmations use.
      */

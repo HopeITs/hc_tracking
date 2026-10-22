@@ -92,6 +92,7 @@ return [
     'module' => 'الوحدة',
     'all_modules' => 'كل الوحدات',
     'happened' => 'حدث',
+    'risk_cell' => 'الاحتمال :likelihood، الشدة :severity: :count',
     'final_report' => 'التقرير النهائي',
     'weight' => 'الوزن',
     'internal' => 'داخلي',

@@ -309,14 +309,17 @@ class PlanIndicator extends Model implements TracksActivity
      * A target whose approved rows carry no denominator is left out and
      * counted by pooledExcludedCountSql(). pooledRatio() is the PHP twin.
      *
+     * It aggregates the columns pooledTermsSelectSql() adds, over a derived
+     * table of one row per target: MySQL's ONLY_FULL_GROUP_BY rejects the
+     * correlated per-target subqueries inside a grouped aggregate.
+     *
      * @return Expression<literal-string&non-falsy-string>
      */
-    public static function pooledRatioSql(CarbonImmutable $from, CarbonImmutable $to): Expression
+    public static function pooledRatioSql(): Expression
     {
-        [$numerator, $denominator] = self::pooledTermsSql($from, $to);
         $percentage = IndicatorMeasure::Percentage->value;
 
-        return new Expression("(sum(case when {$denominator} > 0 then {$numerator} end) / nullif(sum(case when {$denominator} > 0 then {$denominator} end), 0) * (case when max(".self::measureSql().") = '{$percentage}' then 100 else 1 end))");
+        return new Expression("(sum(case when pooled_denominator > 0 then pooled_numerator end) / nullif(sum(case when pooled_denominator > 0 then pooled_denominator end), 0) * (case when max(pooled_measure) = '{$percentage}' then 100 else 1 end))");
     }
 
     /**
@@ -325,11 +328,23 @@ class PlanIndicator extends Model implements TracksActivity
      *
      * @return Expression<literal-string&non-falsy-string>
      */
-    public static function pooledExcludedCountSql(CarbonImmutable $from, CarbonImmutable $to): Expression
+    public static function pooledExcludedCountSql(): Expression
     {
-        [, $denominator, $approved] = self::pooledTermsSql($from, $to);
+        return new Expression('coalesce(sum(case when pooled_denominator is null and pooled_approved = 1 then 1 else 0 end), 0)');
+    }
 
-        return new Expression("coalesce(sum(case when {$denominator} is null and exists(select 1 from reports r where {$approved}) then 1 else 0 end), 0)");
+    /**
+     * The per-target terms pooledRatioSql() and pooledExcludedCountSql()
+     * aggregate, as select columns on a `plan_indicators` query:
+     * pooled_numerator, pooled_denominator, pooled_approved, pooled_measure.
+     *
+     * @return Expression<literal-string&non-falsy-string>
+     */
+    public static function pooledTermsSelectSql(CarbonImmutable $from, CarbonImmutable $to): Expression
+    {
+        [$numerator, $denominator, $approved] = self::pooledTermsSql($from, $to);
+
+        return new Expression("{$numerator} as pooled_numerator, {$denominator} as pooled_denominator, exists(select 1 from reports r where {$approved}) as pooled_approved, ".self::measureSql().' as pooled_measure');
     }
 
     /**

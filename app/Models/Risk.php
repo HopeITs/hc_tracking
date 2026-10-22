@@ -19,11 +19,13 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
  * @property string $name
  * @property int $project_id
  * @property bool $happened
+ * @property int|null $likelihood
+ * @property int|null $severity
  * @property string|null $solution
  * @property CarbonImmutable|null $created_at
  * @property CarbonImmutable|null $updated_at
  */
-#[Fillable(['impact', 'name', 'project_id', 'happened', 'solution'])]
+#[Fillable(['impact', 'name', 'project_id', 'happened', 'likelihood', 'severity', 'solution'])]
 class Risk extends Model implements TracksActivity
 {
     /** @use HasFactory<RiskFactory> */
@@ -40,6 +42,14 @@ class Risk extends Model implements TracksActivity
     }
 
     /**
+     * Likelihood × severity (1–9) for the heat map, or null until both are rated.
+     */
+    public function heatScore(): ?int
+    {
+        return $this->likelihood === null || $this->severity === null ? null : $this->likelihood * $this->severity;
+    }
+
+    /**
      * Get the attributes that should be cast.
      *
      * @return array<string, string>
@@ -48,6 +58,8 @@ class Risk extends Model implements TracksActivity
     {
         return [
             'happened' => 'boolean',
+            'likelihood' => 'integer',
+            'severity' => 'integer',
         ];
     }
 
@@ -71,7 +83,7 @@ class Risk extends Model implements TracksActivity
      */
     public function activityEvents(): array
     {
-        return ['happened' => 'happened', 'name' => 'updated', 'impact' => 'updated', 'solution' => 'updated'];
+        return ['happened' => 'happened', 'name' => 'updated', 'impact' => 'updated', 'likelihood' => 'updated', 'severity' => 'updated', 'solution' => 'updated'];
     }
 
     /**

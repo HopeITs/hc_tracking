@@ -9,12 +9,13 @@ use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Pagination\LengthAwarePaginator;
 use Livewire\Attributes\Computed;
 use Livewire\Attributes\Locked;
+use Livewire\Attributes\Layout;
 use Livewire\Attributes\Title;
 use Livewire\Attributes\Url;
 use Livewire\Component;
 use Livewire\WithPagination;
 
-new #[Title('titles.strategy')] class extends Component {
+new #[Layout('layouts::desk'), Title('titles.strategy')] class extends Component {
     use ManagesStrategicPillars;
     use WithPagination;
 
@@ -232,6 +233,7 @@ new #[Title('titles.strategy')] class extends Component {
     $sortAria = fn (string $column): ?string => $sort === $column ? ($direction === 'asc' ? 'ascending' : 'descending') : null;
 @endphp
 
+<x-desk.record-sheet register="pages::strategies.index" :close-url="route('strategies.index')" :title="$strategy->name">
 <section class="@container/detail flex min-h-full w-full flex-1 flex-col gap-4 bg-white text-secondary-dark dark:bg-surface-0 dark:text-ink">
     <x-ui.detail-header
         :breadcrumbs="[
@@ -425,3 +427,4 @@ new #[Title('titles.strategy')] class extends Component {
         </x-slot:footer>
     </x-ui.panel>
 </section>
+</x-desk.record-sheet>

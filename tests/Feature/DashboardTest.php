@@ -34,7 +34,7 @@ test('the home page is the desk: greeting, the role layout and the add tile', fu
         ->assertSeeText(__('desk.customize'));
 });
 
-test('pages not yet redesigned keep the copyright footer', function () {
+test('desk pages keep the copyright footer', function () {
     $this->actingAs(User::factory()->role('General Manager')->create())
         ->get(route('projects.index'))
         ->assertSeeText(__('authentication.copyright_notice', ['year' => now()->year]));

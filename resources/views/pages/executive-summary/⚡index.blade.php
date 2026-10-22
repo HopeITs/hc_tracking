@@ -5,11 +5,12 @@ use App\Livewire\Concerns\ExecutiveSummary\ReadsSummaryCoverage;
 use App\Livewire\Concerns\ExecutiveSummary\ReadsSummaryLedger;
 use App\Models\AnnualPlan;
 use Livewire\Attributes\Computed;
+use Livewire\Attributes\Layout;
 use Livewire\Attributes\Title;
 use Livewire\Attributes\Url;
 use Livewire\Component;
 
-new #[Title('titles.executive_summary')] class extends Component {
+new #[Layout('layouts::desk'), Title('titles.executive_summary')] class extends Component {
     use LoadsSummarySources;
     use ReadsSummaryCoverage;
     use ReadsSummaryLedger;
@@ -126,11 +127,7 @@ new #[Title('titles.executive_summary')] class extends Component {
     $ink = 'text-secondary-dark dark:text-ink';
 @endphp
 
-<section
-    class="exec-ledger admin-directory @container/ledger flex min-h-full w-full flex-1 flex-col gap-9 bg-white text-secondary-dark dark:bg-surface-0 dark:text-ink [&_[data-flux-heading]]:text-secondary-dark! [&_[data-flux-label]]:text-secondary-dark! dark:[&_[data-flux-heading]]:text-ink! dark:[&_[data-flux-label]]:text-ink!"
-    aria-labelledby="executive-summary-heading"
->
-    <x-ui.page-header heading-id="executive-summary-heading" :title="__('common.executive_summary')">
+<x-desk.register class="exec-ledger admin-directory @container/ledger [&_[data-flux-heading]]:text-secondary-dark! [&_[data-flux-label]]:text-secondary-dark! dark:[&_[data-flux-heading]]:text-ink! dark:[&_[data-flux-label]]:text-ink!" heading-id="executive-summary-heading" :title="__('common.executive_summary')">
         <x-slot:filters>
             <x-ui.header-filter-select
                 :label="__('executive_summary.fiscal_year')"
@@ -142,7 +139,7 @@ new #[Title('titles.executive_summary')] class extends Component {
                 @endforeach
             </x-ui.header-filter-select>
         </x-slot:filters>
-    </x-ui.page-header>
+
 
     {{-- The struck balance: the year in one line, every figure half of a pair. --}}
     @include('pages.executive-summary._index-balance')
@@ -161,4 +158,4 @@ new #[Title('titles.executive_summary')] class extends Component {
     <span wire:loading.delay.flex wire:target="year" class="hidden items-center gap-1.5 type-meta {{ $muted }}">
         <flux:icon.arrow-path class="size-3.5 animate-spin" /> {{ __('common.updating') }}
     </span>
-</section>
+</x-desk.register>

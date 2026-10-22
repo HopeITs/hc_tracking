@@ -32,6 +32,6 @@ test('the results framework links a proposal group straight to its Story block',
     Result::factory()->create(['type' => ResultType::Impact, 'program_id' => $this->program->id, 'proposal_id' => $this->proposal->id]);
 
     Livewire::actingAs($this->user)->test('pages::results.index')
-        ->assertSeeHtml('href="'.route('projects.show', ['project' => $this->project, 'proposal' => $this->proposal->id, 'ptab' => 'logframe']).'#proposal"')
+        ->assertSeeHtml('href="'.e(route('projects.show', ['project' => $this->project, 'proposal' => $this->proposal->id, 'ptab' => 'logframe']).'#proposal').'"')
         ->assertDontSeeHtml(route('proposals.show', $this->proposal));
 });

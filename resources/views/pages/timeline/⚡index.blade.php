@@ -7,6 +7,7 @@ use App\Livewire\Concerns\ChecksFinanceVisibility;
 use App\Models\Program;
 use Illuminate\Database\Eloquent\Collection;
 use Livewire\Attributes\Computed;
+use Livewire\Attributes\Layout;
 use Livewire\Attributes\Title;
 use Livewire\Attributes\Url;
 use Livewire\Component;
@@ -28,7 +29,7 @@ use Livewire\Component;
  * Read-only by design — schedules are edited on each project's Plan tab,
  * where links, baselines and undo live.
  */
-new #[Title('titles.timeline')] class extends Component {
+new #[Layout('layouts::desk'), Title('titles.timeline')] class extends Component {
     use BuildsPortfolioGantt;
     use ChecksFinanceVisibility;
 
@@ -154,11 +155,7 @@ new #[Title('titles.timeline')] class extends Component {
     }
 @endphp
 
-<section class="admin-directory @container/directory flex min-h-full w-full flex-1 flex-col gap-5 bg-white text-secondary-dark dark:bg-surface-0 dark:text-ink" aria-labelledby="timeline-heading">
-    <x-ui.page-header
-        heading-id="timeline-heading"
-        :title="__('titles.timeline')"
-        :count="$this->recordCount"
+<x-desk.register class="admin-directory @container/directory" heading-id="timeline-heading" :title="__('titles.timeline')" :count="$this->recordCount"
     >
         <x-slot:filters>
             @if ($activeView === 'pipeline')
@@ -184,7 +181,7 @@ new #[Title('titles.timeline')] class extends Component {
                 </x-ui.header-filter-select>
             @endif
         </x-slot:filters>
-    </x-ui.page-header>
+
 
     <div class="relative rounded-xl border border-secondary-soft bg-white shadow-card dark:border-transparent dark:bg-surface-1 dark:shadow-raised" data-timeline-board>
         {{-- The three lenses on the same portfolio --}}
@@ -214,4 +211,4 @@ new #[Title('titles.timeline')] class extends Component {
             @endif
         </div>
     </div>
-</section>
+</x-desk.register>

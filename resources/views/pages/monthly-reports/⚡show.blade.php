@@ -7,10 +7,11 @@ use App\Livewire\Concerns\MonthlyReports\ReadsMonthlyReport;
 use App\Livewire\Concerns\MonthlyReports\RunsMonthlyReportWorkflow;
 use App\Models\MonthlyReport;
 use Illuminate\Support\Facades\Gate;
+use Livewire\Attributes\Layout;
 use Livewire\Attributes\Title;
 use Livewire\Component;
 
-new #[Title('titles.monthly_report')] class extends Component {
+new #[Layout('layouts::desk'), Title('titles.monthly_report')] class extends Component {
     use EditsMonthlyReportActivities;
     use EditsMonthlyReportLines;
     use ManagesMonthlyReportFiles;
@@ -35,6 +36,7 @@ new #[Title('titles.monthly_report')] class extends Component {
     $isEditable = collect($this->rows)->contains(fn (array $row): bool => $row['editable']);
 @endphp
 
+<x-desk.record-sheet register="pages::monthly-reports.index" :close-url="route('monthly-reports.index')" :title="$report->period->translatedFormat('F Y')" :subtitle="$report->project->name">
 <section class="@container/detail flex min-h-full w-full flex-1 flex-col gap-8 bg-white text-secondary-dark dark:bg-surface-0 dark:text-ink">
     @include('pages.monthly-reports._show-header')
 
@@ -73,3 +75,4 @@ new #[Title('titles.monthly_report')] class extends Component {
 
     @include('pages.monthly-reports._show-file-modals')
 </section>
+</x-desk.record-sheet>

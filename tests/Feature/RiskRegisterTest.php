@@ -114,6 +114,40 @@ test('logging a risk requires a name an impact and an existing project', functio
     expect(Risk::query()->count())->toBe(0);
 });
 
+test('a risk is rated for likelihood and severity, and the rating can be cleared again', function () {
+    $user = User::factory()->role('General Manager')->create();
+    $risk = Risk::factory()->rated(2, 3)->create();
+
+    Livewire::actingAs($user)
+        ->test('pages::risks.index')
+        ->call('openEditModal', $risk->id)
+        ->assertSet('likelihood', '2')->assertSet('severity', '3')
+        ->set('likelihood', '3')
+        ->set('severity', '')
+        ->call('saveRisk')
+        ->assertHasNoErrors();
+
+    $risk->refresh();
+
+    expect($risk->likelihood)->toBe(3)
+        ->and($risk->severity)->toBeNull()
+        ->and($risk->heatScore())->toBeNull();
+});
+
+test('a rating outside 1 to 3 is refused', function () {
+    $risk = Risk::factory()->create();
+
+    Livewire::actingAs(User::factory()->role('General Manager')->create())
+        ->test('pages::risks.index')
+        ->call('openEditModal', $risk->id)
+        ->set('likelihood', '4')
+        ->set('severity', '0')
+        ->call('saveRisk')
+        ->assertHasErrors(['likelihood', 'severity']);
+
+    expect($risk->fresh()->likelihood)->toBeNull();
+});
+
 test('a risk can be edited and marked as materialised', function () {
     $user = User::factory()->role('General Manager')->create();
     $risk = Risk::factory()->create(['name' => 'Old risk', 'solution' => null, 'happened' => false]);

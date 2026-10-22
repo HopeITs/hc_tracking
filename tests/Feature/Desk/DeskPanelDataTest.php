@@ -122,6 +122,48 @@ test('risks list open ones before the ones that happened', function () {
         ->assertSeeInOrder(['Open risk', 'Happened risk']);
 });
 
+test('the dates lens opens the timeline as its full register', function () {
+    Project::factory()->create();
+
+    Livewire::actingAs(User::factory()->role('General Manager')->create())->test('desk.panels.projects', ['size' => 'XL'])
+        ->assertSeeHtml('href="'.route('projects.index').'"')
+        ->call('setLens', 'dates')
+        ->assertSeeHtml('href="'.route('timeline.index').'"');
+});
+
+test('the risk heat map counts rated risks by square and leaves unrated ones off it', function () {
+    Risk::factory()->rated(3, 3)->create();
+    Risk::factory()->rated(1, 2)->create();
+    Risk::factory()->create(['name' => 'Unrated risk']);
+
+    $panel = Livewire::actingAs(User::factory()->role('General Manager')->create())->test('desk.panels.risks', ['size' => 'M']);
+
+    expect($panel->instance()->heat)->toBe(['3:3' => 1, '1:2' => 1]);
+    $panel->assertSeeHtml('data-risk-cell="3:3"')
+        ->assertSee('Unrated risk')
+        ->assertSee(__('risks.not_rated'));
+});
+
+test('a heat map square filters the risk list, and clicking it again clears it', function () {
+    Risk::factory()->rated(3, 3)->create(['name' => 'Road closure']);
+    Risk::factory()->rated(1, 1)->create(['name' => 'Late paperwork']);
+
+    Livewire::actingAs(User::factory()->role('General Manager')->create())->test('desk.panels.risks', ['size' => 'M'])
+        ->call('setFilter', '3:3')
+        ->assertSee('Road closure')
+        ->assertDontSee('Late paperwork')
+        ->call('setFilter', 'all')
+        ->assertSee('Late paperwork');
+});
+
+test('the worst rated open risk leads the list', function () {
+    Risk::factory()->rated(1, 1)->create(['name' => 'Minor risk']);
+    Risk::factory()->rated(3, 2)->create(['name' => 'Major risk']);
+
+    Livewire::actingAs(User::factory()->role('General Manager')->create())->test('desk.panels.risks', ['size' => 'M'])
+        ->assertSeeInOrder(['Major risk', 'Minor risk']);
+});
+
 test('someone who owns no project sees every project without picking a scope', function () {
     Project::factory()->create(['name' => 'Aleppo Wells']);
 

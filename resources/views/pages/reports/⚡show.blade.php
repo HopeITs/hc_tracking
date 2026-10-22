@@ -12,11 +12,12 @@ use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Support\Str;
 use Livewire\Attributes\Computed;
 use Livewire\Attributes\Locked;
+use Livewire\Attributes\Layout;
 use Livewire\Attributes\Title;
 use Livewire\Component;
 use Livewire\WithFileUploads;
 
-new #[Title('titles.report')] class extends Component {
+new #[Layout('layouts::desk'), Title('titles.report')] class extends Component {
     use ManagesReportFiles;
     use ManagesReportForm;
     use PreviewsFiles;
@@ -171,6 +172,7 @@ new #[Title('titles.report')] class extends Component {
     ];
 @endphp
 
+<x-desk.record-sheet register="pages::reports.index" :close-url="route('reports.index')" :title="$planIndicator->indicator->name">
 <section class="@container/detail flex min-h-full w-full flex-1 flex-col gap-8 bg-white text-secondary-dark dark:bg-surface-0 dark:text-ink">
     <x-ui.detail-header
         :breadcrumbs="[
@@ -354,3 +356,4 @@ new #[Title('titles.report')] class extends Component {
 
     @include('pages.reports._show-file-modal')
 </section>
+</x-desk.record-sheet>

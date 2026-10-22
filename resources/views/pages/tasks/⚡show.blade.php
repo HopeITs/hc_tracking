@@ -17,12 +17,13 @@ use Illuminate\Support\Facades\Gate;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\Rules\Enum;
 use Livewire\Attributes\Computed;
+use Livewire\Attributes\Layout;
 use Livewire\Attributes\Locked;
 use Livewire\Attributes\Title;
 use Livewire\Component;
 use Livewire\WithFileUploads;
 
-new #[Title('titles.task')] class extends Component
+new #[Layout('layouts::desk'), Title('titles.task')] class extends Component
 {
     use ManagesSubtasks;
     use ManagesTaskAttachments;
@@ -198,6 +199,7 @@ new #[Title('titles.task')] class extends Component
 };
 ?>
 
+<x-desk.record-sheet register="pages::tasks.index" :close-url="route('tasks.index')" :title="$this->task->title" :subtitle="$this->task->sourceLabel()">
 <section class="@container/detail flex min-h-full w-full flex-1 flex-col gap-4 bg-white text-secondary-dark dark:bg-surface-0 dark:text-ink" aria-labelledby="task-detail-heading">
     @php $assignees = $this->task->taskAssignees->pluck('employee')->filter(); @endphp
 
@@ -276,3 +278,4 @@ new #[Title('titles.task')] class extends Component
 
     @include('pages.tasks._show-modals')
 </section>
+</x-desk.record-sheet>

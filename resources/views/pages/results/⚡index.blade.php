@@ -11,11 +11,12 @@ use App\Models\Result;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Gate;
 use Livewire\Attributes\Computed;
+use Livewire\Attributes\Layout;
 use Livewire\Attributes\Title;
 use Livewire\Attributes\Url;
 use Livewire\Component;
 
-new #[Title('titles.results_framework')] class extends Component {
+new #[Layout('layouts::desk'), Title('titles.results_framework')] class extends Component {
     use BuildsResultsFramework;
     use BuildsResultsTree;
     use ManagesResultForm;
@@ -149,12 +150,7 @@ new #[Title('titles.results_framework')] class extends Component {
     ];
 @endphp
 
-<section class="@container/directory flex min-h-full w-full flex-1 flex-col gap-4 bg-white text-secondary-dark dark:bg-surface-0 dark:text-ink" aria-labelledby="results-framework-heading">
-    <x-ui.page-header
-        heading-id="results-framework-heading"
-        :title="__('common.results_framework')"
-        :count="$overview['statements']"
-    >
+<x-desk.register class="@container/directory" heading-id="results-framework-heading" :title="__('common.results_framework')" :count="$overview['statements']">
         <x-slot:filters>
             <x-ui.input
                 type="search"
@@ -194,7 +190,7 @@ new #[Title('titles.results_framework')] class extends Component {
                 {{ __('results_framework.add_result') }}
             </x-ui.button>@endcan
         </x-slot:actions>
-    </x-ui.page-header>
+
 
     {{-- The framework at a glance: four figures, then the chain they describe. --}}
     @include('pages.results._index-overview')
@@ -270,4 +266,4 @@ new #[Title('titles.results_framework')] class extends Component {
         :confirm-label="__('results_framework.delete_result')"
         confirm-test="confirm-delete-result"
     />
-</section>
+</x-desk.register>

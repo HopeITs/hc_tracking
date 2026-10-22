@@ -19,12 +19,13 @@ use Illuminate\Database\Eloquent\Relations\MorphTo;
 use Illuminate\Pagination\LengthAwarePaginator;
 use Livewire\Attributes\Computed;
 use Livewire\Attributes\Locked;
+use Livewire\Attributes\Layout;
 use Livewire\Attributes\Title;
 use Livewire\Attributes\Url;
 use Livewire\Component;
 use Livewire\WithPagination;
 
-new #[Title('titles.program')] class extends Component {
+new #[Layout('layouts::desk'), Title('titles.program')] class extends Component {
     use AddsQuickTask;
     use FiltersResultsChain;
     use ReadsProgramDelivery;
@@ -249,6 +250,7 @@ new #[Title('titles.program')] class extends Component {
 };
 ?>
 
+<x-desk.record-sheet register="pages::projects.index" :register-params="['program' => (string) $this->program->id]" :close-url="route('projects.index', ['program' => $this->program->id])" :title="$this->program->name">
 <section class="@container/detail flex min-h-full w-full flex-1 flex-col gap-6 bg-white text-secondary-dark dark:bg-surface-0 dark:text-ink">
     <header class="border-b border-secondary-soft @4xl/detail:border-b-0 dark:border-line">
         <nav aria-label="{{ __('ui.breadcrumb') }}" class="flex flex-wrap items-center gap-1.5 text-xs text-secondary-medium dark:text-ink-muted">
@@ -392,3 +394,4 @@ new #[Title('titles.program')] class extends Component {
 
     <x-tasks.add-task-modal :open="$showAddTaskModal" test-prefix="new-program-task" />
 </section>
+</x-desk.record-sheet>

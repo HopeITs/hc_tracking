@@ -18,6 +18,7 @@ use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
 use Livewire\Attributes\Computed;
 use Livewire\Attributes\Locked;
+use Livewire\Attributes\Layout;
 use Livewire\Attributes\Title;
 use Livewire\Attributes\Url;
 use Livewire\Component;
@@ -29,7 +30,7 @@ use Livewire\Component;
 | travels in the component state. Finance shows only for
 | funding-agreements.view holders; Save needs a recorded agreement.
 */
-new #[Title('titles.donor_report_builder')] class extends Component {
+new #[Layout('layouts::desk'), Title('titles.donor_report_builder')] class extends Component {
     #[Url(as: 'proposal', except: '')]
     public string $proposalId = '';
 
@@ -220,6 +221,7 @@ new #[Title('titles.donor_report_builder')] class extends Component {
     $slotHint = DonorReportResponsibles::slotFor(DonorReportType::tryFrom($type) ?? DonorReportType::Narrative);
 @endphp
 
+<x-desk.record-sheet register="pages::reporting-duties.index" :close-url="route('reporting-duties.index')" :title="__('titles.donor_report_builder')">
 <section class="@container flex min-h-full w-full flex-1 flex-col gap-8 bg-white text-secondary-dark dark:bg-surface-0 dark:text-ink" data-donor-report-builder>
     <x-ui.page-header heading-id="donor-report-builder-heading" :title="__('titles.donor_report_builder')" />
 
@@ -294,3 +296,4 @@ new #[Title('titles.donor_report_builder')] class extends Component {
         </form>
     @endif
 </section>
+</x-desk.record-sheet>

@@ -28,6 +28,17 @@ class RiskFactory extends Factory
     }
 
     /**
+     * Indicate how likely the risk is and how hard it would hit, each 1–3.
+     */
+    public function rated(int $likelihood, int $severity): static
+    {
+        return $this->state(fn (array $attributes): array => [
+            'likelihood' => $likelihood,
+            'severity' => $severity,
+        ]);
+    }
+
+    /**
      * Indicate that the risk materialised and was mitigated.
      */
     public function happened(): static

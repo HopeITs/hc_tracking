@@ -173,3 +173,62 @@
         background: var(--paper);
     }
 }
+
+/* The copyright line under every Desk page (user decision 2026-10-22: the footer stays). */
+@layer components {
+    .dk-foot { margin-top: 40px; border-top: 1px solid var(--line); padding: 16px; text-align: center; }
+    .dk-foot p { margin: 0; font-size: 12px; color: var(--ink-3); }
+}
+
+/*
+ * A record opened as a sheet over its register (x-desk.record-sheet, stage 6).
+ * The record keeps its own page markup; here it takes the Desk's look: the
+ * sheet header carries the title, panels lose their boxes for hairline
+ * sections, and stat tiles read as typographic figures. Unlayered on purpose: the
+ * record markup carries Tailwind utilities, which out-rank any layer.
+ */
+.dk-record-behind { pointer-events: none; user-select: none; }
+.dk-record-sheet { z-index: 51; }
+.dk-record-body { display: block; }
+.dk-record-body > * { min-height: 0 !important; background: none !important; }
+.dk-record-body > section { gap: 18px !important; }
+
+.dk-record-body [data-detail-header] { border: 0; padding-bottom: 0; gap: 8px; }
+.dk-record-body > section > header > nav[aria-label],
+.dk-record-body [data-detail-header] > nav,
+.dk-record-body [data-detail-header] [data-flux-heading] { display: none; }
+.dk-record-body [data-detail-header] div.min-w-0 > p.text-sm { display: none; }
+.dk-record-body [data-detail-header] p { color: var(--ink-3); }
+
+.dk-record-body [data-panel] {
+    border: 0;
+    border-top: 1px solid var(--line);
+    border-radius: 0;
+    background: none;
+    box-shadow: none;
+    overflow: visible;
+}
+.dk-record-body [data-panel] > div:first-child { border-bottom: 0; padding-inline: 0; min-height: 0; }
+.dk-record-body [data-panel] > div:first-child p.truncate {
+    font-size: 11.5px;
+    font-weight: 800;
+    letter-spacing: .06em;
+    text-transform: uppercase;
+    color: var(--ink-3);
+}
+[lang="ar"] .dk-record-body [data-panel] > div:first-child p.truncate { letter-spacing: 0; font-size: 12.5px; }
+
+.dk-record-body [data-stat-tile] {
+    border: 0;
+    border-inline-start: 1px solid var(--line);
+    border-radius: 0;
+    background: none;
+    box-shadow: none;
+    padding-block: 2px;
+}
+.dk-record-body [data-stat-tile]:hover { transform: none; box-shadow: none; }
+.dk-record-body [data-stat-tile] .tabular-nums,
+.dk-record-body [data-stat-tile] [class*="text-2xl"],
+.dk-record-body [data-stat-tile] [class*="text-3xl"] { font-variant-numeric: tabular-nums; font-weight: 800; }
+
+.dk-record-body [data-data-table] { border: 1px solid var(--line); border-radius: 12px; box-shadow: none; }

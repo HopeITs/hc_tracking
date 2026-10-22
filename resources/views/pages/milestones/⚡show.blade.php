@@ -19,10 +19,11 @@ use Illuminate\Validation\Rules\Enum;
 use Illuminate\Validation\ValidationException;
 use Livewire\Attributes\Computed;
 use Livewire\Attributes\Locked;
+use Livewire\Attributes\Layout;
 use Livewire\Attributes\Title;
 use Livewire\Component;
 
-new #[Title('titles.milestone')] class extends Component {
+new #[Layout('layouts::desk'), Title('titles.milestone')] class extends Component {
     use AddsQuickTask;
     use PicksMilestoneActivity;
 
@@ -451,6 +452,7 @@ new #[Title('titles.milestone')] class extends Component {
     $selectedParentMilestone = $parentMilestoneId === '' ? null : $this->parentOptions->firstWhere('id', (int) $parentMilestoneId);
 @endphp
 
+<x-desk.record-sheet register="pages::milestones.index" :close-url="route('milestones.index')" :title="$this->milestone->name" :subtitle="$this->milestone->ownerName()">
 <section class="@container/detail flex min-h-full w-full flex-1 flex-col gap-4 bg-white text-secondary-dark dark:bg-surface-0 dark:text-ink" aria-labelledby="milestone-detail-heading">
     <x-ui.detail-header
         id="milestone-detail-heading"
@@ -694,3 +696,4 @@ new #[Title('titles.milestone')] class extends Component {
         </x-slot:actions>
     </x-ui.modal>
 </section>
+</x-desk.record-sheet>

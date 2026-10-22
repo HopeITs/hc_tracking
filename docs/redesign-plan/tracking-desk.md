@@ -48,13 +48,14 @@ All navigation goes through `App\Support\Desk\Destinations`, which feeds the Ask
 | 2 | Registers: frame, board and calendar views, desk styling | `a00959cb` | Done |
 | 3 | Project Story pages | `26f671e7` | Done, **tests owed** |
 | 4 | Side sheets, proposal page folded into the Story | `7dcc0ac0` | Done, **tests owed** |
-| 5 | Settings (5 groups) and 13 admin/settings pages on `x-desk.register`, plus open-item fixes | `53f89e6c` | Done, **untested** |
+| 5 | Settings (5 groups) and 13 admin/settings pages on `x-desk.register`, plus open-item fixes | `53f89e6c` | Done, tested |
+| 6 | Every remaining page on the Desk: record sheets, last registers, risk heat map, test fixes | (uncommitted) | Done, tested |
 
 ### Stage 1: top bar and Desk
 
 The sidebar, the old top header and the dashboard pages were deleted. See `.ai/rules/desk.md` for the full list of deleted files and the rule for each panel:
 
-- **Risks panel:** a list only (open risks first, then risks that happened). There is no heatmap.
+- **Risks panel:** a 3×3 heat map (likelihood × severity, added in stage 6) above the list (open risks first, then risks that happened).
 - **Projects panel:** the stage comes from the proposal stage plus the project status. Health is "off track" when an item is late, "watch" when something is due within 7 days, and "on track" otherwise.
 - **Waiting on others** collects four things:
   - late tasks I created that are assigned to others
@@ -117,3 +118,12 @@ The sidebar, the old top header and the dashboard pages were deleted. See `.ai/r
 | Helpers | `app/Support/Desk/` (`Money`, `ProjectStage`, `RelativeDay`) |
 | Styles | `resources/css/desk.css`, `resources/css/desk-story.css` |
 | Strings | `lang/{en,ar}/desk.php`, `lang/{en,ar}/story.php` |
+
+## 6. Stage 6: everything on the Desk (2026-10-22)
+
+- **Record sheets** (`x-desk.record-sheet`): task, milestone, annual plan, funding agreement, donor report (and compose), monthly report, report, donor, strategy and program pages open as a side sheet over their register. Old URLs keep working; the show component keeps all its logic; the register behind is deferred and inert. Closing (X, Esc, scrim) goes back to the register.
+- **Program** opens over the Projects register filtered to it.
+- **Timeline, Results, Executive summary, Monthly matrix, Indicator library** moved onto `x-desk.register`. Timeline is the full register behind the Desk's Dates lens (the panel's "open" link follows the lens). Results stays a register because program-level frameworks have no Story.
+- **Risk heat map**: new nullable `risks.likelihood` / `risks.severity` (1–3), set in the risk sheet.
+- **Footer** stays, on every Desk page.
+- **Fixes found by the test run**: activity timeline missing root (500 on every record page), Results link hidden from MEAL, Monthly Matrix SQL failing under MySQL ONLY_FULL_GROUP_BY.
