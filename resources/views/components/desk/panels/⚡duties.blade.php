@@ -69,7 +69,7 @@ new class extends Component {
             @foreach ($pg['slice'] as $report)
                 @php
                     $days = (int) $today->diffInDays($report->due_on, false);
-                    $person = $this->people[$report->responsible_employee_id] ?? null;
+                    $person = $report->responsible_employee_id === null ? null : ($this->people[$report->responsible_employee_id] ?? null);
                 @endphp
                 <li wire:key="dr-{{ $report->id }}">
                     <div>
