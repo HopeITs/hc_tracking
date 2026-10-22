@@ -159,6 +159,22 @@ describe('copying a framework', function () {
     });
 });
 
+it('copies a root of the proposal it renews, keeping its link to the program framework', function () {
+    $programRoot = programFrameworkTree($this->program);
+    $previous = Proposal::factory()->create();
+    $previousRoot = Result::factory()->type(ResultType::Impact)->create(['program_id' => $this->program->id, 'proposal_id' => $previous->id, 'contributes_to_result_id' => $programRoot->id]);
+    Result::factory()->type(ResultType::Outcome)->childOf($previousRoot)->create(['program_id' => $this->program->id, 'proposal_id' => $previous->id]);
+    $this->proposal->update(['previous_proposal_id' => $previous->id]);
+    $this->actingAs($this->editor);
+
+    $copy = app(CopyResultTree::class)->handle($previousRoot, $this->proposal);
+
+    expect($copy->proposal_id)->toBe($this->proposal->id)
+        ->and($copy->copied_from_id)->toBe($previousRoot->id)
+        ->and($copy->contributes_to_result_id)->toBe($programRoot->id)
+        ->and($copy->children()->sole()->copied_from_id)->toBe($previousRoot->children()->sole()->id);
+});
+
 describe('what is refused', function () {
     it('refuses the same root twice', function () {
         $source = programFrameworkTree($this->program);
@@ -189,6 +205,16 @@ describe('what is refused', function () {
         expect(fn () => app(CopyResultTree::class)->handle($child, $this->proposal))->toThrow(ValidationException::class);
         expect(fn () => app(CopyResultTree::class)->handle($ownRoot, $this->proposal))->toThrow(ValidationException::class);
         expect($this->proposal->results()->count())->toBe(1);
+    });
+
+    it('refuses a root of a proposal that is not the one it renews', function () {
+        $other = Proposal::factory()->create();
+        $otherRoot = Result::factory()->type(ResultType::Impact)->create(['program_id' => $this->program->id, 'proposal_id' => $other->id]);
+        $this->actingAs($this->editor);
+
+        expect(fn () => app(CopyResultTree::class)->handle($otherRoot, $this->proposal))
+            ->toThrow(ValidationException::class, __('results_framework.choose_a_framework_of_this_proposal'));
+        expect($this->proposal->results()->count())->toBe(0);
     });
 
     it('refuses once the proposal has been submitted unless the user holds results.update', function () {

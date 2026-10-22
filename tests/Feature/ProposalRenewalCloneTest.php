@@ -28,36 +28,6 @@ const RENEWAL_TREE_COPIER = 'App\Actions\Results\CopyResultTree';
 
 beforeEach(function () {
     $this->travelTo('2026-10-14 10:00:00');
-
-    // T32's CopyResultTree is not merged yet: stand in for it with the same
-    // contract (handle(Result $sourceRoot, Proposal $proposal): Result) until
-    // the real class exists.
-    if (! class_exists(RENEWAL_TREE_COPIER)) {
-        app()->bind(RENEWAL_TREE_COPIER, fn () => new class
-        {
-            public function handle(Result $sourceRoot, Proposal $proposal): Result
-            {
-                $copy = function (Result $source, ?int $parentId) use (&$copy, $proposal): Result {
-                    $node = Result::query()->create([
-                        'statement' => $source->statement,
-                        'type' => $source->type,
-                        'program_id' => $source->program_id,
-                        'proposal_id' => $proposal->id,
-                        'parent_id' => $parentId,
-                        'copied_from_id' => $source->id,
-                    ]);
-
-                    foreach ($source->children()->get() as $child) {
-                        $copy($child, $node->id);
-                    }
-
-                    return $node;
-                };
-
-                return $copy($sourceRoot, null);
-            }
-        });
-    }
 });
 
 /**

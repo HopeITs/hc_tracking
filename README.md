@@ -194,11 +194,11 @@ second copy loads two instances and breaks reactivity.
 ## Repository
 
 ```
-origin  git@gitlab.com:hcsyria/hc-tracking.git
+origin  git@github.com:HopeITs/hc_tracking.git
 ```
 
 This is the canonical repository for the project. Clone it, branch from
-`main`, and open merge requests against `main`.
+`main`, and open pull requests against `main`.
 
 ---
 
