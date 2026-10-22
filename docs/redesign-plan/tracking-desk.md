@@ -102,9 +102,7 @@ The sidebar, the old top header and the dashboard pages were deleted. See `.ai/r
 
 ## 4. Still owed
 
-1. Run the affected Pest tests for stages 3–5 and fix anything that fails.
-2. Youssef tests stage 5 in the browser.
-3. Merge to `main`, only on Youssef's go.
+Nothing. On 2026-10-22 every test file the branch touched passed (592 tests), and a browser pass covered all list pages, 168 record pages, sheets, Ask, Settings, Arabic and phone width. It fixed three PHP-in-Alpine `:aria-label` bindings, lost Ask keystrokes while the palette opens, and made `layouts::desk` the default Livewire layout (the old `layouts/app.blade.php` is gone). The guided tour stays. Merge to `main` on Youssef's go.
 
 ## 5. Where the code lives
 

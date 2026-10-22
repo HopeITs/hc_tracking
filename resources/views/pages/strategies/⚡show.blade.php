@@ -287,7 +287,7 @@ new #[Layout('layouts::desk'), Title('titles.strategy')] class extends Component
 
         <x-ui.panel :title="__('strategies.plan_coverage')" :subtitle="__('strategies.plan_coverage_by_year')">
             <x-slot:toolbar>
-                <div class="relative flex size-16 shrink-0 items-center justify-center" role="img" :aria-label="__('strategies.average_coverage').': '.round($coveragePct).'%'">
+                <div class="relative flex size-16 shrink-0 items-center justify-center" role="img" aria-label="{{ __('strategies.average_coverage').': '.round($coveragePct).'%' }}">
                     <svg class="size-16 -rotate-90" viewBox="0 0 36 36" aria-hidden="true">
                         <circle cx="18" cy="18" r="{{ $ringRadius }}" fill="none" stroke-width="3" class="stroke-secondary-soft dark:stroke-surface-2" />
                         <circle

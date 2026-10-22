@@ -32,7 +32,8 @@ document.addEventListener('alpine:init', () => {
             this.open = true;
             this.selected = 0;
             window.hcLockPageScroll?.();
-            this.$nextTick(() => this.$refs.input?.focus());
+            // The input is teleported to <body>, so wait for x-show to paint it before focusing.
+            this.$nextTick(() => requestAnimationFrame(() => document.getElementById('dk-pal-q')?.focus()));
         },
 
         hide() {
@@ -46,6 +47,18 @@ document.addEventListener('alpine:init', () => {
         },
 
         onGlobalKey(event) {
+            // Keys typed while the palette is still opening land in its input instead of being lost.
+            const input = document.getElementById('dk-pal-q');
+
+            if (this.open && input && event.target !== input && event.key.length === 1 && ! event.metaKey && ! event.ctrlKey && ! event.altKey) {
+                event.preventDefault();
+                input.value += event.key;
+                input.dispatchEvent(new Event('input', { bubbles: true }));
+                input.focus();
+
+                return;
+            }
+
             if (event.key === '/' && ! this.open && ! isTyping(event.target) && ! event.metaKey && ! event.ctrlKey && ! event.altKey) {
                 event.preventDefault();
                 this.show();
