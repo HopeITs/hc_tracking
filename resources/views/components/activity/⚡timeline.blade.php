@@ -61,8 +61,9 @@ new class extends Component {
     $presenter = app(ActivityPresenter::class);
 @endphp
 
+<div data-activity-timeline @if ($compact) data-compact @endif>
 @if ($compact)
-    <div data-activity-timeline data-compact>
+    <div>
         @if ($this->entries->isEmpty())
             <p class="dk-muted">{{ __('activity.empty') }}</p>
         @else
@@ -81,7 +82,7 @@ new class extends Component {
         @endif
     </div>
 @else
-<div data-activity-timeline>
+<div>
     @if ($this->entries->isEmpty())
         <p class="py-6 text-sm text-secondary-medium dark:text-ink-muted">{{ __('activity.empty') }}</p>
     @else
@@ -122,3 +123,4 @@ new class extends Component {
     @endif
 </div>
 @endif
+</div>

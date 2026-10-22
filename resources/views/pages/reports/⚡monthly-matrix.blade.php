@@ -5,12 +5,13 @@ use App\Livewire\Concerns\Reports\BuildsMatrixBreakdowns;
 use App\Livewire\Concerns\Reports\BuildsMonthlyMatrix;
 use App\Livewire\Concerns\Reports\ExportsMonthlyMatrix;
 use App\Livewire\Concerns\Reports\GroupsMonthlyMatrix;
+use Livewire\Attributes\Layout;
 use Livewire\Attributes\Title;
 use Livewire\Attributes\Url;
 use Livewire\Component;
 use Livewire\WithPagination;
 
-new #[Title('titles.monthly_matrix')] class extends Component {
+new #[Layout('layouts::desk'), Title('titles.monthly_matrix')] class extends Component {
     use BuildsMatrixActivities;
     use BuildsMatrixBreakdowns;
     use BuildsMonthlyMatrix;
@@ -86,14 +87,7 @@ new #[Title('titles.monthly_matrix')] class extends Component {
     $filters = $this->resolvedFilters;
 @endphp
 
-<section
-    class="@container/directory flex min-h-full w-full flex-1 flex-col gap-4 bg-white text-secondary-dark dark:bg-surface-0 dark:text-ink"
-    aria-labelledby="monthly-matrix-heading"
->
-    <x-ui.page-header
-        heading-id="monthly-matrix-heading"
-        :title="__('titles.monthly_matrix')"
-        :count="$onActivities ? $board['count'] : $paged->total()"
+<x-desk.register class="@container/directory" heading-id="monthly-matrix-heading" :title="__('titles.monthly_matrix')" :count="$onActivities ? $board['count'] : $paged->total()"
     >
         <x-slot:filters>
             <div class="contents" data-matrix-filters>
@@ -164,7 +158,7 @@ new #[Title('titles.monthly_matrix')] class extends Component {
                 </x-ui.button>
             </span>
         </x-slot:actions>
-    </x-ui.page-header>
+
 
     <div class="flex flex-wrap items-end justify-between gap-3" data-matrix-modes>
         <x-ui.relation-tabs
@@ -213,4 +207,4 @@ new #[Title('titles.monthly_matrix')] class extends Component {
         @include('pages.reports._monthly-matrix-legend')
         @include('pages.reports._monthly-matrix-table')
     @endif
-</section>
+</x-desk.register>

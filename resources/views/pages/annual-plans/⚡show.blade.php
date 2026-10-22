@@ -9,10 +9,11 @@ use Illuminate\Support\Facades\Gate;
 use Illuminate\Validation\Rule;
 use Livewire\Attributes\Computed;
 use Livewire\Attributes\Locked;
+use Livewire\Attributes\Layout;
 use Livewire\Attributes\Title;
 use Livewire\Component;
 
-new #[Title('titles.annual_plan')] class extends Component {
+new #[Layout('layouts::desk'), Title('titles.annual_plan')] class extends Component {
     use FiltersResultsChain;
     use ReadsAnnualPlanSummary;
 
@@ -188,6 +189,7 @@ new #[Title('titles.annual_plan')] class extends Component {
     $gaugeOffset = $gaugeCircumference * (1 - $summary['reportingShare'] / 100);
 @endphp
 
+<x-desk.record-sheet register="pages::annual-plans.index" :close-url="route('annual-plans.index')" :title="__('common.fy_year_program', ['year' => $plan->year, 'program' => $plan->program->name])" :subtitle="$plan->program->strategy?->name">
 <section class="@container/detail flex min-h-full w-full flex-1 flex-col gap-8 bg-white text-secondary-dark dark:bg-surface-0 dark:text-ink">
     <x-ui.detail-header
         :breadcrumbs="[
@@ -394,3 +396,4 @@ new #[Title('titles.annual_plan')] class extends Component {
         confirm-test="confirm-delete-annual-plan"
     />
 </section>
+</x-desk.record-sheet>

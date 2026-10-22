@@ -12,7 +12,7 @@ use Carbon\CarbonImmutable;
 use Illuminate\Support\Facades\DB;
 
 /*
-| PlanIndicator::pooledRatioSql() and its PHP twin pooledRatio() (contracts
+| PlanIndicator::pooledRatioSql() (over pooledTermsSelectSql()) and its PHP twin pooledRatio() (contracts
 | §13 Pooling, D-25): Σ numerators ÷ Σ denominators over approved rows in the
 | window; fixed basis sums the counts (latest when cumulative), entered basis
 | takes the latest row; rows without a denominator are left out and counted.
@@ -57,9 +57,12 @@ function prPool(array $targets): array
     $ids = array_map(fn (PlanIndicator $target): int => $target->id, $targets);
     $grammar = DB::connection()->getQueryGrammar();
 
-    $row = PlanIndicator::query()->whereKey($ids)->toBase()
-        ->selectRaw(PlanIndicator::pooledRatioSql($from, $to)->getValue($grammar).' as ratio')
-        ->selectRaw(PlanIndicator::pooledExcludedCountSql($from, $to)->getValue($grammar).' as excluded')
+    $terms = PlanIndicator::query()->whereKey($ids)->toBase()
+        ->selectRaw(PlanIndicator::pooledTermsSelectSql($from, $to)->getValue($grammar));
+
+    $row = DB::query()->fromSub($terms, 'pooled')
+        ->selectRaw(PlanIndicator::pooledRatioSql()->getValue($grammar).' as ratio')
+        ->selectRaw(PlanIndicator::pooledExcludedCountSql()->getValue($grammar).' as excluded')
         ->first();
 
     $loaded = PlanIndicator::query()->whereKey($ids)->with(['reports', 'indicator.libraryIndicator'])->get();

@@ -22,7 +22,6 @@ use App\Support\MealCoverage;
 use Carbon\CarbonImmutable;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Query\Builder;
-use Illuminate\Database\Query\Expression;
 use Illuminate\Pagination\LengthAwarePaginator;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Auth;
@@ -648,12 +647,17 @@ trait BuildsMonthlyMatrix
         }
 
         $grammar = DB::connection()->getQueryGrammar();
-        $pooled = PlanIndicator::query()
+        $terms = PlanIndicator::query()
             ->toBase()
             ->from('plan_indicators')
             ->whereIn('plan_indicators.id', array_keys($rowKeyOfTarget))
+            ->select(['plan_indicators.id', 'plan_indicators.project_id'])
+            ->selectRaw('(select i2.library_indicator_id from indicators i2 where i2.id = plan_indicators.indicator_id) as library_indicator_id, '.PlanIndicator::pooledTermsSelectSql($from, $to)->getValue($grammar));
+
+        $pooled = DB::query()
+            ->fromSub($terms, 'pooled')
             ->groupBy(...$this->pooledGroupColumns($isDonorView, $byLibrary))
-            ->selectRaw('min(plan_indicators.id) as first_target_id, '.PlanIndicator::pooledRatioSql($from, $to)->getValue($grammar).' as ratio, '.PlanIndicator::pooledExcludedCountSql($from, $to)->getValue($grammar).' as excluded')
+            ->selectRaw('min(pooled.id) as first_target_id, '.PlanIndicator::pooledRatioSql()->getValue($grammar).' as ratio, '.PlanIndicator::pooledExcludedCountSql()->getValue($grammar).' as excluded')
             ->get();
 
         $result = [];
@@ -669,18 +673,17 @@ trait BuildsMonthlyMatrix
 
     /**
      * The columns one pooled ratio is grouped by: a target (donor view), a
-     * center's library entry (center view) or a library entry (grouped).
+     * center's library entry (center view) or a library entry (grouped),
+     * named on the `pooled` derived table pooledRatios() aggregates.
      *
-     * @return list<Expression|string>
+     * @return list<string>
      */
     protected function pooledGroupColumns(bool $isDonorView, bool $byLibrary): array
     {
-        $library = DB::raw('(select i2.library_indicator_id from indicators i2 where i2.id = plan_indicators.indicator_id)');
-
         return match (true) {
-            $byLibrary => [$library],
-            $isDonorView => ['plan_indicators.project_id', 'plan_indicators.id'],
-            default => ['plan_indicators.project_id', $library],
+            $byLibrary => ['pooled.library_indicator_id'],
+            $isDonorView => ['pooled.project_id', 'pooled.id'],
+            default => ['pooled.project_id', 'pooled.library_indicator_id'],
         };
     }
 }

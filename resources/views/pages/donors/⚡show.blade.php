@@ -18,11 +18,12 @@ use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Support\Facades\Gate;
 use Livewire\Attributes\Computed;
 use Livewire\Attributes\Locked;
+use Livewire\Attributes\Layout;
 use Livewire\Attributes\Title;
 use Livewire\Component;
 use Symfony\Component\HttpFoundation\StreamedResponse;
 
-new #[Title('titles.donor')] class extends Component {
+new #[Layout('layouts::desk'), Title('titles.donor')] class extends Component {
     use ManagesAgreementForm;
     use ManagesDonorForm;
     use ReadsDonorMoney;
@@ -251,6 +252,7 @@ new #[Title('titles.donor')] class extends Component {
     ];
 @endphp
 
+<x-desk.record-sheet register="pages::donors.index" :close-url="route('donors.index')" :title="$donor->name">
 <section class="@container/detail flex min-h-full w-full flex-1 flex-col bg-white text-secondary-dark dark:bg-surface-0 dark:text-ink" data-donor-dossier>
     <x-ui.detail-header
         :breadcrumbs="[
@@ -392,3 +394,4 @@ new #[Title('titles.donor')] class extends Component {
         :currency-code="$agreementCurrency"
     />
 </section>
+</x-desk.record-sheet>

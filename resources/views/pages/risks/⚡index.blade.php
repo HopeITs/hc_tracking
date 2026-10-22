@@ -54,6 +54,12 @@ new #[Layout('layouts::desk'), Title('titles.risks')] class extends Component {
 
     public bool $happened = false;
 
+    /** How likely the risk is, 1–3, or empty while unrated. */
+    public string $likelihood = '';
+
+    /** How hard it would hit, 1–3, or empty while unrated. */
+    public string $severity = '';
+
     public string $riskProjectId = '';
 
     public function updatedSearch(): void
@@ -260,7 +266,7 @@ new #[Layout('layouts::desk'), Title('titles.risks')] class extends Component {
     public function openEditModal(int $riskId): void
     {
         $risk = Risk::query()
-            ->select(['id', 'name', 'impact', 'solution', 'happened', 'project_id'])
+            ->select(['id', 'name', 'impact', 'solution', 'happened', 'likelihood', 'severity', 'project_id'])
             ->findOrFail($riskId);
 
         Gate::authorize('update', $risk);
@@ -271,6 +277,8 @@ new #[Layout('layouts::desk'), Title('titles.risks')] class extends Component {
         $this->impact = $risk->impact ?? '';
         $this->solution = $risk->solution ?? '';
         $this->happened = $risk->happened;
+        $this->likelihood = (string) ($risk->likelihood ?? '');
+        $this->severity = (string) ($risk->severity ?? '');
         $this->riskProjectId = (string) $risk->project_id;
         $this->showRiskModal = true;
     }
@@ -292,6 +300,8 @@ new #[Layout('layouts::desk'), Title('titles.risks')] class extends Component {
             'impact' => ['required', 'string'],
             'solution' => ['nullable', 'string'],
             'happened' => ['boolean'],
+            'likelihood' => ['nullable', 'integer', 'between:1,3'],
+            'severity' => ['nullable', 'integer', 'between:1,3'],
             'riskProjectId' => ['required', 'integer', Rule::exists(Project::class, 'id')],
         ], [
             'name.required' => __('risks.enter_a_short_risk_name'),
@@ -315,6 +325,8 @@ new #[Layout('layouts::desk'), Title('titles.risks')] class extends Component {
             'impact' => $validated['impact'],
             'solution' => $validated['solution'] === '' ? null : $validated['solution'],
             'happened' => $validated['happened'],
+            'likelihood' => $validated['likelihood'] === '' || $validated['likelihood'] === null ? null : (int) $validated['likelihood'],
+            'severity' => $validated['severity'] === '' || $validated['severity'] === null ? null : (int) $validated['severity'],
             'project_id' => (int) $validated['riskProjectId'],
         ])->save();
 
@@ -381,6 +393,8 @@ new #[Layout('layouts::desk'), Title('titles.risks')] class extends Component {
         $this->impact = '';
         $this->solution = '';
         $this->happened = false;
+        $this->likelihood = '';
+        $this->severity = '';
         $this->riskProjectId = '';
     }
 };
@@ -640,8 +654,20 @@ new #[Layout('layouts::desk'), Title('titles.risks')] class extends Component {
                 </div>
             </x-ui.form-section>
 
-            <x-ui.form-section :title="__('risks.section_assessment')" :fields="['impact', 'solution']">
+            <x-ui.form-section :title="__('risks.section_assessment')" :fields="['likelihood', 'severity', 'impact', 'solution']">
                 <div class="grid gap-x-4 gap-y-3 @2xl/modal:grid-cols-2">
+                    @foreach (['likelihood' => 'risks.likelihood', 'severity' => 'risks.severity'] as $ratingField => $ratingLabel)
+                        <x-ui.form-segmented
+                            wire:model="{{ $ratingField }}"
+                            :label="__($ratingLabel)"
+                            :options="[
+                                ['value' => '', 'label' => __('risks.not_rated')],
+                                ['value' => '1', 'label' => __('risks.rating_low'), 'test' => 'form-'.$ratingField.'-1'],
+                                ['value' => '2', 'label' => __('risks.rating_medium'), 'test' => 'form-'.$ratingField.'-2'],
+                                ['value' => '3', 'label' => __('risks.rating_high'), 'test' => 'form-'.$ratingField.'-3'],
+                            ]"
+                        />
+                    @endforeach
                     <x-ui.form-textarea wire:model="impact" :label="__('common.impact')" required />
                     <x-ui.form-textarea wire:model="solution" :label="__('common.mitigation')" />
                 </div>

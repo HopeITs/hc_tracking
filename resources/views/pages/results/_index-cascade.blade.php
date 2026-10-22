@@ -41,9 +41,9 @@
                         </span>
 
                         @if ($groupProposal !== null)
-                            @can('proposals.view')<a href="{{ $groupProposalHref }}" wire:navigate class="type-meta font-semibold text-secondary-medium hover:text-primary dark:hover:text-brand-text hover:underline dark:text-ink-muted" data-test="proposal-framework-link-{{ $groupProposal->id }}">
+                            @if (isset($proposalStoryHrefs[$groupProposal->id]) || auth()->user()->can('proposals.view'))<a href="{{ $groupProposalHref }}" wire:navigate class="type-meta font-semibold text-secondary-medium hover:text-primary dark:hover:text-brand-text hover:underline dark:text-ink-muted" data-test="proposal-framework-link-{{ $groupProposal->id }}">
                                 {{ __('common.view_name', ['name' => $groupProposal->name]) }}
-                            </a>@endcan
+                            </a>@endif
                         @elseif ($groupProgram !== null)
                             <a href="{{ route('programs.show', $groupProgram) }}" wire:navigate class="type-meta font-semibold text-secondary-medium hover:text-primary dark:hover:text-brand-text hover:underline dark:text-ink-muted">
                                 {{ __('common.view_name', ['name' => $groupProgram->name]) }}

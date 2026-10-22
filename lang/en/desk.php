@@ -92,6 +92,7 @@ return [
     'module' => 'Module',
     'all_modules' => 'All modules',
     'happened' => 'happened',
+    'risk_cell' => 'Likelihood :likelihood, severity :severity: :count',
     'final_report' => 'Final report',
     'weight' => 'weight',
     'internal' => 'Internal',

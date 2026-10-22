@@ -4,12 +4,13 @@ use App\Livewire\Concerns\IndicatorLibrary\ListsLibraryEntries;
 use App\Livewire\Concerns\IndicatorLibrary\ManagesLibraryEntryForm;
 use App\Models\LibraryIndicator;
 use Illuminate\Support\Facades\Gate;
+use Livewire\Attributes\Layout;
 use Livewire\Attributes\Title;
 use Livewire\Attributes\Url;
 use Livewire\Component;
 use Livewire\WithPagination;
 
-new #[Title('titles.indicator_library')] class extends Component {
+new #[Layout('layouts::desk'), Title('titles.indicator_library')] class extends Component {
     use ListsLibraryEntries;
     use ManagesLibraryEntryForm;
     use WithPagination;
@@ -86,14 +87,7 @@ new #[Title('titles.indicator_library')] class extends Component {
     $paged = $this->pagedEntries;
 @endphp
 
-<section
-    class="@container/directory flex min-h-full w-full flex-1 flex-col gap-4 bg-white text-secondary-dark dark:bg-surface-0 dark:text-ink"
-    aria-labelledby="indicator-library-heading"
->
-    <x-ui.page-header
-        heading-id="indicator-library-heading"
-        :title="__('titles.indicator_library')"
-        :count="$this->filteredEntries->count()"
+<x-desk.register class="@container/directory" heading-id="indicator-library-heading" :title="__('titles.indicator_library')" :count="$this->filteredEntries->count()"
     >
         <x-slot:filters>
             <div class="contents" data-library-filters>
@@ -148,7 +142,7 @@ new #[Title('titles.indicator_library')] class extends Component {
                 </x-ui.button>
             </x-slot:actions>
         @endcan
-    </x-ui.page-header>
+
 
     @if ($paged->isEmpty())
         <x-ui.empty-state
@@ -175,4 +169,4 @@ new #[Title('titles.indicator_library')] class extends Component {
     @include('pages.indicator-library._index-entry-modal')
 
     @include('pages.indicator-library._index-confirm-modals')
-</section>
+</x-desk.register>

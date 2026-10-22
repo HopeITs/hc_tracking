@@ -16,6 +16,7 @@ use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Support\Facades\Gate;
 use Livewire\Attributes\Computed;
 use Livewire\Attributes\Locked;
+use Livewire\Attributes\Layout;
 use Livewire\Attributes\Title;
 use Livewire\Component;
 use Livewire\Features\SupportFileUploads\TemporaryUploadedFile;
@@ -27,7 +28,7 @@ use Livewire\WithFileUploads;
 | files and the submission. Rendered from the snapshot alone; finance only
 | for funding-agreements.view holders. The route checks the view policy.
 */
-new #[Title('titles.donor_report')] class extends Component {
+new #[Layout('layouts::desk'), Title('titles.donor_report')] class extends Component {
     use SubmitsDonorReport;
     use WithFileUploads;
 
@@ -215,6 +216,7 @@ new #[Title('titles.donor_report')] class extends Component {
     ];
 @endphp
 
+<x-desk.record-sheet register="pages::reporting-duties.index" :close-url="route('reporting-duties.index')" :title="$report->title">
 <section class="@container/detail flex min-h-full w-full flex-1 flex-col gap-8 bg-white text-secondary-dark dark:bg-surface-0 dark:text-ink" data-donor-report-page>
     <x-ui.detail-header :breadcrumbs="$breadcrumbs" :title="$report->title" title-class="text-3xl! font-extrabold! leading-none! tracking-tight!">
         <x-slot:meta>
@@ -377,3 +379,4 @@ new #[Title('titles.donor_report')] class extends Component {
 
     <x-donor-reports.submit-modal :open="$showSubmitModal" :needs-file="$submissionNeedsFile" :file-count="$submissionFileCount" />
 </section>
+</x-desk.record-sheet>
