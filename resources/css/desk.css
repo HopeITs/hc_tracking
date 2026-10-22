@@ -529,6 +529,7 @@
 .dk-pgb{ display:inline-flex;align-items:center;gap:4px }
 .dk-pempty{ padding:20px 4px;color:var(--ink-3);font-size:14px }
 .dk-addtile{ grid-column:span 3;min-height:180px;border:2px dashed var(--line-2);border-radius:14px;background:none;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px;color:var(--ink-3);cursor:pointer;font-weight:800;font-size:14px }
+.dk-grid-tail{ margin-top:14px }
 .dk-addtile:hover{ border-color:var(--ink-3);color:var(--ink) }
 .dk-addtile small{ font-weight:400;font-size:12.5px }
 .dk-addtile svg.dk-i{ width:26px;height:26px }
