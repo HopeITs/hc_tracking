@@ -12,4 +12,14 @@ return [
     'entered_by_invalid' => 'Choose who enters this indicator.',
     'evidence_types_invalid' => 'Choose active evidence types only.',
     'fixed_denominator_invalid' => 'Enter a whole number of at least 1.',
+    'console' => [
+        'prefill_row' => 'Project :project: template :template, :created lines created, :skipped already there, unlinked targets (link them to the library first): :unlinked.',
+        'template_new' => 'new',
+        'template_existing' => 'already there',
+        'none' => 'none',
+        'missing_lines' => 'Fixed-basis lines with no fixed_denominator (line ids): :ids.',
+        'missing_targets' => 'Fixed-basis targets that would get a line with no fixed_denominator (target ids): :ids.',
+        'missing_none' => 'Fixed-basis lines with no fixed_denominator: none.',
+        'dry_run' => 'Dry run: nothing was written.',
+    ],
 ];

@@ -12,4 +12,14 @@ return [
     'entered_by_invalid' => 'اختر من يُدخل هذا المؤشر',
     'evidence_types_invalid' => 'اختر أنواع أدلة فعّالة فقط',
     'fixed_denominator_invalid' => 'أدخل عددًا صحيحًا لا يقل عن 1',
+    'console' => [
+        'prefill_row' => 'المشروع :project: القالب :template، أُنشئ :created سطرًا، و:skipped موجودة مسبقًا، والمستهدفات غير المربوطة (اربطها بالمكتبة أولًا): :unlinked',
+        'template_new' => 'جديد',
+        'template_existing' => 'موجود مسبقًا',
+        'none' => 'لا شيء',
+        'missing_lines' => 'أسطر بأساس مقام ثابت دون fixed_denominator (أرقام الأسطر): :ids',
+        'missing_targets' => 'مستهدفات ستحصل على سطر بأساس مقام ثابت دون fixed_denominator (أرقام المستهدفات): :ids',
+        'missing_none' => 'أسطر بأساس مقام ثابت دون fixed_denominator: لا شيء',
+        'dry_run' => 'تشغيل تجريبي: لم يُكتب شيء',
+    ],
 ];
