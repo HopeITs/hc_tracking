@@ -84,7 +84,7 @@ Team A answered every open item with one line, relayed by the developer: «تم 
 | Item | Status |
 |---|---|
 | Time of `up` (T) | pending. It starts the 48-hour monitoring (§5). |
-| Deployed commit | pending. GitHub has no commit newer than `main` `9b4d3db0` and no tag (checked 2026-10-26). |
+| Deployed commit | **`96ea52be` on `lifecycle/T29-deploy`** (`git log -1` on the server, pasted 2026-10-26). Its code equals `main` `9b4d3db0`: the four commits after it change only `deployment.md` and `handoffs/T29.md`. Production runs a working branch; switch it to `main` once this branch is merged (no code change). |
 | Gate evidence, rows 2, 3, 8, 9, 10 | pending |
 | Step outputs D1–D20 | pending (deploy log, §7) |
 | Full or phased (D5) | pending |
@@ -530,7 +530,7 @@ Filled during the deploy and the 48 hours (T29 slice 2), from pasted outputs. Co
 | D3 code, composer, npm | | | | | |
 | D4 `optimize:clear` | | | | | |
 | D5 `permissions:sync` dry / real / again | | | | | |
-| D6 `migrate --force --step` + POST-01…11 | | | | | |
+| D6 `migrate --force --step` + POST-01…11 | | | Original output not received. Post-deploy `migrate:status`: every migration `Ran` (pasted 2026-10-26). POST-01…11 pending | | pass (post-check) |
 | D7 `hr:map-project-centers` dry / apply / apply | | | | | |
 | D8 pillars, Micro urban, Micro agri | | | | | |
 | D9 `meal:seed-indicator-library` | | | | | |
@@ -558,7 +558,7 @@ T is pending (§1 "Deploy reported"), so the checkpoint times are set once Team 
 
 | Checkpoint | Time | Checked by (role) | Findings (M1–M11) | Actions | Severity |
 |---|---|---|---|---|---|
-| C1 T + 15 min | 2026-10-26 (`/report-templates` check) | developer | **Confirmed:** `/report-templates` returns the app's 404 on production, so T33 slices 3–4 are not deployed (§1). No template confirmation screen; no templates for already-active projects; no 2026 annual plans | T33 slices 3–4, then a follow-up deploy (D10, D11, S9); warn MEAL and the PR Manager | High |
+| C1 T + 15 min | 2026-10-26 (pasted checks) | developer, Team A | **Confirmed:** `/report-templates` returns the app's 404 on production, so T33 slices 3–4 are not deployed (§1); no template confirmation screen, no templates for already-active projects, no 2026 annual plans. Commit `96ea52be` (code = `main` `9b4d3db0`). `migrate:status`: all `Ran`. M2 decryption failures: 0. M4 `queue:failed`: empty. Not yet checked: file-key copies and backups, `supervisorctl status`, `queue:restart`, cron, M1 errors, pages S4–S21 | T33 slices 3–4, then a follow-up deploy (D10, D11, S9); warn MEAL and the PR Manager; send the unchecked items | High (T33 gap); the rest pass |
 | C2 T + 1 h | | | | | |
 | C3 T + 4 h | | | | | |
 | C4 end of day 14 (+ POST-18) | | | | | |
@@ -678,5 +678,5 @@ Use the message in §6.
 | B19 | Decryption-failure threshold `<n>` | Dev 1 (after the rehearsal) | §6 triggers |
 | B20 | `.env.example` lacks `SESSION_EXPIRE_ON_CLOSE` although `.ai/rules/config-2.md` says it is there. The config defaults to `true`. | config owner (follow-up, not T29) | none (§2 still checks the key by name) |
 | B21 | Window times, `<release-tag>`, `<previous-release>`, `<agreed-record>`, backup retention date | Dev 1 | header, §2, S22, §8 |
-| B22 | **Deploy reported done (2026-10-26), evidence pending:** the time of `up` (T), the deployed commit (push it if newer than `9b4d3db0`), backup + restore result, file-key copies (yes/no), D1–D20 outputs, POST checks, full or phased | Team A · Dev 1 | §1 rows 2, 3, 8–10; §7 deploy log; §5 checkpoint times |
+| B22 | **Deploy reported done (2026-10-26), evidence pending.** Received: commit `96ea52be`; `migrate:status` all `Ran`; 0 decryption failures; `queue:failed` empty. Still pending: the time of `up` (T); backup + restore result; file-key copies (yes/no); `supervisorctl status`, `queue:restart` and the cron line; D1–D20 outputs; POST checks; pages S4–S21; full or phased | Team A · Dev 1 | §1 rows 2, 3, 8–10; §7 deploy log; §5 checkpoint times |
 | B23 | **T33 gap after the deploy (High), confirmed 2026-10-26** (`/report-templates` → 404 on production): without slices 3–4, MEAL cannot confirm templates (no project reaches `active`), already-active projects have no templates, and no 2026 annual plans exist | T33 · B3 (slice 3), B4 (slice 4); Dev 1 (follow-up deploy) | follow-up deploy: D10, D11, POST-15, POST-16, S9 |
