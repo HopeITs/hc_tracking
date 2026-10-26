@@ -89,12 +89,12 @@ Team A answered every open item with one line, relayed by the developer: «تم 
 | Step outputs D1–D20 | pending (deploy log, §7) |
 | Full or phased (D5) | pending |
 
-**T33 gap (flagged, High).** If `9b4d3db0` is what production runs, it lacks T33 slices 3–4:
+**T33 gap (High), confirmed on production 2026-10-26.** The developer opened `/report-templates` on the production site while signed in, and got the app's own 404 page (`errors.404_heading`, "This record isn't on the map"). The app runs, but the route is not registered, so T33 slice 3 is not deployed. Slice 4 comes after slice 3 and is very likely missing too; confirm with `<php> artisan list` on the server. Production therefore lacks T33 slices 3–4:
 - **No `report-templates:prefill-active` (D11).** Projects already active at launch got no pending template, so their monthly reports have no indicator lines (D-45 not met).
 - **No `/report-templates` page.** MEAL has no screen to confirm a template. `ConfirmReportTemplate` is the only way to call `ActivateProject` (§12.4), so a project approved after launch stays `approved`, never becomes `active` (D-04b, D-39) and gets no monthly reports. The approval listener still creates its pending template.
 - **No `annual-plans:ensure-2026` (D10).** No 2026 annual plans were created for the org-wide indicators (D-44).
 
-Fix: merge T33 slices 3–4, then a follow-up deploy that runs D10 and D11 (dry → real → again) and POST-15 / POST-16. If production runs a newer commit, push it to GitHub so this can be checked against it.
+Fix: merge T33 slices 3–4, then a follow-up deploy that runs D10 and D11 (dry → real → again), POST-15 / POST-16 and smoke test S9. Until then, tell MEAL and the PR Manager that newly approved projects stay `approved` (no monthly reports yet).
 
 **Checks to run now** (§5; they go into the monitoring report as C1):
 - both off-server copies of the file key (§2);
@@ -558,7 +558,7 @@ T is pending (§1 "Deploy reported"), so the checkpoint times are set once Team 
 
 | Checkpoint | Time | Checked by (role) | Findings (M1–M11) | Actions | Severity |
 |---|---|---|---|---|---|
-| C1 T + 15 min | | | T33 gap (§1): no template confirmation screen; no templates for already-active projects; no 2026 annual plans, if production runs `9b4d3db0` | Confirm the deployed commit; T33 slices 3–4, then a follow-up deploy | High |
+| C1 T + 15 min | 2026-10-26 (`/report-templates` check) | developer | **Confirmed:** `/report-templates` returns the app's 404 on production, so T33 slices 3–4 are not deployed (§1). No template confirmation screen; no templates for already-active projects; no 2026 annual plans | T33 slices 3–4, then a follow-up deploy (D10, D11, S9); warn MEAL and the PR Manager | High |
 | C2 T + 1 h | | | | | |
 | C3 T + 4 h | | | | | |
 | C4 end of day 14 (+ POST-18) | | | | | |
@@ -679,4 +679,4 @@ Use the message in §6.
 | B20 | `.env.example` lacks `SESSION_EXPIRE_ON_CLOSE` although `.ai/rules/config-2.md` says it is there. The config defaults to `true`. | config owner (follow-up, not T29) | none (§2 still checks the key by name) |
 | B21 | Window times, `<release-tag>`, `<previous-release>`, `<agreed-record>`, backup retention date | Dev 1 | header, §2, S22, §8 |
 | B22 | **Deploy reported done (2026-10-26), evidence pending:** the time of `up` (T), the deployed commit (push it if newer than `9b4d3db0`), backup + restore result, file-key copies (yes/no), D1–D20 outputs, POST checks, full or phased | Team A · Dev 1 | §1 rows 2, 3, 8–10; §7 deploy log; §5 checkpoint times |
-| B23 | **T33 gap after the deploy (High):** without slices 3–4, MEAL cannot confirm templates (no project reaches `active`), already-active projects have no templates, and no 2026 annual plans exist | T33 · B3 (slice 3), B4 (slice 4); Dev 1 (follow-up deploy) | follow-up deploy: D10, D11, POST-15, POST-16, S9 |
+| B23 | **T33 gap after the deploy (High), confirmed 2026-10-26** (`/report-templates` → 404 on production): without slices 3–4, MEAL cannot confirm templates (no project reaches `active`), already-active projects have no templates, and no 2026 annual plans exist | T33 · B3 (slice 3), B4 (slice 4); Dev 1 (follow-up deploy) | follow-up deploy: D10, D11, POST-15, POST-16, S9 |
