@@ -1,10 +1,10 @@
 # Production deployment checklist
 
-> **DRAFT (pre-CP6). DECISION: NO-GO.**
+> **DRAFT. The gate on 2026-10-26 was NO-GO. Team A reported the same day that production is fully deployed. Evidence pending: §1 "Deploy reported (2026-10-26)".**
 > - Written 2026-10-26 (day 11, CP4) on `lifecycle/T29-deploy` from GitHub `main` `9b4d3db0` (`HopeITs/hc_tracking`).
 > - Dev 1 approved drafting before T29's start state passes. T27 is still an early draft, and T28 has not run (§1).
 > - Every **TBD** has an owner in [Appendix B](#appendix-b-open-items). Durations marked "local" come from T27's local rehearsal on a developer PC. They are **not** production rehearsal timings.
-> - At CP6 (Wed 28 Oct): re-run §1, fill the TBDs from T27's and T28's handoffs, then remove this banner.
+> - Next: collect the deploy evidence (§1), fill the deploy log (§7) from pasted outputs, and run the monitoring checks (§5) from T, the time of `up`. Remove this banner when the deploy log is complete.
 
 The operator is **Dev 1** (backup Dev 2). T29 prepares this document and reads the outputs the operator pastes. It never connects to production, reads a secret or runs a step. Sources: [`runbook.md`](runbook.md) Part B and Part C, [`checks.sql`](checks.sql), [`rehearsal-report.md`](rehearsal-report.md).
 
@@ -66,9 +66,9 @@ Check every row on the morning of the deploy. **Any ❌ or ⏸ → No-Go. Do not
 | 5 | Topology confirmed | Dev 1 | ✅ | (a) VPS + Supervisor + cron (Q2, Team A, 2026-10-26). The program names and the cron line are checked at T-2 (§2). |
 | 6 | Coverage: deploy Thu 29 Oct; two people on call for 48 h; a **named** Team A on-call for Sat 31 Oct and Sun 1 Nov | Dev 1 | ⏸ TBD | §2 |
 | 7 | Readiness tests green | T29 | ✅ | 19 files, 192 passed (2026-10-26, local); list in `handoffs/T29.md` |
-| 8 | Final backup taken **and test-restored** | Dev 1 | ⏸ on the day | §3 D2 |
-| 9 | `FILE_ENCRYPTION_KEY` present, with two off-server copies verified by a second person | Dev 1 + 1 | ⏸ | §2 |
-| 10 | Go recorded at CP6 | management | ⏸ | — |
+| 8 | Final backup taken **and test-restored** | Dev 1 | ⏸ evidence pending | Deploy reported done (below); no backup time or restore result received |
+| 9 | `FILE_ENCRYPTION_KEY` present, with two off-server copies verified by a second person | Dev 1 + 1 | ⏸ evidence pending | Deploy reported done (below); no confirmation received |
+| 10 | Go recorded at CP6 | management | ⏸ evidence pending | No Go record received |
 
 **Decision: NO-GO** (2026-10-26, T29 slice 1 draft). Reason: rows 2, 3 and 4. Re-evaluate at CP6.
 
@@ -76,6 +76,33 @@ Check every row on the morning of the deploy. **Any ❌ or ⏸ → No-Go. Do not
 |---|---|---|---|
 | Dev 1 (operator) | | | |
 | Management | | | |
+
+### Deploy reported (2026-10-26)
+
+Team A answered every open item with one line, relayed by the developer: «تم النشر على السيرفر كاملا» ("the deploy to the server is complete"). No output, time or commit came with it. It is recorded here **as reported, not verified**.
+
+| Item | Status |
+|---|---|
+| Time of `up` (T) | pending. It starts the 48-hour monitoring (§5). |
+| Deployed commit | pending. GitHub has no commit newer than `main` `9b4d3db0` and no tag (checked 2026-10-26). |
+| Gate evidence, rows 2, 3, 8, 9, 10 | pending |
+| Step outputs D1–D20 | pending (deploy log, §7) |
+| Full or phased (D5) | pending |
+
+**T33 gap (flagged, High).** If `9b4d3db0` is what production runs, it lacks T33 slices 3–4:
+- **No `report-templates:prefill-active` (D11).** Projects already active at launch got no pending template, so their monthly reports have no indicator lines (D-45 not met).
+- **No `/report-templates` page.** MEAL has no screen to confirm a template. `ConfirmReportTemplate` is the only way to call `ActivateProject` (§12.4), so a project approved after launch stays `approved`, never becomes `active` (D-04b, D-39) and gets no monthly reports. The approval listener still creates its pending template.
+- **No `annual-plans:ensure-2026` (D10).** No 2026 annual plans were created for the org-wide indicators (D-44).
+
+Fix: merge T33 slices 3–4, then a follow-up deploy that runs D10 and D11 (dry → real → again) and POST-15 / POST-16. If production runs a newer commit, push it to GitHub so this can be checked against it.
+
+**Checks to run now** (§5; they go into the monitoring report as C1):
+- both off-server copies of the file key (§2);
+- the pre-deploy backups kept;
+- `sudo supervisorctl status`, and whether `queue:restart` ran after the deploy (D16);
+- the `schedule:run` cron line (§2);
+- M2: decryption failures;
+- M4: `queue:failed`.
 
 ---
 
@@ -493,9 +520,11 @@ Filled during the deploy and the 48 hours (T29 slice 2), from pasted outputs. Co
 
 ### Deploy log
 
+**Status 2026-10-26:** Team A reported the deploy as done (§1 "Deploy reported"). No output has been received yet. The rows stay empty until the outputs are pasted; never fill a row from memory.
+
 | Step | Started | Ended | Output summary (counts / ids) | Operator (role) | Result |
 |---|---|---|---|---|---|
-| §1 gate | | | Go / No-Go | | |
+| §1 gate | — | — | No-Go on 2026-10-26 (rows 2, 3, 4); the deploy went ahead per Team A's report | — | reported |
 | D1 `down` | | | | | |
 | D2 backups + test restore | | | backup time: | | |
 | D3 code, composer, npm | | | | | |
@@ -505,8 +534,8 @@ Filled during the deploy and the 48 hours (T29 slice 2), from pasted outputs. Co
 | D7 `hr:map-project-centers` dry / apply / apply | | | | | |
 | D8 pillars, Micro urban, Micro agri | | | | | |
 | D9 `meal:seed-indicator-library` | | | | | |
-| D10 `annual-plans:ensure-2026` | | | | | TBD (G2) |
-| D11 `report-templates:prefill-active` | | | | | TBD (G3) |
+| D10 `annual-plans:ensure-2026` | | | Command absent on `9b4d3db0`: not run, unless production runs a newer commit (T33 gap, §1) | | pending |
+| D11 `report-templates:prefill-active` | | | Command absent on `9b4d3db0`: not run, unless production runs a newer commit (T33 gap, §1) | | pending |
 | D12 `monthly-reports:backfill --from=2026-10` | | | | | |
 | D13 `files:encrypt-existing` (or D4 deferral) | | | | | |
 | D14 POST checks, PRE-20, PRE-20b | | | | | |
@@ -515,7 +544,7 @@ Filled during the deploy and the 48 hours (T29 slice 2), from pasted outputs. Co
 | D17 `schedule:list` | | | | | |
 | D18 phased permissions | | | | | |
 | D19 smoke tests S1–S23 | | | | | |
-| D20 `up` (T) | | | | | |
+| D20 `up` (T) | | | Reported done by Team A (2026-10-26); the time of `up` is pending | | reported, not verified |
 
 ### Monitoring report
 
@@ -525,9 +554,11 @@ Severity:
 - **Medium** = a workaround exists;
 - **Low** = cosmetic.
 
+T is pending (§1 "Deploy reported"), so the checkpoint times are set once Team A gives it. Checks run before then go into C1 with their actual time. The T33 gap is already a High finding to carry into C1.
+
 | Checkpoint | Time | Checked by (role) | Findings (M1–M11) | Actions | Severity |
 |---|---|---|---|---|---|
-| C1 T + 15 min | | | | | |
+| C1 T + 15 min | | | T33 gap (§1): no template confirmation screen; no templates for already-active projects; no 2026 annual plans, if production runs `9b4d3db0` | Confirm the deployed commit; T33 slices 3–4, then a follow-up deploy | High |
 | C2 T + 1 h | | | | | |
 | C3 T + 4 h | | | | | |
 | C4 end of day 14 (+ POST-18) | | | | | |
@@ -647,3 +678,5 @@ Use the message in §6.
 | B19 | Decryption-failure threshold `<n>` | Dev 1 (after the rehearsal) | §6 triggers |
 | B20 | `.env.example` lacks `SESSION_EXPIRE_ON_CLOSE` although `.ai/rules/config-2.md` says it is there. The config defaults to `true`. | config owner (follow-up, not T29) | none (§2 still checks the key by name) |
 | B21 | Window times, `<release-tag>`, `<previous-release>`, `<agreed-record>`, backup retention date | Dev 1 | header, §2, S22, §8 |
+| B22 | **Deploy reported done (2026-10-26), evidence pending:** the time of `up` (T), the deployed commit (push it if newer than `9b4d3db0`), backup + restore result, file-key copies (yes/no), D1–D20 outputs, POST checks, full or phased | Team A · Dev 1 | §1 rows 2, 3, 8–10; §7 deploy log; §5 checkpoint times |
+| B23 | **T33 gap after the deploy (High):** without slices 3–4, MEAL cannot confirm templates (no project reaches `active`), already-active projects have no templates, and no 2026 annual plans exist | T33 · B3 (slice 3), B4 (slice 4); Dev 1 (follow-up deploy) | follow-up deploy: D10, D11, POST-15, POST-16, S9 |
