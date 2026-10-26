@@ -15,7 +15,7 @@ The operator is **Dev 1** (backup Dev 2). T29 prepares this document and reads t
 | Total window | **TBD** = the sum of the step durations in §3 plus the smoke tests (§4), from T27's final rehearsal. Local reference only: migrations 57 / 57 in 5 s; restore 2 s. |
 | Release | `<release-tag>` (the commit T28 tested). Previous release for rollback: `<previous-release>` |
 | Variant | **full / phased**: decision D5, TBD |
-| Topology | **(a)** VPS + Supervisor (`queue:work`, `reverb:start`) + cron `schedule:run`, or **(b)** Pusher with `QUEUE_CONNECTION=sync`: TBD. **Unknown → stop.** |
+| Topology | **(a) VPS:** Supervisor runs `queue:work` and `reverb:start`; cron runs `schedule:run` every minute. Q2, Team A, 2026-10-26. Option (b), Pusher with `QUEUE_CONNECTION=sync`, is not used. |
 | File encryption | inside the window / after `up`: decision D4, TBD |
 | Operator · backup | Dev 1 · Dev 2 |
 
@@ -63,7 +63,7 @@ Check every row on the morning of the deploy. **Any ❌ or ⏸ → No-Go. Do not
 | 2 | **T27** passed with no manual step; durations recorded; rollback tried; every blocking PRE is 0 or decided; the copy is deleted | Dev 1 | ❌ | `handoffs/T27.md` says "slice 1/2 early draft, pre-CP5". Gaps G2, G3, G4, G6, G7, G8 and G10 are open. `rehearsal-report.md` §1–7 are empty. |
 | 3 | **T28** Go at CP6 (full or phased); 0 open Critical/High; UAT signed by MEAL, Funding and Finance; full suite green | Dev 1 + management | ❌ | No `handoffs/T28.md`, no `launch/qa-report.md`. CP6 is Wed 28 Oct. |
 | 4 | Every runbook command and flag exists; the schedule shows `monthly-reports:prepare`, the daily scanner and `reports:monthly-digest` | T29 | ⚠ partial | Schedule ✅ (§3 D17). Commands: `annual-plans:ensure-2026` and `report-templates:prefill-active` are not registered (G2, G3). The other commands and flags match `--help` (2026-10-26). |
-| 5 | Topology confirmed: (a) or (b) | Dev 1 | ⏸ TBD | — |
+| 5 | Topology confirmed | Dev 1 | ✅ | (a) VPS + Supervisor + cron (Q2, Team A, 2026-10-26). The program names and the cron line are checked at T-2 (§2). |
 | 6 | Coverage: deploy Thu 29 Oct; two people on call for 48 h; a **named** Team A on-call for Sat 31 Oct and Sun 1 Nov | Dev 1 | ⏸ TBD | §2 |
 | 7 | Readiness tests green | T29 | ✅ | 19 files, 192 passed (2026-10-26, local); list in `handoffs/T29.md` |
 | 8 | Final backup taken **and test-restored** | Dev 1 | ⏸ on the day | §3 D2 |
@@ -90,7 +90,9 @@ By Tue 27 Oct; at the latest at CP6 (Wed 28 Oct). Write "done" with the time and
   - support channel `<support-contact>`.
 
   Owner: Dev 1. TBD.
-- [ ] **Topology** recorded: (a) or (b). Unknown → stop. Owner: Dev 1.
+- [ ] **VPS processes** (topology (a), Q2). Owner: Dev 1.
+  - `sudo supervisorctl status` lists the queue worker and the Reverb program, both RUNNING. This document uses the names `hc-tracking-queue` and `hc-tracking-reverb` from `docs/superpowers/plans/2026-09-23-notifications.md`; if the server uses other names, write them here and use them in D16, M5, M8 and R5.
+  - `crontab -l` for the web user shows `* * * * * cd <app-path> && <php> artisan schedule:run >> /dev/null 2>&1`. **No cron line → stop:** nothing scheduled would run (05:00 prepare, 06:00 scan, 08:00 digest).
 - [ ] **Production `.env` checked by name.** Dev 1 reads the file on the server; nobody pastes or says a value. Each key is present with the expected setting:
   - `APP_ENV=production`
   - `APP_DEBUG=false`
@@ -102,7 +104,7 @@ By Tue 27 Oct; at the latest at CP6 (Wed 28 Oct). Write "done" with the time and
   - `DB_USERNAME` is **not** root (least-privilege account)
   - `MAIL_MAILER` and the `MAIL_*` keys set
   - `FILE_ENCRYPTION_KEY` and `FILE_ENCRYPTION_KEY_ID` present
-  - topology (a): `BROADCAST_CONNECTION=reverb`, `QUEUE_CONNECTION=database`; topology (b): `BROADCAST_CONNECTION=pusher`, `QUEUE_CONNECTION=sync` (`.env.example` comments)
+  - `BROADCAST_CONNECTION=reverb` and `QUEUE_CONNECTION=database` (topology (a))
 - [ ] **File encryption key** (D-19, T22). Owner: Dev 1.
   1. If production `.env` already has a `FILE_ENCRYPTION_KEY`, **do not generate another one**. A second key after files are encrypted means data loss.
   2. Otherwise generate it **once**, on the server terminal only, before the first encrypted write (that is, before D3): `<php> -r "echo 'base64:'.base64_encode(random_bytes(32)).PHP_EOL;"`. Put it in `FILE_ENCRYPTION_KEY`. Set `FILE_ENCRYPTION_KEY_ID` (empty = `k1`).
@@ -120,6 +122,7 @@ By Tue 27 Oct; at the latest at CP6 (Wed 28 Oct). Write "done" with the time and
   - the PR Manager fills the `target_beneficiaries` list from `report-templates:prefill-active --dry-run` (runbook step 8a; TBD, G3);
   - Dev 1 decides each self-funded relinking id (POST-20).
 - [ ] **Warn MEAL and the managers** that the first scans after `up` send many reminders (§5 "Expected first-day alerts").
+- [ ] **Notification baseline B** for the flood rule (§5, Q6). Dev 1 runs this read-only query on production and records only the top count: `SELECT DATE(created_at) AS day, notifiable_id AS user_id, COUNT(*) AS n FROM notifications WHERE created_at >= CURDATE() - INTERVAL 14 DAY GROUP BY day, user_id ORDER BY n DESC LIMIT 5;`. B = the highest `n` (0 if there are no rows).
 - [ ] **Release tags:** `<release-tag>` is cut from the commit T28 tested; `<previous-release>` is recorded for R3.
 - [ ] **Agreed test record** for the new-upload smoke test S22: `<agreed-record>`, or "none" (then watch the first real upload).
 
@@ -259,7 +262,7 @@ The order is T27 Part B, as the T29 prompt sets it. Failure routing:
   - the dry run ends with `Dry run: nothing was written.`;
   - the second real run creates 0;
   - POST-17 = a 0, b 0, c = PRE-27a `expected_months`, d 0.
-  - The backfill sends **no** notification: generation runs under `Activity::withoutRecording`. The grouped `monthly_reports.generated` comes only from projects activated later (Q1, Appendix B).
+  - The backfill sends **no** notification: generation runs under `Activity::withoutRecording`. The grouped `monthly_reports.generated` comes only from projects activated later (Q1: Team A confirmed the code's behaviour, 2026-10-26).
 - **Stop if:** POST-17 a, b or d is not 0.
 
 ### D13 · Encrypt existing files (T22; D-19) ⛁, inside the window or after `up` (D4)
@@ -292,9 +295,10 @@ The order is T27 Part B, as the T29 prompt sets it. Failure routing:
 ### D16 · Restart workers
 - **Owner:** Dev 1 · **Duration:** seconds · **On failure → R1**
 - **Do:**
-  - topology (a): `<php> artisan queue:restart`, then `sudo supervisorctl restart hc-tracking-reverb` (or `<php> artisan reverb:restart`; Supervisor starts it again)
-  - topology (b): nothing to restart
-- **Expected:** (a) `supervisorctl status` shows `hc-tracking-reverb` and `hc-tracking-queue:*` RUNNING.
+  1. `<php> artisan queue:restart`. The workers finish their current job, exit, and Supervisor starts them on the new code.
+  2. `sudo supervisorctl restart hc-tracking-reverb` (or `<php> artisan reverb:restart`; Supervisor starts it again).
+- **Expected:** `sudo supervisorctl status` shows `hc-tracking-reverb` and `hc-tracking-queue:*` RUNNING.
+- **Stop if:** a program is not RUNNING. Workers left on the old code would fail on the new tables.
 
 ### D17 · Schedule
 - **Owner:** Dev 1 · **Duration:** seconds · **On failure → R1**
@@ -311,7 +315,7 @@ The order is T27 Part B, as the T29 prompt sets it. Failure routing:
   0 3 * * *     files:prune
   0 * * * *     cache:prune-expired
   ```
-  Topology (a): the cron line `* * * * * cd <app-path> && <php> artisan schedule:run >> /dev/null 2>&1` exists for the web user.
+  The cron line `* * * * * cd <app-path> && <php> artisan schedule:run >> /dev/null 2>&1` exists for the web user (§2).
 - **Stop if:** an entry is missing or extra. **Never** schedule `files:encrypt-existing`.
 
 ### D18 · Phased release only: withheld permissions
@@ -389,20 +393,47 @@ Sat and Sun are non-working days (Mon–Fri default, D-22), so the scanners send
 | M1 | Errors | `grep -cE '\.(ERROR\|CRITICAL\|ALERT\|EMERGENCY):' <app-path>/storage/logs/laravel*.log`, then `tail -n 200 <app-path>/storage/logs/laravel*.log` for the latest messages | No new CRITICAL/ALERT/EMERGENCY. Each new ERROR is classified in the report. |
 | M2 | Decryption failures (`app/Exceptions/UnreadableStoredFile.php`) | `grep 'Stored file could not be read.' <app-path>/storage/logs/laravel*.log \| tail -n 20`. Each line carries only `table`, `id`, `key_id` (`contracts.md §16`). | 0 new. Several files, one shared `key_id`, or any file uploaded after `up` → **rollback trigger** (§6). |
 | M3 | Key-ring refused (`app/Support/FileKeyring.php`) | `grep -c 'File encryption is not configured.' <app-path>/storage/logs/laravel*.log` | 0. Any → uploads are refused: Critical. Check `FILE_ENCRYPTION_KEY*` by name (§2). |
-| M4 | Failed jobs | `<php> artisan queue:failed` | No new rows. Record the job class only. Topology (b): failures appear in M1 instead. |
-| M5 | Queue backlog (topology a) | `SELECT queue, COUNT(*) AS waiting, FROM_UNIXTIME(MIN(available_at)) AS oldest FROM jobs WHERE reserved_at IS NULL GROUP BY queue;` | Oldest waiting job < 5 min. Otherwise check `supervisorctl status hc-tracking-queue:*`. Topology (b): always empty. |
+| M4 | Failed jobs | `<php> artisan queue:failed` | No new rows. Record the job class only. |
+| M5 | Queue backlog | `SELECT queue, COUNT(*) AS waiting, FROM_UNIXTIME(MIN(available_at)) AS oldest FROM jobs WHERE reserved_at IS NULL GROUP BY queue;` | Oldest waiting job < 5 min. Otherwise check `sudo supervisorctl status hc-tracking-queue:*` and `tail -n 50 <app-path>/storage/logs/queue.log`. |
 | M6 | Scheduler activity | `SELECT rule, COUNT(*) AS fired, MAX(fired_at) AS last FROM notification_alert_ledger WHERE fired_at >= '<since>' GROUP BY rule ORDER BY rule;` | New rows after each 06:00 scan on working days. The ledger stops duplicates, so a re-scan adds no rows. |
-| M7 | Notification flood | Per key: `SELECT JSON_UNQUOTE(JSON_EXTRACT(data, '$.key')) AS message_key, COUNT(*) AS n FROM notifications WHERE created_at >= '<since>' GROUP BY message_key ORDER BY n DESC;` Per recipient: `SELECT notifiable_id AS user_id, COUNT(*) AS n FROM notifications WHERE created_at >= '<since>' GROUP BY notifiable_id ORDER BY n DESC LIMIT 10;` | Compare with "Expected first-day alerts" below. A recipient (MEAL or General Management user id) above `<flood-threshold>` per day is High (threshold TBD, Q6). |
-| M8 | Real-time (Reverb / Pusher) | (a) `sudo supervisorctl status hc-tracking-reverb`, `tail -n 50 <app-path>/storage/logs/reverb.log`; (b) the Pusher dashboard | RUNNING / no errors; a toast arrives without a page refresh |
+| M7 | Notification flood | Per key: `SELECT JSON_UNQUOTE(JSON_EXTRACT(data, '$.key')) AS message_key, COUNT(*) AS n FROM notifications WHERE created_at >= '<since>' GROUP BY message_key ORDER BY n DESC;` Per recipient: `SELECT notifiable_id AS user_id, COUNT(*) AS n FROM notifications WHERE created_at >= '<since>' GROUP BY notifiable_id ORDER BY n DESC LIMIT 10;` | Apply the flood rule below (Q6). Compare with "Expected first-day alerts". |
+| M8 | Real-time (Reverb) | `sudo supervisorctl status hc-tracking-reverb`, `tail -n 50 <app-path>/storage/logs/reverb.log` | RUNNING, no errors; a toast arrives without a page refresh |
 | M9 | Disk | `df -h <app-path>`; `du -sh <app-path>/storage/app/private <app-path>/storage/logs` | ≥ 20 % free; logs not growing fast |
 | M10 | Key-page timings | Open Home, one proposal, `/monthly-reports` and `/reports/monthly-matrix`; time each page | Within the T28 baseline (TBD) |
 | M11 | User reports | `<support-contact>` | Each report classified (severity, §7) |
+
+**Flood rule (Q6).** `config/notifications.php` has no flood limit. Team A asked for the most suitable rule given the app's own defaults (2026-10-26). The rule below is that recommendation; revisit it at C5 with the first day's real numbers. It is built on what the code already guarantees:
+- **The ledger** (`notification_alert_ledger`, unique on rule, subject, stage and user) sends a scheduled alert at most once per item, stage and person. The reminder stages are spaced over days: due soon at 7, 3 and 1 working days; overdue every 3 working days.
+- **The grouper** merges a repeat into the latest unread row with the same group key within `grouping_window_minutes` = 5.
+- **Digest keys** reach MEAL and General Management only in the one daily oversight summary.
+
+So a same-day duplicate of a scheduled alert is a defect, while a high count of distinct items may be normal.
+
+1. **Duplicates (defect).** Expected: 0 rows.
+   ```sql
+   SELECT notifiable_id AS user_id, JSON_UNQUOTE(JSON_EXTRACT(data, '$.key')) AS message_key, subject_type, subject_id, DATE(created_at) AS day,
+          SUM(COALESCE(CAST(JSON_EXTRACT(data, '$.count') AS UNSIGNED), 1)) AS deliveries
+   FROM notifications
+   WHERE created_at >= '<since>' AND JSON_UNQUOTE(JSON_EXTRACT(data, '$.key')) LIKE 'notifications.alerts.%'
+   GROUP BY user_id, message_key, subject_type, subject_id, day
+   HAVING deliveries > 1;
+   ```
+   Any row → check that subject's ledger rows. A true repeat is **High**.
+2. **Volume per recipient and working day.** Leave out D11's one-off `report_template.pending` (its expected count is the number of templates D11 created). Flag a user above:
+   - first 24 h after `up`: **max(30, 3 × B)**, because the first scans catch up on everything already due;
+   - from day 2: **max(20, 2 × B)**.
+
+   B is the T-2 baseline (§2). The floors cover a quiet production where B is near 0. Oversight is new in this release, so MEAL and General Management users get more than their baseline: a flag means **review**, not failure.
+3. **When flagged:** find the key with the M7 per-key query filtered on that `notifiable_id`.
+   - If it is real movements or distinct items, record it as expected.
+   - If it repeats one key, it is **High**: switch that key off in `/admin/notification-settings` (Event Notifications), write the time in the monitoring report, fix it, then switch it back on. A disabled key sends nothing, direct recipients included.
+   - A flood is never a rollback trigger on its own.
 
 **At C4 only:** POST-18 (`checks.sql`) = 0, except the rows `files:encrypt-existing` reported missing. This is the acceptance check for encryption.
 
 **At C8 only:**
 - Lines built for November: `SELECT COUNT(DISTINCT r.id) AS reports, COUNT(l.id) AS line_rows FROM monthly_reports r LEFT JOIN monthly_report_lines l ON l.monthly_report_id = r.id WHERE r.period = '2026-11-01';`. Lines > 0 only for projects whose template MEAL confirmed.
-- Monthly digest: `SELECT COUNT(*) FROM notification_alert_ledger WHERE rule = 'monthly_digest' AND stage = '2026-10';` > 0. The mail is queued: topology (a) needs the worker (M5).
+- Monthly digest: `SELECT COUNT(*) FROM notification_alert_ledger WHERE rule = 'monthly_digest' AND stage = '2026-10';` > 0. The mail is queued, so it needs the worker (M5).
 
 **Expected first-day alerts.** These are normal, and the ledger stops duplicates:
 - monthly report due;
@@ -410,10 +441,10 @@ Sat and Sun are non-working days (Mon–Fri default, D-22), so the scanners send
 - donor-report owners;
 - project start / end;
 - templates to confirm (`report_template.pending`, after D11);
-- the grouped `monthly_reports.generated` for projects **activated after `up`** (the backfill sends none, Q1);
+- the grouped `monthly_reports.generated` for projects **activated after `up`** (the backfill sends none; Q1, confirmed);
 - the oversight digest to MEAL and General Management.
 
-Mail failures still leave the in-app notification. Retries depend on the topology: (a) the queue retries 3 times; (b) sync sends inline and logs the failure (M1).
+Mail failures still leave the in-app notification. The queue retries a failed mail 3 times, then it appears in `queue:failed` (M4).
 
 **Acceptance (prompt):** the system works; 0 critical errors in 48 h; POST-18 as above.
 
@@ -431,7 +462,7 @@ Restore is the production rollback. **Never `migrate:rollback`** in production: 
 | Systematic decryption errors (M2) | the same failure across several files (≥ `<n>`, TBD by Dev 1 after the rehearsal), all failures on one `key_id`, **or** any failure on a file uploaded after `up` |
 | The approval path breaks | `ApproveProposal` errors (M1) or leaves a wrong proposal or project status (user report, M11) |
 
-**Cut-off (proposal, Q4: Dev 1 + management):** restore is the default until the end of day 14 (Thu 29 Oct). After that, a **forward fix** is the default, unless a trigger puts data at risk: new uploads that cannot be decrypted, or approvals writing a wrong status.
+**Cut-off (Q4: Team A agreed 2026-10-26; management confirms in the §1 sign-off):** restore is the default until the end of day 14 (Thu 29 Oct). After that, a **forward fix** is the default, unless a trigger puts data at risk: new uploads that cannot be decrypted, or approvals writing a wrong status.
 
 **Data-loss window:** the D2 backup is taken after `down`, so a rollback **before D20** loses nothing (the bypass session writes only S22's test upload, which is deleted). A rollback **after D20** loses every change users made between `up` and R1. Tell them with A3.
 
@@ -444,7 +475,7 @@ Restore is the production rollback. **Never `migrate:rollback`** in production: 
 | R2 | Restore the database **and** `storage/app/private` **together**, from the D2 backup point. Post-deploy rows carry `encryption_key_id`; the old code would serve ciphertext if only one were restored. Steps: 1. Move the current folder aside: `mv <app-path>/storage/app/private <backup-dir>/private-failed-<release-tag>` (kept for investigation). 2. `tar -xzf <backup-dir>/private-predeploy.tgz -C <app-path>/storage/app`. 3. Restore `<backup-dir>/<db>-predeploy.sql` into an **empty** schema: the release created tables the dump does not drop. Use T27's step 13.1 method (TBD, Appendix B). 4. Restore `.env` from D2 only if it changed during the deploy. | PRE-20 counts equal the D2 values |
 | R3 | Previous release: `git checkout <previous-release>`, then `composer install --no-dev --optimize-autoloader`, then `npm ci` and `npm run build` | each exits 0 |
 | R4 | `<php> artisan optimize` | `DONE` |
-| R5 | Topology (a): `<php> artisan queue:restart`, then `sudo supervisorctl restart hc-tracking-reverb` (or `<php> artisan reverb:restart`). Topology (b): nothing. | RUNNING |
+| R5 | `<php> artisan queue:restart`, then `sudo supervisorctl restart hc-tracking-reverb` (or `<php> artisan reverb:restart`) | `sudo supervisorctl status` shows both programs RUNNING |
 | R6 | `<php> artisan up` | `Application is now live.` |
 | R7 | Verify: PRE-20 counts = D2; one file downloads; one login works. Send A3. | all three pass |
 
@@ -604,14 +635,14 @@ Use the message in §6.
 | B7 | G7: duplicated HR program codes 003, 004, 009; cities without an active center | HR via Dev 2 | D9, D7 |
 | B8 | G4 / D2: `prechecks.md` missing; PRE-01…10 accepted or not | Dev 1, Dev 2 | §2 |
 | B9 | G8: MEAL approval of the T32 data; `donor_attribution` per program | Dev 1 | D8 |
-| B10 | Topology (a) or (b) | Dev 1 | §1 row 5; D16; M4, M5, M8 |
+| B10 | ✅ **Q2, closed 2026-10-26:** topology (a) VPS. Still to check at T-2: the Supervisor program names and the `schedule:run` cron line (§2). | Team A · Dev 1 | — |
 | B11 | On-call names (48 h; Team A Sat 31 Oct, Sun 1 Nov); support contact | Dev 1 | §1 row 6; §2 |
 | B12 | D4: encryption inside or after the window | Dev 1 + management | D13 |
 | B13 | D5: full or phased, and the withheld permission list | management | D18; S-test skips |
-| B14 | **Q1:** the prompt expects the backfill to send the grouped `monthly_reports.generated`. In the code it sends none (`BackfillMonthlyReports` → `MonthlyReportGenerator::generate()` under `Activity::withoutRecording`); only `GenerateMonthlyReportsForProject` on `ProjectActivated` does. Documented as in the code. | Dev 1 | D12, M7 |
-| B15 | **Q4:** rollback cut-off (proposal in §6) | Dev 1 + management | §6 |
+| B14 | ✅ **Q1, closed 2026-10-26:** Team A adopts the code's behaviour. The backfill sends no `monthly_reports.generated` (`BackfillMonthlyReports` → `MonthlyReportGenerator::generate()` under `Activity::withoutRecording`); only `GenerateMonthlyReportsForProject` on `ProjectActivated` does. | Team A | — |
+| B15 | **Q4:** rollback cut-off (§6). Team A ✅ 2026-10-26; management ⏸ (§1 sign-off) | management | §6 |
 | B16 | **Q5:** where users read the user guide (`<user-guide-link>`) | Dev 1 | Appendix A |
-| B17 | **Q6:** flood threshold per recipient per day | Dev 1 | M7 |
+| B17 | ✅ **Q6, closed 2026-10-26:** the flood rule in §5. Team A asked for the most suitable rule given the defaults. Revisit at C5 with real numbers; B is measured at T-2 (§2). | Team A · Dev 1 (B) | — |
 | B18 | Restore method into an empty schema (R2), from T27 step 13.1 | Dev 1 | R2 |
 | B19 | Decryption-failure threshold `<n>` | Dev 1 (after the rehearsal) | §6 triggers |
 | B20 | `.env.example` lacks `SESSION_EXPIRE_ON_CLOSE` although `.ai/rules/config-2.md` says it is there. The config defaults to `true`. | config owner (follow-up, not T29) | none (§2 still checks the key by name) |
