@@ -103,6 +103,59 @@ final class ReportTemplatePrefiller
      */
     public function prefillProject(Project $project): PrefillResult
     {
+        ['proposals' => $proposals, 'beneficiaries' => $beneficiaries] = $this->approvedProposals($project);
+
+        return $this->prefill($project, $proposals, $beneficiaries);
+    }
+
+    /**
+     * What prefillProject() would create, read-only: whether the template is
+     * new, the lines already on it, the targets that would get a new line,
+     * the unlinked targets and the would-be-new `fixed`-basis lines with no
+     * `fixed_denominator` (as target ids, since no line exists yet). Writes
+     * nothing (`report-templates:prefill-active --dry-run`).
+     *
+     * @return array{createsTemplate: bool, existingLineCount: int, newLinePlanIndicatorIds: list<int>, unlinkedPlanIndicatorIds: list<int>, missingFixedDenominatorPlanIndicatorIds: list<int>}
+     */
+    public function previewProject(Project $project): array
+    {
+        ['proposals' => $proposals, 'beneficiaries' => $beneficiaries] = $this->approvedProposals($project);
+        ['lines' => $lines, 'unlinked' => $unlinked] = $this->plannedLines($project, $proposals, $beneficiaries);
+
+        $template = ReportTemplate::query()->where('project_id', $project->id)->first();
+        $existing = $template === null ? [] : $template->lines()->pluck('plan_indicator_id')->map(fn (int|string $id): int => (int) $id)->all();
+        $new = [];
+        $missing = [];
+
+        foreach ($lines as $planIndicatorId => $attributes) {
+            if (in_array($planIndicatorId, $existing, true)) {
+                continue;
+            }
+
+            $new[] = $planIndicatorId;
+
+            if ($attributes['fixed'] && $attributes['values']['fixed_denominator'] === null) {
+                $missing[] = $planIndicatorId;
+            }
+        }
+
+        return [
+            'createsTemplate' => $template === null,
+            'existingLineCount' => count($existing),
+            'newLinePlanIndicatorIds' => $new,
+            'unlinkedPlanIndicatorIds' => $unlinked,
+            'missingFixedDenominatorPlanIndicatorIds' => $missing,
+        ];
+    }
+
+    /**
+     * The project's donor-approved proposals and their
+     * `project_proposal.target_beneficiaries`.
+     *
+     * @return array{proposals: Collection<int, Proposal>, beneficiaries: array<int, int|null>}
+     */
+    private function approvedProposals(Project $project): array
+    {
         $proposals = $project->proposals()
             ->whereIn('proposals.status', ProposalStatus::approvedByDonor())
             ->orderBy('proposals.id')
@@ -115,7 +168,7 @@ final class ReportTemplatePrefiller
             $beneficiaries[$proposal->id] = $value === null ? null : (int) $value;
         }
 
-        return $this->prefill($project, $proposals, $beneficiaries);
+        return ['proposals' => $proposals, 'beneficiaries' => $beneficiaries];
     }
 
     /**

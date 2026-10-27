@@ -10,6 +10,7 @@ use App\Livewire\Concerns\ChecksFinanceVisibility;
 use App\Livewire\Concerns\EditsProjectGantt;
 use App\Livewire\Concerns\Projects\ManagesProjectAssignment;
 use App\Livewire\Concerns\Projects\ManagesProjectFiles;
+use App\Livewire\Concerns\Projects\ManagesReportTemplate;
 use App\Livewire\Concerns\Projects\ReadsProjectDelivery;
 use App\Livewire\Concerns\Projects\ReadsProjectFunding;
 use App\Enums\AssignmentStatus;
@@ -33,6 +34,7 @@ new #[Title('titles.project')] class extends Component {
     use EditsProjectGantt;
     use ManagesProjectAssignment;
     use ManagesProjectFiles;
+    use ManagesReportTemplate;
     use ReadsProjectDelivery;
     use ReadsProjectFunding;
     use WithFileUploads;
@@ -224,7 +226,7 @@ new #[Title('titles.project')] class extends Component {
     #[Computed]
     public function tabs(): array
     {
-        return [
+        $tabs = [
             ['key' => 'milestones', 'label' => __('common.milestones'), 'count' => $this->project->milestones_count],
             ['key' => 'tasks', 'label' => __('common.tasks'), 'count' => $this->tasks->count()],
             ['key' => 'plan', 'label' => __('gantt.plan'), 'count' => null],
@@ -234,6 +236,12 @@ new #[Title('titles.project')] class extends Component {
             ['key' => 'files', 'label' => __('projects.files'), 'count' => $this->project->media_count],
             ['key' => 'activity', 'label' => __('activity.title'), 'count' => null],
         ];
+
+        if ($this->canViewReportTemplate) {
+            array_splice($tabs, 5, 0, [['key' => 'template', 'label' => __('report_templates.tab.title'), 'count' => (int) $this->reportTemplate?->getAttribute('pending_lines_count') ?: null]]);
+        }
+
+        return $tabs;
     }
 };
 ?>
@@ -447,11 +455,19 @@ new #[Title('titles.project')] class extends Component {
         @include('pages.projects._show-files-tab')
     @elseif ($tab === 'activity')
         @include('pages.projects._show-activity-tab')
+    @elseif ($tab === 'template')
+        @if ($this->canViewReportTemplate)
+            @include('pages.projects._show-template-tab')
+        @endif
     @else
         @include('pages.projects._show-proposals-tab')
     @endif
 
     @include('pages.projects._show-modals')
+
+    @if ($this->canManageReportTemplate)
+        @include('pages.projects._show-template-modals')
+    @endif
 
     <x-ui.confirm-modal
         wire:model="showCloseModal"

@@ -40,7 +40,7 @@ test('the sidebar lists every page for a Super Admin with funding in the order m
         'strategies.index', 'programs.index', 'annual-plans.index',
         'projects.index', 'milestones.index', 'timeline.index', 'risks.index',
         'results.index', 'indicator-library.index', 'indicators.index', 'targets.index', 'reports.index', 'reports.monthly-matrix', 'monthly-reports.index',
-        'donor-reports.compose', 'reporting-duties.index',
+        'report-templates.index', 'donor-reports.compose', 'reporting-duties.index',
         'donors.index', 'proposals.index', 'funding-agreements.index', 'transfers.index', 'admin.accounts.index',
         'tasks.index', 'department-tasks.index', 'calendar.index',
         'admin.users.index', 'admin.notification-settings.edit', 'activity.index', 'admin.cities.index', 'admin.sectors.index',

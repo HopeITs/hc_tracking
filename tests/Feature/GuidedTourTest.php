@@ -78,6 +78,7 @@ test('the tour on funding pages includes finance table filter and totals steps',
 dataset('page tours', [
     'indicator library' => ['indicator-library.index', 'MEAL', [], ['Indicator Library', 'Find an entry', 'Grouped by level', 'An indicator'], 'مكتبة المؤشرات', 'data-library-entry'],
     'department tasks' => ['department-tasks.index', 'Team Member', [], ['Department Tasks', 'The requests'], 'مهام الأقسام', 'data-tour="department-tasks-list"'],
+    'report template queue' => ['report-templates.index', 'MEAL', [], ['Templates to confirm', 'The queue'], 'قوالب بانتظار التأكيد', 'data-report-template-queue'],
     'sectors' => ['admin.sectors.index', 'MEAL', [], ['Sectors', 'Add a sector'], 'القطاعات', 'data-tour="sectors-create"'],
     'supervision' => ['admin.users.index', 'General Manager', ['tab' => 'supervision'], ['Supervision'], 'دليل المستخدمين', 'data-supervision-tab'],
     'default reviewers' => ['admin.notification-settings.edit', 'Super Admin', [], ['Default reviewers'], 'قواعد الإشعارات', 'data-default-reviewers'],

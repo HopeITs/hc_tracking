@@ -7,6 +7,7 @@ namespace Tests\PHPStan;
 use App\Livewire\Concerns\ChecksFinanceVisibility;
 use App\Livewire\Concerns\Projects\ManagesProjectAssignment;
 use App\Livewire\Concerns\Projects\ManagesProjectFiles;
+use App\Livewire\Concerns\Projects\ManagesReportTemplate;
 use App\Livewire\Concerns\Projects\ReadsProjectDelivery;
 use App\Livewire\Concerns\Projects\ReadsProjectFunding;
 use Livewire\Component;
@@ -26,6 +27,7 @@ abstract class ProjectsShowPageHost extends Component
     use ChecksFinanceVisibility;
     use ManagesProjectAssignment;
     use ManagesProjectFiles;
+    use ManagesReportTemplate;
     use ReadsProjectDelivery;
     use ReadsProjectFunding;
     use WithFileUploads;

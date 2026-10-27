@@ -29,6 +29,7 @@ return [
     'reports' => 'Reports',
     'monthly_report' => 'Monthly report',
     'monthly_reports' => 'Monthly Reports',
+    'report_templates' => 'Templates to confirm',
     'results_framework' => 'Results Framework',
     'risks' => 'Risks',
     'security_settings' => 'Security Settings',
