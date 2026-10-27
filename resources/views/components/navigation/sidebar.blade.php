@@ -248,7 +248,7 @@
             $showReportingDuties = auth()->check() && (auth()->user()->can('funding-agreements.update') || auth()->user()->hasReportingDuties());
         @endphp
 
-        @if (auth()->user()?->canAny(['results.view', 'indicator-library.view', 'indicators.view', 'targets.view', 'reports.view', 'reports.aggregate']) || $showReportingDuties)
+        @if (auth()->user()?->canAny(['results.view', 'indicator-library.view', 'indicators.view', 'targets.view', 'reports.view', 'report-templates.manage', 'reports.aggregate']) || $showReportingDuties)
             <flux:sidebar.group
                 :heading="__('navigation.group_monitoring_evaluation')"
                 :class="$navigationGroupClasses"
@@ -347,6 +347,22 @@
                         {{ __('navigation.monthly_reports') }}
                         <x-slot:icon-trailing>
                             <x-notifications.module-badge module="monthly-reports" :count="$moduleCounts['monthly-reports'] ?? 0" />
+                        </x-slot:icon-trailing>
+                    </flux:sidebar.item>
+                @endcan
+
+                @can('report-templates.manage')
+                    <flux:sidebar.item
+                        icon="clipboard-document-check"
+                        :href="route('report-templates.index')"
+                        :current="request()->routeIs('report-templates.*')"
+                        :class="$navigationItemClasses"
+                        wire:navigate.hover
+                        data-test="nav-report-templates"
+                    >
+                        {{ __('navigation.report_templates') }}
+                        <x-slot:icon-trailing>
+                            <x-notifications.module-badge module="report-templates" :count="$moduleCounts['report-templates'] ?? 0" />
                         </x-slot:icon-trailing>
                     </flux:sidebar.item>
                 @endcan
