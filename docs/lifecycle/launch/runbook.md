@@ -30,8 +30,8 @@ Each gap stops the rehearsal until its owner closes it.
 | # | Gap | Owner | Effect on this runbook |
 |---|---|---|---|
 | G1 | CP5 (feature freeze) is not declared. On `main` `21b3187a`, every release task with a handoff says "done" except **T33** ("in progress, slices 1–2/4"); T33 slices 3–4 may still add migrations or commands. | T33 · B3 (slice 3), B4 (slice 4) | Re-run the inventory (§2) at CP5. |
-| G2 | `annual-plans:ensure-2026` is not registered (`artisan list` on `main`, 2026-10-21). | T33 slice 4 · B4 | Step 7 is PENDING; POST-15 cannot run. |
-| G3 | `report-templates:prefill-active` is not registered. Its helper `App\Support\ReportTemplatePrefiller::prefillProject()` exists; only the command is missing. | T33 slice 4 · B4 | Steps 8 and 8a are PENDING; POST-16 cannot run. |
+| G2 | `annual-plans:ensure-2026` now exists (T33 slice 4, merged into `main` on 2026-10-27). It has tests but has **not been rehearsed** yet. | T33 slice 4 · B4 | Step 7 and POST-15 are not rehearsed. |
+| G3 | `report-templates:prefill-active` now exists (T33 slice 4, merged into `main` on 2026-10-27). It has tests but has **not been rehearsed** yet. | T33 slice 4 · B4 | Steps 8 and 8a and POST-16 are not rehearsed. |
 | G4 | `docs/lifecycle/prechecks.md` does not exist (T01 slice 1 not delivered). PRE-01…PRE-10 follow T01's specification; there is no T01 result to compare with. | T01 · Dev 2; decision D2 | Production results of PRE-01…PRE-10 must be pasted by a human. |
 | G5 | `migrate --pretend` cannot preview the whole release. Locally it previews #19–#23, then #24 `2026_10_15_105819` throws "funding_agreement_installments must exist first.": `--pretend` executes nothing, so #23's table never exists. This says nothing about whether a real run is safe. | T27 / Dev 1 | Validation method for the rest: §2 "How the migrations were validated". |
 | G6 | **One open project per (center, program) (D-30a): confirmed against the real HR data.** On 2026-10-22, `hr:map-project-centers --dry-run` against an HR dump imported locally reported **4 conflicts**: projects 9 and 25 ("DISC Aleppo", "Science Zone Aleppo") both map to center ADISC, and 11 and 26 ("DISC Homs", "Science Zone Homs") to HDISC. These are the same pairs as PRE-07 locally and T30's dev run (#17/#33, #19/#34). The command never applies a conflict. **Release blocker** until management decides each pair. Also 1 ambiguous project (19, several candidate centers in its city). | management (D-30c) via Dev 2 (T30) | Step 4 cannot pass. Evidence needed: the step-4 Conflicts list on the production copy, and a recorded decision per pair (another HR center for one project, close a finished one, or an accepted exception), plus the center for project 19. |
@@ -172,8 +172,8 @@ From `<php> artisan <command> --help` on `main` `21b3187a`.
 | 5 | `strategy:import-pillars <file> {--strategy=} {--dry-run}` | T32 · B4 | yes | pillars, `programs.strategic_pillar_id` (under `Activity::withoutRecording`) |
 | 5 | `meal:import-framework <file> {--program=} {--dry-run}` | T32 · B4 | yes | library entries (sets `imported_at`), program-framework results and indicators (under `withoutRecording`) |
 | 6 | `meal:seed-indicator-library {--dry-run}` | T11 · B2 | yes | library entries, `indicators.library_indicator_id` (under `withoutRecording`) |
-| 7 | `annual-plans:ensure-2026 {--dry-run}` | T33 · B4 | — | **PENDING (G2)** |
-| 8, 8a | `report-templates:prefill-active {--dry-run}` | T33 · B4 | — | **PENDING (G3)**; by its helper: templates and lines, a `report_template.created` activity (notify: false), and `report_template.pending` notifications to MEAL |
+| 7 | `annual-plans:ensure-2026 {--dry-run}` | T33 · B4 | yes | 2026 annual plans for programs that have a manager (under `withoutRecording`); not rehearsed (G2) |
+| 8, 8a | `report-templates:prefill-active {--dry-run}` | T33 · B4 | yes | templates and lines of `active` projects (under `withoutRecording`, so no activity rows); no template for a project with no lines to plan; on a re-run, `fixed_denominator` of pending fixed-basis lines that are still NULL, from `target_beneficiaries`; `report_template.pending` notifications to MEAL; not rehearsed (G3) |
 | 9 | `monthly-reports:backfill {--from=YYYY-MM} {--dry-run}` (default `--from=2026-10`) | T17A · B1 | yes | `monthly_reports` rows (generator under `withoutRecording`) |
 | — | `monthly-reports:prepare {--dry-run}` (scheduled daily 05:00, `withoutOverlapping()->onOneServer()`) | T17A · B1 | yes | current-month lines; **not run by hand here** |
 | 10 | `files:encrypt-existing {--dry-run} {--chunk=100} {--isolated}` (resumable) | T22 · B4 | yes | encrypted copies, then `path` + `encryption_key_id` |
@@ -209,7 +209,7 @@ The local *tracking* data was seeded against the stand-in, so tracking ↔ HR li
 **Local end-to-end rehearsal (2026-10-22).**
 - Part A steps 0–13 were run on a throwaway local copy, made from the real-data local DB and rolled back to the baseline. HR was the real HR dump, read-only.
 - Results are in `rehearsal-report.md` §0. It found G10, G11 and the `files:encrypt-existing` prompt.
-- It is not a production rehearsal: local data, no files, and steps 7, 8 and 8a are still PENDING.
+- It is not a production rehearsal: local data, no files, and steps 7, 8 and 8a were not run (their commands did not exist yet).
 
 ---
 
@@ -312,21 +312,27 @@ Run only once MEAL has approved `handoffs/T32-data.md` (G8). Urban before agri, 
 - **Expected:** POST-14 = 0; `activities` unchanged (PRE-20).
 - **Stop if** it stops on a duplicated code.
 
-### Step 7: 2026 annual plans (T33) ⛁: **PENDING (G2)**
+### Step 7: 2026 annual plans (T33) ⛁: not rehearsed (G2)
 1. `<php> artisan annual-plans:ensure-2026 --dry-run`, then real, then again
 - **Expected:** POST-15 = 0 / 0; other plans unchanged.
 
-### Step 8: report templates for active projects (T33) ⛁: **PENDING (G3)**
+### Step 8: report templates for active projects (T33) ⛁: not rehearsed (G3)
 1. `<php> artisan report-templates:prefill-active --dry-run`, then real, then again
 2. Re-run PRE-20 and PRE-20b.
 - **Expected:**
   - POST-16 = 0 / 0; projects by status = the counts after 3c; unlinked targets listed.
-  - The first real run adds `report_template.created` activities and `report_template.pending` notifications by design: record their counts. The second run adds none.
+  - A project with no lines to plan (no library-linked targets of donor-approved proposals and no `HC.*` annual-plan targets) gets no template and is not in the `/report-templates` queue. Its unlinked targets are still printed.
+  - `activities` unchanged (PRE-20): the command runs under `Activity::withoutRecording()`.
+  - The first real run adds `report_template.pending` notifications by design: record their count. The second run adds none.
+  - The command ends with the list of lines missing `fixed_denominator`. Step 8a works through it.
 - **Stop if** a project status changed.
 
-### Step 8a: `target_beneficiaries` (D-25) ⛁: a human data-entry step, **PENDING (G3)**
-1. The PR Manager enters the missing values through T06's post-approval edit. This is not a command.
-2. Re-run `<php> artisan report-templates:prefill-active --dry-run` and read its list of lines missing `fixed_denominator`.
+### Step 8a: `target_beneficiaries` (D-25) ⛁: a human data-entry step, not rehearsed (G3)
+1. The PR Manager enters the missing `target_beneficiaries` through T06's post-approval edit. This is not a command.
+2. `<php> artisan report-templates:prefill-active --dry-run`. Lines that the real run would now fill are counted as "would be refreshed" and leave the missing list.
+3. `<php> artisan report-templates:prefill-active`. It sets `fixed_denominator` on each still-`pending` fixed-basis line whose value is NULL and whose `target_beneficiaries` is now filled. Confirmed and retired lines are never touched.
+4. Repeat 1–3 until the list says "none", or only accepted lines remain.
+- A **confirmed** line with no `fixed_denominator` stays in the list. Only MEAL can fix it, by editing the line on the project's template tab.
 - **Expected:** the list is empty, or Dev 1 and MEAL accepted each remaining line in the report. POST-21 is the wider D-25 work list (informational).
 - **No-Go if** the list is non-empty and not accepted.
 

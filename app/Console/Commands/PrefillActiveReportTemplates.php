@@ -9,6 +9,7 @@ use App\Enums\ProjectStatus;
 use App\Enums\ReportTemplateLineStatus;
 use App\Models\Activity;
 use App\Models\Project;
+use App\Models\ReportTemplate;
 use App\Support\PrefillResult;
 use App\Support\ReportTemplatePrefiller;
 use Illuminate\Console\Command;
@@ -19,10 +20,12 @@ use Illuminate\Support\Facades\DB;
  * report templates and lines of projects already active at deploy. They stay
  * active: no activation, no project or proposal status write. Prints one row
  * per project: template new or already there, lines created, lines already
- * there and the unlinked targets ("link it to the library first"); then the
- * ids of the `fixed`-basis lines with no `fixed_denominator` (a NULL
+ * there and the unlinked targets ("link it to the library first"); a project
+ * with no line to plan gets no template. Then the ids of the `fixed`-basis
+ * lines with no `fixed_denominator` (a NULL
  * `project_proposal.target_beneficiaries`, D-25), or "none", which T27 checks
- * before go. Idempotent; --dry-run computes the same rows and list (the
+ * before go: a re-run fills the pending ones whose beneficiaries were entered
+ * since (step 8a). Idempotent; --dry-run computes the same rows and list (the
  * would-be-new lines as target ids) and writes nothing. Runs silent: a
  * launch fill writes no activity rows (Dev 1, 2026-10-23); MEAL's
  * `report_template.pending` notification is still sent.
@@ -42,21 +45,31 @@ class PrefillActiveReportTemplates extends Command
             ->orderBy('id')
             ->get();
         $missingTargetIds = [];
+        $refreshedLineIds = [];
 
         foreach ($projects as $project) {
             $row = $dryRun ? $this->preview($prefiller, $project) : $this->apply($prefiller, $project);
             $missingTargetIds = [...$missingTargetIds, ...$row['missingTargets']];
+            $refreshedLineIds = [...$refreshedLineIds, ...$row['refreshed']];
 
             $this->line(__('report_templates.console.prefill_row', [
                 'project' => $project->id,
-                'template' => __($row['templateCreated'] ? 'report_templates.console.template_new' : 'report_templates.console.template_existing'),
+                'template' => __(match (true) {
+                    $row['templateCreated'] => 'report_templates.console.template_new',
+                    $row['hasTemplate'] => 'report_templates.console.template_existing',
+                    default => 'report_templates.console.template_none',
+                }),
                 'created' => $row['created'],
                 'skipped' => $row['skipped'],
                 'unlinked' => $this->ids($row['unlinked']),
             ]));
         }
 
-        $this->reportMissingDenominators($this->missingDenominatorLineIds(), $missingTargetIds);
+        if ($refreshedLineIds !== []) {
+            $this->line(__('report_templates.console.refreshed_lines', ['ids' => $this->ids($refreshedLineIds)]));
+        }
+
+        $this->reportMissingDenominators(array_values(array_diff($this->missingDenominatorLineIds(), $refreshedLineIds)), $missingTargetIds);
 
         if ($dryRun) {
             $this->info(__('report_templates.console.dry_run'));
@@ -66,7 +79,7 @@ class PrefillActiveReportTemplates extends Command
     }
 
     /**
-     * @return array{templateCreated: bool, created: int, skipped: int, unlinked: list<int>, missingTargets: list<int>}
+     * @return array{hasTemplate: bool, templateCreated: bool, created: int, skipped: int, refreshed: list<int>, unlinked: list<int>, missingTargets: list<int>}
      */
     private function apply(ReportTemplatePrefiller $prefiller, Project $project): array
     {
@@ -77,9 +90,11 @@ class PrefillActiveReportTemplates extends Command
             ->count();
 
         return [
+            'hasTemplate' => ReportTemplate::query()->where('project_id', $project->id)->exists(),
             'templateCreated' => $result->createdTemplateIds !== [],
             'created' => count($result->createdLineIds),
             'skipped' => $lines - count($result->createdLineIds),
+            'refreshed' => $result->refreshedLineIds,
             'unlinked' => $result->unlinkedPlanIndicatorIds,
             'missingTargets' => [],
         ];
@@ -88,16 +103,18 @@ class PrefillActiveReportTemplates extends Command
     /**
      * The same row as apply(), read-only.
      *
-     * @return array{templateCreated: bool, created: int, skipped: int, unlinked: list<int>, missingTargets: list<int>}
+     * @return array{hasTemplate: bool, templateCreated: bool, created: int, skipped: int, refreshed: list<int>, unlinked: list<int>, missingTargets: list<int>}
      */
     private function preview(ReportTemplatePrefiller $prefiller, Project $project): array
     {
         $preview = $prefiller->previewProject($project);
 
         return [
+            'hasTemplate' => $preview['hasTemplate'],
             'templateCreated' => $preview['createsTemplate'],
             'created' => count($preview['newLinePlanIndicatorIds']),
             'skipped' => $preview['existingLineCount'],
+            'refreshed' => $preview['refreshedLineIds'],
             'unlinked' => $preview['unlinkedPlanIndicatorIds'],
             'missingTargets' => $preview['missingFixedDenominatorPlanIndicatorIds'],
         ];

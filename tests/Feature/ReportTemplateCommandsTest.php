@@ -231,4 +231,34 @@ describe('report-templates:prefill-active', function () {
 
         expect(ReportTemplateLine::query()->where('plan_indicator_id', $this->fixed->id)->sole()->fixed_denominator)->toBe(120);
     });
+
+    test('once the beneficiaries are entered, a dry run and then a real re-run empty the missing list (step 8a)', function () {
+        $this->artisan('report-templates:prefill-active')->assertSuccessful();
+        $line = ReportTemplateLine::query()->where('plan_indicator_id', $this->fixed->id)->sole();
+        $this->proposal->projects()->updateExistingPivot($this->active->id, ['target_beneficiaries' => 90]);
+
+        $this->artisan('report-templates:prefill-active', ['--dry-run' => true])
+            ->expectsOutputToContain(__('report_templates.console.refreshed_lines', ['ids' => $line->id]))
+            ->expectsOutputToContain(__('report_templates.console.missing_none'))
+            ->assertSuccessful();
+
+        expect($line->fresh()->fixed_denominator)->toBeNull();
+
+        $this->artisan('report-templates:prefill-active')
+            ->expectsOutputToContain(__('report_templates.console.refreshed_lines', ['ids' => $line->id]))
+            ->expectsOutputToContain(__('report_templates.console.missing_none'))
+            ->assertSuccessful();
+
+        expect($line->fresh()->fixed_denominator)->toBe(90);
+    });
+
+    test('an active project with no line to plan gets no template', function () {
+        $empty = Project::factory()->active()->create(['program_id' => $this->program->id]);
+
+        $this->artisan('report-templates:prefill-active')
+            ->expectsOutputToContain(($this->row)($empty, 'none', 0, 0, __('report_templates.console.none')))
+            ->assertSuccessful();
+
+        expect(ReportTemplate::query()->where('project_id', $empty->id)->exists())->toBeFalse();
+    });
 });

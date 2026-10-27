@@ -9,7 +9,8 @@ namespace App\Support;
  * templates and pending lines it created, the targets it skipped because
  * their indicator has no library link ("Link it to the library first"), and
  * the `fixed`-basis lines left without a `fixed_denominator` (a NULL
- * `project_proposal.target_beneficiaries`, D-25) for a human to fill.
+ * `project_proposal.target_beneficiaries`, D-25) for a human to fill, and
+ * the pending lines that took a `fixed_denominator` filled since.
  * Ids only, so a command can print them and T27 can check the last list.
  */
 final readonly class PrefillResult
@@ -19,12 +20,14 @@ final readonly class PrefillResult
      * @param  list<int>  $createdLineIds
      * @param  list<int>  $unlinkedPlanIndicatorIds
      * @param  list<int>  $missingFixedDenominatorLineIds
+     * @param  list<int>  $refreshedLineIds
      */
     public function __construct(
         public array $createdTemplateIds = [],
         public array $createdLineIds = [],
         public array $unlinkedPlanIndicatorIds = [],
         public array $missingFixedDenominatorLineIds = [],
+        public array $refreshedLineIds = [],
     ) {}
 
     /**
@@ -37,6 +40,7 @@ final readonly class PrefillResult
             self::union($this->createdLineIds, $other->createdLineIds),
             self::union($this->unlinkedPlanIndicatorIds, $other->unlinkedPlanIndicatorIds),
             self::union($this->missingFixedDenominatorLineIds, $other->missingFixedDenominatorLineIds),
+            self::union($this->refreshedLineIds, $other->refreshedLineIds),
         );
     }
 
