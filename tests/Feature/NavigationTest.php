@@ -32,7 +32,8 @@ test('a Super Admin sidebar lists every page, grouped like the old sidebar, the 
 
     expect(array_column($groups, 'group'))->toBe(['overview', 'strategy_planning', 'projects_delivery', 'monitoring_evaluation', 'funding_finance', 'workspace', 'administration', 'you'])
         ->and($groups[0]['items'][0]['route'])->toBe('dashboard')
-        ->and(array_column($groups[6]['items'], 'route'))->toContain('admin.users.index', 'activity.index', 'admin.cities.index');
+        ->and(array_column($groups[6]['items'], 'route'))->toContain('admin.users.index', 'activity.index', 'admin.cities.index')
+        ->and(array_column($groups[3]['items'], 'route'))->toContain('report-templates.index');
 });
 
 test('a Team Member sidebar leaves out the pages their role cannot open', function () {
