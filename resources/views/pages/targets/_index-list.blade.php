@@ -76,7 +76,7 @@
                                     $pendingWidth = $targetAmount > 0 ? max(0, min(100 - $approvedWidth, $pendingAmount / $targetAmount * 100)) : 0;
                                     $isExpanded = $expandedTargetId === $target->id;
                                     $chainIssues = $sourceLabel === null ? [] : $target->chainIssues();
-                                    $linkClass = 'rounded-sm font-medium text-secondary-dark underline decoration-secondary-soft decoration-1 underline-offset-[3px] transition-colors hover:decoration-current focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary dark:text-ink dark:decoration-line-strong';
+                                    $linkClass = 'rounded-sm font-medium text-secondary-dark underline decoration-secondary-soft decoration-1 underline-offset-[3px] transition-colors hover:decoration-current focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-secondary-medium dark:text-ink dark:decoration-line-strong';
                                 @endphp
                                 <li class="relative" wire:key="target-{{ $target->id }}">
                                     <span aria-hidden="true" class="absolute top-[1.4rem] -start-[5.5px] z-10 size-2.5 rounded-full ring-4 ring-white {{ $statusMeta[$rowStatus]['dot'] }} dark:ring-surface-1"></span>
@@ -188,7 +188,7 @@
                                                         aria-expanded="{{ $isExpanded ? 'true' : 'false' }}"
                                                         aria-controls="target-reports-{{ $target->id }}"
                                                         data-test="toggle-reports-{{ $target->id }}"
-                                                        class="-mx-1 inline-flex min-h-7 cursor-pointer items-center gap-1 rounded-md px-1 font-medium tabular-nums text-secondary-dark transition-colors hover:bg-secondary-soft/60 focus-visible:outline-2 focus-visible:outline-primary dark:text-ink dark:hover:bg-white/10"
+                                                        class="-mx-1 inline-flex min-h-7 cursor-pointer items-center gap-1 rounded-md px-1 font-medium tabular-nums text-secondary-dark transition-colors hover:bg-secondary-soft/60 focus-visible:outline-2 focus-visible:outline-secondary-medium dark:text-ink dark:hover:bg-white/10"
                                                     >
                                                         {{ trans_choice('targets.count_report', $target->reports_count, ['count' => $target->reports_count]) }}
                                                         <flux:icon.chevron-down variant="micro" @class(['size-3.5 transition-transform duration-200', 'rotate-180' => $isExpanded]) aria-hidden="true" />
@@ -240,7 +240,7 @@
                                             <ol class="flex flex-col divide-y divide-secondary-soft dark:divide-line">
                                                 @foreach ($this->expandedReports as $report)
                                                     <li wire:key="target-report-{{ $report->id }}">
-                                                        <a href="{{ route('reports.show', $report) }}" wire:navigate class="group grid grid-cols-[minmax(0,1fr)_auto] items-center gap-x-4 gap-y-1 rounded-md px-3 py-2.5 transition-colors hover:bg-ground focus-visible:outline-2 focus-visible:outline-primary @2xl/directory:grid-cols-[minmax(0,1fr)_auto_auto_auto] dark:hover:bg-white/[0.04]">
+                                                        <a href="{{ route('reports.show', $report) }}" wire:navigate class="group grid grid-cols-[minmax(0,1fr)_auto] items-center gap-x-4 gap-y-1 rounded-md px-3 py-2.5 transition-colors hover:bg-ground focus-visible:outline-2 focus-visible:outline-secondary-medium @2xl/directory:grid-cols-[minmax(0,1fr)_auto_auto_auto] dark:hover:bg-white/[0.04]">
                                                             <span class="flex min-w-0 flex-col text-[13px] font-medium">
                                                                 <span class="truncate">
                                                                 @if ($report->period_start && $report->period_end)

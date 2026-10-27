@@ -324,7 +324,7 @@ test('a donor opens from its eye button, not from a linked name', function () {
         ->test('pages::donors.index')
         ->assertSeeHtml('aria-label="View UNICEF"')
         ->assertSeeHtml('href="'.route('donors.show', $donor).'"')
-        ->assertDontSeeHtml('hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary text-secondary-dark dark:text-ink">UNICEF</a>');
+        ->assertDontSeeHtml('hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-secondary-medium text-secondary-dark dark:text-ink">UNICEF</a>');
 });
 
 test('a pending tranche with no scheduled date does not break the transfers ahead', function () {

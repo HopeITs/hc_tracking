@@ -158,7 +158,7 @@
         background-color: var(--color-white);
     }
 
-    /* Flux's disabled:data-invalid:border-red-500 is 0,3,0; filters keep their resting border in every state. */
+    /* Flux's disabled:data-invalid:border-primary is 0,3,0; filters keep their resting border in every state. */
     .directory-filters [data-flux-control][data-invalid]:disabled {
         border-color: var(--color-secondary-soft);
     }
@@ -765,7 +765,7 @@ ui-toast-group[position='center'] {
         color: var(--color-ink-faint);
     }
 
-    /* Invalid fields: ties Flux's dark:data-invalid:border-red-500 (0,2,0) and wins by order. */
+    /* Invalid fields: ties Flux's dark:data-invalid:border-primary (0,2,0) and wins by order. */
     :where(.dark) [data-flux-control][data-invalid] {
         border-color: var(--color-brand-text);
     }

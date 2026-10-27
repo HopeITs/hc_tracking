@@ -180,7 +180,7 @@ new class extends Component {
                 wire:target="view"
                 aria-pressed="{{ ($mode === 'chain') === $this->showsChain ? 'true' : 'false' }}"
                 @class([
-                    'cursor-pointer rounded-md px-3 py-1.5 text-sm font-semibold focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary',
+                    'cursor-pointer rounded-md px-3 py-1.5 text-sm font-semibold focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-secondary-medium',
                     'bg-white text-secondary-dark shadow-sm dark:bg-surface-3 dark:text-ink' => ($mode === 'chain') === $this->showsChain,
                     'text-secondary-medium hover:text-secondary-dark dark:text-ink-muted dark:hover:text-ink' => ($mode === 'chain') !== $this->showsChain,
                 ])

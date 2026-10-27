@@ -16,7 +16,7 @@
     >
         @if ($showApproveModal)
             @if ($errors->has('approveGate'))
-                <div class="mb-4 flex flex-wrap items-center justify-between gap-3 rounded-lg border border-primary bg-primary/5 p-3 text-sm text-status-critical" role="alert" data-test="approve-gate-alert">
+                <div class="mb-4 flex flex-wrap items-center justify-between gap-3 rounded-lg border border-primary bg-secondary-soft/60 p-3 text-sm text-status-critical" role="alert" data-test="approve-gate-alert">
                     <ul class="min-w-0 flex-1 list-disc ps-5 font-semibold">
                         @foreach ($errors->get('approveGate') as $gateMessage)
                             <li>{{ $gateMessage }}</li>

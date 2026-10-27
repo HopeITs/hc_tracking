@@ -60,10 +60,10 @@ new class extends Component {
     $rows = $this->rows;
     $today = CarbonImmutable::today();
     $late = $rows->filter(fn ($report): bool => $report->due_on->lt($today))->count();
-    $pg = $this->paginate($rows, 5);
+    $pg = $this->paginate($rows, self::PerPage);
 @endphp
 
-<x-desk.panel id="duties" register="reporting-duties.index" :size="$size" :index="$index" :total="$total" :count="$late > 0 ? $late : ($rows->count() ?: null)">
+<x-desk.panel :facets="$pg['facets']" id="duties" register="reporting-duties.index" :size="$size" :index="$index" :total="$total" :count="$late > 0 ? $late : ($rows->count() ?: null)">
     @if ($pg['total'] > 0)
         <ul class="dk-plist">
             @foreach ($pg['slice'] as $report)

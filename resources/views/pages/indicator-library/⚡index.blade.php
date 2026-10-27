@@ -137,7 +137,7 @@ new #[Layout('layouts::desk'), Title('titles.indicator_library')] class extends 
 
         @can('create', LibraryIndicator::class)
             <x-slot:actions>
-                <x-ui.button tone="primary" icon="plus" class="min-h-11 self-end touch-manipulation @sm/directory:min-h-10" wire:click="openCreateModal" data-test="create-library-entry">
+                <x-ui.button tone="primary" icon="plus" class="min-h-11 self-end touch-manipulation @sm/directory:min-h-10" wire:click="openCreateModal" data-test="create-library-entry" data-quick-create>
                     {{ __('indicator_library.add_entry') }}
                 </x-ui.button>
             </x-slot:actions>

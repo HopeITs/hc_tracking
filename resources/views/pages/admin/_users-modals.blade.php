@@ -46,7 +46,7 @@
         confirm-test="confirm-delete-user-button"
     >
         @if ($deleteError)
-            <div class="rounded-lg border border-primary bg-primary/5 p-3 text-sm text-status-critical" role="alert">
+            <div class="rounded-lg border border-primary bg-secondary-soft/60 p-3 text-sm text-status-critical" role="alert">
                 <p class="font-semibold">{{ __('users.unable_to_delete_user') }}</p>
                 <p>{{ $deleteError }}</p>
             </div>

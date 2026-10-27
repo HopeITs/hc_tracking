@@ -4,12 +4,12 @@ use App\Enums\MilestoneStatus;
 use App\Enums\ProposalStatus;
 use App\Enums\TaskStatus;
 use App\Models\Activity;
+use App\Models\Donor;
 use App\Models\DonorReport;
 use App\Models\Milestone;
 use App\Models\MonthlyReport;
 use App\Models\Project;
 use App\Models\Proposal;
-use App\Models\Risk;
 use App\Models\Task;
 use App\Models\User;
 use Livewire\Livewire;
@@ -114,14 +114,6 @@ test('department deliverables show the Media Team media work only and hide finan
         ->assertDontSee('Shoot the opening');
 });
 
-test('risks list open ones before the ones that happened', function () {
-    Risk::factory()->happened()->create(['name' => 'Happened risk']);
-    Risk::factory()->create(['name' => 'Open risk']);
-
-    Livewire::actingAs(User::factory()->role('General Manager')->create())->test('desk.panels.risks', ['size' => 'M'])
-        ->assertSeeInOrder(['Open risk', 'Happened risk']);
-});
-
 test('the dates lens opens the timeline as its full register', function () {
     Project::factory()->create();
 
@@ -131,45 +123,12 @@ test('the dates lens opens the timeline as its full register', function () {
         ->assertSeeHtml('href="'.route('timeline.index').'"');
 });
 
-test('the risk heat map counts rated risks by square and leaves unrated ones off it', function () {
-    Risk::factory()->rated(3, 3)->create();
-    Risk::factory()->rated(1, 2)->create();
-    Risk::factory()->create(['name' => 'Unrated risk']);
-
-    $panel = Livewire::actingAs(User::factory()->role('General Manager')->create())->test('desk.panels.risks', ['size' => 'M']);
-
-    expect($panel->instance()->heat)->toBe(['3:3' => 1, '1:2' => 1]);
-    $panel->assertSeeHtml('data-risk-cell="3:3"')
-        ->assertSee('Unrated risk')
-        ->assertSee(__('risks.not_rated'));
-});
-
-test('a heat map square filters the risk list, and clicking it again clears it', function () {
-    Risk::factory()->rated(3, 3)->create(['name' => 'Road closure']);
-    Risk::factory()->rated(1, 1)->create(['name' => 'Late paperwork']);
-
-    Livewire::actingAs(User::factory()->role('General Manager')->create())->test('desk.panels.risks', ['size' => 'M'])
-        ->call('setFilter', '3:3')
-        ->assertSee('Road closure')
-        ->assertDontSee('Late paperwork')
-        ->call('setFilter', 'all')
-        ->assertSee('Late paperwork');
-});
-
-test('the worst rated open risk leads the list', function () {
-    Risk::factory()->rated(1, 1)->create(['name' => 'Minor risk']);
-    Risk::factory()->rated(3, 2)->create(['name' => 'Major risk']);
-
-    Livewire::actingAs(User::factory()->role('General Manager')->create())->test('desk.panels.risks', ['size' => 'M'])
-        ->assertSeeInOrder(['Major risk', 'Minor risk']);
-});
-
 test('someone who owns no project sees every project without picking a scope', function () {
     Project::factory()->create(['name' => 'Aleppo Wells']);
 
     Livewire::actingAs(userWithRole('General Manager', insertHrEmployee()))->test('desk.panels.projects', ['size' => 'XL'])
         ->assertSee('Aleppo Wells')
-        ->assertDontSeeHtml('id="ps-projects-scope"');
+        ->assertDontSeeHtml('data-model="scope"');
 });
 
 test('an owner starts on their own projects and can switch to all', function () {
@@ -182,4 +141,25 @@ test('an owner starts on their own projects and can switch to all', function () 
         ->assertDontSee('Their Clinic')
         ->call('setScope', 'all')
         ->assertSee('Their Clinic');
+});
+
+test('the pipeline names the donor a proposal is written for before any agreement is signed', function () {
+    $donor = Donor::factory()->create(['name' => 'Caritas Poland']);
+    Proposal::factory()->create(['name' => 'Winter shelter repairs', 'donor_id' => $donor->id, 'status' => ProposalStatus::ProposalReview]);
+
+    Livewire::actingAs(User::factory()->role('General Manager')->create())->test('desk.panels.pipeline', ['size' => 'L'])
+        ->assertSee('Winter shelter repairs')
+        ->assertSee('Caritas Poland')
+        ->assertDontSee(__('desk.no_donor_yet'));
+});
+
+test('the donors panel lists only donors with a proposal written for them, counting those proposals', function () {
+    $active = Donor::factory()->create(['name' => 'Mennonite Central Committee']);
+    Donor::factory()->create(['name' => 'Dormant Foundation']);
+    Proposal::factory()->count(2)->create(['donor_id' => $active->id]);
+
+    Livewire::actingAs(User::factory()->role('General Manager')->create())->test('desk.panels.donors', ['size' => 'L'])
+        ->assertSee('Mennonite Central Committee')
+        ->assertSee(trans_choice('desk.proposals_count', 2, ['count' => 2]))
+        ->assertDontSee('Dormant Foundation');
 });

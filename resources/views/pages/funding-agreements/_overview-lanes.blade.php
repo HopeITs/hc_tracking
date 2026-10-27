@@ -86,7 +86,7 @@
                                                     x-on:click="toggleLane({{ $agreement->id }})"
                                                     :aria-expanded="(open === {{ $agreement->id }}).toString()"
                                                     aria-controls="agreement-ledger-{{ $agreement->id }}"
-                                                    class="mt-2 inline-flex min-h-8 items-center gap-1.5 rounded-md text-xs font-semibold underline-offset-4 hover:underline focus-visible:outline-2 focus-visible:outline-primary {{ $inkText }}"
+                                                    class="mt-2 inline-flex min-h-8 items-center gap-1.5 rounded-md text-xs font-semibold underline-offset-4 hover:underline focus-visible:outline-2 focus-visible:outline-secondary-medium {{ $inkText }}"
                                                     data-lane-toggle
                                                 >
                                                     <flux:icon.chevron-down variant="micro" class="size-4 transition-transform duration-200" ::class="open === {{ $agreement->id }} && 'rotate-180'" />
@@ -146,7 +146,7 @@
                                                                 x-on:click="toggleLane({{ $agreement->id }}, {{ $transfer->id }})"
                                                                 aria-label="{{ $trancheText }}"
                                                                 aria-controls="agreement-ledger-{{ $agreement->id }}"
-                                                                class="relative flex -translate-x-1/2 -translate-y-1/2 items-center rounded-full focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary rtl:translate-x-1/2"
+                                                                class="relative flex -translate-x-1/2 -translate-y-1/2 items-center rounded-full focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-secondary-medium rtl:translate-x-1/2"
                                                                 data-bead="{{ $state }}"
                                                             >
                                                                 <span @class(['tranche-bead block shrink-0 rounded-full transition-transform duration-150 ease-out group-hover/pill:scale-125', $beadClass[$state]]) style="width: {{ $size }}rem; height: {{ $size }}rem" aria-hidden="true"></span>
@@ -304,7 +304,7 @@
                                                     @endif
                                                     <div class="mt-4 flex flex-wrap items-center gap-2">
                                                         <x-ui.button tone="secondary" size="sm" icon="eye" :href="route('funding-agreements.show', $agreement)" wire:navigate>{{ __('funding_agreements.open_agreement') }}</x-ui.button>
-                                                        <button type="button" x-on:click="open = null" class="inline-flex min-h-8 items-center rounded-md px-2 text-xs font-semibold hover:underline focus-visible:outline-2 focus-visible:outline-primary {{ $mutedText }}">{{ __('common.close') }}</button>
+                                                        <button type="button" x-on:click="open = null" class="inline-flex min-h-8 items-center rounded-md px-2 text-xs font-semibold hover:underline focus-visible:outline-2 focus-visible:outline-secondary-medium {{ $mutedText }}">{{ __('common.close') }}</button>
                                                     </div>
                                                 </div>
                                             </div>

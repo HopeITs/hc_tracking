@@ -74,7 +74,7 @@ new class extends Component {
     $events = $this->events;
 @endphp
 
-<x-desk.panel id="coming" register="calendar.index" :size="$size" :index="$index" :total="$total" :count="$events->count()">
+<x-desk.panel :facets="[]" id="coming" register="calendar.index" :size="$size" :index="$index" :total="$total" :count="$events->count()">
     <x-slot:tools>
         <div class="dk-seg" role="group">
             @foreach (['list' => __('desk.view_list'), 'month' => __('desk.view_month')] as $key => $label)
@@ -123,7 +123,7 @@ new class extends Component {
         @endif
     @else
         @php
-            $pg = $this->paginate($events, 6);
+            $pg = $this->paginate($events, self::PerPage);
         @endphp
         @if ($pg['total'] > 0)
             <ol class="dk-cal">

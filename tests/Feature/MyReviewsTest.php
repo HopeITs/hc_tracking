@@ -48,6 +48,25 @@ test('a reviewer without proposals.view can go to My reviews and the panel count
         ->assertSeeHtml('<span class="dk-pc dk-num" data-panel-count>2</span>');
 });
 
+test('the panel lists each proposal still waiting on the viewer once, never ones they reviewed or other people\'s', function () {
+    [$employeeId, $user] = reviewerLogin();
+    $twice = myReview($employeeId, 'Water Access', ProposalStatus::ConceptNoteReview);
+    ProposalReviewer::factory()->additional()->create(['proposal_id' => $twice->proposal_id, 'stage' => ReviewStage::ConceptNote, 'employee_id' => insertHrEmployee()]);
+    myReview($employeeId, 'Already Read', ProposalStatus::ConceptNoteReview, seen: true);
+    myReview($employeeId, 'Moved On', ProposalStatus::ConceptNoteSubmitted);
+    myReview(insertHrEmployee(), 'Someone Else', ProposalStatus::ConceptNoteReview);
+    $user->assignRole('Super Admin');
+
+    $panel = Livewire::actingAs($user)->test('desk.panels.reviews', ['size' => 'M'])
+        ->assertSee('Water Access')
+        ->assertDontSee('Already Read')
+        ->assertDontSee('Moved On')
+        ->assertDontSee('Someone Else')
+        ->assertSeeHtml('<span class="dk-pc dk-num" data-panel-count>1</span>');
+
+    expect($panel->instance()->rows)->toHaveCount(1);
+});
+
 test('someone never asked to review sees no My reviews link', function () {
     [, $user] = reviewerLogin();
     myReview(insertHrEmployee(), 'Someone Else', ProposalStatus::ConceptNoteReview);

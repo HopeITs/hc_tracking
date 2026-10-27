@@ -15,7 +15,7 @@ use Livewire\Component;
 
 /**
  * Every project: one line per project through its seven stages, a health
- * word and one of five lenses (stage, money, results, dates, risks).
+ * word and one of four lenses (stage, money, results, dates).
  * Stage and health come from App\Support\Desk\ProjectStage.
  */
 new class extends Component {
@@ -27,13 +27,18 @@ new class extends Component {
 
     public function setLens(string $lens): void
     {
-        $this->lens = in_array($lens, ['stage', 'money', 'results', 'dates', 'risks'], true) ? $lens : 'stage';
+        $this->lens = in_array($lens, ['stage', 'money', 'results', 'dates'], true) ? $lens : 'stage';
     }
 
     public function setScope(string $scope): void
     {
         $this->scope = $scope === 'all' ? 'all' : 'mine';
         $this->page = 0;
+    }
+
+    public function updatedScope(string $scope): void
+    {
+        $this->setScope($scope);
     }
 
     /**
@@ -49,10 +54,10 @@ new class extends Component {
             ->where('status', '!=', ProjectStatus::Archived)
             ->with([
                 'user:id,first_name_en,last_name_en,first_name_ar,last_name_ar',
-                'proposals:id,name,status',
+                'proposals:id,name,status,donor_id',
+                'proposals.donor:id,name',
                 'proposals.donorNames',
                 'milestones' => fn ($query) => $query->select(['id', 'project_id', 'planned_end_date', 'status'])->whereIn('status', [MilestoneStatus::Planned, MilestoneStatus::Ongoing]),
-                'risks' => fn ($query) => $query->select(['id', 'project_id', 'name', 'happened'])->where('happened', false),
                 'monthlyReports:id,project_id,period,status,returned_at',
                 ...($money ? ['proposals.donorProposals:id,proposal_id,budget,currency', 'proposals.donorProposals.transfers'] : []),
             ])
@@ -95,7 +100,7 @@ new class extends Component {
                 'health' => ProjectStage::health($stage, $signals),
                 'attention' => $signals['late'] + $signals['soon'],
                 'lead' => $lead,
-                'donor' => $lead?->donorNames->pluck('name')->implode(', ') ?? '',
+                'donor' => $lead?->donor?->name ?? $lead?->donorNames->pluck('name')->implode(', ') ?? '',
                 'money' => $money,
                 'results' => ['validated' => $project->monthlyReports->where('status', MonthlyReportStatus::Validated)->count(), 'total' => $project->monthlyReports->count()],
             ];
@@ -123,8 +128,8 @@ new class extends Component {
     $list = $base->filter($filters[$active])
         ->sortBy([fn ($a, $b) => $order[$lines[$a->id]['health']] <=> $order[$lines[$b->id]['health']], fn ($a, $b) => $lines[$a->id]['stage'] <=> $lines[$b->id]['stage']])
         ->values();
-    $pg = $this->paginate($list, 6);
-    $lenses = array_filter(['stage', 'money', 'results', 'dates', 'risks'], fn (string $key): bool => $key !== 'money' || $this->canViewFundingPosition());
+    $pg = $this->paginate($list, 3);
+    $lenses = array_filter(['stage', 'money', 'results', 'dates'], fn (string $key): bool => $key !== 'money' || $this->canViewFundingPosition());
     $shownLens = in_array($lens, $lenses, true) ? $lens : 'stage';
     $today = CarbonImmutable::today();
     $dated = $list->filter(fn ($project) => $project->start_date !== null && $project->end_date !== null);
@@ -135,26 +140,31 @@ new class extends Component {
     $stages = __('desk.stages');
 @endphp
 
-<x-desk.panel id="projects" :register="$shownLens === 'dates' ? 'timeline.index' : 'projects.index'" :size="$size" :index="$index" :total="$total" :count="$list->count()">
+<x-desk.panel :facets="$pg['facets']" :filtered="$active !== 'all' || ($hasOthers && $scope !== 'mine')" id="projects" :register="$shownLens === 'dates' ? 'timeline.index' : 'projects.index'" :size="$size" :index="$index" :total="$total" :count="$list->count()">
+    <x-slot:filters>
+        @if ($hasOthers)
+            <div class="contents" data-filter-defaults='{"scope":"mine"}'>
+                <x-ui.header-filter-select :label="__('desk.scope')" wire:model="scope" :value="$scope" deferred>
+                    <option value="mine">{{ __('desk.scope_mine_projects') }}</option>
+                    <option value="all">{{ __('desk.filter_all') }}</option>
+                </x-ui.header-filter-select>
+            </div>
+        @endif
+        <div class="contents" data-filter-defaults='{"filter":"all"}'>
+            <x-ui.header-filter-select :label="__('desk.filter')" wire:model="filter" :value="$active" deferred>
+                @foreach ($filters as $key => $test)
+                    <option value="{{ $key }}">{{ __('desk.project_filter.'.$key) }} ({{ $base->filter($test)->count() }})</option>
+                @endforeach
+            </x-ui.header-filter-select>
+        </div>
+    </x-slot:filters>
+
     <x-slot:tools>
         <div class="dk-seg" role="group">
             @foreach ($lenses as $key)
                 <button type="button" wire:click="setLens('{{ $key }}')" aria-pressed="{{ $shownLens === $key ? 'true' : 'false' }}">{{ __('desk.lens.'.$key) }}</button>
             @endforeach
         </div>
-        @if ($hasOthers)
-            <label class="dk-sr" for="ps-projects-scope">{{ __('desk.scope') }}</label>
-            <select class="dk-mini" id="ps-projects-scope" wire:change="setScope($event.target.value)">
-                <option value="mine" @selected($scope === 'mine')>{{ __('desk.scope_mine_projects') }}</option>
-                <option value="all" @selected($scope === 'all')>{{ __('desk.filter_all') }}</option>
-            </select>
-        @endif
-        <label class="dk-sr" for="ps-projects-f">{{ __('desk.filter') }}</label>
-        <select class="dk-mini" id="ps-projects-f" wire:change="setFilter($event.target.value)">
-            @foreach ($filters as $key => $test)
-                <option value="{{ $key }}" @selected($active === $key)>{{ __('desk.project_filter.'.$key) }} ({{ $base->filter($test)->count() }})</option>
-            @endforeach
-        </select>
     </x-slot:tools>
 
     @if ($pg['total'] > 0)
@@ -207,13 +217,6 @@ new class extends Component {
                                     <div class="dk-tl-legend"><span>{{ $project->start_date->translatedFormat('M Y') }}</span><span>{{ $project->end_date->translatedFormat('M Y') }}</span></div>
                                 @else
                                     <span class="dk-muted dk-small">{{ __('desk.no_dates_yet') }}</span>
-                                @endif
-                                @break
-                            @case('risks')
-                                @if ($project->risks->isEmpty())
-                                    <span class="dk-muted">{{ __('desk.no_open_risks') }}</span>
-                                @else
-                                    <span><span class="dk-riskdots">@foreach ($project->risks as $risk)<i class="dk-med"></i>@endforeach</span>{{ $project->risks->first()->name }}</span>
                                 @endif
                                 @break
                             @default

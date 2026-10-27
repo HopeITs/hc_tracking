@@ -51,7 +51,7 @@
             'neutral' => 'ring-secondary-light/45 dark:ring-white/25',
             'good' => 'ring-status-good/40',
             'warn' => 'ring-status-warn/45',
-            'critical' => 'ring-status-critical/50',
+            'critical' => 'ring-status-critical',
             'funding' => 'ring-funding/45',
             'muted' => 'ring-secondary-soft dark:ring-white/15',
         ],
@@ -59,7 +59,7 @@
             'neutral' => 'bg-board-head text-secondary-dark ring-secondary-soft dark:bg-white/10 dark:text-ink dark:ring-white/15',
             'good' => 'bg-status-good-soft text-status-good ring-status-good/25',
             'warn' => 'bg-status-warn-soft text-status-warn ring-status-warn/25',
-            'critical' => 'bg-status-critical-soft text-status-critical ring-status-critical/25',
+            'critical' => 'bg-status-critical-soft text-status-critical ring-status-critical',
             'funding' => 'bg-funding-soft text-funding ring-funding/25',
             'muted' => 'bg-transparent text-secondary-light ring-secondary-soft dark:text-ink-muted dark:ring-white/15',
         ],
@@ -169,10 +169,10 @@
 
     $toolButton = 'grid size-8 place-items-center rounded-lg text-secondary-dark transition-colors hover:bg-board-head disabled:opacity-35 dark:text-ink dark:hover:bg-white/10';
     $segment = 'inline-flex items-center rounded-lg border border-secondary-soft bg-white p-0.5 dark:border-white/15 dark:bg-transparent';
-    $segmentButton = 'rounded-md px-2.5 py-1 text-xs font-semibold transition-colors focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-primary';
+    $segmentButton = 'rounded-md px-2.5 py-1 text-xs font-semibold transition-colors focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-secondary-medium';
     $segmentOn = 'bg-secondary-dark text-white shadow-sm dark:bg-ink dark:text-surface-0';
     $segmentOff = 'text-secondary-medium hover:text-secondary-dark dark:text-ink-muted dark:hover:text-ink';
-    $chip = 'inline-flex cursor-pointer items-center gap-1.5 rounded-full border px-2.5 py-1 text-xs font-semibold transition-colors focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-primary';
+    $chip = 'inline-flex cursor-pointer items-center gap-1.5 rounded-full border px-2.5 py-1 text-xs font-semibold transition-colors focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-secondary-medium';
     $chipOn = 'border-secondary-dark bg-secondary-dark text-white dark:border-ink dark:bg-ink dark:text-surface-0';
     $chipOff = 'border-secondary-soft text-secondary-medium hover:border-secondary-light hover:text-secondary-dark dark:border-white/15 dark:text-ink-muted dark:hover:text-ink';
     $control = 'rounded-lg border border-secondary-soft bg-white px-2.5 py-1.5 text-xs text-secondary-dark dark:border-field-line dark:bg-surface-2 dark:text-ink';
@@ -197,7 +197,7 @@
             <button
                 type="button"
                 x-on:click="zoomToFit()"
-                class="group/span flex min-w-0 items-center gap-3.5 rounded-lg text-start focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-primary"
+                class="group/span flex min-w-0 items-center gap-3.5 rounded-lg text-start focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-secondary-medium"
                 title="{{ __('gantt.fit_whole_plan') }}"
             >
                 <span class="flex min-w-0 flex-col gap-0.5">
@@ -265,7 +265,7 @@
                 aria-roledescription="{{ __('gantt.horizon.role') }}"
                 x-on:pointerdown="horizonDown($event)"
                 x-on:keydown="horizonKeydown($event)"
-                class="relative cursor-grab touch-none overflow-hidden rounded-lg bg-board-head select-none active:cursor-grabbing focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary dark:bg-black/15"
+                class="relative cursor-grab touch-none overflow-hidden rounded-lg bg-board-head select-none active:cursor-grabbing focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-secondary-medium dark:bg-black/15"
                 x-bind:style="`height:${24 + horizon.lanes * (horizonLaneHeight + 3) + 14}px`"
             >
                 {{-- Next 30 and 90 days --}}
@@ -560,7 +560,7 @@
             x-on:scroll="onScroll($event)"
             x-on:wheel="onWheel($event)"
             x-on:keydown="onKeydown($event)"
-            class="gantt-scroller relative h-full min-w-0 flex-1 overflow-auto overscroll-contain focus:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-primary/40"
+            class="gantt-scroller relative h-full min-w-0 flex-1 overflow-auto overscroll-contain focus:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-secondary-light"
         >
             <div class="relative" x-bind:style="`width:${gridWidth + chartWidth}px`">
                 {{-- Header --}}
@@ -768,7 +768,7 @@
                                         x-on:mousemove="showTip(item.row, $event)"
                                         x-on:mouseleave="hideTip()"
                                     >
-                                        <div class="absolute inset-0 rounded-[2px]" x-bind:class="[isCriticalShown(item.row) || item.row.late ? 'bg-status-critical/35' : 'bg-secondary-dark/30 dark:bg-white/30', roleOf(item.row) === 'self' ? 'ring-2 ring-status-active ring-offset-2 ring-offset-white dark:ring-offset-surface-1' : '']"></div>
+                                        <div class="absolute inset-0 rounded-[2px]" x-bind:class="[isCriticalShown(item.row) || item.row.late ? 'bg-status-critical' : 'bg-secondary-dark/30 dark:bg-white/30', roleOf(item.row) === 'self' ? 'ring-2 ring-status-active ring-offset-2 ring-offset-white dark:ring-offset-surface-1' : '']"></div>
                                         <div class="absolute inset-y-0 left-0 rounded-[2px]" x-bind:class="isCriticalShown(item.row) || item.row.late ? 'bg-status-critical' : 'bg-secondary-dark dark:bg-ink-muted'" x-bind:style="`width:${item.row.progress}%`"></div>
                                         <span class="absolute -bottom-1.5 left-0 border-x-4 border-t-[6px] border-x-transparent" x-bind:class="item.row.late ? 'border-t-status-critical' : 'border-t-secondary-dark dark:border-t-ink-muted'" aria-hidden="true"></span>
                                         <span class="absolute right-0 -bottom-1.5 border-x-4 border-t-[6px] border-x-transparent" x-bind:class="item.row.late ? 'border-t-status-critical' : 'border-t-secondary-dark dark:border-t-ink-muted'" aria-hidden="true"></span>

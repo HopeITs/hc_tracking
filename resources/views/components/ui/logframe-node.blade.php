@@ -97,7 +97,7 @@
                     x-on:click="open = ! open"
                     x-bind:aria-expanded="open.toString()"
                     aria-controls="chain-children-{{ $result->id }}"
-                    class="ms-auto inline-flex cursor-pointer items-center gap-1 rounded-sm type-meta font-semibold text-secondary-dark hover:text-primary focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary print:hidden dark:text-ink dark:hover:text-brand-text"
+                    class="ms-auto inline-flex cursor-pointer items-center gap-1 rounded-sm type-meta font-semibold text-secondary-dark hover:text-primary focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-secondary-medium print:hidden dark:text-ink dark:hover:text-brand-text"
                 >
                     {{ trans_choice('programs.logframe_count_contributing', count($children), ['count' => count($children)]) }}
                     <flux:icon.chevron-down variant="micro" class="size-3.5 transition-transform duration-200" x-bind:class="open ? '' : '-rotate-90 rtl:rotate-90'" aria-hidden="true" />
@@ -133,7 +133,7 @@
                 x-on:click="contributions = ! contributions"
                 x-bind:aria-expanded="contributions.toString()"
                 aria-controls="chain-contributions-{{ $result->id }}"
-                class="inline-flex cursor-pointer items-center gap-1.5 rounded-sm type-meta font-semibold text-secondary-dark hover:text-primary focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary print:hidden dark:text-ink dark:hover:text-brand-text"
+                class="inline-flex cursor-pointer items-center gap-1.5 rounded-sm type-meta font-semibold text-secondary-dark hover:text-primary focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-secondary-medium print:hidden dark:text-ink dark:hover:text-brand-text"
             >
                 <flux:icon.document-text variant="micro" class="size-3.5" aria-hidden="true" />
                 {{ trans_choice('results_framework.chain_contributions', count($contributions), ['count' => count($contributions)]) }}

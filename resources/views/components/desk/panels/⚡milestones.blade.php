@@ -34,11 +34,11 @@ new class extends Component {
 
 @php
     $rows = $this->rows;
-    $pg = $this->paginate($rows, 5);
+    $pg = $this->paginate($rows, self::PerPage);
     $format = __('desk.date_short');
 @endphp
 
-<x-desk.panel id="milestones" register="milestones.index" :size="$size" :index="$index" :total="$total" :count="$rows->count()">
+<x-desk.panel :facets="$pg['facets']" id="milestones" register="milestones.index" :size="$size" :index="$index" :total="$total" :count="$rows->count()">
     @if ($pg['total'] > 0)
         <ul class="dk-plist">
             @foreach ($pg['slice'] as $milestone)

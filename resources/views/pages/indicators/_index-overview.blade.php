@@ -23,7 +23,7 @@
                                 aria-pressed="{{ $rag === $segment['key'] ? 'true' : 'false' }}"
                                 style="width: {{ ($segment['count'] / max($overview['indicators'], 1)) * 100 }}%"
                                 @class([
-                                    'h-full transition-opacity focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-primary',
+                                    'h-full transition-opacity focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-secondary-medium',
                                     $segment['fill'],
                                     'opacity-100' => $rag === '' || $rag === $segment['key'],
                                     'opacity-30' => $rag !== '' && $rag !== $segment['key'],
@@ -42,7 +42,7 @@
                             wire:key="rag-legend-{{ $segment['key'] }}"
                             aria-pressed="{{ $rag === $segment['key'] ? 'true' : 'false' }}"
                             @class([
-                                'inline-flex items-center gap-1.5 rounded-md px-1 py-0.5 type-meta transition-colors focus-visible:outline-2 focus-visible:outline-primary',
+                                'inline-flex items-center gap-1.5 rounded-md px-1 py-0.5 type-meta transition-colors focus-visible:outline-2 focus-visible:outline-secondary-medium',
                                 'font-bold text-secondary-dark dark:text-ink' => $rag === $segment['key'],
                                 'text-secondary-medium hover:text-secondary-dark dark:text-ink-muted dark:hover:text-ink' => $rag !== $segment['key'],
                             ])

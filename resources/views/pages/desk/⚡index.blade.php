@@ -2,6 +2,7 @@
 
 use App\Livewire\Concerns\Dashboard\ReadsDashboardAttention;
 use App\Livewire\Concerns\Dashboard\ReadsDashboardWork;
+use App\Livewire\Concerns\Desk\ArrangesPanels;
 use App\Support\Desk\Panels;
 use Carbon\CarbonImmutable;
 use Illuminate\Database\Eloquent\Builder;
@@ -17,6 +18,7 @@ use Livewire\Component;
  * Every change to the arrangement is saved on users.desk_layout at once.
  */
 new #[Layout('layouts::desk'), Title('titles.dashboard')] class extends Component {
+    use ArrangesPanels;
     use ReadsDashboardAttention;
     use ReadsDashboardWork;
 
@@ -66,60 +68,13 @@ new #[Layout('layouts::desk'), Title('titles.dashboard')] class extends Componen
         return ['total' => $this->attentionItems->count() + $soon, 'late' => $late];
     }
 
-    public function resizePanel(string $panel, string $size): void
-    {
-        if (! isset(Panels::Sizes[$size])) {
-            return;
-        }
-
-        $this->save(array_map(fn (array $entry): array => $entry['panel'] === $panel ? [...$entry, 'size' => $size] : $entry, $this->layout));
-    }
-
-    public function movePanel(string $panel, int $position): void
-    {
-        $layout = $this->layout;
-        $from = array_search($panel, array_column($layout, 'panel'), true);
-
-        if ($from === false) {
-            return;
-        }
-
-        [$entry] = array_splice($layout, $from, 1);
-        array_splice($layout, max(0, min($position, count($layout))), 0, [$entry]);
-        $this->save($layout);
-    }
-
-    public function removePanel(string $panel): void
-    {
-        $this->save(array_values(array_filter($this->layout, fn (array $entry): bool => $entry['panel'] !== $panel)));
-    }
-
-    public function addPanel(string $panel): void
-    {
-        $library = $this->library;
-
-        if (! isset($library[$panel]) || in_array($panel, array_column($this->layout, 'panel'), true)) {
-            return;
-        }
-
-        $this->save([...$this->layout, ['panel' => $panel, 'size' => $library[$panel]['size']]]);
-    }
-
-    public function resetLayout(): void
-    {
-        $user = auth()->user();
-        $user->desk_layout = null;
-        $user->save();
-        unset($this->layout);
-    }
-
     /**
-     * @param  list<array{panel: string, size: string}>  $layout
+     * @param  list<array{panel: string, size: string}>|null  $layout
      */
-    private function save(array $layout): void
+    protected function storeLayout(?array $layout): void
     {
         $user = auth()->user();
-        $user->desk_layout = array_values($layout);
+        $user->desk_layout = $layout === null ? null : array_values($layout);
         $user->save();
         unset($this->layout);
     }
@@ -161,9 +116,6 @@ new #[Layout('layouts::desk'), Title('titles.dashboard')] class extends Componen
             <h1>{{ rtrim($this->greeting(), '.!') }}{{ __('desk.sentence_end') }} {!! $n === 0 ? e(__('desk.hello_none')) : trans_choice('desk.hello_count', $n, ['count' => $n]) !!}</h1>
             <p class="dk-lede">{{ $n === 0 ? __('desk.lede_done') : ($needs['late'] > 0 ? trans_choice('desk.lede_late', $needs['late'], ['count' => $needs['late']]) : __('desk.lede_none_late')) }}</p>
         </div>
-        <div class="dk-hello-tools">
-            <button type="button" class="dk-btn" x-on:click="$dispatch('dk-customize-open')" data-desk-customize-trigger><x-desk.icon name="grid" />{{ __('desk.customize') }}</button>
-        </div>
     </section>
 
     <div class="dk-grid" id="dk-grid" data-desk-grid>
@@ -172,14 +124,16 @@ new #[Layout('layouts::desk'), Title('titles.dashboard')] class extends Componen
         @endforeach
     </div>
 
-    {{-- Outside the dense grid so it can never be backfilled into a gap: always the last card. --}}
-    <div class="dk-grid dk-grid-tail">
-        <button type="button" class="dk-addtile" x-on:click="$dispatch('dk-customize-open')" data-desk-add>
-            <x-desk.icon name="plus" />
-            <span>{{ __('desk.add_panel') }}</span>
-            <small>{{ trans_choice('desk.more_available', $more, ['count' => $more]) }}</small>
-        </button>
-    </div>
+    {{-- Outside the dense grid so it can never be backfilled into a gap: always the last card, and only while a panel is left to add. --}}
+    @if ($more > 0)
+        <div class="dk-grid dk-grid-tail">
+            <button type="button" class="dk-addtile" x-on:click="$dispatch('dk-customize-open')" data-desk-add>
+                <x-desk.icon name="plus" />
+                <span>{{ __('desk.add_panel') }}</span>
+                <small>{{ trans_choice('desk.more_available', $more, ['count' => $more]) }}</small>
+            </button>
+        </div>
+    @endif
 
     @include('pages.desk._customize-sheet')
 </div>

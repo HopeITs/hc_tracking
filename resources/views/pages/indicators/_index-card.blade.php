@@ -124,7 +124,7 @@
                         {{-- What was committed to funders, and what has been reported back. --}}
                         {{-- Counted per target: two targets on one indicator can sit in different plans and years. --}}
                         @if ($row['targets'] !== [])
-                            <a href="{{ route('targets.index', ['indicator' => $indicator->id]) }}" wire:navigate class="group/targets block rounded-md focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary">
+                            <a href="{{ route('targets.index', ['indicator' => $indicator->id]) }}" wire:navigate class="group/targets block rounded-md focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-secondary-medium">
                                 <div class="flex items-baseline justify-between gap-2">
                                     <p class="type-label text-secondary-medium group-hover/targets:text-primary dark:group-hover/targets:text-brand-text dark:text-ink-muted">{{ __('indicators.targets_achieved') }}</p>
                                     <p class="type-meta tabular-nums text-secondary-medium dark:text-ink-muted">
@@ -155,14 +155,14 @@
                             @endif
 
                             @if ($row['overdueReports'] > 0)
-                                <span class="inline-flex items-center gap-1 rounded-md border border-primary/30 bg-status-critical-soft px-2 py-0.5 text-xs font-semibold text-primary dark:text-brand-text">
+                                <span class="inline-flex items-center gap-1 rounded-md border border-primary bg-status-critical-soft px-2 py-0.5 text-xs font-semibold text-primary dark:text-brand-text">
                                     <flux:icon.document-text variant="micro" class="size-3" aria-hidden="true" />
                                     {{ trans_choice('indicators.count_report_overdue', $row['overdueReports'], ['count' => $row['overdueReports']]) }}
                                 </span>
                             @endif
 
                             @if ($row['chainIssues'] > 0)
-                                <span class="inline-flex items-center gap-1 rounded-md border border-primary/30 bg-status-critical-soft px-2 py-0.5 text-xs font-semibold text-primary dark:text-brand-text">
+                                <span class="inline-flex items-center gap-1 rounded-md border border-primary bg-status-critical-soft px-2 py-0.5 text-xs font-semibold text-primary dark:text-brand-text">
                                     <flux:icon.link-slash variant="micro" class="size-3" aria-hidden="true" />
                                     {{ trans_choice('indicators.count_target_out_of_step', $row['chainIssues'], ['count' => $row['chainIssues']]) }}
                                 </span>

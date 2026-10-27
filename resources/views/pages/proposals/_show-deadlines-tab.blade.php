@@ -46,7 +46,7 @@
                                                 <p class="flex min-w-0 items-center gap-1.5 text-sm">
                                                     <flux:icon :name="$kindIcon[$item['kind']]" variant="micro" class="size-4 shrink-0 {{ $mutedText }}" aria-hidden="true" />
                                                     @if ($item['url'] !== null)
-                                                        <a href="{{ $item['url'] }}" wire:navigate class="truncate font-semibold underline-offset-4 hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary {{ $inkText }}">{{ $item['title'] }}</a>
+                                                        <a href="{{ $item['url'] }}" wire:navigate class="truncate font-semibold underline-offset-4 hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-secondary-medium {{ $inkText }}">{{ $item['title'] }}</a>
                                                     @else
                                                         <span class="truncate font-semibold {{ $inkText }}">{{ $item['title'] }}</span>
                                                     @endif

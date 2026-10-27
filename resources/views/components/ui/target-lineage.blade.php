@@ -13,7 +13,7 @@
 
     $accent = fn (ResultType $type): string => match ($type) {
         ResultType::Impact => 'h-1 bg-primary',
-        ResultType::Outcome => 'h-0.5 bg-primary/60',
+        ResultType::Outcome => 'h-0.5 bg-primary',
         ResultType::Output, ResultType::Activity, ResultType::CrossCutting => 'h-0.5 bg-transparent',
     };
 @endphp

@@ -71,7 +71,7 @@
                 x-on:click="open = ! open"
                 x-bind:aria-expanded="open.toString()"
                 aria-controls="{{ $detailsId }}"
-                class="inline-flex items-center gap-1 rounded-md px-2 py-1 text-xs font-semibold {{ $mutedText }} hover:bg-secondary-soft focus-visible:outline-2 focus-visible:outline-primary dark:hover:bg-white/[0.06]"
+                class="inline-flex items-center gap-1 rounded-md px-2 py-1 text-xs font-semibold {{ $mutedText }} hover:bg-secondary-soft focus-visible:outline-2 focus-visible:outline-secondary-medium dark:hover:bg-white/[0.06]"
             >
                 @if ($hasExtras)
                     <span class="size-1.5 rounded-full bg-primary dark:bg-brand-text" aria-hidden="true"></span>
@@ -151,7 +151,7 @@
                         dir="auto"
                         wire:model.blur="{{ $noteModel }}"
                         aria-label="{{ $row['name'] }} — {{ __('monthly_reports.grid_note') }}"
-                        class="w-full rounded-md border border-secondary-light bg-white px-2 py-1 text-sm text-secondary-dark outline-none focus:border-primary focus:ring-2 focus:ring-primary/30 dark:border-field-line dark:bg-surface-2 dark:text-ink dark:focus:border-brand"
+                        class="w-full rounded-md border border-secondary-light bg-white px-2 py-1 text-sm text-secondary-dark outline-none focus:border-secondary-medium focus:ring-2 focus:ring-secondary-light dark:border-field-line dark:bg-surface-2 dark:text-ink dark:focus:border-ink-muted"
                     ></textarea>
                     @error($noteModel)
                         <p class="mt-1 text-xs text-status-critical">{{ $message }}</p>

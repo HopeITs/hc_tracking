@@ -38,7 +38,7 @@
         'received' => 'bg-funding',
         'upcoming' => 'money-pending border border-status-warn bg-white dark:bg-surface-1',
         'transit' => 'bg-status-warn',
-        'late' => 'bg-primary dark:bg-status-critical ring-4 ring-primary/15',
+        'late' => 'bg-primary dark:bg-status-critical ring-4 ring-secondary-light',
         'failed' => 'border-2 border-primary bg-white dark:bg-surface-1',
     ];
     $tagClass = [
@@ -105,7 +105,7 @@
                 </div>
 
                 <div class="hidden items-center gap-2 @3xl/cal:flex">
-                    <button type="button" x-on:click="goToToday()" class="inline-flex min-h-9 items-center gap-1.5 rounded-lg border px-3 text-xs font-semibold transition-colors hover:bg-board-head focus-visible:outline-2 focus-visible:outline-primary dark:hover:bg-white/5 {{ $hairline }} {{ $inkText }}" data-jump-today>
+                    <button type="button" x-on:click="goToToday()" class="inline-flex min-h-9 items-center gap-1.5 rounded-lg border px-3 text-xs font-semibold transition-colors hover:bg-board-head focus-visible:outline-2 focus-visible:outline-secondary-medium dark:hover:bg-white/5 {{ $hairline }} {{ $inkText }}" data-jump-today>
                         <span class="size-2 rounded-full bg-primary dark:bg-ink" aria-hidden="true"></span>
                         {{ __('common.today') }}
                     </button>
@@ -129,7 +129,7 @@
                         aria-pressed="{{ $isActive ? 'true' : 'false' }}"
                         @disabled($stageCount === 0 && ! $isActive)
                         @class([
-                            'inline-flex min-h-9 items-center gap-2 rounded-full border ps-3 pe-3.5 text-xs font-semibold transition-colors duration-150 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary disabled:cursor-default disabled:opacity-45',
+                            'inline-flex min-h-9 items-center gap-2 rounded-full border ps-3 pe-3.5 text-xs font-semibold transition-colors duration-150 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-secondary-medium disabled:cursor-default disabled:opacity-45',
                             'border-secondary-dark bg-secondary-dark text-white dark:border-ink dark:bg-ink dark:text-surface-0' => $isActive,
                             $hairline.' hover:border-secondary-light hover:bg-board-head dark:hover:bg-white/5 '.$inkText => ! $isActive,
                         ])
@@ -267,7 +267,7 @@
                                                                 'late' => $amount($periodMoney['late']),
                                                                 'failed' => $amount($periodMoney['failed']),
                                                             ]) }}"
-                                                            class="absolute inset-x-1 inset-y-1 flex items-end gap-1.5 rounded-md px-1 pb-1 text-start transition-colors hover:bg-board-head focus-visible:outline-2 focus-visible:outline-primary aria-pressed:bg-funding-soft dark:hover:bg-white/5"
+                                                            class="absolute inset-x-1 inset-y-1 flex items-end gap-1.5 rounded-md px-1 pb-1 text-start transition-colors hover:bg-board-head focus-visible:outline-2 focus-visible:outline-secondary-medium aria-pressed:bg-funding-soft dark:hover:bg-white/5"
                                                             data-period="{{ $period['key'] }}"
                                                         >
                                                             <span class="flex h-full w-1.5 shrink-0 flex-col-reverse overflow-hidden rounded-full" aria-hidden="true">

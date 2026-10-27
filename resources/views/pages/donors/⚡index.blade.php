@@ -321,7 +321,7 @@ new #[Layout('layouts::desk'), Title('titles.donors')] class extends Component {
                 @endif
 
                 @can('donors.create')
-                <x-ui.button tone="primary" icon="plus" class="page-action page-action-primary" wire:click="openCreateModal" data-test="create-donor-button">
+                <x-ui.button tone="primary" icon="plus" class="page-action page-action-primary" wire:click="openCreateModal" data-test="create-donor-button" data-quick-create>
                     {{ __('donors.add_donor') }}
                 </x-ui.button>
                 @endcan

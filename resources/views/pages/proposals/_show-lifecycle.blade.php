@@ -37,7 +37,7 @@
 
                     <span @class([
                         'relative z-10 size-2.5 rounded-full',
-                        'bg-primary dark:bg-brand ring-4 ring-primary/20' => in_array($stop['state'], ['current', 'rejected'], true),
+                        'bg-primary dark:bg-brand ring-4 ring-secondary-light' => in_array($stop['state'], ['current', 'rejected'], true),
                         'bg-secondary-dark dark:bg-ink-muted' => $stop['state'] === 'past',
                         'border-2 border-secondary-soft bg-white dark:border-line-strong dark:bg-surface-1' => $stop['state'] === 'ahead',
                     ]) aria-hidden="true"></span>

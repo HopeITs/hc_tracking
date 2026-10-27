@@ -100,7 +100,7 @@
                                     aria-pressed="{{ $rail['isActive'] ? 'true' : 'false' }}"
                                     aria-label="{{ __('annual_plans.focus_year_plans_targets', ['year' => $rail['year'], 'plans' => $rail['plans'], 'targets' => $rail['targets']]) }}"
                                     @class([
-                                        'min-h-9 cursor-pointer rounded-md px-2.5 py-1 text-sm font-bold tabular-nums transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary',
+                                        'min-h-9 cursor-pointer rounded-md px-2.5 py-1 text-sm font-bold tabular-nums transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-secondary-medium',
                                         'bg-primary dark:bg-ink dark:text-surface-0 text-white' => $rail['isActive'],
                                         'text-secondary-dark hover:bg-secondary-soft dark:text-ink dark:hover:bg-surface-2' => ! $rail['isActive'],
                                     ])

@@ -63,6 +63,17 @@ class Donor extends Model implements TracksActivity
     }
 
     /**
+     * The proposals written for this donor (proposals.donor_id), from the
+     * concept note on, whether or not an agreement was signed yet.
+     *
+     * @return HasMany<Proposal, $this>
+     */
+    public function proposalsWrittenFor(): HasMany
+    {
+        return $this->hasMany(Proposal::class);
+    }
+
+    /**
      * The proposals this donor funds.
      *
      * `donor_proposal` carries budget and currency, so prefer donorProposals()

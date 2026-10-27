@@ -11,6 +11,12 @@ return [
     'group_overview' => 'Overview',
     'group_projects_delivery' => 'Projects & Delivery',
     'group_strategy_planning' => 'Strategy & Planning',
+    'group_administration' => 'Administration',
+    'group_you' => 'You',
+    'panels' => 'Panels',
+    'open_menu' => 'Open the menu',
+    'expand_sidebar' => 'Expand the sidebar',
+    'collapse_sidebar' => 'Collapse the sidebar',
     'group_workspace' => 'My Workspace',
     'guideline' => 'User guideline',
     'indicator_library' => 'Indicator Library',
@@ -30,4 +36,5 @@ return [
     'donor_report_builder' => 'Donor Report Builder',
     'reporting_duties' => 'My Reporting Duties',
     'monthly_matrix' => 'Monthly Matrix',
+    'tools' => 'Tools',
 ];

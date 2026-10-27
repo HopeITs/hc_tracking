@@ -112,17 +112,12 @@ test('the settings page offers the desktop app install through the install modal
         ->and($installButton->getAttribute('x-on:click'))->toBe("\$flux.modal('install-app').show()");
 });
 
-test('the settings sheet offers the desktop app install while the browser holds an install prompt', function () {
+test('the top bar offers the desktop app install while the browser holds an install prompt', function () {
     $xpath = desktopAppPage('dashboard');
 
-    $rows = $xpath->query('//*[@data-settings-install]');
+    $button = $xpath->query('//*[@data-test="top-bar-install-app"]')->item(0);
 
-    expect($rows->length)->toBe(1)
-        ->and($rows->item(0)->getAttribute('x-show'))->toBe("state === 'available'");
-
-    $button = $xpath->query('.//*[@data-test="settings-install-app"]', $rows->item(0))->item(0);
-
-    expect(trim($button->textContent))->toBe(__('desk.install'))
+    expect($button->parentNode->getAttribute('x-show'))->toBe("state === 'available'")
         ->and($button->getAttribute('x-on:click'))->toContain("\$flux.modal('install-app').show()");
 });
 

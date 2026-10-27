@@ -37,7 +37,7 @@
     }
 
     .dark ::selection {
-        background-color: color-mix(in srgb, var(--color-brand) 35%, transparent);
+        background-color: color-mix(in srgb, var(--color-secondary-medium) 35%, transparent);
     }
 
     .dark img:not([data-no-dim]) {

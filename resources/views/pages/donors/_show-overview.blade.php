@@ -133,7 +133,7 @@
                                         <a
                                             href="{{ route('funding-agreements.show', $lane['agreement']) }}"
                                             wire:navigate
-                                            class="group absolute top-1/2 z-10 -translate-x-1/2 hover:z-30 focus-visible:z-30 -translate-y-1/2 rounded-full focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary rtl:translate-x-1/2"
+                                            class="group absolute top-1/2 z-10 -translate-x-1/2 hover:z-30 focus-visible:z-30 -translate-y-1/2 rounded-full focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-secondary-medium rtl:translate-x-1/2"
                                             style="inset-inline-start: {{ $point['position'] }}%"
                                             aria-label="{{ __('donors.tranche_point_label', ['state' => $stateLabels[$point['state']], 'amount' => $amount($point['amount']), 'currency' => $point['currency'], 'date' => $point['date']->translatedFormat(__('formats.date')), 'proposal' => $lane['agreement']->proposal->name]) }}"
                                             wire:key="point-{{ $point['id'] }}"
@@ -142,7 +142,7 @@
                                             <span @class([
                                                 'block rounded-full transition-transform duration-200 ease-out group-hover:scale-125',
                                                 'bg-funding' => $point['state'] === 'received',
-                                                'bg-primary dark:bg-status-critical ring-4 ring-primary/15' => $point['state'] === 'overdue',
+                                                'bg-primary dark:bg-status-critical ring-4 ring-secondary-light' => $point['state'] === 'overdue',
                                                 'border-2 border-dashed border-status-critical bg-white dark:bg-surface-1' => $point['state'] === 'failed',
                                                 'border-[3px] border-status-warn bg-white dark:bg-surface-1' => in_array($point['state'], ['due', 'transit', 'undated'], true),
                                             ]) style="width: {{ $point['size'] }}rem; height: {{ $point['size'] }}rem"></span>
@@ -266,7 +266,7 @@
                                     <ul class="mt-2 flex flex-col" role="list">
                                         @foreach ($agreement->reports as $owedReport)
                                             <li wire:key="agreement-{{ $agreement->id }}-owed-{{ $owedReport->id }}" data-owed-donor-report="{{ $owedReport->id }}">
-                                                <a href="{{ route('funding-agreements.show', $agreement) }}#reports-heading" wire:navigate class="group flex min-h-9 items-center justify-between gap-3 border-b py-1.5 text-sm focus-visible:outline-2 focus-visible:outline-primary {{ $hairline }}">
+                                                <a href="{{ route('funding-agreements.show', $agreement) }}#reports-heading" wire:navigate class="group flex min-h-9 items-center justify-between gap-3 border-b py-1.5 text-sm focus-visible:outline-2 focus-visible:outline-secondary-medium {{ $hairline }}">
                                                     <span class="min-w-0">
                                                         <span class="block truncate font-medium underline-offset-4 group-hover:underline {{ $inkText }}">{{ $owedReport->title }}</span>
                                                         <span class="block text-[11px] {{ $mutedText }}">{{ $owedReport->type->label() }}</span>
@@ -289,7 +289,7 @@
                                     <ul class="mt-2 flex flex-col" role="list">
                                         @foreach ($reports->take($this::LISTED_REPORTS) as $report)
                                             <li wire:key="agreement-{{ $agreement->id }}-report-{{ $report->id }}" data-agreement-report="{{ $report->id }}">
-                                                <a href="{{ route('reports.show', $report) }}" wire:navigate class="group flex min-h-9 items-center justify-between gap-3 border-b py-1.5 text-sm focus-visible:outline-2 focus-visible:outline-primary {{ $hairline }}">
+                                                <a href="{{ route('reports.show', $report) }}" wire:navigate class="group flex min-h-9 items-center justify-between gap-3 border-b py-1.5 text-sm focus-visible:outline-2 focus-visible:outline-secondary-medium {{ $hairline }}">
                                                     <span class="min-w-0">
                                                         <span class="block truncate font-medium underline-offset-4 group-hover:underline {{ $inkText }}">{{ $report->planIndicator?->indicator?->name ?? __('donors.report_number', ['number' => $report->id]) }}</span>
                                                         <span class="block text-[11px] tabular-nums {{ $mutedText }}">{{ $report->planned_date->translatedFormat(__('formats.date')) }}</span>
@@ -308,7 +308,7 @@
 
                         @if ($agreement->transfers->isNotEmpty())
                             <details class="group min-w-0 @4xl/detail:col-span-2" data-tranche-ledger="{{ $agreement->id }}">
-                                <summary class="inline-flex min-h-9 cursor-pointer list-none items-center gap-1.5 text-xs font-semibold underline-offset-4 hover:underline focus-visible:outline-2 focus-visible:outline-primary {{ $inkText }} [&::-webkit-details-marker]:hidden">
+                                <summary class="inline-flex min-h-9 cursor-pointer list-none items-center gap-1.5 text-xs font-semibold underline-offset-4 hover:underline focus-visible:outline-2 focus-visible:outline-secondary-medium {{ $inkText }} [&::-webkit-details-marker]:hidden">
                                     <flux:icon.chevron-right variant="micro" class="size-4 transition-transform group-open:rotate-90 rtl:-scale-x-100" aria-hidden="true" />
                                     {{ trans_choice('donors.every_tranche_in_detail', $agreement->transfers->count(), ['count' => $agreement->transfers->count()]) }}
                                 </summary>

@@ -57,12 +57,12 @@
                             type="button"
                             wire:click="togglePhase('{{ $stop['phase']->value }}')"
                             aria-pressed="{{ $isSelected ? 'true' : 'false' }}"
-                            class="group flex w-full flex-col items-center gap-1.5 rounded-lg px-1 pb-2 text-center transition-colors duration-150 hover:bg-board-head focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary dark:hover:bg-white/5"
+                            class="group flex w-full flex-col items-center gap-1.5 rounded-lg px-1 pb-2 text-center transition-colors duration-150 hover:bg-board-head focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-secondary-medium dark:hover:bg-white/5"
                             data-phase-stop="{{ $stop['phase']->value }}"
                         >
                             <span @class([
                                 'relative z-10 size-3.5 rounded-full border-2 transition-transform duration-200 ease-out group-hover:scale-125',
-                                'border-primary bg-primary dark:bg-brand dark:border-brand ring-4 ring-primary/15' => $isSelected,
+                                'border-primary bg-primary dark:bg-brand dark:border-brand ring-4 ring-secondary-light' => $isSelected,
                                 'border-secondary-dark bg-secondary-dark dark:border-ink-muted dark:bg-ink-muted' => ! $isSelected && ! $isEmpty,
                                 'border-secondary-light bg-white dark:bg-surface-1' => ! $isSelected && $isEmpty,
                             ]) aria-hidden="true"></span>

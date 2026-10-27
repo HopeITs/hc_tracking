@@ -137,4 +137,7 @@ return [
     'close' => 'Close',
     'hr_unavailable' => 'Could not load HR data',
     'no_active_position' => 'No active position',
+    'back' => 'Back',
+    'steps' => 'Steps',
+    'step_of' => 'Step :step of :total',
 ];

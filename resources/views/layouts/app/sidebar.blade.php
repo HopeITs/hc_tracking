@@ -16,17 +16,22 @@
             <x-preloader />
         @endpersist
 
-        <x-desk.top-bar />
+        <div class="dk-app" data-app-shell>
+            @auth
+                <x-desk.side-nav :shows-inbox="$showsInbox" />
+            @endauth
+
+            <div class="dk-main" data-app-main>
+                <x-desk.top-bar :shows-inbox="$showsInbox" />
+
+                {{ $slot }}
+            </div>
+        </div>
 
         @if ($showsInbox)
             <livewire:desk.ask />
+            <livewire:desk.page-panels :route-name="request()->route()?->getName() ?? ''" :page-title="filled($title ?? null) ? __($title) : null" />
         @endif
-
-        @auth
-            <x-desk.settings-sheet />
-        @endauth
-
-        {{ $slot }}
 
         <x-tour.overlay />
 

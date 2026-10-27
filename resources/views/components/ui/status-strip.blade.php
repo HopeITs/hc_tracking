@@ -49,7 +49,7 @@
                         wire:click="$set('{{ $wireModel }}', '{{ $target }}')"
                         aria-pressed="{{ $isActive ? 'true' : 'false' }}"
                         @class([
-                            'inline-flex items-center gap-1.5 rounded-md px-1.5 py-1 type-meta transition-colors hover:bg-secondary-soft focus-visible:outline-2 focus-visible:outline-primary dark:hover:bg-surface-2',
+                            'inline-flex items-center gap-1.5 rounded-md px-1.5 py-1 type-meta transition-colors hover:bg-secondary-soft focus-visible:outline-2 focus-visible:outline-secondary-medium dark:hover:bg-surface-2',
                             'text-secondary-dark dark:text-ink' => ! $isActive,
                             'bg-secondary-soft text-secondary-dark dark:bg-surface-2 dark:text-ink' => $isActive,
                         ])

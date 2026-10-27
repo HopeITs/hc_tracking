@@ -14,7 +14,6 @@ use App\Models\User;
 use App\Notifications\AppNotification;
 use App\Notifications\NotificationPayload;
 use App\Notifications\UnreadSubjects;
-use Livewire\Livewire;
 
 function notifyAbout(User $user, string $module, string $type, int $id): void
 {
@@ -34,17 +33,6 @@ test('unread subjects are listed per type', function () {
     expect(app(UnreadSubjects::class)->ids($user, 'task'))->toBe([4, 9])
         ->and(app(UnreadSubjects::class)->has($user, 'project', 4))->toBeTrue()
         ->and(app(UnreadSubjects::class)->has($user, 'project', 9))->toBeFalse();
-});
-
-test('the notifications panel counts the unread notifications', function () {
-    $user = Activity::withoutRecording(fn () => User::factory()->role('General Manager')->create());
-    notifyAbout($user, 'tasks', 'task', 1);
-    notifyAbout($user, 'tasks', 'task', 2);
-
-    Livewire::actingAs($user)->test('desk.panels.inbox', ['size' => 'M'])
-        ->assertSeeHtml('<span class="dk-pc dk-num" data-panel-count>2</span>')
-        ->call('markAllRead')
-        ->assertDontSeeHtml('data-panel-count');
 });
 
 test('list rows carry a dot only for records with unread notifications', function (string $route, string $type, Closure $make) {

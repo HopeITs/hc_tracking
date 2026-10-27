@@ -36,7 +36,7 @@
 
     <div class="min-w-0">
         <a href="{{ route('tasks.show', $task) }}" wire:navigate @class([
-            'block truncate text-sm font-semibold underline-offset-4 hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary',
+            'block truncate text-sm font-semibold underline-offset-4 hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-secondary-medium',
             $mutedText.' line-through decoration-secondary-light' => $isDone,
             $inkText => ! $isDone,
         ])>{{ $task->title }}</a>

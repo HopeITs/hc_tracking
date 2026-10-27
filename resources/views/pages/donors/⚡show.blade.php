@@ -356,7 +356,7 @@ new #[Layout('layouts::desk'), Title('titles.donor')] class extends Component {
                 <ul class="mt-2 flex flex-col gap-1">
                     @foreach ($this->overdueTranches as $item)
                         <li wire:key="overdue-{{ $item['transfer']->id }}" data-overdue-tranche="{{ $item['transfer']->id }}">
-                            <a href="{{ route('funding-agreements.show', $item['agreement']) }}" wire:navigate class="group flex min-h-8 flex-wrap items-baseline gap-x-3 gap-y-0.5 text-sm focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary">
+                            <a href="{{ route('funding-agreements.show', $item['agreement']) }}" wire:navigate class="group flex min-h-8 flex-wrap items-baseline gap-x-3 gap-y-0.5 text-sm focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-secondary-medium">
                                 <span class="font-bold tabular-nums {{ $inkText }}">{{ $amount((float) $item['transfer']->payment_amount) }} <span class="text-xs font-semibold {{ $mutedText }}">{{ $item['transfer']->amount_transfered_currency?->value ?? $item['agreement']->currency->value }}</span></span>
                                 <span class="min-w-0 underline-offset-4 group-hover:underline {{ $inkText }}">{{ __('donors.overdue_line', ['proposal' => $item['agreement']->proposal->name, 'date' => $item['transfer']->scheduled_date->translatedFormat(__('formats.date'))]) }}</span>
                                 <span class="text-xs font-semibold tabular-nums text-status-critical">{{ trans_choice('donors.days_late', $item['days'], ['count' => $item['days']]) }}</span>

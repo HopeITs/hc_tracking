@@ -76,9 +76,10 @@ new class extends Component {
     $late = $this->late;
     $donors = $this->donors;
     $peak = max(1, (float) $donors->max('committed'));
+    $pg = $this->paginate($donors, self::PerPage);
 @endphp
 
-<x-desk.panel id="money" register="funding-agreements.index" :size="$size" :index="$index" :total="$total">
+<x-desk.panel :facets="$pg['facets']" id="money" register="funding-agreements.index" :size="$size" :index="$index" :total="$total">
     <div class="dk-money">
         @foreach ($this->fundingPosition as $row)
             <div class="dk-mrow" wire:key="money-{{ $row['currency'] }}">
@@ -95,7 +96,7 @@ new class extends Component {
     @if ($donors->isNotEmpty())
         <div class="dk-dbars">
             <p class="dk-small dk-muted">{{ __('desk.by_donor_usd') }}</p>
-            @foreach ($donors as $donor)
+            @foreach ($pg['slice'] as $donor)
                 <div class="dk-dbar" wire:key="db-{{ $loop->index }}">
                     <span>{{ $donor['name'] }}</span>
                     <span class="dk-track"><b class="dk-com" style="width:{{ round($donor['committed'] / $peak * 100, 2) }}%"></b><b class="dk-rec" style="width:{{ round(min($donor['received'], $donor['committed']) / $peak * 100, 2) }}%"></b></span>
@@ -104,4 +105,8 @@ new class extends Component {
             @endforeach
         </div>
     @endif
+
+    <x-slot:foot>
+        <x-desk.pager :pg="$pg" />
+    </x-slot:foot>
 </x-desk.panel>

@@ -32,14 +32,14 @@
             @endphp
 
             @if ($statusStale)
-                <div class="mb-4 flex flex-wrap items-center justify-between gap-3 rounded-lg border border-primary bg-primary/5 p-3 text-sm text-status-critical" role="alert" data-test="status-stale-alert">
+                <div class="mb-4 flex flex-wrap items-center justify-between gap-3 rounded-lg border border-primary bg-secondary-soft/60 p-3 text-sm text-status-critical" role="alert" data-test="status-stale-alert">
                     <p class="min-w-0 flex-1 font-semibold">{{ __('proposals.stale_status_explained') }}</p>
                     <x-ui.button type="button" size="sm" icon="arrow-path" wire:click="reloadStatusModal" wire:loading.attr="disabled" wire:target="reloadStatusModal" data-test="status-reload-button">{{ __('proposals.reload') }}</x-ui.button>
                 </div>
             @endif
 
             @if ($errors->has('statusGate'))
-                <div class="mb-4 rounded-lg border border-primary bg-primary/5 p-3 text-sm text-status-critical" role="alert" data-test="status-gate-alert">
+                <div class="mb-4 rounded-lg border border-primary bg-secondary-soft/60 p-3 text-sm text-status-critical" role="alert" data-test="status-gate-alert">
                     <ul class="list-disc ps-5">
                         @foreach ($errors->get('statusGate') as $gateMessage)
                             <li>{{ $gateMessage }}</li>
@@ -111,7 +111,7 @@
     >
         @if ($showCorrectModal)
             @if ($statusStale)
-                <div class="mb-4 rounded-lg border border-primary bg-primary/5 p-3 text-sm text-status-critical" role="alert" data-test="correct-stale-alert">
+                <div class="mb-4 rounded-lg border border-primary bg-secondary-soft/60 p-3 text-sm text-status-critical" role="alert" data-test="correct-stale-alert">
                     <p class="font-semibold">{{ __('proposals.stale_status_explained') }}</p>
                 </div>
             @endif

@@ -31,7 +31,7 @@
                         data-step-state
                         @class([
                             'type-meta rounded-full px-2 py-0.5',
-                            'bg-primary/10 text-primary dark:bg-primary/25 dark:text-ink' => $on,
+                            'bg-secondary-soft/60 text-primary dark:bg-primary dark:text-ink' => $on,
                             'bg-secondary-soft/60 text-secondary-medium dark:bg-white/10 dark:text-ink-muted' => ! $on,
                         ])
                     >{{ $state }}</span>

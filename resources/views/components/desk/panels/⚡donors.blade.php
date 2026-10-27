@@ -10,8 +10,9 @@ use Livewire\Attributes\Computed;
 use Livewire\Component;
 
 /**
- * Donors: each donor with its type, proposals, last contact and next
- * step. Money (received against committed, per currency) is read and shown
+ * Donors: each donor we have written a proposal for (the ones we actually
+ * work with), most recently active first, with its type, proposals, last
+ * contact and next step. Money (received against committed, per currency) is read and shown
  * only to viewers who may see funding agreements and transfers
  * (.ai/rules/pages.md "Hide money, keep names").
  */
@@ -26,7 +27,10 @@ new class extends Component {
     {
         return $this->visible(Donor::query(), 'donors')
             ->select(['id', 'slug', 'name', 'type', 'is_internal', 'last_contacted_on', 'next_step'])
-            ->withCount('proposals')
+            ->whereHas('proposalsWrittenFor')
+            ->withCount('proposalsWrittenFor as proposals_count')
+            ->withMax('proposalsWrittenFor as last_active_at', 'updated_at')
+            ->orderByDesc('last_active_at')
             ->orderBy('name')
             ->get();
     }
@@ -73,11 +77,11 @@ new class extends Component {
 ?>
 
 @php
-    $pg = $this->paginate($this->rows, 4);
+    $pg = $this->paginate($this->rows, self::PerPage);
     $money = $this->money;
 @endphp
 
-<x-desk.panel id="donors" register="donors.index" :size="$size" :index="$index" :total="$total" :count="$pg['total']">
+<x-desk.panel :facets="$pg['facets']" id="donors" register="donors.index" :size="$size" :index="$index" :total="$total" :count="$pg['total']">
     @if ($pg['total'] > 0)
         <ul class="dk-plist">
             @foreach ($pg['slice'] as $donor)

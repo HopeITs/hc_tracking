@@ -137,4 +137,7 @@ return [
     'close' => 'إغلاق',
     'hr_unavailable' => 'تعذّر تحميل بيانات HR',
     'no_active_position' => 'لا منصب نشط',
+    'back' => 'رجوع',
+    'steps' => 'الخطوات',
+    'step_of' => 'الخطوة :step من :total',
 ];

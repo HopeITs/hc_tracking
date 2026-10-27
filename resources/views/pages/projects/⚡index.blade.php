@@ -286,7 +286,7 @@ new #[Layout('layouts::desk'), Title('titles.projects')] class extends Component
 >
     <x-slot:actions>
         @can('create', App\Models\Project::class)
-            <button type="button" class="dk-btn dk-primary" wire:click="openCreateModal" data-test="create-project-button"><x-desk.icon name="plus" />{{ __('projects.add_project') }}</button>
+            <button type="button" class="dk-btn dk-primary" wire:click="openCreateModal" data-test="create-project-button" data-quick-create><x-desk.icon name="plus" />{{ __('projects.add_project') }}</button>
         @endcan
     </x-slot:actions>
     <x-slot:search>

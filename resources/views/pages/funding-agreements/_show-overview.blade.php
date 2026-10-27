@@ -213,7 +213,7 @@
                                                 'relative z-10 size-3 rounded-full',
                                                 'bg-funding' => $stop['state'] === 'done' && $isReceived,
                                                 'bg-secondary-dark dark:bg-ink-muted' => $stop['state'] === 'done' && ! $isReceived,
-                                                'bg-primary dark:bg-status-critical ring-4 ring-primary/20' => in_array($stop['state'], ['late', 'failed'], true),
+                                                'bg-primary dark:bg-status-critical ring-4 ring-secondary-light' => in_array($stop['state'], ['late', 'failed'], true),
                                                 'border-2 border-secondary-soft bg-white dark:border-line-strong dark:bg-surface-1' => $stop['state'] === 'ahead',
                                             ])></span>
                                         </span>

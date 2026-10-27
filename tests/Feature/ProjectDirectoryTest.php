@@ -580,7 +580,7 @@ test('a board card rates an overdue project critical and an on-track project goo
     Livewire::actingAs($user)->test('pages::projects.index')
         // Critical fills solid in light (white type); dark uses the soft critical chip.
         ->assertSeeHtml('border-primary bg-primary dark:border-transparent dark:bg-status-critical-soft dark:text-status-critical font-semibold text-white')
-        ->assertSeeHtml('border-primary/40');
+        ->assertSeeHtml('motion-reduce:hover:translate-y-0 border-primary');
 });
 
 test('every view opens a project through the same eye action instead of a clickable name', function () {

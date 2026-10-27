@@ -18,6 +18,7 @@
 @import './desk.css';
 @import './desk-register.css';
 @import './desk-story.css';
+@import './desk-shell.css';
 
 /* flux.css already scans Flux's own stubs; these are the app's views and Laravel's pagination views. */
 @source '../views';

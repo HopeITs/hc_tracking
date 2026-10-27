@@ -51,7 +51,7 @@
                                                 x-on:focus="$store.proposalFlow.focus = '{{ $node['key'] }}'"
                                                 x-on:blur="$store.proposalFlow.focus = null"
                                                 :class="$store.proposalFlow.isDimmed('{{ $node['key'] }}') && 'opacity-30'"
-                                                class="group flex w-full cursor-pointer items-stretch justify-end gap-3 rounded-sm text-end transition-opacity duration-200 focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-primary"
+                                                class="group flex w-full cursor-pointer items-stretch justify-end gap-3 rounded-sm text-end transition-opacity duration-200 focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-secondary-medium"
                                                 title="{{ __('proposals.filter_by_donor', ['name' => $node['name']]) }}"
                                                 data-flow-node="{{ $node['key'] }}"
                                             >
@@ -78,7 +78,7 @@
                                                 x-on:focus="$store.proposalFlow.focus = '{{ $node['key'] }}'"
                                                 x-on:blur="$store.proposalFlow.focus = null"
                                                 :class="$store.proposalFlow.isDimmed('{{ $node['key'] }}') && 'opacity-30'"
-                                                class="group flex w-full items-stretch gap-3 rounded-sm transition-opacity duration-200 focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-primary"
+                                                class="group flex w-full items-stretch gap-3 rounded-sm transition-opacity duration-200 focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-secondary-medium"
                                                 data-flow-node="{{ $node['key'] }}"
                                             >
                                                 <span data-flow-in="{{ $node['key'] }}" class="w-2 shrink-0 rounded-full bg-secondary-dark dark:bg-ink-muted"></span>
@@ -110,7 +110,7 @@
                                                 x-on:focus="$store.proposalFlow.focus = '{{ $node['key'] }}'"
                                                 x-on:blur="$store.proposalFlow.focus = null"
                                                 :class="$store.proposalFlow.isDimmed('{{ $node['key'] }}') && 'opacity-30'"
-                                                class="group flex min-h-8 items-center gap-2.5 rounded-sm transition-opacity duration-200 focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-primary"
+                                                class="group flex min-h-8 items-center gap-2.5 rounded-sm transition-opacity duration-200 focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-secondary-medium"
                                                 data-flow-node="{{ $node['key'] }}"
                                             >
                                                 <span data-flow-in="{{ $node['key'] }}" class="size-2.5 shrink-0 rounded-full border-2 border-secondary-dark bg-white dark:border-ink-muted dark:bg-surface-1"></span>

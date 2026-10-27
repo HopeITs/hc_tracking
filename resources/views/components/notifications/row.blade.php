@@ -6,7 +6,7 @@
     $isSnoozed = $notification->snoozed_until !== null && $notification->snoozed_until->isFuture();
     $quickLabels = __('notifications.quick.labels');
     $glyphTone = match ($notification->priority) {
-        \App\Enums\NotificationPriority::Critical => 'bg-primary dark:bg-status-critical dark:text-surface-0 text-white shadow-[0_3px_10px_-3px_rgba(190,31,36,0.6)]',
+        \App\Enums\NotificationPriority::Critical => 'bg-primary dark:bg-status-critical dark:text-surface-0 text-white shadow-[0_3px_10px_-3px_rgba(16,24,40,0.35)]',
         \App\Enums\NotificationPriority::Important => 'bg-status-warn-soft text-status-warn',
         \App\Enums\NotificationPriority::Info => 'bg-secondary-soft/70 text-secondary-dark dark:bg-white/10 dark:text-ink',
     };
@@ -53,7 +53,7 @@
                 type="checkbox"
                 wire:model.live="selected"
                 value="{{ $notification->id }}"
-                class="absolute inset-0 z-10 size-full cursor-pointer appearance-none rounded-full focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
+                class="absolute inset-0 z-10 size-full cursor-pointer appearance-none rounded-full focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-secondary-medium"
                 aria-label="{{ __('notifications.select_notification') }}"
                 data-row-select
             />

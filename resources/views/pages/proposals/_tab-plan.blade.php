@@ -84,7 +84,7 @@
                     <li class="flex flex-wrap items-center gap-x-4 gap-y-1.5 py-3" style="padding-inline-start: {{ $row['depth'] * 1.25 }}rem" wire:key="plan-milestone-{{ $milestone->id }}" data-plan-milestone="{{ $milestone->id }}">
                         <div class="min-w-0 flex-1">
                             <p class="flex min-w-0 items-center gap-2">
-                                <a href="{{ route('milestones.show', $milestone) }}" wire:navigate class="truncate text-sm font-semibold underline-offset-4 hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary {{ $inkText }}" dir="auto">{{ $milestone->name }}</a>
+                                <a href="{{ route('milestones.show', $milestone) }}" wire:navigate class="truncate text-sm font-semibold underline-offset-4 hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-secondary-medium {{ $inkText }}" dir="auto">{{ $milestone->name }}</a>
                                 @if ($milestone->is_final_report)
                                     <span class="inline-flex shrink-0 items-center gap-1 rounded-md border border-secondary-light px-1.5 py-0.5 text-[11px] font-semibold {{ $mutedText }}" data-final-report>
                                         <flux:icon.document-check variant="micro" class="size-3.5" aria-hidden="true" />{{ __('milestones.final_report_badge') }}

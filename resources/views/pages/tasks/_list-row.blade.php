@@ -46,7 +46,7 @@
     wire:key="task-table-row-{{ $task->id }}"
     data-test="task-row-{{ $task->id }}"
     @class([
-        'group/row outline-none transition-colors hover:bg-secondary-soft/40 focus-visible:bg-secondary-soft/40 focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-primary dark:hover:bg-surface-2',
+        'group/row outline-none transition-colors hover:bg-secondary-soft/40 focus-visible:bg-secondary-soft/40 focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-secondary-medium dark:hover:bg-surface-2',
         'bg-secondary-soft/20 dark:bg-white/[0.03]' => $isSubtask,
     ])
     @if ($isSubtask)
@@ -170,7 +170,7 @@
                 wire:change="rescheduleTask({{ $task->id }}, $event.target.value)"
                 @disabled(! $canUpdate)
                 aria-label="{{ __('tasks.due_date_2') }}: {{ $task->title }}"
-                class="w-full min-w-0 rounded border-0 bg-transparent p-1 text-xs tabular-nums focus:ring-1 focus:ring-primary focus:outline-none {{ $dueDateClasses }}"
+                class="w-full min-w-0 rounded border-0 bg-transparent p-1 text-xs tabular-nums focus:ring-1 focus:ring-secondary-light focus:outline-none {{ $dueDateClasses }}"
                 data-test="task-due-date-{{ $task->id }}"
             />
         </div>

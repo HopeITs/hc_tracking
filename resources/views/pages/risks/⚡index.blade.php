@@ -417,7 +417,7 @@ new #[Layout('layouts::desk'), Title('titles.risks')] class extends Component {
 >
     <x-slot:actions>
         @can('create', App\Models\Risk::class)
-            <button type="button" class="dk-btn dk-primary" wire:click="openCreateModal" data-test="create-risk-button"><x-desk.icon name="plus" />{{ __('risks.log_risk') }}</button>
+            <button type="button" class="dk-btn dk-primary" wire:click="openCreateModal" data-test="create-risk-button" data-quick-create><x-desk.icon name="plus" />{{ __('risks.log_risk') }}</button>
         @endcan
     </x-slot:actions>
     <x-slot:search>

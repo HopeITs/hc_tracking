@@ -11,7 +11,7 @@
     <button
         type="button"
         wire:click="setSort('{{ $field }}')"
-        class="inline-flex w-full cursor-pointer items-center gap-1 text-start hover:text-secondary-dark focus-visible:rounded focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-primary dark:hover:text-ink {{ $isActive ? 'text-secondary-dark dark:text-ink' : '' }}"
+        class="inline-flex w-full cursor-pointer items-center gap-1 text-start hover:text-secondary-dark focus-visible:rounded focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-secondary-medium dark:hover:text-ink {{ $isActive ? 'text-secondary-dark dark:text-ink' : '' }}"
         aria-label="{{ __('tasks.sort_by_field', ['field' => $label]) }} — {{ $nextDirectionLabel }}"
         data-test="task-sort-header-{{ $field }}"
         data-sort-direction="{{ $isActive ? $sortDirection : 'none' }}"

@@ -319,7 +319,7 @@ new #[Layout('layouts::desk'), Title('titles.annual_plan')] class extends Compon
                         <li wire:key="activity-{{ $report->id }}">
                             <a
                                 href="{{ route('reports.show', $report) }}" wire:navigate
-                                class="flex items-start gap-3 p-3.5 transition-colors hover:bg-board-head focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-primary"
+                                class="flex items-start gap-3 p-3.5 transition-colors hover:bg-board-head focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-secondary-medium"
                             >
                                 <span
                                     aria-hidden="true"

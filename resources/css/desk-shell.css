@@ -1,0 +1,406 @@
+/*
+ * Desk shell v2 (spec docs/superpowers/specs/2026-10-27-desk-shell-v2-design.md):
+ * the sidebar rail, the top bar, the Panels popup, centered popups in place of
+ * every side sheet, the step wizard and the card grid inner pages sit on.
+ * Classes are dk- prefixed like desk.css; tokens come from desk.css :root.
+ */
+@layer components {
+    :root {
+        --side-rail: 80px;
+        --side-open: 252px;
+        --side-w: var(--side-rail);
+        --top-h: 64px;
+        --pop-w: 760px;
+        --pop-h: min(640px, calc(100dvh - 96px));
+    }
+
+    html.dk-nav-open { --side-w: var(--side-open); }
+
+    /* ---------- App frame: sidebar column + main column ---------- */
+    .dk-app { display: grid; grid-template-columns: var(--side-w) minmax(0, 1fr); min-height: 100dvh; }
+    html.dk-nav-animate .dk-app { transition: grid-template-columns .22s cubic-bezier(.2, .8, .2, 1); }
+    .dk-main { min-width: 0; display: flex; flex-direction: column; }
+    .dk-main > .dk-scope:not(.dk-top) { flex: 1; display: flex; flex-direction: column; }
+    .dk-main > .dk-top { flex: none; }
+    .dk-main > .dk-scope:not(.dk-top) > main { flex: 1; width: 100%; }
+
+    /* ---------- Sidebar ---------- */
+    .dk-side { position: sticky; top: 0; height: 100dvh; display: flex; flex-direction: column; background: var(--paper); border-inline-end: 1px solid var(--line); z-index: 35; min-width: 0; }
+    .dk-side-h { height: var(--top-h); flex: none; display: flex; align-items: center; padding-inline: 16px; border-bottom: 1px solid var(--line); overflow: hidden; }
+    .dk-side-logo { display: flex; align-items: center; gap: 10px; min-width: 0; text-decoration: none; }
+    .dk-side-mark { width: 34px; height: 34px; flex: none; }
+    .dk-side-word { height: 34px; width: auto; display: none; }
+    html.dk-nav-open .dk-side-mark { display: none; }
+    html.dk-nav-open:not(.dark) .dk-side-word-light, html.dk-nav-open.dark .dk-side-word-dark { display: block; }
+
+    .dk-side-toggle { position: absolute; top: calc(var(--top-h) / 2 - 14px); inset-inline-end: -14px; z-index: 2; width: 28px; height: 28px; border-radius: 50%; border: 1px solid var(--line-2); background: var(--paper); color: var(--ink-3); display: grid; place-items: center; cursor: pointer; box-shadow: 0 1px 2px rgb(16 24 40 / .08); }
+    .dk-side-toggle:hover { color: var(--ink); border-color: var(--ink-3); }
+    .dk-side-toggle svg.dk-i { width: 15px; height: 15px; }
+    html.dk-nav-open .dk-side-chev { transform: scaleX(-1); }
+    [dir="rtl"] .dk-side-chev { transform: scaleX(-1); }
+    html.dk-nav-open[dir="rtl"] .dk-side-chev { transform: none; }
+
+    .dk-side-scroll { flex: 1; min-height: 0; overflow-y: auto; overflow-x: hidden; padding: 12px 10px 20px; scrollbar-width: thin; }
+    .dk-side-g + .dk-side-g { margin-top: 14px; }
+    .dk-side-gh { font-size: 11px; font-weight: 800; letter-spacing: .07em; text-transform: uppercase; color: var(--faint); padding: 4px 10px 6px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    [lang="ar"] .dk-side-gh { letter-spacing: 0; font-size: 12px; }
+    .dk-side-g ul { display: grid; gap: 2px; }
+    .dk-side-a { position: relative; display: flex; align-items: center; gap: 11px; height: 38px; padding-inline: 12px; border-radius: 10px; color: var(--ink-2); text-decoration: none; font-size: 14px; font-weight: 600; white-space: nowrap; transition: background .12s, color .12s; }
+    .dk-side-a:hover { background: var(--sunk); color: var(--ink); }
+    .dk-side-a.dk-on { background: var(--brand); color: var(--on-brand); font-weight: 700; }
+    .dark .dk-side-a.dk-on { background: var(--sunk); color: var(--ink); }
+    .dark .dk-side-a.dk-on::before { content: ""; position: absolute; inset-block: 7px; inset-inline-start: 0; width: 3px; border-radius: 3px; background: var(--brand); }
+    .dk-side-ic { width: 20px !important; height: 20px !important; flex: none; }
+    .dk-side-l { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+    .dk-side-badge { min-width: 20px; height: 20px; padding-inline: 6px; border-radius: 999px; background: var(--brand-soft); color: var(--brand-ink); font-size: 11px; font-weight: 800; display: inline-grid; place-items: center; }
+    .dk-side-a.dk-on .dk-side-badge { background: rgb(255 255 255 / .22); color: inherit; }
+
+    /* Rail (collapsed): icons only, group headings become thin rules, badges become dots. */
+    html:not(.dk-nav-open) .dk-side-h { justify-content: center; padding-inline: 0; }
+    html:not(.dk-nav-open) .dk-side-gh { height: 1px; padding: 0; margin: 4px 14px 8px; background: var(--line); color: transparent; }
+    html:not(.dk-nav-open) .dk-side-g:first-child .dk-side-gh { display: none; }
+    html:not(.dk-nav-open) .dk-side-a { justify-content: center; padding-inline: 0; width: 52px; height: 42px; margin-inline: auto; }
+    html:not(.dk-nav-open) .dk-side-l { display: none; }
+    html:not(.dk-nav-open) .dk-side-badge { position: absolute; top: 7px; inset-inline-end: 9px; min-width: 6px; width: 6px; height: 6px; padding: 0; font-size: 0; background: var(--brand); box-shadow: 0 0 0 2px var(--paper); }
+    html:not(.dk-nav-open) .dk-side-a.dk-on .dk-side-badge { background: var(--on-brand); box-shadow: 0 0 0 2px var(--brand); }
+
+    .dk-side-tip { position: fixed; z-index: 80; transform: translateY(-50%); padding: 6px 10px; border-radius: 8px; background: var(--ink); color: var(--paper); font-size: 13px; font-weight: 700; white-space: nowrap; pointer-events: none; box-shadow: var(--dk-shadow); }
+
+    .dk-side-scrim { display: none; }
+
+    /* ---------- Top bar ---------- */
+    .dk-top-in { display: flex; align-items: center; gap: 12px; height: var(--top-h); padding-inline: 20px; }
+    .dk-top-menu, .dk-top-mark { display: none; }
+    .dk-top-mark img { width: 32px; height: 32px; display: block; }
+    .dk-top-find { flex: 1; min-width: 0; display: flex; align-items: center; justify-content: center; gap: 8px; }
+    .dk-top-find .dk-ask { margin-inline: 0; max-width: 560px; }
+    .dk-panels-btn { height: 44px; border-radius: 999px; padding-inline: 16px; flex: none; }
+    .dk-panels-btn:hover { border-color: var(--ink-3); }
+    .dk-tools { align-items: center; }
+    .dk-tools [data-notification-bell] > button { width: 40px !important; height: 40px !important; border-radius: 10px !important; color: var(--ink-2) !important; }
+    .dk-tools [data-notification-bell] > button:hover { background: var(--sunk) !important; box-shadow: none !important; }
+    .dk-wide-tool { display: inline-flex; }
+    .dk-narrow-tools { display: none; }
+
+    .dk-usermenu-pop { width: 260px; top: 46px; }
+    .dk-usermenu-pop > a, .dk-usermenu-pop .dk-narrow-tools > a, .dk-usermenu-pop button[role="menuitem"] { display: flex; align-items: center; gap: 10px; height: 38px; padding-inline: 10px; border: 0; background: none; border-radius: 8px; font-size: 13.5px; font-weight: 700; color: var(--ink); text-decoration: none; cursor: pointer; width: 100%; text-align: start; }
+    .dk-usermenu-pop > a:hover, .dk-usermenu-pop .dk-narrow-tools > a:hover, .dk-usermenu-pop button[role="menuitem"]:hover { background: var(--sunk); }
+    .dk-usermenu-pop .dk-danger { color: var(--bad); }
+    .dk-usermenu-who { display: flex; align-items: center; gap: 10px; padding: 6px 8px 10px; margin-bottom: 4px; border-bottom: 1px solid var(--line); }
+    .dk-usermenu-who strong { display: block; font-size: 14px; line-height: 1.3; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .dk-usermenu-who small { display: block; font-size: 12px; color: var(--ink-3); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .dk-usermenu-out { margin-top: 4px; padding-top: 4px; border-top: 1px solid var(--line); }
+
+    @media (max-width: 1099px) {
+        .dk-wide-tool { display: none !important; }
+        .dk-narrow-tools { display: grid; gap: 2px; }
+        .dk-panels-l { display: none; }
+        .dk-panels-btn { width: 44px; padding-inline: 0; }
+    }
+
+    /* ---------- Narrow screens: no rail, the menu button lays the sidebar over the page ---------- */
+    @media (max-width: 899px) {
+        .dk-app { grid-template-columns: minmax(0, 1fr); }
+        .dk-side { position: fixed; inset-block: 0; inset-inline-start: 0; width: min(300px, calc(100vw - 48px)); visibility: hidden; opacity: 0; transition: opacity .18s, visibility .18s; box-shadow: var(--dk-shadow); z-index: 70; }
+        .dk-side-toggle { display: none; }
+        html.dk-nav-mobile .dk-side { visibility: visible; opacity: 1; }
+        html.dk-nav-mobile .dk-side-scrim { display: block; position: fixed; inset: 0; z-index: 69; background: var(--scrim); }
+        /* The overlay always shows labels, whatever the desktop rail choice. */
+        .dk-side .dk-side-h { justify-content: flex-start !important; padding-inline: 16px !important; }
+        .dk-side .dk-side-mark { display: none !important; }
+        html:not(.dark) .dk-side .dk-side-word-light, html.dark .dk-side .dk-side-word-dark { display: block !important; }
+        .dk-side .dk-side-gh { height: auto !important; padding: 4px 10px 6px !important; margin: 0 !important; background: none !important; color: var(--faint) !important; display: block !important; }
+        .dk-side .dk-side-a { justify-content: flex-start !important; padding-inline: 12px !important; width: auto !important; margin-inline: 0 !important; height: 44px; }
+        .dk-side .dk-side-l { display: block !important; }
+        .dk-side .dk-side-badge { position: static !important; width: auto !important; min-width: 20px !important; height: 20px !important; padding-inline: 6px !important; font-size: 11px !important; background: var(--brand-soft) !important; box-shadow: none !important; }
+        .dk-top-menu, .dk-top-mark { display: inline-flex; }
+        .dk-top-in { padding-inline: 10px; gap: 6px; }
+    }
+
+    @media (max-width: 560px) {
+        .dk-top-find .dk-ask .dk-ph, .dk-top-find .dk-ask kbd { display: none; }
+        .dk-top-find .dk-ask { flex: none; width: 44px; padding-inline: 0; justify-content: center; }
+        .dk-top-find { justify-content: flex-start; }
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+        html.dk-nav-animate .dk-app, .dk-side { transition: none; }
+    }
+}
+
+/* ---------- Centered popups (shell v2): no side sheets anywhere ---------- */
+@layer components {
+    /* The Desk's own sheets (record sheets, Customize, Panels) open in the middle of the screen. */
+    .dk-sheet { top: 50%; bottom: auto; left: 50%; right: auto; inset-inline-end: auto; transform: translate(-50%, -50%); width: min(var(--pop-w), calc(100vw - 32px)); height: var(--pop-h); max-height: calc(100dvh - 32px); border-radius: 18px; overflow: hidden; animation: dk-pop .2s cubic-bezier(.2, .8, .2, 1); }
+    [dir="rtl"] .dk-sheet { animation-name: dk-pop; }
+    .dk-sheet.dk-wide { width: min(var(--pop-w), calc(100vw - 32px)); }
+    .dk-sheet.dk-xwide { width: min(1100px, calc(100vw - 32px)); height: calc(100dvh - 48px); }
+    .dk-sheet .dk-sh-b { min-height: 0; }
+    @keyframes dk-pop { from { opacity: 0; transform: translate(-50%, -47%) scale(.985); } to { opacity: 1; transform: translate(-50%, -50%) scale(1); } }
+
+    @media (max-width: 639px) {
+        .dk-sheet, .dk-sheet.dk-wide, .dk-sheet.dk-xwide { width: 100vw; height: 100dvh; max-height: 100dvh; border-radius: 0; }
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+        .dk-sheet { animation: none; }
+    }
+
+    /* ---------- Step wizard (x-ui.modal with 3+ form sections, resources/js/modal-shell.js) ---------- */
+    .modal-shell-steps { display: flex; flex-shrink: 0; padding: 14px var(--spacing-card) 12px; border-bottom: 1px solid var(--color-secondary-soft); background: var(--color-board-head); }
+    .modal-shell-steps li { position: relative; flex: 1 1 0; min-width: 0; }
+    .modal-shell-steps li + li::before { content: ""; position: absolute; top: 13px; inset-inline-start: calc(-50% + 18px); inset-inline-end: calc(50% + 18px); height: 2px; border-radius: 2px; background: var(--color-secondary-soft); }
+    .modal-shell-steps li.is-done + li::before, .modal-shell-steps li.is-current::before { background: var(--color-secondary-dark); }
+    .modal-shell-steps button { display: flex; flex-direction: column; align-items: center; gap: 6px; width: 100%; padding: 0 4px; border: 0; background: none; cursor: pointer; color: var(--color-secondary-medium); font: inherit; }
+    .modal-shell-step-dot { display: grid; place-items: center; width: 28px; height: 28px; border-radius: 50%; border: 2px solid var(--color-secondary-soft); background: var(--color-white); font-size: 12px; font-weight: 800; font-variant-numeric: tabular-nums; transition: background .15s, border-color .15s, color .15s; }
+    .modal-shell-step-label { max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 12px; font-weight: 600; line-height: 1.2; }
+    .modal-shell-steps li.is-done .modal-shell-step-dot { border-color: var(--color-secondary-dark); color: var(--color-secondary-dark); }
+    .modal-shell-steps li.is-current .modal-shell-step-dot { border-color: var(--color-secondary-dark); background: var(--color-secondary-dark); color: var(--color-white); }
+    .modal-shell-steps li.is-current .modal-shell-step-label { color: var(--color-secondary-dark); font-weight: 800; }
+    .modal-shell-steps li.is-invalid .modal-shell-step-dot { border-color: var(--color-status-critical); color: var(--color-status-critical); }
+    .modal-shell-steps li.is-invalid.is-current .modal-shell-step-dot { background: var(--color-status-critical); color: var(--color-white); }
+    .modal-shell-steps button:focus-visible { outline: 2px solid var(--color-secondary-medium); outline-offset: 2px; border-radius: 8px; }
+
+    .dark .modal-shell-steps { border-bottom-color: var(--color-line); background: var(--color-surface-2); }
+    .dark .modal-shell-steps li + li::before { background: var(--color-line); }
+    .dark .modal-shell-steps li.is-done + li::before, .dark .modal-shell-steps li.is-current::before { background: var(--color-ink-muted); }
+    .dark .modal-shell-steps button { color: var(--color-ink-muted); }
+    .dark .modal-shell-step-dot { border-color: var(--color-line-strong); background: var(--color-surface-3); }
+    .dark .modal-shell-steps li.is-done .modal-shell-step-dot { border-color: var(--color-ink-muted); color: var(--color-ink); }
+    .dark .modal-shell-steps li.is-current .modal-shell-step-dot { border-color: var(--color-ink); background: var(--color-ink); color: var(--color-surface-0); }
+    .dark .modal-shell-steps li.is-current .modal-shell-step-label { color: var(--color-ink); }
+
+    /* One section per step; the stepper names it, so the section's own rail heading steps aside. */
+    .modal-shell-frame[data-wizard] .form-section-rail { display: none; }
+    .modal-shell-frame[data-wizard] .form-section { padding-block: 0; border-top: 0 !important; grid-template-columns: minmax(0, 1fr); }
+    .modal-shell-body[data-step="1"] section.form-section:not(:nth-of-type(1)) { display: none; }
+    .modal-shell-body[data-step="2"] section.form-section:not(:nth-of-type(2)) { display: none; }
+    .modal-shell-body[data-step="3"] section.form-section:not(:nth-of-type(3)) { display: none; }
+    .modal-shell-body[data-step="4"] section.form-section:not(:nth-of-type(4)) { display: none; }
+    .modal-shell-body[data-step="5"] section.form-section:not(:nth-of-type(5)) { display: none; }
+    .modal-shell-body[data-step="6"] section.form-section:not(:nth-of-type(6)) { display: none; }
+    .modal-shell-body[data-step="7"] section.form-section:not(:nth-of-type(7)) { display: none; }
+    .modal-shell-body[data-step="8"] section.form-section:not(:nth-of-type(8)) { display: none; }
+    .modal-shell-body[data-step="9"] section.form-section:not(:nth-of-type(9)) { display: none; }
+    .modal-shell-body[data-step="10"] section.form-section:not(:nth-of-type(10)) { display: none; }
+    .modal-shell-body[data-step="11"] section.form-section:not(:nth-of-type(11)) { display: none; }
+    .modal-shell-body[data-step="12"] section.form-section:not(:nth-of-type(12)) { display: none; }
+    .modal-shell-body[data-step="13"] section.form-section:not(:nth-of-type(13)) { display: none; }
+    .modal-shell-body[data-step="14"] section.form-section:not(:nth-of-type(14)) { display: none; }
+
+    @media (width < 40rem) {
+        .modal-shell-steps { padding-inline: 1rem; }
+        .modal-shell-steps li:not(.is-current) .modal-shell-step-label { display: none; }
+    }
+}
+
+/*
+ * Popup sizes. Flux's <dialog> is styled by unlayered flux.css rules, so these stay
+ * unlayered too. Every form dialog shares one width; a wizard also shares one
+ * height; confirmations stay small; a wide non-form dialog (file preview,
+ * inspector) keeps the wide size. Below 40rem forms.css makes it full screen.
+ */
+[data-flux-modal] > dialog.modal-shell { width: min(var(--pop-w), calc(100vw - 32px)); max-width: none; max-height: calc(100dvh - 48px); border-radius: 18px; }
+[data-flux-modal] > dialog.modal-shell-sm { width: min(440px, calc(100vw - 32px)); }
+[data-flux-modal] > dialog.modal-shell-xl:not(:has(.modal-shell-frame[data-wizard])):not(:has(section.form-section)) { width: min(1020px, calc(100vw - 32px)); }
+[data-flux-modal] > dialog.modal-shell:has(.modal-shell-frame[data-wizard]) { height: var(--pop-h); }
+[data-flux-modal] > dialog.filter-dialog { height: var(--pop-h); }
+
+/* ---------- Desk panels: paginate, never scroll (no scroll trap) ---------- */
+@layer components {
+    /* Panels size to one page of rows; panels in the same grid row stretch to one height, so rows stay aligned. */
+    .dk-panel { height: auto; min-height: 0; }
+    .dk-panel[style*="--span:12"] { min-height: 0; }
+    .dk-pb { overflow: visible; overscroll-behavior: auto; }
+    .dk-pf { margin-top: auto; }
+    .dk-panel .dk-mx-wrap { overflow-x: auto; overscroll-behavior-x: contain; }
+
+    /* ---------- Panels popup (components/desk/⚡page-panels) ---------- */
+    .dk-pp .dk-sh-h { align-items: center; }
+    .dk-pp-tools { display: flex; align-items: center; gap: 8px; flex: none; }
+    .dk-pp-body { display: block; background: var(--ground); padding-block: 18px 24px; overflow-y: auto; }
+    .dk-pp-add { width: 340px; max-height: min(420px, 60vh); overflow-y: auto; top: 44px; }
+    .dk-pp-add > button { height: auto; min-height: 44px; display: flex; align-items: flex-start; gap: 10px; width: 100%; padding: 8px; border: 0; background: none; border-radius: 10px; text-align: start; cursor: pointer; color: var(--ink); }
+    .dk-pp-add > button:hover { background: var(--sunk); }
+    .dk-pp-add .dk-li-t { display: grid; gap: 2px; min-width: 0; }
+    .dk-pp-add .dk-li-t strong { font-size: 13.5px; }
+    .dk-pp-add .dk-li-t .dk-is { font-size: 12px; color: var(--ink-3); line-height: 1.35; }
+    .dk-pp-add .dk-li-ic { width: 30px; height: 30px; flex: none; border-radius: 8px; background: var(--sunk); display: grid; place-items: center; color: var(--ink-2); }
+    .dk-pp-ghost { min-height: 260px; background: linear-gradient(90deg, var(--paper), var(--sunk), var(--paper)); background-size: 200% 100%; animation: dk-shimmer 1.2s linear infinite; }
+    @keyframes dk-shimmer { to { background-position: -200% 0; } }
+    .dk-pp-empty { display: grid; justify-items: center; gap: 8px; max-width: 420px; margin: 8vh auto 0; text-align: center; color: var(--ink-3); }
+    .dk-pp-empty svg.dk-i { width: 34px; height: 34px; }
+    .dk-pp-empty strong { color: var(--ink); font-size: 18px; }
+    .dk-pp-empty .dk-btn { margin-top: 8px; }
+
+    @media (max-width: 760px) {
+        .dk-pp-tl { display: none; }
+        .dk-pp-add { position: fixed; inset-inline: 12px; width: auto; top: 76px; }
+        .dk-pp .dk-sh-h { flex-wrap: wrap; }
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+        .dk-pp-ghost { animation: none; }
+    }
+}
+
+@layer components {
+    @media (max-width: 760px) {
+        .dk-panel { max-height: none; min-height: 0; }
+    }
+}
+
+/* ---------- Ask bar additions ---------- */
+@layer components {
+    .dk-pal-busy { width: 16px; height: 16px; border-radius: 50%; border: 2px solid var(--line-2); border-top-color: var(--ink-2); animation: dk-spin .7s linear infinite; flex: none; }
+    @keyframes dk-spin { to { transform: rotate(360deg); } }
+    .dk-pal-try { padding: 12px 10px 6px; display: grid; gap: 8px; }
+    .dk-pal-try > p { font-size: 11.5px; font-weight: 800; letter-spacing: .08em; text-transform: uppercase; color: var(--ink-3); }
+    [lang="ar"] .dk-pal-try > p { letter-spacing: 0; font-size: 12.5px; }
+    .dk-pal-try .dk-is { font-size: 13px; color: var(--ink-3); }
+    .dk-pal-chips { display: flex; flex-wrap: wrap; gap: 8px; }
+    .dk-pal-chips .dk-chip { height: 34px; }
+    .dk-pal-chips .dk-chip.dk-sel, .dk-pal-chips .dk-chip:hover { border-color: var(--ink-2); color: var(--ink); background: var(--sunk); }
+    .dk-pal-act .dk-ic { background: var(--brand-soft); color: var(--brand-ink); }
+    .dk-pal-act > span:last-child { font-weight: 700; }
+    .dk-pal-i[aria-disabled="true"] { opacity: .55; cursor: default; }
+
+    @media (prefers-reduced-motion: reduce) {
+        .dk-pal-busy { animation: none; }
+    }
+}
+
+/*
+ * ---------- Inner pages on a card grid ----------
+ * The project Story (and the proposal folded into it): the facts line, the stage
+ * rail, every chapter and every side block sit in their own bordered card,
+ * aligned to the page grid. The spine and its dots stay outside the cards, so
+ * the dot-and-thread motif still links the chapters. Headline figures inside
+ * stay typographic; only functional groupings are boxed.
+ */
+@layer components {
+    .dk-story .dk-facts { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); border: 1px solid var(--line); border-radius: 14px; background: var(--paper); margin-bottom: 14px; overflow: hidden; }
+    .dk-story .dk-facts > div, [dir="rtl"] .dk-story .dk-facts > div { padding: 14px 18px; margin: 0; border: 0; border-inline-end: 1px solid var(--line); border-bottom: 1px solid var(--line); }
+    .dk-story .dk-rail { margin-inline: 0; padding-inline: 18px; border: 1px solid var(--line); border-radius: 14px; margin-block: 4px 18px; }
+    .dk-story .dk-story-grid { gap: 0 24px; }
+    .dk-story .dk-chapters { margin-top: 0; }
+    .dk-story .dk-ch-body { margin-bottom: 12px; padding: 18px 20px; border: 1px solid var(--line); border-radius: 14px; background: var(--paper); }
+    .dk-story .dk-ch.dk-now .dk-ch-body { padding: 20px 22px 26px; border-color: var(--ink-3); box-shadow: 0 1px 2px rgb(16 24 40 / .05), 0 6px 18px -10px rgb(16 24 40 / .18); }
+    .dk-story .dk-ch.dk-later .dk-ch-body { background: transparent; border-style: dashed; }
+    .dk-story .dk-ch .dk-spine i { margin-top: 22px; }
+    .dk-story .dk-ch.dk-now .dk-spine i { margin-top: 19px; }
+    .dk-story .dk-ch:last-child .dk-spine::before { height: 26px; }
+    .dk-story .dk-story-side { gap: 12px; padding-top: 0; }
+    .dk-story .dk-sblock { padding: 16px 18px; border: 1px solid var(--line); border-radius: 14px; background: var(--paper); min-width: 0; }
+    .dk-story .dk-sblock > h3 { padding-bottom: 8px; margin-bottom: 10px; border-bottom: 1px solid var(--line); }
+    .dk-story .dk-story-acts { margin-bottom: 12px; }
+
+    /* Record popups: the record's own header becomes the first card. */
+    .dk-record-body [data-detail-header] { padding: 18px 20px; border: 1px solid var(--line) !important; border-radius: 14px; background: var(--paper); }
+    .dk-record-body { background: var(--ground); }
+
+    @media (max-width: 760px) {
+        .dk-story .dk-ch { grid-template-columns: 18px minmax(0, 1fr); gap: 0 10px; }
+        .dk-story .dk-ch-body { padding: 14px 14px; }
+    }
+}
+
+/* ---------- Top bar tools: one gray capsule of round buttons (the old header look) ---------- */
+@layer components {
+    .dk-capsule { display: inline-flex; align-items: center; gap: 2px; padding: 4px; border-radius: 999px; background: var(--sunk); border: 1px solid var(--line); }
+    .dk-capsule .dk-iconbtn, .dk-capsule [data-notification-bell] > button { width: 36px !important; min-width: 36px; height: 36px !important; padding: 0; border-radius: 999px !important; color: var(--ink-2) !important; background: transparent; transition: background .15s, color .15s, box-shadow .15s; }
+    .dk-capsule .dk-iconbtn:hover, .dk-capsule [data-notification-bell] > button:hover, .dk-capsule [data-notification-bell] > button[aria-expanded="true"] { background: var(--paper) !important; color: var(--ink) !important; box-shadow: 0 1px 2px rgb(16 24 40 / .12) !important; }
+    .dk-capsule [data-locale-toggle] button { font-size: 13px; font-weight: 800; }
+    .dk-capsule .dk-wide-tool { display: inline-flex; }
+    .dk-top-find .dk-ask svg, .dk-panels-btn svg { color: var(--ink-3); flex: none; }
+    .dk-panels-btn { background: var(--sunk); }
+    @media (max-width: 1099px) { .dk-capsule .dk-wide-tool { display: none !important; } }
+}
+
+/* Focus is gray everywhere; red is kept for real validation errors only (user decision 2026-10-27). */
+@layer components {
+    .dk-scope :is(input, textarea, select):focus-visible { outline: none; border-color: var(--ink-3); box-shadow: 0 0 0 3px var(--sunk); }
+    .dk-scope .dk-pal-in input:focus-visible { box-shadow: none; }
+}
+:where(input, textarea, select, button, a):focus-visible { outline-color: var(--color-secondary-medium); }
+
+/* ---------- Panel filter button and popup ---------- */
+@layer components {
+    .dk-pfilter { color: var(--ink-3); }
+    .dk-pfilter.dk-on { color: var(--on-brand); background: var(--brand); }
+    .dk-pfilter.dk-on:hover { background: var(--brand-hover); }
+    .dk-sheet.dk-pf-pop { width: min(480px, calc(100vw - 32px)); height: auto; max-height: calc(100dvh - 48px); z-index: 71; }
+    .dk-pf-scrim { z-index: 70; }
+    .dk-pf-pop .dk-field input, .dk-pf-select { height: 42px; width: 100%; padding-inline: 12px; border-radius: 10px; border: 1px solid var(--line-2); background: var(--paper); color: var(--ink); font-size: 14px; }
+    .dk-pf-pop .dk-sh-f { justify-content: flex-end; }
+}
+
+/* ---------- Every panel one fixed height: one-line rows, the rest pages (user decision 2026-10-27) ---------- */
+@layer components {
+    :root { --panel-h: 330px; }
+    .dk-panel, .dk-panel[style*="--span:12"] { height: var(--panel-h); min-height: 0; max-height: var(--panel-h); }
+    .dk-pb, .dk-panel[style*="--span:12"] .dk-pb { overflow: hidden; }
+    .dk-ptools { flex-wrap: nowrap; overflow: hidden; }
+    .dk-panel :is(.dk-it, .dk-tt, .dk-is, .dk-plist strong, .dk-rn strong, .dk-pm strong, .dk-mx th a) { display: block; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .dk-panel .dk-items > li { grid-template-columns: 12px minmax(0, 1fr) auto !important; align-items: center; padding-block: 8px; }
+    .dk-panel .dk-items .dk-acts { grid-column: auto !important; padding-top: 0 !important; justify-content: flex-end; }
+    .dk-panel .dk-sev { margin-top: 0; }
+    .dk-panel .dk-plist > li { padding-block: 7px; }
+    /* Pipeline: the stage funnel becomes one row of chips, only stages that hold proposals. */
+    .dk-funnel-chips { display: flex !important; flex-wrap: nowrap; gap: 6px; overflow-x: auto; scrollbar-width: none; padding-bottom: 6px; }
+    .dk-funnel-chips .dk-fb { display: inline-flex !important; align-items: center; gap: 6px; flex: none; width: auto !important; height: 30px; padding-inline: 10px; border-radius: 999px; border: 1px solid var(--line-2); }
+    .dk-funnel-chips .dk-fbar { display: none !important; }
+    .dk-funnel-chips .dk-fb.dk-on { background: var(--ink); color: var(--paper); border-color: var(--ink); }
+    @media (max-width: 760px) { .dk-panel, .dk-panel[style*="--span:12"] { height: var(--panel-h); max-height: var(--panel-h); } }
+}
+@layer components {
+    :root { --panel-h: 362px; }
+    .dk-panel .dk-people > li { display: grid; grid-template-columns: 30px minmax(0, 1fr) auto; grid-template-areas: "av pm act" "av st act"; column-gap: 10px; row-gap: 0; align-items: center; padding-block: 6px; text-align: start; }
+    .dk-panel .dk-people .dk-av { grid-area: av; }
+    .dk-panel .dk-people .dk-pm { grid-area: pm; min-width: 0; width: 100%; height: auto; justify-self: stretch; display: block; padding: 0; border: 0; border-radius: 0; background: none; text-align: start; }
+    .dk-panel .dk-people .dk-pm .dk-is { display: none; }
+    .dk-panel .dk-people > li > .dk-small { grid-area: st; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .dk-panel .dk-people > li > .dk-btn { grid-area: act; }
+}
+@layer components {
+    .dk-pf-body { gap: 14px; }
+    .dk-pf-search { display: flex; align-items: center; gap: 10px; height: 44px; padding-inline: 14px; border: 1px solid var(--line-2); border-radius: 12px; background: var(--tint); color: var(--ink-3); }
+    .dk-pf-search:focus-within { border-color: var(--ink-3); background: var(--paper); }
+    .dk-pf-search input { flex: 1; min-width: 0; height: 100%; border: 0 !important; background: none !important; box-shadow: none !important; outline: none; color: var(--ink); font-size: 14px; }
+    .dk-pf-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)); gap: 10px; }
+    .dk-pf-grid:empty { display: none; }
+}
+
+/* Collapsed rail: every icon a 40px circle on the rail's centre line (same axis as the logo mark); the active one a filled circle; a 5px action dot. */
+@layer components {
+    html:not(.dk-nav-open) .dk-side-scroll { padding-inline: 0; scrollbar-width: none; }
+    html:not(.dk-nav-open) .dk-side-scroll::-webkit-scrollbar { display: none; }
+    html:not(.dk-nav-open) .dk-side-g ul { justify-items: center; gap: 4px; }
+    html:not(.dk-nav-open) .dk-side-a { width: 40px; height: 40px; padding: 0; margin-inline: auto; border-radius: 50%; justify-content: center; }
+    html:not(.dk-nav-open) .dk-side-a .dk-side-ic { width: 20px !important; height: 20px !important; }
+    html:not(.dk-nav-open) .dk-side-a.dk-on::before { display: none; }
+    html:not(.dk-nav-open) .dk-side-badge { top: 6px; inset-inline-end: 6px; min-width: 5px; width: 5px; height: 5px; box-shadow: 0 0 0 1.5px var(--paper); }
+    html:not(.dk-nav-open) .dk-side-gh { margin-inline: 22px; }
+    html:not(.dk-nav-open) .dk-side-h { padding-inline: 0; justify-content: center; }
+    html:not(.dk-nav-open) .dk-side-mark { width: 36px; height: 36px; }
+}
+@layer components {
+    html:not(.dk-nav-open) .dk-side-a { width: 34px; height: 34px; }
+    html:not(.dk-nav-open) .dk-side-g ul { gap: 8px; }
+    html:not(.dk-nav-open) .dk-side-a .dk-side-ic { width: 18px !important; height: 18px !important; }
+    html:not(.dk-nav-open) .dk-side-badge { top: 3px; inset-inline-end: 3px; }
+}
+/* Sidebar header and top bar share one 64px row: both borders sit on the same line on every page. */
+@layer components {
+    .dk-top { box-sizing: border-box; height: var(--top-h); }
+    .dk-top-in { height: calc(var(--top-h) - 1px); }
+    .dk-side-h { box-sizing: border-box; height: var(--top-h); }
+}
+/* Page content keeps its 28px top space; the rail's first icon starts on that same line. A stray gap on the sidebar's flex column pushed the icons 34px lower. */
+@layer components {
+    .dk-side { gap: 0; }
+    .dk-hello { padding-top: 0; }
+    .dk-scope main { padding-top: 28px; }
+    .dk-side-scroll, html:not(.dk-nav-open) .dk-side-scroll { padding-top: 28px; }
+    .dk-top { background: var(--paper); backdrop-filter: none; -webkit-backdrop-filter: none; }
+}

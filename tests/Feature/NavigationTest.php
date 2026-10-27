@@ -6,51 +6,48 @@ use App\Support\Desk\Destinations;
 use Illuminate\Support\Facades\Route;
 
 /**
- * The pages a user can open from the Ask bar's "Go to" list, in order.
+ * The pages a user's sidebar lists, in order.
  *
  * @return list<string>
  */
 function deskPageRoutes(User $user): array
 {
-    return array_column(app(Destinations::class)->for($user, Destinations::Pages), 'route');
+    return array_column(app(Destinations::class)->for($user), 'route');
 }
 
-/**
- * The Settings sheet rows a user can open (unlocked), in order.
- *
- * @return list<string>
- */
-function openSettingsRoutes(User $user): array
-{
-    return array_column(array_filter(app(Destinations::class)->settingsFor($user), fn (array $row): bool => $row['open']), 'route');
-}
-
-test('the desk replaces the sidebar: no sidebar or old header renders, the top bar does', function () {
+test('every page renders the sidebar and the top bar with its tools', function () {
     $this->actingAs(User::factory()->role('Team Member')->create())
         ->get(route('dashboard'))
         ->assertOk()
+        ->assertSee('data-side-nav', false)
         ->assertSee('data-desk-top-bar', false)
         ->assertSee('data-desk-ask', false)
-        ->assertDontSee('data-navigation-sidebar', false)
-        ->assertDontSee('data-desktop-navigation-header', false)
-        ->assertDontSee('data-mobile-navigation-toggle', false);
+        ->assertSee('data-panels-trigger', false)
+        ->assertSee('data-notification-bell', false)
+        ->assertSee('data-user-menu', false);
 });
 
-test('a Super Admin can go to every page, in the order the work flows', function () {
-    expect(deskPageRoutes(User::factory()->role('Super Admin')->create()))->toBe([
-        'dashboard',
-        'strategies.index', 'programs.index', 'annual-plans.index',
-        'projects.index', 'milestones.index', 'timeline.index', 'risks.index',
-        'results.index', 'indicators.index', 'targets.index', 'reports.index', 'reports.monthly-matrix', 'monthly-reports.index',
-        'report-templates.index', 'donor-reports.compose', 'reporting-duties.index',
-        'donors.index', 'proposals.index', 'funding-agreements.index', 'transfers.index',
-        'tasks.index', 'department-tasks.index', 'calendar.index', 'notifications.index',
-    ]);
+test('a Super Admin sidebar lists every page, grouped like the old sidebar, the Desk first', function () {
+    $groups = app(Destinations::class)->sidebarFor(User::factory()->role('Super Admin')->create());
+
+    expect(array_column($groups, 'group'))->toBe(['overview', 'strategy_planning', 'projects_delivery', 'monitoring_evaluation', 'funding_finance', 'workspace', 'administration', 'you'])
+        ->and($groups[0]['items'][0]['route'])->toBe('dashboard')
+        ->and(array_column($groups[6]['items'], 'route'))->toContain('admin.users.index', 'activity.index', 'admin.cities.index');
 });
 
-test('a Team Member opens only the indicator library, the read-only cities, sectors and strategies and their own settings', function () {
-    expect(openSettingsRoutes(User::factory()->role('Team Member')->create()))
-        ->toBe(['security.edit', 'notification-settings.edit', 'indicator-library.index', 'admin.sectors.index', 'admin.cities.index', 'strategies.index']);
+test('a Team Member sidebar leaves out the pages their role cannot open', function () {
+    $routes = deskPageRoutes(User::factory()->role('Team Member')->create());
+
+    expect($routes)->toContain('dashboard', 'security.edit', 'notification-settings.edit')
+        ->not->toContain('admin.users.index', 'admin.accounts.index', 'admin.notification-settings.edit', 'transfers.index');
+});
+
+test('the rendered sidebar links only what the role may open', function () {
+    $this->actingAs(User::factory()->role('Team Member')->create())
+        ->get(route('dashboard'))
+        ->assertSee('data-side-link="dashboard"', false)
+        ->assertDontSee('data-side-link="admin.users.index"', false)
+        ->assertDontSee('data-side-link="admin.accounts.index"', false);
 });
 
 test('the donor report builder goes only to reports.aggregate holders, reporting duties to responsibles and agreement editors', function () {
@@ -68,23 +65,23 @@ test('funding pages follow the module permissions of each role', function () {
     $funding = ['donors.index', 'proposals.index', 'funding-agreements.index', 'transfers.index'];
 
     expect(deskPageRoutes(User::factory()->role('Financial')->create()))->toContain(...$funding)
-        ->and(openSettingsRoutes(User::factory()->role('Financial')->create()))->toContain('admin.accounts.index')
+        ->and(deskPageRoutes(User::factory()->role('Financial')->create()))->toContain('admin.accounts.index')
         ->and(deskPageRoutes(User::factory()->role('Public Relations Manager')->create()))->toContain('donors.index', 'proposals.index', 'funding-agreements.index')->not->toContain('transfers.index')
         ->and(array_intersect(deskPageRoutes(User::factory()->role('Team Member')->create()), $funding))->toBe([]);
 });
 
-test('every page and settings destination is a registered route', function () {
-    foreach ([...deskPageRoutes(User::factory()->role('Super Admin')->create()), ...array_column(app(Destinations::class)->settingsFor(User::factory()->role('Super Admin')->create()), 'route')] as $route) {
+test('every destination is a registered route', function () {
+    foreach (deskPageRoutes(User::factory()->role('Super Admin')->create()) as $route) {
         expect(Route::has($route))->toBeTrue($route);
     }
 });
 
-test('the top bar links to the user guideline and the settings sheet to the bug report form, both in a new tab', function () {
+test('the top bar links to the user guideline and the bug report form, both in a new tab', function () {
     $html = $this->actingAs(User::factory()->role('Team Member')->create())->get(route('dashboard'))->assertOk()->getContent();
     $xpath = new DOMXPath(tap(new DOMDocument, fn (DOMDocument $document) => $document->loadHTML($html, LIBXML_NOERROR | LIBXML_NOWARNING)));
 
     $guideline = $xpath->query('//*[@data-desk-top-bar]//a[@data-guideline]');
-    $report = $xpath->query('//*[@data-report-bug]//a');
+    $report = $xpath->query('//a[@data-report-bug]');
 
     expect($guideline)->toHaveCount(1)
         ->and($guideline->item(0)->getAttribute('target'))->toBe('_blank')

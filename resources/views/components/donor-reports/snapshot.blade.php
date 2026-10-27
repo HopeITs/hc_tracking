@@ -67,7 +67,7 @@
     @endif
 
     @if ($completeness['missing'] !== [] || $completeness['missing_denominator'] !== [])
-        <div class="rounded-xl border border-status-critical/40 bg-status-critical-soft p-4 text-sm {{ $ink }}" role="alert" data-completeness-warning data-tour="donor-report-completeness">
+        <div class="rounded-xl border border-status-critical bg-status-critical-soft p-4 text-sm {{ $ink }}" role="alert" data-completeness-warning data-tour="donor-report-completeness">
             <p class="flex items-center gap-2 font-semibold text-status-critical">
                 <flux:icon.exclamation-triangle variant="mini" class="size-5 shrink-0" />
                 {{ __('donor_reports.incomplete_title') }}

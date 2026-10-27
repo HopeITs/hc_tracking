@@ -395,7 +395,7 @@ new #[Layout('layouts::desk'), Title('titles.reports')] class extends Component 
 >
     <x-slot:actions>
             @can('create', App\Models\Report::class)
-                <button type="button" class="dk-btn dk-primary" wire:click="openCreateModal" data-test="create-report-button"><x-desk.icon name="plus" />{{ __('reports.record_report') }}</button>
+                <button type="button" class="dk-btn dk-primary" wire:click="openCreateModal" data-test="create-report-button" data-quick-create><x-desk.icon name="plus" />{{ __('reports.record_report') }}</button>
             @endcan
         </x-slot:actions>
     <x-slot:search>
@@ -452,7 +452,7 @@ new #[Layout('layouts::desk'), Title('titles.reports')] class extends Component 
                             aria-pressed="{{ $overdue !== '' ? 'true' : 'false' }}"
                             data-test="overdue-chip"
                             @class([
-                                'inline-flex min-h-9 items-center gap-1.5 rounded-full border px-3 type-meta font-semibold transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary',
+                                'inline-flex min-h-9 items-center gap-1.5 rounded-full border px-3 type-meta font-semibold transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-secondary-medium',
                                 'border-primary bg-primary dark:bg-ink dark:text-surface-0 dark:border-ink text-white' => $overdue !== '',
                                 'border-secondary-soft bg-white text-secondary-medium hover:border-secondary-light hover:text-secondary-dark dark:border-line dark:bg-surface-1 dark:text-ink-muted dark:hover:text-ink' => $overdue === '',
                             ])

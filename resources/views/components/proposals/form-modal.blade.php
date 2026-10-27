@@ -45,12 +45,12 @@
 >
     @if ($open)
         @if ($errors->any())
-            <div class="mb-4 flex flex-wrap items-center gap-x-3 gap-y-2 rounded-lg border border-status-critical/40 bg-status-critical-soft px-3 py-2 text-sm" role="alert" data-form-error-summary>
+            <div class="mb-4 flex flex-wrap items-center gap-x-3 gap-y-2 rounded-lg border border-status-critical bg-status-critical-soft px-3 py-2 text-sm" role="alert" data-form-error-summary>
                 <flux:icon.exclamation-circle variant="micro" class="size-4 shrink-0 text-status-critical" aria-hidden="true" />
                 <p class="min-w-0 flex-1 font-semibold text-status-critical">{{ trans_choice('common.fields_need_attention', $errors->count(), ['count' => $errors->count()]) }}</p>
                 <button
                     type="button"
-                    class="text-sm font-semibold text-secondary-dark underline underline-offset-4 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary dark:text-ink"
+                    class="text-sm font-semibold text-secondary-dark underline underline-offset-4 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-secondary-medium dark:text-ink"
                     x-on:click="const field = $el.closest('form').querySelector('[aria-invalid=true]'); field?.scrollIntoView({ block: 'center' }); field?.focus({ preventScroll: true })"
                 >{{ __('proposals.go_to_the_first_problem') }}</button>
             </div>

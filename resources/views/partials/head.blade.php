@@ -15,6 +15,9 @@
 <meta name="apple-mobile-web-app-title" content="HC Tracking">
 <meta name="mobile-web-app-capable" content="yes">
 
+{{-- Restores the sidebar's expanded/rail choice before first paint (resources/js/side-nav.js). --}}
+<script>try { if (localStorage.getItem('hc-nav') === 'open') { document.documentElement.classList.add('dk-nav-open'); } } catch (e) {}</script>
+
 @fonts
 
 @vite(['resources/css/app.css', 'resources/js/app.js'])

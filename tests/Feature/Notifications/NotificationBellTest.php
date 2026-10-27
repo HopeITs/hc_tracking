@@ -117,14 +117,14 @@ test('a refresh tells the page the new counts', function () {
         ->assertDispatched('notification-counts', counts: ['total' => 1, 'critical' => 0, 'modules' => ['tasks' => 1]]);
 });
 
-test('every authenticated page tells the script who is listening, and the desk carries the notifications panel', function () {
+test('every authenticated page tells the script who is listening, and the desk has no notifications panel', function () {
     $user = Activity::withoutRecording(fn () => User::factory()->create());
 
     $this->actingAs($user)->get(route('dashboard'))
         ->assertOk()
         ->assertSeeHtml('data-user-id="'.$user->id.'"');
 
-    expect(app(Panels::class)->availableTo($user))->toHaveKey('inbox');
+    expect(app(Panels::class)->availableTo($user))->not->toHaveKey('inbox');
 });
 
 test('the bell renders in arabic for arabic readers', function () {

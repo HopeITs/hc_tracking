@@ -69,7 +69,7 @@
                     <div class="flex items-center gap-3">
                         <input id="task-edit-progress-slider" type="range" wire:model="progressPercentage" min="0" max="100" step="1" class="h-1.5 w-full flex-1 cursor-pointer accent-primary" data-test="task-edit-progress-slider" />
                         <div class="relative w-16 shrink-0">
-                            <input type="number" wire:model="progressPercentage" min="0" max="100" required class="w-full rounded-lg border border-secondary-light bg-white py-1.5 ps-2 pe-6 text-end text-sm font-semibold tabular-nums text-secondary-dark focus:ring-1 focus:ring-primary focus:outline-none dark:border-field-line dark:bg-surface-2 dark:text-ink" aria-label="{{ __('tasks.progress_2') }}" data-test="task-edit-progress-input" />
+                            <input type="number" wire:model="progressPercentage" min="0" max="100" required class="w-full rounded-lg border border-secondary-light bg-white py-1.5 ps-2 pe-6 text-end text-sm font-semibold tabular-nums text-secondary-dark focus:ring-1 focus:ring-secondary-light focus:outline-none dark:border-field-line dark:bg-surface-2 dark:text-ink" aria-label="{{ __('tasks.progress_2') }}" data-test="task-edit-progress-input" />
                             <span class="pointer-events-none absolute inset-y-0 end-2 flex items-center text-sm text-secondary-medium dark:text-ink-muted">%</span>
                         </div>
                     </div>

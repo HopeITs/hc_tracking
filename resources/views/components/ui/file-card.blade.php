@@ -8,7 +8,7 @@
     };
 
     $categoryTone = match ($media->collection) {
-        \App\Enums\MediaCollection::Proposal => 'border-primary/25 bg-status-critical-soft text-primary dark:text-brand-text',
+        \App\Enums\MediaCollection::Proposal => 'border-primary bg-status-critical-soft text-primary dark:text-brand-text',
         \App\Enums\MediaCollection::Agreement => 'border-funding/25 bg-funding-soft text-funding',
         \App\Enums\MediaCollection::Mou => 'border-status-good/25 bg-status-good-soft text-status-good',
         \App\Enums\MediaCollection::Evidence, \App\Enums\MediaCollection::NeedAssessment =>'border-status-warn/25 bg-status-warn-soft text-status-warn',

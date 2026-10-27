@@ -5,8 +5,8 @@
     $activities = $this->activities;
     $fillsNarrative = $this->fillsNarrative();
     $mutedText = 'text-secondary-medium dark:text-ink-muted';
-    $field = 'w-full rounded-md border border-secondary-light bg-white px-2 py-1.5 text-sm text-secondary-dark outline-none focus:border-primary focus:ring-2 focus:ring-primary/30 dark:border-field-line dark:bg-surface-2 dark:text-ink dark:focus:border-brand';
-    $chip = 'inline-flex cursor-pointer items-center gap-1 rounded-full border border-secondary-light px-3 py-1 text-xs font-semibold text-secondary-dark hover:bg-secondary-soft has-checked:border-transparent has-checked:bg-secondary-dark has-checked:text-white has-focus-visible:ring-2 has-focus-visible:ring-primary/40 dark:border-line-strong dark:text-ink dark:hover:bg-white/[0.06] dark:has-checked:bg-ink dark:has-checked:text-surface-0';
+    $field = 'w-full rounded-md border border-secondary-light bg-white px-2 py-1.5 text-sm text-secondary-dark outline-none focus:border-secondary-medium focus:ring-2 focus:ring-secondary-light dark:border-field-line dark:bg-surface-2 dark:text-ink dark:focus:border-ink-muted';
+    $chip = 'inline-flex cursor-pointer items-center gap-1 rounded-full border border-secondary-light px-3 py-1 text-xs font-semibold text-secondary-dark hover:bg-secondary-soft has-checked:border-transparent has-checked:bg-secondary-dark has-checked:text-white has-focus-visible:ring-2 has-focus-visible:ring-secondary-light dark:border-line-strong dark:text-ink dark:hover:bg-white/[0.06] dark:has-checked:bg-ink dark:has-checked:text-surface-0';
     $reasonStatuses = ['not_started', 'suspended', 'cancelled'];
     $dateFields = ['started' => 'started_on', 'completed' => 'completed_on', 'conducted' => 'executed_on'];
     $preferred = [ActivityStatus::Started, ActivityStatus::Ongoing, ActivityStatus::Completed, ActivityStatus::Conducted, ActivityStatus::NotStarted, ActivityStatus::Suspended, ActivityStatus::Cancelled];
@@ -77,7 +77,7 @@
                                     </label>
                                 @endforeach
                                 @if ($more !== [])
-                                    <button type="button" x-show="! more" @if ($chosenInMore) style="display: none" @endif x-on:click="more = true" class="rounded-full px-2 py-1 text-xs font-semibold {{ $mutedText }} hover:text-secondary-dark focus-visible:outline-2 focus-visible:outline-primary dark:hover:text-ink">
+                                    <button type="button" x-show="! more" @if ($chosenInMore) style="display: none" @endif x-on:click="more = true" class="rounded-full px-2 py-1 text-xs font-semibold {{ $mutedText }} hover:text-secondary-dark focus-visible:outline-2 focus-visible:outline-secondary-medium dark:hover:text-ink">
                                         {{ __('monthly_reports.more_statuses') }}
                                     </button>
                                 @endif
@@ -115,7 +115,7 @@
                         @endforeach
 
                         <div x-data="{ note: @js($noteOpen) }" class="flex flex-wrap items-start gap-x-6 gap-y-2">
-                            <button type="button" x-show="! note" @if ($noteOpen) style="display: none" @endif x-on:click="note = true; $nextTick(() => $refs.note.focus())" class="inline-flex items-center gap-1 text-xs font-semibold {{ $mutedText }} hover:text-secondary-dark focus-visible:outline-2 focus-visible:outline-primary dark:hover:text-ink">
+                            <button type="button" x-show="! note" @if ($noteOpen) style="display: none" @endif x-on:click="note = true; $nextTick(() => $refs.note.focus())" class="inline-flex items-center gap-1 text-xs font-semibold {{ $mutedText }} hover:text-secondary-dark focus-visible:outline-2 focus-visible:outline-secondary-medium dark:hover:text-ink">
                                 <flux:icon.plus variant="micro" class="size-3.5" aria-hidden="true" />
                                 {{ __('monthly_reports.add_note') }}
                             </button>

@@ -65,7 +65,7 @@
             wire:model="taskDrafts.{{ $rowKey }}.due_date"
             value="{{ $taskDraft['due_date'] }}"
             aria-label="{{ __('tasks.due_date_2') }}"
-            class="w-28 shrink-0 rounded border-0 bg-transparent p-1 text-xs tabular-nums text-secondary-medium focus:ring-1 focus:ring-primary focus:outline-none dark:text-ink-muted"
+            class="w-28 shrink-0 rounded border-0 bg-transparent p-1 text-xs tabular-nums text-secondary-medium focus:ring-1 focus:ring-secondary-light focus:outline-none dark:text-ink-muted"
             data-test="task-add-due-date-mobile-{{ $group }}-{{ $groupKeyString }}"
         />
 

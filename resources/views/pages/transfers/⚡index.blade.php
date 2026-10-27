@@ -343,7 +343,7 @@ new #[Layout('layouts::desk'), Title('titles.transfers')] class extends Componen
 
                         @if ($this->agreementFilter !== null)
                             <x-funding.filter-row :label="__('finance_tables.group_agreement')" on :watch="['agreement']" :models="['agreement']" x-show="filled(['agreement'])">
-                                <button type="button" x-on:click="pick('agreement', '')" class="inline-flex min-h-8 items-center gap-1.5 rounded-full bg-funding-soft ps-3 pe-2 text-xs font-semibold text-funding transition-colors hover:bg-funding hover:text-white focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary dark:text-ink dark:hover:text-surface-0" data-agreement-chip>
+                                <button type="button" x-on:click="pick('agreement', '')" class="inline-flex min-h-8 items-center gap-1.5 rounded-full bg-funding-soft ps-3 pe-2 text-xs font-semibold text-funding transition-colors hover:bg-funding hover:text-white focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-secondary-medium dark:text-ink dark:hover:text-surface-0" data-agreement-chip>
                                     {{ __('transfers.agreement_filter_chip', ['donor' => $this->agreementFilter->donor->name, 'proposal' => $this->agreementFilter->proposal->name]) }}
                                     <flux:icon.x-mark variant="micro" class="size-3.5" />
                                 </button>
@@ -359,7 +359,7 @@ new #[Layout('layouts::desk'), Title('titles.transfers')] class extends Componen
                 @endif
 
                 @can('transfers.create')
-                <x-ui.button tone="primary" icon="plus" class="page-action page-action-primary" wire:click="openCreateModal" data-test="create-transfer-button">
+                <x-ui.button tone="primary" icon="plus" class="page-action page-action-primary" wire:click="openCreateModal" data-test="create-transfer-button" data-quick-create>
                     {{ __('transfers.record_transfer') }}
                 </x-ui.button>
                 @endcan

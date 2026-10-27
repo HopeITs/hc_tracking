@@ -19,8 +19,8 @@
                 <div data-test="access-role-directory" class="divide-y divide-secondary-soft dark:divide-line">
                     @foreach ($this->roles as $roleRow)
                         <button type="button" wire:click="selectRole({{ $roleRow->id }})" wire:key="access-role-{{ $roleRow->id }}" @class([
-                            'relative flex min-h-12 w-full items-center justify-between gap-3 px-3 py-2.5 text-start transition focus-visible:z-10 focus-visible:outline-2 focus-visible:outline-inset focus-visible:outline-primary',
-                            'bg-secondary-soft/60 text-primary dark:text-brand-text dark:bg-brand/10' => $selectedRoleId === $roleRow->id,
+                            'relative flex min-h-12 w-full items-center justify-between gap-3 px-3 py-2.5 text-start transition focus-visible:z-10 focus-visible:outline-2 focus-visible:outline-inset focus-visible:outline-secondary-medium',
+                            'bg-secondary-soft/60 text-primary dark:text-brand-text dark:bg-white/[0.06]' => $selectedRoleId === $roleRow->id,
                             'bg-white text-secondary-medium hover:bg-secondary-soft/40 dark:bg-surface-1 dark:text-ink-muted dark:hover:bg-surface-2' => $selectedRoleId !== $roleRow->id,
                         ])>
                             @if ($selectedRoleId === $roleRow->id)
@@ -45,7 +45,7 @@
                                     <span class="rounded-md border border-primary px-2 py-1 text-[0.7rem] font-bold text-primary dark:text-brand-text">{{ __('roles.protected_role') }}</span>
                                 @endif
                             </div>
-                            <button type="button" wire:click="showAssignedUsers" class="group mt-1 inline-flex min-h-8 items-center gap-1.5 rounded-md text-sm font-semibold text-secondary-medium underline decoration-secondary-light underline-offset-4 transition hover:text-primary dark:hover:text-brand-text hover:decoration-primary focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary dark:text-ink-muted" aria-haspopup="dialog">
+                            <button type="button" wire:click="showAssignedUsers" class="group mt-1 inline-flex min-h-8 items-center gap-1.5 rounded-md text-sm font-semibold text-secondary-medium underline decoration-secondary-light underline-offset-4 transition hover:text-primary dark:hover:text-brand-text hover:decoration-primary focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-secondary-medium dark:text-ink-muted" aria-haspopup="dialog">
                                 <flux:icon.users class="size-4 shrink-0 text-primary dark:text-brand-text" />
                                 <span>{{ trans_choice('roles.users_count', $this->selectedRole->users_count, ['count' => $this->selectedRole->users_count]) }}</span>
                             </button>

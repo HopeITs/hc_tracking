@@ -82,7 +82,7 @@
                             keyboard; the page states every figure without it.
                         --}}
                         <div
-                            class="group relative -my-3 cursor-ew-resize touch-none py-3 select-none focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-primary"
+                            class="group relative -my-3 cursor-ew-resize touch-none py-3 select-none focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-secondary-medium"
                             role="slider"
                             tabindex="0"
                             aria-valuemin="0"
@@ -121,7 +121,7 @@
                                     <a
                                         href="{{ route('projects.show', tap(new Project, fn ($project) => $project->id = $bar['id'])) }}"
                                         wire:navigate
-                                        class="absolute top-0 flex h-7 min-w-0 items-center rounded-sm bg-funding-soft px-2 text-[11px] font-semibold text-funding transition-colors hover:bg-funding hover:text-white dark:hover:text-surface-0 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary dark:text-ink"
+                                        class="absolute top-0 flex h-7 min-w-0 items-center rounded-sm bg-funding-soft px-2 text-[11px] font-semibold text-funding transition-colors hover:bg-funding hover:text-white dark:hover:text-surface-0 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-secondary-medium dark:text-ink"
                                         style="inset-inline-start: {{ $bar['start'] }}%; width: {{ $bar['width'] }}%"
                                     >
                                         <span class="truncate">{{ $bar['name'] }}</span>

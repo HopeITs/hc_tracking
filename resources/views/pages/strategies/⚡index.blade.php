@@ -355,7 +355,7 @@ new #[Layout('layouts::desk'), Title('titles.strategies')] class extends Compone
 
         @if ($this->canCreateStrategies)
             <x-slot:actions>
-                <x-ui.button tone="primary" icon="plus" class="min-h-11 touch-manipulation @sm/directory:min-h-10" wire:click="openCreateModal" data-test="create-strategy-button">
+                <x-ui.button tone="primary" icon="plus" class="min-h-11 touch-manipulation @sm/directory:min-h-10" wire:click="openCreateModal" data-test="create-strategy-button" data-quick-create>
                     {{ __('strategies.add_strategy') }}
                 </x-ui.button>
             </x-slot:actions>
@@ -364,7 +364,7 @@ new #[Layout('layouts::desk'), Title('titles.strategies')] class extends Compone
     <div class="flex items-center justify-between gap-3">
         <div class="min-w-0">
             @if ($portfolio['has_records'] && $portfolio['status_counts']['active'] === 0 && ! $portfolio['filters_active'])
-                <div class="inline-flex w-fit items-center gap-2 rounded-md border border-primary/40 bg-primary/5 px-3 py-2 text-xs font-semibold text-primary dark:text-brand-text" role="status">
+                <div class="inline-flex w-fit items-center gap-2 rounded-md border border-primary bg-secondary-soft/60 px-3 py-2 text-xs font-semibold text-primary dark:text-brand-text" role="status">
                     <flux:icon.clock class="size-4" />
                     {{ __('strategies.no_strategy_currently_covers_year', ['year' => $portfolio['current_year']]) }}
                 </div>

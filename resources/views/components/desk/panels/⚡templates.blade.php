@@ -56,10 +56,10 @@ new class extends Component {
 @php
     $rows = $this->rows;
     $pending = $rows->where('status', ReportTemplateStatus::Pending)->count();
-    $pg = $this->paginate($rows, 5);
+    $pg = $this->paginate($rows, self::PerPage);
 @endphp
 
-<x-desk.panel id="templates" :size="$size" :index="$index" :total="$total" :count="$pending > 0 ? $pending : null">
+<x-desk.panel :facets="$pg['facets']" id="templates" :size="$size" :index="$index" :total="$total" :count="$pending > 0 ? $pending : null">
     @if ($pg['total'] > 0)
         <ul class="dk-plist">
             @foreach ($pg['slice'] as $template)

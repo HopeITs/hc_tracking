@@ -14,7 +14,7 @@ test('the header carries a tour button and the tour overlay with translated step
         ->assertSee('data-test="tour-start-button"', false)
         ->assertSee('data-tour-root', false)
         ->assertSee('Your desk')
-        ->assertSee('The Ask bar replaces the menu');
+        ->assertSee('Ask anything');
 });
 
 test('a page tour opens with its own introduction and only lists the blocks the page renders', function () {
@@ -124,8 +124,8 @@ test('the desk tour walks the top bar, then the desk and its panels', function (
     $this->actingAs(User::factory()->role('Team Member')->create())
         ->get(route('dashboard'))
         ->assertOk()
-        ->assertSeeInOrder(['The logo takes you home', 'It answers questions', 'Your initials open settings', 'Customize desk', 'The dots move it', 'Add a panel', 'Come back any time'])
-        ->assertSee('data-desk-customize-trigger', false)
+        ->assertSeeInOrder(['Every page, by your role', 'It answers and acts', 'Your initials', 'The dots move it', 'Add a panel', 'Come back any time'])
+        ->assertDontSee('data-desk-customize-trigger', false)
         ->assertSee('data-desk-add', false);
 });
 

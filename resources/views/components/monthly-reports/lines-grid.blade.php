@@ -68,7 +68,7 @@
                 type="button"
                 x-on:click="open = ! open"
                 x-bind:aria-expanded="open.toString()"
-                class="inline-flex items-center gap-1.5 rounded-md px-1 py-0.5 text-xs font-semibold text-secondary-medium hover:text-secondary-dark focus-visible:outline-2 focus-visible:outline-primary dark:text-ink-muted dark:hover:text-ink"
+                class="inline-flex items-center gap-1.5 rounded-md px-1 py-0.5 text-xs font-semibold text-secondary-medium hover:text-secondary-dark focus-visible:outline-2 focus-visible:outline-secondary-medium dark:text-ink-muted dark:hover:text-ink"
             >
                 <flux:icon.lock-closed variant="micro" class="size-3.5" aria-hidden="true" />
                 {{ trans_choice('monthly_reports.meal_lines_group', count($mealRows), ['count' => count($mealRows)]) }}

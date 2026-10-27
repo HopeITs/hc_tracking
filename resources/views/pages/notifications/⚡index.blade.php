@@ -519,7 +519,7 @@ new #[Layout('layouts::desk'), Title('titles.notifications')] class extends Comp
             @endif
 
             @if ($this->pinned->isNotEmpty())
-                <section class="mb-8 rounded-2xl bg-status-critical-soft/60 p-1.5 pt-3 dark:bg-primary/12" aria-labelledby="inbox-pinned-heading" data-inbox-pinned>
+                <section class="mb-8 rounded-2xl bg-status-critical-soft/60 p-1.5 pt-3 dark:bg-secondary-soft/60" aria-labelledby="inbox-pinned-heading" data-inbox-pinned>
                     <div class="flex items-center gap-2.5 px-3 pb-1">
                         <span class="notification-beacon relative size-2 rounded-full bg-primary dark:bg-status-critical text-primary dark:text-brand-text" aria-hidden="true"></span>
                         <h2 id="inbox-pinned-heading" class="text-sm font-bold text-status-critical">{{ __('notifications.sections.pinned') }}</h2>

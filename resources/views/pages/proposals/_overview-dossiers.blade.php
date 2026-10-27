@@ -73,7 +73,7 @@
                                         <x-ui.button tone="ghost" size="sm" icon="trash" class="size-10! touch-manipulation" wire:click="confirmDelete({{ $proposal->id }})" :aria-label="__('common.delete_name', ['name' => $proposal->name])" />
                                     @else
                                         <flux:tooltip :content="__('proposals.funded_proposals_cannot_be_deleted_remove_the_funding_agreem')">
-                                            <span class="inline-flex size-10 cursor-not-allowed items-center justify-center rounded-lg text-secondary-light focus-visible:outline-2 focus-visible:outline-primary" aria-disabled="true" tabindex="0" aria-label="{{ __('proposals.funded_proposals_cannot_be_deleted_remove_the_funding_agreem') }}">
+                                            <span class="inline-flex size-10 cursor-not-allowed items-center justify-center rounded-lg text-secondary-light focus-visible:outline-2 focus-visible:outline-secondary-medium" aria-disabled="true" tabindex="0" aria-label="{{ __('proposals.funded_proposals_cannot_be_deleted_remove_the_funding_agreem') }}">
                                                 <flux:icon.lock-closed class="size-4" />
                                             </span>
                                         </flux:tooltip>
@@ -102,7 +102,7 @@
                                         @endif
                                         <span @class([
                                             'relative z-10 size-2.5 rounded-full',
-                                            'bg-primary dark:bg-brand ring-4 ring-primary/20' => $isCurrent || $isRejectionPoint,
+                                            'bg-primary dark:bg-brand ring-4 ring-secondary-light' => $isCurrent || $isRejectionPoint,
                                             'bg-secondary-dark dark:bg-ink-muted' => $isPast,
                                             'border-2 border-secondary-soft bg-white dark:border-line-strong dark:bg-surface-1' => $isAhead,
                                         ]) aria-hidden="true"></span>

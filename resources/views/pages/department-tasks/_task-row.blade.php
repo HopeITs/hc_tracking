@@ -36,7 +36,7 @@
             @if ($proposal !== null)
                 <span aria-hidden="true">·</span>
                 @if ($this->openableProposals[$proposal->id] ?? false)
-                    <a href="{{ route('proposals.show', $proposal) }}?tab=plan" wire:navigate class="truncate underline-offset-4 hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary" dir="auto" data-proposal-link>{{ $proposal->name }}</a>
+                    <a href="{{ route('proposals.show', $proposal) }}?tab=plan" wire:navigate class="truncate underline-offset-4 hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-secondary-medium" dir="auto" data-proposal-link>{{ $proposal->name }}</a>
                 @else
                     <span class="truncate" dir="auto" data-proposal-name>{{ $proposal->name }}</span>
                 @endif

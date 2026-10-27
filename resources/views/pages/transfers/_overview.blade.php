@@ -17,7 +17,7 @@
                         wire:click="setSort('{{ $sortKey }}')"
                         aria-pressed="{{ $sort === $sortKey ? 'true' : 'false' }}"
                         @class([
-                            'rounded-full px-3 py-1.5 text-xs font-semibold transition-colors duration-150 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary',
+                            'rounded-full px-3 py-1.5 text-xs font-semibold transition-colors duration-150 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-secondary-medium',
                             'bg-secondary-dark text-white dark:bg-ink dark:text-surface-0' => $sort === $sortKey,
                             'text-secondary-medium hover:bg-board-head dark:text-ink-muted dark:hover:bg-white/5' => $sort !== $sortKey,
                         ])

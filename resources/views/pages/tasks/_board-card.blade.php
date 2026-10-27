@@ -262,7 +262,7 @@
                                         wire:model="subtaskDrafts.{{ $task->id }}.due_date"
                                         value="{{ $boardSubtaskDraft['due_date'] }}"
                                         aria-label="{{ __('tasks.due_date_2') }}"
-                                        class="w-24 shrink-0 rounded border-0 bg-transparent p-0.5 text-[11px] tabular-nums text-secondary-medium focus:ring-1 focus:ring-primary focus:outline-none dark:text-ink-muted"
+                                        class="w-24 shrink-0 rounded border-0 bg-transparent p-0.5 text-[11px] tabular-nums text-secondary-medium focus:ring-1 focus:ring-secondary-light focus:outline-none dark:text-ink-muted"
                                         data-test="task-board-subtask-due-date-{{ $task->id }}"
                                     />
 

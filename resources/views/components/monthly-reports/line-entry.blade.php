@@ -34,7 +34,7 @@
         'denominator' => $row['denominator_label'],
     ];
     $notMeasured = (bool) ($state['not_measured'] ?? false);
-    $inputClasses = 'h-8 w-24 rounded-md border bg-white px-2 text-end tabular-nums text-secondary-dark outline-none focus:border-primary focus:ring-2 focus:ring-primary/30 disabled:bg-board disabled:text-secondary-light dark:bg-surface-2 dark:text-ink dark:focus:border-brand dark:disabled:bg-surface-1 dark:disabled:text-ink-faint';
+    $inputClasses = 'h-8 w-24 rounded-md border bg-white px-2 text-end tabular-nums text-secondary-dark outline-none focus:border-secondary-medium focus:ring-2 focus:ring-secondary-light disabled:bg-board disabled:text-secondary-light dark:bg-surface-2 dark:text-ink dark:focus:border-ink-muted dark:disabled:bg-surface-1 dark:disabled:text-ink-faint';
     $readClasses = 'inline-block min-w-12 text-end tabular-nums font-semibold';
     $mutedText = 'text-secondary-medium dark:text-ink-muted';
     $showsComputed = $showComputed && ($kind !== MonthlyReportEntryKind::Count || $row['disaggregated']);
@@ -135,7 +135,7 @@
                 type="checkbox"
                 wire:model.live="{{ $prefix }}.not_measured"
                 @disabled(! $editable)
-                class="size-4 rounded border-secondary-light text-primary focus:ring-primary/30 dark:border-field-line dark:bg-surface-2"
+                class="size-4 rounded border-secondary-light text-primary focus:ring-secondary-light dark:border-field-line dark:bg-surface-2"
             >
             {{ __('monthly_reports.not_measured') }}
         </label>

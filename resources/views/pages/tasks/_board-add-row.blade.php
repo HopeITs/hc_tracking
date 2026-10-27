@@ -8,7 +8,7 @@
                 $boardTaskDraftAssignees = collect($this->userOptions)->whereIn('id', collect($boardTaskDraft['assignees'])->map(fn ($id) => (int) $id));
                 $boardDraftPriority = TaskPriority::from($boardTaskDraft['priority']);
             @endphp
-            <div class="mx-3 flex flex-col gap-1.5 rounded-xl border border-dashed border-secondary-light bg-white/60 px-2.5 py-2 transition-colors focus-within:border-primary hover:border-secondary-medium dark:border-line dark:bg-surface-1" data-test="task-board-add-row-{{ $case->value }}">
+            <div class="mx-3 flex flex-col gap-1.5 rounded-xl border border-dashed border-secondary-light bg-white/60 px-2.5 py-2 transition-colors focus-within:border-secondary-medium hover:border-secondary-medium dark:border-line dark:bg-surface-1" data-test="task-board-add-row-{{ $case->value }}">
                 <label class="flex items-center gap-2">
                     {{ FluxMarkup::icon('plus', 'micro', 'size-4 shrink-0 text-primary dark:text-brand-text') }}
                     <span class="sr-only">{{ __('tasks.add_task') }}</span>
@@ -59,7 +59,7 @@
                         wire:model="taskDrafts.{{ $boardRowKey }}.due_date"
                         value="{{ $boardTaskDraft['due_date'] }}"
                         aria-label="{{ __('tasks.due_date_2') }}"
-                        class="w-24 shrink-0 rounded border-0 bg-transparent p-0.5 text-[11px] tabular-nums text-secondary-medium focus:ring-1 focus:ring-primary focus:outline-none dark:text-ink-muted"
+                        class="w-24 shrink-0 rounded border-0 bg-transparent p-0.5 text-[11px] tabular-nums text-secondary-medium focus:ring-1 focus:ring-secondary-light focus:outline-none dark:text-ink-muted"
                         data-test="task-board-add-due-date-{{ $case->value }}"
                     />
 

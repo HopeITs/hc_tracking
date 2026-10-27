@@ -80,7 +80,7 @@
             x-bind:aria-expanded="open ? 'true' : 'false'"
             aria-haspopup="listbox"
             aria-label="{{ $label }}"
-            class="flex w-full cursor-pointer items-center justify-between gap-2 rounded-lg border px-3 text-start text-sm font-medium focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
+            class="flex w-full cursor-pointer items-center justify-between gap-2 rounded-lg border px-3 text-start text-sm font-medium focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-secondary-medium"
         >
             <span class="truncate">{{ $triggerLabel }}</span>
             <flux:icon.chevron-up-down class="size-4 shrink-0 text-secondary-medium dark:text-ink-muted" aria-hidden="true" />
