@@ -127,11 +127,20 @@ class ProposalPolicy
 
     /**
      * Whether the user's HR employee reviews any stage of the proposal.
-     * Read on every request, never cached on a component.
+     * Read on every request, never cached on a component. A list that eager
+     * loads `reviewers` (narrowed to the viewer's rows is enough) is read from
+     * memory, so checking each card costs no query.
      */
     private function isReviewer(User $user, Proposal $proposal): bool
     {
-        return $user->employee_id !== null
-            && $proposal->reviewers()->where('employee_id', $user->employee_id)->exists();
+        if ($user->employee_id === null) {
+            return false;
+        }
+
+        if ($proposal->relationLoaded('reviewers')) {
+            return $proposal->reviewers->contains('employee_id', $user->employee_id);
+        }
+
+        return $proposal->reviewers()->where('employee_id', $user->employee_id)->exists();
     }
 }
