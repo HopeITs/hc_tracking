@@ -85,7 +85,7 @@
             <x-ui.form-section :title="__('common.section_schedule')" :fields="['startDate', 'dueDate', 'completedDate']">
                 @if ($isMissedDraft || $isOverdueDraft)
                     <x-slot:hint>
-                        <span class="inline-flex items-center rounded-full bg-primary/10 px-2 py-0.5 text-[10px] font-bold tracking-wide text-status-critical uppercase">{{ $isMissedDraft ? __('tasks.missed') : __('tasks.overdue') }}</span>
+                        <span class="inline-flex items-center rounded-full bg-secondary-soft/60 px-2 py-0.5 text-[10px] font-bold tracking-wide text-status-critical uppercase">{{ $isMissedDraft ? __('tasks.missed') : __('tasks.overdue') }}</span>
                     </x-slot:hint>
                 @endif
 

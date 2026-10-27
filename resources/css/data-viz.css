@@ -165,7 +165,7 @@
 
     /* A transfer that failed: still owed, but it went wrong rather than simply not arriving yet. */
     .money-failed {
-        background-color: color-mix(in srgb, var(--color-primary) 18%, transparent);
+        background-color: color-mix(in srgb, var(--color-secondary-medium) 18%, transparent);
         background-image: repeating-linear-gradient(135deg, var(--color-primary) 0 2px, transparent 2px 6px);
     }
 
@@ -359,12 +359,12 @@
      * brand palette rather than the browser's defaults.
      */
     .dossier ::selection {
-        background: color-mix(in srgb, var(--color-primary) 22%, transparent);
+        background: color-mix(in srgb, var(--color-secondary-medium) 22%, transparent);
         color: var(--color-secondary-dark);
     }
 
     .dark .dossier ::selection {
-        background: color-mix(in srgb, var(--color-brand) 35%, transparent);
+        background: color-mix(in srgb, var(--color-secondary-medium) 35%, transparent);
         color: var(--color-ink);
     }
 
@@ -504,7 +504,7 @@
      * brown is an overdue mark nobody chases.
      */
     .money-overdue {
-        background-color: color-mix(in srgb, var(--color-status-critical) 12%, transparent);
+        background-color: color-mix(in srgb, var(--color-secondary-medium) 12%, transparent);
         border: 1.5px dashed var(--color-status-critical);
     }
 
@@ -663,12 +663,12 @@
      * rest of the app is untouched.
      */
     .exec-ledger ::selection {
-        background: color-mix(in srgb, var(--color-primary) 22%, transparent);
+        background: color-mix(in srgb, var(--color-secondary-medium) 22%, transparent);
         color: var(--color-secondary-dark);
     }
 
     .dark .exec-ledger ::selection {
-        background: color-mix(in srgb, var(--color-brand) 35%, transparent);
+        background: color-mix(in srgb, var(--color-secondary-medium) 35%, transparent);
         color: var(--color-ink);
     }
 

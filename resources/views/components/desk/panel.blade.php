@@ -5,11 +5,14 @@
     'total',
     'count' => null,
     'register' => null,
+    'facets' => [],
+    'filtered' => false,
 ])
 
 @php
     $title = __("desk.panel.{$id}.title");
     $sizes = \App\Support\Desk\Panels::Sizes;
+    $filtered = $filtered || collect($facets)->contains(fn (array $choice): bool => $choice['value'] !== '');
 @endphp
 
 {{--
@@ -18,7 +21,7 @@
     panel (resources/js/desk.js); the menu's actions call the Desk page
     (pages::desk.index) through $wire.$parent.
 --}}
-<section {{ $attributes->class('dk-panel') }} style="--span:{{ $sizes[$size] }}" data-panel="{{ $id }}" data-idx="{{ $index }}" aria-labelledby="dk-ph-{{ $id }}" x-data="{ menu: false }" x-on:keydown.escape="menu = false">
+<section {{ $attributes->class('dk-panel') }} style="--span:{{ $sizes[$size] }}" data-panel="{{ $id }}" data-idx="{{ $index }}" aria-labelledby="dk-ph-{{ $id }}" x-data="deskPanel(@js($id))" x-on:keydown.escape="menu = false">
     <header class="dk-ph">
         <button type="button" class="dk-grip" draggable="true" data-drag="{{ $id }}" aria-label="{{ __('desk.panel_move', ['panel' => $title]) }}" title="{{ __('desk.panel_drag') }}">
             <x-desk.icon name="grip" />
@@ -28,6 +31,9 @@
             <span class="dk-pc dk-num" data-panel-count>{{ $count }}</span>
         @endif
         <span class="dk-pspace"></span>
+        <button type="button" @class(['dk-iconbtn dk-sm dk-pfilter', 'dk-on' => $filtered]) x-on:click="openFilters()" aria-haspopup="dialog" aria-label="{{ __('desk.panel_filter', ['panel' => $title]) }}" title="{{ __('desk.filter') }}" data-panel-filter>
+            <flux:icon.funnel variant="outline" class="size-4" />
+        </button>
         @if ($register !== null)
             <a href="{{ route($register) }}" wire:navigate class="dk-iconbtn dk-sm" data-panel-register aria-label="{{ __('desk.panel_open_full', ['panel' => $title]) }}" title="{{ __('desk.panel_open_full_short') }}">
                 <x-desk.icon name="expand" />
@@ -50,7 +56,7 @@
                 @if ($index < $total - 1)
                     <button type="button" role="menuitem" x-on:click="menu = false; $wire.$parent.movePanel('{{ $id }}', {{ $index + 1 }})"><x-desk.icon name="chev" class="dk-flip" />{{ __('desk.move_later') }}</button>
                 @endif
-                <button type="button" role="menuitem" class="dk-danger" x-on:click="menu = false; $wire.$parent.removePanel('{{ $id }}')"><x-desk.icon name="x" />{{ __('desk.remove_from_desk') }}</button>
+                <button type="button" role="menuitem" class="dk-danger" x-on:click="menu = false; $wire.$parent.removePanel('{{ $id }}')"><x-desk.icon name="x" />{{ __('desk.remove_panel') }}</button>
             </div>
         </span>
     </header>
@@ -64,4 +70,42 @@
     @isset($foot)
         <footer class="dk-pf" data-panel-foot>{{ $foot }}</footer>
     @endisset
+
+    {{-- The panel's filters as a small centered popup of dropdowns: choices read from its rows, plus the panel's own (filters slot). They are a draft until Done (resources/js/desk-filters.js). --}}
+    <template x-teleport="body">
+        <div x-show="filtering" x-cloak class="dk-scope" x-on:keydown.escape.window.stop="discardFilters()">
+            <div class="dk-sh-scrim dk-pf-scrim" x-on:click="discardFilters()"></div>
+            <div class="dk-sheet dk-pf-pop" role="dialog" aria-modal="true" aria-labelledby="dk-pf-t-{{ $id }}" data-panel-filter-dialog="{{ $id }}">
+                <div class="dk-sh-h">
+                    <div class="min-w-0">
+                        <h2 id="dk-pf-t-{{ $id }}">{{ __('desk.filter_panel', ['panel' => $title]) }}</h2>
+                        <p>{{ __('desk.filter_lede') }}</p>
+                    </div>
+                    <button type="button" class="dk-iconbtn" x-on:click="discardFilters()" aria-label="{{ __('common.close') }}"><flux:icon.x-mark variant="outline" class="size-5" /></button>
+                </div>
+                <div class="dk-sh-b dk-pf-body">
+                    @if ($facets === [] && ! isset($filters))
+                        <p class="dk-pempty">{{ __('desk.filter_none') }}</p>
+                    @endif
+                    <div class="dk-pf-grid directory-filters">
+                        @foreach ($facets as $facet => $choice)
+                            <x-ui.header-filter-select :label="$choice['label']" wire:model="facets.{{ $facet }}" :value="$choice['value']" deferred wire:key="pf-{{ $id }}-{{ $facet }}">
+                                <option value="">{{ __('desk.filter_any', ['facet' => $choice['label']]) }}</option>
+                                @foreach ($choice['options'] as $option)
+                                    <option value="{{ $option }}">{{ $option }}</option>
+                                @endforeach
+                            </x-ui.header-filter-select>
+                        @endforeach
+                    </div>
+                    @isset($filters)
+                        <div class="dk-pf-grid">{{ $filters }}</div>
+                    @endisset
+                </div>
+                <div class="dk-sh-f">
+                    <button type="button" class="dk-btn dk-ghost" x-on:click="clearDraft()">{{ __('desk.filter_clear') }}</button>
+                    <button type="button" class="dk-btn dk-primary" x-on:click="applyFilters()">{{ __('desk.filter_done') }}</button>
+                </div>
+            </div>
+        </div>
+    </template>
 </section>

@@ -12,7 +12,7 @@
         <button
             type="button"
             wire:click="openUnblockModal({{ $project->id }})"
-            class="{{ $badgeClasses }} touch-manipulation cursor-pointer transition-colors hover:brightness-95 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
+            class="{{ $badgeClasses }} touch-manipulation cursor-pointer transition-colors hover:brightness-95 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-secondary-medium"
             title="{{ __('projects.unblock_hint') }}"
             aria-label="{{ __('projects.unblock_name', ['name' => $project->name]) }}"
             data-test="blocked-badge-unblock"

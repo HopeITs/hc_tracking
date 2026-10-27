@@ -82,7 +82,7 @@
                             aria-pressed="{{ $isActiveLevel ? 'true' : 'false' }}"
                             data-test="level-filter-{{ $levelCase->value }}"
                             @class([
-                                'group flex min-w-0 flex-1 flex-col rounded-xl border p-3 text-start transition-all focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary',
+                                'group flex min-w-0 flex-1 flex-col rounded-xl border p-3 text-start transition-all focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-secondary-medium',
                                 'border-primary bg-white shadow-card dark:bg-surface-1' => $isActiveLevel,
                                 'border-secondary-soft bg-white hover:-translate-y-0.5 hover:border-secondary-light dark:border-line dark:bg-surface-1' => ! $isActiveLevel,
                             ])

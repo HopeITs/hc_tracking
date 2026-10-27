@@ -16,7 +16,7 @@
      * grey mark and a dark button, because nothing is lost.
      */
     [$markClasses, $buttonTone] = match ($tone) {
-        'danger' => ['bg-primary/10 text-status-critical', 'primary'],
+        'danger' => ['bg-secondary-soft/60 text-status-critical', 'primary'],
         'neutral' => ['bg-secondary-soft text-secondary-dark dark:bg-surface-2 dark:text-ink', 'neutral'],
         default => throw new InvalidArgumentException("Unknown x-ui.confirm-modal tone [{$tone}]."),
     };

@@ -169,7 +169,7 @@
         @endif
 
         @if ($editing && $confirmingDelete)
-            <div class="mb-3 flex flex-col gap-3 rounded-lg border border-primary/40 bg-primary/5 p-3 text-sm sm:flex-row sm:items-center sm:justify-between" role="alert" data-confirm-agreement-delete>
+            <div class="mb-3 flex flex-col gap-3 rounded-lg border border-primary bg-secondary-soft/60 p-3 text-sm sm:flex-row sm:items-center sm:justify-between" role="alert" data-confirm-agreement-delete>
                 <p class="text-secondary-dark dark:text-ink">{{ __('funding_agreements.delete_this_agreement_confirm') }}</p>
                 <div class="flex shrink-0 gap-2">
                     <x-ui.button type="button" size="sm" wire:click="cancelAgreementDelete">{{ __('common.cancel') }}</x-ui.button>

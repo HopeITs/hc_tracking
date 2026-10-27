@@ -4,7 +4,6 @@ use App\Enums\ArStatus;
 use App\Enums\Currency;
 use App\Enums\ProposalStatus;
 use App\Enums\TaskStatus;
-use App\Models\Activity;
 use App\Models\DonorProposal;
 use App\Models\Milestone;
 use App\Models\Proposal;
@@ -12,6 +11,7 @@ use App\Models\Risk;
 use App\Models\Task;
 use App\Models\TransfersTracking;
 use App\Models\User;
+use App\Support\Desk\Panels;
 use Livewire\Livewire;
 
 beforeEach(function () {
@@ -30,8 +30,18 @@ test('the home page is the desk: greeting, the role layout and the add tile', fu
         ->assertSee('data-desk-hello', false)
         ->assertSee('data-panel="glance"', false)
         ->assertSee('data-panel="projects"', false)
-        ->assertSee('data-desk-add', false)
-        ->assertSeeText(__('desk.customize'));
+        ->assertSeeHtml('class="dk-addtile"')
+        ->assertDontSee('data-desk-customize-trigger', false);
+});
+
+test('the add tile is gone once every panel the viewer may open is on the desk', function () {
+    $user = User::factory()->role('General Manager')->create();
+    $user->forceFill(['desk_layout' => array_map(fn (string $panel): array => ['panel' => $panel, 'size' => 'M'], array_keys(app(Panels::class)->availableTo($user)))])->save();
+
+    $this->actingAs($user)
+        ->get(route('dashboard'))
+        ->assertOk()
+        ->assertDontSeeHtml('class="dk-addtile"');
 });
 
 test('desk pages keep the copyright footer', function () {
@@ -140,16 +150,4 @@ test('the proposal pipeline counts every status and its bars filter the list', f
     $panel->call('setFilter', 'submitted')
         ->assertSee('Winter shelter appeal')
         ->assertDontSee('Closed appeal');
-});
-
-test('what happened lists activity log sentences and filters by module', function () {
-    $user = User::factory()->role('General Manager')->create();
-    $this->actingAs($user);
-    Proposal::factory()->create(['name' => 'Winter shelter appeal']);
-    Activity::withoutRecording(fn () => Task::factory()->create());
-
-    Livewire::actingAs($user)->test('desk.panels.activity', ['size' => 'L'])
-        ->assertSee('Winter shelter appeal')
-        ->call('setFilter', 'tasks')
-        ->assertDontSee('Winter shelter appeal');
 });

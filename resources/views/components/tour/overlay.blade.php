@@ -48,11 +48,12 @@
     $welcome['body'] = $copy('intro', 'body', ["tour_pages.pages.{$routeKey}"]) ?? __('tour.welcome.body');
     $welcome['key'] = 'welcome';
 
-    /* The top bar is explained once, on the Desk, not repeated on every page; the Desk steps come from config/tour.php. */
+    /* The sidebar and top bar are explained once, on the Desk, not repeated on every page; the Desk steps come from config/tour.php. */
     $shellSteps = [
-        $step('logo', ['[data-desk-logo]']),
+        $step('logo', ['[data-side-nav]', '[data-side-nav-open]']),
         $step('ask', ['[data-desk-ask]']),
         $step('ask_answers', ['[data-desk-ask]']),
+        $step('panels', ['[data-panels-trigger]']),
         $step('tools', ['[data-desk-tools]']),
         $step('locale', ['[data-desk-top-bar] [data-locale-toggle]']),
         $step('profile', ['[data-tour="profile"]']),
@@ -178,7 +179,7 @@
                         x-ref="primary"
                         x-on:click="next()"
                         :class="isLast && index === 0 ? 'ms-auto' : ''"
-                        class="inline-flex cursor-pointer touch-manipulation items-center gap-1.5 rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-white hover:bg-primary/90 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary max-lg:min-h-11"
+                        class="inline-flex cursor-pointer touch-manipulation items-center gap-1.5 rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-white hover:bg-primary focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-secondary-medium max-lg:min-h-11"
                     >
                         <span x-text="isLast ? @js(__('tour.finish')) : @js(__('tour.next'))"></span>
                         <flux:icon.arrow-right x-show="! isLast" variant="micro" class="rtl:-scale-x-100" />

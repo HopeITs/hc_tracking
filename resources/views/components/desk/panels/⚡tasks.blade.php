@@ -30,6 +30,11 @@ new class extends Component {
         $this->page = 0;
     }
 
+    public function updatedScope(string $scope): void
+    {
+        $this->setScope($scope);
+    }
+
     public function shownStatus(): TaskStatus
     {
         return TaskStatus::tryFrom($this->filter) ?? TaskStatus::Todo;
@@ -93,23 +98,27 @@ new class extends Component {
     $rows = $this->rows;
     $status = $this->shownStatus();
     $list = $rows->where('status', $status)->values();
-    $pg = $this->paginate($list, 5);
+    $pg = $this->paginate($list, self::PerPage);
     $today = \Carbon\CarbonImmutable::today();
     $user = auth()->user();
 @endphp
 
-<x-desk.panel id="tasks" register="tasks.index" :size="$size" :index="$index" :total="$total" :count="$rows->where('status', '!=', TaskStatus::Done)->count()">
+<x-desk.panel :facets="$pg['facets']" :filtered="$scope !== 'mine'" id="tasks" register="tasks.index" :size="$size" :index="$index" :total="$total" :count="$rows->where('status', '!=', TaskStatus::Done)->count()">
+    <x-slot:filters>
+        <div class="contents" data-filter-defaults='{"scope":"mine"}'>
+            <x-ui.header-filter-select :label="__('desk.whose')" wire:model="scope" :value="$scope" deferred>
+                <option value="mine">{{ __('desk.scope_mine_tasks') }}</option>
+                <option value="team">{{ __('desk.scope_team') }}</option>
+            </x-ui.header-filter-select>
+        </div>
+    </x-slot:filters>
+
     <x-slot:tools>
         <div class="dk-seg" role="group">
             @foreach (TaskStatus::cases() as $option)
                 <button type="button" wire:click="setFilter('{{ $option->value }}')" aria-pressed="{{ $option === $status ? 'true' : 'false' }}">{{ $option->label() }} {{ $rows->where('status', $option)->count() }}</button>
             @endforeach
         </div>
-        <label class="dk-sr" for="ps-tasks-scope">{{ __('desk.whose') }}</label>
-        <select class="dk-mini" id="ps-tasks-scope" wire:change="setScope($event.target.value)">
-            <option value="mine" @selected($scope === 'mine')>{{ __('desk.scope_mine_tasks') }}</option>
-            <option value="team" @selected($scope === 'team')>{{ __('desk.scope_team') }}</option>
-        </select>
     </x-slot:tools>
 
     @if ($pg['total'] > 0)

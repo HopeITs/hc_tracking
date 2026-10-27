@@ -7,7 +7,7 @@
     'requiredNote' => false,
     'cancelLabel' => null,
     'flush' => false,
-    'sheet' => true,
+    'sheet' => false,
 ])
 
 @php
@@ -23,10 +23,13 @@
      * the `close` action runs exactly once, through wire:close, whichever way
      * the user leaves.
      *
-     * By default it is a Tracking Desk side sheet (Flux's flyout behaviour with the bare variant, so
-     * no physical margin classes; forms.css docks it to the inline-end edge
-     * with logical margins: right in LTR, left in RTL; width by size in forms.css).
-     * `:sheet="false"` keeps the small centered dialog that confirmations use.
+     * Every dialog is a centered popup (shell v2: no side sheets; `sheet` is
+     * kept only so older call sites still compile). Form dialogs share one
+     * width (forms.css). A form with three or more x-ui.form-section blocks
+     * becomes a step wizard on its own (resources/js/modal-shell.js): one
+     * section per step, a stepper in the header, Back / Next in the footer,
+     * the submit actions on the last step, and a fixed height so every wizard
+     * on the site takes the same space.
      */
     $maxWidth = match ($size) {
         'sm' => 'max-w-md',
@@ -41,18 +44,20 @@
     $submitAction = $submit === null ? null : Illuminate\Support\Str::before($submit, '(');
     $frameTag = $submit === null ? 'div' : 'form';
 
-    $modalAttributes = $attributes->class([$sheet ? null : $maxWidth, 'modal-shell', 'modal-shell-'.$size, $sheet ? 'modal-shell-sheet' : 'modal-shell-centered']);
+    $modalAttributes = $attributes->class([$maxWidth, 'modal-shell', 'modal-shell-'.$size, 'modal-shell-centered']);
 
     if ($close !== null) {
         $modalAttributes = $modalAttributes->merge(['wire:close' => $close]);
     }
 @endphp
 
-<flux:modal :closable="false" :flyout="$sheet" :variant="$sheet ? 'bare' : null" :attributes="$modalAttributes">
+<flux:modal :closable="false" :attributes="$modalAttributes">
     <{{ $frameTag }}
         class="modal-shell-frame"
         @if ($submit !== null) wire:submit="{{ $submit }}" novalidate @endif
         x-data="modalShell(@js($titleId), @js($submitAction))"
+        x-bind:data-wizard="wizard ? '' : null"
+        x-on:keydown.enter="onEnter($event)"
     >
         <header class="modal-shell-header">
             @isset($mark)
@@ -78,8 +83,19 @@
             </button>
         </header>
 
+        <ol class="modal-shell-steps" x-show="wizard" x-cloak aria-label="{{ __('common.steps') }}" data-modal-steps>
+            <template x-for="(label, i) in labels" :key="i">
+                <li x-bind:class="{ 'is-current': i + 1 === step, 'is-done': i + 1 < step, 'is-invalid': invalid[i] }" x-bind:aria-current="i + 1 === step ? 'step' : null">
+                    <button type="button" x-on:click="go(i + 1)">
+                        <span class="modal-shell-step-dot" aria-hidden="true" x-text="i + 1"></span>
+                        <span class="modal-shell-step-label" x-text="label"></span>
+                    </button>
+                </li>
+            </template>
+        </ol>
+
         @if ($slot->hasActualContent())
-            <div @class(['modal-shell-body', 'modal-shell-body-flush' => $flush])>
+            <div @class(['modal-shell-body', 'modal-shell-body-flush' => $flush]) x-ref="body" x-bind:data-step="wizard ? step : null">
                 {{ $slot }}
             </div>
         @endif
@@ -97,7 +113,10 @@
             <div class="modal-shell-actions">
                 <x-ui.button type="button" x-on:click="close()">{{ $cancelLabel ?? __('common.cancel') }}</x-ui.button>
 
-                <fieldset class="modal-shell-submit" x-bind:disabled="busy">
+                <x-ui.button type="button" x-show="wizard && step > 1" x-cloak x-on:click="back()" data-modal-back>{{ __('common.back') }}</x-ui.button>
+                <x-ui.button type="button" tone="primary" x-show="wizard && step < total" x-cloak x-on:click="next()" data-modal-next>{{ __('common.next') }}</x-ui.button>
+
+                <fieldset class="modal-shell-submit" x-bind:disabled="busy" x-show="! wizard || step === total">
                     {{ $actions ?? '' }}
                 </fieldset>
             </div>

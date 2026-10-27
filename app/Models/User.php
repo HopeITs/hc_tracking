@@ -49,6 +49,7 @@ use Spatie\Permission\Traits\HasRoles;
  * @property int|null $active_role_id
  * @property string|null $locale
  * @property array<mixed>|null $desk_layout the saved Desk arrangement, list<array{panel: string, size: string}> as written; read through Panels::layoutFor(), which drops anything malformed
+ * @property array<mixed>|null $page_panels the Panels popup's sets per route name, array<string, list<array{panel: string, size: string}>> as written; read through Panels::pageLayoutFor()
  * @property bool $notification_popups
  * @property CarbonImmutable|null $tour_seen_at
  * @property CarbonImmutable|null $email_verified_at
@@ -78,6 +79,7 @@ class User extends Authenticatable implements HasLocalePreference, PasskeyUser, 
         'employee_id' => null,
         'locale' => null,
         'desk_layout' => null,
+        'page_panels' => null,
         'notification_popups' => false,
         'tour_seen_at' => null,
         'email_two_factor_enabled' => false,
@@ -654,7 +656,17 @@ class User extends Authenticatable implements HasLocalePreference, PasskeyUser, 
             'notification_popups' => 'boolean',
             'tour_seen_at' => 'datetime',
             'desk_layout' => 'array',
+            'page_panels' => 'array',
         ];
+    }
+
+    /**
+     * Whether the user holds an administrator role (config access-control.administrator_roles),
+     * who sees every page, panel and action of the Desk.
+     */
+    public function isAdministrator(): bool
+    {
+        return $this->hasRole(config('access-control.administrator_roles', []));
     }
 
     public function activityModule(): string

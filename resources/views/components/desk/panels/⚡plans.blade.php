@@ -84,11 +84,11 @@ new class extends Component {
 
 @php
     $year = $this->shownYear();
-    $pg = $this->paginate($this->rows, 5);
+    $pg = $this->paginate($this->rows, self::PerPage);
     $delivery = $this->delivery;
 @endphp
 
-<x-desk.panel id="plans" register="annual-plans.index" :size="$size" :index="$index" :total="$total">
+<x-desk.panel :facets="$pg['facets']" id="plans" register="annual-plans.index" :size="$size" :index="$index" :total="$total">
     @if (count($this->years) > 0)
         <x-slot:tools>
             <div class="dk-seg" role="group">

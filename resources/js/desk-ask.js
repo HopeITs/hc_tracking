@@ -12,6 +12,24 @@ function isTyping(target) {
         && (target.isContentEditable || ['INPUT', 'TEXTAREA', 'SELECT'].includes(target.tagName));
 }
 
+/**
+ * An Ask action ("new proposal") opens a register with ?quick=create: once
+ * the page is in, press its own create button (data-quick-create) so the form
+ * opens with the page's usual permissions and state, then drop the flag from
+ * the address so Back and refresh do not open it again.
+ */
+document.addEventListener('livewire:navigated', () => {
+    const url = new URL(window.location.href);
+
+    if (url.searchParams.get('quick') !== 'create') {
+        return;
+    }
+
+    url.searchParams.delete('quick');
+    window.history.replaceState(window.history.state, '', url);
+    requestAnimationFrame(() => document.querySelector('[data-quick-create]')?.click());
+});
+
 document.addEventListener('alpine:init', () => {
     window.Alpine.data('hcDeskAsk', () => ({
         open: false,
@@ -82,6 +100,18 @@ document.addEventListener('alpine:init', () => {
 
         choose() {
             this.rows()[this.selected]?.click();
+        },
+
+        // A suggestion chip asks its question as if it had been typed.
+        ask(question) {
+            const input = document.getElementById('dk-pal-q');
+
+            this.$wire.set('query', question);
+
+            if (input) {
+                input.value = question;
+                input.focus();
+            }
         },
     }));
 });

@@ -24,7 +24,7 @@
                                         @endif
                                         <span class="min-w-0 text-secondary-dark dark:text-ink" dir="auto">{{ $indicator->libraryIndicator?->localizedName() ?? $indicator->name }}</span>
                                         @if ($indicator->library_indicator_id === null)
-                                            <span class="inline-flex items-center gap-1 rounded-full border border-status-critical/40 px-2 py-0.5 text-[11px] font-semibold text-status-critical">
+                                            <span class="inline-flex items-center gap-1 rounded-full border border-status-critical px-2 py-0.5 text-[11px] font-semibold text-status-critical">
                                                 <flux:icon.link-slash variant="micro" class="size-3" aria-hidden="true" />
                                                 {{ __('targets.not_linked_to_library') }}
                                             </span>
@@ -48,7 +48,7 @@
                     @endforeach
                 </div>
                 @error('indicator')
-                    <p class="flex items-center gap-1.5 border-t border-status-critical/30 bg-status-critical-soft px-4 py-2 text-sm font-semibold text-status-critical" role="alert">
+                    <p class="flex items-center gap-1.5 border-t border-status-critical bg-status-critical-soft px-4 py-2 text-sm font-semibold text-status-critical" role="alert">
                         <flux:icon.exclamation-triangle variant="micro" class="size-4 shrink-0" />{{ $message }}
                     </p>
                 @enderror

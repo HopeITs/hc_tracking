@@ -13,7 +13,7 @@
     }
 
     .gantt-editor:focus {
-        outline: 2px solid color-mix(in srgb, var(--color-primary) 45%, transparent);
+        outline: 2px solid color-mix(in srgb, var(--color-secondary-medium) 45%, transparent);
         outline-offset: 0;
     }
 
@@ -25,7 +25,7 @@
     }
 
     .dark .gantt-editor:focus {
-        outline-color: color-mix(in srgb, var(--color-brand) 60%, transparent);
+        outline-color: color-mix(in srgb, var(--color-secondary-medium) 60%, transparent);
     }
 
     /* Gantt baseline: a hatched sliver under the planned bar. */
@@ -128,9 +128,9 @@
 
     /* Slip: the hatched run from a late row's planned finish to today. */
     .gantt-slip {
-        background-color: color-mix(in oklab, var(--color-status-critical) 12%, transparent);
-        background-image: repeating-linear-gradient(135deg, color-mix(in oklab, var(--color-status-critical) 70%, transparent) 0 1.5px, transparent 1.5px 5px);
-        box-shadow: inset 0 0 0 1px color-mix(in oklab, var(--color-status-critical) 40%, transparent);
+        background-color: color-mix(in srgb, var(--color-secondary-medium) 12%, transparent);
+        background-image: repeating-linear-gradient(135deg, var(--color-status-critical) 0 1.5px, transparent 1.5px 5px);
+        box-shadow: inset 0 0 0 1px var(--color-status-critical);
     }
 
     /* Bars draw in once from their start edge; milestones settle in after them. */

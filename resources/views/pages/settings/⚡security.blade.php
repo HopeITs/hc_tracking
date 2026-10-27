@@ -556,7 +556,7 @@ new #[Layout('layouts::desk'), Title('titles.security_settings')] class extends 
                                     icon:variant="outline"
                                     wire:click="confirmDelete({{ $passkey['id'] }})"
                                     :aria-label="__('settings.remove_passkey')"
-                                    class="text-primary hover:bg-primary/10 dark:text-ink dark:hover:bg-white/10"
+                                    class="text-primary hover:bg-secondary-soft/60 dark:text-ink dark:hover:bg-white/10"
                                 />
                             </li>
                         @endforeach

@@ -246,7 +246,7 @@ new #[Layout('layouts::desk'), Title('titles.indicators')] class extends Compone
         </x-slot:filters>
 
         <x-slot:actions>
-            @can('indicators.create')<x-ui.button tone="primary" icon="plus" class="min-h-11 self-end touch-manipulation @sm/directory:min-h-10" wire:click="openCreateModal" data-test="create-indicator-button">
+            @can('indicators.create')<x-ui.button tone="primary" icon="plus" class="min-h-11 self-end touch-manipulation @sm/directory:min-h-10" wire:click="openCreateModal" data-test="create-indicator-button" data-quick-create>
                 {{ __('indicators.add_indicator') }}
             </x-ui.button>@endcan
         </x-slot:actions>

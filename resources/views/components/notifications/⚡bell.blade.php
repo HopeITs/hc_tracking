@@ -8,6 +8,7 @@ use App\Notifications\NotificationPresenter;
 use App\Notifications\UnreadCounts;
 use Illuminate\Support\Collection;
 use Livewire\Attributes\Computed;
+use Livewire\Attributes\Locked;
 use Livewire\Attributes\On;
 use Livewire\Component;
 
@@ -27,6 +28,13 @@ new class extends Component {
      * unread count is read.
      */
     public bool $opened = false;
+
+    /**
+     * Whether the panel links to the notification rules; the top bar decides,
+     * so the bell itself never loads the viewer's permissions.
+     */
+    #[Locked]
+    public bool $canManageRules = false;
 
     /**
      * @return array{total: int, critical: int, modules: array<string, int>}
@@ -183,6 +191,11 @@ new class extends Component {
                 <a href="{{ route('notifications.index') }}" wire:navigate class="inline-flex size-8 items-center justify-center rounded-lg text-secondary-medium transition-colors hover:bg-secondary-soft hover:text-secondary-dark dark:text-ink-muted dark:hover:bg-white/10 dark:hover:text-ink" aria-label="{{ __('notifications.full_page') }}" title="{{ __('notifications.full_page') }}">
                     <flux:icon.arrows-pointing-out variant="mini" class="size-4" />
                 </a>
+                @if ($canManageRules)
+                    <a href="{{ route('admin.notification-settings.edit') }}" wire:navigate class="inline-flex size-8 items-center justify-center rounded-lg text-secondary-medium transition-colors hover:bg-secondary-soft hover:text-secondary-dark dark:text-ink-muted dark:hover:bg-white/10 dark:hover:text-ink" aria-label="{{ __('navigation.notification_settings') }}" title="{{ __('navigation.notification_settings') }}" data-bell-rules>
+                        <flux:icon.adjustments-horizontal variant="mini" class="size-4" />
+                    </a>
+                @endif
                 <a href="{{ route('notification-settings.edit') }}" wire:navigate class="inline-flex size-8 items-center justify-center rounded-lg text-secondary-medium transition-colors hover:bg-secondary-soft hover:text-secondary-dark dark:text-ink-muted dark:hover:bg-white/10 dark:hover:text-ink" aria-label="{{ __('notifications.settings_link') }}" title="{{ __('notifications.settings_link') }}">
                     <flux:icon.cog-6-tooth variant="mini" class="size-4" />
                 </a>
@@ -261,7 +274,7 @@ new class extends Component {
             @else
                 @forelse ($this->sections as $section => $rows)
                     @if ($section === 'pinned')
-                        <div class="mt-2 rounded-xl bg-status-critical-soft/60 p-1 pt-2.5 dark:bg-primary/12" data-bell-pinned>
+                        <div class="mt-2 rounded-xl bg-status-critical-soft/60 p-1 pt-2.5 dark:bg-secondary-soft/60" data-bell-pinned>
                             <p class="flex items-center gap-2 px-2.5 pb-0.5 text-xs font-bold text-status-critical">
                                 <span class="notification-beacon relative size-1.5 rounded-full bg-primary dark:bg-status-critical text-primary dark:text-brand-text" aria-hidden="true"></span>
                                 {{ __("notifications.sections.{$section}") }}

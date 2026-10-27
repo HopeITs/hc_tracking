@@ -127,7 +127,7 @@ new #[Layout('layouts::desk'), Title('titles.tasks')] class extends Component
     </x-slot:figures>
     <x-slot:actions>
         @can('create', App\Models\Task::class)
-            <button type="button" class="dk-btn dk-primary" wire:click="openCreateDrawer" data-test="create-task-button"><x-desk.icon name="plus" />{{ __('tasks.add_task') }}</button>
+            <button type="button" class="dk-btn dk-primary" wire:click="openCreateDrawer" data-test="create-task-button" data-quick-create><x-desk.icon name="plus" />{{ __('tasks.add_task') }}</button>
         @endcan
     </x-slot:actions>
     <x-slot:search>

@@ -16,9 +16,8 @@ return [
 
     'pages' => [
         'dashboard' => [
-            'intro' => ['title' => 'Your desk', 'body' => 'Everything that needs you, on panels you arrange yourself. There is no menu: the Ask bar at the top opens any page. Let’s walk through it.'],
+            'intro' => ['title' => 'Your desk', 'body' => 'Everything that needs you, on panels you arrange yourself. The sidebar opens any page, and the Ask bar at the top answers questions and takes actions. Let’s walk through it.'],
             'hello' => ['title' => 'The greeting', 'body' => 'The date and who you are, then one sentence: how many things need you and how many are late.'],
-            'customize' => ['title' => 'Customize desk', 'body' => 'Opens the panel library: what is on your desk with its size, what you can add, and what is locked for your role and why. Reset brings back your role’s layout.'],
             'grip' => ['title' => 'The dots move it', 'body' => 'Drag a panel by the six dots and drop it on another panel. The grid packs itself so no space is left empty.'],
             'count' => ['title' => 'The number', 'body' => 'How many items in the panel need attention.'],
             'register' => ['title' => 'Open in full', 'body' => 'The arrows open the full page behind the panel.'],

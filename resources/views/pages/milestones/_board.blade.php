@@ -15,7 +15,7 @@
     $columnTone = fn (MilestoneStatus $case): string => match ($case) {
         MilestoneStatus::Reached => 'border-status-good/30 bg-status-good-soft',
         MilestoneStatus::Ongoing => 'border-status-warn/30 bg-status-warn-soft',
-        MilestoneStatus::Postponed => 'border-primary/30 bg-status-critical-soft',
+        MilestoneStatus::Postponed => 'border-primary bg-status-critical-soft',
         MilestoneStatus::Cancelled => 'border-secondary-light bg-secondary-soft/60 dark:bg-white/10',
         MilestoneStatus::Planned => 'border-board-line bg-board',
     };

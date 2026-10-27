@@ -26,7 +26,7 @@
 
     $accent = match ($result->type) {
         ResultType::Impact => 'h-1 bg-primary',
-        ResultType::Outcome => 'h-0.5 bg-primary/60',
+        ResultType::Outcome => 'h-0.5 bg-primary',
         ResultType::Output => 'h-0.5 bg-transparent',
         ResultType::Activity, ResultType::CrossCutting => 'h-0.5 bg-transparent',
     };
@@ -162,7 +162,7 @@
                     x-on:click="measuresOpen = ! measuresOpen"
                     x-bind:aria-expanded="measuresOpen.toString()"
                     aria-controls="framework-measures-{{ $result->id }}"
-                    class="inline-flex items-center gap-1.5 rounded-md type-meta font-semibold text-secondary-dark hover:text-primary dark:hover:text-brand-text focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary dark:text-ink"
+                    class="inline-flex items-center gap-1.5 rounded-md type-meta font-semibold text-secondary-dark hover:text-primary dark:hover:text-brand-text focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-secondary-medium dark:text-ink"
                 >
                     <flux:icon.chart-bar variant="micro" class="size-3.5" aria-hidden="true" />
                     {{ trans_choice('programs.logframe_count_indicators', $indicatorCount, ['count' => $indicatorCount]) }}
@@ -177,7 +177,7 @@
                 <a
                     href="{{ route('indicators.index', ['create' => $result->id]) }}"
                     wire:navigate
-                    class="inline-flex items-center gap-1 rounded-md type-meta font-semibold text-primary dark:text-brand-text hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
+                    class="inline-flex items-center gap-1 rounded-md type-meta font-semibold text-primary dark:text-brand-text hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-secondary-medium"
                     data-test="add-indicator-for-result-{{ $result->id }}"
                 >
                     <flux:icon.plus variant="micro" class="size-3.5" aria-hidden="true" />
@@ -411,7 +411,7 @@
                 x-on:click="branchOpen = ! branchOpen"
                 x-bind:aria-expanded="branchOpen.toString()"
                 aria-controls="framework-branch-{{ $result->id }}"
-                class="mt-2 inline-flex items-center gap-1.5 rounded-md type-meta font-semibold text-secondary-medium hover:text-primary dark:hover:text-brand-text focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary dark:text-ink-muted"
+                class="mt-2 inline-flex items-center gap-1.5 rounded-md type-meta font-semibold text-secondary-medium hover:text-primary dark:hover:text-brand-text focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-secondary-medium dark:text-ink-muted"
             >
                 <flux:icon.chevron-down variant="micro" class="size-3.5 transition-transform duration-200" x-bind:class="branchOpen ? '' : '-rotate-90 rtl:rotate-90'" aria-hidden="true" />
                 {{ trans_choice('programs.logframe_count_contributing', count($children), ['count' => count($children)]) }}

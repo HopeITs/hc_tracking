@@ -156,7 +156,7 @@
                                         @disabled($line['shrink'] <= 0)
                                         data-ledger-figure="short"
                                         @class([
-                                            'group -m-2 rounded-lg p-2 text-start transition-colors duration-150 focus-visible:outline-2 focus-visible:outline-primary enabled:hover:bg-board-head disabled:cursor-default dark:enabled:hover:bg-white/5',
+                                            'group -m-2 rounded-lg p-2 text-start transition-colors duration-150 focus-visible:outline-2 focus-visible:outline-secondary-medium enabled:hover:bg-board-head disabled:cursor-default dark:enabled:hover:bg-white/5',
                                             'bg-board-head ring-1 ring-secondary-dark dark:bg-white/5 dark:ring-ink' => $shortfallIsActive,
                                         ])
                                     >
@@ -207,7 +207,7 @@
                                                 aria-pressed="{{ $isActive ? 'true' : 'false' }}"
                                                 @disabled($isEmpty && ! $isActive)
                                                 @class([
-                                                    'group -m-2 w-full rounded-lg p-2 text-start transition-colors duration-150 focus-visible:outline-2 focus-visible:outline-primary enabled:hover:bg-board-head disabled:cursor-default dark:enabled:hover:bg-white/5',
+                                                    'group -m-2 w-full rounded-lg p-2 text-start transition-colors duration-150 focus-visible:outline-2 focus-visible:outline-secondary-medium enabled:hover:bg-board-head disabled:cursor-default dark:enabled:hover:bg-white/5',
                                                     'bg-board-head ring-1 ring-secondary-dark dark:bg-white/5 dark:ring-ink' => $isActive,
                                                 ])
                                                 data-ledger-figure="{{ $figure['stage'] }}"
@@ -244,7 +244,7 @@
                                     <button
                                         type="button"
                                         wire:click="toggleStage('{{ $segment['stage'] }}')"
-                                        @class(['ledger-segment h-full min-w-1.5 rounded-[2px] transition-opacity duration-150 hover:opacity-80 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary', $segment['fill'], 'ring-1 ring-secondary-dark dark:ring-ink' => $isActive])
+                                        @class(['ledger-segment h-full min-w-1.5 rounded-[2px] transition-opacity duration-150 hover:opacity-80 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-secondary-medium', $segment['fill'], 'ring-1 ring-secondary-dark dark:ring-ink' => $isActive])
                                         style="width: {{ round($segment['value'] / $scale * 100, 3) }}%"
                                         title="{{ $segmentTitle }}"
                                         aria-pressed="{{ $isActive ? 'true' : 'false' }}"

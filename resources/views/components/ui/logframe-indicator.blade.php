@@ -41,7 +41,7 @@
                 x-on:click="breakdown = ! breakdown"
                 x-bind:aria-expanded="breakdown.toString()"
                 aria-controls="chain-targets-{{ $row['indicator']->id }}"
-                class="ms-auto inline-flex cursor-pointer items-center gap-1 rounded-sm type-meta font-semibold text-secondary-dark hover:text-primary focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary print:hidden dark:text-ink dark:hover:text-brand-text"
+                class="ms-auto inline-flex cursor-pointer items-center gap-1 rounded-sm type-meta font-semibold text-secondary-dark hover:text-primary focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-secondary-medium print:hidden dark:text-ink dark:hover:text-brand-text"
             >
                 {{ trans_choice('results_framework.chain_count_targets', count($targets), ['count' => count($targets)]) }}
                 <flux:icon.chevron-down variant="micro" class="size-3.5 transition-transform duration-200" x-bind:class="breakdown ? 'rotate-180' : ''" aria-hidden="true" />

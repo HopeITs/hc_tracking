@@ -77,7 +77,7 @@
                                         aria-pressed="{{ $isActive ? 'true' : 'false' }}"
                                         @disabled($isEmpty && ! $isActive)
                                         @class([
-                                            'group -m-2 rounded-lg p-2 text-start transition-colors duration-150 focus-visible:outline-2 focus-visible:outline-primary enabled:hover:bg-board-head disabled:cursor-default dark:enabled:hover:bg-white/5 @6xl/ledger:text-end',
+                                            'group -m-2 rounded-lg p-2 text-start transition-colors duration-150 focus-visible:outline-2 focus-visible:outline-secondary-medium enabled:hover:bg-board-head disabled:cursor-default dark:enabled:hover:bg-white/5 @6xl/ledger:text-end',
                                             'bg-board-head ring-1 ring-secondary-dark dark:bg-white/5 dark:ring-ink' => $isActive,
                                         ])
                                         data-ledger-figure="{{ $figure['stage'] }}"
@@ -121,7 +121,7 @@
                                         aria-label="{{ __('funding_agreements.show_agreements_stage', ['stage' => $segment['label'], 'amount' => $amount($segment['display']), 'currency' => $line['currency']]) }}"
                                         title="{{ $segmentText }}"
                                         @class([
-                                            'ledger-segment h-full min-w-1.5 cursor-pointer first:rounded-s-full last:rounded-e-full transition-[filter,transform] duration-150 hover:brightness-110 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary',
+                                            'ledger-segment h-full min-w-1.5 cursor-pointer first:rounded-s-full last:rounded-e-full transition-[filter,transform] duration-150 hover:brightness-110 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-secondary-medium',
                                             $segment['fill'],
                                             'outline-2 outline-offset-2 outline-secondary-dark dark:outline-ink' => $isActive,
                                         ])

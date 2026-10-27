@@ -11,6 +11,12 @@ return [
     'group_overview' => 'نظرة عامة',
     'group_projects_delivery' => 'المشاريع والتنفيذ',
     'group_strategy_planning' => 'الاستراتيجية والتخطيط',
+    'group_administration' => 'الإدارة',
+    'group_you' => 'حسابي',
+    'panels' => 'اللوحات',
+    'open_menu' => 'فتح القائمة',
+    'expand_sidebar' => 'توسيع الشريط الجانبي',
+    'collapse_sidebar' => 'طي الشريط الجانبي',
     'group_workspace' => 'مساحة عملي',
     'guideline' => 'دليل الاستخدام',
     'indicator_library' => 'مكتبة المؤشرات',
@@ -29,4 +35,5 @@ return [
     'donor_report_builder' => 'منشئ تقارير المانحين',
     'reporting_duties' => 'مهام التقارير',
     'monthly_matrix' => 'المصفوفة الشهرية',
+    'tools' => 'الأدوات',
 ];

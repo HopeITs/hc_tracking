@@ -157,10 +157,10 @@ new class extends Component {
 
 @php
     $rows = $this->rows;
-    $pg = $this->paginate($rows, 4);
+    $pg = $this->paginate($rows, self::PerPage);
 @endphp
 
-<x-desk.panel id="waiting" :size="$size" :index="$index" :total="$total" :count="$rows->count()">
+<x-desk.panel :facets="$pg['facets']" id="waiting" :size="$size" :index="$index" :total="$total" :count="$rows->count()">
     @if ($pg['total'] > 0)
         <ul class="dk-wait">
             @foreach ($pg['slice'] as $row)

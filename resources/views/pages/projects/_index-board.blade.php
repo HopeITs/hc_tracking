@@ -47,7 +47,7 @@
                                         'group/card relative isolate flex h-full flex-col rounded-xl border bg-board p-4',
                                         'transition-[transform,box-shadow,border-color] duration-200 ease-[cubic-bezier(0.16,1,0.3,1)] motion-reduce:transition-none',
                                         'hover:-translate-y-0.5 hover:shadow-[0_10px_24px_-12px_rgb(16_24_40/0.28),0_2px_6px_-2px_rgb(16_24_40/0.10)] motion-reduce:hover:translate-y-0',
-                                        'border-primary/40' => $schedule['tone'] === 'critical',
+                                        'border-primary' => $schedule['tone'] === 'critical',
                                         'border-status-warn/45' => $schedule['tone'] === 'warn',
                                         'border-board-line' => ! in_array($schedule['tone'], ['critical', 'warn'], true),
                                     ])
@@ -73,7 +73,7 @@
                                             <a
                                                 href="{{ route('projects.show', $project) }}"
                                                 wire:navigate
-                                                class="grid size-11 place-items-center rounded-md border-0! bg-transparent! text-secondary-dark! transition-colors hover:bg-secondary-soft! focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary dark:text-ink! dark:hover:bg-surface-2! @3xl/directory:size-8!"
+                                                class="grid size-11 place-items-center rounded-md border-0! bg-transparent! text-secondary-dark! transition-colors hover:bg-secondary-soft! focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-secondary-medium dark:text-ink! dark:hover:bg-surface-2! @3xl/directory:size-8!"
                                                 aria-label="{{ __('projects.open_project', ['name' => $project->name]) }}"
                                             >
                                                 <flux:icon.eye class="size-4.5" />

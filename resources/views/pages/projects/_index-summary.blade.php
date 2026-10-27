@@ -20,8 +20,8 @@
                 aria-pressed="{{ $isSelected ? 'true' : 'false' }}"
                 data-test="lifecycle-{{ $case->value }}"
                 @class([
-                    'flex min-h-16 snap-start cursor-pointer flex-col justify-center gap-1 px-4 py-3 text-start transition-colors focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-primary',
-                    'bg-primary text-white dark:bg-brand/10 dark:text-ink' => $isSelected,
+                    'flex min-h-16 snap-start cursor-pointer flex-col justify-center gap-1 px-4 py-3 text-start transition-colors focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-secondary-medium',
+                    'bg-primary text-white dark:bg-white/[0.06] dark:text-ink' => $isSelected,
                     'bg-white text-secondary-dark hover:bg-secondary-soft/50 dark:bg-surface-1 dark:text-ink dark:hover:bg-surface-2' => ! $isSelected,
                 ])
             >
@@ -97,7 +97,7 @@
                         data-test="lens-{{ $lensValue }}"
                         wire:key="tile-lens-{{ $lensValue }}"
                         @class([
-                            'box-border flex flex-col justify-between gap-2 border-2 p-4 text-start transition-colors focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-primary',
+                            'box-border flex flex-col justify-between gap-2 border-2 p-4 text-start transition-colors focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-secondary-medium',
                             $lensCornerClasses,
                             'cursor-pointer border-white bg-white hover:border-secondary-soft/50 hover:bg-secondary-soft/50 dark:border-surface-1 dark:bg-surface-1 dark:hover:border-surface-2 dark:hover:bg-surface-2' => ! $lensIsQuiet && ! $lensIsActive,
                             'cursor-pointer border-primary bg-white dark:bg-surface-1' => $lensIsActive,

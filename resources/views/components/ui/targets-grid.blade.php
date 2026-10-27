@@ -101,7 +101,7 @@
                                 {{ $indicator->measure->label() }}@if ($unit !== null && ! $row['isPercentage']) · {{ $unit }}@endif
                             </span>
                             @if (! $row['linked'])
-                                <span class="mt-1 inline-flex items-center gap-1 rounded-full border border-status-critical/40 px-2 py-0.5 text-[11px] font-semibold text-status-critical" data-badge="not-linked">
+                                <span class="mt-1 inline-flex items-center gap-1 rounded-full border border-status-critical px-2 py-0.5 text-[11px] font-semibold text-status-critical" data-badge="not-linked">
                                     <flux:icon.link-slash variant="micro" class="size-3" aria-hidden="true" />
                                     {{ __('targets.not_linked_to_library') }}
                                 </span>
@@ -155,7 +155,7 @@
                                             x-on:keydown.arrow-right="if ($event.target.selectionEnd === $event.target.value.length) move($event, 0, isRtl() ? -1 : 1)"
                                             x-on:keydown.arrow-left="if ($event.target.selectionStart === 0) move($event, 0, isRtl() ? 1 : -1)"
                                             @class([
-                                                'h-8 w-24 rounded-md border bg-white px-2 text-end tabular-nums text-secondary-dark outline-none focus:border-primary focus:ring-2 focus:ring-primary/30 dark:bg-surface-2 dark:text-ink',
+                                                'h-8 w-24 rounded-md border bg-white px-2 text-end tabular-nums text-secondary-dark outline-none focus:border-secondary-medium focus:ring-2 focus:ring-secondary-light dark:bg-surface-2 dark:text-ink',
                                                 'border-status-critical' => $hasError,
                                                 'border-secondary-light dark:border-line' => ! $hasError,
                                             ])

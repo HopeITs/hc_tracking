@@ -203,7 +203,7 @@
                                             aria-expanded="false"
                                             x-bind:aria-expanded="open ? 'true' : 'false'"
                                             aria-controls="transfer-detail-{{ $transfer->id }}"
-                                            class="-me-1 flex size-8 items-center justify-center rounded-md text-secondary-medium transition-colors duration-150 hover:bg-board-head focus-visible:outline-2 focus-visible:outline-primary dark:text-ink-muted dark:hover:bg-white/5"
+                                            class="-me-1 flex size-8 items-center justify-center rounded-md text-secondary-medium transition-colors duration-150 hover:bg-board-head focus-visible:outline-2 focus-visible:outline-secondary-medium dark:text-ink-muted dark:hover:bg-white/5"
                                             aria-label="{{ __('transfers.show_the_arithmetic') }}"
                                         >
                                             <flux:icon name="chevron-down" class="size-4 transition-transform duration-200" x-bind:class="open && 'rotate-180'" />

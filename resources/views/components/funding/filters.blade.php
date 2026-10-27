@@ -32,8 +32,7 @@
     <flux:modal
         :name="$name"
         :closable="false"
-        variant="flyout"
-        class="filter-dialog modal-shell modal-shell-sheet modal-shell-md"
+        class="filter-dialog modal-shell modal-shell-centered modal-shell-md"
     >
         <div class="flex h-full min-h-0 flex-col" x-init="$el.closest('dialog')?.setAttribute('aria-labelledby', 'finance-filters-title')">
             <header class="flex items-start gap-4 border-b border-secondary-soft px-6 pb-4 pt-5 dark:border-line">
@@ -46,7 +45,7 @@
                     <p class="mt-1 text-sm text-secondary-medium dark:text-ink-muted">{{ __('finance_tables.filters_draft_hint') }}</p>
                 </div>
 
-                <button type="button" class="-me-2 inline-flex size-9 items-center justify-center rounded-lg text-secondary-medium transition-colors hover:bg-secondary-soft hover:text-secondary-dark focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary dark:text-ink-muted dark:hover:bg-surface-2 dark:hover:text-ink" x-on:click="dismiss()" aria-label="{{ __('common.close') }}">
+                <button type="button" class="-me-2 inline-flex size-9 items-center justify-center rounded-lg text-secondary-medium transition-colors hover:bg-secondary-soft hover:text-secondary-dark focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-secondary-medium dark:text-ink-muted dark:hover:bg-surface-2 dark:hover:text-ink" x-on:click="dismiss()" aria-label="{{ __('common.close') }}">
                     <flux:icon.x-mark class="size-5" />
                 </button>
             </header>

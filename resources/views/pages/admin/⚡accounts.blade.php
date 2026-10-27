@@ -197,7 +197,7 @@ new #[Layout('layouts::desk'), Title('titles.accounts')] class extends Component
                 @endif
 
                 @can('accounts.create')
-                    <x-ui.button tone="primary" icon="plus" class="page-action page-action-primary" wire:click="openCreateModal" data-test="create-account-button">
+                    <x-ui.button tone="primary" icon="plus" class="page-action page-action-primary" wire:click="openCreateModal" data-test="create-account-button" data-quick-create>
                         {{ __('accounts.open_account') }}
                     </x-ui.button>
                 @endcan

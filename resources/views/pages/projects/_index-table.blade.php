@@ -131,7 +131,7 @@
                                     <a
                                         href="{{ route('projects.show', $project) }}"
                                         wire:navigate
-                                        class="grid size-11 shrink-0 place-items-center rounded-md border-0! bg-transparent! text-secondary-dark! transition-colors hover:bg-secondary-soft! focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary dark:text-ink! dark:hover:bg-surface-2! @3xl/directory:size-8!"
+                                        class="grid size-11 shrink-0 place-items-center rounded-md border-0! bg-transparent! text-secondary-dark! transition-colors hover:bg-secondary-soft! focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-secondary-medium dark:text-ink! dark:hover:bg-surface-2! @3xl/directory:size-8!"
                                         aria-label="{{ __('projects.open_project', ['name' => $project->name]) }}"
                                     >
                                         <flux:icon.eye class="size-4.5" />

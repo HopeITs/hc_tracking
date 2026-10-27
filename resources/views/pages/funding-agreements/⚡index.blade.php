@@ -273,7 +273,7 @@ new #[Layout('layouts::desk'), Title('titles.funding_agreements')] class extends
                 @endif
 
                 @can('funding-agreements.create')
-                <x-ui.button tone="primary" icon="plus" class="page-action page-action-primary" wire:click="openCreateModal" data-test="create-agreement-button">
+                <x-ui.button tone="primary" icon="plus" class="page-action page-action-primary" wire:click="openCreateModal" data-test="create-agreement-button" data-quick-create>
                     {{ __('funding_agreements.record_agreement') }}
                 </x-ui.button>
                 @endcan

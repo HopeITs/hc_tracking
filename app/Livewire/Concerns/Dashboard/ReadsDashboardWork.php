@@ -14,6 +14,7 @@ use App\Models\Report;
 use App\Models\Task;
 use App\Models\TaskAssignee;
 use App\Models\TransfersTracking;
+use App\Models\User;
 use App\Support\SupervisionMap;
 use Carbon\CarbonImmutable;
 use Illuminate\Database\Eloquent\Relations\MorphTo;
@@ -47,13 +48,13 @@ trait ReadsDashboardWork
     #[Computed]
     public function myTeam(): array
     {
-        $employeeId = auth()->user()->employee_id;
+        $user = auth()->user();
+        $employeeId = $user->employee_id;
 
-        if ($employeeId === null) {
-            return [];
-        }
-
-        $superviseeIds = SupervisionMap::superviseesOf($employeeId);
+        // An administrator sees every linked employee: the whole organisation is their team.
+        $superviseeIds = $user->isAdministrator()
+            ? array_values(array_filter(array_map('intval', User::query()->whereNotNull('employee_id')->where('employee_id', '!=', $employeeId ?? 0)->pluck('employee_id')->all())))
+            : ($employeeId === null ? [] : SupervisionMap::superviseesOf($employeeId));
 
         if ($superviseeIds === []) {
             return [];

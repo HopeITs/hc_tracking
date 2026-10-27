@@ -74,7 +74,7 @@
                                             x-on:mouseenter="focus = {{ $segment['donorId'] ?? 'null' }}"
                                             x-on:mouseleave="focus = null"
                                             :class="lit({{ $segment['donorId'] ?? 'null' }}) ? '' : 'opacity-40'"
-                                            class="grid grid-cols-[minmax(0,7rem)_minmax(0,1fr)_auto] items-center gap-3 rounded-lg px-2 {{ $isRoomy ? 'py-2.5' : 'py-1.5' }} transition-[background-color,opacity] duration-200 hover:bg-board-head focus-visible:outline-2 focus-visible:outline-primary @3xl/directory:grid-cols-[minmax(0,10rem)_minmax(0,1fr)_8rem] dark:hover:bg-white/5"
+                                            class="grid grid-cols-[minmax(0,7rem)_minmax(0,1fr)_auto] items-center gap-3 rounded-lg px-2 {{ $isRoomy ? 'py-2.5' : 'py-1.5' }} transition-[background-color,opacity] duration-200 hover:bg-board-head focus-visible:outline-2 focus-visible:outline-secondary-medium @3xl/directory:grid-cols-[minmax(0,10rem)_minmax(0,1fr)_8rem] dark:hover:bg-white/5"
                                             aria-label="{{ __('donors.segment_label', ['name' => $segment['name'], 'currency' => $line['currency'], 'committed' => $this->amount($segment['committed']), 'received' => $this->amount($segment['received']), 'percent' => (int) round($segment['share'])]) }}"
                                             data-wallet-segment="{{ $segment['donorId'] ?? 'rest' }}"
                                         >
@@ -154,8 +154,8 @@
                                         wire:click="toggleType('{{ $stop['value'] }}')"
                                         aria-pressed="{{ $isSelected ? 'true' : 'false' }}"
                                         @class([
-                                            'grid w-full grid-cols-[7rem_minmax(0,1fr)_1.5rem] items-center gap-3 rounded-md px-2 py-1.5 text-start text-sm transition-colors hover:bg-board-head focus-visible:outline-2 focus-visible:outline-primary dark:hover:bg-white/5',
-                                            'bg-primary/8 dark:bg-brand/10' => $isSelected,
+                                            'grid w-full grid-cols-[7rem_minmax(0,1fr)_1.5rem] items-center gap-3 rounded-md px-2 py-1.5 text-start text-sm transition-colors hover:bg-board-head focus-visible:outline-2 focus-visible:outline-secondary-medium dark:hover:bg-white/5',
+                                            'bg-secondary-soft/60 dark:bg-white/[0.06]' => $isSelected,
                                             'opacity-50' => $stop['count'] === 0 && ! $isSelected,
                                         ])
                                         data-type-stop="{{ $stop['value'] }}"
@@ -183,7 +183,7 @@
                 <h2 id="ledger-heading" class="text-lg font-bold {{ $inkText }}">{{ __('donors.every_donor_and_what_they_fund') }}</h2>
                 <p class="flex flex-wrap items-baseline gap-x-3 text-xs {{ $mutedText }}">
                     @if ($pulse['followUps'] > 0 && $sort !== 'follow_up')
-                        <button type="button" wire:click="$set('sort', 'follow_up')" class="font-semibold text-status-critical underline-offset-4 hover:underline focus-visible:outline-2 focus-visible:outline-primary" data-follow-ups-due>
+                        <button type="button" wire:click="$set('sort', 'follow_up')" class="font-semibold text-status-critical underline-offset-4 hover:underline focus-visible:outline-2 focus-visible:outline-secondary-medium" data-follow-ups-due>
                             {{ trans_choice('donors.count_follow_ups_due', $pulse['followUps'], ['count' => $pulse['followUps']]) }}
                         </button>
                     @endif

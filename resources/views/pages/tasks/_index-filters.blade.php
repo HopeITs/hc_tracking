@@ -36,7 +36,7 @@
                         data-test="my-task-card-{{ $myTask->id }}"
                         @class([
                             'flex w-64 shrink-0 flex-col gap-2 rounded-xl border p-3 text-start shadow-sm transition-shadow hover:shadow-md dark:bg-surface-1',
-                            'border-primary/30 bg-white dark:border-status-critical/30' => $isAssignedToMe,
+                            'border-primary bg-white dark:border-status-critical' => $isAssignedToMe,
                             'border-dashed border-secondary-light bg-secondary-soft/30 dark:border-line dark:bg-white/[0.03]' => ! $isAssignedToMe,
                         ])
                     >
@@ -116,7 +116,7 @@
                 aria-pressed="{{ $myTasksOnly ? 'true' : 'false' }}"
                 data-test="task-filter-my-tasks-only"
                 @class([
-                    'inline-flex shrink-0 items-center gap-1.5 rounded-md border px-2.5 py-1.5 text-xs font-semibold transition-colors focus-visible:outline-2 focus-visible:outline-primary',
+                    'inline-flex shrink-0 items-center gap-1.5 rounded-md border px-2.5 py-1.5 text-xs font-semibold transition-colors focus-visible:outline-2 focus-visible:outline-secondary-medium',
                     'border-primary bg-primary dark:bg-ink dark:text-surface-0 dark:border-ink text-white' => $myTasksOnly,
                     'border-secondary-light text-secondary-medium hover:bg-secondary-soft dark:text-ink-muted dark:hover:bg-surface-2' => ! $myTasksOnly,
                 ])

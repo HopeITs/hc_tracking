@@ -79,7 +79,7 @@
     --color-status-warn: #9a6412;
     --color-status-warn-soft: #f7eedd;
     --color-status-critical: var(--color-primary);
-    --color-status-critical-soft: #f8e4e4;
+    --color-status-critical-soft: #efeff0;
     --color-status-active: #2563a8;
     --color-status-active-soft: #e5eef7;
     --color-funding: #2b5f6b;
@@ -150,7 +150,7 @@
     --color-desk-faint: #939598;
     --color-desk-line: #e1e1e3;
     --color-desk-line-2: #c6c7c9;
-    --color-brand-soft: #f8e4e4;
+    --color-brand-soft: #efeff0;
     --color-brand-ink: #be1f24;
     --color-on-brand: #ffffff;
     --color-scrim: rgb(24 24 28 / 0.38);
@@ -173,7 +173,7 @@
         --color-field-line: #6b6d74;
         --color-brand: #d4343a;
         --color-brand-hover: #e04046;
-        --color-brand-text: #ff7b7f;
+        --color-brand-text: #d4343a;
 
         /* Flux's neutral accent (primary Flux buttons, checked controls): ink on the page ground. */
         --color-accent: var(--color-ink);
@@ -184,8 +184,8 @@
         --color-status-good-soft: rgb(92 198 144 / 0.13);
         --color-status-warn: #e3ad52;
         --color-status-warn-soft: rgb(227 173 82 / 0.13);
-        --color-status-critical: #ff8a8d;
-        --color-status-critical-soft: rgb(255 138 141 / 0.13);
+        --color-status-critical: #d4343a;
+        --color-status-critical-soft: rgb(255 255 255 / 0.07);
         --color-status-active: #7cb1ee;
         --color-status-active-soft: rgb(124 177 238 / 0.13);
         --color-funding: #79bccb;
@@ -210,8 +210,8 @@
         --color-desk-faint: #8a8c93;
         --color-desk-line: #2e2f34;
         --color-desk-line-2: #4a4b51;
-        --color-brand-soft: rgb(212 52 58 / 0.16);
-        --color-brand-ink: #ff8a8d;
+        --color-brand-soft: rgb(255 255 255 / 0.07);
+        --color-brand-ink: #d4343a;
         --color-scrim: rgb(0 0 0 / 0.55);
         --color-header-bg: rgb(21 22 24 / 0.86);
         --shadow-overlay: 0 1px 2px rgb(0 0 0 / 0.4), 0 16px 40px rgb(0 0 0 / 0.5);

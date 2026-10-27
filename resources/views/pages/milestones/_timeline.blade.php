@@ -230,7 +230,7 @@
                         <button
                             type="button"
                             x-on:click="$nextTick(() => $refs.todayMarker?.scrollIntoView({ inline: 'center', block: 'nearest', behavior: 'smooth' }))"
-                            class="inline-flex cursor-pointer items-center gap-1 rounded-md px-2 py-1 text-xs font-semibold text-primary dark:text-brand-text hover:bg-primary/10"
+                            class="inline-flex cursor-pointer items-center gap-1 rounded-md px-2 py-1 text-xs font-semibold text-primary dark:text-brand-text hover:bg-secondary-soft/60"
                         >
                             <flux:icon.calendar-days variant="micro" class="size-3.5" />
                             {{ __('common.today') }}
@@ -282,8 +282,8 @@
                             {{-- hover crosshair + ghost "add here" marker --}}
                             <template x-if="hover">
                                 <div class="pointer-events-none absolute inset-y-0 z-20 -translate-x-1/2 rtl:translate-x-1/2" :style="'inset-inline-start: ' + hover.at + '%'">
-                                    <span class="absolute inset-y-0 left-1/2 w-px -translate-x-1/2 bg-primary/40"></span>
-                                    <span class="absolute rounded-full border-2 border-dashed border-primary/70 bg-white/80 dark:bg-surface-1/80" style="top: {{ $topPad }}px; width: 1.75rem; height: 1.75rem; transform: translate(-50%, -50%);"></span>
+                                    <span class="absolute inset-y-0 left-1/2 w-px -translate-x-1/2 bg-primary"></span>
+                                    <span class="absolute rounded-full border-2 border-dashed border-primary bg-white/80 dark:bg-surface-1/80" style="top: {{ $topPad }}px; width: 1.75rem; height: 1.75rem; transform: translate(-50%, -50%);"></span>
                                     <span class="absolute start-1/2 -translate-x-1/2 -translate-y-full whitespace-nowrap rounded-md bg-secondary-dark px-1.5 py-0.5 text-[10px] font-semibold text-white dark:bg-surface-3 dark:text-ink rtl:translate-x-1/2" style="top: 0" x-text="hover.label"></span>
                                 </div>
                             </template>
@@ -313,7 +313,7 @@
                                         wire:navigate
                                         wire:key="milestone-marker-{{ $milestone->id }}"
                                         data-milestone-marker
-                                        class="relative flex -translate-y-1/2 cursor-pointer items-center justify-center rounded-full shadow-sm ring-2 ring-white focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary dark:ring-surface-1 {{ $depth === 0 ? 'size-7' : 'size-6' }} {{ $markerTone($milestone) }}"
+                                        class="relative flex -translate-y-1/2 cursor-pointer items-center justify-center rounded-full shadow-sm ring-2 ring-white focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-secondary-medium dark:ring-surface-1 {{ $depth === 0 ? 'size-7' : 'size-6' }} {{ $markerTone($milestone) }}"
                                         aria-label="{{ __('common.edit_name', ['name' => $milestone->name]) }}"
                                     >
                                         <flux:icon.flag variant="micro" class="{{ $depth === 0 ? 'size-3.5' : 'size-3' }}" />

@@ -54,7 +54,7 @@
                     @foreach ($taskGroups as $group)
                         <section class="min-w-0" wire:key="program-task-group-{{ $group['project']->id }}">
                             <header class="border-b border-secondary-soft pt-4 pb-3 dark:border-line">
-                                <a href="{{ route('projects.show', $group['project']) }}" wire:navigate class="min-w-0 truncate text-base font-bold underline-offset-4 hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary {{ $taskInkText }}">{{ $group['project']->name }}</a>
+                                <a href="{{ route('projects.show', $group['project']) }}" wire:navigate class="min-w-0 truncate text-base font-bold underline-offset-4 hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-secondary-medium {{ $taskInkText }}">{{ $group['project']->name }}</a>
                             </header>
                             <ul class="divide-y divide-secondary-soft dark:divide-line">
                                 @foreach ($group['tasks'] as $task)

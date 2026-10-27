@@ -7,8 +7,9 @@ use Livewire\Attributes\Computed;
 use Livewire\Component;
 
 /**
- * My reviews: the proposals and concept notes the viewer is named to
- * review (the My reviews page's own query), unread first.
+ * My reviews: the proposals and concept notes still waiting on the viewer's
+ * own review (ProposalReviewer::awaitingReview: not marked seen, and the
+ * proposal is still in that stage), one row per proposal, oldest ask first.
  */
 new class extends Component {
     use IsDeskPanel;
@@ -27,21 +28,22 @@ new class extends Component {
 
         return ProposalReviewer::query()
             ->forEmployee((int) $employeeId)
+            ->awaitingReview()
             ->with('proposal:id,slug,name,status')
-            ->orderByRaw('seen_at is not null')
-            ->latest('id')
-            ->get();
+            ->oldest('created_at')
+            ->get()
+            ->unique('proposal_id')
+            ->values();
     }
 };
 ?>
 
 @php
     $rows = $this->rows;
-    $unread = $rows->whereNull('seen_at')->count();
-    $pg = $this->paginate($rows, 5);
+    $pg = $this->paginate($rows, self::PerPage);
 @endphp
 
-<x-desk.panel id="reviews" register="reviews.index" :size="$size" :index="$index" :total="$total" :count="$unread > 0 ? $unread : null">
+<x-desk.panel :facets="$pg['facets']" id="reviews" register="reviews.index" :size="$size" :index="$index" :total="$total" :count="$rows->isNotEmpty() ? $rows->count() : null">
     @if ($pg['total'] > 0)
         <ul class="dk-plist">
             @foreach ($pg['slice'] as $review)
@@ -50,11 +52,7 @@ new class extends Component {
                         <strong>@if ($review->proposal !== null)<a href="{{ route('proposals.show', $review->proposal) }}" wire:navigate>{{ $review->proposal->name }}</a>@else — @endif</strong>
                         <span class="dk-is">{{ $review->stage->label() }} · {{ $review->slot->label() }}</span>
                     </div>
-                    @if ($review->seen_at !== null)
-                        <span class="dk-pill dk-good">{{ __('desk.read') }}</span>
-                    @else
-                        <span class="dk-pill dk-warn">{{ __('desk.not_read') }}</span>
-                    @endif
+                    <span class="dk-small dk-muted dk-num" title="{{ $review->created_at?->translatedFormat(__('formats.date_long')) }}">{{ __('desk.asked_on', ['when' => \App\Support\Desk\RelativeDay::for($review->created_at)]) }}</span>
                 </li>
             @endforeach
         </ul>

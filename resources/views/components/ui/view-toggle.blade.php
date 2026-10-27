@@ -13,7 +13,7 @@
             aria-checked="{{ $isActive ? 'true' : 'false' }}"
             wire:click="$set('{{ $wireModel }}', '{{ $option['key'] }}')"
             @class([
-                'inline-flex h-full items-center gap-1.5 rounded-md px-3 text-sm font-semibold transition-colors focus-visible:outline-2 focus-visible:outline-primary',
+                'inline-flex h-full items-center gap-1.5 rounded-md px-3 text-sm font-semibold transition-colors focus-visible:outline-2 focus-visible:outline-secondary-medium',
                 'bg-secondary-dark text-white dark:bg-ink dark:text-surface-0' => $isActive,
                 'text-secondary-medium hover:bg-secondary-soft/60 hover:text-secondary-dark dark:text-ink-muted dark:hover:bg-surface-2 dark:hover:text-ink' => ! $isActive,
             ])

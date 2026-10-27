@@ -78,7 +78,7 @@
                                                 <a
                                                 href="{{ route('projects.show', $project) }}"
                                                 wire:navigate
-                                                class="grid size-11 place-items-center rounded-md border-0! bg-transparent! text-secondary-dark! transition-colors hover:bg-secondary-soft! focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary dark:text-ink! dark:hover:bg-surface-2! @3xl/directory:size-8!"
+                                                class="grid size-11 place-items-center rounded-md border-0! bg-transparent! text-secondary-dark! transition-colors hover:bg-secondary-soft! focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-secondary-medium dark:text-ink! dark:hover:bg-surface-2! @3xl/directory:size-8!"
                                                 aria-label="{{ __('projects.open_project', ['name' => $project->name]) }}"
                                             >
                                                 <flux:icon.eye class="size-4.5" />
@@ -108,7 +108,7 @@
                                                 <span
                                                     @class([
                                                         'inline-flex items-center gap-1 rounded-full border px-1.5 py-0.5 text-xs tabular-nums',
-                                                        'border-primary/30 bg-primary/10 font-semibold text-primary dark:text-brand-text' => $connection['alert'],
+                                                        'border-primary bg-secondary-soft/60 font-semibold text-primary dark:text-brand-text' => $connection['alert'],
                                                         'border-secondary-soft text-secondary-medium dark:border-line dark:text-ink-muted' => ! $connection['alert'] && $connection['count'] > 0,
                                                         'border-secondary-soft text-secondary-light dark:border-line' => ! $connection['alert'] && $connection['count'] === 0,
                                                     ])

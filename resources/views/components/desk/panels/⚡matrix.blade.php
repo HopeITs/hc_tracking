@@ -88,10 +88,10 @@ new class extends Component {
     $months = $this->months();
     $glyphs = ['validated' => '✓', 'submitted' => '•', 'late' => '!', 'returned' => '↺', 'draft' => ''];
     $lateCount = $rows->sum(fn ($project) => $project->monthlyReports->filter(fn ($report) => $this->stateOf($report) === 'late')->count());
-    $pg = $this->paginate($rows, 6);
+    $pg = $this->paginate($rows, 3);
 @endphp
 
-<x-desk.panel id="matrix" register="reports.monthly-matrix" :size="$size" :index="$index" :total="$total" :count="$lateCount > 0 ? $lateCount : null">
+<x-desk.panel :facets="$pg['facets']" id="matrix" register="reports.monthly-matrix" :size="$size" :index="$index" :total="$total" :count="$lateCount > 0 ? $lateCount : null">
     <div class="dk-mx-wrap">
         <table class="dk-mx">
             <thead>

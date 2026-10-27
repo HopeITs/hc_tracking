@@ -11,7 +11,7 @@
                         type="button"
                         x-on:click="gapsOnly = ! gapsOnly"
                         x-bind:aria-pressed="gapsOnly ? 'true' : 'false'"
-                        class="inline-flex min-h-9 shrink-0 cursor-pointer items-center gap-1.5 rounded-md border px-2.5 type-meta font-semibold transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
+                        class="inline-flex min-h-9 shrink-0 cursor-pointer items-center gap-1.5 rounded-md border px-2.5 type-meta font-semibold transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-secondary-medium"
                         x-bind:class="gapsOnly ? 'border-primary bg-primary dark:bg-ink dark:text-surface-0 dark:border-ink text-white' : 'border-board-line text-secondary-medium hover:text-secondary-dark dark:text-ink-muted dark:hover:text-ink'"
                     >
                         <flux:icon.funnel variant="micro" class="size-3.5" aria-hidden="true" />
@@ -101,7 +101,7 @@
                                             @can('create', App\Models\AnnualPlan::class)<button
                                                 type="button"
                                                 wire:click="openCreateModal({{ $program->id }}, {{ $year }})"
-                                                class="flex w-full min-h-11 touch-manipulation items-center justify-between gap-3 rounded-md border border-dashed border-board-line px-3 py-2 text-start transition-colors hover:border-primary focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
+                                                class="flex w-full min-h-11 touch-manipulation items-center justify-between gap-3 rounded-md border border-dashed border-board-line px-3 py-2 text-start transition-colors hover:border-primary focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-secondary-medium"
                                                 aria-label="{{ __('annual_plans.add_a_plan_for_program_in_year', ['program' => $program->name, 'year' => $year]) }}"
                                             >
                                                 <span class="type-meta font-bold tabular-nums text-secondary-light">{{ $year }}</span>
@@ -116,7 +116,7 @@
                                                 href="{{ route('annual-plans.show', $plan) }}"
                                                 wire:navigate
                                                 @class([
-                                                    'flex min-w-0 flex-1 min-h-11 flex-col justify-center gap-1 rounded-md border px-3 py-2 transition-colors hover:border-primary focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary',
+                                                    'flex min-w-0 flex-1 min-h-11 flex-col justify-center gap-1 rounded-md border px-3 py-2 transition-colors hover:border-primary focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-secondary-medium',
                                                     'border-primary' => $year === $activeYear,
                                                     'border-board-line' => $year !== $activeYear,
                                                 ])
@@ -185,7 +185,7 @@
                                         aria-pressed="{{ $rail['isActive'] ? 'true' : 'false' }}"
                                         aria-label="{{ __('annual_plans.focus_year_plans_targets', ['year' => $rail['year'], 'plans' => $rail['plans'], 'targets' => $rail['targets']]) }}"
                                         @class([
-                                            'flex w-full cursor-pointer flex-col items-center gap-1 rounded-md border-2 px-2 py-1.5 transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary',
+                                            'flex w-full cursor-pointer flex-col items-center gap-1 rounded-md border-2 px-2 py-1.5 transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-secondary-medium',
                                             'border-primary' => $rail['isActive'],
                                             'border-transparent hover:border-board-line' => ! $rail['isActive'],
                                         ])
@@ -271,7 +271,7 @@
                                                 x-on:focus="hoverYear = {{ $year }}"
                                                 x-on:blur="hoverYear = null"
                                                 @class([
-                                                    'group/gap flex h-full w-full min-h-14 items-center justify-center rounded-md border border-dashed transition-colors hover:border-primary hover:bg-board focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary',
+                                                    'group/gap flex h-full w-full min-h-14 items-center justify-center rounded-md border border-dashed transition-colors hover:border-primary hover:bg-board focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-secondary-medium',
                                                     'border-primary' => $year === $activeYear,
                                                     'border-secondary-soft dark:border-line' => $year !== $activeYear,
                                                 ])
@@ -292,7 +292,7 @@
                                                 x-on:focus="hoverYear = {{ $year }}"
                                                 x-on:blur="hoverYear = null"
                                                 @class([
-                                                    'relative flex h-full min-h-14 flex-col items-center justify-center gap-1.5 overflow-hidden rounded-md border bg-board transition-[transform,border-color,box-shadow] duration-150 hover:-translate-y-0.5 hover:border-primary hover:shadow-[0_10px_20px_-14px_rgb(0_0_0/0.55)] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary motion-reduce:transition-none motion-reduce:hover:translate-y-0',
+                                                    'relative flex h-full min-h-14 flex-col items-center justify-center gap-1.5 overflow-hidden rounded-md border bg-board transition-[transform,border-color,box-shadow] duration-150 hover:-translate-y-0.5 hover:border-primary hover:shadow-[0_10px_20px_-14px_rgb(0_0_0/0.55)] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-secondary-medium motion-reduce:transition-none motion-reduce:hover:translate-y-0',
                                                     'border-primary' => $year === $activeYear,
                                                     'border-secondary-soft dark:border-line' => $year !== $activeYear,
                                                 ])
@@ -325,7 +325,7 @@
                                                 @can('update', $plan)<button
                                                     type="button"
                                                     wire:click="openEditModal({{ $plan->id }})"
-                                                    class="grid size-5 place-items-center rounded border border-secondary-soft bg-board text-secondary-medium transition-colors hover:border-primary hover:text-primary dark:hover:text-brand-text focus-visible:opacity-100 focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-primary dark:border-line dark:text-ink-muted"
+                                                    class="grid size-5 place-items-center rounded border border-secondary-soft bg-board text-secondary-medium transition-colors hover:border-primary hover:text-primary dark:hover:text-brand-text focus-visible:opacity-100 focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-secondary-medium dark:border-line dark:text-ink-muted"
                                                     aria-label="{{ __('annual_plans.edit_the_plan_for_program_in_year', ['program' => $program->name, 'year' => $year]) }}"
                                                 >
                                                     <flux:icon.pencil-square class="size-3" />
@@ -333,7 +333,7 @@
                                                 @can('delete', $plan)<button
                                                     type="button"
                                                     wire:click="confirmDelete({{ $plan->id }})"
-                                                    class="grid size-5 place-items-center rounded border border-secondary-soft bg-board text-secondary-medium transition-colors hover:border-primary hover:text-primary dark:hover:text-brand-text focus-visible:opacity-100 focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-primary dark:border-line dark:text-ink-muted"
+                                                    class="grid size-5 place-items-center rounded border border-secondary-soft bg-board text-secondary-medium transition-colors hover:border-primary hover:text-primary dark:hover:text-brand-text focus-visible:opacity-100 focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-secondary-medium dark:border-line dark:text-ink-muted"
                                                     aria-label="{{ __('annual_plans.delete_the_plan_for_program_in_year', ['program' => $program->name, 'year' => $year]) }}"
                                                 >
                                                     <flux:icon.trash class="size-3" />

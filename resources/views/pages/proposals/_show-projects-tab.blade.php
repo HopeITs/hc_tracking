@@ -43,7 +43,7 @@
 
                             <div class="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
                                 <div class="min-w-0">
-                                    <a href="{{ route('projects.show', $project) }}" wire:navigate class="text-base font-bold underline-offset-4 hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary {{ $inkText }}">{{ $project->name }}</a>
+                                    <a href="{{ route('projects.show', $project) }}" wire:navigate class="text-base font-bold underline-offset-4 hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-secondary-medium {{ $inkText }}">{{ $project->name }}</a>
                                     <p class="mt-0.5 flex flex-wrap items-center gap-x-2 gap-y-0.5 text-xs {{ $mutedText }}">
                                         <span>{{ $project->program->name }}</span>
                                         <span aria-hidden="true">·</span>

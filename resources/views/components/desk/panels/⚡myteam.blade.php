@@ -111,11 +111,12 @@ new class extends Component {
 
 @php
     $people = $this->people;
+    $pg = $this->paginate(collect($people), self::PerPage);
 @endphp
 
-<x-desk.panel id="myteam" :size="$size" :index="$index" :total="$total" :count="count($people)">
+<x-desk.panel :facets="$pg['facets']" id="myteam" :size="$size" :index="$index" :total="$total" :count="count($people)">
     <ul class="dk-people">
-        @foreach ($people as $person)
+        @foreach ($pg['slice'] as $person)
             @php
                 $behind = $person['overdue'] + $person['lateReports'];
             @endphp
@@ -129,4 +130,8 @@ new class extends Component {
             </li>
         @endforeach
     </ul>
+
+    <x-slot:foot>
+        <x-desk.pager :pg="$pg" />
+    </x-slot:foot>
 </x-desk.panel>

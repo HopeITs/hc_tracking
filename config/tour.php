@@ -29,7 +29,6 @@ return [
     'pages' => [
         'dashboard' => [
             ['id' => 'hello', 'targets' => ['[data-desk-hello]']],
-            ['id' => 'customize', 'targets' => ['[data-desk-customize-trigger]']],
             ['id' => 'grip', 'targets' => ['[data-desk-grid] [data-drag]']],
             ['id' => 'count', 'targets' => ['[data-desk-grid] [data-panel-count]']],
             ['id' => 'register', 'targets' => ['[data-desk-grid] [data-panel-register]']],

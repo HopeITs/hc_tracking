@@ -7,65 +7,64 @@ namespace App\Support\Desk;
 use App\Models\ProposalReviewer;
 use App\Models\User;
 use Closure;
-use Illuminate\Support\Facades\Lang;
 
 /**
  * Every page the Tracking Desk can open, with the rule that decides who may.
  *
- * The Desk has no menu: the Ask bar lists these as "Go to" results and the
- * Settings sheet lists the settings ones. Both read this one list, so a page
- * and its permission check are written once. Order follows the old sidebar
- * (money as it arrives, daily work after it, reference lists last).
+ * The sidebar, the Ask bar's "Go to" results and the avatar menu all read
+ * this one list, so a page and its permission check are written once. Order
+ * and groups follow the old sidebar; `module` names the unread-notification
+ * module whose count the sidebar shows beside the link.
  */
 final class Destinations
 {
-    public const string Pages = 'pages';
-
-    public const string Settings = 'settings';
+    /**
+     * Sidebar group keys in display order (labels: navigation.group_*).
+     *
+     * @var list<string>
+     */
+    public const array Groups = ['overview', 'strategy_planning', 'projects_delivery', 'monitoring_evaluation', 'funding_finance', 'workspace', 'administration', 'you'];
 
     /**
-     * The Settings sheet groups, each route with the permission that opens it
-     * (shown in the lock tooltip). The sheet's "You" group also holds Install,
-     * Report a problem and Log out, which are not routes.
+     * Pages reached from the top bar instead of the sidebar: the inbox from the
+     * bell, notification preferences and rules from the avatar menu and the
+     * bell's panel. The Ask bar still finds them.
      *
-     * @var array<string, array<string, string|null>>
+     * @var list<string>
      */
-    private const array SettingsGroups = [
-        'you' => ['security.edit' => null, 'notification-settings.edit' => null],
-        'people' => ['admin.users.index' => 'access-management.manage-users'],
-        'meal' => [
-            'indicator-library.index' => 'indicator-library.view',
-            'admin.evidence-types.index' => 'evidence-types.manage',
-            'admin.narrative-questions.index' => 'narrative-questions.manage',
-            'admin.sectors.index' => 'sectors.view',
-        ],
-        'places' => [
-            'admin.cities.index' => 'cities.view',
-            'admin.accounts.index' => 'accounts.view',
-            'strategies.index' => 'strategies.view',
-        ],
-        'system' => [
-            'admin.notification-settings.edit' => 'notification-settings.manage',
-            'executive-summary.index' => 'executive-summary.view',
-            'activity.index' => 'activity-log.view',
-        ],
+    private const array OutsideSidebar = ['notifications.index', 'notification-settings.edit', 'admin.notification-settings.edit'];
+
+    /**
+     * Sidebar group => its heading's translation key.
+     *
+     * @var array<string, string>
+     */
+    private const array GroupLabels = [
+        'overview' => 'navigation.group_overview',
+        'strategy_planning' => 'navigation.group_strategy_planning',
+        'projects_delivery' => 'navigation.group_projects_delivery',
+        'monitoring_evaluation' => 'navigation.group_monitoring_evaluation',
+        'funding_finance' => 'navigation.group_funding_finance',
+        'workspace' => 'navigation.group_workspace',
+        'administration' => 'navigation.group_administration',
+        'you' => 'navigation.group_you',
     ];
 
     /**
      * Every destination the given user may open, in display order.
      *
-     * @return list<array{route: string, label: string, icon: string, section: string}>
+     * @return list<array{route: string, label: string, icon: string, hero: string, group: string, module: string|null}>
      */
-    public function for(User $user, ?string $section = null): array
+    public function for(User $user, ?string $group = null): array
     {
         $destinations = [];
 
         foreach ($this->all() as $destination) {
-            if ($section !== null && $destination['section'] !== $section) {
+            if ($group !== null && $destination['group'] !== $group) {
                 continue;
             }
 
-            if (! ($destination['allows'])($user)) {
+            if (! $user->isAdministrator() && ! ($destination['allows'])($user)) {
                 continue;
             }
 
@@ -73,7 +72,9 @@ final class Destinations
                 'route' => $destination['route'],
                 'label' => __($destination['label']),
                 'icon' => $destination['icon'],
-                'section' => $destination['section'],
+                'hero' => $destination['hero'],
+                'group' => $destination['group'],
+                'module' => $destination['module'],
             ];
         }
 
@@ -81,88 +82,92 @@ final class Destinations
     }
 
     /**
-     * Every settings destination with whether the user may open it, grouped as
-     * the Settings sheet shows them, so the locked ones can say why.
+     * The sidebar: the user's destinations grouped, empty groups left out.
      *
-     * @return list<array{route: string, group: string, label: string, icon: string, open: bool, hint: string, locked_reason: string}>
+     * @return list<array{group: string, label: string, items: list<array{route: string, label: string, icon: string, hero: string, group: string, module: string|null}>}>
      */
-    public function settingsFor(User $user): array
+    public function sidebarFor(User $user): array
     {
-        $byRoute = [];
+        $byGroup = collect($this->for($user))->reject(fn (array $page): bool => in_array($page['route'], self::OutsideSidebar, true))->groupBy('group');
+        $groups = [];
 
-        foreach ($this->all() as $destination) {
-            $byRoute[$destination['route']] = $destination;
-        }
-
-        $rows = [];
-
-        foreach (self::SettingsGroups as $group => $routes) {
-            foreach ($routes as $route => $permission) {
-                $destination = $byRoute[$route];
-
-                $rows[] = [
-                    'route' => $route,
-                    'group' => $group,
-                    'label' => __($destination['label']),
-                    'icon' => $destination['icon'],
-                    'open' => ($destination['allows'])($user),
-                    'hint' => Lang::has($hintKey = 'desk.settings_hint.'.str_replace(['.', '-'], '_', $route)) ? __($hintKey) : '',
-                    'locked_reason' => $permission === null
-                        ? __('desk.settings_locked')
-                        : __('desk.settings_locked_permission', ['permission' => $permission]),
-                ];
+        foreach (self::Groups as $group) {
+            if (! $byGroup->has($group)) {
+                continue;
             }
+
+            $groups[] = [
+                'group' => $group,
+                'label' => __(self::GroupLabels[$group]),
+                'items' => array_values($byGroup->get($group)->all()),
+            ];
         }
 
-        return $rows;
+        return $groups;
     }
 
     /**
-     * @return list<array{route: string, label: string, icon: string, section: string, allows: Closure(User): bool}>
+     * @return list<array{route: string, label: string, icon: string, hero: string, group: string, module: string|null, allows: Closure(User): bool}>
      */
     private function all(): array
     {
         $can = fn (string $ability): Closure => fn (User $user): bool => $user->can($ability);
+        $everyone = fn (): bool => true;
+        $page = fn (string $route, string $label, string $icon, string $hero, string $group, Closure $allows, ?string $module = null): array => [
+            'route' => $route,
+            'label' => $label,
+            'icon' => $icon,
+            'hero' => $hero,
+            'group' => $group,
+            'module' => $module,
+            'allows' => $allows,
+        ];
 
         return [
-            ['route' => 'dashboard', 'label' => 'desk.your_desk', 'icon' => 'grid', 'section' => self::Pages, 'allows' => fn (): bool => true],
-            ['route' => 'reviews.index', 'label' => 'common.my_reviews', 'icon' => 'file', 'section' => self::Pages, 'allows' => $this->hasReviews(...)],
-            ['route' => 'strategies.index', 'label' => 'common.strategies', 'icon' => 'chart', 'section' => self::Pages, 'allows' => $can('strategies.view')],
-            ['route' => 'programs.index', 'label' => 'common.programs', 'icon' => 'folder', 'section' => self::Pages, 'allows' => $can('programs.view')],
-            ['route' => 'annual-plans.index', 'label' => 'common.annual_plans', 'icon' => 'cal', 'section' => self::Pages, 'allows' => $can('annual-plans.view')],
-            ['route' => 'projects.index', 'label' => 'common.projects', 'icon' => 'folder', 'section' => self::Pages, 'allows' => $can('projects.view')],
-            ['route' => 'milestones.index', 'label' => 'common.milestones', 'icon' => 'flag', 'section' => self::Pages, 'allows' => $can('milestones.view')],
-            ['route' => 'timeline.index', 'label' => 'titles.timeline', 'icon' => 'cal', 'section' => self::Pages, 'allows' => $can('projects.view')],
-            ['route' => 'risks.index', 'label' => 'common.risks', 'icon' => 'info', 'section' => self::Pages, 'allows' => $can('risks.view')],
-            ['route' => 'results.index', 'label' => 'common.results_framework', 'icon' => 'chart', 'section' => self::Pages, 'allows' => $can('results.view')],
-            ['route' => 'indicators.index', 'label' => 'common.indicators', 'icon' => 'chart', 'section' => self::Pages, 'allows' => $can('indicators.view')],
-            ['route' => 'targets.index', 'label' => 'common.targets', 'icon' => 'dot', 'section' => self::Pages, 'allows' => $can('targets.view')],
-            ['route' => 'reports.index', 'label' => 'common.reports', 'icon' => 'file', 'section' => self::Pages, 'allows' => $can('reports.view')],
-            ['route' => 'reports.monthly-matrix', 'label' => 'navigation.monthly_matrix', 'icon' => 'table', 'section' => self::Pages, 'allows' => $can('reports.view')],
-            ['route' => 'monthly-reports.index', 'label' => 'navigation.monthly_reports', 'icon' => 'cal', 'section' => self::Pages, 'allows' => $can('reports.view')],
-            ['route' => 'donor-reports.compose', 'label' => 'navigation.donor_report_builder', 'icon' => 'file', 'section' => self::Pages, 'allows' => $can('reports.aggregate')],
-            ['route' => 'reporting-duties.index', 'label' => 'navigation.reporting_duties', 'icon' => 'file', 'section' => self::Pages, 'allows' => fn (User $user): bool => $user->can('funding-agreements.update') || $user->hasReportingDuties()],
-            ['route' => 'donors.index', 'label' => 'common.donors', 'icon' => 'users', 'section' => self::Pages, 'allows' => $can('donors.view')],
-            ['route' => 'proposals.index', 'label' => 'common.proposals', 'icon' => 'file', 'section' => self::Pages, 'allows' => $can('proposals.view')],
-            ['route' => 'funding-agreements.index', 'label' => 'common.funding_agreements', 'icon' => 'coins', 'section' => self::Pages, 'allows' => $can('funding-agreements.view')],
-            ['route' => 'transfers.index', 'label' => 'common.transfers', 'icon' => 'coins', 'section' => self::Pages, 'allows' => $can('transfers.view')],
-            ['route' => 'tasks.index', 'label' => 'common.tasks', 'icon' => 'check', 'section' => self::Pages, 'allows' => $can('tasks.view')],
-            ['route' => 'department-tasks.index', 'label' => 'titles.department_tasks', 'icon' => 'board', 'section' => self::Pages, 'allows' => $can('tasks.view')],
-            ['route' => 'calendar.index', 'label' => 'common.my_calendar', 'icon' => 'cal', 'section' => self::Pages, 'allows' => $can('calendar.view')],
-            ['route' => 'notifications.index', 'label' => 'desk.notifications', 'icon' => 'bell', 'section' => self::Pages, 'allows' => fn (): bool => true],
+            $page('dashboard', 'desk.your_desk', 'grid', 'home', 'overview', $everyone),
+            $page('reviews.index', 'common.my_reviews', 'file', 'document-magnifying-glass', 'overview', $this->hasReviews(...)),
+            $page('executive-summary.index', 'common.executive_summary', 'chart', 'presentation-chart-bar', 'overview', $can('executive-summary.view')),
 
-            ['route' => 'admin.users.index', 'label' => 'navigation.user_directory', 'icon' => 'users', 'section' => self::Settings, 'allows' => fn (User $user): bool => $user->can('viewAny', User::class)],
-            ['route' => 'indicator-library.index', 'label' => 'navigation.indicator_library', 'icon' => 'chart', 'section' => self::Settings, 'allows' => $can('indicator-library.view')],
-            ['route' => 'admin.evidence-types.index', 'label' => 'navigation.evidence_types', 'icon' => 'file', 'section' => self::Settings, 'allows' => $can('evidence-types.manage')],
-            ['route' => 'admin.narrative-questions.index', 'label' => 'navigation.narrative_questions', 'icon' => 'info', 'section' => self::Settings, 'allows' => $can('narrative-questions.manage')],
-            ['route' => 'admin.sectors.index', 'label' => 'navigation.sectors', 'icon' => 'grid', 'section' => self::Settings, 'allows' => $can('sectors.view')],
-            ['route' => 'admin.notification-settings.edit', 'label' => 'navigation.notification_settings', 'icon' => 'bell', 'section' => self::Settings, 'allows' => $can('notification-settings.manage')],
-            ['route' => 'admin.cities.index', 'label' => 'common.cities', 'icon' => 'map', 'section' => self::Settings, 'allows' => $can('cities.view')],
-            ['route' => 'admin.accounts.index', 'label' => 'common.accounts', 'icon' => 'coins', 'section' => self::Settings, 'allows' => $can('accounts.view')],
-            ['route' => 'notification-settings.edit', 'label' => 'desk.my_notifications', 'icon' => 'bell', 'section' => self::Settings, 'allows' => fn (): bool => true],
-            ['route' => 'executive-summary.index', 'label' => 'common.executive_summary', 'icon' => 'chart', 'section' => self::Settings, 'allows' => $can('executive-summary.view')],
-            ['route' => 'activity.index', 'label' => 'navigation.activity_log', 'icon' => 'undo', 'section' => self::Settings, 'allows' => $can('activity-log.view')],
-            ['route' => 'security.edit', 'label' => 'common.security', 'icon' => 'lock', 'section' => self::Settings, 'allows' => fn (): bool => true],
+            $page('strategies.index', 'common.strategies', 'chart', 'light-bulb', 'strategy_planning', $can('strategies.view'), 'strategies'),
+            $page('programs.index', 'common.programs', 'folder', 'rectangle-group', 'strategy_planning', $can('programs.view'), 'programs'),
+            $page('annual-plans.index', 'common.annual_plans', 'cal', 'calendar-date-range', 'strategy_planning', $can('annual-plans.view'), 'annual-plans'),
+
+            $page('projects.index', 'common.projects', 'folder', 'folder-open', 'projects_delivery', $can('projects.view'), 'projects'),
+            $page('milestones.index', 'common.milestones', 'flag', 'flag', 'projects_delivery', $can('milestones.view'), 'milestones'),
+            $page('timeline.index', 'titles.timeline', 'cal', 'bars-3-bottom-left', 'projects_delivery', $can('projects.view')),
+            $page('risks.index', 'common.risks', 'info', 'exclamation-triangle', 'projects_delivery', $can('risks.view'), 'risks'),
+
+            $page('results.index', 'common.results_framework', 'chart', 'trophy', 'monitoring_evaluation', $can('results.view'), 'results'),
+            $page('indicator-library.index', 'navigation.indicator_library', 'chart', 'book-open', 'monitoring_evaluation', $can('indicator-library.view'), 'indicator-library'),
+            $page('indicators.index', 'common.indicators', 'chart', 'chart-bar', 'monitoring_evaluation', $can('indicators.view'), 'indicators'),
+            $page('targets.index', 'common.targets', 'dot', 'viewfinder-circle', 'monitoring_evaluation', $can('targets.view'), 'targets'),
+            $page('reports.index', 'common.reports', 'file', 'document-chart-bar', 'monitoring_evaluation', $can('reports.view'), 'reports'),
+            $page('reports.monthly-matrix', 'navigation.monthly_matrix', 'table', 'table-cells', 'monitoring_evaluation', $can('reports.view')),
+            $page('monthly-reports.index', 'navigation.monthly_reports', 'cal', 'newspaper', 'monitoring_evaluation', $can('reports.view'), 'monthly-reports'),
+            $page('donor-reports.compose', 'navigation.donor_report_builder', 'file', 'document-plus', 'monitoring_evaluation', $can('reports.aggregate')),
+            $page('reporting-duties.index', 'navigation.reporting_duties', 'file', 'inbox-stack', 'monitoring_evaluation', fn (User $user): bool => $user->can('funding-agreements.update') || $user->hasReportingDuties(), 'donor-reports'),
+
+            $page('donors.index', 'common.donors', 'users', 'gift', 'funding_finance', $can('donors.view'), 'donors'),
+            $page('proposals.index', 'common.proposals', 'file', 'document-text', 'funding_finance', $can('proposals.view'), 'proposals'),
+            $page('funding-agreements.index', 'common.funding_agreements', 'coins', 'document-currency-dollar', 'funding_finance', $can('funding-agreements.view'), 'funding-agreements'),
+            $page('transfers.index', 'common.transfers', 'coins', 'arrows-right-left', 'funding_finance', $can('transfers.view'), 'transfers'),
+            $page('admin.accounts.index', 'common.accounts', 'coins', 'building-library', 'funding_finance', $can('accounts.view'), 'accounts'),
+
+            $page('tasks.index', 'common.tasks', 'check', 'check-circle', 'workspace', $can('tasks.view'), 'tasks'),
+            $page('department-tasks.index', 'titles.department_tasks', 'board', 'building-office-2', 'workspace', $can('tasks.view')),
+            $page('calendar.index', 'common.my_calendar', 'cal', 'calendar', 'workspace', $can('calendar.view')),
+            $page('notifications.index', 'desk.notifications', 'bell', 'bell', 'workspace', $everyone),
+
+            $page('admin.users.index', 'navigation.user_directory', 'users', 'users', 'administration', fn (User $user): bool => $user->can('viewAny', User::class), 'access-management'),
+            $page('admin.notification-settings.edit', 'navigation.notification_settings', 'bell', 'adjustments-horizontal', 'administration', $can('notification-settings.manage')),
+            $page('activity.index', 'navigation.activity_log', 'undo', 'clipboard-document-list', 'administration', $can('activity-log.view')),
+            $page('admin.cities.index', 'common.cities', 'map', 'map-pin', 'administration', $can('cities.view')),
+            $page('admin.sectors.index', 'navigation.sectors', 'grid', 'tag', 'administration', $can('sectors.view')),
+            $page('admin.evidence-types.index', 'navigation.evidence_types', 'file', 'paper-clip', 'administration', $can('evidence-types.manage')),
+            $page('admin.narrative-questions.index', 'navigation.narrative_questions', 'info', 'question-mark-circle', 'administration', $can('narrative-questions.manage')),
+
+            $page('security.edit', 'common.security', 'lock', 'shield-check', 'you', $everyone),
+            $page('notification-settings.edit', 'desk.my_notifications', 'bell', 'cog-6-tooth', 'you', $everyone),
         ];
     }
 

@@ -50,11 +50,11 @@ new class extends Component {
 ?>
 
 @php
-    $pg = $this->paginate($this->rows, 5);
+    $pg = $this->paginate($this->rows, self::PerPage);
     $format = __('desk.date_long');
 @endphp
 
-<x-desk.panel id="transfers" register="transfers.index" :size="$size" :index="$index" :total="$total" :count="$this->lateCount > 0 ? $this->lateCount : null">
+<x-desk.panel :facets="$pg['facets']" id="transfers" register="transfers.index" :size="$size" :index="$index" :total="$total" :count="$this->lateCount > 0 ? $this->lateCount : null">
     <x-slot:tools>
         <div class="dk-seg" role="group">
             @foreach (['upcoming' => __('desk.filter_upcoming'), 'late' => __('desk.filter_late'), 'received' => __('desk.filter_received')] as $key => $label)

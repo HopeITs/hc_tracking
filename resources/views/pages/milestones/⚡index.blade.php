@@ -318,7 +318,7 @@ new #[Layout('layouts::desk'), Title('titles.milestones')] class extends Compone
     </x-slot:figures>
     <x-slot:actions>
             @can('create', App\Models\Milestone::class)
-                <button type="button" class="dk-btn dk-primary" wire:click="openCreateModal" data-test="create-milestone-button"><x-desk.icon name="plus" />{{ __('milestones.add_milestone') }}</button>
+                <button type="button" class="dk-btn dk-primary" wire:click="openCreateModal" data-test="create-milestone-button" data-quick-create><x-desk.icon name="plus" />{{ __('milestones.add_milestone') }}</button>
             @endcan
         </x-slot:actions>
     <x-slot:filters>

@@ -61,10 +61,10 @@ new class extends Component {
         'week' => $all->where('week', true)->values(),
         default => $all,
     };
-    $pg = $this->paginate($list, 5);
+    $pg = $this->paginate($list, self::PerPage);
 @endphp
 
-<x-desk.panel id="needs" :size="$size" :index="$index" :total="$total" :count="$all->count()">
+<x-desk.panel :facets="$pg['facets']" id="needs" :size="$size" :index="$index" :total="$total" :count="$all->count()">
     <x-slot:tools>
         <div class="dk-seg" role="group">
             @foreach (['all' => __('desk.filter_all'), 'late' => __('desk.filter_late'), 'week' => __('desk.filter_week')] as $key => $label)

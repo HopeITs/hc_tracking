@@ -54,3 +54,47 @@ test('"Go to" offers only the pages the viewer may open', function () {
     expect($goTo(User::factory()->role('Financial')->create(), 'transfers'))->toContain(route('transfers.index'))
         ->and($goTo(User::factory()->role('Team Member')->create(), 'transfers'))->toBe([]);
 });
+
+test('a create word opens the matching register form, only with the create permission', function () {
+    $actions = fn (User $user, string $query): array => array_values(array_filter(
+        array_merge(...array_column(askAs($user, $query)['groups'], 'items')),
+        fn (array $item): bool => $item['action'] ?? false,
+    ));
+
+    expect($actions(User::factory()->role('Financial')->create(), 'new transfer'))->toHaveCount(1)
+        ->and($actions(User::factory()->role('Financial')->create(), 'new transfer')[0]['href'])->toBe(route('transfers.index', ['quick' => 'create']))
+        ->and($actions(User::factory()->role('Team Member')->create(), 'new transfer'))->toBe([]);
+});
+
+test('typos and Arabic still find the page and the action', function () {
+    $user = User::factory()->role('Super Admin')->create();
+    $labels = fn (string $query): array => array_column(array_merge(...array_column(askAs($user, $query)['groups'], 'items')), 'label');
+
+    expect($labels('propsal'))->toContain(__('desk.ask_new.proposal'), __('common.proposals'))
+        ->and($labels('مقترح جديد'))->toContain(__('desk.ask_new.proposal'));
+});
+
+test('"my tasks this week" lists only my open tasks due within seven days', function () {
+    $employeeId = insertHrEmployee();
+    $user = User::factory()->role('Team Member')->create(['employee_id' => $employeeId]);
+    $mine = Task::factory()->create(['title' => 'Mine soon', 'due_date' => '2026-09-18']);
+    $mine->taskAssignees()->create(['employee_id' => $employeeId]);
+    $later = Task::factory()->create(['title' => 'Mine later', 'due_date' => '2026-10-30']);
+    $later->taskAssignees()->create(['employee_id' => $employeeId]);
+    Task::factory()->create(['title' => 'Not mine', 'due_date' => '2026-09-17']);
+
+    $results = askAs($user, 'my tasks this week');
+
+    expect(array_column($results['groups'][0]['items'], 'label'))->toBe(['Mine soon']);
+});
+
+test('"how many projects" counts only what the viewer may see', function () {
+    Project::factory()->count(3)->create();
+
+    expect(askAs(User::factory()->role('Super Admin')->create(), 'how many projects')['answers'][0]['title'])->toBe('3 projects')
+        ->and(askAs(User::factory()->create(), 'how many projects')['answers'][0]['title'])->toBe('0 projects');
+});
+
+test('an empty box offers example questions', function () {
+    expect(askAs(User::factory()->role('Team Member')->create(), '')['suggestions'])->toContain(__('desk.ask_suggest.late'));
+});

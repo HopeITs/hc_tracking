@@ -9,7 +9,7 @@
             <div class="mb-6 flex flex-wrap items-center justify-between gap-3">
                 <p class="max-w-prose text-xs {{ $mutedText }}">{{ __('proposals.reports_filed_against_the_targets_this_proposal_commits') }}</p>
                 @if ($this->targets->isNotEmpty())
-                    <a href="{{ route('reports.index', ['create' => 1]) }}" wire:navigate class="inline-flex min-h-10 touch-manipulation items-center gap-1.5 rounded-lg bg-primary dark:bg-brand dark:hover:bg-brand-hover px-3 text-sm font-semibold text-white hover:bg-primary/90 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary" data-test="record-report">
+                    <a href="{{ route('reports.index', ['create' => 1]) }}" wire:navigate class="inline-flex min-h-10 touch-manipulation items-center gap-1.5 rounded-lg bg-primary dark:bg-brand dark:hover:bg-brand-hover px-3 text-sm font-semibold text-white hover:bg-primary focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-secondary-medium" data-test="record-report">
                         <flux:icon.plus variant="micro" class="size-4" aria-hidden="true" />
                         {{ __('proposals.record_a_report') }}
                     </a>
@@ -46,7 +46,7 @@
                         @endphp
                         <li class="flex min-w-0 flex-col gap-2 py-4 @2xl/detail:flex-row @2xl/detail:items-center @2xl/detail:gap-6" wire:key="report-{{ $report->id }}" data-report="{{ $report->id }}">
                             <div class="min-w-0 flex-1">
-                                <a href="{{ route('reports.show', $report) }}" wire:navigate class="line-clamp-2 text-sm font-semibold underline-offset-4 hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary {{ $inkText }}">{{ $report->planIndicator->indicator->name }}</a>
+                                <a href="{{ route('reports.show', $report) }}" wire:navigate class="line-clamp-2 text-sm font-semibold underline-offset-4 hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-secondary-medium {{ $inkText }}">{{ $report->planIndicator->indicator->name }}</a>
                                 <p class="mt-0.5 flex flex-wrap items-center gap-x-2 gap-y-0.5 text-xs tabular-nums {{ $mutedText }}">
                                     <span>{{ $report->planIndicator->project?->name ?? __('common.organisation_wide') }}</span>
                                     @if ($report->period_start !== null && $report->period_end !== null)

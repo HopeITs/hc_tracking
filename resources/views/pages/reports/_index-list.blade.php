@@ -29,7 +29,7 @@
                                     <span aria-hidden="true">·</span>
                                     <span>{{ $report->planned_date?->translatedFormat(__('formats.date')) }}</span>
                                     @if ($rowIsOverdue)
-                                        <span class="inline-flex items-center gap-1 rounded-md border border-primary/30 bg-status-critical-soft px-1.5 text-[11px] font-semibold text-primary dark:text-brand-text">
+                                        <span class="inline-flex items-center gap-1 rounded-md border border-primary bg-status-critical-soft px-1.5 text-[11px] font-semibold text-primary dark:text-brand-text">
                                             <flux:icon.clock variant="micro" class="size-3" aria-hidden="true" />
                                             {{ __('reports.overdue') }}
                                         </span>

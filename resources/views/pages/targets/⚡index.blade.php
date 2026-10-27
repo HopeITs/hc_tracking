@@ -115,7 +115,7 @@ new #[Layout('layouts::desk'), Title('titles.targets')] class extends Component 
     :count="$this->matchingCount"
 >
     <x-slot:actions>
-            @can('targets.create')<x-ui.button tone="primary" icon="plus" class="min-h-11 self-end touch-manipulation @sm/directory:min-h-10" wire:click="openCreateModal" data-test="create-target-button">
+            @can('targets.create')<x-ui.button tone="primary" icon="plus" class="min-h-11 self-end touch-manipulation @sm/directory:min-h-10" wire:click="openCreateModal" data-test="create-target-button" data-quick-create>
                 {{ __('targets.commit_target') }}
             </x-ui.button>@endcan
         </x-slot:actions>

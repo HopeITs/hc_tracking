@@ -12,7 +12,7 @@
 @endphp
 <li class="flex min-w-0 flex-wrap items-center gap-3 py-3" wire:key="file-{{ $media->mediable_type }}-{{ $media->id }}" data-file="{{ $media->id }}">
     @if ($isStored && in_array($media->type, [\App\Enums\FileType::Jpg, \App\Enums\FileType::Png], true))
-        <button type="button" wire:click="openPreview({{ $media->id }})" class="size-10 shrink-0 touch-manipulation overflow-hidden rounded-xl border border-secondary-soft focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary dark:border-line" aria-label="{{ __('reports.preview_name', ['name' => $media->original_name]) }}">
+        <button type="button" wire:click="openPreview({{ $media->id }})" class="size-10 shrink-0 touch-manipulation overflow-hidden rounded-xl border border-secondary-soft focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-secondary-medium dark:border-line" aria-label="{{ __('reports.preview_name', ['name' => $media->original_name]) }}">
             <img src="{{ route('proposals.files.preview', [$proposal, $media]) }}" alt="" loading="lazy" class="size-full object-cover" data-no-dim />
         </button>
     @else
@@ -24,7 +24,7 @@
 
     <div class="min-w-0 flex-1">
         @if ($isStored)
-            <button type="button" wire:click="openPreview({{ $media->id }})" class="block max-w-full touch-manipulation truncate text-start text-sm font-semibold underline-offset-4 hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary {{ $inkText }}" title="{{ $media->original_name }}" data-test="preview-file-name">{{ $media->original_name }}</button>
+            <button type="button" wire:click="openPreview({{ $media->id }})" class="block max-w-full touch-manipulation truncate text-start text-sm font-semibold underline-offset-4 hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-secondary-medium {{ $inkText }}" title="{{ $media->original_name }}" data-test="preview-file-name">{{ $media->original_name }}</button>
         @else
             <p class="truncate text-sm font-semibold {{ $inkText }}" title="{{ $media->original_name }}">{{ $media->original_name }}</p>
         @endif
@@ -55,7 +55,7 @@
             <x-ui.button tone="ghost" size="sm" icon="eye" class="size-9! touch-manipulation" wire:click="openPreview({{ $media->id }})" :aria-label="__('reports.preview_name', ['name' => $media->original_name])" data-test="preview-file-{{ $media->id }}" />
             <a
                 href="{{ $downloadUrl }}"
-                class="inline-flex size-9 touch-manipulation items-center justify-center rounded-lg transition-colors hover:bg-secondary-soft focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary dark:hover:bg-surface-2 {{ $mutedText }}"
+                class="inline-flex size-9 touch-manipulation items-center justify-center rounded-lg transition-colors hover:bg-secondary-soft focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-secondary-medium dark:hover:bg-surface-2 {{ $mutedText }}"
                 aria-label="{{ __('common.download_name', ['name' => $media->original_name]) }}"
                 data-test="download-file-{{ $media->id }}"
             >

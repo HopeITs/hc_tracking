@@ -403,7 +403,7 @@ new class extends Component {
     @endif
 
     @if ($showStale)
-        <div class="flex flex-wrap items-center gap-3 rounded-lg border border-status-critical/40 px-3 py-2.5 type-meta text-status-critical" role="alert" data-test="calendar-stale">
+        <div class="flex flex-wrap items-center gap-3 rounded-lg border border-status-critical px-3 py-2.5 type-meta text-status-critical" role="alert" data-test="calendar-stale">
             <flux:icon.exclamation-triangle variant="micro" class="size-3.5 shrink-0" aria-hidden="true" />
             <span class="me-auto">{{ __('results_framework.schedule_stale') }}</span>
             <x-ui.button size="sm" icon="arrow-path" wire:click="showLatest" wire:loading.attr="disabled" wire:target="showLatest">{{ __('results_framework.calendar_show_latest') }}</x-ui.button>
@@ -525,7 +525,7 @@ new class extends Component {
                                                         wire:click="toggleMonth({{ $row['id'] }}, '{{ $key }}', '{{ $row['version'] }}')"
                                                     @endif
                                                     wire:loading.attr="disabled" wire:target="{{ $writeTargets }}"
-                                                    class="group relative flex h-11 w-full items-center outline-none hover:bg-secondary-soft/50 focus-visible:z-10 focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-primary disabled:cursor-wait dark:hover:bg-white/[0.04] dark:focus-visible:ring-brand"
+                                                    class="group relative flex h-11 w-full items-center outline-none hover:bg-secondary-soft/50 focus-visible:z-10 focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-secondary-light disabled:cursor-wait dark:hover:bg-white/[0.04] dark:focus-visible:ring-ink-muted"
                                                 >
                                                     @if ($markClasses !== null)
                                                         <span class="relative block {{ $markClasses }}" aria-hidden="true">

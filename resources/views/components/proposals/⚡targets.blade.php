@@ -761,7 +761,7 @@ new class extends Component {
                                             @endif
                                             <span class="min-w-0 {{ $inkText }}" dir="auto">{{ $instance->libraryIndicator?->localizedName() ?? $instance->name }}</span>
                                             @if ($instance->library_indicator_id === null)
-                                                <span class="inline-flex items-center gap-1 rounded-full border border-status-critical/40 px-2 py-0.5 text-[11px] font-semibold text-status-critical" data-badge="not-linked">
+                                                <span class="inline-flex items-center gap-1 rounded-full border border-status-critical px-2 py-0.5 text-[11px] font-semibold text-status-critical" data-badge="not-linked">
                                                     <flux:icon.link-slash variant="micro" class="size-3" aria-hidden="true" />
                                                     {{ __('targets.not_linked_to_library') }}
                                                 </span>
@@ -873,7 +873,7 @@ new class extends Component {
         @endif
 
         @error('cells')
-            <div class="border-b border-status-critical/30 bg-status-critical-soft px-4 py-3 text-sm text-status-critical" role="alert" data-grid-errors>
+            <div class="border-b border-status-critical bg-status-critical-soft px-4 py-3 text-sm text-status-critical" role="alert" data-grid-errors>
                 <p class="flex items-center gap-1.5 font-semibold"><flux:icon.exclamation-triangle variant="micro" class="size-4 shrink-0" />{{ $message }}</p>
                 @if ($isStale)
                     <p class="mt-1">{{ __('targets.cell_stale') }}
@@ -883,7 +883,7 @@ new class extends Component {
             </div>
         @enderror
         @error('proposal')
-            <p class="border-b border-status-critical/30 bg-status-critical-soft px-4 py-3 text-sm font-semibold text-status-critical" role="alert">{{ $message }}</p>
+            <p class="border-b border-status-critical bg-status-critical-soft px-4 py-3 text-sm font-semibold text-status-critical" role="alert">{{ $message }}</p>
         @enderror
 
         @if ($this->gridRows === [] || $columns === [])

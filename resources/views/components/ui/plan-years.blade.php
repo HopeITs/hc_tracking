@@ -124,7 +124,7 @@
                             <span aria-hidden="true" @class([
                                 'absolute top-4 -translate-y-1/2 rounded-full border-2 bg-board @3xl/detail:top-10',
                                 '-translate-x-1/2 rtl:translate-x-1/2' => true,
-                                'size-4 border-primary ring-4 ring-primary/15' => $isCurrent,
+                                'size-4 border-primary ring-4 ring-secondary-light' => $isCurrent,
                                 'size-3 border-secondary-light' => ! $isCurrent && $plan !== null,
                                 'size-2.5 border-board-line' => ! $isCurrent && $plan === null,
                                 '-start-5 @3xl/detail:start-1/2' => true,
@@ -150,7 +150,7 @@
                                     wire:navigate
                                     wire:key="program-plan-{{ $plan->id }}"
                                     @class([
-                                        'group relative flex h-full flex-col overflow-hidden rounded-md border bg-board transition-[border-color,box-shadow] duration-200 hover:border-primary focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary',
+                                        'group relative flex h-full flex-col overflow-hidden rounded-md border bg-board transition-[border-color,box-shadow] duration-200 hover:border-primary focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-secondary-medium',
                                         'border-primary shadow-[0_18px_40px_-24px_rgb(0_0_0/0.4)]' => $isCurrent,
                                         'border-board-line shadow-[0_10px_28px_-24px_rgb(0_0_0/0.35)] hover:shadow-[0_18px_40px_-24px_rgb(0_0_0/0.4)]' => ! $isCurrent,
                                     ])
@@ -225,7 +225,7 @@
                         x-on:click="step({{ $direction }})"
                         aria-label="{{ __($edge === 'start' ? 'programs.plan_scroll_back' : 'programs.plan_scroll_forward') }}"
                         @class([
-                            'absolute top-32 z-10 hidden size-10 cursor-pointer items-center justify-center rounded-full border border-secondary-dark bg-secondary-dark text-white shadow-lg hover:border-primary hover:bg-primary dark:hover:border-ink dark:hover:bg-ink dark:hover:text-surface-0 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary @3xl/detail:flex',
+                            'absolute top-32 z-10 hidden size-10 cursor-pointer items-center justify-center rounded-full border border-secondary-dark bg-secondary-dark text-white shadow-lg hover:border-primary hover:bg-primary dark:hover:border-ink dark:hover:bg-ink dark:hover:text-surface-0 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-secondary-medium @3xl/detail:flex',
                             '-start-3' => $edge === 'start',
                             '-end-3' => $edge === 'end',
                         ])

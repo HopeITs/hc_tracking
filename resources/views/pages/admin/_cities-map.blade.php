@@ -67,7 +67,7 @@
                         x-on:click="selected = {{ $city['id'] }}"
                         :aria-pressed="selected === {{ $city['id'] }} ? 'true' : 'false'"
                         aria-label="{{ __('cities.view_projects_in_name', ['name' => $city['name']]) }}"
-                        class="group absolute flex -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-full p-2 hover:z-30 focus-visible:z-30 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
+                        class="group absolute flex -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-full p-2 hover:z-30 focus-visible:z-30 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-secondary-medium"
                         style="left: {{ $leftPct }}%; top: {{ $topPct }}%;"
                         :class="selected === {{ $city['id'] }} ? 'z-10' : 'z-0'"
                     >

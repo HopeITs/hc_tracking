@@ -27,7 +27,7 @@
                         aria-pressed="{{ $status === $statusKey ? 'true' : 'false' }}"
                         data-test="status-filter-{{ $statusKey }}"
                         @class([
-                            'inline-flex min-h-10 cursor-pointer items-center gap-2 rounded-full border px-3.5 text-sm font-medium transition-colors duration-150 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary',
+                            'inline-flex min-h-10 cursor-pointer items-center gap-2 rounded-full border px-3.5 text-sm font-medium transition-colors duration-150 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-secondary-medium',
                             'border-secondary-dark bg-secondary-dark text-white dark:border-ink dark:bg-ink dark:text-surface-0' => $status === $statusKey,
                             'border-secondary-soft hover:border-secondary-light dark:border-line dark:hover:border-field-line' => $status !== $statusKey,
                         ])

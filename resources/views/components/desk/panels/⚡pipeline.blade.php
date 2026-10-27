@@ -42,8 +42,8 @@ new class extends Component {
     public function rows(): Collection
     {
         return $this->visible(Proposal::query(), 'proposals')
-            ->select(['id', 'slug', 'name', 'status'])
-            ->with(['donorProposals:id,proposal_id,donor_id,budget,currency', 'donorProposals.donor:id,name'])
+            ->select(['id', 'slug', 'name', 'status', 'donor_id', 'requested_budget', 'requested_currency'])
+            ->with(['donor:id,name', 'donorProposals:id,proposal_id,donor_id,budget,currency', 'donorProposals.donor:id,name'])
             ->when($this->filter !== 'all', fn ($query) => $query->where('status', $this->filter))
             ->latest('id')
             ->get();
@@ -53,19 +53,39 @@ new class extends Component {
     {
         return self::Tones[$status->value] ?? '';
     }
+
+    /**
+     * The donor the proposal is written for, or, failing that, the donors on
+     * its signed agreements; '' when neither is known.
+     */
+    public function donorName(Proposal $proposal): string
+    {
+        return $proposal->donor?->name
+            ?? $proposal->donorProposals->map(fn ($link) => $link->donor?->name)->filter()->implode(', ');
+    }
+
+    /**
+     * Status and donor, for the filter popup's dropdowns.
+     *
+     * @return array<string, string>
+     */
+    protected function facetsOf(mixed $row): array
+    {
+        return array_filter(['status' => $row->status->label(), 'donor' => $this->donorName($row)]);
+    }
 };
 ?>
 
 @php
     $counts = $this->counts;
     $peak = max(1, ...array_values($counts));
-    $pg = $this->paginate($this->rows, 4);
+    $pg = $this->paginate($this->rows, self::PerPage);
     $showMoney = $this->canView('funding-agreements');
 @endphp
 
-<x-desk.panel id="pipeline" register="proposals.index" :size="$size" :index="$index" :total="$total" :count="array_sum($counts)">
-    <div class="dk-funnel">
-        @foreach (ProposalStatus::cases() as $status)
+<x-desk.panel :facets="$pg['facets']" id="pipeline" register="proposals.index" :size="$size" :index="$index" :total="$total" :count="array_sum($counts)">
+    <div class="dk-funnel dk-funnel-chips">
+        @foreach (array_filter(ProposalStatus::cases(), fn ($status) => $counts[$status->value] > 0 || $filter === $status->value) as $status)
             @php
                 $on = $filter === $status->value;
                 $tone = $this->tone($status);
@@ -86,11 +106,15 @@ new class extends Component {
             <li wire:key="p-{{ $proposal->id }}">
                 <div>
                     <strong><a href="{{ route('proposals.show', $proposal) }}" wire:navigate>{{ $proposal->name }}</a></strong>
-                    <span class="dk-is">{{ $proposal->donorProposals->map(fn ($link) => $link->donor?->name)->filter()->implode(', ') ?: __('desk.no_donor_yet') }}</span>
+                    <span class="dk-is">{{ $this->donorName($proposal) ?: __('desk.no_donor_yet') }}</span>
                 </div>
                 <span @class(['dk-pill', $tone !== '' ? 'dk-'.$tone : null])>{{ $proposal->status->label() }}</span>
                 @if ($showMoney)
-                    <span class="dk-num dk-small">{{ $agreement !== null && (float) $agreement->budget > 0 ? Money::format($agreement->budget, $agreement->currency) : '—' }}</span>
+                    @if ($agreement !== null && (float) $agreement->budget > 0)
+                        <span class="dk-num dk-small">{{ Money::format($agreement->budget, $agreement->currency) }}</span>
+                    @elseif ((float) $proposal->requested_budget > 0 && $proposal->requested_currency !== null)
+                        <span class="dk-num dk-small">{{ Money::format($proposal->requested_budget, $proposal->requested_currency) }}</span>
+                    @endif
                 @endif
             </li>
         @endforeach

@@ -55,7 +55,7 @@
             x-on:click="milestones = ! milestones"
             x-bind:aria-expanded="milestones.toString()"
             aria-controls="chain-milestones-{{ $activityId }}"
-            class="inline-flex cursor-pointer items-center gap-1.5 rounded-sm type-meta font-semibold text-secondary-dark hover:text-primary focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary print:hidden dark:text-ink dark:hover:text-brand-text"
+            class="inline-flex cursor-pointer items-center gap-1.5 rounded-sm type-meta font-semibold text-secondary-dark hover:text-primary focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-secondary-medium print:hidden dark:text-ink dark:hover:text-brand-text"
         >
             <flux:icon.flag variant="micro" class="size-3.5" aria-hidden="true" />
             {{ trans_choice('results_framework.chain_milestones', $milestoneCount, ['count' => $milestoneCount]) }}

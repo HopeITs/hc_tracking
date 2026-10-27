@@ -10,8 +10,8 @@
                 <div class="max-h-[min(62vh,44rem)] divide-y divide-secondary-soft overflow-y-auto overscroll-contain dark:divide-line">
                     @forelse ($this->users as $user)
                         <button type="button" wire:click="selectUser({{ $user->id }})" wire:key="access-user-{{ $user->id }}" @class([
-                            'group relative flex min-h-[4.5rem] w-full items-center gap-3 px-3 py-2.5 text-start transition focus-visible:z-10 focus-visible:outline-2 focus-visible:outline-inset focus-visible:outline-primary',
-                            'bg-secondary-soft/60 dark:bg-brand/10' => $selectedUserId === $user->id,
+                            'group relative flex min-h-[4.5rem] w-full items-center gap-3 px-3 py-2.5 text-start transition focus-visible:z-10 focus-visible:outline-2 focus-visible:outline-inset focus-visible:outline-secondary-medium',
+                            'bg-secondary-soft/60 dark:bg-white/[0.06]' => $selectedUserId === $user->id,
                             'bg-white hover:bg-secondary-soft/40 dark:bg-surface-1 dark:hover:bg-surface-2' => $selectedUserId !== $user->id,
                         ])>
                             @if ($selectedUserId === $user->id)

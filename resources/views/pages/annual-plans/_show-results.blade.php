@@ -38,7 +38,7 @@
                                 @endphp
                                 <a
                                     href="{{ $targetHref }}" wire:navigate
-                                    class="grid grid-cols-1 gap-x-4 gap-y-1.5 px-4 py-3 transition-colors @2xl/detail:grid-cols-[minmax(0,1fr)_7rem_8rem_6rem] @2xl/detail:items-center hover:bg-board-head focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-primary"
+                                    class="grid grid-cols-1 gap-x-4 gap-y-1.5 px-4 py-3 transition-colors @2xl/detail:grid-cols-[minmax(0,1fr)_7rem_8rem_6rem] @2xl/detail:items-center hover:bg-board-head focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-secondary-medium"
                                     wire:key="plan-target-{{ $target->id }}"
                                 >
                                     <span class="min-w-0">

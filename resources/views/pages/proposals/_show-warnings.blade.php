@@ -15,7 +15,7 @@
                         data-warning="{{ $warning['key'] }}"
                         @if ($loop->index >= 3) x-show="expanded" x-cloak @endif
                     >
-                        <button type="button" wire:click="$set('tab', '{{ $warning['tab'] }}')" aria-controls="tab-panel" class="group flex min-h-8 w-full touch-manipulation items-start gap-2.5 text-start text-sm focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary">
+                        <button type="button" wire:click="$set('tab', '{{ $warning['tab'] }}')" aria-controls="tab-panel" class="group flex min-h-8 w-full touch-manipulation items-start gap-2.5 text-start text-sm focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-secondary-medium">
                             <span @class(['mt-1.5 size-2 shrink-0 rounded-full', 'bg-primary dark:bg-status-critical' => $warning['critical'], 'border-2 border-status-warn' => ! $warning['critical']]) aria-hidden="true"></span>
                             <span class="min-w-0 flex-1 underline-offset-4 group-hover:underline {{ $warning['critical'] ? 'font-semibold '.$inkText : $inkText }}">{{ $warning['text'] }}</span>
                             <flux:icon.arrow-right variant="micro" class="mt-0.5 size-4 shrink-0 {{ $mutedText }} rtl:rotate-180" aria-hidden="true" />

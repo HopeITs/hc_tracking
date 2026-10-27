@@ -50,11 +50,11 @@ new class extends Component {
 
 @php
     $rows = $this->rows;
-    $pg = $this->paginate($rows, 5);
+    $pg = $this->paginate($rows, self::PerPage);
     $number = fn (?float $value): string => $value === null ? '—' : rtrim(rtrim(number_format($value, 2, '.', ','), '0'), '.');
 @endphp
 
-<x-desk.panel id="targets" register="targets.index" :size="$size" :index="$index" :total="$total" :count="$rows->count()">
+<x-desk.panel :facets="$pg['facets']" id="targets" register="targets.index" :size="$size" :index="$index" :total="$total" :count="$rows->count()">
     @if ($pg['total'] > 0)
         <ul class="dk-inds">
             @foreach ($pg['slice'] as $row)

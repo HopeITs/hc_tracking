@@ -464,7 +464,7 @@ new #[Layout('layouts::desk'), Title('titles.city_directory')] class extends Com
                     href="{{ route('projects.index', ['city' => $city->id]) }}"
                     wire:navigate
                     aria-label="{{ __('cities.view_projects_in_name', ['name' => $city->name]) }}"
-                    class="group flex flex-1 flex-col gap-4 p-4 focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-primary"
+                    class="group flex flex-1 flex-col gap-4 p-4 focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-secondary-medium"
                 >
                     <span
                         aria-hidden="true"

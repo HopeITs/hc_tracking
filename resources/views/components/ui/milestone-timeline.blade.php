@@ -83,7 +83,7 @@
                             @foreach ($ticks as $tick)
                                 <span aria-hidden="true" class="absolute inset-y-0 w-px bg-board-line" style="inset-inline-start: {{ $tick['at'] }}%"></span>
                             @endforeach
-                            <span aria-hidden="true" class="absolute inset-y-0 z-10 w-0.5 -translate-x-1/2 bg-primary/70 rtl:translate-x-1/2" style="inset-inline-start: {{ $todayAt }}%"></span>
+                            <span aria-hidden="true" class="absolute inset-y-0 z-10 w-0.5 -translate-x-1/2 bg-primary rtl:translate-x-1/2" style="inset-inline-start: {{ $todayAt }}%"></span>
 
                             @if ($milestone->planned_start_date !== null)
                                 @php
@@ -91,7 +91,7 @@
                                 @endphp
                                 <button
                                     type="button"
-                                    class="absolute top-1/2 z-20 flex size-6 -translate-x-1/2 -translate-y-1/2 cursor-pointer items-center justify-center rounded-full focus-visible:outline-2 focus-visible:outline-primary rtl:translate-x-1/2"
+                                    class="absolute top-1/2 z-20 flex size-6 -translate-x-1/2 -translate-y-1/2 cursor-pointer items-center justify-center rounded-full focus-visible:outline-2 focus-visible:outline-secondary-medium rtl:translate-x-1/2"
                                     style="inset-inline-start: {{ $position($milestone->planned_start_date) }}%"
                                     x-data="{ open: false }"
                                     x-on:mouseenter="open = true"

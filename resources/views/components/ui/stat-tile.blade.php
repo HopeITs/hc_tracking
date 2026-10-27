@@ -22,7 +22,7 @@
     <a
         href="{{ $href }}"
         wire:navigate
-        data-stat-tile {{ $attributes->class('group block rounded-xl border border-secondary-soft bg-white p-4 shadow-card transition-all hover:-translate-y-0.5 hover:shadow-card-hover focus-visible:outline-2 focus-visible:outline-primary dark:border-transparent dark:bg-surface-1 dark:shadow-raised dark:hover:shadow-raised') }}
+        data-stat-tile {{ $attributes->class('group block rounded-xl border border-secondary-soft bg-white p-4 shadow-card transition-all hover:-translate-y-0.5 hover:shadow-card-hover focus-visible:outline-2 focus-visible:outline-secondary-medium dark:border-transparent dark:bg-surface-1 dark:shadow-raised dark:hover:shadow-raised') }}
     >
         <div class="flex items-start justify-between gap-3">
             <div class="min-w-0">

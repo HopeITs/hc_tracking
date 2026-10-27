@@ -40,7 +40,7 @@
                                     <span class="text-base font-bold">{{ $rowReport->period->translatedFormat('F Y') }}</span>
                                     <x-monthly-reports.state-chip :state="$row['state']" />
                                     @if ($row['overdue'])
-                                        <span class="inline-flex items-center gap-1 rounded-md border border-primary/30 bg-status-critical-soft px-1.5 py-0.5 text-xs font-semibold text-status-critical" data-overdue="{{ $row['key'] }}">
+                                        <span class="inline-flex items-center gap-1 rounded-md border border-primary bg-status-critical-soft px-1.5 py-0.5 text-xs font-semibold text-status-critical" data-overdue="{{ $row['key'] }}">
                                             <flux:icon.exclamation-triangle variant="micro" class="size-3.5" aria-hidden="true" />
                                             {{ __('monthly_reports.overdue') }}
                                         </span>

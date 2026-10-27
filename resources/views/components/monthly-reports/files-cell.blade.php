@@ -34,7 +34,7 @@
                 <button
                     type="button"
                     wire:click="confirmDeleteFile({{ $file['id'] }})"
-                    class="ms-auto shrink-0 rounded p-0.5 {{ $mutedText }} hover:text-status-critical focus-visible:outline-2 focus-visible:outline-primary"
+                    class="ms-auto shrink-0 rounded p-0.5 {{ $mutedText }} hover:text-status-critical focus-visible:outline-2 focus-visible:outline-secondary-medium"
                     aria-label="{{ __('monthly_reports.delete_file_name', ['name' => $file['name']]) }}"
                 >
                     <flux:icon.trash variant="micro" class="size-3.5" aria-hidden="true" />
@@ -58,7 +58,7 @@
         <button
             type="button"
             wire:click="openFileModal({{ $lineId === null ? 'null' : $lineId }}, {{ $entryId === null ? 'null' : $entryId }})"
-            class="inline-flex w-fit items-center gap-1 rounded-md border border-secondary-light px-2 py-1 text-xs font-semibold text-secondary-dark hover:bg-secondary-soft focus-visible:outline-2 focus-visible:outline-primary dark:border-line-strong dark:text-ink dark:hover:bg-white/[0.06]"
+            class="inline-flex w-fit items-center gap-1 rounded-md border border-secondary-light px-2 py-1 text-xs font-semibold text-secondary-dark hover:bg-secondary-soft focus-visible:outline-2 focus-visible:outline-secondary-medium dark:border-line-strong dark:text-ink dark:hover:bg-white/[0.06]"
             aria-label="{{ __('monthly_reports.attach_file_to', ['name' => $label]) }}"
         >
             <flux:icon.arrow-up-tray variant="micro" class="size-3.5" aria-hidden="true" />

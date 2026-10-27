@@ -42,7 +42,7 @@
 
             <label class="block @4xl/detail:w-80">
                 <span class="sr-only">{{ __('programs.find_a_project') }}</span>
-                <span class="flex min-h-10 items-center gap-2 rounded-md border border-board-line bg-board px-3 focus-within:border-primary focus-within:ring-2 focus-within:ring-primary/15">
+                <span class="flex min-h-10 items-center gap-2 rounded-md border border-board-line bg-board px-3 focus-within:border-secondary-medium focus-within:ring-2 focus-within:ring-secondary-light">
                     <flux:icon.magnifying-glass variant="micro" class="size-4 shrink-0 text-secondary-light" aria-hidden="true" />
                     <input type="search" wire:model.live.debounce.300ms="projectSearch" placeholder="{{ __('programs.find_a_project') }}" class="min-w-0 flex-1 bg-transparent py-2 text-sm outline-none placeholder:text-secondary-light" />
                 </span>
@@ -51,7 +51,7 @@
 
         <div class="flex flex-wrap gap-2" role="group" aria-label="{{ __('programs.timeline_filter_status') }}">
             <button type="button" wire:click="filterProjectsByStatus('')" aria-pressed="{{ $status === '' ? 'true' : 'false' }}" @class([
-                'inline-flex cursor-pointer items-center gap-2 rounded-full border py-1 ps-3 pe-2 text-sm font-semibold transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary',
+                'inline-flex cursor-pointer items-center gap-2 rounded-full border py-1 ps-3 pe-2 text-sm font-semibold transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-secondary-medium',
                 'border-secondary-dark bg-secondary-dark text-white dark:border-ink dark:bg-ink dark:text-surface-0' => $status === '',
                 'border-board-line bg-board hover:border-secondary-light' => $status !== '',
             ])>
@@ -63,7 +63,7 @@
                 @php $segment = $statusSegments[$index]; @endphp
                 @continue($segment['count'] === 0 && $status !== $case->value)
                 <button type="button" wire:click="filterProjectsByStatus('{{ $case->value }}')" aria-pressed="{{ $status === $case->value ? 'true' : 'false' }}" @class([
-                    'inline-flex cursor-pointer items-center gap-2 rounded-full border py-1 ps-2.5 pe-2 text-sm font-semibold transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary',
+                    'inline-flex cursor-pointer items-center gap-2 rounded-full border py-1 ps-2.5 pe-2 text-sm font-semibold transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-secondary-medium',
                     'border-secondary-dark bg-secondary-dark text-white dark:border-ink dark:bg-ink dark:text-surface-0' => $status === $case->value,
                     'border-board-line bg-board hover:border-secondary-light' => $status !== $case->value,
                 ])>
@@ -98,7 +98,7 @@
                 <span class="inline-flex items-center gap-1.5"><span class="size-2.5 rotate-45 rounded-[2px] border-2 border-status-warn bg-status-warn"></span>{{ MilestoneStatus::Ongoing->label() }}</span>
                 <span class="inline-flex items-center gap-1.5"><span class="size-2.5 rotate-45 rounded-[2px] border-2 border-primary bg-primary dark:bg-status-critical dark:border-status-critical"></span>{{ __('milestones.missed') }} / {{ __('milestones.overdue') }}</span>
                 <span class="inline-flex items-center gap-1.5"><span class="w-4 border-t-2 border-dashed border-status-warn"></span>{{ __('programs.timeline_outside_legend') }}</span>
-                <span class="inline-flex items-center gap-1.5"><span class="relative flex h-3.5 w-7 rounded-sm border border-primary/40 bg-primary/10 dark:bg-white/10 dark:border-line-strong"><span class="h-full w-3 rounded-s-sm bg-primary dark:bg-ink-muted"></span><span class="absolute -inset-y-1 start-4 w-0.5 bg-primary dark:bg-ink-muted"></span></span>{{ __('programs.timeline_legend_progress') }}</span>
+                <span class="inline-flex items-center gap-1.5"><span class="relative flex h-3.5 w-7 rounded-sm border border-primary bg-secondary-soft/60 dark:bg-white/10 dark:border-line-strong"><span class="h-full w-3 rounded-s-sm bg-primary dark:bg-ink-muted"></span><span class="absolute -inset-y-1 start-4 w-0.5 bg-primary dark:bg-ink-muted"></span></span>{{ __('programs.timeline_legend_progress') }}</span>
                 <span class="inline-flex items-center gap-1.5"><span class="h-3.5 w-0.5 bg-primary dark:bg-ink"></span>{{ __('programs.timeline_today') }}</span>
             </div>
 
@@ -141,7 +141,7 @@
                         }
 
                         $neutralTone = 'border-board-line bg-board text-secondary-medium dark:text-ink-muted';
-                        $criticalTone = 'border-primary/30 bg-status-critical-soft text-primary dark:text-brand-text';
+                        $criticalTone = 'border-primary bg-status-critical-soft text-primary dark:text-brand-text';
                         $schedule = match (true) {
                             $isFinished => ['label' => $progress === null ? $project->status->label() : __('programs.timeline_closed_at', ['percent' => $progress]), 'tone' => $neutralTone, 'icon' => 'archive-box'],
                             $hasDates && $today->gt($project->end_date) && ($progress ?? 0) < 100 => ['label' => __('programs.timeline_past_end'), 'tone' => $criticalTone, 'icon' => 'calendar'],
@@ -165,7 +165,7 @@
                             default => 'bg-secondary-light',
                         };
                         $trackTone = match (true) {
-                            $isLive => 'border-primary/40 bg-primary/10',
+                            $isLive => 'border-primary bg-secondary-soft/60',
                             $isPreparing => 'border-dashed border-status-warn/60 bg-status-warn-soft',
                             default => 'border-board-line bg-secondary-soft/60 dark:bg-white/10',
                         };
@@ -179,7 +179,7 @@
                         <div class="grid gap-4 px-5 py-4 @4xl/detail:grid-cols-[minmax(15rem,20rem)_1fr_10rem] @4xl/detail:items-center @4xl/detail:gap-8">
                             {{-- Identity --}}
                             <div class="min-w-0">
-                                <a href="{{ route('projects.show', $project) }}" wire:navigate class="inline-flex max-w-full items-start gap-1.5 font-semibold text-pretty group-hover:text-primary dark:group-hover:text-brand-text focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary after:absolute after:inset-0 after:content-['']">
+                                <a href="{{ route('projects.show', $project) }}" wire:navigate class="inline-flex max-w-full items-start gap-1.5 font-semibold text-pretty group-hover:text-primary dark:group-hover:text-brand-text focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-secondary-medium after:absolute after:inset-0 after:content-['']">
                                     <span class="line-clamp-2">{{ $project->name }}</span>
                                     <flux:icon.arrow-up-right variant="micro" class="mt-1 size-3.5 shrink-0 opacity-0 transition-opacity duration-150 group-focus-within:opacity-100 group-hover:opacity-100 rtl:-scale-x-100" aria-hidden="true" />
                                 </a>
@@ -193,7 +193,7 @@
                                         <flux:icon.shield-exclamation variant="micro" class="size-3.5" aria-hidden="true" />{{ trans_choice('programs.timeline_open_risks', $openRisks, ['count' => $openRisks]) }}
                                     </span>
                                     @if ($project->materialised_risks_count > 0)
-                                        <span class="inline-flex items-center gap-1 rounded-full border border-primary/30 bg-status-critical-soft px-2 py-0.5 font-semibold text-primary dark:text-brand-text">
+                                        <span class="inline-flex items-center gap-1 rounded-full border border-primary bg-status-critical-soft px-2 py-0.5 font-semibold text-primary dark:text-brand-text">
                                             <flux:icon.bolt variant="micro" class="size-3.5" aria-hidden="true" />{{ trans_choice('programs.timeline_materialised', $project->materialised_risks_count, ['count' => $project->materialised_risks_count]) }}
                                         </span>
                                     @endif
@@ -207,7 +207,7 @@
                                         @foreach ($ticks as $tick)
                                             <span aria-hidden="true" class="absolute inset-y-0 hidden w-px bg-board-line @4xl/detail:block" style="inset-inline-start: {{ $tick['at'] }}%"></span>
                                         @endforeach
-                                        <span aria-hidden="true" class="absolute inset-y-0 z-10 w-0.5 -translate-x-1/2 bg-primary/70 rtl:translate-x-1/2" style="inset-inline-start: {{ $todayAt }}%"></span>
+                                        <span aria-hidden="true" class="absolute inset-y-0 z-10 w-0.5 -translate-x-1/2 bg-primary rtl:translate-x-1/2" style="inset-inline-start: {{ $todayAt }}%"></span>
                                     @endif
 
                                     @if ($hasWindow)
@@ -235,7 +235,7 @@
                                             @endphp
                                             <button
                                                 type="button"
-                                                class="absolute top-1/2 z-20 flex size-6 -translate-x-1/2 -translate-y-1/2 cursor-pointer items-center justify-center rounded-full focus-visible:outline-2 focus-visible:outline-primary rtl:translate-x-1/2"
+                                                class="absolute top-1/2 z-20 flex size-6 -translate-x-1/2 -translate-y-1/2 cursor-pointer items-center justify-center rounded-full focus-visible:outline-2 focus-visible:outline-secondary-medium rtl:translate-x-1/2"
                                                 style="inset-inline-start: {{ $position($milestone->planned_start_date) }}%"
                                                 x-data="{ open: false }"
                                                 x-on:mouseenter="open = true"
