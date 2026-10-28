@@ -114,10 +114,11 @@ test('a Team Member opens a task they created', function () {
 });
 
 test('the dashboard shows no module data to an account with no role', function () {
-    Task::factory()->create(['title' => 'Overdue dashboard task', 'due_date' => now()->subDays(3)]);
+    $manager = userWithRole('Managers');
+    Task::factory()->create(['title' => 'Overdue dashboard task', 'due_date' => now()->subDays(3), 'created_by' => $manager->id]);
 
     $this->actingAs(User::factory()->create())->get(route('dashboard'))->assertOk()->assertDontSee('Overdue dashboard task');
-    $this->actingAs(userWithRole('Managers'))->get(route('dashboard'))->assertOk()->assertSee('Overdue dashboard task');
+    $this->actingAs($manager)->get(route('dashboard'))->assertOk()->assertSee('Overdue dashboard task');
 });
 
 test('the sidebar hides links an account cannot open', function () {

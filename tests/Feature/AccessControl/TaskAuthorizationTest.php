@@ -92,7 +92,7 @@ test('an assignee on the task page changes status but not the title', function (
     expect($this->task->fresh())
         ->title->toBe('Assigned work')
         ->priority->toBe(TaskPriority::Low)
-        ->status->toBe(TaskStatus::Done)
+        ->status->toBe(TaskStatus::UnderReview)
         ->progress_percentage->toBe(100)
         ->completed_date->toDateString()->toBe('2026-09-28');
 });

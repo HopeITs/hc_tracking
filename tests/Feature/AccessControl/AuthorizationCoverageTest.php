@@ -42,6 +42,7 @@ function authorizationCoverageExemptions(): array
         'app/Livewire/Concerns/Desk/ArrangesPanels.php:movePanel' => 'Saves only the signed-in user\'s own Desk layout; Panels::layoutFor() drops any panel they may not see.',
         'app/Livewire/Concerns/Desk/ArrangesPanels.php:removePanel' => 'Saves only the signed-in user\'s own Desk layout.',
         'app/Livewire/Concerns/Desk/ArrangesPanels.php:addPanel' => 'Saves only the signed-in user\'s own Desk layout, and only a panel from the library they may see.',
+        'resources/views/components/desk/panels/⚡plans.blade.php:expected' => 'Reads the share of the year passed; writes nothing.',
         'app/Livewire/Concerns/Desk/ArrangesPanels.php:resetLayout' => 'Clears only the signed-in user\'s own Desk layout.',
     ];
 }
