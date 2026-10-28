@@ -37,6 +37,7 @@ test('a program opens as its own page, not a sheet over the projects register', 
         ->assertSee('class="dk-scope"', false)
         ->assertSee('href="'.route('programs.index').'" wire:navigate', false)
         ->assertSee('Children University')
+        ->assertSee('class="dk-story', false)
         ->assertDontSee('data-desk-record-host', false);
 });
 

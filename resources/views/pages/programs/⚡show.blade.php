@@ -250,105 +250,102 @@ new #[Layout('layouts::desk'), Title('titles.program')] class extends Component 
 };
 ?>
 
-<section class="@container/detail flex min-h-full w-full flex-1 flex-col gap-6 bg-white text-secondary-dark dark:bg-surface-0 dark:text-ink">
-    <header class="border-b border-secondary-soft @4xl/detail:border-b-0 dark:border-line">
-        <nav aria-label="{{ __('ui.breadcrumb') }}" class="flex flex-wrap items-center gap-1.5 text-xs text-secondary-medium dark:text-ink-muted">
-            <a href="{{ route('programs.index') }}" wire:navigate class="rounded font-medium hover:text-secondary-dark hover:underline dark:hover:text-ink">{{ __('common.programs') }}</a>
-            <span aria-hidden="true" class="text-secondary-light">/</span>
-            <span aria-current="page" class="font-semibold text-secondary-dark dark:text-ink">{{ $this->program->name }}</span>
+<section class="dk-story @container/detail flex flex-col gap-6" data-story>
+    <div>
+        <a class="dk-back" href="{{ route('programs.index') }}" wire:navigate data-story-back><x-desk.icon name="back" class="dk-flip" />{{ __('common.programs') }}</a>
+
+        <nav class="dk-crumb" aria-label="{{ __('ui.breadcrumb') }}">
+            @if ($this->program->strategy)
+                <a href="{{ route('strategies.show', $this->program->strategy) }}" wire:navigate>{{ $this->program->strategy->name }}</a>
+            @else
+                <span>{{ __('common.strategy_not_assigned') }}</span>
+            @endif
+            ›
+            <span aria-current="page">{{ $this->program->name }}</span>
         </nav>
 
-        <div class="mt-5 flex flex-col gap-7 @4xl/detail:flex-row @4xl/detail:items-stretch @4xl/detail:gap-10">
-            <div class="min-w-0 @4xl/detail:flex-1 @4xl/detail:border-b @4xl/detail:border-secondary-soft dark:border-line">
-                <div class="flex items-start gap-3 @4xl/detail:min-h-[8.3125rem]">
-                    <div class="flex size-11 shrink-0 items-center justify-center rounded-md bg-primary dark:bg-white/10 dark:text-ink text-white"><flux:icon name="briefcase" class="size-5" /></div>
-                    <div class="min-w-0">
-                        <p class="text-xs font-semibold tracking-[0.12em] text-secondary-medium uppercase dark:text-ink-muted">{{ __('common.program') }}</p>
-                        <div class="mt-1 flex items-center gap-2">
-                            <h1 class="text-3xl font-bold tracking-tight text-secondary-dark dark:text-ink @3xl/detail:text-4xl">{{ $this->program->name }}</h1>
-                            @if (app(\App\Notifications\UnreadSubjects::class)->has(auth()->user(), 'program', $this->program->id))
-                                <span class="size-2.5 shrink-0 rounded-full bg-primary dark:bg-ink" data-unread-dot title="{{ __('notifications.has_unread') }}"><span class="sr-only">{{ __('notifications.has_unread') }}</span></span>
-                            @endif
-                        </div>
-                    </div>
-                </div>
-
-                <dl class="grid gap-5 border-t border-secondary-soft pt-4 @3xl/detail:grid-cols-2 @5xl/detail:grid-cols-4 dark:border-line">
-                    <div class="min-w-0">
-                        <dt class="text-xs font-semibold tracking-[0.1em] text-secondary-medium uppercase dark:text-ink-muted">{{ __('programs.linked_strategy') }}</dt>
-                        <dd class="mt-1.5 truncate text-sm font-semibold">
-                            @if ($this->program->strategy)
-                                <a href="{{ route('strategies.show', $this->program->strategy) }}" wire:navigate class="hover:text-primary dark:hover:text-brand-text hover:underline">{{ $this->program->strategy->name }}</a>
-                            @else
-                                <span class="font-normal text-secondary-medium dark:text-ink-muted">{{ __('common.not_assigned') }}</span>
-                            @endif
-                        </dd>
-                    </div>
-                    <div class="min-w-0">
-                        <dt class="text-xs font-semibold tracking-[0.1em] text-secondary-medium uppercase dark:text-ink-muted">{{ __('programs.direct_manager') }}</dt>
-                        <dd class="mt-1.5 truncate text-sm font-semibold">
-                            {{ $this->program->manager?->name ?? __('common.not_assigned') }}
-                            @if ($this->program->manager)
-                                <span class="sr-only" dir="auto" lang="{{ \App\Enums\Locale::current()->other()->value }}">{{ $this->program->manager->secondary_name }}</span>
-                            @endif
-                        </dd>
-                    </div>
-                    <div class="min-w-0">
-                        <dt class="text-xs font-semibold tracking-[0.1em] text-secondary-medium uppercase dark:text-ink-muted">{{ __('programs.updated') }}</dt>
-                        <dd class="mt-1.5 truncate text-sm font-semibold">{{ $this->program->updated_at?->translatedFormat(__('formats.date')) ?? '—' }}</dd>
-                    </div>
-                    <div class="min-w-0" data-program-donor-attribution>
-                        <dt class="text-xs font-semibold tracking-[0.1em] text-secondary-medium uppercase dark:text-ink-muted">
-                            <label for="program-donor-attribution">{{ __('programs.donor_attribution') }}</label>
-                        </dt>
-                        <dd class="mt-1.5 text-sm font-semibold">
-                            @can('report-templates.manage')
-                                <flux:select id="program-donor-attribution" size="sm" wire:change="setDonorAttribution($event.target.value)" wire:loading.attr="disabled" wire:target="setDonorAttribution">
-                                    @foreach (DonorAttribution::cases() as $attribution)
-                                        <flux:select.option value="{{ $attribution->value }}" :selected="$this->program->donor_attribution === $attribution">{{ $attribution->label() }}</flux:select.option>
-                                    @endforeach
-                                </flux:select>
-                            @else
-                                {{ $this->program->donor_attribution->label() }}
-                            @endcan
-                            <p class="mt-1 text-xs font-normal text-secondary-medium dark:text-ink-muted">{{ __('programs.donor_attribution_help') }}</p>
-                        </dd>
-                    </div>
-                </dl>
+        <div class="dk-story-h">
+            <div>
+                <p class="dk-eyebrow">{{ __('common.program') }}</p>
+                <h1>
+                    {{ $this->program->name }}
+                    @if (app(\App\Notifications\UnreadSubjects::class)->has(auth()->user(), 'program', $this->program->id))
+                        <span class="inline-block size-2.5 rounded-full bg-primary align-middle dark:bg-ink" data-unread-dot title="{{ __('notifications.has_unread') }}"><span class="sr-only">{{ __('notifications.has_unread') }}</span></span>
+                    @endif
+                </h1>
             </div>
 
-            <aside class="overflow-hidden rounded-lg border border-secondary-soft bg-white text-secondary-dark @4xl/detail:w-[22rem] @4xl/detail:shrink-0 dark:border-line dark:bg-surface-1 dark:text-ink" aria-label="{{ __('programs.delivery_health') }}">
-                <div class="min-h-32 p-5">
-                    <div class="flex items-start justify-between gap-4">
-                        <div class="min-w-0">
-                            <p class="text-xs font-semibold tracking-[0.1em] text-secondary-medium uppercase dark:text-ink-muted">{{ __('programs.delivery_health') }}</p>
-                            <p class="mt-1 text-sm font-semibold">{{ __('programs.milestone_progress') }}</p>
-                        </div>
-                        <span class="shrink-0 text-3xl font-bold tracking-tight text-primary dark:text-brand-text tabular-nums">{{ $this->milestoneProgress['percentage'] === null ? '—' : number_format($this->milestoneProgress['percentage'], 0).'%' }}</span>
+            <aside class="dk-next" aria-label="{{ __('programs.delivery_health') }}">
+                <div class="flex items-start justify-between gap-4">
+                    <div class="min-w-0">
+                        <p class="dk-eyebrow">{{ __('programs.delivery_health') }}</p>
+                        <p class="dk-who mt-1">{{ __('programs.milestone_progress') }}</p>
                     </div>
-                    <p class="mt-3 text-xs text-secondary-medium tabular-nums dark:text-ink-muted">{{ $this->milestoneProgress['percentage'] === null ? __('programs.no_weighted_milestones') : __('programs.weighted_progress_of_total', ['reached' => number_format($this->milestoneProgress['reached'], 0), 'total' => number_format($this->milestoneProgress['total'], 0)]) }}</p>
-                    <div class="mt-4 h-2 overflow-hidden rounded-full bg-secondary-soft dark:bg-surface-2" role="progressbar" aria-valuemin="0" aria-valuemax="100" @if ($this->milestoneProgress['percentage'] !== null) aria-valuenow="{{ $this->milestoneProgress['percentage'] }}" @endif aria-label="{{ __('programs.milestone_progress') }}">
-                        <div class="h-full rounded-full bg-primary dark:bg-ink-muted motion-reduce:transition-none" style="width: {{ $this->milestoneProgress['percentage'] ?? 0 }}%"></div>
-                    </div>
+                    <span class="dk-num shrink-0 text-3xl font-extrabold tracking-tight">{{ $this->milestoneProgress['percentage'] === null ? '—' : number_format($this->milestoneProgress['percentage'], 0).'%' }}</span>
                 </div>
-                <div class="border-t border-secondary-soft px-5 py-4 dark:border-line">
-                    <p class="text-xs font-semibold tracking-[0.1em] text-secondary-medium uppercase dark:text-ink-muted">{{ __('programs.projects_by_status') }}</p>
-                    <div class="mt-3 flex h-2 overflow-hidden rounded-full bg-secondary-soft dark:bg-surface-2" role="img" aria-label="{{ __('programs.projects_by_status') }}">
+                <div>
+                    <span class="dk-meter dk-res" role="progressbar" aria-valuemin="0" aria-valuemax="100" @if ($this->milestoneProgress['percentage'] !== null) aria-valuenow="{{ $this->milestoneProgress['percentage'] }}" @endif aria-label="{{ __('programs.milestone_progress') }}"><b style="width: {{ $this->milestoneProgress['percentage'] ?? 0 }}%"></b></span>
+                    <p class="dk-who dk-num mt-2">{{ $this->milestoneProgress['percentage'] === null ? __('programs.no_weighted_milestones') : __('programs.weighted_progress_of_total', ['reached' => number_format($this->milestoneProgress['reached'], 0), 'total' => number_format($this->milestoneProgress['total'], 0)]) }}</p>
+                </div>
+                <div>
+                    <p class="dk-fcat mt-0!">{{ __('programs.projects_by_status') }}</p>
+                    <div class="mt-2 flex h-1.5 overflow-hidden rounded-full bg-secondary-soft dark:bg-surface-2" role="img" aria-label="{{ __('programs.projects_by_status') }}">
                         @foreach ($this->projectStatusSegments as $segment)
                             @if ($segment['count'] > 0)<span class="{{ $segment['tone'] }}" style="flex: {{ $segment['count'] }}" title="{{ $segment['label'] }}: {{ $segment['count'] }}"></span>@endif
                         @endforeach
                     </div>
-                    <div class="mt-3 flex flex-wrap gap-2">
+                    <div class="mt-2 flex flex-wrap gap-1.5">
                         @foreach ($this->projectStatusSegments as $segment)
                             @if ($segment['count'] > 0)
-                                <span class="inline-flex items-center gap-1.5 rounded-md border border-secondary-soft px-2 py-1 text-xs font-medium text-secondary-medium dark:border-line dark:text-ink-muted"><span class="size-1.5 rounded-full {{ $segment['tone'] }}"></span>{{ $segment['label'] }} <span class="font-semibold tabular-nums">{{ $segment['count'] }}</span></span>
+                                <span class="dk-pill gap-1.5"><span class="size-1.5 rounded-full {{ $segment['tone'] }}"></span>{{ $segment['label'] }} <span class="dk-num">{{ $segment['count'] }}</span></span>
                             @endif
                         @endforeach
                     </div>
                 </div>
             </aside>
         </div>
-    </header>
+
+        <dl class="dk-facts">
+            <div>
+                <dt>{{ __('programs.linked_strategy') }}</dt>
+                <dd>
+                    @if ($this->program->strategy)
+                        <a href="{{ route('strategies.show', $this->program->strategy) }}" wire:navigate class="hover:underline">{{ $this->program->strategy->name }}</a>
+                    @else
+                        <span class="dk-muted">{{ __('common.not_assigned') }}</span>
+                    @endif
+                </dd>
+            </div>
+            <div>
+                <dt>{{ __('programs.direct_manager') }}</dt>
+                <dd>
+                    {{ $this->program->manager?->name ?? __('common.not_assigned') }}
+                    @if ($this->program->manager)
+                        <span class="sr-only" dir="auto" lang="{{ \App\Enums\Locale::current()->other()->value }}">{{ $this->program->manager->secondary_name }}</span>
+                    @endif
+                </dd>
+            </div>
+            <div>
+                <dt>{{ __('programs.updated') }}</dt>
+                <dd>{{ $this->program->updated_at?->translatedFormat(__('formats.date')) ?? '—' }}</dd>
+            </div>
+            <div class="max-w-80" data-program-donor-attribution>
+                <dt><label for="program-donor-attribution">{{ __('programs.donor_attribution') }}</label></dt>
+                <dd class="block!">
+                    @can('report-templates.manage')
+                        <flux:select id="program-donor-attribution" size="sm" wire:change="setDonorAttribution($event.target.value)" wire:loading.attr="disabled" wire:target="setDonorAttribution">
+                            @foreach (DonorAttribution::cases() as $attribution)
+                                <flux:select.option value="{{ $attribution->value }}" :selected="$this->program->donor_attribution === $attribution">{{ $attribution->label() }}</flux:select.option>
+                            @endforeach
+                        </flux:select>
+                    @else
+                        {{ $this->program->donor_attribution->label() }}
+                    @endcan
+                    <p class="dk-small dk-muted mt-1 font-normal">{{ __('programs.donor_attribution_help') }}</p>
+                </dd>
+            </div>
+        </dl>
+    </div>
 
     <div class="flex flex-wrap items-center gap-1 border-b border-secondary-soft dark:border-line" role="tablist" aria-label="{{ __('programs.connection_views') }}">
         @foreach ($this->tabs as $tabOption)
