@@ -1,7 +1,9 @@
 {{--
     The timeline view of projects/index: every project's window plotted against
     the shared date axis. Included by ⚡index.blade.php, whose top PHP block
-    defines $projects, $today, $fundingByProject, $scheduleOf and $elapsedOf.
+    defines $projects, $today, $scheduleOf and $elapsedOf. Each row is the
+    project, its health word, its bar and its milestones; money and links stay
+    on the list view's preview and the project page.
 --}}
 @use('App\Enums\MilestoneStatus')
 @use('App\Enums\ProjectStatus')
@@ -23,7 +25,7 @@
                         }
                     }
                     $todayAt = $position($today);
-                    $timelineColumns = '@4xl/directory:grid-cols-[minmax(15rem,20rem)_minmax(0,1fr)_10rem]';
+                    $timelineColumns = '@4xl/directory:grid-cols-[minmax(15rem,19rem)_minmax(0,1fr)_7rem]';
                 @endphp
 
                 <x-ui.panel>
@@ -56,8 +58,12 @@
                                 $progress = $this->progressFor($project);
                                 $schedule = $scheduleOf($project);
                                 $elapsed = $elapsedOf($project);
-                                $connections = $this->connectionsOf($project);
-                                $funding = $fundingByProject[$project->id] ?? null;
+                                $healthClass = match ($schedule['tone']) {
+                                    'good' => 'dk-good',
+                                    'warn' => 'dk-warn',
+                                    'critical' => 'dk-bad',
+                                    default => 'dk-calm',
+                                };
                                 $hasDates = $project->start_date !== null && $project->end_date !== null && $project->end_date->gte($project->start_date);
                                 $hasWindow = $window !== null && $hasDates;
                                 $barStart = $hasWindow ? $position($project->start_date) : 0;
@@ -70,54 +76,14 @@
 
                             <li class="bg-white transition-colors hover:bg-secondary-soft/30 dark:bg-surface-1 dark:hover:bg-surface-2" wire:key="project-timeline-{{ $project->id }}">
                                 <div class="grid gap-4 px-4 py-4 {{ $timelineColumns }} @4xl/directory:items-center @4xl/directory:gap-6">
-                                    <div class="min-w-0">
-                                        <div class="flex items-start justify-between gap-2">
-                                            <span class="line-clamp-2 min-w-0 text-sm font-semibold" title="{{ $project->name }}">{{ $project->name }}</span>
-
-                                            <div class="flex shrink-0 items-center gap-1">
-                                                <a
-                                                href="{{ route('projects.show', $project) }}"
-                                                wire:navigate
-                                                class="grid size-11 place-items-center rounded-md border-0! bg-transparent! text-secondary-dark! transition-colors hover:bg-secondary-soft! focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-secondary-medium dark:text-ink! dark:hover:bg-surface-2! @3xl/directory:size-8!"
-                                                aria-label="{{ __('projects.open_project', ['name' => $project->name]) }}"
-                                            >
-                                                <flux:icon.eye class="size-4.5" />
-                                            </a>
-                                            <x-ui.blocked-badge :project="$project" />
-                                            @can('update', $project)<x-ui.button tone="ghost" size="sm" icon="pencil-square" class="size-11! shrink-0 touch-manipulation @3xl/directory:size-8!" wire:click="openEditModal({{ $project->id }})" :aria-label="__('common.edit_name', ['name' => $project->name])" />@endcan
-                                                @if ($project->status === ProjectStatus::Archived)
-                                                    @can('delete', $project)<x-ui.button tone="ghost" size="sm" icon="arrow-uturn-left" class="size-11! shrink-0 touch-manipulation @3xl/directory:size-8!" wire:click="restoreProject({{ $project->id }})" :aria-label="__('projects.restore_name', ['name' => $project->name])" />@endcan
-                                                @else
-                                                    @can('delete', $project)<x-ui.button tone="ghost" size="sm" icon="archive-box" class="size-11! shrink-0 touch-manipulation @3xl/directory:size-8!" wire:click="confirmArchive({{ $project->id }})" :aria-label="__('projects.archive_name', ['name' => $project->name])" />@endcan
-                                                @endif
-                                            </div>
+                                    <div class="flex min-w-0 items-start justify-between gap-2">
+                                        <div class="min-w-0">
+                                            <p class="line-clamp-2 text-sm font-semibold" title="{{ $project->name }}">{{ $project->name }}</p>
+                                            <p class="mt-0.5 truncate text-xs text-secondary-medium dark:text-ink-muted">{{ $project->city?->name ?? __('common.unknown_city') }} · {{ $project->program->name }}</p>
+                                            <span class="dk-health {{ $healthClass }} mt-1.5">{{ $schedule['label'] }}</span>
                                         </div>
 
-                                        <p class="mt-1 truncate text-xs text-secondary-medium dark:text-ink-muted">{{ $project->city?->name ?? __('common.unknown_city') }} · {{ $project->program->name }}</p>
-                                        <p class="truncate text-xs text-secondary-medium dark:text-ink-muted">{{ $project->program->strategy?->name ?? __('common.strategy_not_assigned') }}</p>
-
-                                        <div class="mt-2 flex flex-wrap items-center gap-1.5">
-                                            <x-ui.enum-badge :case="$project->status" />
-                                            <x-ui.project-funding-badge :project="$project" />
-                                            <x-ui.employee-chip :employee="$project->user" compact />
-                                            <x-ui.assignment-badge :project="$project" />
-                                        </div>
-
-                                        <div class="mt-2 flex flex-wrap items-center gap-1">
-                                            @foreach ($connections as $connection)
-                                                <span
-                                                    @class([
-                                                        'inline-flex items-center gap-1 rounded-full border px-1.5 py-0.5 text-xs tabular-nums',
-                                                        'border-primary bg-secondary-soft/60 font-semibold text-primary dark:text-brand-text' => $connection['alert'],
-                                                        'border-secondary-soft text-secondary-medium dark:border-line dark:text-ink-muted' => ! $connection['alert'] && $connection['count'] > 0,
-                                                        'border-secondary-soft text-secondary-light dark:border-line' => ! $connection['alert'] && $connection['count'] === 0,
-                                                    ])
-                                                    aria-label="{{ $connection['label'] }}"
-                                                >
-                                                    <flux:icon :name="$connection['icon']" variant="micro" class="size-3.5" aria-hidden="true" />{{ $connection['count'] }}
-                                                </span>
-                                            @endforeach
-                                        </div>
+                                        @include('pages.projects._index-row-actions')
                                     </div>
 
                                     <div class="min-w-0">
@@ -177,27 +143,14 @@
                                                 <flux:icon.arrow-long-right variant="micro" class="inline size-3.5 rtl:-scale-x-100" aria-hidden="true" />
                                                 {{ $project->end_date?->translatedFormat(__('formats.date')) ?? '—' }}
                                             </span>
-                                            @if ($funding !== null)
-                                                @foreach ($funding['currencies'] as $barCurrency => $barTotal)
-                                                    <span wire:key="timeline-funding-{{ $project->id }}-{{ $barCurrency }}"><x-ui.money :amount="$barTotal" :currency="$barCurrency" /></span>
-                                                @endforeach
-                                            @endif
-                                            @if ($project->target_beneficiaries !== null)
-                                                <span>{{ number_format($project->target_beneficiaries) }} · {{ __('projects.col_beneficiaries') }}</span>
-                                            @endif
                                         </div>
                                     </div>
 
-                                    <div class="flex items-end justify-between gap-3 @4xl/directory:flex-col @4xl/directory:items-end @4xl/directory:gap-2">
-                                        <span class="inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-xs whitespace-nowrap {{ $this->tonePillClasses($schedule['tone']) }}">
-                                            <flux:icon :name="$schedule['icon']" variant="micro" class="size-3.5" aria-hidden="true" />{{ $schedule['label'] }}
-                                        </span>
-                                        <div class="text-end">
-                                            <p class="type-figure">{{ $progress === null ? '—' : $progress.'%' }}</p>
-                                            <p class="text-xs tabular-nums text-secondary-medium dark:text-ink-muted">
-                                                {{ $progress === null ? __('projects.no_weighted_milestones') : __('projects.milestones_reached', ['reached' => $project->reached_milestones_count, 'total' => $project->milestones_count]) }}
-                                            </p>
-                                        </div>
+                                    <div class="text-end">
+                                        <p class="type-figure">{{ $progress === null ? '—' : round($progress).'%' }}</p>
+                                        <p class="text-xs tabular-nums text-secondary-medium dark:text-ink-muted">
+                                            {{ $progress === null ? __('projects.no_weighted_milestones') : __('projects.milestones_reached', ['reached' => $project->reached_milestones_count, 'total' => $project->milestones_count]) }}
+                                        </p>
                                     </div>
                                 </div>
                             </li>

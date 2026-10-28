@@ -24,15 +24,14 @@ test('a manager sees the edit and archive actions on the Story', function () {
         ->test('pages::projects.show', ['project' => $this->project])
         ->assertSeeHtml('data-test="edit-project"')
         ->assertSeeHtml('data-test="archive-project"')
-        ->assertDontSeeHtml('data-test="edit-project-locked"')
-        ->assertDontSeeHtml('data-test="archive-project-locked"');
+        ->assertDontSeeHtml('data-test="edit-project-locked"');
 });
 
-test('a viewer without the permissions sees the actions locked, not usable', function () {
+test('a viewer without the permissions sees no edit or archive actions at all', function () {
     Livewire::actingAs(userWithRole('Team Member'))
         ->test('pages::projects.show', ['project' => $this->project])
-        ->assertSeeHtml('data-test="edit-project-locked"')
-        ->assertSeeHtml('data-test="archive-project-locked"')
+        ->assertDontSeeHtml('data-test="edit-project')
+        ->assertDontSeeHtml('data-test="archive-project')
         ->assertDontSeeHtml('wire:click="openEditModal(')
         ->assertDontSeeHtml('wire:click="confirmArchive(');
 });
@@ -50,13 +49,12 @@ test('archiving from the Story archives the project and offers Restore', functio
     expect($this->project->fresh()->status)->toBe(ProjectStatus::Archived);
 });
 
-test('a viewer without the archive permission sees Restore locked on an archived project', function () {
+test('a viewer without the archive permission sees no Restore on an archived project', function () {
     $this->project->forceFill(['status' => ProjectStatus::Archived])->saveQuietly();
 
     Livewire::actingAs(userWithRole('Team Member'))
         ->test('pages::projects.show', ['project' => $this->project])
-        ->assertSeeHtml('data-test="restore-project-locked"')
-        ->assertDontSeeHtml('data-test="restore-project"');
+        ->assertDontSeeHtml('data-test="restore-project');
 });
 
 test('archiving is refused for a viewer without the permission', function () {

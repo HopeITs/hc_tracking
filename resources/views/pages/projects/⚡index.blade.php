@@ -33,10 +33,9 @@ new #[Layout('layouts::desk'), Title('titles.projects')] class extends Component
     use UnblocksProjects;
     use WithPagination;
 
-    /** Cards are smaller than rows, so the board shows more of them. */
-    private const BOARD_PAGE_SIZE = 24;
+    private const LIST_PAGE_SIZE = 20;
 
-    private const LIST_PAGE_SIZE = 15;
+    private const TIMELINE_PAGE_SIZE = 15;
 
     #[Url(except: '')]
     public string $search = '';
@@ -59,8 +58,8 @@ new #[Layout('layouts::desk'), Title('titles.projects')] class extends Component
     #[Url(except: '')]
     public string $status = '';
 
-    #[Url(except: 'board')]
-    public string $view = 'board';
+    #[Url(except: 'list')]
+    public string $view = 'list';
 
     #[Url(except: 'name')]
     public string $sort = 'name';
@@ -109,8 +108,8 @@ new #[Layout('layouts::desk'), Title('titles.projects')] class extends Component
                 'ownerAssignment',
                 'proposals:proposals.id,proposals.status',
             ])
-            // Only the table view shows the sectors column.
-            ->when($this->view === 'table', fn (Builder $query) => $query->with([
+            // Only the list view's preview shows the sectors.
+            ->when($this->view === 'list', fn (Builder $query) => $query->with([
                 'sectors' => fn ($query) => $query->select(['sectors.id', 'sectors.name_ar', 'sectors.name_en', 'sectors.is_active'])->ordered(),
             ]))
             ->when($this->view === 'timeline', fn (Builder $query) => $query->with([
@@ -134,7 +133,7 @@ new #[Layout('layouts::desk'), Title('titles.projects')] class extends Component
             ->withSum(['milestones as planned_weight' => fn ($query) => $query->where('status', '!=', MilestoneStatus::Cancelled->value)], 'weight_percentage');
 
         return $this->applySort($this->applyFilters($query))
-            ->paginate($this->view === 'board' ? self::BOARD_PAGE_SIZE : self::LIST_PAGE_SIZE);
+            ->paginate($this->view === 'list' ? self::LIST_PAGE_SIZE : self::TIMELINE_PAGE_SIZE);
     }
 
     /** @return Collection<int, Program> */
@@ -201,14 +200,26 @@ new #[Layout('layouts::desk'), Title('titles.projects')] class extends Component
     $canViewMoney = $this->canViewMoney();
     $projects = $this->projects;
 
-    $loadingTargets = 'search, city, program, owner, status, lens, sort, view, toggleStatus, toggleLens, clearFilters, gotoPage, nextPage, previousPage';
+    $loadingTargets = 'search, city, program, owner, sector, status, lens, sort, view, toggleStatus, toggleLens, clearFilters, gotoPage, nextPage, previousPage';
 
-    /* Tabs, tiles, panels and card chrome are lifted from pages/milestones so
-       the two directories read as one product. */
+    /* Two ways to read the portfolio: a scannable list, and the same projects on a calendar. */
     $viewOptions = [
-        'table' => ['icon' => 'table', 'label' => __('projects.view_table'), 'test' => 'project-view-table'],
+        'list' => ['icon' => 'table', 'label' => __('projects.view_table'), 'test' => 'project-view-list'],
         'timeline' => ['icon' => 'chart', 'label' => __('projects.view_timeline'), 'test' => 'project-view-timeline'],
-        'board' => ['icon' => 'board', 'label' => __('projects.view_board'), 'test' => 'project-view-board'],
+    ];
+
+    /* The filters that live behind the one Filters button, as removable chips once set. */
+    $activeFilterChips = array_filter([
+        'city' => $city !== '' ? $this->cityOptions->firstWhere('id', (int) $city)?->name : null,
+        'program' => $program !== '' ? $this->programOptions->firstWhere('id', (int) $program)?->name : null,
+        'owner' => $owner !== '' ? (HrEmployee::find((int) $owner)?->name ?? '#'.$owner) : null,
+        'sector' => $sector !== '' ? $this->sectorOptions->firstWhere('id', (int) $sector)?->localizedName() : null,
+    ], fn (?string $label): bool => $label !== null);
+    $activeFilterLabels = [
+        'city' => __('common.city'),
+        'program' => __('common.program'),
+        'owner' => __('projects.owner'),
+        'sector' => __('sectors.sectors'),
     ];
 
     $sortOptions = [
@@ -219,10 +230,10 @@ new #[Layout('layouts::desk'), Title('titles.projects')] class extends Component
     ];
 
     $lensTiles = [
-        'unfunded' => ['label' => __('projects.lens_unfunded'), 'hint' => __('projects.lens_unfunded_hint'), 'icon' => 'banknotes'],
-        'overdue' => ['label' => __('projects.lens_overdue'), 'hint' => __('projects.lens_overdue_hint'), 'icon' => 'calendar-days'],
-        'slipping' => ['label' => __('projects.lens_slipping'), 'hint' => __('projects.lens_slipping_hint'), 'icon' => 'exclamation-triangle'],
-        'risks' => ['label' => __('projects.lens_risks'), 'hint' => __('projects.lens_risks_hint'), 'icon' => 'bolt'],
+        'unfunded' => ['label' => __('projects.lens_unfunded'), 'hint' => __('projects.lens_unfunded_hint')],
+        'overdue' => ['label' => __('projects.lens_overdue'), 'hint' => __('projects.lens_overdue_hint')],
+        'slipping' => ['label' => __('projects.lens_slipping'), 'hint' => __('projects.lens_slipping_hint')],
+        'risks' => ['label' => __('projects.lens_risks'), 'hint' => __('projects.lens_risks_hint')],
     ];
 
     /* How much of a project's own window has passed, as a percentage. */
@@ -292,61 +303,83 @@ new #[Layout('layouts::desk'), Title('titles.projects')] class extends Component
     <x-slot:search>
         <x-desk.register-search :label="__('projects.search_projects')" :placeholder="__('projects.project_city_program_or_owner')" wire:model.live.debounce.300ms="search" />
     </x-slot:search>
+    <x-slot:figures>
+        <span><b>{{ number_format($this->committedBeneficiaries) }}</b>{{ __('projects.tile_beneficiaries') }}</span>
+        @if ($canViewMoney)
+            @foreach ($this->committedFunding as $fundingCurrency => $fundingTotal)
+                <span wire:key="committed-{{ $fundingCurrency }}"><b><x-ui.money :amount="$fundingTotal" :currency="$fundingCurrency" /></b>{{ __('projects.tile_committed_funding') }}</span>
+            @endforeach
+        @endif
+    </x-slot:figures>
     <x-slot:filters>
+        {{-- Every "narrow it down" choice sits behind one button; what is set shows as chips below. --}}
+        <div class="dk-pmenu" x-data="{ open: false }" x-on:click.outside="open = false" x-on:keydown.escape.window="open = false">
+            <button type="button" class="dk-btn" x-on:click="open = ! open" x-bind:aria-expanded="open" aria-haspopup="dialog" data-test="project-filters-button">
+                <x-desk.icon name="grid" />{{ __('projects.filters') }}
+                @if ($activeFilterChips !== [])
+                    <span class="dk-pc dk-num">{{ count($activeFilterChips) }}</span>
+                @endif
+            </button>
 
-            <x-ui.header-filter-select :label="__('common.city')" wire:model.live="city" :value="$city">
-                <option value="">{{ __('projects.all_cities') }}</option>
-                @foreach ($this->cityOptions as $cityOption)
-                    <option value="{{ $cityOption->id }}">{{ $cityOption->name }} · {{ $cityOption->secondary_name }}</option>
-                @endforeach
-            </x-ui.header-filter-select>
+            <div class="dk-pop dk-pjf-pop" role="dialog" aria-label="{{ __('projects.filters') }}" x-show="open" x-cloak x-transition.opacity.duration.120ms>
+                <x-ui.header-filter-select :label="__('common.city')" wire:model.live="city" :value="$city">
+                    <option value="">{{ __('projects.all_cities') }}</option>
+                    @foreach ($this->cityOptions as $cityOption)
+                        <option value="{{ $cityOption->id }}">{{ $cityOption->name }} · {{ $cityOption->secondary_name }}</option>
+                    @endforeach
+                </x-ui.header-filter-select>
 
-            <x-ui.header-filter-select :label="__('common.program')" wire:model.live="program" :value="$program">
-                <option value="">{{ __('common.all_programs') }}</option>
-                @foreach ($this->programOptions as $programOption)
-                    <option value="{{ $programOption->id }}">{{ $programOption->name }}</option>
-                @endforeach
-            </x-ui.header-filter-select>
+                <x-ui.header-filter-select :label="__('common.program')" wire:model.live="program" :value="$program">
+                    <option value="">{{ __('common.all_programs') }}</option>
+                    @foreach ($this->programOptions as $programOption)
+                        <option value="{{ $programOption->id }}">{{ $programOption->name }}</option>
+                    @endforeach
+                </x-ui.header-filter-select>
 
-            <x-ui.header-filter-select :label="__('projects.owner')" wire:model.live="owner" :value="$owner" employees>
-                <option value="">{{ __('projects.all_owners') }}</option>
-            </x-ui.header-filter-select>
+                <x-ui.header-filter-select :label="__('projects.owner')" wire:model.live="owner" :value="$owner" employees>
+                    <option value="">{{ __('projects.all_owners') }}</option>
+                </x-ui.header-filter-select>
 
-            <x-ui.header-filter-select :label="__('sectors.sectors')" wire:model.live="sector" :value="$sector">
-                <option value="">{{ __('sectors.all_sectors') }}</option>
-                @foreach ($this->sectorOptions as $sectorOption)
-                    <option value="{{ $sectorOption->id }}">{{ $sectorOption->localizedName() }}@unless ($sectorOption->is_active) · {{ __('sectors.inactive') }}@endunless</option>
-                @endforeach
-            </x-ui.header-filter-select>
+                <x-ui.header-filter-select :label="__('sectors.sectors')" wire:model.live="sector" :value="$sector">
+                    <option value="">{{ __('sectors.all_sectors') }}</option>
+                    @foreach ($this->sectorOptions as $sectorOption)
+                        <option value="{{ $sectorOption->id }}">{{ $sectorOption->localizedName() }}@unless ($sectorOption->is_active) · {{ __('sectors.inactive') }}@endunless</option>
+                    @endforeach
+                </x-ui.header-filter-select>
+            </div>
+        </div>
 
-            <x-ui.header-filter-select :label="__('projects.sort_by')" wire:model.live="sort" :value="$sort">
-                @foreach ($sortOptions as $sortValue => $sortLabel)
-                    <option value="{{ $sortValue }}">{{ $sortLabel }}</option>
-                @endforeach
-            </x-ui.header-filter-select>
-            @if ($filtersAreActive)
+        <x-ui.header-filter-select :label="__('projects.sort_by')" wire:model.live="sort" :value="$sort">
+            @foreach ($sortOptions as $sortValue => $sortLabel)
+                <option value="{{ $sortValue }}">{{ $sortLabel }}</option>
+            @endforeach
+        </x-ui.header-filter-select>
+
+        @if ($filtersAreActive)
             <button type="button" class="dk-btn dk-ghost dk-sm" wire:click="clearFilters"><x-desk.icon name="x" />{{ __('desk.register.clear') }}</button>
         @endif
     </x-slot:filters>
 
 
+    {{-- A housekeeping note for portfolio managers, kept to one line until opened. --}}
     @if ($this->projectsWithoutCenterCount > 0)
-        <flux:callout variant="warning" icon="building-office" data-test="projects-without-center">
-            <flux:callout.heading>{{ __('projects.projects_without_center') }} ({{ $this->projectsWithoutCenterCount }})</flux:callout.heading>
-            <flux:callout.text>
-                {{ __('projects.projects_without_center_hint') }}
-                <button type="button" wire:click="$toggle('showProjectsWithoutCenter')" class="ms-1 font-medium underline" aria-expanded="{{ $showProjectsWithoutCenter ? 'true' : 'false' }}">
+        <div class="dk-pjnote" data-test="projects-without-center">
+            <x-desk.icon name="info" />
+            <p>
+                <strong>{{ __('projects.projects_without_center') }} ({{ $this->projectsWithoutCenterCount }})</strong>
+                <span class="dk-pjnote-hint">{{ __('projects.projects_without_center_hint') }}</span>
+                <button type="button" wire:click="$toggle('showProjectsWithoutCenter')" aria-expanded="{{ $showProjectsWithoutCenter ? 'true' : 'false' }}">
                     {{ $showProjectsWithoutCenter ? __('projects.hide_projects_without_center') : __('projects.show_projects_without_center') }}
                 </button>
                 @if ($showProjectsWithoutCenter)
-                    <span class="mt-1 flex flex-wrap gap-x-3 gap-y-1">
+                    <span class="dk-pjnote-list">
                         @foreach ($this->projectsWithoutCenter as $unmappedProject)
-                            <a href="{{ route('projects.show', $unmappedProject) }}" wire:navigate class="font-medium hover:underline">{{ $unmappedProject->name }}</a>
+                            <a href="{{ route('projects.show', $unmappedProject) }}" wire:navigate>{{ $unmappedProject->name }}</a>
                         @endforeach
                     </span>
                 @endif
-            </flux:callout.text>
-        </flux:callout>
+            </p>
+        </div>
     @endif
 
     @include('pages.projects._index-summary')
@@ -369,18 +402,14 @@ new #[Layout('layouts::desk'), Title('titles.projects')] class extends Component
         </x-ui.panel>
     @else
         <div class="flex flex-col gap-4 transition-opacity motion-reduce:transition-none" wire:loading.class="opacity-60" wire:target="{{ $loadingTargets }}">
-            @if ($view === 'board')
-                @include('pages.projects._index-board')
-            @elseif ($view === 'table')
-                @include('pages.projects._index-table')
-            @else
+            @if ($view === 'timeline')
                 @include('pages.projects._index-timeline')
+            @else
+                @include('pages.projects._index-list')
             @endif
 
             @if ($projects->hasPages())
-                <x-ui.panel class="px-4 py-3">
-                    <flux:pagination :paginator="$projects" class="text-secondary-medium! dark:text-ink-muted!" scroll-to="#project-directory-heading" />
-                </x-ui.panel>
+                <flux:pagination :paginator="$projects" class="text-secondary-medium! dark:text-ink-muted!" scroll-to="#project-directory-heading" />
             @endif
         </div>
     @endif

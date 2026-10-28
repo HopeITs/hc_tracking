@@ -403,7 +403,7 @@ test('the projects directory shows committed budgets in every view only to viewe
             'proposals' => ['Harbour Clean Water'],
         ]);
 
-    if ($view === 'board') {
+    if ($view === 'list') {
         $managers->assertSee('Aurora Foundation')->assertSee('Harbour Clean Water');
     }
 
@@ -413,16 +413,15 @@ test('the projects directory shows committed budgets in every view only to viewe
         ->assertSee('731,942');
 
     expect($financial->instance()->committedFunding)->toBe(['USD' => 731942.0]);
-})->with(['board', 'table', 'timeline']);
+})->with(['list', 'timeline']);
 
-test('the projects directory keeps the portfolio tile row whole when the committed funding tile is hidden', function () {
+test('the projects directory keeps the beneficiaries figure when the committed funding figure is hidden', function () {
     seedProjectMoneyFixture();
 
     Livewire::actingAs(userWithRole('Team Member'))
         ->test('pages::projects.index')
         ->assertSee(__('projects.tile_beneficiaries'))
-        ->assertDontSee(__('projects.tile_committed_funding'))
-        ->assertSeeHtml('dark:bg-line grid-cols-1');
+        ->assertDontSee(__('projects.tile_committed_funding'));
 });
 
 test('the project page loads no budget pivot for a viewer without funding agreements', function () {
