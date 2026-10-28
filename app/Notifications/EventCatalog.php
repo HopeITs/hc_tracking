@@ -192,6 +192,8 @@ final class EventCatalog
             // desk: a person asks someone holding their work to move it
             [
                 'nudge.sent' => self::entry('tasks', $now, 'listener', OversightMode::None),
+                'task_review.submitted' => self::entry('tasks', $now, 'listener', OversightMode::None),
+                'task_review.sent_back' => self::entry('tasks', $now, 'listener', OversightMode::None),
             ],
             // monthly-reports
             [

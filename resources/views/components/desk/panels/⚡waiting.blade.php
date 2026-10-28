@@ -125,7 +125,7 @@ new class extends Component {
      * Nudge everyone a row may reach. The row and its people are read back
      * from rows(), never from the request, so a tampered key nudges nobody.
      */
-    public function nudge(string $key, SendNudge $nudge): void
+    public function nudge(string $key, SendNudge $nudge, ?string $note = null): void
     {
         $row = $this->rows->firstWhere('key', $key);
 
@@ -136,7 +136,7 @@ new class extends Component {
         $sent = 0;
 
         foreach ($row['targets'] as $employeeId) {
-            $sent += $nudge->handle(auth()->user(), $row['subject'], $employeeId) ? 1 : 0;
+            $sent += $nudge->handle(auth()->user(), $row['subject'], $employeeId, $note) ? 1 : 0;
         }
 
         Flux::toast(text: $sent > 0 ? __('desk.nudged') : __('desk.nudged_already'), variant: $sent > 0 ? 'success' : null);
@@ -167,7 +167,10 @@ new class extends Component {
                 <li wire:key="{{ $row['key'] }}">
                     <div><p><a href="{{ $row['href'] }}" wire:navigate>{{ $row['text'] }}</a></p>@if ($row['sub'] !== '')<p class="dk-is">{{ $row['sub'] }}</p>@endif</div>
                     @if ($row['targets'] !== [])
-                        <button type="button" class="dk-btn dk-ghost dk-sm" wire:click="nudge('{{ $row['key'] }}')"><x-desk.icon name="bell" />{{ __('desk.nudge') }}</button>
+                        @php
+                            $pokeCall = "nudge('".$row['key']."'";
+                        @endphp
+                        <x-desk.poke :call="$pokeCall" :name="$row['text']" labelled />
                     @endif
                 </li>
             @endforeach

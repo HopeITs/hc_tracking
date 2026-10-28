@@ -63,7 +63,7 @@
                     <a class="dk-btn dk-lg {{ $next['mine'] || $next['owner'] === null ? 'dk-primary' : '' }}" href="{{ $next['href'] }}" wire:navigate data-test="{{ $story['stage'] === 0 ? 'new-concept-note' : 'story-next-go' }}">{{ $next['label'] }}</a>
                 @endif
                 @if ($next['nudge'] && $next['ownerName'] !== null)
-                    <button type="button" class="dk-btn" wire:click="nudgeNextStep" data-test="story-nudge"><x-desk.icon name="bell" />{{ __('desk.nudge_named', ['name' => $next['ownerName']]) }}</button>
+                    <x-desk.poke call="nudgeNextStep" :name="$next['ownerName']" class="dk-btn" data-test="story-nudge" />
                 @endif
             </div>
         @endif

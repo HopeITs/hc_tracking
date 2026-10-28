@@ -6,7 +6,6 @@ namespace App\Support\Desk;
 
 use App\Models\ProposalReviewer;
 use App\Models\User;
-use App\Support\SupervisionMap;
 use Closure;
 use Illuminate\Support\Facades\Route;
 use Illuminate\Support\Str;
@@ -37,7 +36,7 @@ final class Panels
      * @var array<string, list<array{0: string, 1: string}>>
      */
     private const array RoleLayouts = [
-        'General Manager' => [['glance', 'XL'], ['needs', 'L'], ['myteam', 'S'], ['reviews', 'S'], ['pipeline', 'L'], ['money', 'L'], ['matrix', 'XL'], ['duties', 'M'], ['targets', 'M'], ['plans', 'L'], ['projects', 'XL']],
+        'General Manager' => [['needs', 'L'], ['myteam', 'S'], ['reviews', 'S'], ['glance', 'XL'], ['pipeline', 'L'], ['money', 'L'], ['matrix', 'XL'], ['duties', 'M'], ['targets', 'M'], ['plans', 'L'], ['projects', 'XL']],
         'Public Relations Manager' => [['needs', 'L'], ['coming', 'S'], ['waiting', 'S'], ['pipeline', 'L'], ['money', 'L'], ['projects', 'XL'], ['duties', 'M'], ['transfers', 'M'], ['reviews', 'M']],
         'Public Relations' => [['needs', 'L'], ['coming', 'L'], ['tasks', 'L'], ['milestones', 'L'], ['projects', 'XL']],
         'MEAL' => [['needs', 'L'], ['validate', 'S'], ['templates', 'S'], ['matrix', 'XL'], ['targets', 'L'], ['myteam', 'L'], ['projects', 'XL'], ['reviews', 'M'], ['coming', 'M']],
@@ -280,7 +279,7 @@ final class Panels
             'reviews' => ['icon' => 'search', 'size' => 'M', 'register' => 'reviews.index', 'allows' => $this->hasReviews(...)],
             'tasks' => ['icon' => 'check', 'size' => 'L', 'register' => 'tasks.index', 'allows' => $can('tasks.view')],
             'deliverables' => ['icon' => 'board', 'size' => 'M', 'register' => 'department-tasks.index', 'allows' => $can('tasks.view')],
-            'myteam' => ['icon' => 'users', 'size' => 'M', 'register' => null, 'allows' => fn (User $user): bool => $user->employee_id !== null && SupervisionMap::superviseesOf($user->employee_id) !== []],
+            'myteam' => ['icon' => 'users', 'size' => 'M', 'register' => null, 'allows' => fn (User $user): bool => $user->employee_id !== null || $user->isAdministrator()],
             'targets' => ['icon' => 'chart', 'size' => 'L', 'register' => 'targets.index', 'allows' => $can('targets.view')],
             'duties' => ['icon' => 'file', 'size' => 'M', 'register' => 'reporting-duties.index', 'allows' => fn (User $user): bool => $user->can('reports.aggregate') || $user->can('funding-agreements.update') || $user->hasReportingDuties()],
             'milestones' => ['icon' => 'flag', 'size' => 'M', 'register' => 'milestones.index', 'allows' => $can('milestones.view')],

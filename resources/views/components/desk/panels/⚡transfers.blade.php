@@ -38,7 +38,13 @@ new class extends Component {
 
     public function shownFilter(): string
     {
-        return $this->filter === 'all' ? 'upcoming' : $this->filter;
+        return in_array($this->filter, ['late', 'received'], true) ? $this->filter : 'upcoming';
+    }
+
+    public function updatedFilter(string $filter): void
+    {
+        $this->filter = in_array($filter, ['late', 'received'], true) ? $filter : 'all';
+        $this->page = 0;
     }
 
     #[Computed]
@@ -54,17 +60,19 @@ new class extends Component {
     $format = __('desk.date_long');
 @endphp
 
-<x-desk.panel :facets="$pg['facets']" id="transfers" register="transfers.index" :size="$size" :index="$index" :total="$total" :count="$this->lateCount > 0 ? $this->lateCount : null">
-    <x-slot:tools>
-        <div class="dk-seg" role="group">
-            @foreach (['upcoming' => __('desk.filter_upcoming'), 'late' => __('desk.filter_late'), 'received' => __('desk.filter_received')] as $key => $label)
-                <button type="button" wire:click="setFilter('{{ $key }}')" aria-pressed="{{ $this->shownFilter() === $key ? 'true' : 'false' }}">{{ $label }}</button>
-            @endforeach
+<x-desk.panel :facets="$pg['facets']" :filtered="$filter !== 'all'" id="transfers" register="transfers.index" :size="$size" :index="$index" :total="$total" :count="$this->lateCount > 0 ? $this->lateCount : null">
+    <x-slot:filters>
+        <div class="contents" data-filter-defaults='{"filter":"all"}'>
+            <x-ui.header-filter-select :label="__('desk.facet.status')" wire:model="filter" :value="$filter" deferred>
+                <option value="all">{{ __('desk.filter_upcoming') }}</option>
+                <option value="late">{{ __('desk.filter_late') }}</option>
+                <option value="received">{{ __('desk.filter_received') }}</option>
+            </x-ui.header-filter-select>
         </div>
-    </x-slot:tools>
+    </x-slot:filters>
 
     @if ($pg['total'] > 0)
-        <ol class="dk-ladder">
+        <ol class="dk-ladder dk-tr">
             @foreach ($pg['slice'] as $transfer)
                 @php
                     $state = $transfer->state();
@@ -74,7 +82,7 @@ new class extends Component {
                 <li wire:key="t-{{ $transfer->id }}" class="dk-{{ $state }}">
                     <span class="dk-d">{{ $date?->translatedFormat($format) ?? '—' }}</span>
                     <i></i>
-                    <span><strong class="dk-num">{{ Money::format($received ? ($transfer->net_amount_received ?? $transfer->payment_amount) : $transfer->payment_amount, $received ? $transfer->amount_received_currency : $transfer->amount_transfered_currency) }}</strong> <span class="dk-is">{{ $transfer->donorProposal?->donor?->name ?? '—' }} · {{ $transfer->donorProposal?->proposal?->name ?? '—' }}</span></span>
+                    <span class="dk-tr-m" title="{{ $transfer->donorProposal?->donor?->name ?? '—' }} · {{ $transfer->donorProposal?->proposal?->name ?? '—' }}"><strong class="dk-num">{{ Money::format($received ? ($transfer->net_amount_received ?? $transfer->payment_amount) : $transfer->payment_amount, $received ? $transfer->amount_received_currency : $transfer->amount_transfered_currency) }}</strong> <span class="dk-is">{{ $transfer->donorProposal?->donor?->name ?? '—' }} · {{ $transfer->donorProposal?->proposal?->name ?? '—' }}</span></span>
                     <span @class(['dk-pill', 'dk-bad' => $state === 'late' || $state === 'failed', 'dk-money' => $received, 'dk-mute' => ! $received && $state !== 'late' && $state !== 'failed'])>{{ __('desk.transfer_state.'.$state) }}</span>
                 </li>
             @endforeach

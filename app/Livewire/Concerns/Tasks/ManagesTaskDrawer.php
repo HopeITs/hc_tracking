@@ -15,6 +15,7 @@ use App\Models\Milestone;
 use App\Models\Task;
 use Flux\Flux;
 use Illuminate\Support\Facades\Gate;
+use Illuminate\Validation\ValidationException;
 use Livewire\Attributes\Computed;
 use Livewire\Attributes\Locked;
 use Livewire\Attributes\Renderless;
@@ -186,7 +187,15 @@ trait ManagesTaskDrawer
             return;
         }
 
-        if (! app(CompleteTask::class)->handle($task)) {
+        try {
+            $completed = app(CompleteTask::class)->handle($task);
+        } catch (ValidationException $refused) {
+            Flux::toast(variant: 'danger', text: $refused->validator->errors()->first());
+
+            return;
+        }
+
+        if (! $completed) {
             Flux::toast(variant: 'danger', text: __('tasks.completed_tasks_cannot_change_status'));
 
             return;
@@ -214,7 +223,15 @@ trait ManagesTaskDrawer
             return;
         }
 
-        if (! app(ChangeTaskStatus::class)->handle($task, $newStatus)) {
+        try {
+            $changed = app(ChangeTaskStatus::class)->handle($task, $newStatus);
+        } catch (ValidationException $refused) {
+            Flux::toast(variant: 'danger', text: $refused->validator->errors()->first());
+
+            return;
+        }
+
+        if (! $changed) {
             Flux::toast(variant: 'danger', text: __('tasks.completed_tasks_cannot_change_status'));
 
             return;

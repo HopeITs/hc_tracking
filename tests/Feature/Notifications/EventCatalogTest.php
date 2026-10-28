@@ -36,6 +36,8 @@ function contractEventKeys(): array
         'proposal.plan_rebased',
         // Desk redesign: a person nudges whoever holds their work; user-approved, not yet in §15.2.
         'nudge.sent',
+        // Task workflow: submitted for review / sent back with a note; user-approved 2026-10-27, not yet in §15.2.
+        'task_review.submitted', 'task_review.sent_back',
     ];
 }
 
@@ -98,7 +100,7 @@ test('importance, oversight and critical follow the contract', function () {
             'project.activated', 'project.approved', 'proposal.approved', 'proposal.status_changed',
         ])
         ->and($management)->toBe(['transfer.generated', 'transfer.late', 'transfer.received'])
-        ->and($none)->toBe(['department_task.created', 'department_task.delivered', 'department_task.due', 'department_task.returned', 'nudge.sent', 'proposal.plan_rebased']);
+        ->and($none)->toBe(['department_task.created', 'department_task.delivered', 'department_task.due', 'department_task.returned', 'nudge.sent', 'proposal.plan_rebased', 'task_review.sent_back', 'task_review.submitted']);
 });
 
 test('every key has a title and a body in English and Arabic', function () {

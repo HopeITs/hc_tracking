@@ -38,14 +38,16 @@ new class extends Component {
 
 <x-desk.panel :facets="$pg['facets']" id="validate" register="monthly-reports.index" :size="$size" :index="$index" :total="$total" :count="$rows->count()">
     @if ($pg['total'] > 0)
-        <ul class="dk-plist">
+        <ul class="dk-rv">
             @foreach ($pg['slice'] as $report)
+                @php
+                    $waited = $report->submitted_at === null ? 0 : (int) $report->submitted_at->startOfDay()->diffInDays(\Carbon\CarbonImmutable::today());
+                @endphp
                 <li wire:key="v-{{ $report->id }}">
-                    <div>
-                        <strong>{{ $report->project?->name ?? '—' }}</strong>
-                        <span class="dk-is">{{ $report->period->translatedFormat('F Y') }}@if ($report->preparer !== null) · {{ $report->preparer->name }}@endif @if ($report->submitted_at !== null) · {{ \App\Support\Desk\RelativeDay::for($report->submitted_at) }}@endif</span>
-                    </div>
-                    <a href="{{ route('monthly-reports.show', $report) }}" wire:navigate class="dk-btn dk-sm dk-primary">{{ __('desk.validate') }}</a>
+                    <span class="dk-rv-n" title="{{ $report->project?->name }}">{{ $report->project?->name ?? '—' }}</span>
+                    <span class="dk-pill dk-act dk-rv-s">{{ $report->period->translatedFormat('M Y') }}</span>
+                    <span @class(['dk-rv-m dk-is', 'dk-bad' => $waited > 7])>@if ($report->preparer !== null){{ $report->preparer->name }} · @endif{{ $report->submitted_at === null ? '—' : __('desk.sent_on', ['date' => \App\Support\Desk\RelativeDay::for($report->submitted_at)]) }}@if ($waited > 7) · {{ __('desk.review_waiting_long') }}@endif</span>
+                    <a href="{{ route('monthly-reports.show', $report) }}" wire:navigate class="dk-btn dk-sm dk-primary dk-rv-a">{{ __('desk.validate') }}</a>
                 </li>
             @endforeach
         </ul>

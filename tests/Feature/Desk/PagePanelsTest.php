@@ -50,11 +50,11 @@ test('a Super Admin may place every panel and open every page, role-tied ones in
 });
 
 test('a panel lists four rows a page, and its filter popup has only dropdowns that wait for Done', function () {
-    Task::factory()->count(6)->create();
+    $admin = User::factory()->role('Super Admin')->create();
+    Task::factory()->count(6)->create(['created_by' => $admin->id]);
 
-    $panel = Livewire::actingAs(User::factory()->role('Super Admin')->create())
-        ->test('desk.panels.tasks', ['size' => 'L', 'index' => 0, 'total' => 1])
-        ->call('setScope', 'team');
+    $panel = Livewire::actingAs($admin)
+        ->test('desk.panels.tasks', ['size' => 'L', 'index' => 0, 'total' => 1]);
 
     $panel->assertSee(__('desk.range_of', ['from' => 1, 'to' => 4, 'total' => 6]))
         ->assertDontSeeHtml('data-directory-search')

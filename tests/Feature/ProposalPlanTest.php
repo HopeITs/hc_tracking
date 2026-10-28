@@ -616,7 +616,7 @@ test('the dashboard names the proposal of a late proposal-level milestone and it
     Task::factory()->create(['source_type' => 'milestone', 'source_id' => $milestone->id, 'title' => 'Book the venue', 'due_date' => '2026-02-10']);
 
     $contexts = collect(Livewire::actingAs(User::factory()->role('General Manager')->create())
-        ->test('desk.panels.needs', ['size' => 'L'])
+        ->test('desk.panels.glance', ['size' => 'XL'])
         ->instance()
         ->attentionItems)->pluck('context', 'title');
 

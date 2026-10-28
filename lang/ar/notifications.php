@@ -690,12 +690,25 @@ return [
                 'body' => 'سجّل :actor اتفاقية التمويل للمقترح «:subject»',
             ],
         ],
+        'task_review' => [
+            'submitted' => [
+                'title' => 'مهمة أُرسلت لمراجعتك',
+                'body' => 'أرسل :actor «:subject» لمراجعتك في :date',
+            ],
+            'sent_back' => [
+                'title' => 'مهمة أُعيدت',
+                'body' => 'أعاد :actor «:subject»: «:note»',
+            ],
+        ],
         'nudge' => [
             'sent' => [
-                'title' => 'تذكير',
-                'body' => 'ذكّرك :actor بـ«:subject»',
+                'title' => 'نكزة',
+                'body' => 'نكزك :actor بخصوص «:subject»',
+                'body_note' => 'نكزك :actor بخصوص «:subject»: «:note»',
+                'plain' => 'نكزك :actor',
+                'plain_note' => 'نكزك :actor: «:note»',
             ],
-            'logged' => 'ذكّر :actor :employee بـ«:subject»',
+            'logged' => 'نكز :actor :employee بخصوص «:subject»',
         ],
         'monthly_reports' => [
             'generated' => [

@@ -528,6 +528,15 @@
 .dk-addtile svg.dk-i{ width:26px;height:26px }
 /* items inside panels */
 .dk-panel .dk-items>li{ grid-template-columns:12px minmax(0,1fr);padding-block:11px;gap:4px 10px }
+/* Needs you: the primary card, a quiet brand accent on its leading edge */
+.dk-panel.dk-needs{ border-inline-start:3px solid var(--brand) }
+.dk-needs .dk-it{ overflow:hidden;text-overflow:ellipsis;white-space:nowrap }
+.dk-needs .dk-who{ color:var(--ink-2);font-weight:700 }
+.dk-allclear{ display:flex;align-items:center;gap:12px;padding:18px 4px }
+.dk-allclear p{ display:grid;gap:2px }
+.dk-allclear strong{ font-size:15px }
+.dk-allclear .dk-is{ margin:0 }
+.dk-allclear-dot{ width:12px;height:12px;flex:none;border-radius:50%;background:var(--good);box-shadow:0 0 0 5px var(--good-soft) }
 .dk-panel .dk-items .dk-acts{ grid-column:2;justify-content:flex-start;padding-top:6px;gap:6px }
 .dk-panel .dk-it{ font-size:14.5px }
 .dk-panel .dk-is{ font-size:12.5px }
@@ -548,6 +557,273 @@
 .dk-people>li{ display:flex;align-items:center;gap:10px;padding-block:8px;border-bottom:1px solid var(--line) }
 .dk-people .dk-pm{ flex:1;min-width:0 }
 .dk-people .dk-pm strong{ font-size:14px }
+/* My team: fixed avatar, truncating name block, load figures, Poke */
+.dk-team>li{ display:grid;grid-template-columns:30px minmax(0,1fr) auto 30px;align-items:center;gap:10px;padding-block:8px;border-bottom:1px solid var(--line) }
+.dk-team>li:last-child{ border-bottom:0 }
+.dk-tm-who{ display:grid;min-width:0 }
+.dk-tm-who strong,.dk-tm-who .dk-is{ overflow:hidden;text-overflow:ellipsis;white-space:nowrap }
+.dk-tm-who strong{ font-size:14px }
+.dk-tm-who .dk-is{ font-size:12.5px;margin-top:1px }
+.dk-tm-load{ display:grid;justify-items:end;font-size:12.5px;line-height:1.35;white-space:nowrap }
+.dk-tm-load b{ font-size:14px;font-weight:800 }
+.dk-panel[style*="--span:3"] .dk-team>li{ grid-template-columns:30px minmax(0,1fr) 30px }
+.dk-panel[style*="--span:3"] .dk-tm-load{ grid-column:2;grid-row:2;justify-items:start;display:flex;gap:8px }
+/* Tasks card: title block · assignees · 4-dot phase stepper; review actions under it */
+.dk-tk>li{ display:grid;grid-template-columns:minmax(0,1fr) auto 76px;align-items:center;gap:4px 12px;padding-block:9px;border-bottom:1px solid var(--line) }
+.dk-tk>li:last-child{ border-bottom:0 }
+.dk-tk-main{ min-width:0 }
+.dk-tk-t{ display:block;font-size:14px;font-weight:700;color:var(--ink);overflow:hidden;text-overflow:ellipsis;white-space:nowrap }
+.dk-tk-t:hover{ text-decoration:underline }
+.dk-tk .dk-done .dk-tk-t,.dk-tk>li.dk-done .dk-tk-t{ color:var(--faint);text-decoration:line-through }
+.dk-tk .dk-ms{ font-size:11px;font-weight:800;letter-spacing:.06em;text-transform:uppercase;color:var(--active);margin-inline-end:6px }
+[lang="ar"] .dk-tk .dk-ms{ letter-spacing:0;font-size:12px }
+.dk-tk .dk-is{ display:flex;min-width:0;font-size:12.5px;margin-top:2px;white-space:nowrap }
+.dk-tk-p{ overflow:hidden;text-overflow:ellipsis;min-width:0 }
+.dk-tk-av{ display:flex;justify-content:flex-end }
+.dk-av-xs{ width:24px;height:24px;font-size:10px;border:2px solid var(--paper);margin-inline-start:-6px }
+.dk-av-xs:first-child{ margin-inline-start:0 }
+.dk-tk-steps{ display:flex;align-items:center;justify-content:space-between;position:relative;justify-self:end;width:76px }
+ol.dk-tk-steps::before{ content:"";position:absolute;inset-inline:6px;top:50%;height:1px;background:var(--line-2) }
+.dk-tk-steps>li{ position:relative;display:grid;place-items:center }
+span.dk-pill.dk-tk-steps{ width:auto }
+.dk-step{ display:block;width:12px;height:12px;padding:0;border-radius:50%;border:2px solid var(--line-2);background:var(--paper) }
+.dk-step.dk-past{ background:var(--ink-3);border-color:var(--ink-3) }
+.dk-step.dk-now{ background:var(--brand);border-color:var(--brand);box-shadow:0 0 0 3px var(--brand-soft) }
+.dk-step.dk-no{ opacity:.45;cursor:not-allowed }
+button.dk-step.dk-go{ cursor:pointer;border-color:var(--brand) }
+button.dk-step.dk-go:hover,button.dk-step.dk-go:focus-visible{ background:var(--brand-soft) }
+.dk-tk-review{ grid-column:1 / -1;display:flex;gap:6px;justify-content:flex-end }
+.dk-panel[style*="--span:3"] .dk-tk>li,.dk-panel[style*="--span:4"] .dk-tk>li{ grid-template-columns:minmax(0,1fr) 76px }
+.dk-panel[style*="--span:3"] .dk-tk-av,.dk-panel[style*="--span:4"] .dk-tk-av{ grid-column:1;justify-content:flex-start }
+.dk-panel[style*="--span:3"] .dk-tk-steps,.dk-panel[style*="--span:4"] .dk-tk-steps{ grid-column:2;grid-row:1 }
+.dk-panel[style*="--span:3"] .dk-tk-review,.dk-panel[style*="--span:4"] .dk-tk-review{ justify-content:flex-start }
+/* Milestones: name + health on line 1, project · due + progress on line 2; one line at W/XL */
+.dk-ms-rows>li{ display:grid;grid-template-columns:minmax(0,1fr) auto;grid-template-areas:"n h" "m b";align-items:center;gap:3px 12px;padding-block:9px;border-bottom:1px solid var(--line) }
+.dk-ms-rows>li:last-child{ border-bottom:0 }
+.dk-ms-n{ grid-area:n;min-width:0;font-size:14px;font-weight:700;color:var(--ink);overflow:hidden;text-overflow:ellipsis;white-space:nowrap }
+.dk-ms-n:hover{ text-decoration:underline }
+.dk-ms-h{ grid-area:h;justify-self:end }
+.dk-ms-meta{ grid-area:m;display:flex;min-width:0;margin:0;font-size:12.5px;white-space:nowrap }
+.dk-ms-p{ overflow:hidden;text-overflow:ellipsis;min-width:0 }
+.dk-ms-bar{ grid-area:b;display:grid;grid-template-columns:72px 36px;align-items:center;gap:8px;justify-self:end;font-size:12.5px;color:var(--ink-2);text-align:end }
+.dk-ms-bar .dk-meter{ margin:0 }
+.dk-ms-bar .dk-meter b{ background:var(--ink-2) }
+[data-health="bad"] .dk-ms-bar .dk-meter b{ background:var(--bad) }
+[data-health="warn"] .dk-ms-bar .dk-meter b{ background:var(--warn) }
+.dk-panel[style*="--span:8"] .dk-ms-rows>li,.dk-panel[style*="--span:12"] .dk-ms-rows>li{ grid-template-columns:minmax(0,1.4fr) minmax(0,1fr) 116px 110px;grid-template-areas:"n m b h" }
+/* My agenda: type colours, 14-day load strip, grouped list, month grid + day popover */
+.dk-k-ms{ --k:var(--active) } .dk-k-task{ --k:var(--ink-2) } .dk-k-rep{ --k:var(--warn) } .dk-k-money{ --k:var(--money) } .dk-k-donor{ --k:var(--brand) }
+.dk-kdot{ display:inline-block;width:8px;height:8px;flex:none;border-radius:50%;background:var(--k,var(--ink-3)) }
+.dk-load{ display:grid;grid-template-columns:repeat(14,minmax(0,1fr));gap:3px;margin-bottom:8px }
+.dk-ld{ display:grid;grid-template-rows:34px auto;gap:2px;padding:3px 0 2px;border:0;border-radius:7px;background:none;cursor:pointer;color:var(--ink-3) }
+.dk-ld:hover{ background:var(--sunk) }
+.dk-ld.dk-on{ background:var(--sunk);color:var(--ink) }
+.dk-ld-bar{ position:relative;width:8px;justify-self:center;border-radius:4px;background:var(--line) }
+.dk-ld-bar b{ position:absolute;inset-inline:0;bottom:0;border-radius:4px;background:var(--ink-3) }
+.dk-ld.dk-busy .dk-ld-bar b{ background:var(--warn) }
+.dk-ld-d{ font-size:10.5px;text-align:center;line-height:1 }
+.dk-ld.dk-today .dk-ld-d{ color:var(--brand-ink);font-weight:800 }
+.dk-ld.dk-today .dk-ld-bar{ box-shadow:0 0 0 2px var(--brand-soft) }
+.dk-ld-pick{ margin:0 0 4px;font-size:12.5px }
+.dk-link{ border:0;background:none;padding:0;color:var(--brand-ink);font:inherit;font-weight:700;cursor:pointer }
+.dk-agenda>li.dk-ag-h{ font-size:11px;font-weight:800;letter-spacing:.08em;text-transform:uppercase;color:var(--ink-3);padding:8px 0 2px }
+[lang="ar"] .dk-agenda>li.dk-ag-h{ letter-spacing:0;font-size:12px }
+.dk-agenda>li.dk-ag{ display:grid;grid-template-columns:48px 8px minmax(0,1fr);align-items:center;gap:10px;padding-block:7px;border-bottom:1px solid var(--line) }
+.dk-ag.dk-past{ opacity:.6 }
+.dk-ag-d{ font-size:12.5px;font-weight:700;color:var(--ink-2) }
+.dk-ag-m{ display:grid;min-width:0 }
+.dk-ag-m a,.dk-ag-m .dk-is{ overflow:hidden;text-overflow:ellipsis;white-space:nowrap }
+.dk-ag-m a{ font-size:14px;font-weight:700;color:var(--ink) }
+.dk-ag-m .dk-is{ font-size:12.5px;margin-top:1px }
+.dk-mcal{ display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:3px;margin-bottom:6px }
+.dk-mcal .dk-wd{ font-size:10.5px;color:var(--ink-3);text-align:center;font-weight:800;padding-bottom:2px }
+.dk-mday{ display:grid;grid-template-rows:1fr 8px;place-items:center;aspect-ratio:1/1;max-height:46px;width:100%;padding:3px 0;border:0;border-radius:8px;background:none;cursor:pointer;color:var(--ink-2);font-size:12.5px;line-height:1 }
+.dk-mday:hover{ background:var(--sunk) }
+.dk-mday.dk-today{ color:var(--brand-ink);font-weight:800;box-shadow:inset 0 0 0 2px var(--brand) }
+.dk-mday.dk-on{ background:var(--sunk);color:var(--ink) }
+.dk-mdots{ display:flex;align-items:center;gap:2px;height:8px }
+.dk-mdots i{ width:5px;height:5px;border-radius:50%;background:var(--k,var(--ink-3)) }
+.dk-mdots b{ font-size:8.5px;font-weight:800;color:var(--ink-3) }
+.dk-daypop{ position:fixed;z-index:70;width:min(280px,calc(100vw - 24px));max-height:240px;overflow:auto;background:var(--paper);border:1px solid var(--line);border-radius:12px;box-shadow:var(--dk-shadow);padding:10px 12px }
+.dk-daypop ul{ display:grid;gap:6px;margin-top:6px }
+.dk-daypop li{ display:grid;grid-template-columns:8px minmax(0,1fr);gap:2px 8px;align-items:center }
+.dk-daypop li a{ font-size:13.5px;font-weight:700;color:var(--ink);overflow:hidden;text-overflow:ellipsis;white-space:nowrap }
+.dk-daypop li .dk-is{ grid-column:2;margin:0;font-size:12px }
+/* Monthly reports: CSS-grid matrix (identical centred squares), late-first list at S/M, legend filters */
+.dk-mx-sum{ font-size:13px;color:var(--ink-2);margin:0 0 8px }
+.dk-mx-sum b{ font-size:15px;font-weight:800 }
+.dk-mx2{ display:grid;gap:2px }
+.dk-mx2-r{ display:grid;grid-template-columns:minmax(0,1fr) repeat(var(--months),28px) 44px;align-items:center;column-gap:4px;padding-block:3px }
+.dk-mx2-h{ font-size:11px;font-weight:800;color:var(--ink-3) }
+.dk-mx2-h>span{ text-align:center;white-space:nowrap;overflow:hidden }
+.dk-mx2-h>span:first-child{ text-align:start }
+.dk-mx2-n{ display:grid;min-width:0 }
+.dk-mx2-n a,.dk-mx2-n .dk-is{ overflow:hidden;text-overflow:ellipsis;white-space:nowrap }
+.dk-mx2-n a{ font-size:13.5px;font-weight:700;color:var(--ink) }
+.dk-mx2-n .dk-is{ font-size:11.5px;margin-top:1px }
+.dk-mx2-c{ display:grid;place-items:center;height:28px }
+.dk-mx2 .dk-mc{ width:24px;min-width:0;height:24px;border-radius:6px;font-size:11px;line-height:1;display:grid;place-items:center }
+.dk-mx2 .dk-mc.dk-dim{ opacity:.18 }
+.dk-mx2-v{ text-align:end;font-size:12.5px;color:var(--ink-2) }
+.dk-mx-list>li{ display:grid;grid-template-columns:minmax(0,1fr) auto;align-items:center;gap:2px 10px;padding-block:8px;border-bottom:1px solid var(--line) }
+.dk-mx-list>li:last-child{ border-bottom:0 }
+.dk-mx-ln{ min-width:0;font-size:14px;font-weight:700;color:var(--ink);overflow:hidden;text-overflow:ellipsis;white-space:nowrap }
+.dk-mx-list .dk-is{ grid-column:1 / -1;margin:0;font-size:12.5px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap }
+.dk-mxp-late{ color:var(--bad);background:var(--bad-soft) }
+.dk-mxp-returned{ color:var(--warn);background:var(--warn-soft) }
+.dk-mxp-submitted{ color:var(--active);background:var(--active-soft) }
+.dk-mxp-validated{ color:var(--good);background:var(--good-soft) }
+.dk-mxp-draft{ color:var(--ink-3);background:var(--sunk) }
+.dk-legend button{ display:inline-flex;align-items:center;gap:6px;border:0;background:none;padding:3px 6px;margin-inline:-6px 0;border-radius:999px;font:inherit;font-size:12.5px;color:var(--ink-3);cursor:pointer }
+.dk-legend button:hover{ background:var(--sunk) }
+.dk-legend button.dk-on{ background:var(--sunk);color:var(--ink);font-weight:700 }
+.dk-legend button .dk-num{ color:var(--ink-2) }
+/* At a glance: a typographic row with thin dividers at W/XL, two columns at M/L, a list at S */
+.dk-glance{ display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:0 }
+.dk-glance>li{ min-width:0;border-bottom:1px solid var(--line) }
+.dk-gl-a{ display:grid;gap:2px;align-content:start;padding:10px 12px 10px 0;color:inherit;border-radius:8px }
+[dir="rtl"] .dk-gl-a{ padding:10px 0 10px 12px }
+a.dk-gl-a:hover strong{ text-decoration:underline;text-decoration-thickness:2px }
+.dk-gl-a strong{ font-size:clamp(26px,2.6vw,36px);font-weight:800;letter-spacing:-.02em;line-height:1.05;color:var(--ink) }
+.dk-gl-l{ font-size:12.5px;color:var(--ink-2);line-height:1.35 }
+.dk-gl-d{ font-size:12px;font-weight:700;color:var(--ink-3) }
+.dk-gl-d.dk-good{ color:var(--good) }
+.dk-gl-d.dk-bad{ color:var(--bad) }
+.dk-panel[style*="--span:8"] .dk-glance,.dk-panel[style*="--span:12"] .dk-glance{ grid-template-columns:repeat(var(--figs),minmax(0,1fr)) }
+.dk-panel[style*="--span:8"] .dk-glance>li,.dk-panel[style*="--span:12"] .dk-glance>li{ border-bottom:0;border-inline-end:1px solid var(--line);padding-inline-start:14px }
+.dk-panel[style*="--span:8"] .dk-glance>li:first-child,.dk-panel[style*="--span:12"] .dk-glance>li:first-child{ padding-inline-start:0 }
+.dk-panel[style*="--span:8"] .dk-glance>li:last-child,.dk-panel[style*="--span:12"] .dk-glance>li:last-child{ border-inline-end:0 }
+.dk-panel[style*="--span:3"] .dk-glance{ grid-template-columns:1fr }
+.dk-panel[style*="--span:3"] .dk-gl-a{ grid-template-columns:auto minmax(0,1fr);align-items:baseline;column-gap:10px;padding-block:7px }
+.dk-panel[style*="--span:3"] .dk-gl-a strong{ font-size:22px;grid-row:span 2 }
+@media (max-width: 1279px){ .dk-panel[style*="--span:8"] .dk-glance{ grid-template-columns:repeat(3,minmax(0,1fr));row-gap:8px } }
+/* Proposal pipeline: fixed columns so the status pill sits at the same x on every row; two lines at S/M */
+.dk-pl-sum{ font-size:12.5px;color:var(--ink-3);margin:0 0 6px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis }
+.dk-pl>li{ display:grid;grid-template-columns:minmax(0,1.4fr) minmax(0,1fr) 132px 74px 28px;grid-template-areas:"n d s t o";align-items:center;gap:2px 12px;padding-block:9px;border-bottom:1px solid var(--line) }
+.dk-pl.dk-pl-money>li{ grid-template-columns:minmax(0,1.4fr) minmax(0,1fr) 132px 104px 74px 28px;grid-template-areas:"n d s m t o" }
+.dk-pl>li:last-child{ border-bottom:0 }
+.dk-pl-n{ grid-area:n;min-width:0;font-size:14px;font-weight:700;color:var(--ink);overflow:hidden;text-overflow:ellipsis;white-space:nowrap }
+.dk-pl-d{ grid-area:d;min-width:0;font-size:12.5px;color:var(--ink-3);overflow:hidden;text-overflow:ellipsis;white-space:nowrap }
+.dk-pl-s{ grid-area:s;min-width:0 }
+.dk-pl-s .dk-pill{ max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;display:inline-block }
+.dk-pl-m{ grid-area:m;text-align:end;font-size:12.5px;color:var(--ink-2);white-space:nowrap }
+.dk-pl-t{ grid-area:t;text-align:end;font-size:12px;color:var(--ink-3);white-space:nowrap }
+.dk-pl-t.dk-bad{ color:var(--bad);font-weight:700 }
+.dk-pl-o{ grid-area:o;display:flex;justify-content:flex-end }
+.dk-panel[style*="--span:6"] .dk-pl>li{ grid-template-columns:minmax(0,1fr) 132px 74px 28px;grid-template-areas:"n s t o" "d s t o" }
+.dk-panel[style*="--span:6"] .dk-pl.dk-pl-money>li{ grid-template-columns:minmax(0,1fr) 120px 96px 70px 28px;grid-template-areas:"n s m t o" "d s m t o" }
+.dk-panel[style*="--span:3"] .dk-pl>li,.dk-panel[style*="--span:4"] .dk-pl>li,.dk-panel[style*="--span:3"] .dk-pl.dk-pl-money>li,.dk-panel[style*="--span:4"] .dk-pl.dk-pl-money>li{ grid-template-columns:minmax(0,1fr) auto;grid-template-areas:"n s" "d d" "m t";row-gap:3px }
+.dk-panel[style*="--span:3"] .dk-pl-o,.dk-panel[style*="--span:4"] .dk-pl-o{ display:none }
+.dk-panel[style*="--span:3"] .dk-pl-m,.dk-panel[style*="--span:4"] .dk-pl-m{ text-align:start }
+.dk-panel[style*="--span:3"] .dk-pl-d::after,.dk-panel[style*="--span:4"] .dk-pl-d::after{ content:attr(data-owner) }
+/* Funding position: small totals line, then agreement rows (name · bar · amounts · next tranche) */
+.dk-fp-tot{ display:flex;flex-wrap:wrap;gap:2px 16px;font-size:12.5px;color:var(--ink-2);margin:0 0 6px }
+.dk-fp-tot b{ font-weight:800;color:var(--money) }
+.dk-fp>li{ display:grid;grid-template-columns:minmax(0,1fr) 90px auto 128px;grid-template-areas:"n b v t";align-items:center;gap:3px 12px;padding-block:9px;border-bottom:1px solid var(--line) }
+.dk-fp>li:last-child{ border-bottom:0 }
+.dk-fp-n{ grid-area:n;min-width:0;font-size:14px;font-weight:700;color:var(--ink);overflow:hidden;text-overflow:ellipsis;white-space:nowrap }
+.dk-fp-n .dk-is{ font-weight:400;font-size:12.5px }
+.dk-fp-bar{ grid-area:b }
+.dk-fp-bar .dk-meter{ margin:0 }
+[data-status="overdue"] .dk-fp-bar .dk-meter b{ background:var(--bad) }
+.dk-fp-v{ grid-area:v;font-size:12.5px;white-space:nowrap;text-align:end }
+.dk-fp-t{ grid-area:t;display:flex;justify-content:flex-end;min-width:0 }
+.dk-fp-t .dk-pill{ max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap }
+.dk-panel[style*="--span:3"] .dk-fp>li,.dk-panel[style*="--span:4"] .dk-fp>li,.dk-panel[style*="--span:6"] .dk-fp>li{ grid-template-columns:minmax(0,1fr) auto;grid-template-areas:"n t" "b v" }
+.dk-panel[style*="--span:3"] .dk-fp-bar,.dk-panel[style*="--span:4"] .dk-fp-bar,.dk-panel[style*="--span:6"] .dk-fp-bar{ min-width:60px }
+/* Donor reporting: title + days on line 1, donor · project · type + state on line 2 */
+.dk-dr>li{ display:grid;grid-template-columns:minmax(0,1fr) auto;grid-template-areas:"n t" "m s";align-items:center;gap:3px 12px;padding-block:9px;border-bottom:1px solid var(--line) }
+.dk-dr>li:last-child{ border-bottom:0 }
+.dk-dr-n{ grid-area:n;min-width:0;font-size:14px;font-weight:700;color:var(--ink);overflow:hidden;text-overflow:ellipsis;white-space:nowrap }
+.dk-dr-t{ grid-area:t;justify-self:end;font-size:12.5px;font-weight:700;color:var(--ink-3);white-space:nowrap }
+.dk-dr-t.dk-warn{ color:var(--warn) }
+.dk-dr-m{ grid-area:m;min-width:0;margin:0;font-size:12.5px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap }
+.dk-dr-s{ grid-area:s;justify-self:end;white-space:nowrap }
+.dk-panel[style*="--span:8"] .dk-dr>li,.dk-panel[style*="--span:12"] .dk-dr>li{ grid-template-columns:minmax(0,1fr) minmax(0,1.2fr) 120px 96px;grid-template-areas:"n m s t" }
+/* Donors: name · type + proposal-status strip on line 1; last contact → next step + money on line 2 */
+.dk-dn>li{ display:grid;grid-template-columns:minmax(0,1fr) auto;grid-template-areas:"n s" "m v";align-items:center;gap:3px 12px;padding-block:9px;border-bottom:1px solid var(--line) }
+.dk-dn>li:last-child{ border-bottom:0 }
+.dk-dn-n{ grid-area:n;min-width:0;font-size:14px;font-weight:700;color:var(--ink);overflow:hidden;text-overflow:ellipsis;white-space:nowrap }
+.dk-dn-n .dk-is{ font-weight:400;font-size:12.5px }
+.dk-dn-strip{ grid-area:s;display:flex;align-items:center;gap:3px;justify-self:end }
+.dk-dn-strip i{ width:9px;height:9px;border-radius:50%;background:var(--ink-3) }
+.dk-dn-strip i.dk-dot-act{ background:var(--active) } .dk-dn-strip i.dk-dot-good{ background:var(--good) } .dk-dn-strip i.dk-dot-bad{ background:var(--bad) } .dk-dn-strip i.dk-dot-mute{ background:var(--line-2) }
+.dk-dn-strip b{ font-size:10.5px;color:var(--ink-3);margin-inline-start:2px }
+.dk-dn-m{ grid-area:m;min-width:0;margin:0;font-size:12.5px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap }
+.dk-dn-v{ grid-area:v;display:grid;justify-items:end;font-size:12px;white-space:nowrap }
+.dk-dn-v .dk-meter{ width:96px;margin-top:3px }
+.dk-panel[style*="--span:3"] .dk-dn.dk-dn-money>li,.dk-panel[style*="--span:4"] .dk-dn.dk-dn-money>li{ grid-template-areas:"n s" "m m" "v v" }
+.dk-panel[style*="--span:3"] .dk-dn-v,.dk-panel[style*="--span:4"] .dk-dn-v{ justify-items:start }
+/* Every project: name · lens · health; at S/M the lens takes line 2, so every lens differs at every size */
+.dk-pj>li{ display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1.1fr) 104px;grid-template-areas:"n l h";align-items:center;gap:4px 14px;padding-block:9px;border-bottom:1px solid var(--line) }
+.dk-pj>li:last-child{ border-bottom:0 }
+.dk-pj-n{ grid-area:n;display:grid;min-width:0 }
+.dk-pj-n a{ display:flex;align-items:center;gap:6px;min-width:0;font-size:14px;font-weight:700;color:var(--ink);overflow:hidden;text-overflow:ellipsis;white-space:nowrap }
+.dk-pj-n a .dk-att{ flex:none }
+.dk-pj-n .dk-is{ margin:1px 0 0;font-size:12.5px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap }
+.dk-pj-l{ grid-area:l;display:grid;gap:4px;min-width:0;font-size:12.5px;color:var(--ink-2) }
+.dk-pj-l .dk-meter{ margin:0 }
+.dk-pj-l .dk-thread{ margin:0 }
+.dk-pj-v{ overflow:hidden;text-overflow:ellipsis;white-space:nowrap }
+.dk-pj-v strong{ color:var(--money);font-weight:800 }
+.dk-pj-res{ display:flex;flex-wrap:wrap;gap:2px 14px }
+.dk-pj-res b{ font-size:14px;font-weight:800;color:var(--ink) }
+.dk-pj-res b.dk-bad{ color:var(--bad) }
+.dk-pj-tl{ position:relative;height:6px;border-radius:6px;background:var(--sunk) }
+.dk-pj-tl b{ position:absolute;inset-block:0;inset-inline-start:0;border-radius:6px;background:var(--ink-3) }
+.dk-pj-tl i{ position:absolute;top:-3px;width:2px;height:12px;background:var(--brand);border-radius:1px }
+.dk-pj-h{ grid-area:h;justify-self:end;white-space:nowrap }
+.dk-panel[style*="--span:3"] .dk-pj>li,.dk-panel[style*="--span:4"] .dk-pj>li{ grid-template-columns:minmax(0,1fr) auto;grid-template-areas:"n h" "l l" }
+/* Annual plans: program · done bar with expected tick · done/expected; targets behind · owner below */
+.dk-ap>li{ display:grid;grid-template-columns:minmax(0,1fr) minmax(80px,140px) 76px;grid-template-areas:"n b v" "m m m";align-items:center;gap:3px 12px;padding-block:9px;border-bottom:1px solid var(--line) }
+.dk-ap>li:last-child{ border-bottom:0 }
+.dk-ap-n{ grid-area:n;min-width:0;font-size:14px;font-weight:700;color:var(--ink);overflow:hidden;text-overflow:ellipsis;white-space:nowrap }
+.dk-ap-bar{ grid-area:b }
+.dk-ap-bar .dk-meter{ margin:0 }
+.dk-ap>li.dk-behind .dk-meter b{ background:var(--warn) }
+.dk-ap-v{ grid-area:v;text-align:end;font-size:12px;color:var(--ink-3);white-space:nowrap }
+.dk-ap-v b{ font-size:13.5px;color:var(--ink) }
+.dk-ap-m{ grid-area:m;margin:0;font-size:12.5px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap }
+.dk-panel[style*="--span:3"] .dk-ap>li{ grid-template-columns:minmax(0,1fr) auto;grid-template-areas:"n v" "b b" "m m" }
+/* My reviews + Report templates status: name · pill on line 1, meta · action on line 2 */
+.dk-rv>li,.dk-tp>li{ display:grid;grid-template-columns:minmax(0,1fr) auto;grid-template-areas:"n s" "m a";align-items:center;gap:3px 12px;padding-block:9px;border-bottom:1px solid var(--line) }
+.dk-rv>li:last-child,.dk-tp>li:last-child{ border-bottom:0 }
+.dk-rv-n,.dk-tp-n{ grid-area:n;min-width:0;font-size:14px;font-weight:700;color:var(--ink);overflow:hidden;text-overflow:ellipsis;white-space:nowrap }
+.dk-rv-s,.dk-tp-s{ grid-area:s;justify-self:end;white-space:nowrap }
+.dk-rv-m,.dk-tp-m{ grid-area:m;margin:0;font-size:12.5px;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap }
+.dk-rv-m.dk-bad{ color:var(--bad);font-weight:700 }
+.dk-rv-a,.dk-tp-a{ grid-area:a;justify-self:end }
+/* Targets behind: name · rating on line 1, meter with expected tick · values on line 2 */
+.dk-tg>li{ display:grid;grid-template-columns:minmax(0,1fr) auto;grid-template-areas:"n s" "b v";align-items:center;gap:4px 12px;padding-block:9px;border-bottom:1px solid var(--line) }
+.dk-tg>li:last-child{ border-bottom:0 }
+.dk-tg-n{ grid-area:n;min-width:0;font-size:14px;font-weight:700;color:var(--ink);overflow:hidden;text-overflow:ellipsis;white-space:nowrap }
+.dk-tg-n .dk-mono{ color:var(--ink-3);font-weight:700;font-size:12px }
+.dk-tg-n .dk-is{ font-weight:400;font-size:12.5px }
+.dk-tg-s{ grid-area:s;justify-self:end }
+.dk-tg-b{ grid-area:b;min-width:0 }
+.dk-tg-b .dk-meter{ margin:0 }
+.dk-tg-v{ grid-area:v;justify-self:end;font-size:12px;color:var(--ink-3);white-space:nowrap }
+.dk-tg-v strong{ font-size:13.5px;color:var(--ink) }
+/* Transfers ladder: at S/M the amount line wraps under the date and state */
+.dk-tr>li{ grid-template-columns:96px 12px minmax(0,1fr) auto }
+.dk-tr-m{ min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap }
+.dk-panel[style*="--span:3"] .dk-tr>li,.dk-panel[style*="--span:4"] .dk-tr>li{ grid-template-columns:12px minmax(0,1fr) auto;grid-template-areas:"i d s" "i m m";row-gap:2px }
+.dk-panel[style*="--span:3"] .dk-tr>li>i,.dk-panel[style*="--span:4"] .dk-tr>li>i{ grid-area:i }
+.dk-panel[style*="--span:3"] .dk-tr .dk-d,.dk-panel[style*="--span:4"] .dk-tr .dk-d{ grid-area:d }
+.dk-panel[style*="--span:3"] .dk-tr-m,.dk-panel[style*="--span:4"] .dk-tr-m{ grid-area:m }
+.dk-panel[style*="--span:3"] .dk-tr .dk-pill,.dk-panel[style*="--span:4"] .dk-tr .dk-pill{ grid-area:s }
+/* Waiting on others: the sentence truncates to two lines, the Poke button never shrinks */
+.dk-wait>li>div{ min-width:0;flex:1 }
+.dk-wait>li>div p:first-child{ display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden }
+.dk-wait>li>.dk-poke{ flex:none }
+.dk-poke{ display:inline-flex }
+.dk-poke-pop{ position:fixed;z-index:70;width:min(300px,calc(100vw - 24px));background:var(--paper);border:1px solid var(--line);border-radius:12px;box-shadow:var(--dk-shadow);padding:12px;display:grid;gap:8px }
+.dk-poke-h{ font-size:14px;font-weight:800 }
+.dk-poke-chips{ display:flex;flex-wrap:wrap;gap:6px }
+.dk-poke-chips .dk-chip{ height:26px;font-size:12px;padding-inline:10px }
+.dk-poke-pop textarea{ width:100%;resize:none;border:1px solid var(--line-2);border-radius:8px;background:var(--sunk);color:var(--ink);padding:8px;font:inherit;font-size:13.5px }
+.dk-poke-f{ display:flex;align-items:center;gap:6px }
+.dk-poke-f .dk-is{ margin:0;margin-inline-end:auto;font-size:12px }
 .dk-hist>li{ grid-template-columns:24px minmax(0,1fr);align-items:start;font-size:13.5px;padding-block:6px }
 .dk-panel .dk-rows>li{ grid-template-columns:22px minmax(150px,1fr) minmax(170px,.9fr) minmax(200px,1.3fr) 110px 18px;padding:10px 8px;margin-inline:-8px }
 .dk-panel .dk-rn strong{ font-size:14.5px }

@@ -45,14 +45,19 @@ new class extends Component {
 
 <x-desk.panel :facets="$pg['facets']" id="reviews" register="reviews.index" :size="$size" :index="$index" :total="$total" :count="$rows->isNotEmpty() ? $rows->count() : null">
     @if ($pg['total'] > 0)
-        <ul class="dk-plist">
+        <ul class="dk-rv">
             @foreach ($pg['slice'] as $review)
-                <li wire:key="rv-{{ $review->id }}">
-                    <div>
-                        <strong>@if ($review->proposal !== null)<a href="{{ route('proposals.show', $review->proposal) }}" wire:navigate>{{ $review->proposal->name }}</a>@else — @endif</strong>
-                        <span class="dk-is">{{ $review->stage->label() }} · {{ $review->slot->label() }}</span>
-                    </div>
-                    <span class="dk-small dk-muted dk-num" title="{{ $review->created_at?->translatedFormat(__('formats.date_long')) }}">{{ __('desk.asked_on', ['when' => \App\Support\Desk\RelativeDay::for($review->created_at)]) }}</span>
+                @php
+                    $waited = $review->created_at === null ? 0 : (int) $review->created_at->startOfDay()->diffInDays(\Carbon\CarbonImmutable::today());
+                    $long = $waited > 7;
+                @endphp
+                <li wire:key="rv-{{ $review->id }}" @class(['dk-long' => $long])>
+                    <span class="dk-rv-n" title="{{ $review->proposal?->name }}">{{ $review->proposal?->name ?? '—' }}</span>
+                    <span class="dk-pill dk-act dk-rv-s">{{ $review->stage->label() }}</span>
+                    <span @class(['dk-rv-m dk-is', 'dk-bad' => $long]) title="{{ $review->created_at?->translatedFormat(__('formats.date_long')) }}">{{ __('desk.asked_on', ['when' => \App\Support\Desk\RelativeDay::for($review->created_at)]) }}@if ($long) · {{ __('desk.review_waiting_long') }}@endif · {{ $review->slot->label() }}</span>
+                    @if ($review->proposal !== null)
+                        <a href="{{ route('proposals.show', $review->proposal) }}" wire:navigate @class(['dk-btn dk-sm dk-rv-a', 'dk-primary' => $long])>{{ __('desk.review_action') }}</a>
+                    @endif
                 </li>
             @endforeach
         </ul>

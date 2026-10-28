@@ -2,9 +2,9 @@
 
 use App\Livewire\Concerns\Dashboard\ReadsDashboardAttention;
 use App\Livewire\Concerns\Dashboard\ReadsDashboardWork;
+use App\Livewire\Concerns\Dashboard\ReadsDeskDecisions;
 use App\Livewire\Concerns\Desk\ArrangesPanels;
 use App\Support\Desk\Panels;
-use Carbon\CarbonImmutable;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Livewire\Attributes\Computed;
@@ -21,6 +21,7 @@ new #[Layout('layouts::desk'), Title('titles.dashboard')] class extends Componen
     use ArrangesPanels;
     use ReadsDashboardAttention;
     use ReadsDashboardWork;
+    use ReadsDeskDecisions;
 
     /**
      * @return list<array{panel: string, size: string}>
@@ -52,20 +53,17 @@ new #[Layout('layouts::desk'), Title('titles.dashboard')] class extends Componen
     }
 
     /**
-     * How many things need the viewer, and how many of those are late, for the greeting.
+     * How many decisions wait on the viewer, and how many of those are late,
+     * for the greeting: the same rows as the Needs you panel's This week view.
      *
      * @return array{total: int, late: int}
      */
     #[Computed]
     public function needsCount(): array
     {
-        $late = $this->attentionItems->filter(fn (array $item): bool => ($item['daysLate'] ?? 0) > 0)->count();
-        $weekEnd = CarbonImmutable::today()->addDays(7);
-        $soon = $this->upcoming->filter(fn (array $item): bool => $item['date']->lessThanOrEqualTo($weekEnd))
-            ->reject(fn (array $item): bool => $this->attentionItems->contains('key', $item['key']))
-            ->count();
+        $week = $this->decisionsIn('week');
 
-        return ['total' => $this->attentionItems->count() + $soon, 'late' => $late];
+        return ['total' => $week->count(), 'late' => $week->where('late', true)->count()];
     }
 
     /**

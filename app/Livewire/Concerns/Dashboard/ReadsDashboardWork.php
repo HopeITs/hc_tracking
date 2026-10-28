@@ -15,7 +15,7 @@ use App\Models\Task;
 use App\Models\TaskAssignee;
 use App\Models\TransfersTracking;
 use App\Models\User;
-use App\Support\SupervisionMap;
+use App\Support\Desk\TeamScope;
 use Carbon\CarbonImmutable;
 use Illuminate\Database\Eloquent\Relations\MorphTo;
 use Illuminate\Support\Collection;
@@ -35,26 +35,21 @@ use Livewire\Attributes\Computed;
 trait ReadsDashboardWork
 {
     /**
-     * The people the signed-in person supervises (SupervisionMap: HR direct
-     * reports plus local supervisions, active employees only) and how many
-     * open tasks each has overdue, most overdue first.
+     * The signed-in person's team (TeamScope: their reports, the people on
+     * their projects and their department, each under the closest tie) and
+     * how many open tasks each has overdue, most overdue first.
      *
-     * Supervision grants no visibility: the count runs as the signed-in user,
-     * so TaskVisibilityScope still applies. A fixed number of queries however
-     * many people are listed; with nobody to supervise, only the map loads.
+     * Being on the team grants no visibility: the count runs as the signed-in
+     * user, so TaskVisibilityScope still applies. A fixed number of queries
+     * however many people are listed.
      *
-     * @return list<array{employeeId: int, name: string, overdue: int}>
+     * @return list<array{employeeId: int, name: string, overdue: int, relation: string}>
      */
     #[Computed]
     public function myTeam(): array
     {
-        $user = auth()->user();
-        $employeeId = $user->employee_id;
-
-        // An administrator sees every linked employee: the whole organisation is their team.
-        $superviseeIds = $user->isAdministrator()
-            ? array_values(array_filter(array_map('intval', User::query()->whereNotNull('employee_id')->where('employee_id', '!=', $employeeId ?? 0)->pluck('employee_id')->all())))
-            : ($employeeId === null ? [] : SupervisionMap::superviseesOf($employeeId));
+        $team = TeamScope::for(auth()->user());
+        $superviseeIds = array_keys($team);
 
         if ($superviseeIds === []) {
             return [];
@@ -79,6 +74,7 @@ trait ReadsDashboardWork
                 'employeeId' => $id,
                 'name' => (string) $names->get($id),
                 'overdue' => (int) $overdue->get($id, 0),
+                'relation' => $team[$id],
             ])
             ->sortBy([['overdue', 'desc'], ['name', 'asc']])
             ->all());

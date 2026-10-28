@@ -18,17 +18,22 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Facades\Cache;
 
 /**
- * A Desk nudge: "X nudged you about Y", sent in the app to the person
- * holding a piece of the sender's work (user decision, .ai/rules/desk.md).
+ * A Desk poke (shown as "Poke"; the class and events keep the old nudge
+ * name so stored settings keep working): "X poked you about Y: note", sent
+ * in the app and live to a person on the sender's work or team (user
+ * decision 2026-10-27).
  *
- * The same item can nudge the same person once a day. The nudge is logged
- * in the activity log (nudge.logged, notifying nobody) and travels as the
- * catalog event nudge.sent, which an administrator can switch off. The
- * caller decides who may be nudged about what; this only sends.
+ * The subject and the note are both optional. The same sender can poke the
+ * same person once a day. A poke about a subject is logged on it
+ * (nudge.logged, notifying nobody). It travels as the catalog event
+ * nudge.sent, which an administrator can switch off. The caller decides who
+ * may be poked about what; this only sends.
  */
 final class SendNudge
 {
     public const string Event = 'nudge.sent';
+
+    public const int NoteLimit = 200;
 
     public function __construct(
         private EventCatalog $catalog,
@@ -38,10 +43,12 @@ final class SendNudge
     ) {}
 
     /**
-     * @return bool false when nothing was sent (switched off, already nudged today, or nobody to reach)
+     * @return bool false when nothing was sent (switched off, already poked today, or nobody to reach)
      */
-    public function handle(User $sender, Model&TracksActivity $subject, int $employeeId): bool
+    public function handle(User $sender, (Model&TracksActivity)|null $subject, int $employeeId, ?string $note = null): bool
     {
+        $note = self::cleanNote($note);
+
         if ($employeeId === $sender->employee_id) {
             return false;
         }
@@ -58,25 +65,42 @@ final class SendNudge
             return false;
         }
 
-        if (! Cache::add("desk-nudge:{$subject->getMorphClass()}:{$subject->getKey()}:{$employeeId}", true, now()->addDay())) {
+        if (! Cache::add("desk-poke:{$sender->id}:{$employeeId}", true, now()->addDay())) {
             return false;
         }
+
+        $line = ($subject === null ? 'plain' : 'body').($note === null ? '' : '_note');
 
         User::query()->findOrFail($userId)->notify(new AppNotification(new NotificationPayload(
             kind: NotificationKind::Action,
             module: $catalog['module'],
             priority: NotificationPriority::Info,
-            key: 'notifications.events.'.self::Event,
-            params: ['actor' => $sender->name, 'subject' => $subject->activityLabel()],
-            subjectType: $subject->getMorphClass(),
-            subjectId: (int) $subject->getKey(),
+            key: 'notifications.events.'.self::Event.'.'.$line,
+            params: array_filter(['actor' => $sender->name, 'subject' => $subject?->activityLabel(), 'note' => $note], fn (?string $value): bool => $value !== null),
+            subjectType: $subject?->getMorphClass(),
+            subjectId: $subject === null ? null : (int) $subject->getKey(),
             actorId: $sender->id,
         )));
+
+        if ($subject === null) {
+            return true;
+        }
 
         $this->recorder->record($subject, 'nudge.logged', properties: [
             'employee' => $this->employees->names([$employeeId])[$employeeId] ?? ['en' => '—', 'ar' => '—'],
         ], notify: false);
 
         return true;
+    }
+
+    /**
+     * The note as plain text: tags stripped, whitespace trimmed, at most
+     * NoteLimit characters; empty becomes null.
+     */
+    public static function cleanNote(?string $note): ?string
+    {
+        $note = trim(preg_replace('/\s+/u', ' ', strip_tags((string) $note)) ?? '');
+
+        return $note === '' ? null : mb_substr($note, 0, self::NoteLimit);
     }
 }
