@@ -133,7 +133,7 @@ test('handling the approval twice creates no duplicate template, line or questio
     $second = app(ReportTemplatePrefiller::class)->prefillForProposal($this->proposal);
 
     expect([ReportTemplate::query()->count(), ReportTemplateLine::query()->count(), DB::table('report_template_questions')->count()])->toBe($counts)
-        ->and($counts[0])->toBe(2)
+        ->and($counts[0])->toBe(1)
         ->and($counts[1])->toBe(1)
         ->and($second->createdTemplateIds)->toBe([])
         ->and($second->createdLineIds)->toBe([]);
@@ -169,6 +169,7 @@ test('the active bank questions are copied once, when the template is created', 
     $monthly = NarrativeQuestion::factory()->monthly()->create(['text_ar' => 'ما أبرز الإنجازات؟', 'text_en' => 'Main achievements?', 'sort_order' => 3]);
     $retired = NarrativeQuestion::factory()->inactive()->create();
     $expected = NarrativeQuestion::query()->active()->ordered()->get();
+    prefillTarget($this->proposal, $this->output, $this->centerA);
 
     approveForPrefill($this->proposal);
 
@@ -246,4 +247,40 @@ test('a move to any status but approved pre-fills nothing', function () {
 
     expect(app(PrefillReportTemplates::class)->shouldQueue(new ProposalStatusChanged($this->proposal->id, ProposalStatus::Approved, ProposalStatus::Active, null)))->toBeFalse()
         ->and(ReportTemplate::query()->count())->toBe(0);
+});
+
+test('a project with no line to plan gets no template, and its unlinked targets are still listed', function () {
+    $unlinked = prefillTarget($this->proposal, $this->output, $this->centerA, null);
+
+    $result = app(ReportTemplatePrefiller::class)->prefillForProposal($this->proposal);
+
+    expect(ReportTemplate::query()->count())->toBe(0)
+        ->and($result->createdTemplateIds)->toBe([])
+        ->and($result->unlinkedPlanIndicatorIds)->toBe([$unlinked->id])
+        ->and(app(ReportTemplatePrefiller::class)->previewProject($this->centerA))
+        ->toMatchArray(['hasTemplate' => false, 'createsTemplate' => false, 'newLinePlanIndicatorIds' => []]);
+});
+
+test('a re-run fills the fixed_denominator of a pending line once the beneficiaries are entered, and leaves a confirmed line alone', function () {
+    $fixed = ['denominator_basis' => 'fixed', 'measure' => 'percentage', 'unit' => null];
+    $pendingTarget = prefillTarget($this->proposal, $this->output, $this->centerB, $fixed);
+    $confirmedTarget = prefillTarget($this->proposal, $this->output, $this->centerB, $fixed);
+    $prefiller = app(ReportTemplatePrefiller::class);
+    $prefiller->prefillProject($this->centerB);
+    $pending = ReportTemplateLine::query()->where('plan_indicator_id', $pendingTarget->id)->sole();
+    $confirmed = ReportTemplateLine::query()->where('plan_indicator_id', $confirmedTarget->id)->sole();
+    $confirmed->forceFill(['status' => ReportTemplateLineStatus::Confirmed])->save();
+
+    $this->proposal->projects()->updateExistingPivot($this->centerB->id, ['target_beneficiaries' => 240]);
+
+    expect($prefiller->previewProject($this->centerB)['refreshedLineIds'])->toBe([$pending->id])
+        ->and($pending->fresh()->fixed_denominator)->toBeNull();
+
+    $result = $prefiller->prefillProject($this->centerB);
+
+    expect($result->refreshedLineIds)->toBe([$pending->id])
+        ->and($result->createdLineIds)->toBe([])
+        ->and($pending->fresh()->fixed_denominator)->toBe(240)
+        ->and($confirmed->fresh()->fixed_denominator)->toBeNull()
+        ->and($prefiller->prefillProject($this->centerB)->refreshedLineIds)->toBe([]);
 });

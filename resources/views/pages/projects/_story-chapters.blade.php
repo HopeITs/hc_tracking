@@ -133,6 +133,9 @@
                                     @case('targets')
                                         @include('pages.projects._show-targets-tab')
                                         @break
+                                    @case('template')
+                                        @include('pages.projects._show-template-tab')
+                                        @break
                                     @default
                                         @include('pages.projects._show-milestones-tab')
                                 @endswitch

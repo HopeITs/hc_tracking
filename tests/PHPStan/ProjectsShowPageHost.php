@@ -9,6 +9,7 @@ use App\Livewire\Concerns\Projects\ArchivesProjects;
 use App\Livewire\Concerns\Projects\ManagesProjectAssignment;
 use App\Livewire\Concerns\Projects\ManagesProjectFiles;
 use App\Livewire\Concerns\Projects\ManagesProjectForm;
+use App\Livewire\Concerns\Projects\ManagesReportTemplate;
 use App\Livewire\Concerns\Projects\ReadsProjectDelivery;
 use App\Livewire\Concerns\Projects\ReadsProjectFunding;
 use App\Livewire\Concerns\Projects\ReadsProjectStory;
@@ -32,6 +33,7 @@ abstract class ProjectsShowPageHost extends Component
         ManagesProjectAssignment::refreshFromInbox insteadof ManagesProjectForm;
     }
     use ManagesProjectFiles;
+    use ManagesReportTemplate;
     use ReadsProjectDelivery;
     use ReadsProjectFunding;
     use ReadsProjectStory;

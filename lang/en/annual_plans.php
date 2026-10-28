@@ -18,6 +18,12 @@ return [
     'committed_value' => 'Committed value',
     'connections' => 'Connections',
     'connections_hint' => 'The program, strategy, manager and projects this plan ties together.',
+    'console' => [
+        'plan_row' => 'Program :program: :year plan created, manager :manager.',
+        'skipped_no_manager' => 'Skipped, no program manager: programs :programs.',
+        'summary' => ':created created, :existing already there, :skipped skipped (no manager).',
+        'dry_run' => 'Dry run: nothing was written.',
+    ],
     'count_target_awaiting_first_report' => ':count target awaiting its first report|:count targets awaiting their first report',
     'coverage_matrix' => 'Coverage matrix',
     'coverage_matrix_hint' => 'Every program against every fiscal year. The number is targets committed; the bar underneath is the share of reports approved.',

@@ -7,7 +7,7 @@
 --}}
 @php
     $embeddedId = $this->embeddedProposalId;
-    $switchable = $this->attachedProposals->filter(fn ($proposal) => auth()->user()?->can('view', $proposal));
+    $switchable = $this->attachedProposals->filter(fn ($proposal) => in_array($proposal->id, $this->viewableProposalIds, true));
 @endphp
 
 <div class="dk-block dk-story-proposal" id="proposal" data-test="story-proposal" data-proposal-id="{{ $embeddedId }}">

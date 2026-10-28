@@ -12,6 +12,7 @@ use App\Livewire\Concerns\Projects\ArchivesProjects;
 use App\Livewire\Concerns\Projects\ManagesProjectAssignment;
 use App\Livewire\Concerns\Projects\ManagesProjectFiles;
 use App\Livewire\Concerns\Projects\ManagesProjectForm;
+use App\Livewire\Concerns\Projects\ManagesReportTemplate;
 use App\Livewire\Concerns\Projects\ReadsProjectDelivery;
 use App\Livewire\Concerns\Projects\ReadsProjectFunding;
 use App\Livewire\Concerns\Projects\ReadsProjectStory;
@@ -43,6 +44,7 @@ new #[Layout('layouts::desk'), Title('titles.project')] class extends Component 
         ManagesProjectAssignment::refreshFromInbox insteadof ManagesProjectForm;
     }
     use ManagesProjectFiles;
+    use ManagesReportTemplate;
     use ReadsProjectDelivery;
     use ReadsProjectFunding;
     use ReadsProjectStory;
@@ -272,19 +274,25 @@ new #[Layout('layouts::desk'), Title('titles.project')] class extends Component 
     #[Computed]
     public function tabs(): array
     {
-        return [
+        $tabs = [
             ['key' => 'milestones', 'label' => __('common.milestones'), 'count' => $this->project->milestones_count],
             ['key' => 'tasks', 'label' => __('common.tasks'), 'count' => $this->tasks->count()],
             ['key' => 'plan', 'label' => __('gantt.plan'), 'count' => null],
             ['key' => 'risks', 'label' => __('common.risks'), 'count' => $this->project->risks_count],
             ['key' => 'targets', 'label' => __('common.targets'), 'count' => $this->project->plan_indicators_count],
         ];
+
+        if ($this->canViewReportTemplate) {
+            array_splice($tabs, 5, 0, [['key' => 'template', 'label' => __('report_templates.tab.title'), 'count' => (int) $this->reportTemplate?->getAttribute('pending_lines_count') ?: null]]);
+        }
+
+        return $tabs;
     }
 
     #[Computed]
     public function deliveryTab(): string
     {
-        return in_array($this->tab, ['milestones', 'tasks', 'plan', 'risks', 'targets'], true) ? $this->tab : 'milestones';
+        return in_array($this->tab, ['milestones', 'tasks', 'plan', 'risks', 'targets', ...($this->canViewReportTemplate ? ['template'] : [])], true) ? $this->tab : 'milestones';
     }
 };
 ?>
@@ -335,6 +343,10 @@ new #[Layout('layouts::desk'), Title('titles.project')] class extends Component 
     @include('pages.projects._story-chapters')
 
     @include('pages.projects._show-modals')
+
+    @if ($this->canManageReportTemplate)
+        @include('pages.projects._show-template-modals')
+    @endif
 
     <x-ui.confirm-modal
         wire:model="showCloseModal"

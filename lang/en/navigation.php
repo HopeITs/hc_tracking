@@ -23,6 +23,7 @@ return [
     'sectors' => 'Sectors',
     'evidence_types' => 'Evidence types',
     'monthly_reports' => 'Monthly Reports',
+    'report_templates' => 'Templates to confirm',
     'narrative_questions' => 'Narrative questions',
     'platform' => 'Platform',
     'primary_navigation' => 'Primary navigation',

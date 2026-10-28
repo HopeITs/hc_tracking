@@ -23,6 +23,7 @@ return [
     'sectors' => 'القطاعات',
     'evidence_types' => 'أنواع الشواهد',
     'monthly_reports' => 'التقارير الشهرية',
+    'report_templates' => 'قوالب بانتظار التأكيد',
     'narrative_questions' => 'بنك الأسئلة السردية',
     'platform' => 'المنصة',
     'primary_navigation' => 'التنقل الرئيسي',

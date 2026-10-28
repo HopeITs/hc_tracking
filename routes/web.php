@@ -289,6 +289,10 @@ Route::middleware(['auth', EnsureTwoFactorIsEnabled::class])->group(function () 
         ->can('narrative-questions.manage')
         ->name('admin.narrative-questions.index');
 
+    Route::livewire('report-templates', 'pages::report-templates.index')
+        ->can('report-templates.manage')
+        ->name('report-templates.index');
+
     Route::livewire('admin/accounts', 'pages::admin.accounts')
         ->can('accounts.view')
         ->name('admin.accounts.index');

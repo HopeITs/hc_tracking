@@ -29,6 +29,7 @@ return [
     'reports' => 'التقارير',
     'monthly_report' => 'التقرير الشهري',
     'monthly_reports' => 'التقارير الشهرية',
+    'report_templates' => 'قوالب بانتظار التأكيد',
     'results_framework' => 'إطار النتائج',
     'risks' => 'المخاطر',
     'security_settings' => 'إعدادات الأمان',

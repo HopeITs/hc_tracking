@@ -9,6 +9,7 @@ use App\Enums\NotificationKind;
 use App\Enums\NotificationPriority;
 use App\Enums\ProjectStatus;
 use App\Enums\ProposalStatus;
+use App\Enums\ReportTemplateLineStatus;
 use App\Models\AnnualPlan;
 use App\Models\LibraryIndicator;
 use App\Models\NarrativeQuestion;
@@ -16,6 +17,7 @@ use App\Models\PlanIndicator;
 use App\Models\Project;
 use App\Models\Proposal;
 use App\Models\ReportTemplate;
+use App\Models\ReportTemplateLine;
 use App\Models\User;
 use App\Notifications\ActivityRecorder;
 use App\Notifications\AppNotification;
@@ -33,9 +35,13 @@ use Illuminate\Support\Facades\Log;
  * Pre-fills projects' monthly report templates as `pending` (contracts.md
  * §12.4, T33, D-41, D-44, D-45): one template per project, the active bank
  * questions copied when it is created, and one pending line per
- * library-linked target that has none yet. Lines already there (pending,
- * confirmed or retired) and the template's status are never touched, so a
- * confirmed template stays confirmed and MEAL confirms the new lines.
+ * library-linked target that has none yet. A project with no line to plan
+ * gets no template, so the MEAL queue never holds one it cannot confirm.
+ * Lines already there and the template's status are not touched, so a
+ * confirmed template stays confirmed and MEAL confirms the new lines; the one
+ * exception is a pending `fixed`-basis line created without a
+ * `fixed_denominator`, which takes the `target_beneficiaries` filled since
+ * (T27 step 8a).
  *
  * Targets are the project's proposal targets (one proposal on approval, every
  * donor-approved proposal for prefillProject()) and its annual-plan targets
@@ -103,6 +109,70 @@ final class ReportTemplatePrefiller
      */
     public function prefillProject(Project $project): PrefillResult
     {
+        ['proposals' => $proposals, 'beneficiaries' => $beneficiaries] = $this->approvedProposals($project);
+
+        return $this->prefill($project, $proposals, $beneficiaries);
+    }
+
+    /**
+     * What prefillProject() would do, read-only: whether the project has or
+     * would get a template and whether it is new, the lines already on it,
+     * the targets that would get a new line, the lines whose
+     * `fixed_denominator` would be filled, the unlinked targets and the
+     * would-be-new `fixed`-basis lines with no `fixed_denominator` (as target
+     * ids, since no line exists yet). Writes nothing
+     * (`report-templates:prefill-active --dry-run`).
+     *
+     * @return array{hasTemplate: bool, createsTemplate: bool, existingLineCount: int, newLinePlanIndicatorIds: list<int>, refreshedLineIds: list<int>, unlinkedPlanIndicatorIds: list<int>, missingFixedDenominatorPlanIndicatorIds: list<int>}
+     */
+    public function previewProject(Project $project): array
+    {
+        ['proposals' => $proposals, 'beneficiaries' => $beneficiaries] = $this->approvedProposals($project);
+        ['lines' => $lines, 'unlinked' => $unlinked] = $this->plannedLines($project, $proposals, $beneficiaries);
+
+        $template = ReportTemplate::query()->where('project_id', $project->id)->first();
+        $existing = $template === null ? new Collection : $template->lines()->get()->keyBy(fn (ReportTemplateLine $line): int => (int) $line->plan_indicator_id);
+        $new = [];
+        $refresh = [];
+        $missing = [];
+
+        foreach ($lines as $planIndicatorId => $attributes) {
+            $line = $existing->get($planIndicatorId);
+
+            if ($line !== null) {
+                if ($this->refreshesDenominator($line, $attributes)) {
+                    $refresh[] = $line->id;
+                }
+
+                continue;
+            }
+
+            $new[] = $planIndicatorId;
+
+            if ($attributes['fixed'] && $attributes['values']['fixed_denominator'] === null) {
+                $missing[] = $planIndicatorId;
+            }
+        }
+
+        return [
+            'hasTemplate' => $template !== null || $new !== [],
+            'createsTemplate' => $template === null && $new !== [],
+            'existingLineCount' => $existing->count(),
+            'newLinePlanIndicatorIds' => $new,
+            'refreshedLineIds' => $refresh,
+            'unlinkedPlanIndicatorIds' => $unlinked,
+            'missingFixedDenominatorPlanIndicatorIds' => $missing,
+        ];
+    }
+
+    /**
+     * The project's donor-approved proposals and their
+     * `project_proposal.target_beneficiaries`.
+     *
+     * @return array{proposals: Collection<int, Proposal>, beneficiaries: array<int, int|null>}
+     */
+    private function approvedProposals(Project $project): array
+    {
         $proposals = $project->proposals()
             ->whereIn('proposals.status', ProposalStatus::approvedByDonor())
             ->orderBy('proposals.id')
@@ -115,7 +185,7 @@ final class ReportTemplatePrefiller
             $beneficiaries[$proposal->id] = $value === null ? null : (int) $value;
         }
 
-        return $this->prefill($project, $proposals, $beneficiaries);
+        return ['proposals' => $proposals, 'beneficiaries' => $beneficiaries];
     }
 
     /**
@@ -126,6 +196,10 @@ final class ReportTemplatePrefiller
     {
         ['lines' => $lines, 'unlinked' => $unlinked] = $this->plannedLines($project, $proposals, $beneficiaries);
 
+        if ($lines === []) {
+            return new PrefillResult(unlinkedPlanIndicatorIds: $unlinked);
+        }
+
         $result = DB::transaction(function () use ($project, $lines, $unlinked): PrefillResult {
             [$template, $created] = $this->lockedTemplate($project);
 
@@ -133,12 +207,20 @@ final class ReportTemplatePrefiller
                 $this->copyQuestions($template);
             }
 
-            $existing = $template->lines()->pluck('plan_indicator_id')->map(fn (int|string $id): int => (int) $id)->all();
+            $existing = $template->lines()->get()->keyBy(fn (ReportTemplateLine $line): int => (int) $line->plan_indicator_id);
             $createdLineIds = [];
+            $refreshedLineIds = [];
             $missing = [];
 
             foreach ($lines as $planIndicatorId => $attributes) {
-                if (in_array($planIndicatorId, $existing, true)) {
+                $line = $existing->get($planIndicatorId);
+
+                if ($line !== null) {
+                    if ($this->refreshesDenominator($line, $attributes)) {
+                        $line->update(['fixed_denominator' => $attributes['values']['fixed_denominator']]);
+                        $refreshedLineIds[] = $line->id;
+                    }
+
                     continue;
                 }
 
@@ -150,7 +232,7 @@ final class ReportTemplatePrefiller
                 }
             }
 
-            return new PrefillResult($created ? [$template->id] : [], $createdLineIds, $unlinked, $missing);
+            return new PrefillResult($created ? [$template->id] : [], $createdLineIds, $unlinked, $missing, $refreshedLineIds);
         });
 
         if ($result->missingFixedDenominatorLineIds !== []) {
@@ -165,6 +247,22 @@ final class ReportTemplatePrefiller
         }
 
         return $result;
+    }
+
+    /**
+     * Whether an existing line takes the `fixed_denominator` it was created
+     * without: still pending, `fixed` basis, and the
+     * `project_proposal.target_beneficiaries` filled since (D-25, T27 step
+     * 8a). A confirmed or retired line is MEAL's to edit.
+     *
+     * @param  array{values: array<string, mixed>, fixed: bool}  $attributes
+     */
+    private function refreshesDenominator(ReportTemplateLine $line, array $attributes): bool
+    {
+        return $attributes['fixed']
+            && $line->status === ReportTemplateLineStatus::Pending
+            && $line->fixed_denominator === null
+            && $attributes['values']['fixed_denominator'] !== null;
     }
 
     /**

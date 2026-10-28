@@ -64,13 +64,40 @@ trait ReadsProjectStory
      * is linked to this project and the viewer may open it, else the lead
      * proposal, else the first linked one the viewer may open.
      */
+    /**
+     * Ids of the linked proposals the viewer may open (ProposalPolicy::view:
+     * proposals.view, or named as a reviewer), in one query however many
+     * proposals are linked.
+     *
+     * @return list<int>
+     */
+    #[Computed]
+    public function viewableProposalIds(): array
+    {
+        $viewer = auth()->user();
+        $ids = $this->attachedProposals->pluck('id')->map(fn (mixed $id): int => (int) $id);
+
+        if ($viewer === null || $ids->isEmpty()) {
+            return [];
+        }
+
+        if ($viewer->can('proposals.view')) {
+            return array_values($ids->all());
+        }
+
+        $reviewing = $viewer->employee_id === null ? collect() : ProposalReviewer::query()
+            ->whereIn('proposal_id', $ids->all())
+            ->where('employee_id', $viewer->employee_id)
+            ->pluck('proposal_id')
+            ->map(fn (mixed $id): int => (int) $id);
+
+        return array_values($ids->intersect($reviewing)->all());
+    }
+
     #[Computed]
     public function embeddedProposalId(): ?int
     {
-        $viewer = auth()->user();
-        $viewable = $this->attachedProposals
-            ->filter(fn (Proposal $proposal): bool => $viewer?->can('view', $proposal) === true)
-            ->pluck('id');
+        $viewable = collect($this->viewableProposalIds);
         $chosen = ctype_digit($this->storyProposal) ? (int) $this->storyProposal : null;
         $leadId = $this->story['lead']?->id;
 

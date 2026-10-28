@@ -101,6 +101,9 @@ return [
         'department-tasks.index' => [
             ['id' => 'list', 'targets' => ['[data-tour="department-tasks-list"]']],
         ],
+        'report-templates.index' => [
+            ['id' => 'queue', 'targets' => ['[data-report-template-queue]']],
+        ],
         'admin.sectors.index' => [
             ['id' => 'create', 'targets' => ['[data-tour="sectors-create"]']],
         ],
