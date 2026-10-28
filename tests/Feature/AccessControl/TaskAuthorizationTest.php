@@ -84,7 +84,7 @@ test('an assignee on the task page changes status but not the title', function (
 
     $page->set('title', 'Renamed by assignee')
         ->set('taskPriority', TaskPriority::High->value)
-        ->set('taskStatus', TaskStatus::Done->value)
+        ->set('taskStatus', TaskStatus::UnderReview->value)
         ->set('progressPercentage', '100')
         ->set('completedDate', '2026-09-28')
         ->call('updateTask');

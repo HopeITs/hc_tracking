@@ -4,13 +4,13 @@ declare(strict_types=1);
 
 namespace App\Support;
 
-use App\Actions\Tasks\NotifyTaskReview;
 use App\Enums\DependencyType;
 use App\Enums\TaskStatus;
 use App\Models\ScheduleDependency;
 use App\Models\Scopes\TaskVisibilityScope;
 use App\Models\Task;
 use App\Models\User;
+use App\Notifications\TaskReviewNotices;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Validation\ValidationException;
 
@@ -140,7 +140,7 @@ final class TaskWorkflow
             return;
         }
 
-        $notify = app(NotifyTaskReview::class);
+        $notify = app(TaskReviewNotices::class);
 
         if ($task->status === TaskStatus::UnderReview && ! $approved) {
             $notify->submitted($user, $task);
