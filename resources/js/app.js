@@ -6,6 +6,7 @@ import './list-layout';
 import './charts';
 import './count-up';
 import './desk-ask';
+import './desk-customize';
 import './desk-filters';
 import './desk-grid';
 import './form-fields';

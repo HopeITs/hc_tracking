@@ -124,7 +124,7 @@ new class extends Component {
 
 <x-desk.panel :facets="$pg['facets']" id="myteam" :size="$size" :index="$index" :total="$total" :count="count($people)">
     @if ($pg['total'] > 0)
-        <ul class="dk-team">
+        <ul class="dk-team" {{ $this->fitAttributes($pg) }}>
             @foreach ($pg['slice'] as $person)
                 @php
                     $behind = $person['overdue'] + $person['lateReports'];

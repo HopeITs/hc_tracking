@@ -142,6 +142,8 @@ new class extends Component {
             $month = $this->shownMonth();
             $byDay = $this->filtered($this->monthEvents)->groupBy(fn (array $event): string => $event['date']->toDateString());
             $lead = $month->dayOfWeekIso - 1;
+            $weeks = (int) ceil(($lead + $month->daysInMonth) / 7);
+            $trail = $weeks * 7 - $lead - $month->daysInMonth;
             $weekdays = collect(range(0, 6))->map(fn (int $offset): string => CarbonImmutable::parse('2026-10-12')->addDays($offset)->translatedFormat('D'));
         @endphp
         <div class="dk-mm-h">
@@ -149,25 +151,28 @@ new class extends Component {
             <strong>{{ $month->translatedFormat('F Y') }}</strong>
             <button type="button" class="dk-iconbtn dk-sm" wire:click="shiftMonth(1)" aria-label="{{ __('desk.next_month') }}"><x-desk.icon name="chev" class="dk-flip" /></button>
         </div>
-        <div class="dk-mcal" x-data="{ open: '', top: 0, left: 0, pick(day, el) { if (this.open === day) { this.open = ''; return } const r = el.getBoundingClientRect(); const w = Math.min(280, window.innerWidth - 24); this.top = Math.min(r.bottom + 6, window.innerHeight - 240); this.left = Math.max(12, Math.min(r.left + r.width / 2 - w / 2, window.innerWidth - w - 12)); this.open = day } }" x-on:keydown.escape.window="open = ''">
+        <div class="dk-mcal" style="--weeks:{{ $weeks }}" x-data="{ open: '', top: 0, left: 0, pick(day, el) { if (this.open === day) { this.open = ''; return } const r = el.getBoundingClientRect(); const w = Math.min(280, window.innerWidth - 24); this.top = Math.min(r.bottom + 6, window.innerHeight - 240); this.left = Math.max(12, Math.min(r.left + r.width / 2 - w / 2, window.innerWidth - w - 12)); this.open = day } }" x-on:keydown.escape.window="open = ''">
             @foreach ($weekdays as $weekday)
                 <span class="dk-wd">{{ $weekday }}</span>
             @endforeach
-            @for ($i = 0; $i < $lead; $i++)
-                <span aria-hidden="true"></span>
+            @for ($i = $lead; $i > 0; $i--)
+                <span class="dk-mday dk-mday-off" aria-hidden="true"><span class="dk-num">{{ $month->subDays($i)->day }}</span></span>
             @endfor
             @for ($d = 1; $d <= $month->daysInMonth; $d++)
                 @php
                     $date = $month->setDay($d)->toDateString();
                     $items = $byDay->get($date, collect());
                 @endphp
-                <button type="button" wire:key="md-{{ $date }}" @class(['dk-mday', 'dk-today' => $date === $today->toDateString()]) x-bind:class="open === '{{ $date }}' && 'dk-on'" x-on:click="pick('{{ $date }}', $el)" aria-label="{{ CarbonImmutable::parse($date)->translatedFormat(__('formats.date')) }}: {{ trans_choice('desk.agenda_items', $items->count(), ['count' => $items->count()]) }}">
+                <button type="button" wire:key="md-{{ $date }}" @class(['dk-mday', 'dk-today' => $date === $today->toDateString(), 'dk-has' => $items->isNotEmpty(), 'dk-past' => $date < $today->toDateString()]) x-bind:class="open === '{{ $date }}' && 'dk-on'" x-on:click="pick('{{ $date }}', $el)" aria-label="{{ CarbonImmutable::parse($date)->translatedFormat(__('formats.date')) }}: {{ trans_choice('desk.agenda_items', $items->count(), ['count' => $items->count()]) }}">
                     <span class="dk-num">{{ $d }}</span>
                     <span class="dk-mdots" aria-hidden="true">
                         @foreach ($items->take(3) as $item)<i class="{{ $tones[$item['kind']] ?? '' }}"></i>@endforeach
                         @if ($items->count() > 3)<b class="dk-num">+{{ $items->count() - 3 }}</b>@endif
                     </span>
                 </button>
+            @endfor
+            @for ($i = 1; $i <= $trail; $i++)
+                <span class="dk-mday dk-mday-off" aria-hidden="true"><span class="dk-num">{{ $i }}</span></span>
             @endfor
             <template x-teleport="body">
                 <div class="dk-scope dk-daypop" role="dialog" x-show="open !== ''" x-cloak x-transition.opacity x-on:click.outside="if (! $event.target.closest('.dk-mday')) open = ''" x-bind:style="`top:${top}px;left:${left}px`">
@@ -203,7 +208,7 @@ new class extends Component {
             <p class="dk-ld-pick dk-is">{{ CarbonImmutable::parse($day)->translatedFormat(__('formats.date')) }} · <button type="button" class="dk-link" wire:click="pickDay('{{ $day }}')">{{ __('desk.agenda_all_days') }}</button></p>
         @endif
         @if ($pg['total'] > 0)
-            <ol class="dk-agenda">
+            <ol class="dk-agenda" {{ $this->fitAttributes($pg) }}>
                 @php
                     $group = null;
                 @endphp
@@ -212,7 +217,7 @@ new class extends Component {
                         $now = $this->groupOf($event['date']);
                     @endphp
                     @if ($now !== $group)
-                        <li class="dk-ag-h" wire:key="agh-{{ $now }}-{{ $pg['page'] }}">{{ __('desk.agenda_group.'.$now) }}</li>
+                        <li class="dk-ag-h" data-fit-head wire:key="agh-{{ $now }}-{{ $pg['page'] }}">{{ __('desk.agenda_group.'.$now) }}</li>
                         @php
                             $group = $now;
                         @endphp

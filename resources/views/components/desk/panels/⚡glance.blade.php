@@ -126,7 +126,7 @@ new class extends Component {
 @endphp
 
 <x-desk.panel id="glance" :size="$size" :index="$index" :total="$total" :filterable="false">
-    <ul class="dk-glance" style="--figs:{{ max(1, count($figures)) }}">
+    <ul class="dk-glance" data-figs="{{ count($figures) }}" style="--figs:{{ max(1, count($figures)) }}">
         @foreach ($figures as $figure)
             <li data-figure="{{ $figure['key'] }}">
                 @if ($figure['href'] !== null)<a href="{{ $figure['href'] }}" wire:navigate class="dk-gl-a">@else<span class="dk-gl-a">@endif

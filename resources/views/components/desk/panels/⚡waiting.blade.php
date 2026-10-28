@@ -158,20 +158,35 @@ new class extends Component {
 @php
     $rows = $this->rows;
     $pg = $this->paginate($rows, self::PerPage);
+    $today = CarbonImmutable::today();
+    $icons = ['task' => 'check', 'monthly-report' => 'file', 'review' => 'search', 'deliverable' => 'board'];
 @endphp
 
 <x-desk.panel :facets="$pg['facets']" id="waiting" :size="$size" :index="$index" :total="$total" :count="$rows->count()">
     @if ($pg['total'] > 0)
-        <ul class="dk-wait">
+        <ul class="dk-wait" {{ $this->fitAttributes($pg) }}>
             @foreach ($pg['slice'] as $row)
-                <li wire:key="{{ $row['key'] }}">
-                    <div><p><a href="{{ $row['href'] }}" wire:navigate>{{ $row['text'] }}</a></p>@if ($row['sub'] !== '')<p class="dk-is">{{ $row['sub'] }}</p>@endif</div>
-                    @if ($row['targets'] !== [])
-                        @php
-                            $pokeCall = "nudge('".$row['key']."'";
-                        @endphp
-                        <x-desk.poke :call="$pokeCall" :name="$row['text']" labelled />
-                    @endif
+                @php
+                    $kind = \Illuminate\Support\Str::beforeLast($row['key'], '-');
+                    $waited = $row['date'] !== null && $row['date']->lt($today) ? (int) $row['date']->startOfDay()->diffInDays($today) : null;
+                @endphp
+                <li wire:key="{{ $row['key'] }}" data-waiting="{{ $kind }}">
+                    <span class="dk-wt-ic dk-wt-{{ $kind }}" aria-hidden="true"><x-desk.icon :name="$icons[$kind] ?? 'dot'" /></span>
+                    <div class="dk-wt-m">
+                        <a href="{{ $row['href'] }}" wire:navigate class="dk-wt-t" title="{{ $row['text'] }}">{{ $row['text'] }}</a>
+                        <p class="dk-is">{{ __('desk.waiting_kind.'.$kind) }}@if ($row['sub'] !== '') · {{ $row['sub'] }}@endif</p>
+                    </div>
+                    <div class="dk-wt-a">
+                        @if ($waited !== null && $waited > 0)
+                            <span @class(['dk-pill dk-num', 'dk-bad' => $waited > 7, 'dk-warn' => $waited <= 7]) title="{{ $row['date']->translatedFormat(__('formats.date')) }}">{{ trans_choice('desk.waiting_days', $waited, ['count' => $waited]) }}</span>
+                        @endif
+                        @if ($row['targets'] !== [])
+                            @php
+                                $pokeCall = "nudge('".$row['key']."'";
+                            @endphp
+                            <x-desk.poke :call="$pokeCall" :name="$row['text']" labelled />
+                        @endif
+                    </div>
                 </li>
             @endforeach
         </ul>

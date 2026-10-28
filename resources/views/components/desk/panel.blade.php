@@ -14,6 +14,8 @@
     $title = __("desk.panel.{$id}.title");
     $sizes = \App\Support\Desk\Panels::Sizes;
     $filtered = $filtered || collect($facets)->contains(fn (array $choice): bool => $choice['value'] !== '');
+    /* No funnel when the popup would only say there is nothing to filter. */
+    $filterable = $filterable && ($facets !== [] || isset($filters));
 @endphp
 
 {{--
@@ -88,9 +90,6 @@
                     <button type="button" class="dk-iconbtn" x-on:click="discardFilters()" aria-label="{{ __('common.close') }}"><flux:icon.x-mark variant="outline" class="size-5" /></button>
                 </div>
                 <div class="dk-sh-b dk-pf-body">
-                    @if ($facets === [] && ! isset($filters))
-                        <p class="dk-pempty">{{ __('desk.filter_none') }}</p>
-                    @endif
                     <div class="dk-pf-grid directory-filters">
                         @foreach ($facets as $facet => $choice)
                             <x-ui.header-filter-select :label="$choice['label']" wire:model="facets.{{ $facet }}" :value="$choice['value']" deferred wire:key="pf-{{ $id }}-{{ $facet }}">

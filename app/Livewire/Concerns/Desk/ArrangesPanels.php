@@ -64,6 +64,38 @@ trait ArrangesPanels
         $this->storeLayout([...$this->layout, ['panel' => $panel, 'size' => $library[$panel]['size']]]);
     }
 
+    /**
+     * "Done" in the Customize sheet: the whole edited arrangement in one
+     * call, or null to go back to the default. Unknown, unavailable and
+     * repeated panels and unknown sizes are dropped.
+     *
+     * @param  array<mixed>|null  $layout
+     */
+    public function saveLayout(?array $layout): void
+    {
+        if ($layout === null) {
+            $this->storeLayout(null);
+
+            return;
+        }
+
+        $library = $this->library;
+        $kept = [];
+
+        foreach ($layout as $entry) {
+            $panel = is_array($entry) ? ($entry['panel'] ?? null) : null;
+            $size = is_array($entry) ? ($entry['size'] ?? null) : null;
+
+            if (! is_string($panel) || ! isset($library[$panel]) || isset($kept[$panel])) {
+                continue;
+            }
+
+            $kept[$panel] = ['panel' => $panel, 'size' => is_string($size) && isset(Panels::Sizes[$size]) ? $size : $library[$panel]['size']];
+        }
+
+        $this->storeLayout(array_values($kept));
+    }
+
     public function resetLayout(): void
     {
         $this->storeLayout(null);
