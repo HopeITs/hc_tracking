@@ -9,7 +9,6 @@ return [
     'dashboard' => 'الرئيسية',
     'donor' => 'المانح',
     'donors' => 'المانحون',
-    'executive_summary' => 'الملخص التنفيذي',
     'funding_agreement' => 'اتفاقية التمويل',
     'funding_agreements' => 'اتفاقيات التمويل',
     'indicators' => 'المؤشرات',

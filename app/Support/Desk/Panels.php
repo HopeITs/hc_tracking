@@ -63,7 +63,6 @@ final class Panels
         'programs' => [['projects', 'XL'], ['plans', 'L'], ['targets', 'L']],
         'strategies' => [['glance', 'XL'], ['plans', 'L'], ['targets', 'L']],
         'annual-plans' => [['plans', 'L'], ['targets', 'L'], ['matrix', 'XL']],
-        'executive-summary' => [['glance', 'XL'], ['money', 'L'], ['pipeline', 'L']],
         'milestones' => [['milestones', 'L'], ['coming', 'L'], ['tasks', 'L']],
         'timeline' => [['milestones', 'L'], ['coming', 'L'], ['projects', 'XL']],
         'risks' => [['needs', 'L'], ['projects', 'XL']],

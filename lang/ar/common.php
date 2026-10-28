@@ -46,7 +46,6 @@ return [
     'drop_or_browse' => ':drop أو :browse',
     'edit_name' => 'تعديل :name',
     'email' => 'البريد الإلكتروني',
-    'executive_summary' => 'الملخص التنفيذي',
     'external_project_number' => 'رقم المشروع الخارجي',
     'fields_need_attention' => '{0} لا توجد حقول تحتاج إلى مراجعة|{1} حقل واحد يحتاج إلى مراجعة|{2} حقلان يحتاجان إلى مراجعة|[3,10] :count حقول تحتاج إلى مراجعة|[11,*] :count حقلًا يحتاج إلى مراجعة',
     'funding' => 'التمويل',

@@ -9,7 +9,6 @@ return [
     'dashboard' => 'Home',
     'donor' => 'Donor',
     'donors' => 'Donors',
-    'executive_summary' => 'Executive Summary',
     'funding_agreement' => 'Funding Agreement',
     'funding_agreements' => 'Funding Agreements',
     'indicators' => 'Indicators',

@@ -56,7 +56,7 @@ final class WeeklyDigestScanner implements Scanner
         $totals = array_reduce($stats, fn (array $carry, array $row): array => array_map(fn (string $key): int => $carry[$key] + $row[$key], array_combine(array_keys($carry), array_keys($carry))), ['overdue' => 0, 'off_track' => 0, 'open_risks' => 0, 'upcoming' => 0]);
 
         foreach ($this->resolver->usersWithRoles(['General Manager']) as $userId) {
-            $payload = $this->digest('notifications.digests.weekly_all', ['programs' => count($stats), ...$totals], 'user', $userId, ['route' => 'executive-summary.index']);
+            $payload = $this->digest('notifications.digests.weekly_all', ['programs' => count($stats), ...$totals], 'user', $userId, ['route' => 'dashboard']);
             $sent += $this->dispatcher->send('weekly_digest', $week, $payload, [$userId], [], [$userId]);
         }
 
