@@ -2,17 +2,12 @@
 
 declare(strict_types=1);
 
-namespace App\Actions\Tasks;
+namespace App\Notifications;
 
 use App\Enums\NotificationKind;
 use App\Enums\NotificationPriority;
 use App\Models\Task;
 use App\Models\User;
-use App\Notifications\AppNotification;
-use App\Notifications\EmployeeRecipients;
-use App\Notifications\EventCatalog;
-use App\Notifications\NotificationPayload;
-use App\Notifications\RecipientFilter;
 use Carbon\CarbonImmutable;
 
 /**
@@ -21,7 +16,7 @@ use Carbon\CarbonImmutable;
  * sent it back with a note (its assignees hear, with the note). Both travel
  * as catalog events an administrator can switch off.
  */
-final class NotifyTaskReview
+final class TaskReviewNotices
 {
     public function __construct(
         private EventCatalog $catalog,
