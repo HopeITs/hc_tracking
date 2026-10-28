@@ -13,6 +13,7 @@ use App\Models\Project;
 use App\Models\Proposal;
 use Flux\Flux;
 use Illuminate\Database\Eloquent\Collection;
+use Illuminate\Support\Facades\Auth;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
 use Livewire\Attributes\Computed;
@@ -83,10 +84,16 @@ trait ReadsProjectFunding
     public function attachedProposals(): Collection
     {
         $canViewMoney = $this->canViewMoney();
+        $viewer = Auth::user();
+        $needsReviewerRows = $viewer?->employee_id !== null && ! $viewer->can('proposals.view');
 
         return $this->project->proposals()
             ->select(['proposals.id', 'proposals.name', 'proposals.internal_project_number', 'proposals.status', 'proposals.planned_date_begin', 'proposals.planned_date_end'])
             ->with('donorNames:id,name')
+            ->when($needsReviewerRows, fn ($query) => $query->with(['reviewers' => fn ($query) => $query
+                ->select(['id', 'proposal_id', 'employee_id'])
+                ->where('employee_id', $viewer->employee_id),
+            ]))
             ->when($canViewMoney, fn ($query) => $query->with(['donorProposals' => fn ($query) => $query
                 ->select(['id', 'proposal_id', 'donor_id', 'currency', 'budget'])
                 ->with('transfers:id,donor_proposal_id,net_amount_received'),
