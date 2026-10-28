@@ -1,24 +1,38 @@
 <?php
 
+use App\Enums\ArStatus;
 use App\Enums\MonthlyReportStatus;
 use App\Enums\ProjectStatus;
 use App\Enums\ProposalPhase;
+use App\Enums\RagStatus;
+use App\Enums\TaskStatus;
 use App\Livewire\Concerns\Dashboard\ChartsDashboard;
 use App\Livewire\Concerns\Dashboard\ReadsDashboardAttention;
 use App\Livewire\Concerns\Desk\IsDeskPanel;
+use App\Models\Indicator;
 use App\Models\MonthlyReport;
 use App\Models\Project;
 use App\Models\Proposal;
-use Carbon\CarbonImmutable;
+use App\Models\Task;
+use App\Models\TransfersTracking;
 use App\Support\Desk\Money;
+use Carbon\CarbonImmutable;
+use Illuminate\Database\Eloquent\Builder;
 use Livewire\Attributes\Computed;
 use Livewire\Component;
 
 /**
- * At a glance: the portfolio in a few big numbers — projects running,
- * proposals being written or reviewed, last month's monthly reports
- * validated (with an eight-month line), the share of USD commitments
- * received (money viewers only) and how many things are late.
+ * At a glance — "are we OK this month?": up to six figures, each a link to
+ * its register with one line of meaning and its change since last month.
+ * Running projects (new this month), proposals in the pipeline (new this
+ * month), last month's reports validated (against the month before), USD
+ * received of committed (money viewers; received this month), late tasks
+ * (against the same day last month) and targets on pace this year. A
+ * change is good or bad by the figure's direction; none is shown when
+ * there is nothing to compare with. Nothing to filter, so no funnel.
+ *
+ * attentionItems (ReadsDashboardAttention) stays on this host for the
+ * tests and the Ask bar that read the dashboard queue through it.
  */
 new class extends Component {
     use ChartsDashboard;
@@ -26,45 +40,82 @@ new class extends Component {
     use ReadsDashboardAttention;
 
     /**
-     * @return array{running: int, pipeline: int|null, reports: array{validated: int, total: int, month: CarbonImmutable, spark: list<int>}|null, money: array{share: int, committed: string}|null, late: int}
+     * @return list<array{key: string, value: string, label: string, delta: int|null, deltaText: string|null, good: bool|null, href: string|null}>
      */
     #[Computed]
     public function figures(): array
     {
-        $lastMonth = CarbonImmutable::today()->startOfMonth()->subMonth();
-        $reports = null;
+        $today = CarbonImmutable::today();
+        $monthStart = $today->startOfMonth();
+        $figures = [];
+
+        if ($this->canView('projects')) {
+            $new = $this->visible(Project::query(), 'projects')->where('status', ProjectStatus::Active)->whereDate('start_date', '>=', $monthStart)->count();
+            $figures[] = $this->figure('running', (string) $this->visible(Project::query(), 'projects')->where('status', ProjectStatus::Active)->count(), $new, upIsGood: true, href: 'projects.index', deltaKey: 'new');
+        }
+
+        if ($this->canView('proposals')) {
+            $pipeline = Proposal::query()->whereIn('status', [...ProposalPhase::Ideation->statuses(), ...ProposalPhase::Planning->statuses()]);
+            $figures[] = $this->figure('pipeline', (string) (clone $pipeline)->count(), (clone $pipeline)->whereDate('created_at', '>=', $monthStart)->count(), upIsGood: true, href: 'proposals.index', deltaKey: 'new');
+        }
 
         if ($this->canView('reports')) {
-            $months = collect(range(7, 0))->map(fn (int $back): string => $lastMonth->subMonths($back)->toDateString());
-            $validated = MonthlyReport::query()
-                ->where('status', MonthlyReportStatus::Validated)
-                ->whereIn('period', $months->all())
-                ->selectRaw('period, count(*) as total')
-                ->groupBy('period')
-                ->pluck('total', 'period')
-                ->mapWithKeys(fn ($total, $period): array => [CarbonImmutable::parse($period)->toDateString() => (int) $total]);
-
-            $reports = [
-                'validated' => (int) $validated->get($lastMonth->toDateString(), 0),
-                'total' => MonthlyReport::query()->whereDate('period', $lastMonth)->count(),
-                'month' => $lastMonth,
-                'spark' => $months->map(fn (string $month): int => (int) $validated->get($month, 0))->all(),
+            $lastMonth = $monthStart->subMonth();
+            $validated = fn (CarbonImmutable $month): int => MonthlyReport::query()->whereDate('period', $month)->where('status', MonthlyReportStatus::Validated)->count();
+            $total = MonthlyReport::query()->whereDate('period', $lastMonth)->count();
+            $figures[] = [
+                ...$this->figure('reports', $validated($lastMonth).'/'.$total, $validated($lastMonth) - $validated($lastMonth->subMonth()), upIsGood: true, href: 'reports.monthly-matrix'),
+                'label' => __('desk.glance.reports', ['month' => $lastMonth->translatedFormat('F')]),
             ];
         }
 
         $usd = $this->fundingPosition->firstWhere('currency', 'USD');
 
+        if ($usd !== null && $usd['share'] !== null) {
+            $thisMonth = (float) TransfersTracking::query()->where('ar_status', ArStatus::Received)->where('amount_received_currency', 'USD')->whereDate('receive_date', '>=', $monthStart)->sum('net_amount_received');
+            $figures[] = [
+                ...$this->figure('money', $usd['share'].'%', $thisMonth > 0 ? 1 : null, upIsGood: true, href: 'transfers.index'),
+                'label' => __('desk.glance.money', ['amount' => Money::format($usd['committed'], 'USD')]),
+                'deltaText' => $thisMonth > 0 ? __('desk.glance.delta.received', ['amount' => Money::format($thisMonth, 'USD')]) : null,
+            ];
+        }
+
+        if ($this->canView('tasks')) {
+            $lateOn = fn (CarbonImmutable $day): int => $this->visible(Task::query(), 'tasks')
+                ->whereDate('due_date', '<', $day)
+                ->whereDate('created_at', '<=', $day)
+                ->where(fn (Builder $query) => $query->where('status', '!=', TaskStatus::Done)->orWhereDate('completed_date', '>', $day))
+                ->count();
+            $now = $this->visible(Task::query(), 'tasks')->where('status', '!=', TaskStatus::Done)->whereDate('due_date', '<', $today)->count();
+            $figures[] = $this->figure('late', (string) $now, $now - $lateOn($today->subMonth()), upIsGood: false, href: 'tasks.index');
+        }
+
+        if ($this->canView('targets') && $this->canView('indicators')) {
+            $yearStart = $today->startOfYear();
+            $rated = Indicator::query()->whereNotNull('target')->with('progress:id,indicator_id,date,value')->get(['id', 'baseline', 'target'])
+                ->map(fn (Indicator $indicator): ?RagStatus => $indicator->ragStatus($yearStart, $today->endOfYear()))
+                ->filter();
+            $figures[] = [
+                ...$this->figure('targets', $rated->filter(fn (RagStatus $rag): bool => $rag === RagStatus::Green)->count().'/'.$rated->count(), null, upIsGood: true, href: 'targets.index'),
+            ];
+        }
+
+        return $figures;
+    }
+
+    /**
+     * @return array{key: string, value: string, label: string, delta: int|null, deltaText: string|null, good: bool|null, href: string|null}
+     */
+    private function figure(string $key, string $value, ?int $delta, bool $upIsGood, ?string $href, string $deltaKey = 'change'): array
+    {
         return [
-            'running' => $this->visible(Project::query(), 'projects')->where('status', ProjectStatus::Active)->count(),
-            'pipeline' => $this->canView('proposals')
-                ? Proposal::query()->whereIn('status', [...ProposalPhase::Ideation->statuses(), ...ProposalPhase::Planning->statuses()])->count()
-                : null,
-            'reports' => $reports,
-            'money' => $usd === null || $usd['share'] === null ? null : [
-                'share' => $usd['share'],
-                'committed' => Money::format($usd['committed'], 'USD'),
-            ],
-            'late' => $this->attentionItems->filter(fn (array $item): bool => ($item['daysLate'] ?? 0) > 0)->count(),
+            'key' => $key,
+            'value' => $value,
+            'label' => __('desk.glance.'.$key),
+            'delta' => $delta,
+            'deltaText' => $delta === null || $delta === 0 ? ($delta === 0 ? __('desk.glance.delta.same') : null) : __('desk.glance.delta.'.$deltaKey, ['count' => ($delta > 0 ? '+' : '−').abs($delta)]),
+            'good' => $delta === null || $delta === 0 ? null : ($delta > 0) === $upIsGood,
+            'href' => $href !== null && \Illuminate\Support\Facades\Route::has($href) ? route($href) : null,
         ];
     }
 };
@@ -74,28 +125,18 @@ new class extends Component {
     $figures = $this->figures;
 @endphp
 
-<x-desk.panel id="glance" :size="$size" :index="$index" :total="$total">
-    <div class="dk-figs">
-        <div class="dk-fig"><strong class="dk-num">{{ $figures['running'] }}</strong><span>{{ __('desk.panel.glance.running') }}</span></div>
-        @if ($figures['pipeline'] !== null)
-            <div class="dk-fig"><strong class="dk-num">{{ $figures['pipeline'] }}</strong><span>{{ __('desk.panel.glance.pipeline') }}</span></div>
-        @endif
-        @if ($figures['reports'] !== null)
-            @php
-                $spark = $figures['reports']['spark'];
-                $peak = max(1, ...$spark);
-                $last = count($spark) - 1;
-                $points = collect($spark)->map(fn (int $value, int $i): string => round($i / $last * 160, 1).','.round(38 - $value / $peak * 34, 1))->implode(' ');
-            @endphp
-            <div class="dk-fig">
-                <strong class="dk-num">{{ $figures['reports']['validated'] }}/{{ $figures['reports']['total'] }}</strong>
-                <span>{{ __('desk.panel.glance.reports', ['month' => $figures['reports']['month']->translatedFormat('F')]) }}</span>
-                <svg class="dk-spark" viewBox="0 0 160 40" preserveAspectRatio="none" aria-hidden="true"><polyline points="{{ $points }}" fill="none" stroke="currentColor" stroke-width="2"/><circle cx="160" cy="{{ round(38 - $spark[$last] / $peak * 34, 1) }}" r="3" fill="currentColor"/></svg>
-            </div>
-        @endif
-        @if ($figures['money'] !== null)
-            <div class="dk-fig"><strong class="dk-num">{{ $figures['money']['share'] }}%</strong><span>{{ __('desk.panel.glance.money', ['amount' => $figures['money']['committed']]) }}</span></div>
-        @endif
-        <div class="dk-fig"><strong class="dk-num">{{ $figures['late'] }}</strong><span>{{ __('desk.panel.glance.late') }}</span></div>
-    </div>
+<x-desk.panel id="glance" :size="$size" :index="$index" :total="$total" :filterable="false">
+    <ul class="dk-glance" style="--figs:{{ max(1, count($figures)) }}">
+        @foreach ($figures as $figure)
+            <li data-figure="{{ $figure['key'] }}">
+                @if ($figure['href'] !== null)<a href="{{ $figure['href'] }}" wire:navigate class="dk-gl-a">@else<span class="dk-gl-a">@endif
+                    <strong class="dk-num">{{ $figure['value'] }}</strong>
+                    <span class="dk-gl-l">{{ $figure['label'] }}</span>
+                    @if ($figure['deltaText'] !== null)
+                        <span @class(['dk-gl-d dk-num', 'dk-good' => $figure['good'] === true, 'dk-bad' => $figure['good'] === false]) data-trend="{{ $figure['delta'] > 0 ? 'up' : ($figure['delta'] < 0 ? 'down' : 'same') }}">@if ($figure['delta'] > 0)▲@elseif ($figure['delta'] < 0)▼@endif {{ $figure['deltaText'] }}</span>
+                    @endif
+                @if ($figure['href'] !== null)</a>@else</span>@endif
+            </li>
+        @endforeach
+    </ul>
 </x-desk.panel>

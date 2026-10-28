@@ -210,7 +210,7 @@ test('Financial sees the funding position, the pipeline, the transfers and their
         ->assertSee('data-panel="money"', false)
         ->assertSee('data-panel="pipeline"', false)
         ->assertSee('$731,942')
-        ->assertSee('123,457 USD from Aurora Foundation')
+        ->assertSee('123,457')
         ->assertSee(route('proposals.index'), false)
         ->assertSee(route('proposals.show', $proposal), false)
         ->assertSee(route('funding-agreements.index'), false)

@@ -45,6 +45,19 @@ new class extends Component {
             ->sortBy([fn (array $a, array $b): int => ($a['rag'] === RagStatus::Red ? 0 : 1) <=> ($b['rag'] === RagStatus::Red ? 0 : 1), fn (array $a, array $b): int => $a['achieved'] <=> $b['achieved']])
             ->values();
     }
+
+    /**
+     * Project and rating, for the filter popup.
+     *
+     * @return array<string, string>
+     */
+    protected function facetsOf(mixed $row): array
+    {
+        return array_filter([
+            'project' => $row['indicator']->project?->name,
+            'status' => $row['rag']->label(),
+        ]);
+    }
 };
 ?>
 
@@ -56,17 +69,17 @@ new class extends Component {
 
 <x-desk.panel :facets="$pg['facets']" id="targets" register="targets.index" :size="$size" :index="$index" :total="$total" :count="$rows->count()">
     @if ($pg['total'] > 0)
-        <ul class="dk-inds">
+        <ul class="dk-tg">
             @foreach ($pg['slice'] as $row)
                 @php
                     $indicator = $row['indicator'];
                     $unit = $indicator->unit ?? '';
                 @endphp
                 <li wire:key="ind-{{ $indicator->id }}">
-                    <span class="dk-mono">{{ $indicator->code ?? '' }}</span>
-                    <span class="dk-nm">{{ $indicator->name }}@if ($indicator->project !== null)<span class="dk-is"> · {{ $indicator->project->name }}</span>@endif</span>
-                    <span class="dk-mcell"><span class="dk-meter dk-res"><b style="width:{{ round(min(100, max(0, $row['achieved'])), 1) }}%"></b><span class="dk-tick" style="inset-inline-start:{{ round($row['expected'], 1) }}%"></span></span></span>
-                    <span class="dk-vals dk-num"><strong>{{ $number($row['latest']) }}{{ $unit }}</strong> / {{ $number((float) $indicator->target) }}{{ $unit }}</span>
+                    <span class="dk-tg-n" title="{{ $indicator->name }}@if ($indicator->project !== null) · {{ $indicator->project->name }}@endif">@if (filled($indicator->code))<span class="dk-mono">{{ $indicator->code }}</span> @endif{{ $indicator->name }}@if ($indicator->project !== null)<span class="dk-is"> · {{ $indicator->project->name }}</span>@endif</span>
+                    <span @class(['dk-pill dk-tg-s', 'dk-bad' => $row['rag'] === RagStatus::Red, 'dk-warn' => $row['rag'] === RagStatus::Amber])>{{ $row['rag']->label() }}</span>
+                    <span class="dk-tg-b" title="{{ __('desk.plans_bar', ['done' => (int) round($row['achieved']), 'expected' => (int) round($row['expected'])]) }}"><span class="dk-meter dk-res"><b style="width:{{ round(min(100, max(0, $row['achieved'])), 1) }}%"></b><span class="dk-tick" style="inset-inline-start:{{ round($row['expected'], 1) }}%"></span></span></span>
+                    <span class="dk-tg-v dk-num"><strong>{{ $number($row['latest']) }}{{ $unit }}</strong> / {{ $number((float) $indicator->target) }}{{ $unit }} · {{ (int) round($row['achieved']) }}%</span>
                 </li>
             @endforeach
         </ul>

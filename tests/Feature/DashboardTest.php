@@ -57,7 +57,7 @@ test('an empty portfolio renders the empty lines of the work panels', function (
     Livewire::actingAs($user)->test('desk.panels.coming', ['size' => 'M'])->assertSee(__('desk.panel.coming.empty'));
 });
 
-test('needs you lists late work and materialised risks, most overdue first', function () {
+test('needs you leaves late work and materialised risks to other cards', function () {
     $task = Task::factory()->create(['title' => 'Submit the water survey', 'due_date' => '2026-09-10']);
     Task::factory()->create(['title' => 'Finished task', 'due_date' => '2026-09-01', 'status' => TaskStatus::Done]);
     Task::factory()->create(['title' => 'Future task', 'due_date' => '2026-11-20']);
@@ -66,13 +66,13 @@ test('needs you lists late work and materialised risks, most overdue first', fun
 
     Livewire::actingAs(User::factory()->role('General Manager')->create())
         ->test('desk.panels.needs', ['size' => 'L'])
-        ->assertSeeInOrder(['Handover of wells', '30 days late', 'Submit the water survey', '5 days late', 'Road closure', 'Materialised'])
-        ->assertSee(route('tasks.show', $task), false)
-        ->assertDontSee('Finished task')
-        ->assertDontSee('Future task');
+        ->assertDontSee('Handover of wells')
+        ->assertDontSee('Submit the water survey')
+        ->assertDontSee(route('tasks.show', $task), false)
+        ->assertDontSee('Road closure');
 });
 
-test('late transfers join needs you', function () {
+test('late transfers stay off needs you', function () {
     TransfersTracking::factory()->create([
         'payment_amount' => 25000,
         'amount_transfered_currency' => Currency::Eur->value,
@@ -81,7 +81,7 @@ test('late transfers join needs you', function () {
 
     Livewire::actingAs(User::factory()->role('General Manager')->create())
         ->test('desk.panels.needs', ['size' => 'L'])
-        ->assertSeeInOrder(['25,000 EUR from', '10 days late']);
+        ->assertDontSee('25,000 EUR from');
 });
 
 test('the attention queue keeps room for materialised risks when late work fills it', function () {
@@ -89,7 +89,7 @@ test('the attention queue keeps room for materialised risks when late work fills
     Risk::factory()->happened()->create(['name' => 'Road closure']);
 
     $items = Livewire::actingAs(User::factory()->role('General Manager')->create())
-        ->test('desk.panels.needs', ['size' => 'L'])
+        ->test('desk.panels.glance', ['size' => 'XL'])
         ->instance()
         ->attentionItems;
 
@@ -138,7 +138,7 @@ test('pending transfers are not counted as money received', function () {
     expect($lines->sum('received'))->toBe(0.0);
 });
 
-test('the proposal pipeline counts every status and its bars filter the list', function () {
+test('the proposal pipeline counts every status and its status dropdown filters the list', function () {
     Proposal::factory()->create(['name' => 'Winter shelter appeal', 'status' => ProposalStatus::Submitted]);
     Proposal::factory()->create(['name' => 'Closed appeal', 'status' => ProposalStatus::Rejected]);
 
@@ -147,7 +147,7 @@ test('the proposal pipeline counts every status and its bars filter the list', f
     expect($panel->instance()->counts['submitted'])->toBe(1)
         ->and($panel->instance()->counts['rejected'])->toBe(1);
 
-    $panel->call('setFilter', 'submitted')
+    $panel->set('status', 'submitted')
         ->assertSee('Winter shelter appeal')
         ->assertDontSee('Closed appeal');
 });

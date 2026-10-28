@@ -9,13 +9,23 @@ use Livewire\Attributes\Computed;
 use Livewire\Component;
 
 /**
- * Coming up: everything with a date from three days ago to six weeks
- * ahead, as a list or as a month with a picked day.
+ * Coming up — My agenda: the one card about WHEN. Every dated item that
+ * involves the viewer (ReadsDeskAgenda) from three days ago to six weeks
+ * ahead, grouped Earlier / Today / Tomorrow / This week / Later, under a
+ * fourteen-day load strip (a bar per day, height = items; a busy day is
+ * marked). Picking a day in the strip narrows the list to it. The Month
+ * view is a seven-column calendar whose days open a popover with their
+ * items, so the card never changes size. Weeks start on Monday.
  */
 new class extends Component {
     use IsDeskPanel;
     use ReadsDashboardAttention;
     use ReadsDeskAgenda;
+
+    /**
+     * A day with this many items or more is marked busy in the strip.
+     */
+    public const int BusyDay = 3;
 
     public string $view = 'list';
 
@@ -32,16 +42,17 @@ new class extends Component {
     public function shiftMonth(int $by): void
     {
         $this->month = $this->shownMonth()->addMonths($by > 0 ? 1 : -1)->toDateString();
-        $this->day = '';
     }
 
     public function pickDay(string $day): void
     {
-        $this->day = $this->day === $day ? '' : CarbonImmutable::parse($day)->toDateString();
+        $picked = CarbonImmutable::parse($day)->toDateString();
+        $this->day = $this->day === $picked ? '' : $picked;
+        $this->page = 0;
     }
 
     /**
-     * @return Collection<int, array{key: string, kind: string, date: CarbonImmutable, title: string, context: string, href: string}>
+     * @return Collection<int, array{key: string, kind: string, date: CarbonImmutable, title: string, context: string, project: string|null, href: string}>
      */
     #[Computed]
     public function events(): Collection
@@ -52,7 +63,7 @@ new class extends Component {
     }
 
     /**
-     * @return Collection<int, array{key: string, kind: string, date: CarbonImmutable, title: string, context: string, href: string}>
+     * @return Collection<int, array{key: string, kind: string, date: CarbonImmutable, title: string, context: string, project: string|null, href: string}>
      */
     #[Computed]
     public function monthEvents(): Collection
@@ -66,15 +77,58 @@ new class extends Component {
     {
         return $this->month === '' ? CarbonImmutable::today()->startOfMonth() : CarbonImmutable::parse($this->month)->startOfMonth();
     }
+
+    /**
+     * Which heading an item sits under.
+     */
+    public function groupOf(CarbonImmutable $date): string
+    {
+        $today = CarbonImmutable::today();
+
+        return match (true) {
+            $date->lessThan($today) => 'earlier',
+            $date->isSameDay($today) => 'today',
+            $date->isSameDay($today->addDay()) => 'tomorrow',
+            $date->lessThanOrEqualTo($today->endOfWeek()) => 'week',
+            default => 'later',
+        };
+    }
+
+    /**
+     * The items the chosen filters keep, without paging them.
+     *
+     * @param  Collection<int, array{key: string, kind: string, date: CarbonImmutable, title: string, context: string, project: string|null, href: string}>  $items
+     * @return Collection<int, array{key: string, kind: string, date: CarbonImmutable, title: string, context: string, project: string|null, href: string}>
+     */
+    public function filtered(Collection $items): Collection
+    {
+        return $this->matchingFacets($items);
+    }
+
+    /**
+     * @return array<string, string>
+     */
+    protected function facetsOf(mixed $row): array
+    {
+        return array_filter([
+            'type' => __('desk.kind.'.$row['kind']),
+            'project' => $row['project'],
+        ], fn (?string $value): bool => $value !== null && $value !== '');
+    }
 };
 ?>
 
 @php
     $today = CarbonImmutable::today();
     $events = $this->events;
+    $pg = $this->paginate($this->day === '' ? $events : $events->filter(fn (array $event): bool => $event['date']->toDateString() === $this->day)->values(), self::PerPage);
+    $shown = $this->filtered($events);
+    $load = $shown->countBy(fn (array $event): string => $event['date']->toDateString());
+    $peak = max(1, (int) $load->max());
+    $tones = ['milestone' => 'dk-k-ms', 'task' => 'dk-k-task', 'monthly-report' => 'dk-k-rep', 'report' => 'dk-k-rep', 'transfer' => 'dk-k-money', 'donor-report' => 'dk-k-donor'];
 @endphp
 
-<x-desk.panel :facets="[]" id="coming" register="calendar.index" :size="$size" :index="$index" :total="$total" :count="$events->count()">
+<x-desk.panel :facets="$pg['facets']" id="coming" register="calendar.index" :size="$size" :index="$index" :total="$total" :count="$events->count()">
     <x-slot:tools>
         <div class="dk-seg" role="group">
             @foreach (['list' => __('desk.view_list'), 'month' => __('desk.view_month')] as $key => $label)
@@ -86,60 +140,92 @@ new class extends Component {
     @if ($view === 'month')
         @php
             $month = $this->shownMonth();
-            $byDay = $this->monthEvents->groupBy(fn (array $event): string => $event['date']->toDateString());
-            $lead = ($month->dayOfWeekIso - 1);
-            $weekStart = $today->startOfWeek(CarbonImmutable::MONDAY);
+            $byDay = $this->filtered($this->monthEvents)->groupBy(fn (array $event): string => $event['date']->toDateString());
+            $lead = $month->dayOfWeekIso - 1;
+            $weekdays = collect(range(0, 6))->map(fn (int $offset): string => CarbonImmutable::parse('2026-10-12')->addDays($offset)->translatedFormat('D'));
         @endphp
         <div class="dk-mm-h">
             <button type="button" class="dk-iconbtn dk-sm" wire:click="shiftMonth(-1)" aria-label="{{ __('desk.previous_month') }}"><x-desk.icon name="back" class="dk-flip" /></button>
             <strong>{{ $month->translatedFormat('F Y') }}</strong>
             <button type="button" class="dk-iconbtn dk-sm" wire:click="shiftMonth(1)" aria-label="{{ __('desk.next_month') }}"><x-desk.icon name="chev" class="dk-flip" /></button>
         </div>
-        <div class="dk-mm">
-            @for ($i = 0; $i < 7; $i++)
-                <span class="dk-wd">{{ mb_substr($weekStart->addDays($i)->translatedFormat('l'), 0, 1) }}</span>
-            @endfor
+        <div class="dk-mcal" x-data="{ open: '', top: 0, left: 0, pick(day, el) { if (this.open === day) { this.open = ''; return } const r = el.getBoundingClientRect(); const w = Math.min(280, window.innerWidth - 24); this.top = Math.min(r.bottom + 6, window.innerHeight - 240); this.left = Math.max(12, Math.min(r.left + r.width / 2 - w / 2, window.innerWidth - w - 12)); this.open = day } }" x-on:keydown.escape.window="open = ''">
+            @foreach ($weekdays as $weekday)
+                <span class="dk-wd">{{ $weekday }}</span>
+            @endforeach
             @for ($i = 0; $i < $lead; $i++)
-                <span></span>
+                <span aria-hidden="true"></span>
             @endfor
             @for ($d = 1; $d <= $month->daysInMonth; $d++)
                 @php
                     $date = $month->setDay($d)->toDateString();
-                    $n = $byDay->get($date)?->count() ?? 0;
+                    $items = $byDay->get($date, collect());
                 @endphp
-                <button type="button" wire:key="md-{{ $date }}" wire:click="pickDay('{{ $date }}')" @class(['dk-md', 'dk-today' => $date === $today->toDateString(), 'dk-on' => $day === $date])>{{ $d }}@if ($n > 0)<i>{{ $n > 1 ? $n : '' }}</i>@endif</button>
+                <button type="button" wire:key="md-{{ $date }}" @class(['dk-mday', 'dk-today' => $date === $today->toDateString()]) x-bind:class="open === '{{ $date }}' && 'dk-on'" x-on:click="pick('{{ $date }}', $el)" aria-label="{{ CarbonImmutable::parse($date)->translatedFormat(__('formats.date')) }}: {{ trans_choice('desk.agenda_items', $items->count(), ['count' => $items->count()]) }}">
+                    <span class="dk-num">{{ $d }}</span>
+                    <span class="dk-mdots" aria-hidden="true">
+                        @foreach ($items->take(3) as $item)<i class="{{ $tones[$item['kind']] ?? '' }}"></i>@endforeach
+                        @if ($items->count() > 3)<b class="dk-num">+{{ $items->count() - 3 }}</b>@endif
+                    </span>
+                </button>
+            @endfor
+            <template x-teleport="body">
+                <div class="dk-scope dk-daypop" role="dialog" x-show="open !== ''" x-cloak x-transition.opacity x-on:click.outside="if (! $event.target.closest('.dk-mday')) open = ''" x-bind:style="`top:${top}px;left:${left}px`">
+                    @foreach ($byDay as $date => $items)
+                        <div x-show="open === '{{ $date }}'">
+                            <p class="dk-poke-h">{{ CarbonImmutable::parse($date)->translatedFormat(__('formats.date')) }}</p>
+                            <ul>
+                                @foreach ($items as $item)
+                                    <li><i class="dk-kdot {{ $tones[$item['kind']] ?? '' }}"></i><a href="{{ $item['href'] }}" wire:navigate>{{ $item['title'] }}</a><span class="dk-is">{{ __('desk.kind.'.$item['kind']) }} · {{ $item['context'] }}</span></li>
+                                @endforeach
+                            </ul>
+                        </div>
+                    @endforeach
+                    <p class="dk-is" x-show="! @js($byDay->keys()->all()).includes(open)">{{ __('desk.nothing_that_day') }}</p>
+                </div>
+            </template>
+        </div>
+    @else
+        <div class="dk-load" role="group" aria-label="{{ __('desk.agenda_load') }}">
+            @for ($i = 0; $i < 14; $i++)
+                @php
+                    $date = $today->addDays($i);
+                    $iso = $date->toDateString();
+                    $n = (int) ($load[$iso] ?? 0);
+                @endphp
+                <button type="button" wire:key="ld-{{ $iso }}" wire:click="pickDay('{{ $iso }}')" @class(['dk-ld', 'dk-today' => $i === 0, 'dk-busy' => $n >= self::BusyDay, 'dk-on' => $day === $iso]) aria-pressed="{{ $day === $iso ? 'true' : 'false' }}" title="{{ $date->translatedFormat(__('formats.date')) }}: {{ trans_choice('desk.agenda_items', $n, ['count' => $n]) }}">
+                    <span class="dk-ld-bar"><b style="height:{{ $n === 0 ? 0 : max(18, (int) round($n * 100 / $peak)) }}%"></b></span>
+                    <span class="dk-ld-d dk-num">{{ $date->format('j') }}</span>
+                </button>
             @endfor
         </div>
         @if ($day !== '')
-            <ul class="dk-plist dk-tight">
-                @forelse ($byDay->get($day, collect()) as $event)
-                    <li wire:key="{{ $event['key'] }}"><div><strong><a href="{{ $event['href'] }}" wire:navigate>{{ $event['title'] }}</a></strong><span class="dk-is">{{ __('desk.kind.'.$event['kind']) }} · {{ $event['context'] }}</span></div></li>
-                @empty
-                    <li><span class="dk-muted dk-small">{{ __('desk.nothing_that_day') }}</span></li>
-                @endforelse
-            </ul>
-        @else
-            <p class="dk-small dk-muted">{{ __('desk.pick_a_day') }}</p>
+            <p class="dk-ld-pick dk-is">{{ CarbonImmutable::parse($day)->translatedFormat(__('formats.date')) }} · <button type="button" class="dk-link" wire:click="pickDay('{{ $day }}')">{{ __('desk.agenda_all_days') }}</button></p>
         @endif
-    @else
-        @php
-            $pg = $this->paginate($events, self::PerPage);
-        @endphp
         @if ($pg['total'] > 0)
-            <ol class="dk-cal">
+            <ol class="dk-agenda">
+                @php
+                    $group = null;
+                @endphp
                 @foreach ($pg['slice'] as $event)
                     @php
-                        $days = (int) $today->diffInDays($event['date'], false);
+                        $now = $this->groupOf($event['date']);
                     @endphp
-                    <li wire:key="{{ $event['key'] }}" @class(['dk-past' => $days < 0, 'dk-soon' => $days >= 0 && $days <= 7])>
-                        <span class="dk-dd"><b>{{ $event['date']->translatedFormat(__('desk.date_short')) }}</b>{{ \App\Support\Desk\RelativeDay::for($event['date']) }}</span>
-                        <span class="dk-pin"><i></i></span>
-                        <div><p><a href="{{ $event['href'] }}" wire:navigate>{{ $event['title'] }}</a></p><p class="dk-is">{{ __('desk.kind.'.$event['kind']) }} · {{ $event['context'] }}</p></div>
+                    @if ($now !== $group)
+                        <li class="dk-ag-h" wire:key="agh-{{ $now }}-{{ $pg['page'] }}">{{ __('desk.agenda_group.'.$now) }}</li>
+                        @php
+                            $group = $now;
+                        @endphp
+                    @endif
+                    <li wire:key="{{ $event['key'] }}" @class(['dk-ag', 'dk-past' => $now === 'earlier'])>
+                        <span class="dk-ag-d dk-num">{{ $event['date']->translatedFormat(__('desk.date_short')) }}</span>
+                        <i class="dk-kdot {{ $tones[$event['kind']] ?? '' }}" title="{{ __('desk.kind.'.$event['kind']) }}"></i>
+                        <span class="dk-ag-m"><a href="{{ $event['href'] }}" wire:navigate title="{{ $event['title'] }}">{{ $event['title'] }}</a><span class="dk-is" title="{{ $event['context'] }}">{{ __('desk.kind.'.$event['kind']) }} · {{ $event['context'] }}</span></span>
                     </li>
                 @endforeach
             </ol>
         @else
-            <p class="dk-pempty">{{ __('desk.panel.coming.empty') }}</p>
+            <p class="dk-pempty">{{ $day === '' ? __('desk.panel.coming.empty') : __('desk.nothing_that_day') }}</p>
         @endif
     @endif
 

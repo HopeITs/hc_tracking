@@ -6,13 +6,15 @@ namespace App\Actions\Tasks;
 
 use App\Enums\TaskStatus;
 use App\Models\Task;
+use App\Support\TaskWorkflow;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Gate;
 
 /**
  * Create or edit a task from the task form (tasks directory drawer, calendar
  * dialog). A done task is closed and is not changed; only the task's creator
- * moves its due date, so anyone else's due-date change is dropped.
+ * moves its due date, so anyone else's due-date change is dropped. A status
+ * change follows TaskWorkflow (refused as a taskStatus error).
  */
 class SaveTask
 {
@@ -32,6 +34,14 @@ class SaveTask
 
         if (! $isCreate && $existing->status === TaskStatus::Done) {
             return ['task' => null, 'lockedBecauseDone' => true, 'dueDateKept' => false];
+        }
+
+        $user = auth()->user();
+        $from = $existing?->status;
+        $approved = $isCreate || TaskWorkflow::approves($user, $existing);
+
+        if (! $isCreate) {
+            TaskWorkflow::guard($user, $existing, TaskStatus::from($validated['taskStatus']), null, 'taskStatus');
         }
 
         $task = $existing ?? new Task;
@@ -72,6 +82,10 @@ class SaveTask
                 'employee_id' => $employeeId,
             ]));
         });
+
+        if ($from !== null) {
+            TaskWorkflow::announce($user, $task, $from, $approved, null);
+        }
 
         return ['task' => $task, 'lockedBecauseDone' => false, 'dueDateKept' => $dueDateKept];
     }

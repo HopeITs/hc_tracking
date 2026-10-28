@@ -690,12 +690,25 @@ return [
                 'body' => ':actor recorded the funding agreement of “:subject”',
             ],
         ],
+        'task_review' => [
+            'submitted' => [
+                'title' => 'Task sent for your review',
+                'body' => ':actor sent “:subject” for your review on :date',
+            ],
+            'sent_back' => [
+                'title' => 'Task sent back',
+                'body' => ':actor sent “:subject” back: “:note”',
+            ],
+        ],
         'nudge' => [
             'sent' => [
-                'title' => 'Nudge',
-                'body' => ':actor nudged you about “:subject”',
+                'title' => 'Poke',
+                'body' => ':actor poked you about “:subject”',
+                'body_note' => ':actor poked you about “:subject”: “:note”',
+                'plain' => ':actor poked you',
+                'plain_note' => ':actor poked you: “:note”',
             ],
-            'logged' => ':actor nudged :employee about “:subject”',
+            'logged' => ':actor poked :employee about “:subject”',
         ],
         'monthly_reports' => [
             'generated' => [

@@ -14,13 +14,39 @@ use Livewire\Attributes\Computed;
 use Livewire\Component;
 
 /**
- * Monthly reports: every project that reports monthly, one cell per month
- * for the last seven months — validated, with MEAL, sent back, late (a
- * past month still in draft) or open — and how many of its reports are
- * validated. A dot marks a pending reopen request.
+ * Monthly reports: which project has not submitted or not had validated
+ * which month. At L, W and XL a project × month grid (six months at L,
+ * twelve at W and XL); at S and M a "late first" list of the reports that
+ * need someone (late, sent back, with MEAL). The legend is a filter: one
+ * click shows only that state, a second click shows all again; the filter
+ * popup offers the same choice next to the program.
  */
 new class extends Component {
     use IsDeskPanel;
+
+    /**
+     * The report states, in the order the legend and summary show them.
+     */
+    public const array States = ['late', 'returned', 'submitted', 'validated', 'draft'];
+
+    public string $state = '';
+
+    public function toggleState(string $state): void
+    {
+        $this->state = $this->state === $state || ! in_array($state, self::States, true) ? '' : $state;
+        $this->page = 0;
+    }
+
+    public function updatedState(string $state): void
+    {
+        $this->state = in_array($state, self::States, true) ? $state : '';
+        $this->page = 0;
+    }
+
+    public function isWide(): bool
+    {
+        return in_array($this->size, ['L', 'W', 'XL'], true);
+    }
 
     /**
      * @return list<CarbonImmutable>
@@ -28,8 +54,9 @@ new class extends Component {
     public function months(): array
     {
         $current = CarbonImmutable::today()->startOfMonth();
+        $count = $this->size === 'L' ? 6 : 12;
 
-        return array_map(fn (int $back): CarbonImmutable => $current->subMonths($back), range(6, 0));
+        return array_map(fn (int $back): CarbonImmutable => $current->subMonths($back), range($count - 1, 0));
     }
 
     /**
@@ -47,6 +74,7 @@ new class extends Component {
             ->whereIn('id', MonthlyReport::query()->select('project_id'))
             ->where('status', '!=', ProjectStatus::Archived)
             ->with([
+                'program:id',
                 'user:id,first_name_en,last_name_en,first_name_ar,last_name_ar',
                 'monthlyReports' => fn ($query) => $query->select(['id', 'slug', 'project_id', 'period', 'status', 'returned_at'])
                     ->withExists(['reopenRequests as has_pending_reopen' => fn ($reopen) => $reopen->where('status', ReopenRequestStatus::Pending)]),
@@ -70,6 +98,29 @@ new class extends Component {
         return $byProject->map(fn (?int $employeeId): string => $employeeId === null ? '' : (string) $names->get($employeeId, ''))->all();
     }
 
+    /**
+     * Every report in the shown months that needs someone (late, sent back,
+     * with MEAL), late first then oldest month, for the S/M list.
+     *
+     * @param  Collection<int, Project>  $projects
+     * @return Collection<int, array{project: Project, report: MonthlyReport, state: string}>
+     */
+    public function attention(Collection $projects): Collection
+    {
+        $from = $this->months()[0];
+        $states = $this->state === '' ? ['late', 'returned', 'submitted'] : [$this->state];
+
+        return $projects
+            ->flatMap(fn (Project $project): Collection => $project->monthlyReports
+                ->filter(fn (MonthlyReport $report): bool => $report->period->greaterThanOrEqualTo($from) && in_array($this->stateOf($report), $states, true))
+                ->map(fn (MonthlyReport $report): array => ['project' => $project, 'report' => $report, 'state' => $this->stateOf($report)]))
+            ->sortBy([
+                fn (array $a, array $b): int => array_search($a['state'], self::States, true) <=> array_search($b['state'], self::States, true),
+                fn (array $a, array $b): int => $a['report']->period <=> $b['report']->period,
+            ])
+            ->values();
+    }
+
     public function stateOf(MonthlyReport $report): string
     {
         return match (true) {
@@ -80,60 +131,102 @@ new class extends Component {
             default => 'draft',
         };
     }
+
+    /**
+     * @return array<string, string>
+     */
+    protected function facetsOf(mixed $row): array
+    {
+        $project = $row instanceof Project ? $row : $row['project'];
+
+        return array_filter(['program' => $project->program?->name], fn (?string $name): bool => $name !== null && $name !== '');
+    }
 };
 ?>
 
 @php
-    $rows = $this->rows;
     $months = $this->months();
+    $from = $months[0];
+    $projects = $this->rows;
+    $inWindow = $projects->flatMap(fn ($project) => $project->monthlyReports->filter(fn ($report) => $report->period->greaterThanOrEqualTo($from)));
+    $counts = $inWindow->countBy(fn ($report) => $this->stateOf($report));
+    $wide = $this->isWide();
     $glyphs = ['validated' => '✓', 'submitted' => '•', 'late' => '!', 'returned' => '↺', 'draft' => ''];
-    $lateCount = $rows->sum(fn ($project) => $project->monthlyReports->filter(fn ($report) => $this->stateOf($report) === 'late')->count());
-    $pg = $this->paginate($rows, 3);
+
+    if ($wide) {
+        $list = $state === '' ? $projects : $projects->filter(fn ($project) => $project->monthlyReports->contains(fn ($report) => $report->period->greaterThanOrEqualTo($from) && $this->stateOf($report) === $state))->values();
+    } else {
+        $list = $this->attention($projects);
+    }
+
+    $pg = $this->paginate($list, self::PerPage);
 @endphp
 
-<x-desk.panel :facets="$pg['facets']" id="matrix" register="reports.monthly-matrix" :size="$size" :index="$index" :total="$total" :count="$lateCount > 0 ? $lateCount : null">
-    <div class="dk-mx-wrap">
-        <table class="dk-mx">
-            <thead>
-                <tr>
-                    <th scope="col">{{ __('desk.project') }}</th>
-                    @foreach ($months as $month)
-                        <th scope="col">{{ $month->translatedFormat('M') }}</th>
-                    @endforeach
-                    <th scope="col">{{ __('desk.validated') }}</th>
-                </tr>
-            </thead>
-            <tbody>
-                @foreach ($pg['slice'] as $project)
-                    @php
-                        $byMonth = $project->monthlyReports->keyBy(fn ($report) => $report->period->format('Y-m'));
-                        $owner = $project->user?->name;
-                        $officer = $this->officers[$project->id] ?? '';
-                    @endphp
-                    <tr wire:key="mx-{{ $project->id }}">
-                        <th scope="row"><a href="{{ route('projects.show', $project) }}" wire:navigate>{{ $project->name }}</a>@if (filled($owner) || $officer !== '')<span class="dk-is">{{ $owner ?? '—' }} → {{ $officer !== '' ? $officer : '—' }}</span>@endif</th>
-                        @foreach ($months as $month)
-                            @php
-                                $report = $byMonth->get($month->format('Y-m'));
-                                $state = $report === null ? null : $this->stateOf($report);
-                            @endphp
-                            <td>
-                                @if ($report !== null)
-                                    <a href="{{ route('monthly-reports.show', $report) }}" wire:navigate class="dk-mc dk-{{ $state }}" aria-label="{{ $month->translatedFormat('F') }}: {{ __('desk.report_state.'.$state) }}">{{ $glyphs[$state] }}@if ($report->has_pending_reopen)<i class="dk-ro"></i>@endif</a>
-                                @else
-                                    <span class="dk-mc dk-future"></span>
-                                @endif
-                            </td>
-                        @endforeach
-                        <td class="dk-num">{{ $project->monthlyReports->where('status', MonthlyReportStatus::Validated)->count() }}/{{ $project->monthlyReports->count() }}</td>
-                    </tr>
+<x-desk.panel :facets="$pg['facets']" :filtered="$state !== ''" id="matrix" register="reports.monthly-matrix" :size="$size" :index="$index" :total="$total" :count="($counts['late'] ?? 0) > 0 ? $counts['late'] : null">
+    <x-slot:filters>
+        <div class="contents" data-filter-defaults='{"state":""}'>
+            <x-ui.header-filter-select :label="__('desk.facet.status')" wire:model="state" :value="$state" deferred>
+                <option value="">{{ __('desk.filter_all') }}</option>
+                @foreach (self::States as $option)
+                    <option value="{{ $option }}">{{ __('desk.report_state.'.$option) }}</option>
                 @endforeach
-            </tbody>
-        </table>
-    </div>
-    <div class="dk-legend">
-        @foreach (['validated', 'submitted', 'returned', 'late', 'draft'] as $state)
-            <span><i class="dk-mc dk-{{ $state }}"></i>{{ __('desk.report_state.'.$state) }}</span>
+            </x-ui.header-filter-select>
+        </div>
+    </x-slot:filters>
+
+    <p class="dk-mx-sum">{!! __('desk.matrix_summary', ['late' => '<b class="dk-num dk-bad">'.($counts['late'] ?? 0).'</b>', 'waiting' => '<b class="dk-num">'.($counts['submitted'] ?? 0).'</b>']) !!}</p>
+
+    @if ($pg['total'] === 0)
+        <p class="dk-pempty">{{ __('desk.matrix_empty') }}</p>
+    @elseif ($wide)
+        <div class="dk-mx2" style="--months:{{ count($months) }}" role="table" aria-label="{{ __('desk.panel.matrix.title') }}">
+            <div class="dk-mx2-r dk-mx2-h" role="row">
+                <span role="columnheader">{{ __('desk.project') }}</span>
+                @foreach ($months as $month)
+                    <span role="columnheader" title="{{ $month->translatedFormat('F Y') }}">{{ mb_substr($month->translatedFormat('M'), 0, 3) }}</span>
+                @endforeach
+                <span role="columnheader">{{ __('desk.validated') }}</span>
+            </div>
+            @foreach ($pg['slice'] as $project)
+                @php
+                    $byMonth = $project->monthlyReports->keyBy(fn ($report) => $report->period->format('Y-m'));
+                    $owner = $project->user?->name;
+                    $officer = $this->officers[$project->id] ?? '';
+                @endphp
+                <div class="dk-mx2-r" role="row" wire:key="mx-{{ $project->id }}">
+                    <span class="dk-mx2-n" role="rowheader"><a href="{{ route('projects.show', $project) }}" wire:navigate title="{{ $project->name }}">{{ $project->name }}</a><span class="dk-is" title="{{ __('desk.matrix_people', ['owner' => $owner ?? '—', 'officer' => $officer !== '' ? $officer : '—']) }}">{{ $owner ?? '—' }} → {{ $officer !== '' ? $officer : '—' }}</span></span>
+                    @foreach ($months as $month)
+                        @php
+                            $report = $byMonth->get($month->format('Y-m'));
+                            $cell = $report === null ? null : $this->stateOf($report);
+                        @endphp
+                        <span role="cell" class="dk-mx2-c">
+                            @if ($report !== null)
+                                <a href="{{ route('monthly-reports.show', $report) }}" wire:navigate @class(['dk-mc dk-'.$cell, 'dk-dim' => $state !== '' && $state !== $cell]) title="{{ $month->translatedFormat('F Y') }}: {{ __('desk.report_state.'.$cell) }}" aria-label="{{ $month->translatedFormat('F') }}: {{ __('desk.report_state.'.$cell) }}">{{ $glyphs[$cell] }}@if ($report->has_pending_reopen)<i class="dk-ro"></i>@endif</a>
+                            @else
+                                <span class="dk-mc dk-future" aria-label="{{ $month->translatedFormat('F') }}: —"></span>
+                            @endif
+                        </span>
+                    @endforeach
+                    <span role="cell" class="dk-mx2-v dk-num">{{ $project->monthlyReports->where('status', MonthlyReportStatus::Validated)->count() }}/{{ $project->monthlyReports->count() }}</span>
+                </div>
+            @endforeach
+        </div>
+    @else
+        <ul class="dk-mx-list">
+            @foreach ($pg['slice'] as $row)
+                <li wire:key="mxl-{{ $row['report']->id }}">
+                    <a href="{{ route('monthly-reports.show', $row['report']) }}" wire:navigate class="dk-mx-ln" title="{{ $row['project']->name }}">{{ $row['project']->name }}</a>
+                    <span class="dk-pill dk-mxp-{{ $row['state'] }}">{{ __('desk.report_state.'.$row['state']) }}</span>
+                    <span class="dk-is">{{ $row['report']->period->translatedFormat('F Y') }} · {{ $row['project']->user?->name ?? '—' }}</span>
+                </li>
+            @endforeach
+        </ul>
+    @endif
+
+    <div class="dk-legend" role="group" aria-label="{{ __('desk.matrix_legend') }}">
+        @foreach (self::States as $option)
+            <button type="button" wire:click="toggleState('{{ $option }}')" aria-pressed="{{ $state === $option ? 'true' : 'false' }}" @class(['dk-on' => $state === $option])><i class="dk-mc dk-{{ $option }}"></i>{{ __('desk.report_state.'.$option) }} <span class="dk-num">{{ $counts[$option] ?? 0 }}</span></button>
         @endforeach
     </div>
 

@@ -52,6 +52,7 @@ use Illuminate\Support\Collection;
  * @property CarbonImmutable|null $due_date
  * @property CarbonImmutable|null $completed_date
  * @property int $progress_percentage
+ * @property bool $evidence_required
  * @property int $created_by
  * @property int|null $copied_from_id
  * @property CarbonImmutable|null $created_at
@@ -79,6 +80,7 @@ use Illuminate\Support\Collection;
     'due_date',
     'completed_date',
     'progress_percentage',
+    'evidence_required',
     'created_by',
     'copied_from_id',
 ])]
@@ -106,6 +108,7 @@ class Task extends Model implements TracksActivity
         'priority' => 'medium',
         'progress_percentage' => 0,
         'kind' => 'general',
+        'evidence_required' => false,
     ];
 
     /**
@@ -365,6 +368,7 @@ class Task extends Model implements TracksActivity
             'due_date' => 'date',
             'completed_date' => 'date',
             'progress_percentage' => 'integer',
+            'evidence_required' => 'boolean',
             'department_id' => 'integer',
             'kind' => TaskKind::class,
             'media_kinds' => AsEnumCollection::of(DeliverableKind::class),

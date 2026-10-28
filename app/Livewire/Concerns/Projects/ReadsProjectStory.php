@@ -136,7 +136,7 @@ trait ReadsProjectStory
      * Nudge whoever holds the next step. The person is read back from
      * story(), never from the request.
      */
-    public function nudgeNextStep(SendNudge $nudge): void
+    public function nudgeNextStep(SendNudge $nudge, ?string $note = null): void
     {
         $next = $this->story['next'];
 
@@ -144,7 +144,7 @@ trait ReadsProjectStory
             return;
         }
 
-        $sent = $nudge->handle(auth()->user(), Project::query()->findOrFail($this->projectId), $next['owner']);
+        $sent = $nudge->handle(auth()->user(), Project::query()->findOrFail($this->projectId), $next['owner'], $note);
 
         Flux::toast(text: $sent ? __('desk.nudged') : __('desk.nudged_already'), variant: $sent ? 'success' : null);
     }

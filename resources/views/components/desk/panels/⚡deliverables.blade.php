@@ -75,17 +75,18 @@ new class extends Component {
 
 <x-desk.panel :facets="$pg['facets']" id="deliverables" register="department-tasks.index" :size="$size" :index="$index" :total="$total" :count="$rows->count()">
     @if ($pg['total'] > 0)
-        <ul class="dk-plist">
+        <ul class="dk-rv">
             @foreach ($pg['slice'] as $task)
+                @php
+                    $late = $task->due_date !== null && $task->due_date->lt(\Carbon\CarbonImmutable::today());
+                @endphp
                 <li wire:key="dl-{{ $task->id }}">
-                    <div>
-                        <strong><a href="{{ route('tasks.show', $task) }}" wire:navigate>{{ $task->title }}</a></strong>
-                        <span class="dk-is">{{ $task->kind->label() }} · {{ $this->parents[$task->id] }}@if ($task->due_date !== null) · {{ $task->due_date->translatedFormat(__('desk.date_short')) }}@endif</span>
-                    </div>
+                    <a href="{{ route('tasks.show', $task) }}" wire:navigate class="dk-rv-n" title="{{ $task->title }}">{{ $task->title }}</a>
+                    <span class="dk-rv-m dk-is" title="{{ $this->parents[$task->id] }}">{{ $task->kind->label() }} · {{ $this->parents[$task->id] }}@if ($task->due_date !== null) · <span @class(['dk-bad' => $late])>{{ $late ? __('desk.tasks_late_since', ['date' => $task->due_date->translatedFormat(__('desk.date_short'))]) : $task->due_date->translatedFormat(__('desk.date_short')) }}</span>@endif</span>
                     @if ($task->delivery_state !== null)
-                        <span @class(['dk-pill', 'dk-warn' => $task->delivery_state === DeliveryState::Returned, 'dk-act' => $task->delivery_state === DeliveryState::Delivered])>{{ $task->delivery_state->label() }}</span>
+                        <span @class(['dk-pill dk-rv-s', 'dk-warn' => $task->delivery_state === DeliveryState::Returned, 'dk-act' => $task->delivery_state === DeliveryState::Delivered])>{{ $task->delivery_state->label() }}</span>
                     @else
-                        <span class="dk-pill">{{ $task->status->label() }}</span>
+                        <span class="dk-pill dk-rv-s">{{ $task->status->label() }}</span>
                     @endif
                 </li>
             @endforeach

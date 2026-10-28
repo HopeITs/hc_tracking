@@ -1,25 +1,33 @@
 <?php
 
+use App\Enums\ProjectStatus;
 use App\Enums\ReportTemplateStatus;
 use App\Livewire\Concerns\Desk\IsDeskPanel;
 use App\Models\HrEmployee;
-use App\Models\ReportTemplate;
+use App\Models\Project;
 use App\Support\MealCoverage;
 use Illuminate\Support\Collection;
 use Livewire\Attributes\Computed;
 use Livewire\Component;
 
 /**
- * Report templates: monthly-report templates waiting for MEAL first, then
- * the confirmed ones, each with its line count and responsible MEAL
- * officer. There is no template review page yet (stage 4 adds the sheet),
- * so a waiting template shows its state instead of a Review button.
+ * Report templates status, for MEAL and managers (report-templates.manage):
+ * every running project with where its monthly-report template stands —
+ * missing (needs creating), pending (waiting for MEAL to confirm) or
+ * approved — its responsible MEAL officer and a link to the project, where
+ * templates are made (there is no template page of its own). Missing first,
+ * then pending, then approved.
  */
 new class extends Component {
     use IsDeskPanel;
 
     /**
-     * @return Collection<int, ReportTemplate>
+     * The order and words of the three states.
+     */
+    public const array States = ['missing', 'pending', 'approved'];
+
+    /**
+     * @return Collection<int, array{project: Project, state: string, lines: int}>
      */
     #[Computed]
     public function rows(): Collection
@@ -28,51 +36,71 @@ new class extends Component {
             return new Collection;
         }
 
-        return ReportTemplate::query()
-            ->with('project')
-            ->withCount('lines')
-            ->orderByRaw('status = ? desc', [ReportTemplateStatus::Pending->value])
-            ->latest('id')
-            ->get();
+        return Project::query()
+            ->select(['id', 'slug', 'name', 'status', 'city_id', 'center_id', 'program_id', 'user_id'])
+            ->whereIn('status', [ProjectStatus::Active, ProjectStatus::Approved])
+            ->with(['reportTemplate' => fn ($query) => $query->select(['id', 'project_id', 'status'])->withCount('lines')])
+            ->orderBy('name')
+            ->get()
+            ->map(fn (Project $project): array => [
+                'project' => $project,
+                'state' => match ($project->reportTemplate?->status) {
+                    null => 'missing',
+                    ReportTemplateStatus::Pending => 'pending',
+                    default => 'approved',
+                },
+                'lines' => (int) ($project->reportTemplate?->lines_count ?? 0),
+            ])
+            ->sortBy(fn (array $row): int => array_search($row['state'], self::States, true))
+            ->values();
     }
 
     /**
-     * template id => responsible MEAL officer's name.
+     * project id => responsible MEAL officer's name.
      *
      * @return array<int, string>
      */
     #[Computed]
     public function officers(): array
     {
-        $byTemplate = $this->rows->mapWithKeys(fn (ReportTemplate $template): array => [$template->id => $template->project === null ? null : MealCoverage::responsibleFor($template->project)]);
-        $names = HrEmployee::query()->whereKey($byTemplate->filter()->unique()->values()->all())->get(HrEmployee::NameColumns)
+        $byProject = $this->rows->mapWithKeys(fn (array $row): array => [$row['project']->id => MealCoverage::responsibleFor($row['project'])]);
+        $names = HrEmployee::query()->whereKey($byProject->filter()->unique()->values()->all())->get(HrEmployee::NameColumns)
             ->mapWithKeys(fn (HrEmployee $employee): array => [$employee->id => $employee->name]);
 
-        return $byTemplate->map(fn (?int $employeeId): string => $employeeId === null ? '' : (string) $names->get($employeeId, ''))->all();
+        return $byProject->map(fn (?int $employeeId): string => $employeeId === null ? '' : (string) $names->get($employeeId, ''))->all();
+    }
+
+    /**
+     * @return array<string, string>
+     */
+    protected function facetsOf(mixed $row): array
+    {
+        return ['status' => __('desk.template_state.'.$row['state'])];
     }
 };
 ?>
 
 @php
     $rows = $this->rows;
-    $pending = $rows->where('status', ReportTemplateStatus::Pending)->count();
+    $counts = $rows->countBy('state');
     $pg = $this->paginate($rows, self::PerPage);
 @endphp
 
-<x-desk.panel :facets="$pg['facets']" id="templates" :size="$size" :index="$index" :total="$total" :count="$pending > 0 ? $pending : null">
+<x-desk.panel :facets="$pg['facets']" id="templates" :size="$size" :index="$index" :total="$total" :count="($counts['missing'] ?? 0) + ($counts['pending'] ?? 0) ?: null">
+    @if ($rows->isNotEmpty())
+        <p class="dk-pl-sum">{{ __('desk.templates_summary', ['missing' => $counts['missing'] ?? 0, 'pending' => $counts['pending'] ?? 0, 'approved' => $counts['approved'] ?? 0]) }}</p>
+    @endif
     @if ($pg['total'] > 0)
-        <ul class="dk-plist">
-            @foreach ($pg['slice'] as $template)
-                <li wire:key="tp-{{ $template->id }}">
-                    <div>
-                        <strong>{{ $template->project?->name ?? '—' }}</strong>
-                        <span class="dk-is">{{ trans_choice('desk.lines_count', $template->lines_count, ['count' => $template->lines_count]) }}@if ($this->officers[$template->id] !== '') · {{ $this->officers[$template->id] }}@endif</span>
-                    </div>
-                    @if ($template->status === ReportTemplateStatus::Pending)
-                        <span class="dk-pill dk-warn">{{ $template->status->label() }}</span>
-                    @else
-                        <span class="dk-pill dk-good">{{ $template->status->label() }}</span>
-                    @endif
+        <ul class="dk-tp">
+            @foreach ($pg['slice'] as $row)
+                @php
+                    $officer = $this->officers[$row['project']->id] ?? '';
+                @endphp
+                <li wire:key="tp-{{ $row['project']->id }}">
+                    <span class="dk-tp-n" title="{{ $row['project']->name }}">{{ $row['project']->name }}</span>
+                    <span @class(['dk-pill dk-tp-s', 'dk-bad' => $row['state'] === 'missing', 'dk-warn' => $row['state'] === 'pending', 'dk-good' => $row['state'] === 'approved'])>{{ __('desk.template_state.'.$row['state']) }}</span>
+                    <span class="dk-tp-m dk-is">@if ($row['state'] !== 'missing'){{ trans_choice('desk.lines_count', $row['lines'], ['count' => $row['lines']]) }} · @endif{{ $officer !== '' ? $officer : __('desk.no_meal_officer') }}</span>
+                    <a href="{{ route('projects.show', $row['project']) }}" wire:navigate @class(['dk-btn dk-sm dk-tp-a', 'dk-primary' => $row['state'] !== 'approved'])>{{ __('desk.template_action.'.$row['state']) }}</a>
                 </li>
             @endforeach
         </ul>

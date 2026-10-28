@@ -35,6 +35,9 @@
                             @endforeach
                         </div>
                         <flux:error name="taskStatus" class="mt-1.5" />
+                        @if ($this->task->status === TaskStatus::UnderReview && $taskStatus === TaskStatus::InProgress->value && \App\Support\TaskWorkflow::approves(auth()->user(), $this->task))
+                            <flux:textarea wire:model="reviewNote" :label="__('tasks.workflow.send_back_note')" rows="2" maxlength="200" class="mt-3" data-test="task-review-note" />
+                        @endif
                     </div>
 
                     @if ($canEditTask)
@@ -91,6 +94,7 @@
                 </div>
                 @if ($canEditTask)
                     <flux:error name="dueDate" class="-mt-3" />
+                    <flux:checkbox wire:model="evidenceRequired" :label="__('tasks.workflow.evidence_required')" :description="__('tasks.workflow.evidence_required_help')" data-test="task-evidence-required" />
                 @endif
 
                 <div class="flex justify-end gap-2 border-t border-secondary-soft pt-4 dark:border-line">

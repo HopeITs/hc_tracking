@@ -189,14 +189,14 @@ test('pages render right to left in arabic and left to right in english', functi
         ->get(route('dashboard'))
         ->assertOk()
         ->assertSee('<html lang="ar" dir="rtl"', false)
-        ->assertSeeText('خصّص المكتب');
+        ->assertSeeText('الرئيسية');
 
     $user->forceFill(['locale' => 'en'])->save();
 
     $this->actingAs($user)
         ->get(route('dashboard'))
         ->assertSee('<html lang="en" dir="ltr"', false)
-        ->assertSeeText('Customize desk');
+        ->assertSeeText('Home');
 });
 
 test('someone who has not chosen a language gets english', function () {

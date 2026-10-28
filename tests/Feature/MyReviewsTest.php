@@ -115,18 +115,18 @@ test('needs you leads with the reviews waiting on the viewer', function () {
 
     $dashboard = Livewire::actingAs($user)->test('desk.panels.needs', ['size' => 'L']);
 
-    expect($dashboard->get('attentionItems')->where('group', 'reviews'))->toHaveCount(1)
-        ->and($dashboard->get('attentionItems')->first())->toMatchArray([
+    expect($dashboard->get('decisions'))->toHaveCount(1)
+        ->and($dashboard->get('decisions')->first())->toMatchArray([
             'key' => 'review-'.$waiting->id,
-            'group' => 'reviews',
+            'kind' => 'review',
             'title' => 'Water Access',
             'href' => route('proposals.show', $waiting->proposal),
-            'allRank' => 0,
+            'late' => false,
         ]);
 
     $dashboard
         ->assertSee('Water Access')
-        ->assertSee(trans_choice('dashboard.review_asked_days', 3, ['count' => 3]))
+        ->assertSee(__('desk.decision_action.review'))
         ->assertDontSee('Already Read');
 });
 
@@ -136,6 +136,17 @@ test('needs you holds no review for someone nothing waits on', function () {
 
     $dashboard = Livewire::actingAs($user)->test('desk.panels.needs', ['size' => 'L']);
 
-    expect($dashboard->get('attentionItems')->where('group', 'reviews'))->toHaveCount(0);
+    expect($dashboard->get('decisions'))->toHaveCount(0);
     $dashboard->assertDontSee('Already Read');
+});
+
+test('my reviews card marks a review asked over a week ago and links straight to it', function () {
+    [$employeeId, $user] = reviewerLogin();
+    $old = myReview($employeeId, 'Old Ask', ProposalStatus::ConceptNoteReview);
+    $old->forceFill(['created_at' => now()->subDays(10)])->save();
+
+    Livewire::actingAs($user)->test('desk.panels.reviews', ['size' => 'M'])
+        ->assertSee(__('desk.review_waiting_long'))
+        ->assertSee(__('desk.review_action'))
+        ->assertSee(route('proposals.show', $old->proposal), false);
 });

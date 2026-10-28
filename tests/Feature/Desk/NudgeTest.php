@@ -1,5 +1,6 @@
 <?php
 
+use App\Actions\Desk\SendNudge;
 use App\Models\Activity;
 use App\Models\Supervision;
 use App\Models\Task;
@@ -32,11 +33,11 @@ test('nudging a late task I created reaches its assignee once a day and is logge
     $task = nudgeLateTask($me, $colleague->employee_id);
 
     $panel = Livewire::actingAs($me)->test('desk.panels.waiting', ['size' => 'M'])
-        ->assertSeeHtml("nudge('task-{$task->id}')")
+        ->assertSee("nudge('task-{$task->id}', note)")
         ->call('nudge', "task-{$task->id}");
 
     expect(UserNotification::query()->forUser($colleague)->count())->toBe(1)
-        ->and(sentencesFor($colleague)[0])->toContain('nudged you about “Procure water pumps”')
+        ->and(sentencesFor($colleague)[0])->toContain('poked you about “Procure water pumps”')
         ->and(Activity::query()->where('event', 'nudge.logged')->where('subject_id', $task->id)->count())->toBe(1);
 
     $panel->call('nudge', "task-{$task->id}");
@@ -53,7 +54,7 @@ test('a key that is not one of my waiting rows nudges nobody', function () {
     $task = nudgeLateTask(userWithRole('Managers', insertHrEmployee(firstNameEn: 'Lina')), $stranger->employee_id);
 
     Livewire::actingAs($me)->test('desk.panels.waiting', ['size' => 'M'])
-        ->assertDontSeeHtml("nudge('task-{$task->id}')")
+        ->assertDontSee("nudge('task-{$task->id}', note)")
         ->call('nudge', "task-{$task->id}");
 
     expect(UserNotification::query()->forUser($stranger)->count())->toBe(0);
@@ -71,7 +72,7 @@ test('a supervisor nudges a supervisee about their oldest overdue task', functio
     Livewire::actingAs($me)->test('desk.panels.myteam', ['size' => 'M'])
         ->call('nudge', $supervisee->employee_id);
 
-    expect(sentencesFor($supervisee)[0])->toContain('nudged you about “Procure water pumps”');
+    expect(sentencesFor($supervisee)[0])->toContain('poked you about “Procure water pumps”');
 });
 
 test('nobody is nudged when an administrator switches the event off', function () {
@@ -83,4 +84,38 @@ test('nobody is nudged when an administrator switches the event off', function (
     Livewire::actingAs($me)->test('desk.panels.waiting', ['size' => 'M'])->call('nudge', "task-{$task->id}");
 
     expect(UserNotification::query()->forUser($colleague)->count())->toBe(0);
+});
+
+test('a poke carries a cleaned note, and the same sender pokes the same person once a day', function () {
+    $me = userWithRole('Managers', insertHrEmployee());
+    $colleague = userWithRole('Team Member', insertHrEmployee(firstNameEn: 'Rana'));
+    $task = nudgeLateTask($me, $colleague->employee_id);
+    $other = nudgeLateTask($me, $colleague->employee_id);
+
+    Livewire::actingAs($me)->test('desk.panels.waiting', ['size' => 'M'])
+        ->call('nudge', "task-{$task->id}", '  <b>Can you</b>   give me an update? ')
+        ->call('nudge', "task-{$other->id}", 'Second item');
+
+    expect(sentencesFor($colleague))->toHaveCount(1)
+        ->and(sentencesFor($colleague)[0])->toContain('poked you about “Procure water pumps”: “Can you give me an update?”');
+});
+
+test('a note is cut to 200 characters and a blank note is dropped', function () {
+    expect(mb_strlen(SendNudge::cleanNote(str_repeat('a', 300))))->toBe(200)
+        ->and(SendNudge::cleanNote('   '))->toBeNull();
+});
+
+test('My team can poke someone with nothing overdue, without a subject', function () {
+    $me = userWithRole('Managers', insertHrEmployee());
+    $supervisee = userWithRole('Team Member', insertHrEmployee(firstNameEn: 'Fadi'));
+    Activity::withoutRecording(fn () => Supervision::factory()->create([
+        'supervisor_employee_id' => $me->employee_id,
+        'supervisee_employee_id' => $supervisee->employee_id,
+    ]));
+
+    Livewire::actingAs($me)->test('desk.panels.myteam', ['size' => 'M'])
+        ->call('nudge', $supervisee->employee_id, 'Coffee at 3?');
+
+    expect(sentencesFor($supervisee))->toBe([$me->name.' poked you: “Coffee at 3?”'])
+        ->and(Activity::query()->where('event', 'nudge.logged')->count())->toBe(0);
 });

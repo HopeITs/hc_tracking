@@ -16,11 +16,13 @@ use Livewire\Attributes\Computed;
 use Livewire\Component;
 
 /**
- * My team: the people the viewer supervises (SupervisionMap, via the
- * dashboard's myTeam()) with their overdue tasks and late monthly reports.
- * Nudging someone behind is about their oldest overdue task, or their
- * oldest late monthly report when no task is overdue, looked up only when
- * the button is pressed so the panel costs the same queries for any team.
+ * My team: the viewer's team (TeamScope via the dashboard's myTeam():
+ * reports, project teams, department) with their overdue tasks and late
+ * monthly reports. Anyone with a tracking account can be poked, with an
+ * optional note; the poke is about their oldest overdue task, else their
+ * oldest late monthly report, else nothing in particular. The subject is
+ * looked up only when Poke is pressed, so the panel costs the same queries
+ * for any team.
  */
 new class extends Component {
     use IsDeskPanel;
@@ -28,7 +30,7 @@ new class extends Component {
     use ReadsDashboardWork;
 
     /**
-     * @return list<array{employeeId: int, name: string, initials: string, title: string, overdue: int, lateReports: int, userId: int|null}>
+     * @return list<array{employeeId: int, name: string, initials: string, title: string, overdue: int, lateReports: int, userId: int|null, relation: string}>
      */
     #[Computed]
     public function people(): array
@@ -65,22 +67,28 @@ new class extends Component {
     /**
      * The person is read back from people(), never trusted from the request.
      */
-    public function nudge(int $employeeId, SendNudge $nudge): void
+    public function nudge(int $employeeId, SendNudge $nudge, ?string $note = null): void
     {
         $person = collect($this->people)->firstWhere('employeeId', $employeeId);
 
-        $subject = $person === null ? null : $this->nudgeSubject($person['employeeId'], $person['userId']);
-
-        if ($subject === null) {
+        if ($person === null || $person['userId'] === null) {
             return;
         }
 
-        $sent = $nudge->handle(auth()->user(), $subject, $employeeId);
+        $sent = $nudge->handle(auth()->user(), $this->nudgeSubject($person['employeeId'], $person['userId']), $employeeId, $note);
         Flux::toast(text: $sent ? __('desk.nudged') : __('desk.nudged_already'), variant: $sent ? 'success' : null);
     }
 
     /**
-     * What a nudge to this person is about: their oldest overdue task the
+     * @return array<string, string>
+     */
+    protected function facetsOf(mixed $row): array
+    {
+        return ['relation' => __('desk.relation.'.$row['relation'])];
+    }
+
+    /**
+     * What a poke to this person is about: their oldest overdue task the
      * viewer may see, else their oldest late monthly report.
      */
     private function nudgeSubject(int $employeeId, ?int $userId): Task|MonthlyReport|null
@@ -115,21 +123,33 @@ new class extends Component {
 @endphp
 
 <x-desk.panel :facets="$pg['facets']" id="myteam" :size="$size" :index="$index" :total="$total" :count="count($people)">
-    <ul class="dk-people">
-        @foreach ($pg['slice'] as $person)
-            @php
-                $behind = $person['overdue'] + $person['lateReports'];
-            @endphp
-            <li wire:key="pp-{{ $person['employeeId'] }}">
-                <span class="dk-av">{{ $person['initials'] }}</span>
-                <span class="dk-pm"><strong>{{ $person['name'] }}</strong>@if ($person['title'] !== '')<span class="dk-is">{{ $person['title'] }}</span>@endif</span>
-                <span @class(['dk-small', 'dk-bad' => $behind > 0, 'dk-muted' => $behind === 0])>{{ $behind > 0 ? __('desk.team_behind', ['tasks' => $person['overdue'], 'reports' => $person['lateReports']]) : __('desk.nothing_overdue') }}</span>
-                @if ($behind > 0)
-                    <button type="button" class="dk-btn dk-ghost dk-sm" wire:click="nudge({{ $person['employeeId'] }})" aria-label="{{ __('desk.nudge_named', ['name' => $person['name']]) }}"><x-desk.icon name="bell" /></button>
-                @endif
-            </li>
-        @endforeach
-    </ul>
+    @if ($pg['total'] > 0)
+        <ul class="dk-team">
+            @foreach ($pg['slice'] as $person)
+                @php
+                    $behind = $person['overdue'] + $person['lateReports'];
+                @endphp
+                <li wire:key="pp-{{ $person['employeeId'] }}">
+                    <span class="dk-av" aria-hidden="true">{{ $person['initials'] }}</span>
+                    <span class="dk-tm-who">
+                        <strong title="{{ $person['name'] }}">{{ $person['name'] }}</strong>
+                        <span class="dk-is" title="{{ $person['title'] }}">{{ __('desk.relation.'.$person['relation']) }}@if ($person['title'] !== '') · {{ $person['title'] }}@endif</span>
+                    </span>
+                    <span class="dk-tm-load">
+                        @if ($behind > 0)
+                            @if ($person['overdue'] > 0)<span class="dk-bad" title="{{ __('desk.team_behind', ['tasks' => $person['overdue'], 'reports' => $person['lateReports']]) }}"><b class="dk-num">{{ $person['overdue'] }}</b> {{ trans_choice('desk.team_tasks_late', $person['overdue']) }}</span>@endif
+                            @if ($person['lateReports'] > 0)<span class="dk-warn"><b class="dk-num">{{ $person['lateReports'] }}</b> {{ trans_choice('desk.team_reports_late', $person['lateReports']) }}</span>@endif
+                        @else
+                            <span class="dk-muted">{{ __('desk.nothing_overdue') }}</span>
+                        @endif
+                    </span>
+                    <x-desk.poke :call="'nudge('.$person['employeeId']" :name="$person['name']" :disabled="$person['userId'] === null" class="dk-iconbtn dk-sm" />
+                </li>
+            @endforeach
+        </ul>
+    @else
+        <p class="dk-pempty">{{ __('desk.panel.myteam.empty') }}</p>
+    @endif
 
     <x-slot:foot>
         <x-desk.pager :pg="$pg" />

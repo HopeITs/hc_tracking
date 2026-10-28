@@ -7,6 +7,7 @@
     'register' => null,
     'facets' => [],
     'filtered' => false,
+    'filterable' => true,
 ])
 
 @php
@@ -31,9 +32,11 @@
             <span class="dk-pc dk-num" data-panel-count>{{ $count }}</span>
         @endif
         <span class="dk-pspace"></span>
+        @if ($filterable)
         <button type="button" @class(['dk-iconbtn dk-sm dk-pfilter', 'dk-on' => $filtered]) x-on:click="openFilters()" aria-haspopup="dialog" aria-label="{{ __('desk.panel_filter', ['panel' => $title]) }}" title="{{ __('desk.filter') }}" data-panel-filter>
             <flux:icon.funnel variant="outline" class="size-4" />
         </button>
+        @endif
         @if ($register !== null)
             <a href="{{ route($register) }}" wire:navigate class="dk-iconbtn dk-sm" data-panel-register aria-label="{{ __('desk.panel_open_full', ['panel' => $title]) }}" title="{{ __('desk.panel_open_full_short') }}">
                 <x-desk.icon name="expand" />
@@ -72,6 +75,7 @@
     @endisset
 
     {{-- The panel's filters as a small centered popup of dropdowns: choices read from its rows, plus the panel's own (filters slot). They are a draft until Done (resources/js/desk-filters.js). --}}
+    @if ($filterable)
     <template x-teleport="body">
         <div x-show="filtering" x-cloak class="dk-scope" x-on:keydown.escape.window.stop="discardFilters()">
             <div class="dk-sh-scrim dk-pf-scrim" x-on:click="discardFilters()"></div>
@@ -108,4 +112,5 @@
             </div>
         </div>
     </template>
+    @endif
 </section>

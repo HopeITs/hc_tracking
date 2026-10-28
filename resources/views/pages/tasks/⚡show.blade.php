@@ -1,5 +1,6 @@
 <?php
 
+use App\Actions\Desk\SendNudge;
 use App\Enums\TaskPriority;
 use App\Enums\TaskStatus;
 use App\Livewire\Concerns\PreviewsFiles;
@@ -9,6 +10,7 @@ use App\Models\HrEmployee;
 use App\Models\Milestone;
 use App\Models\Task;
 use App\Models\TaskAttachment;
+use App\Support\TaskWorkflow;
 use Flux\Flux;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Database\Eloquent\Relations\MorphTo;
@@ -52,6 +54,13 @@ new #[Layout('layouts::desk'), Title('titles.task')] class extends Component
     /** @var array<int, string> */
     public array $assignedTo = [];
 
+    public bool $evidenceRequired = false;
+
+    /**
+     * What to fix, when the approver sends an Under review task back.
+     */
+    public string $reviewNote = '';
+
     public function mount(Task $task): void
     {
         Gate::authorize('view', $task);
@@ -67,6 +76,7 @@ new #[Layout('layouts::desk'), Title('titles.task')] class extends Component
         $this->dueDate = $freshTask->due_date?->toDateString() ?? '';
         $this->completedDate = $freshTask->completed_date?->toDateString() ?? '';
         $this->progressPercentage = (string) $freshTask->progress_percentage;
+        $this->evidenceRequired = $freshTask->evidence_required;
         $this->assignedTo = $freshTask->taskAssignees->pluck('employee_id')->map(fn (int $id): string => (string) $id)->all();
     }
 
@@ -87,6 +97,7 @@ new #[Layout('layouts::desk'), Title('titles.task')] class extends Component
                 'due_date',
                 'completed_date',
                 'progress_percentage',
+                'evidence_required',
                 'created_by',
             ])
             ->with([
@@ -141,6 +152,11 @@ new #[Layout('layouts::desk'), Title('titles.task')] class extends Component
             'progressPercentage.max' => __('tasks.progress_cannot_exceed_100_percent'),
         ]);
 
+        $from = $task->status;
+        $approved = TaskWorkflow::approves(auth()->user(), $task);
+        $note = SendNudge::cleanNote($this->reviewNote);
+        TaskWorkflow::guard(auth()->user(), $task, TaskStatus::from($validated['taskStatus']), $note, 'taskStatus');
+
         DB::transaction(function () use ($task, $validated, $canEdit): void {
             $progress = [
                 'status' => $validated['taskStatus'],
@@ -161,6 +177,7 @@ new #[Layout('layouts::desk'), Title('titles.task')] class extends Component
                 'priority' => $validated['taskPriority'],
                 'start_date' => $validated['startDate'] === '' ? null : $validated['startDate'],
                 'due_date' => $validated['dueDate'] === '' ? null : $validated['dueDate'],
+                'evidence_required' => $this->evidenceRequired,
             ])->save();
 
             $employeeIds = collect($validated['assignedTo'])->map(fn ($id): int => (int) $id)->unique()->values();
@@ -173,6 +190,8 @@ new #[Layout('layouts::desk'), Title('titles.task')] class extends Component
             ]));
         });
 
+        TaskWorkflow::announce(auth()->user(), $task, $from, $approved, $note);
+        $this->reviewNote = '';
         unset($this->task);
 
         Flux::toast(variant: 'success', text: __('tasks.task_updated'));
