@@ -27,6 +27,15 @@ test('every page renders the sidebar and the top bar with its tools', function (
         ->assertSee('data-user-menu', false);
 });
 
+test('the profile menu leaves notification preferences and rules to the bell', function () {
+    $html = $this->actingAs(User::factory()->role('Super Admin')->create())->get(route('dashboard'))->assertOk()->getContent();
+    $menu = str($html)->after('dk-usermenu-pop')->before('dk-usermenu-out')->toString();
+
+    expect($menu)->toContain(route('security.edit'))
+        ->not->toContain(route('notification-settings.edit'))
+        ->not->toContain(route('admin.notification-settings.edit'));
+});
+
 test('a Super Admin sidebar lists every page, grouped like the old sidebar, the Desk first', function () {
     $groups = app(Destinations::class)->sidebarFor(User::factory()->role('Super Admin')->create());
 

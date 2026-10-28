@@ -517,7 +517,7 @@
 .dk-pop>button:hover{ background:var(--sunk) }
 .dk-pop>button.dk-danger{ color:var(--bad) }
 .dk-ptools{ display:flex;flex-wrap:wrap;gap:6px;align-items:center;padding:0 12px 8px }
-.dk-pb{ flex:1 1 auto;min-height:0;overflow:hidden;padding:0 12px 8px;overscroll-behavior:contain }
+.dk-pb{ flex:1 1 auto;min-height:0;overflow:clip;padding:0 12px 8px }
 .dk-pf{ margin-top:auto;flex:none;display:flex;align-items:center;justify-content:space-between;gap:8px;padding:6px 10px 8px 12px;border-top:1px solid var(--line);min-height:42px }
 .dk-pgb{ display:inline-flex;align-items:center;gap:4px }
 .dk-pempty{ padding:20px 4px;color:var(--ink-3);font-size:14px }

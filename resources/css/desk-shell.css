@@ -393,7 +393,8 @@
 /* ---------- Panel body: content fits the fixed card and fills it (desk-filters.js fit) ---------- */
 @layer components {
     /* The body is a column: tools/summaries keep their height, the fitted list takes the rest. Its width is a container so rows lay out by the space they really get. */
-    .dk-pb { display: flex; flex-direction: column; overflow: hidden; container: pb / inline-size; }
+    /* overflow: clip, not hidden: a hidden box is a scroll container, and the wheel over a panel must scroll the page (panels page, they never scroll). */
+    .dk-pb { display: flex; flex-direction: column; overflow: clip; overscroll-behavior: auto; container: pb / inline-size; }
     .dk-pb > * { flex: none; min-width: 0; }
     /* A page that fills the card shares the room left between its rows, content centred in each. */
     .dk-pb > .dk-fit-fill { flex: 1 1 auto; display: flex; flex-direction: column; min-height: 0; }
@@ -409,7 +410,7 @@
     .dk-seg-fill .dk-seg-l { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
     .dk-seg-fill .dk-num { flex: none; }
 
-    /* At a glance: a grid of figure tiles that always fills the card; one row when the card is wide enough for every figure. */
+    /* At a glance: a grid of figure tiles that always fills the card: three columns (two rows of six) from M to W, one row at XL. */
     .dk-pb > .dk-glance { flex: 1 1 auto; min-height: 0; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); grid-auto-rows: minmax(0, 1fr); gap: 1px; background: var(--line); border: 1px solid var(--line); border-radius: 12px; overflow: hidden; }
     .dk-glance > li { display: flex; min-width: 0; min-height: 0; background: var(--paper); container-type: inline-size; }
     .dk-glance > li:last-child:nth-child(odd) { grid-column: span 2; }
@@ -432,7 +433,8 @@
     @container pb (min-width: 560px) {
         .dk-pb > .dk-glance:is([data-figs="1"], [data-figs="2"], [data-figs="3"], [data-figs="4"]) { grid-template-columns: repeat(var(--figs), minmax(0, 1fr)); }
     }
-    @container pb (min-width: 760px) {
+    /* One row only on the full-width card; L and W keep three columns, two rows. */
+    @container pb (min-width: 1000px) {
         .dk-pb > .dk-glance { grid-template-columns: repeat(var(--figs), minmax(0, 1fr)); }
         .dk-glance > li { grid-column: auto !important; }
         .dk-gl-a { padding-inline: 20px; }
@@ -499,4 +501,15 @@
         .dk-panel .dk-pb .dk-pl-o { display: none; }
         .dk-panel .dk-pb .dk-pl-d::after { content: attr(data-owner); }
     }
+}
+
+/* ---------- Panel search (x-desk.panel search=): a box under the header, opened by the header's search button ---------- */
+@layer components {
+    .dk-psearch-btn { color: var(--ink-3); }
+    .dk-psearch-btn.dk-on { color: var(--on-brand); background: var(--brand); }
+    .dk-psearch { display: flex; align-items: center; gap: 8px; height: 36px; margin: 0 12px 8px; padding-inline: 10px; border: 1px solid var(--line-2); border-radius: 10px; background: var(--tint); color: var(--ink-3); flex: none; }
+    .dk-psearch:focus-within { border-color: var(--ink-3); background: var(--paper); }
+    .dk-scope .dk-psearch svg.dk-i { width: 16px; height: 16px; }
+    .dk-psearch input { flex: 1; min-width: 0; height: 100%; border: 0; background: none; outline: none; color: var(--ink); font-size: 13.5px; }
+    .dk-scope .dk-psearch input:focus-visible { box-shadow: none; }
 }
