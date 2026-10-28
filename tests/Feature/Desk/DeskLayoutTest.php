@@ -79,6 +79,8 @@ test('the customize sheet saves its whole draft only on Done, dropping what the 
     $user = User::factory()->role('Team Member')->create();
     $desk = Livewire::actingAs($user)->test('pages::desk.index')
         ->assertSeeHtml('data-customize-done')
+        // A string style binding would overwrite x-show's display:none and list every panel as placed.
+        ->assertSeeHtml("x-bind:style=\"{ order: position('needs') }\"")
         ->assertDontSeeHtml('wire:click="removePanel(')
         ->assertDontSeeHtml('wire:click="addPanel(');
 

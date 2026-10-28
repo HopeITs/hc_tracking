@@ -29,7 +29,7 @@
                         <h3 x-text="{{ \Illuminate\Support\Js::from(__('desk.on_your_desk', ['count' => '__N__'])) }}.replace('__N__', draft.length)">{{ __('desk.on_your_desk', ['count' => count($layout)]) }}</h3>
                         <ul class="dk-lib dk-lib-order">
                             @foreach ($library as $panel)
-                                <li wire:key="cz-on-{{ $panel['id'] }}" x-show="has('{{ $panel['id'] }}')" x-bind:style="'order:' + position('{{ $panel['id'] }}')" data-customize-on="{{ $panel['id'] }}">
+                                <li wire:key="cz-on-{{ $panel['id'] }}" x-show="has('{{ $panel['id'] }}')" x-bind:style="{ order: position('{{ $panel['id'] }}') }" data-customize-on="{{ $panel['id'] }}">
                                     <span class="dk-li-ic"><x-desk.icon :name="$panel['icon']" /></span>
                                     <span class="dk-li-t"><strong>{{ $panel['title'] }}</strong><span class="dk-is">{{ $panel['description'] }}</span></span>
                                     <label class="dk-sr" for="cz-{{ $panel['id'] }}">{{ __('desk.size') }}</label>
