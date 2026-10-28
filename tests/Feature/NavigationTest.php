@@ -27,6 +27,13 @@ test('every page renders the sidebar and the top bar with its tools', function (
         ->assertSee('data-user-menu', false);
 });
 
+test('the panels button sits on My desk only', function () {
+    $this->actingAs(User::factory()->role('General Manager')->create())
+        ->get(route('projects.index'))
+        ->assertOk()
+        ->assertDontSee('data-panels-trigger', false);
+});
+
 test('the profile menu leaves notification preferences and rules to the bell', function () {
     $html = $this->actingAs(User::factory()->role('Super Admin')->create())->get(route('dashboard'))->assertOk()->getContent();
     $menu = str($html)->after('dk-usermenu-pop')->before('dk-usermenu-out')->toString();
