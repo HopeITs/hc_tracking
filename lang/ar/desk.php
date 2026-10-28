@@ -333,7 +333,6 @@ return [
         'admin_accounts_index' => 'الحسابات البنكية التي تمرّ بها الأموال',
         'strategies_index' => 'الاستراتيجيات وركائزها',
         'admin_notification_settings_edit' => 'من يُبلَّغ بماذا ومتى',
-        'executive_summary_index' => 'الصفحة الواحدة للقيادة',
         'notification_settings_edit' => 'كتم الوحدات، إشعارات سطح المكتب',
         'activity_index' => 'من غيّر ماذا',
         'security_edit' => 'رموز البريد، تطبيق المصادقة، مفاتيح المرور',

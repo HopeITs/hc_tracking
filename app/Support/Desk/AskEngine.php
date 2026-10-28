@@ -91,7 +91,6 @@ final class AskEngine
     private const array PageWords = [
         'dashboard' => ['home', 'desk', 'start', 'main', 'الرئيسيه', 'مكتبي', 'المكتب'],
         'reviews.index' => ['review', 'reviews', 'approve', 'approvals', 'مراجعه', 'مراجعات'],
-        'executive-summary.index' => ['summary', 'executive', 'overview', 'ملخص', 'تنفيذي'],
         'programs.index' => ['program', 'programs', 'programme', 'برنامج', 'برامج'],
         'timeline.index' => ['timeline', 'gantt', 'schedule', 'roadmap', 'جدول', 'زمني'],
         'reports.monthly-matrix' => ['matrix', 'monthly', 'مصفوفه', 'شهري'],

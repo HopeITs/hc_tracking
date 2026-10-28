@@ -126,7 +126,6 @@ final class Destinations
         return [
             $page('dashboard', 'desk.your_desk', 'grid', 'home', 'overview', $everyone),
             $page('reviews.index', 'common.my_reviews', 'file', 'document-magnifying-glass', 'overview', $this->hasReviews(...)),
-            $page('executive-summary.index', 'common.executive_summary', 'chart', 'presentation-chart-bar', 'overview', $can('executive-summary.view')),
 
             $page('strategies.index', 'common.strategies', 'chart', 'light-bulb', 'strategy_planning', $can('strategies.view'), 'strategies'),
             $page('programs.index', 'common.programs', 'folder', 'rectangle-group', 'strategy_planning', $can('programs.view'), 'programs'),
