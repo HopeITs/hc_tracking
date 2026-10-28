@@ -341,7 +341,7 @@ test('triage counts ignore the active lens so a tile never shrinks itself', func
         ->and($component->instance()->projects->total())->toBe(1);
 });
 
-test('the active triage lens renders a complete inset border', function () {
+test('the active triage lens reads as pressed', function () {
     $user = User::factory()->role('General Manager')->create();
     projectsForEachLens();
 
@@ -356,7 +356,7 @@ test('the active triage lens renders a complete inset border', function () {
     $activeLens = $xpath->query('//button[@data-test="lens-overdue" and @aria-pressed="true"]')->item(0);
 
     expect($activeLens)->not->toBeNull()
-        ->and($activeLens->getAttribute('class'))->toContain('box-border', 'border-2', 'border-primary');
+        ->and($activeLens->getAttribute('class'))->toContain('dk-chip');
 });
 
 test('lifecycle counts ignore the status filter but respect every other filter', function () {
@@ -435,20 +435,20 @@ test('weighted milestone progress is derived from the reached weight and capped 
         ->and(invade($component->instance())->progressFor($page['Overweight Works']))->toBe(100.0);
 });
 
-test('every view renders the same filtered project set and an unknown view falls back to the board', function () {
+test('every view renders the same filtered project set and an unknown view falls back to the list', function () {
     $user = User::factory()->role('General Manager')->create();
     Project::factory()->active()->create(['name' => 'Aleppo Wells']);
     Project::factory()->closed()->create(['name' => 'Homs Shelter']);
 
     $component = Livewire::actingAs($user)->test('pages::projects.index');
 
-    foreach (['board', 'timeline', 'table'] as $view) {
+    foreach (['list', 'timeline'] as $view) {
         $component->set('view', $view)->assertSee('Aleppo Wells')->assertSee('Homs Shelter');
     }
 
-    $component->set('view', 'gantt');
+    $component->set('view', 'board');
 
-    expect($component->get('view'))->toBe('board');
+    expect($component->get('view'))->toBe('list');
 
     $component->assertSee('Aleppo Wells')->assertSee('Homs Shelter');
 });
@@ -459,7 +459,7 @@ test('projects can be sorted by name dates and recency with undated projects las
     Project::factory()->create(['name' => 'Alpha', 'start_date' => '2026-06-01', 'end_date' => '2026-07-31', 'updated_at' => '2026-02-01 00:00:00']);
     Project::factory()->create(['name' => 'Gamma', 'start_date' => null, 'end_date' => null, 'updated_at' => '2026-03-01 00:00:00']);
 
-    $component = Livewire::actingAs($user)->test('pages::projects.index')->set('view', 'table');
+    $component = Livewire::actingAs($user)->test('pages::projects.index')->set('view', 'list');
 
     $order = fn (): array => $component->instance()->projects->getCollection()->pluck('name')->all();
 
@@ -480,23 +480,28 @@ test('projects can be sorted by name dates and recency with undated projects las
         ->and($order())->toBe(['Alpha', 'Beta', 'Gamma']);
 });
 
-test('the board groups projects by lifecycle state and pages them in twenty-fours', function () {
+test('the list pages projects in twenties and the timeline in fifteens', function () {
     $user = User::factory()->role('General Manager')->create();
-    Project::factory()->count(2)->closed()->create();
-    Project::factory()->count(2)->active()->create();
-    Project::factory()->count(21)->create();
+    Project::factory()->count(25)->create();
 
     $component = Livewire::actingAs($user)->test('pages::projects.index');
-    $page = $component->instance()->projects;
 
-    expect($page->perPage())->toBe(24)
-        ->and($page->count())->toBe(24)
-        ->and($page->getCollection()->pluck('status.value')->unique()->values()->all())->toBe(['draft', 'active', 'closed']);
+    expect($component->instance()->projects->perPage())->toBe(20)
+        ->and($component->instance()->projects->count())->toBe(20);
 
-    $component->set('view', 'table');
+    $component->set('view', 'timeline');
 
     expect($component->instance()->projects->perPage())->toBe(15);
 });
+
+test('an old board or table link opens the list', function (string $oldView) {
+    $user = User::factory()->role('General Manager')->create();
+
+    Livewire::withQueryParams(['view' => $oldView])
+        ->actingAs($user)
+        ->test('pages::projects.index')
+        ->assertSet('view', 'list');
+})->with(['board', 'table']);
 
 test('the project directory renders within its query budget', function () {
     $user = User::factory()->role('General Manager')->create();
@@ -512,31 +517,27 @@ test('the project directory renders within its query budget', function () {
     // 17 + one query that loads every owner assignment for the Rejected badge
     // + one count of the projects without a center (shown to managers)
     // + the two HR queries of EmployeeProfile behind the owner chips' positions
-    // + the sector filter's options (T34; the table view adds one eager load).
+    // + the sector filter's options and the list preview's sector eager load (T34).
     // + one load of the linked proposals' statuses for the funding badge (T08).
-    expect($queries)->toBeLessThanOrEqual(23);
+    expect($queries)->toBeLessThanOrEqual(24);
 });
 
-test('a board card hides relations it has none of and keeps a materialised risk', function () {
+test('a list preview names only the relations a project has and flags a materialised risk', function () {
     $user = User::factory()->role('General Manager')->create();
     $project = Project::factory()->active()->create(['name' => 'Wells Of Hope']);
     Milestone::factory()->count(2)->create(['project_id' => $project->id]);
 
-    $component = Livewire::actingAs($user)->test('pages::projects.index');
-
-    // Two milestones earn a chip; the five empty relations are not rendered at all.
-    $component->assertSeeHtml('aria-hidden="true">2</span>')
+    Livewire::actingAs($user)->test('pages::projects.index')
         ->assertSeeText('2 milestones')
-        ->assertDontSeeHtml('aria-hidden="true">0</span>');
+        ->assertDontSeeHtml('dk-pjl-link dk-bad');
 
     Risk::factory()->create(['project_id' => $project->id, 'happened' => true]);
 
-    // A materialised risk always shows, and takes the solid alert treatment.
     Livewire::actingAs($user)->test('pages::projects.index')
-        ->assertSeeHtml('border-primary bg-primary dark:border-transparent dark:bg-status-critical-soft dark:text-status-critical font-semibold text-white');
+        ->assertSeeHtml('dk-pjl-link dk-bad');
 });
 
-test('a board card with no relations at all says so instead of rendering empty chips', function () {
+test('a list preview with no relations at all says so instead of rendering empty chips', function () {
     $user = User::factory()->role('General Manager')->create();
     Project::factory()->active()->create(['name' => 'Bare Project']);
 
@@ -545,7 +546,7 @@ test('a board card with no relations at all says so instead of rendering empty c
         ->assertDontSeeHtml('aria-hidden="true">0</span>');
 });
 
-test('a board card opens the project through an eye action, not a clickable name', function () {
+test('a list row opens the project through an eye action, not a clickable name', function () {
     $user = User::factory()->role('General Manager')->create();
     $project = Project::factory()->active()->create(['name' => 'Wells Of Hope']);
 
@@ -556,7 +557,7 @@ test('a board card opens the project through an eye action, not a clickable name
         ->assertDontSeeHtml('after:absolute after:inset-0');
 });
 
-test('a board card never prints the progress bar accessibility label as visible copy', function () {
+test('a list row never prints the progress bar accessibility label as visible copy', function () {
     $user = User::factory()->role('General Manager')->create();
     $project = Project::factory()->active()->create(['name' => 'Wells Of Hope']);
     Milestone::factory()->create(['project_id' => $project->id, 'weight_percentage' => 100, 'status' => MilestoneStatus::Reached]);
@@ -568,7 +569,7 @@ test('a board card never prints the progress bar accessibility label as visible 
         ->assertDontSeeText('Milestone progress for Wells Of Hope');
 });
 
-test('a board card rates an overdue project critical and an on-track project good', function () {
+test('a list row rates an overdue project critical', function () {
     $user = User::factory()->role('General Manager')->create();
     $overdue = Project::factory()->active()->create([
         'name' => 'Overdue Project',
@@ -578,9 +579,9 @@ test('a board card rates an overdue project critical and an on-track project goo
     Milestone::factory()->create(['project_id' => $overdue->id, 'weight_percentage' => 100, 'status' => MilestoneStatus::Planned]);
 
     Livewire::actingAs($user)->test('pages::projects.index')
-        // Critical fills solid in light (white type); dark uses the soft critical chip.
-        ->assertSeeHtml('border-primary bg-primary dark:border-transparent dark:bg-status-critical-soft dark:text-status-critical font-semibold text-white')
-        ->assertSeeHtml('motion-reduce:hover:translate-y-0 border-primary');
+        ->assertSeeHtml('dk-pjl-row dk-pjl-alert')
+        ->assertSeeHtml('dk-health dk-bad')
+        ->assertSeeText(__('programs.timeline_past_end'));
 });
 
 test('every view opens a project through the same eye action instead of a clickable name', function () {
@@ -588,7 +589,7 @@ test('every view opens a project through the same eye action instead of a clicka
     $project = Project::factory()->active()->create(['name' => 'Wells Of Hope']);
     $showUrl = route('projects.show', $project);
 
-    foreach (['board', 'timeline', 'table'] as $view) {
+    foreach (['list', 'timeline'] as $view) {
         Livewire::actingAs($user)->test('pages::projects.index')
             ->set('view', $view)
             ->assertSeeHtml('aria-label="Open Wells Of Hope"')
@@ -684,7 +685,7 @@ test('every view offers archive for a live project and restore for an archived o
     $live = Project::factory()->active()->create(['name' => 'Wells Of Hope']);
     $archived = Project::factory()->create(['name' => 'Retired Project', 'status' => ProjectStatus::Archived]);
 
-    foreach (['board', 'timeline', 'table'] as $view) {
+    foreach (['list', 'timeline'] as $view) {
         Livewire::actingAs($user)->test('pages::projects.index')
             ->set('view', $view)
             ->assertSeeHtml('confirmArchive('.$live->id.')')

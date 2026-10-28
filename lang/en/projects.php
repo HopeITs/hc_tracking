@@ -240,4 +240,12 @@ return [
     'scope_to_project' => 'Scope to this project',
     'indicator_scoped_here' => 'Scoped to this project',
     'indicator_scoped' => 'Indicator scoped to this project.',
+    'filters' => 'Filters',
+    'remove_filter' => 'Remove filter :filter',
+    'open' => 'Open',
+    'edit' => 'Edit',
+    'restore' => 'Restore',
+    'more_actions_for' => 'More actions for :name',
+    'ends' => 'Ends',
+    'ended' => 'Ended',
 ];

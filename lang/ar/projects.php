@@ -240,4 +240,12 @@ return [
     'scope_to_project' => 'تخصيص لهذا المشروع',
     'indicator_scoped_here' => 'مخصّص لهذا المشروع',
     'indicator_scoped' => 'خُصّص المؤشر لهذا المشروع.',
+    'filters' => 'الفلاتر',
+    'remove_filter' => 'إزالة الفلتر :filter',
+    'open' => 'فتح',
+    'edit' => 'تعديل',
+    'restore' => 'استعادة',
+    'more_actions_for' => 'إجراءات أخرى لـ :name',
+    'ends' => 'ينتهي',
+    'ended' => 'انتهى',
 ];

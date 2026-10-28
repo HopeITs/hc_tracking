@@ -70,7 +70,7 @@
     </div>
 </div>
 
-<dl class="dk-facts" data-test="story-facts">
+<dl class="dk-facts dk-facts-line" data-test="story-facts">
     <div>
         <dt>{{ __('story.facts.project_status') }}</dt>
         <dd><x-ui.enum-badge :case="$project->status" /> <x-ui.project-funding-badge :project="$project" /></dd>
@@ -132,6 +132,7 @@
     </div>
 </dl>
 
+{{-- Only the actions this person can take; nothing is shown locked. --}}
 <div class="dk-story-acts" role="group" aria-label="{{ __('story.actions_label') }}">
     @if ($project->status === \App\Enums\ProjectStatus::Draft && ! $project->hasActiveProposal())
         <span class="dk-pill dk-warn" data-test="no-active-proposal">{{ __('projects.no_active_proposal') }}</span>
@@ -143,28 +144,20 @@
     @unless ($isArchived)
         @can('update', $project)
             <button type="button" class="dk-btn dk-sm" wire:click="openEditModal({{ $project->id }})" data-test="edit-project"><x-desk.icon name="edit" />{{ __('story.acts.edit') }}</button>
-        @else
-            <button type="button" class="dk-btn dk-ghost dk-sm dk-lockd" title="{{ __('story.acts.why_update') }}" aria-disabled="true" data-test="edit-project-locked"><x-desk.icon name="lock" />{{ __('story.acts.edit') }}</button>
         @endcan
     @endunless
     @if ($project->status === \App\Enums\ProjectStatus::Active)
         @can('update', $project)
             <button type="button" class="dk-btn dk-sm" wire:click="confirmClose" data-test="close-project">{{ __('projects.close_project') }}</button>
-        @else
-            <button type="button" class="dk-btn dk-ghost dk-sm dk-lockd" title="{{ __('story.acts.why_update') }}" aria-disabled="true" data-test="close-project-locked"><x-desk.icon name="lock" />{{ __('projects.close_project') }}</button>
         @endcan
     @endif
     @if ($isArchived)
         @can('delete', $project)
             <button type="button" class="dk-btn dk-primary dk-sm" wire:click="restoreProject({{ $project->id }})" data-test="restore-project"><x-desk.icon name="undo" />{{ __('story.acts.restore') }}</button>
-        @else
-            <button type="button" class="dk-btn dk-ghost dk-sm dk-lockd" title="{{ __('story.acts.why_archive') }}" aria-disabled="true" data-test="restore-project-locked"><x-desk.icon name="lock" />{{ __('story.acts.restore') }}</button>
         @endcan
     @else
         @can('delete', $project)
             <button type="button" class="dk-btn dk-ghost dk-sm" wire:click="confirmArchive({{ $project->id }})" data-test="archive-project">{{ __('story.acts.archive') }}</button>
-        @else
-            <button type="button" class="dk-btn dk-ghost dk-sm dk-lockd" title="{{ __('story.acts.why_archive') }}" aria-disabled="true" data-test="archive-project-locked"><x-desk.icon name="lock" />{{ __('story.acts.archive') }}</button>
         @endcan
     @endif
     @if ($this->canStartConceptNote && $next['href'] !== route('proposals.index', ['for_project' => $project->id]))

@@ -40,3 +40,18 @@
     .dk-story a.dk-mo { text-decoration: none; }
     .dk-story .dk-money .dk-mrow { min-width: 0; }
 }
+
+/*
+ * The project Story reads calmer (2026-10-28): the facts are one typographic
+ * line rather than a grid of boxed cells (so no fact is left alone on a second
+ * row), and chapters already done drop their card so the current one stands out.
+ */
+@layer components {
+    .dk-story .dk-facts.dk-facts-line { display: flex; flex-wrap: wrap; gap: 14px 0; padding: 14px 0; border: 0; border-block: 1px solid var(--line); border-radius: 0; background: none; overflow: visible; }
+    .dk-story .dk-facts.dk-facts-line > div,
+    [dir="rtl"] .dk-story .dk-facts.dk-facts-line > div { padding: 0 22px; margin: 0; border: 0; border-inline-start: 1px solid var(--line); }
+    .dk-story .dk-facts.dk-facts-line > div:first-child { padding-inline-start: 0; border-inline-start: 0; }
+
+    .dk-story .dk-ch.dk-done .dk-ch-body { margin-bottom: 4px; padding: 12px 4px; border-color: transparent; background: none; }
+    .dk-story .dk-ch.dk-done .dk-ch-top h2 { font-size: 15px; }
+}
