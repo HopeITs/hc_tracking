@@ -57,7 +57,7 @@ Keep it inside the `auth, verified` group. `#[Title('titles.dashboard')]` (add t
 ## Data rules
 
 - Each band/panel is its own `#[Computed]` method (`figures`, `attention`, `funding`, `projectStatusChart`, `pipelineChart`, `receiptsChart`, `activity`). Target ≤ 20 queries total.
-- No year filter on this page (the executive summary owns fiscal scoping).
+- No year filter on this page.
 
 ## States
 
