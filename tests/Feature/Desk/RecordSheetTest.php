@@ -4,7 +4,6 @@ use App\Models\Milestone;
 use App\Models\Program;
 use App\Models\Task;
 use App\Models\User;
-use Livewire\Livewire;
 
 test('a record page opens as a sheet over its register, which loads after it', function () {
     $task = Task::factory()->create(['title' => 'Draft the distribution plan']);
@@ -29,12 +28,16 @@ test('the register behind the sheet is inert so only the sheet takes focus', fun
         ->assertSee('class="dk-record-behind" inert aria-hidden="true"', false);
 });
 
-test('a program opens over the projects register filtered to it', function () {
-    $program = Program::factory()->create();
+test('a program opens as its own page, not a sheet over the projects register', function () {
+    $program = Program::factory()->create(['name' => 'Children University']);
 
-    Livewire::actingAs(User::factory()->role('Super Admin')->create())
-        ->test('pages::programs.show', ['program' => $program])
-        ->assertSeeHtml('href="'.e(route('projects.index', ['program' => $program->id])).'"');
+    $this->actingAs(User::factory()->role('Super Admin')->create())
+        ->get(route('programs.show', $program))
+        ->assertOk()
+        ->assertSee('class="dk-scope"', false)
+        ->assertSee('href="'.route('programs.index').'" wire:navigate', false)
+        ->assertSee('Children University')
+        ->assertDontSee('data-desk-record-host', false);
 });
 
 test('a record the viewer may not open is still refused', function () {
