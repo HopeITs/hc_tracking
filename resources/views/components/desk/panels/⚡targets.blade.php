@@ -79,7 +79,7 @@ new class extends Component {
                     <span class="dk-tg-n" title="{{ $indicator->name }}@if ($indicator->project !== null) · {{ $indicator->project->name }}@endif">@if (filled($indicator->code))<span class="dk-mono">{{ $indicator->code }}</span> @endif{{ $indicator->name }}@if ($indicator->project !== null)<span class="dk-is"> · {{ $indicator->project->name }}</span>@endif</span>
                     <span @class(['dk-pill dk-tg-s', 'dk-bad' => $row['rag'] === RagStatus::Red, 'dk-warn' => $row['rag'] === RagStatus::Amber])>{{ $row['rag']->label() }}</span>
                     <span class="dk-tg-b" title="{{ __('desk.plans_bar', ['done' => (int) round($row['achieved']), 'expected' => (int) round($row['expected'])]) }}"><span class="dk-meter dk-res"><b style="width:{{ round(min(100, max(0, $row['achieved'])), 1) }}%"></b><span class="dk-tick" style="inset-inline-start:{{ round($row['expected'], 1) }}%"></span></span></span>
-                    <span class="dk-tg-v dk-num"><strong>{{ $number($row['latest']) }}{{ $unit }}</strong> / {{ $number((float) $indicator->target) }}{{ $unit }} · {{ (int) round($row['achieved']) }}%</span>
+                    <span class="dk-tg-v dk-num"><strong>{{ $number($row['latest']) }}</strong> / {{ $number((float) $indicator->target) }}@if ($unit !== '') {{ $unit }}@endif · {{ (int) round($row['achieved']) }}%</span>
                 </li>
             @endforeach
         </ul>

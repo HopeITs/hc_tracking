@@ -165,17 +165,9 @@ new class extends Component {
                     <span class="dk-pl-d" title="{{ $donor }}" data-owner="{{ $owner !== '' ? ' · '.$owner : '' }}">{{ $donor !== '' ? $donor : __('desk.no_donor_yet') }}</span>
                     <span class="dk-pl-s"><span @class(['dk-pill', $tone !== '' ? 'dk-'.$tone : null]) title="{{ $proposal->status->label() }}">{{ $proposal->status->label() }}</span></span>
                     @if ($showMoney)
-                        <span class="dk-pl-m dk-num">
-                            @if ($agreement !== null && (float) $agreement->budget > 0)
-                                {{ Money::format($agreement->budget, $agreement->currency) }}
-                            @elseif ((float) $proposal->requested_budget > 0 && $proposal->requested_currency !== null)
-                                {{ Money::format($proposal->requested_budget, $proposal->requested_currency) }}
-                            @else
-                                —
-                            @endif
-                        </span>
+                        <span class="dk-pl-m dk-num">@if ($agreement !== null && (float) $agreement->budget > 0){{ Money::format($agreement->budget, $agreement->currency) }}@elseif ((float) $proposal->requested_budget > 0 && $proposal->requested_currency !== null){{ Money::format($proposal->requested_budget, $proposal->requested_currency) }}@endif</span>
                     @endif
-                    <span @class(['dk-pl-t dk-num', 'dk-bad' => $days !== null && $days < 0]) title="{{ $deadline?->translatedFormat(__('formats.date')) ?? __('desk.no_deadline') }}">{{ $days === null ? '—' : ($days < 0 ? trans_choice('desk.days_late', -$days, ['count' => -$days]) : trans_choice('desk.days_left', $days, ['count' => $days])) }}</span>
+                    <span @class(['dk-pl-t dk-num', 'dk-bad' => $days !== null && $days < 0]) title="{{ $deadline?->translatedFormat(__('formats.date')) ?? __('desk.no_deadline') }}">{{ $days === null ? '' : ($days < 0 ? trans_choice('desk.days_late', -$days, ['count' => -$days]) : trans_choice('desk.days_left', $days, ['count' => $days])) }}</span>
                     <span class="dk-pl-o" title="{{ $owner !== '' ? $owner : __('desk.no_owner') }}">@if ($owner !== '')<span class="dk-av dk-av-xs">{{ collect(preg_split('/\s+/u', trim($owner)))->take(2)->map(fn ($part) => mb_substr($part, 0, 1))->implode('') }}</span>@endif</span>
                 </li>
             @endforeach

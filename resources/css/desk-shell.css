@@ -335,11 +335,8 @@
     .dk-pf-pop .dk-sh-f { justify-content: flex-end; }
 }
 
-/* ---------- Every panel one fixed height: one-line rows, the rest pages (user decision 2026-10-27) ---------- */
+/* ---------- Panel rows (panels size to their content: four rows a page, the rest pages — handoff 2026-10-27) ---------- */
 @layer components {
-    :root { --panel-h: 330px; }
-    .dk-panel, .dk-panel[style*="--span:12"] { height: var(--panel-h); min-height: 0; max-height: var(--panel-h); }
-    .dk-pb, .dk-panel[style*="--span:12"] .dk-pb { overflow: hidden; }
     .dk-ptools { flex-wrap: nowrap; overflow: hidden; }
     .dk-panel :is(.dk-it, .dk-tt, .dk-is, .dk-plist strong, .dk-rn strong, .dk-pm strong, .dk-mx th a) { display: block; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
     .dk-panel .dk-items > li { grid-template-columns: 12px minmax(0, 1fr) auto !important; align-items: center; padding-block: 8px; }
@@ -351,14 +348,11 @@
     .dk-funnel-chips .dk-fb { display: inline-flex !important; align-items: center; gap: 6px; flex: none; width: auto !important; height: 30px; padding-inline: 10px; border-radius: 999px; border: 1px solid var(--line-2); }
     .dk-funnel-chips .dk-fbar { display: none !important; }
     .dk-funnel-chips .dk-fb.dk-on { background: var(--ink); color: var(--paper); border-color: var(--ink); }
-    @media (max-width: 760px) { .dk-panel, .dk-panel[style*="--span:12"] { height: var(--panel-h); max-height: var(--panel-h); } }
 }
 @layer components {
-    :root { --panel-h: 362px; }
     .dk-panel .dk-people > li { display: grid; grid-template-columns: 30px minmax(0, 1fr) auto; grid-template-areas: "av pm act" "av st act"; column-gap: 10px; row-gap: 0; align-items: center; padding-block: 6px; text-align: start; }
     .dk-panel .dk-people .dk-av { grid-area: av; }
     .dk-panel .dk-people .dk-pm { grid-area: pm; min-width: 0; width: 100%; height: auto; justify-self: stretch; display: block; padding: 0; border: 0; border-radius: 0; background: none; text-align: start; }
-    .dk-panel .dk-people .dk-pm .dk-is { display: none; }
     .dk-panel .dk-people > li > .dk-small { grid-area: st; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
     .dk-panel .dk-people > li > .dk-btn { grid-area: act; }
 }
