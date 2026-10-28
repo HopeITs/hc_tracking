@@ -30,7 +30,7 @@ HC Tracking is a single shared place to plan and follow the organization's work.
 | **Deliver** | Projects, Milestones, Tasks, Risks and a Timeline show the work and who is doing it. |
 | **Measure** | A Results Framework, Indicators, Targets and Reports show whether the work is making a difference. |
 | **Fund** | Proposals, Donors, Funding Agreements and Transfers track the money behind the work. |
-| **Stay informed** | The Dashboard, Calendar, Executive Summary and Notifications point you to what needs attention. |
+| **Stay informed** | The Dashboard, Calendar and Notifications point you to what needs attention. |
 
 > **⚠ Confirm:** Add one sentence of your own on how the organization uses the site, for example "used by all departments to track annual plan delivery and donor reporting."
 
@@ -43,7 +43,7 @@ HC Tracking is a single shared place to plan and follow the organization's work.
 | **MEAL team** | Results Framework, Indicators, Targets and Reports (including approving them). |
 | **Finance team** | Donors, Proposals, Funding Agreements, Transfers and Accounts. |
 | **Managers** | Strategies, Annual Plans, Projects, Milestones, Risks, Tasks. |
-| **General Manager and Super Admin** | Everything, including the Executive Summary and Activity log; Super Admin also manages roles and notification rules. |
+| **General Manager and Super Admin** | Everything, including the Activity log; Super Admin also manages roles and notification rules. |
 
 ## 3. Getting started
 
@@ -80,7 +80,7 @@ The **sidebar** on the left is the main menu, grouped into sections. You only se
 
 | Sidebar section | Pages |
 |---|---|
-| **Overview** | Dashboard, Executive Summary, My Calendar |
+| **Overview** | Dashboard, My Calendar |
 | **Strategy** | Strategies, Programs, Annual Plans |
 | **Delivery** | Projects, Timeline, Milestones, Tasks, Risks |
 | **Results & Learning** | Results Framework, Indicators, Targets, Reports |
@@ -136,7 +136,6 @@ Using the same words everywhere keeps reports meaningful.
 |---|---|
 | **Dashboard** | Your starting point (see below). |
 | **My Calendar** | A monthly calendar. Use **Add** to create a Milestone, Task, Report deadline, Proposal deadline, Transfer, Donor follow-up or Project timeline entry. Tasks with no date wait in an **Unscheduled** tray: drag one onto a day to schedule it. |
-| **Executive Summary** | A high-level view for leadership (permission needed). |
 | **Notifications** | Your inbox of alerts, with search, filters and **Mark all read**. |
 | **Notification settings** | Mute whole modules, allow desktop popups, and install HC Tracking as a desktop app from Chrome or Edge. |
 | **Notification rules** | Administrators only: the working week, reminder and escalation timings, stalled-work limits, and the daily brief and weekly digest. |

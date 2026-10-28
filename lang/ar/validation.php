@@ -187,7 +187,6 @@ return [
         'email' => 'البريد الإلكتروني',
         'exchangeRate' => 'سعر الصرف',
         'externalProjectNumber' => 'رقم المشروع الخارجي',
-        'executiveSummary' => 'الملخص التنفيذي',
         'fees' => 'الرسوم',
         'feesCurrency' => 'عملة الرسوم',
         'files.*' => 'الملف',

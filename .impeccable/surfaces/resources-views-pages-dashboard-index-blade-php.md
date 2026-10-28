@@ -8,7 +8,7 @@ related_targets: []
 # Dashboard surface brief
 
 Scope: `/dashboard`, the authenticated home page. Mode: Operate.
-Audience: projects & fundraising manager (portfolio altitude) and program officers (their own work). Job: in seconds, see what is slipping today across delivery and money, then drill to the record. Live "today" view, no fiscal filter (executive summary owns fiscal scope). Currencies (USD/EUR/SYP) are never summed. Every string in lang/en + lang/ar; RTL via logical classes. Charts: ApexCharts (already installed).
+Audience: projects & fundraising manager (portfolio altitude) and program officers (their own work). Job: in seconds, see what is slipping today across delivery and money, then drill to the record. Live "today" view, no fiscal filter. Currencies (USD/EUR/SYP) are never summed. Every string in lang/en + lang/ar; RTL via logical classes. Charts: ApexCharts (already installed).
 
 ## Direction contract
 

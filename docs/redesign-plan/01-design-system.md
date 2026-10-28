@@ -100,7 +100,7 @@ These replace `surface` / `surface-sunken` from §2 (keep §2's status and fundi
 
 - One dark horizontal band (`x-ui.figure-housing`) holding 2–6 `x-ui.flap-figure`s.
 - Each figure: characters rendered in `flap` cells (one cell per character group: digits grouped as displayed, e.g. `1,240` = one cell), `type-figure-xl` white numerals, a 1px `flap-split` line across the vertical middle, a `type-label` caption below in `flap-label`. A figure's status tone colours only a 3px dot before the caption (good/warn/critical), never the numerals.
-- **Where allowed, and only there:** dashboard figures band, executive summary coverage values, and one key figure in a detail page header (for example the project's weighted progress %). **Max one housing per page.** Never on body text, tables or buttons (the kitsch guard).
+- **Where allowed, and only there:** dashboard figures band and one key figure in a detail page header (for example the project's weighted progress %). **Max one housing per page.** Never on body text, tables or buttons (the kitsch guard).
 - Money in a flap figure: the currency code sits outside the cells as `type-meta`; one figure per currency.
 
 ### 6.3 Signature element 2: Timetable rows

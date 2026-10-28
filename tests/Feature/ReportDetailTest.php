@@ -30,10 +30,9 @@ test('report detail shows the figure its target and its author', function () {
         ->assertSeeText($report->planIndicator->indicator->name);
 });
 
-test('report detail renders the five narrative sections and the narrative window', function () {
+test('report detail renders the four narrative sections and the narrative window', function () {
     $user = User::factory()->role('General Manager')->create();
     $report = Report::factory()->withNarrative()->create([
-        'executive_summary' => 'Summary text goes here.',
         'key_achievements' => 'Achievements text goes here.',
         'challenges' => 'Challenges text goes here.',
         'lessons_learned' => 'Lessons text goes here.',
@@ -43,7 +42,6 @@ test('report detail renders the five narrative sections and the narrative window
     $this->actingAs($user)
         ->get(route('reports.show', $report))
         ->assertOk()
-        ->assertSeeText('Summary text goes here.')
         ->assertSeeText('Achievements text goes here.')
         ->assertSeeText('Challenges text goes here.')
         ->assertSeeText('Lessons text goes here.')

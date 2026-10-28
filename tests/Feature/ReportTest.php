@@ -24,7 +24,6 @@ test('a new report is a draft, unseen by MEAL, with no narrative written', funct
         ->and($report->narrative_report_notes)->toBeNull()
         ->and($report->period_start)->toBeNull()
         ->and($report->period_end)->toBeNull()
-        ->and($report->executive_summary)->toBeNull()
         ->and($report->key_achievements)->toBeNull()
         ->and($report->challenges)->toBeNull()
         ->and($report->lessons_learned)->toBeNull()
@@ -65,7 +64,6 @@ test('the narrative sections a donor report is made of are stored verbatim', fun
     DB::table('reports')->where('id', $reportId)->update([
         'period_start' => '2026-01-01',
         'period_end' => '2026-03-31',
-        'executive_summary' => 'Reached 82% of the quarterly target.',
         'key_achievements' => 'Two boreholes rehabilitated ahead of schedule.',
         'challenges' => 'Fuel shortages halted pumping for eleven days.',
         'lessons_learned' => 'A pre-positioned fuel reserve would have absorbed the outage.',
@@ -76,7 +74,6 @@ test('the narrative sections a donor report is made of are stored verbatim', fun
 
     expect($report->period_start)->toBe('2026-01-01')
         ->and($report->period_end)->toBe('2026-03-31')
-        ->and($report->executive_summary)->toBe('Reached 82% of the quarterly target.')
         ->and($report->key_achievements)->toBe('Two boreholes rehabilitated ahead of schedule.')
         ->and($report->challenges)->toBe('Fuel shortages halted pumping for eleven days.')
         ->and($report->lessons_learned)->toBe('A pre-positioned fuel reserve would have absorbed the outage.')

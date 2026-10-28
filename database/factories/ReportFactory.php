@@ -70,7 +70,6 @@ class ReportFactory extends Factory
         return $this->state([
             'period_start' => fn (array $attributes): string => CarbonImmutable::parse($attributes['planned_date'])->subMonths(3)->toDateString(),
             'period_end' => fn (array $attributes): string => $attributes['planned_date'],
-            'executive_summary' => fake()->paragraph(),
             'key_achievements' => fake()->paragraph(),
             'challenges' => fake()->paragraph(),
             'lessons_learned' => fake()->paragraph(),

@@ -121,7 +121,7 @@ Nothing. On 2026-10-22 every test file the branch touched passed (592 tests), an
 
 - **Record sheets** (`x-desk.record-sheet`): task, milestone, annual plan, funding agreement, donor report (and compose), monthly report, report, donor, strategy and program pages open as a side sheet over their register. Old URLs keep working; the show component keeps all its logic; the register behind is deferred and inert. Closing (X, Esc, scrim) goes back to the register.
 - **Program** opens over the Projects register filtered to it.
-- **Timeline, Results, Executive summary, Monthly matrix, Indicator library** moved onto `x-desk.register`. Timeline is the full register behind the Desk's Dates lens (the panel's "open" link follows the lens). Results stays a register because program-level frameworks have no Story.
+- **Timeline, Results, Monthly matrix, Indicator library** moved onto `x-desk.register`. Timeline is the full register behind the Desk's Dates lens (the panel's "open" link follows the lens). Results stays a register because program-level frameworks have no Story.
 - **Risk heat map**: new nullable `risks.likelihood` / `risks.severity` (1–3), set in the risk sheet.
 - **Footer** stays, on every Desk page.
 - **Fixes found by the test run**: activity timeline missing root (500 on every record page), Results link hidden from MEAL, Monthly Matrix SQL failing under MySQL ONLY_FULL_GROUP_BY.

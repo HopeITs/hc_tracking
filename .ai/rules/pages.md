@@ -24,7 +24,7 @@ User decision (2026-09-22): on list/board/calendar views the record's own name o
 ## Bind x-ui.header-filter-select :value to the RESOLVED value, not the raw property
 x-ui.header-filter-select picks its trigger label with firstWhere('value', $value) and falls back to `$options[0]` when nothing matches. So a filter whose empty/unknown state resolves server-side to a real default (e.g. `#[Url(except: '')] public string $year = ''` plus a `selectedYear()` that falls back to now()->year) renders the FIRST option while the page computes a different one.
 
-This shipped broken on executive-summary: the picker showed 2027 while every figure on the page was 2026. Fixed by exposing the resolved year as a `#[Computed] fiscalYear()` and passing `:value="(string) $this->fiscalYear"` while `wire:model.live` still writes the raw `year`.
+This once shipped broken: the picker showed 2027 while every figure on the page was 2026. Fixed by exposing the resolved year as a `#[Computed] fiscalYear()` and passing `:value="(string) $this->fiscalYear"` while `wire:model.live` still writes the raw `year`.
 
 Rule: whenever the component resolves the bound property before using it, pass the resolved value to `:value`. A Livewire test asserting only the computed value passes while the trigger lies, so also assert the rendered label (assertSeeHtml('&lt;span class="truncate"&gt;'.$expected.'&lt;/span&gt;')). Filters whose '' genuinely means "All" and render an explicit All option are unaffected.
 

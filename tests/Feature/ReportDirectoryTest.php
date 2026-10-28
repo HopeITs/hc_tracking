@@ -82,7 +82,6 @@ test('creating a report persists the narrative sections and period window', func
         ->set('periodStart', '2026-01-01')
         ->set('periodEnd', '2026-03-31')
         ->set('value', '9500.00')
-        ->set('executiveSummary', 'Summary of the quarter.')
         ->set('keyAchievements', 'Reached every district.')
         ->set('challenges', 'Late disbursement.')
         ->set('lessonsLearned', 'Plan disbursement earlier.')
@@ -94,7 +93,6 @@ test('creating a report persists the narrative sections and period window', func
 
     expect($report->period_start->toDateString())->toBe('2026-01-01')
         ->and($report->period_end->toDateString())->toBe('2026-03-31')
-        ->and($report->executive_summary)->toBe('Summary of the quarter.')
         ->and($report->key_achievements)->toBe('Reached every district.')
         ->and($report->challenges)->toBe('Late disbursement.')
         ->and($report->lessons_learned)->toBe('Plan disbursement earlier.')
@@ -239,14 +237,14 @@ test('narrative sections are trimmed and blank narrative sections are stored as 
         ->set('reportTargetId', (string) $target->id)
         ->set('plannedDate', '2026-03-31')
         ->set('value', '100')
-        ->set('executiveSummary', '  Padded summary.  ')
+        ->set('challenges', '  Padded challenge.  ')
         ->set('keyAchievements', '   ')
         ->call('saveReport')
         ->assertHasNoErrors();
 
     $report = Report::query()->where('plan_indicator_id', $target->id)->sole();
 
-    expect($report->executive_summary)->toBe('Padded summary.')
+    expect($report->challenges)->toBe('Padded challenge.')
         ->and($report->key_achievements)->toBeNull();
 });
 
@@ -415,9 +413,9 @@ test('the report form is rendered only while its modal is open', function () {
 
     Livewire::actingAs($user)
         ->test('pages::reports.index')
-        ->assertDontSeeHtml('wire:model="executiveSummary"')
+        ->assertDontSeeHtml('wire:model="keyAchievements"')
         ->call('openCreateModal')
-        ->assertSeeHtml('wire:model="executiveSummary"');
+        ->assertSeeHtml('wire:model="keyAchievements"');
 });
 
 test('a monthly report mirror row links to its monthly report and offers no edit or delete', function () {
