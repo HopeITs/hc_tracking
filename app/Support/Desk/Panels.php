@@ -36,7 +36,7 @@ final class Panels
      * @var array<string, list<array{0: string, 1: string}>>
      */
     private const array RoleLayouts = [
-        'General Manager' => [['needs', 'L'], ['myteam', 'S'], ['reviews', 'S'], ['glance', 'XL'], ['pipeline', 'L'], ['money', 'L'], ['matrix', 'XL'], ['duties', 'M'], ['targets', 'M'], ['plans', 'L'], ['projects', 'XL']],
+        'General Manager' => [['needs', 'L'], ['myteam', 'S'], ['reviews', 'S'], ['glance', 'XL'], ['pipeline', 'L'], ['money', 'L'], ['matrix', 'XL'], ['duties', 'M'], ['targets', 'M'], ['projects', 'XL']],
         'Public Relations Manager' => [['needs', 'L'], ['coming', 'S'], ['waiting', 'S'], ['pipeline', 'L'], ['money', 'L'], ['projects', 'XL'], ['duties', 'M'], ['transfers', 'M'], ['reviews', 'M']],
         'Public Relations' => [['needs', 'L'], ['coming', 'L'], ['tasks', 'L'], ['milestones', 'L'], ['projects', 'XL']],
         'MEAL' => [['needs', 'L'], ['validate', 'S'], ['templates', 'S'], ['matrix', 'XL'], ['targets', 'L'], ['myteam', 'L'], ['projects', 'XL'], ['reviews', 'M'], ['coming', 'M']],
@@ -60,9 +60,10 @@ final class Panels
      */
     private const array PageLayouts = [
         'projects' => [['milestones', 'L'], ['tasks', 'L'], ['coming', 'L']],
-        'programs' => [['projects', 'XL'], ['plans', 'L'], ['targets', 'L']],
-        'strategies' => [['glance', 'XL'], ['plans', 'L'], ['targets', 'L']],
-        'annual-plans' => [['plans', 'L'], ['targets', 'L'], ['matrix', 'XL']],
+        'programs' => [['projects', 'XL'], ['targets', 'L']],
+        'strategies' => [['glance', 'XL'], ['targets', 'L']],
+        'annual-plans' => [['targets', 'L'], ['matrix', 'XL']],
+        'executive-summary' => [['glance', 'XL'], ['money', 'L'], ['pipeline', 'L']],
         'milestones' => [['milestones', 'L'], ['coming', 'L'], ['tasks', 'L']],
         'timeline' => [['milestones', 'L'], ['coming', 'L'], ['projects', 'XL']],
         'risks' => [['needs', 'L'], ['projects', 'XL']],
@@ -154,6 +155,17 @@ final class Panels
     public function layoutFor(User $user): array
     {
         return $this->clean(is_array($user->desk_layout) ? $user->desk_layout : $this->defaultLayoutFor($user), $user);
+    }
+
+    /**
+     * The role's starting layout as this user would see it (forbidden
+     * panels left out), for the Customize sheet's Reset.
+     *
+     * @return list<array{panel: string, size: string}>
+     */
+    public function startingLayoutFor(User $user): array
+    {
+        return $this->clean($this->defaultLayoutFor($user), $user);
     }
 
     /**
@@ -282,7 +294,6 @@ final class Panels
             'targets' => ['icon' => 'chart', 'size' => 'L', 'register' => 'targets.index', 'allows' => $can('targets.view')],
             'duties' => ['icon' => 'file', 'size' => 'M', 'register' => 'reporting-duties.index', 'allows' => fn (User $user): bool => $user->can('reports.aggregate') || $user->can('funding-agreements.update') || $user->hasReportingDuties()],
             'milestones' => ['icon' => 'flag', 'size' => 'M', 'register' => 'milestones.index', 'allows' => $can('milestones.view')],
-            'plans' => ['icon' => 'cal', 'size' => 'L', 'register' => 'annual-plans.index', 'allows' => $can('annual-plans.view')],
             'donors' => ['icon' => 'users', 'size' => 'L', 'register' => 'donors.index', 'allows' => $can('donors.view')],
         ];
     }

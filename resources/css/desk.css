@@ -635,12 +635,6 @@ button.dk-step.dk-go:hover,button.dk-step.dk-go:focus-visible{ background:var(--
 .dk-ag-m a,.dk-ag-m .dk-is{ overflow:hidden;text-overflow:ellipsis;white-space:nowrap }
 .dk-ag-m a{ font-size:14px;font-weight:700;color:var(--ink) }
 .dk-ag-m .dk-is{ font-size:12.5px;margin-top:1px }
-.dk-mcal{ display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:3px;margin-bottom:6px }
-.dk-mcal .dk-wd{ font-size:10.5px;color:var(--ink-3);text-align:center;font-weight:800;padding-bottom:2px }
-.dk-mday{ display:grid;grid-template-rows:1fr 8px;place-items:center;aspect-ratio:1/1;max-height:46px;width:100%;padding:3px 0;border:0;border-radius:8px;background:none;cursor:pointer;color:var(--ink-2);font-size:12.5px;line-height:1 }
-.dk-mday:hover{ background:var(--sunk) }
-.dk-mday.dk-today{ color:var(--brand-ink);font-weight:800;box-shadow:inset 0 0 0 2px var(--brand) }
-.dk-mday.dk-on{ background:var(--sunk);color:var(--ink) }
 .dk-mdots{ display:flex;align-items:center;gap:2px;height:8px }
 .dk-mdots i{ width:5px;height:5px;border-radius:50%;background:var(--k,var(--ink-3)) }
 .dk-mdots b{ font-size:8.5px;font-weight:800;color:var(--ink-3) }
@@ -678,25 +672,6 @@ button.dk-step.dk-go:hover,button.dk-step.dk-go:focus-visible{ background:var(--
 .dk-legend button:hover{ background:var(--sunk) }
 .dk-legend button.dk-on{ background:var(--sunk);color:var(--ink);font-weight:700 }
 .dk-legend button .dk-num{ color:var(--ink-2) }
-/* At a glance: a typographic row with thin dividers at W/XL, two columns at M/L, a list at S */
-.dk-glance{ display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:0 }
-.dk-glance>li{ min-width:0;border-bottom:1px solid var(--line) }
-.dk-gl-a{ display:grid;gap:2px;align-content:start;padding:10px 12px 10px 0;color:inherit;border-radius:8px }
-[dir="rtl"] .dk-gl-a{ padding:10px 0 10px 12px }
-a.dk-gl-a:hover strong{ text-decoration:underline;text-decoration-thickness:2px }
-.dk-gl-a strong{ font-size:clamp(26px,2.6vw,36px);font-weight:800;letter-spacing:-.02em;line-height:1.05;color:var(--ink) }
-.dk-gl-l{ font-size:12.5px;color:var(--ink-2);line-height:1.35 }
-.dk-gl-d{ font-size:12px;font-weight:700;color:var(--ink-3) }
-.dk-gl-d.dk-good{ color:var(--good) }
-.dk-gl-d.dk-bad{ color:var(--bad) }
-.dk-panel[style*="--span:8"] .dk-glance,.dk-panel[style*="--span:12"] .dk-glance{ grid-template-columns:repeat(var(--figs),minmax(0,1fr)) }
-.dk-panel[style*="--span:8"] .dk-glance>li,.dk-panel[style*="--span:12"] .dk-glance>li{ border-bottom:0;border-inline-end:1px solid var(--line);padding-inline-start:14px }
-.dk-panel[style*="--span:8"] .dk-glance>li:first-child,.dk-panel[style*="--span:12"] .dk-glance>li:first-child{ padding-inline-start:0 }
-.dk-panel[style*="--span:8"] .dk-glance>li:last-child,.dk-panel[style*="--span:12"] .dk-glance>li:last-child{ border-inline-end:0 }
-.dk-panel[style*="--span:3"] .dk-glance{ grid-template-columns:1fr }
-.dk-panel[style*="--span:3"] .dk-gl-a{ grid-template-columns:auto minmax(0,1fr);align-items:baseline;column-gap:10px;padding-block:7px }
-.dk-panel[style*="--span:3"] .dk-gl-a strong{ font-size:22px;grid-row:span 2 }
-@media (max-width: 1279px){ .dk-panel[style*="--span:8"] .dk-glance{ grid-template-columns:repeat(3,minmax(0,1fr));row-gap:8px } }
 /* Proposal pipeline: fixed columns so the status pill sits at the same x on every row; two lines at S/M */
 .dk-pl-sum{ font-size:12.5px;color:var(--ink-3);margin:0 0 6px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis }
 .dk-pl>li{ display:grid;grid-template-columns:minmax(0,1.4fr) minmax(0,1fr) 168px 74px 28px;grid-template-areas:"n d s t o";align-items:center;gap:2px 12px;padding-block:9px;border-bottom:1px solid var(--line) }
@@ -774,17 +749,6 @@ a.dk-gl-a:hover strong{ text-decoration:underline;text-decoration-thickness:2px 
 .dk-pj-tl i{ position:absolute;top:-3px;width:2px;height:12px;background:var(--brand);border-radius:1px }
 .dk-pj-h{ grid-area:h;justify-self:end;white-space:nowrap }
 .dk-panel[style*="--span:3"] .dk-pj>li,.dk-panel[style*="--span:4"] .dk-pj>li{ grid-template-columns:minmax(0,1fr) auto;grid-template-areas:"n h" "l l" }
-/* Annual plans: program · done bar with expected tick · done/expected; targets behind · owner below */
-.dk-ap>li{ display:grid;grid-template-columns:minmax(0,1fr) minmax(80px,140px) 76px;grid-template-areas:"n b v" "m m m";align-items:center;gap:3px 12px;padding-block:9px;border-bottom:1px solid var(--line) }
-.dk-ap>li:last-child{ border-bottom:0 }
-.dk-ap-n{ grid-area:n;min-width:0;font-size:14px;font-weight:700;color:var(--ink);overflow:hidden;text-overflow:ellipsis;white-space:nowrap }
-.dk-ap-bar{ grid-area:b;display:block;min-width:0 }
-.dk-ap-bar .dk-meter{ margin:0 }
-.dk-ap>li.dk-behind .dk-meter b{ background:var(--warn) }
-.dk-ap-v{ grid-area:v;text-align:end;font-size:12px;color:var(--ink-3);white-space:nowrap }
-.dk-ap-v b{ font-size:13.5px;color:var(--ink) }
-.dk-ap-m{ grid-area:m;margin:0;font-size:12.5px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap }
-.dk-panel[style*="--span:3"] .dk-ap>li{ grid-template-columns:minmax(0,1fr) auto;grid-template-areas:"n v" "b b" "m m" }
 /* My reviews + Report templates status: name · pill on line 1, meta · action on line 2 */
 .dk-rv>li,.dk-tp>li{ display:grid;grid-template-columns:minmax(0,1fr) auto;grid-template-areas:"n s" "m a";align-items:center;gap:3px 12px;padding-block:9px;border-bottom:1px solid var(--line) }
 .dk-rv>li:last-child,.dk-tp>li:last-child{ border-bottom:0 }

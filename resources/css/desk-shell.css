@@ -206,12 +206,8 @@
 [data-flux-modal] > dialog.modal-shell:has(.modal-shell-frame[data-wizard]) { height: var(--pop-h); }
 [data-flux-modal] > dialog.filter-dialog { height: var(--pop-h); }
 
-/* ---------- Desk panels: paginate, never scroll (no scroll trap) ---------- */
+/* ---------- Desk panels: one fixed height (desk.css --panel-h), paginate, never scroll, never spill ---------- */
 @layer components {
-    /* Panels size to one page of rows; panels in the same grid row stretch to one height, so rows stay aligned. */
-    .dk-panel { height: auto; min-height: 0; }
-    .dk-panel[style*="--span:12"] { min-height: 0; }
-    .dk-pb { overflow: visible; overscroll-behavior: auto; }
     .dk-pf { margin-top: auto; }
     .dk-panel .dk-mx-wrap { overflow-x: auto; overscroll-behavior-x: contain; }
 
@@ -244,11 +240,6 @@
     }
 }
 
-@layer components {
-    @media (max-width: 760px) {
-        .dk-panel { max-height: none; min-height: 0; }
-    }
-}
 
 /* ---------- Ask bar additions ---------- */
 @layer components {
@@ -335,7 +326,7 @@
     .dk-pf-pop .dk-sh-f { justify-content: flex-end; }
 }
 
-/* ---------- Panel rows (panels size to their content: four rows a page, the rest pages — handoff 2026-10-27) ---------- */
+/* ---------- Panel rows: one line each where they can; the page size is fitted to the card (desk-filters.js) ---------- */
 @layer components {
     .dk-ptools { flex-wrap: nowrap; overflow: hidden; }
     .dk-panel :is(.dk-it, .dk-tt, .dk-is, .dk-plist strong, .dk-rn strong, .dk-pm strong, .dk-mx th a) { display: block; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
@@ -397,4 +388,115 @@
     .dk-scope main { padding-top: 28px; }
     .dk-side-scroll, html:not(.dk-nav-open) .dk-side-scroll { padding-top: 28px; }
     .dk-top { background: var(--paper); backdrop-filter: none; -webkit-backdrop-filter: none; }
+}
+
+/* ---------- Panel body: content fits the fixed card and fills it (desk-filters.js fit) ---------- */
+@layer components {
+    /* The body is a column: tools/summaries keep their height, the fitted list takes the rest. Its width is a container so rows lay out by the space they really get. */
+    .dk-pb { display: flex; flex-direction: column; overflow: hidden; container: pb / inline-size; }
+    .dk-pb > * { flex: none; min-width: 0; }
+    /* A page that fills the card shares the room left between its rows, content centred in each. */
+    .dk-pb > .dk-fit-fill { flex: 1 1 auto; display: flex; flex-direction: column; min-height: 0; }
+    .dk-fit-fill > * { flex: 1 1 auto; align-content: center; align-items: center; }
+    .dk-fit-fill > [data-fit-head] { flex: 0 0 auto; }
+
+    /* Customize sheet: the draft's order is the list's order. */
+    .dk-lib-order { display: flex; flex-direction: column; }
+
+    /* Tasks: the four phases share the tools row; a label too long for its share truncates. */
+    .dk-ptools .dk-seg-fill { display: flex; flex-wrap: nowrap; width: 100%; }
+    .dk-seg-fill button { flex: 1 1 0; min-width: 0; justify-content: center; }
+    .dk-seg-fill .dk-seg-l { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .dk-seg-fill .dk-num { flex: none; }
+
+    /* At a glance: a grid of figure tiles that always fills the card; one row when the card is wide enough for every figure. */
+    .dk-pb > .dk-glance { flex: 1 1 auto; min-height: 0; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); grid-auto-rows: minmax(0, 1fr); gap: 1px; background: var(--line); border: 1px solid var(--line); border-radius: 12px; overflow: hidden; }
+    .dk-glance > li { display: flex; min-width: 0; min-height: 0; background: var(--paper); container-type: inline-size; }
+    .dk-glance > li:last-child:nth-child(odd) { grid-column: span 2; }
+    .dk-gl-a { flex: 1; min-width: 0; display: flex; flex-direction: column; justify-content: center; gap: 4px; padding: 10px 16px; color: inherit; text-decoration: none; transition: background .15s; }
+    a.dk-gl-a:hover { background: var(--tint); }
+    a.dk-gl-a:hover strong { text-decoration: underline; text-decoration-thickness: 2px; text-underline-offset: 4px; }
+    .dk-gl-a strong { font-size: clamp(22px, 17cqi, 44px); font-weight: 800; letter-spacing: -.02em; line-height: 1; color: var(--ink); white-space: nowrap; font-variant-numeric: tabular-nums; }
+    .dk-gl-l { font-size: 12.5px; line-height: 1.35; color: var(--ink-2); display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+    .dk-gl-d { align-self: flex-start; display: block; height: 20px; line-height: 20px; padding-inline: 7px; border-radius: 999px; background: var(--sunk); font-size: 11.5px; font-weight: 700; color: var(--ink-3); white-space: nowrap; max-width: 100%; overflow: hidden; text-overflow: ellipsis; }
+    .dk-gl-d.dk-good { color: var(--good); background: var(--good-soft); }
+    .dk-gl-d.dk-bad { color: var(--bad); background: var(--bad-soft); }
+    @container pb (min-width: 420px) {
+        .dk-pb > .dk-glance { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+        .dk-glance > li:last-child:nth-child(odd) { grid-column: auto; }
+        .dk-glance > li:last-child:nth-child(3n + 1) { grid-column: span 3; }
+        .dk-glance > li:last-child:nth-child(3n + 2) { grid-column: span 2; }
+        .dk-pb > .dk-glance:is([data-figs="2"], [data-figs="4"]) { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+        .dk-glance:is([data-figs="2"], [data-figs="4"]) > li { grid-column: auto !important; }
+    }
+    @container pb (min-width: 560px) {
+        .dk-pb > .dk-glance:is([data-figs="1"], [data-figs="2"], [data-figs="3"], [data-figs="4"]) { grid-template-columns: repeat(var(--figs), minmax(0, 1fr)); }
+    }
+    @container pb (min-width: 760px) {
+        .dk-pb > .dk-glance { grid-template-columns: repeat(var(--figs), minmax(0, 1fr)); }
+        .dk-glance > li { grid-column: auto !important; }
+        .dk-gl-a { padding-inline: 20px; }
+    }
+
+    /* Waiting on others: kind icon · what is stuck and since when · days waiting and Poke. */
+    .dk-wait > li { display: grid; grid-template-columns: 32px minmax(0, 1fr) auto; align-items: center; gap: 6px 12px; padding-block: 10px; border-bottom: 1px solid var(--line); }
+    .dk-wait > li:last-child { border-bottom: 0; }
+    .dk-wt-ic { width: 32px; height: 32px; border-radius: 10px; display: grid; place-items: center; background: var(--sunk); color: var(--ink-2); }
+    .dk-scope .dk-wt-ic svg.dk-i { width: 16px; height: 16px; }
+    .dk-wt-task { background: var(--active-soft); color: var(--active); }
+    .dk-wt-monthly-report { background: var(--warn-soft); color: var(--warn); }
+    .dk-wt-review { background: var(--brand-soft); color: var(--brand-ink); }
+    .dk-wt-deliverable { background: var(--money-soft); color: var(--money); }
+    .dk-wt-m { min-width: 0; display: grid; gap: 2px; }
+    .dk-wt-t { font-size: 14px; font-weight: 700; line-height: 1.35; color: var(--ink); text-decoration: none; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; overflow-wrap: anywhere; }
+    .dk-wt-t:hover { text-decoration: underline; }
+    .dk-wt-m .dk-is { margin: 0; font-size: 12.5px; }
+    .dk-wt-a { display: flex; align-items: center; justify-content: flex-end; gap: 6px; }
+    @container pb (max-width: 380px) {
+        .dk-wait > li { grid-template-columns: 32px minmax(0, 1fr); }
+        .dk-wt-a { grid-column: 2; justify-content: flex-start; }
+    }
+
+    /* My agenda, Month: a real month grid (weekday header, one row per week, days of the next and last month muted) that fills the card. */
+    .dk-pb > .dk-mm-h { padding-bottom: 6px; }
+    .dk-pb > .dk-mcal { flex: 1 1 auto; min-height: 0; display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); grid-template-rows: auto repeat(var(--weeks, 6), minmax(0, 1fr)); gap: 1px; margin: 0; background: var(--line); border: 1px solid var(--line); border-radius: 10px; overflow: hidden; }
+    .dk-mcal .dk-wd { padding: 5px 0; background: var(--tint); font-size: 11px; font-weight: 800; color: var(--ink-3); text-align: center; text-transform: uppercase; letter-spacing: .04em; }
+    [lang="ar"] .dk-mcal .dk-wd { letter-spacing: 0; text-transform: none; }
+    .dk-mday { min-width: 0; min-height: 0; display: flex; flex-direction: column; align-items: flex-start; justify-content: space-between; gap: 2px; padding: 4px 6px; border: 0; border-radius: 0; background: var(--paper); color: var(--ink-2); font-size: 12px; font-weight: 700; line-height: 1; text-align: start; cursor: pointer; }
+    .dk-mday > .dk-num { display: inline-grid; place-items: center; min-width: 20px; height: 20px; border-radius: 999px; }
+    .dk-mday:not(.dk-mday-off):hover { background: var(--sunk); }
+    .dk-mday.dk-past { color: var(--ink-3); }
+    .dk-mday.dk-has { background: var(--tint); }
+    .dk-mday.dk-today > .dk-num { background: var(--brand); color: var(--on-brand); }
+    .dk-mday.dk-on { box-shadow: inset 0 0 0 2px var(--ink-3); }
+    .dk-mday-off { background: var(--ground); color: var(--faint); font-weight: 400; cursor: default; }
+    .dk-mday .dk-mdots { align-self: stretch; gap: 3px; }
+    @container pb (min-width: 480px) {
+        .dk-mday { padding: 6px 8px; font-size: 12.5px; }
+        .dk-mday .dk-mdots i { width: 6px; height: 6px; }
+    }
+}
+
+/* ---------- Wide cards: rows go on one line, so a page holds more of them ---------- */
+@layer components {
+    .dk-dn-v .dk-muted { white-space: nowrap; }
+    /* Donor money on one line: received of committed, then its bar. */
+    .dk-dn-v { display: flex; align-items: center; justify-content: flex-end; gap: 4px 8px; flex-wrap: wrap; }
+    .dk-dn-v .dk-meter { flex: none; width: 80px; margin: 0; }
+    .dk-panel .dk-dn-v { justify-content: flex-start; }
+    @container pb (min-width: 640px) {
+        .dk-dn > li, .dk-panel .dk-dn.dk-dn-money > li { grid-template-columns: minmax(0, 1fr) minmax(0, 1.3fr) auto; grid-template-areas: "n m s"; }
+        .dk-dn.dk-dn-money > li, .dk-panel .dk-dn.dk-dn-money > li { grid-template-columns: minmax(0, 1fr) minmax(0, 1.2fr) auto 190px; grid-template-areas: "n m s v"; }
+        .dk-panel .dk-dn-v { justify-content: flex-end; }
+        .dk-rv > li, .dk-tp > li { grid-template-columns: minmax(0, 1fr) minmax(0, 1.2fr) auto auto; grid-template-areas: "n m s a"; }
+    }
+}
+
+/* ---------- Proposal pipeline in a mid-width card: name and status on line 1, donor · money · deadline on line 2 ---------- */
+@layer components {
+    @container pb (min-width: 380px) and (max-width: 719px) {
+        .dk-panel .dk-pb .dk-pl > li, .dk-panel .dk-pb .dk-pl.dk-pl-money > li { grid-template-columns: minmax(0, 1fr) auto auto; grid-template-areas: "n s s" "d m t"; row-gap: 3px; }
+        .dk-panel .dk-pb .dk-pl-o { display: none; }
+        .dk-panel .dk-pb .dk-pl-d::after { content: attr(data-owner); }
+    }
 }

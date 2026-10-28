@@ -69,7 +69,7 @@ new class extends Component {
 
 <x-desk.panel :facets="$pg['facets']" id="targets" register="targets.index" :size="$size" :index="$index" :total="$total" :count="$rows->count()">
     @if ($pg['total'] > 0)
-        <ul class="dk-tg">
+        <ul class="dk-tg" {{ $this->fitAttributes($pg) }}>
             @foreach ($pg['slice'] as $row)
                 @php
                     $indicator = $row['indicator'];

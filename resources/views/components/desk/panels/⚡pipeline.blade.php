@@ -41,6 +41,14 @@ new class extends Component {
     }
 
     /**
+     * @return list<string>
+     */
+    protected function filterProperties(): array
+    {
+        return ['status'];
+    }
+
+    /**
      * @return array<string, int>
      */
     #[Computed]
@@ -150,7 +158,7 @@ new class extends Component {
     @endif
 
     @if ($pg['total'] > 0)
-        <ul @class(['dk-pl', 'dk-pl-money' => $showMoney])>
+        <ul @class(['dk-pl', 'dk-pl-money' => $showMoney]) {{ $this->fitAttributes($pg) }}>
             @foreach ($pg['slice'] as $proposal)
                 @php
                     $tone = $this->tone($proposal->status);

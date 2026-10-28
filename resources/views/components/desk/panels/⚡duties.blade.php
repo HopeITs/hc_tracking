@@ -106,7 +106,7 @@ new class extends Component {
         <p class="dk-pl-sum">{{ trans_choice('desk.duties_summary', $late, ['late' => $late, 'open' => $rows->count()]) }}</p>
     @endif
     @if ($pg['total'] > 0)
-        <ul class="dk-dr">
+        <ul class="dk-dr" {{ $this->fitAttributes($pg) }}>
             @foreach ($pg['slice'] as $report)
                 @php
                     $days = (int) $today->diffInDays($report->due_on, false);

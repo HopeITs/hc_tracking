@@ -43,6 +43,14 @@ new class extends Component {
         $this->page = 0;
     }
 
+    /**
+     * @return list<string>
+     */
+    protected function filterProperties(): array
+    {
+        return ['scope', 'filter'];
+    }
+
     public function updatedScope(string $scope): void
     {
         $this->setScope($scope);
@@ -191,7 +199,7 @@ new class extends Component {
     </x-slot:tools>
 
     @if ($pg['total'] > 0)
-        <ol class="dk-pj" data-lens="{{ $shownLens }}">
+        <ol class="dk-pj" {{ $this->fitAttributes($pg) }} data-lens="{{ $shownLens }}">
             @foreach ($pg['slice'] as $project)
                 @php
                     $line = $lines[$project->id];

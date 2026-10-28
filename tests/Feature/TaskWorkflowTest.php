@@ -142,10 +142,14 @@ test('the desk tasks card lists mine (assigned or created), my department, and o
     workflowTask($other, [$colleague], ['title' => 'Colleague work']);
 
     $card = Livewire::actingAs($me)->test('desk.panels.tasks', ['size' => 'L'])
-        ->assertSee(['I asked for this', 'Given to me'])
-        ->assertDontSee('Colleague work')
+        ->assertSee('Given to me')
+        ->assertDontSee(['I asked for this', 'Colleague work'])
+        ->call('setFilter', TaskStatus::UnderReview->value)
+        ->assertSee('I asked for this')
         ->assertSee(__('desk.decision_action.approve'))
         ->assertSee(__('desk.tasks_send_back'));
 
-    $card->set('scope', 'department')->assertSee('Colleague work');
+    $card->call('setFilter', TaskStatus::Todo->value)
+        ->call('applyFilters', ['scope' => 'department'])
+        ->assertSee('Colleague work');
 });

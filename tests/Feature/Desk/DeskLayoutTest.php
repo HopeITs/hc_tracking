@@ -74,3 +74,36 @@ test('the customize sheet lists locked panels with the reason', function () {
         ->assertSee(__('desk.panel.money.locked'))
         ->assertDontSeeHtml('data-locked-panel="needs"');
 });
+
+test('the customize sheet saves its whole draft only on Done, dropping what the viewer may not place', function () {
+    $user = User::factory()->role('Team Member')->create();
+    $desk = Livewire::actingAs($user)->test('pages::desk.index')
+        ->assertSeeHtml('data-customize-done')
+        ->assertDontSeeHtml('wire:click="removePanel(')
+        ->assertDontSeeHtml('wire:click="addPanel(');
+
+    expect($user->fresh()->desk_layout)->toBeNull();
+
+    $desk->call('saveLayout', [
+        ['panel' => 'coming', 'size' => 'S'],
+        ['panel' => 'money', 'size' => 'L'],
+        ['panel' => 'tasks', 'size' => 'HUGE'],
+        ['panel' => 'coming', 'size' => 'XL'],
+    ]);
+
+    expect($user->fresh()->desk_layout)->toBe([
+        ['panel' => 'coming', 'size' => 'S'],
+        ['panel' => 'tasks', 'size' => 'L'],
+    ]);
+
+    $desk->call('saveLayout', null);
+
+    expect($user->fresh()->desk_layout)->toBeNull();
+});
+
+test('the annual plans panel is gone, even from a layout saved before', function () {
+    $user = User::factory()->role('Super Admin')->create(['desk_layout' => [['panel' => 'plans', 'size' => 'L'], ['panel' => 'needs', 'size' => 'L']]]);
+
+    expect(app(Panels::class)->availableTo($user))->not->toHaveKey('plans')
+        ->and(deskPanelIds($user))->toBe(['needs']);
+});

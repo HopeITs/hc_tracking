@@ -113,7 +113,7 @@ new class extends Component {
     @endif
 
     @if ($pg['total'] > 0)
-        <ul class="dk-fp">
+        <ul class="dk-fp" {{ $this->fitAttributes($pg) }}>
             @foreach ($pg['slice'] as $row)
                 @php
                     $currency = $row['agreement']->currency->value;

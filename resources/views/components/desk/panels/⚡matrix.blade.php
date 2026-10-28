@@ -25,22 +25,24 @@ new class extends Component {
     use IsDeskPanel;
 
     /**
-     * The report states, in the order the legend and summary show them.
+     * The report states, in the order the status filter and summary show them.
      */
     public const array States = ['late', 'returned', 'submitted', 'validated', 'draft'];
 
     public string $state = '';
 
-    public function toggleState(string $state): void
-    {
-        $this->state = $this->state === $state || ! in_array($state, self::States, true) ? '' : $state;
-        $this->page = 0;
-    }
-
     public function updatedState(string $state): void
     {
         $this->state = in_array($state, self::States, true) ? $state : '';
         $this->page = 0;
+    }
+
+    /**
+     * @return list<string>
+     */
+    protected function filterProperties(): array
+    {
+        return ['state'];
     }
 
     public function isWide(): bool
@@ -168,7 +170,7 @@ new class extends Component {
             <x-ui.header-filter-select :label="__('desk.facet.status')" wire:model="state" :value="$state" deferred>
                 <option value="">{{ __('desk.filter_all') }}</option>
                 @foreach (self::States as $option)
-                    <option value="{{ $option }}">{{ __('desk.report_state.'.$option) }}</option>
+                    <option value="{{ $option }}">{{ __('desk.report_state.'.$option) }} ({{ $counts[$option] ?? 0 }})</option>
                 @endforeach
             </x-ui.header-filter-select>
         </div>
@@ -179,8 +181,8 @@ new class extends Component {
     @if ($pg['total'] === 0)
         <p class="dk-pempty">{{ __('desk.matrix_empty') }}</p>
     @elseif ($wide)
-        <div class="dk-mx2" style="--months:{{ count($months) }}" role="table" aria-label="{{ __('desk.panel.matrix.title') }}">
-            <div class="dk-mx2-r dk-mx2-h" role="row">
+        <div class="dk-mx2" {{ $this->fitAttributes($pg) }} style="--months:{{ count($months) }}" role="table" aria-label="{{ __('desk.panel.matrix.title') }}">
+            <div class="dk-mx2-r dk-mx2-h" role="row" data-fit-head>
                 <span role="columnheader">{{ __('desk.project') }}</span>
                 @foreach ($months as $month)
                     <span role="columnheader" title="{{ $month->translatedFormat('F Y') }}">{{ mb_substr($month->translatedFormat('M'), 0, 3) }}</span>
@@ -213,7 +215,7 @@ new class extends Component {
             @endforeach
         </div>
     @else
-        <ul class="dk-mx-list">
+        <ul class="dk-mx-list" {{ $this->fitAttributes($pg) }}>
             @foreach ($pg['slice'] as $row)
                 <li wire:key="mxl-{{ $row['report']->id }}">
                     <a href="{{ route('monthly-reports.show', $row['report']) }}" wire:navigate class="dk-mx-ln" title="{{ $row['project']->name }}">{{ $row['project']->name }}</a>
@@ -223,12 +225,6 @@ new class extends Component {
             @endforeach
         </ul>
     @endif
-
-    <div class="dk-legend" role="group" aria-label="{{ __('desk.matrix_legend') }}">
-        @foreach (self::States as $option)
-            <button type="button" wire:click="toggleState('{{ $option }}')" aria-pressed="{{ $state === $option ? 'true' : 'false' }}" @class(['dk-on' => $state === $option])><i class="dk-mc dk-{{ $option }}"></i>{{ __('desk.report_state.'.$option) }} <span class="dk-num">{{ $counts[$option] ?? 0 }}</span></button>
-        @endforeach
-    </div>
 
     <x-slot:foot>
         <x-desk.pager :pg="$pg" />
