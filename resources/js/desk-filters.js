@@ -22,6 +22,7 @@
 document.addEventListener('alpine:init', () => {
     window.Alpine.data('deskPanel', (panelId) => ({
         menu: false,
+        searching: false,
         filtering: false,
         draft: {},
         fitTries: 0,
