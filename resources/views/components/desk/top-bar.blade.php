@@ -37,7 +37,8 @@
                 </span>
             </button>
 
-            @if ($showsInbox)
+            {{-- Panels belong to My desk only (user decision 2026-10-28). --}}
+            @if ($showsInbox && request()->routeIs('dashboard'))
                 <button type="button" class="dk-btn dk-panels-btn" x-data x-on:click="$dispatch('dk-panels-open')" aria-haspopup="dialog" data-panels-trigger>
                     <flux:icon.squares-2x2 variant="outline" class="size-5" />
                     <span class="dk-panels-l">{{ __('navigation.panels') }}</span>

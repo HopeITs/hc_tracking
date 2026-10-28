@@ -315,10 +315,15 @@
     @media (max-width: 1099px) { .dk-capsule .dk-wide-tool { display: none !important; } }
 }
 
-/* Focus is gray everywhere; red is kept for real validation errors only (user decision 2026-10-27). */
+/*
+ * Focus is gray everywhere; red is kept for real validation errors only (user decision 2026-10-27).
+ * One ring per field: a bare input draws it itself, but an input inside a field box (the box
+ * carries the border) leaves it to the box, or the two rings read as an input inside an input.
+ */
 @layer components {
     .dk-scope :is(input, textarea, select):focus-visible { outline: none; border-color: var(--ink-3); box-shadow: 0 0 0 3px var(--sunk); }
-    .dk-scope .dk-pal-in input:focus-visible { box-shadow: none; }
+    .dk-scope :is(.form-box, .dk-reg-q, .dk-pf-search, .dk-psearch, .dk-pal-in, .dk-pm, .rules-stepper, .rules-event-search, .rules-chip-add) :is(input, textarea, select):focus-visible { border-color: transparent; box-shadow: none; }
+    .dk-reg-q:focus-within, .dk-pf-search:focus-within, .dk-psearch:focus-within { border-color: var(--ink-3); box-shadow: 0 0 0 3px var(--sunk); }
 }
 :where(input, textarea, select, button, a):focus-visible { outline-color: var(--color-secondary-medium); }
 
@@ -518,5 +523,4 @@
     .dk-psearch:focus-within { border-color: var(--ink-3); background: var(--paper); }
     .dk-scope .dk-psearch svg.dk-i { width: 16px; height: 16px; }
     .dk-psearch input { flex: 1; min-width: 0; height: 100%; border: 0; background: none; outline: none; color: var(--ink); font-size: 13.5px; }
-    .dk-scope .dk-psearch input:focus-visible { box-shadow: none; }
 }
