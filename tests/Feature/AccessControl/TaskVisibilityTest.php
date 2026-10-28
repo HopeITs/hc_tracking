@@ -45,7 +45,7 @@ test('a hidden task file cannot be downloaded', function () {
 
 test('the desk lists no hidden task', function () {
     $this->actingAs($this->member)->get(route('dashboard'))->assertOk()->assertDontSee('Finance-only task');
-    $this->actingAs(userWithRole('Managers'))->get(route('dashboard'))->assertOk()->assertSee('Finance-only task');
+    $this->actingAs(userWithRole('Managers'))->get(route('tasks.index'))->assertOk()->assertSee('Finance-only task');
 });
 
 test('the calendar never shows another department\'s tasks, whoever is picked', function () {
