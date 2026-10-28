@@ -59,7 +59,7 @@ new class extends Component {
     </x-slot:tools>
 
     @if ($pg['total'] > 0)
-        <ol class="dk-items">
+        <ol class="dk-items" {{ $this->fitAttributes($pg) }}>
             @foreach ($pg['slice'] as $item)
                 @php
                     $waited = $item['since'] === null ? null : (int) $item['since']->startOfDay()->diffInDays($today);

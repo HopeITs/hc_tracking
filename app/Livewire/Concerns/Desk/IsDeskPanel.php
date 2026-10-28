@@ -8,6 +8,7 @@ use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Lang;
+use Illuminate\Support\HtmlString;
 use Illuminate\Support\Str;
 use Livewire\Attributes\Reactive;
 
@@ -20,9 +21,16 @@ use Livewire\Attributes\Reactive;
 trait IsDeskPanel
 {
     /**
-     * Rows per panel page: a panel shows three to four rows and pages the rest, never scrolls.
+     * Rows per panel page until the browser has measured the card: the
+     * panel then asks for as many rows as fit its fixed height (fitRows),
+     * so a page fills the card without spilling out of it.
      */
-    public const int PerPage = 4;
+    public const int PerPage = 6;
+
+    /**
+     * The most rows a fitted page may ask for.
+     */
+    public const int MaxPerPage = 24;
 
     #[Reactive]
     public string $size = 'M';
@@ -34,6 +42,11 @@ trait IsDeskPanel
     public int $total = 1;
 
     public int $page = 0;
+
+    /**
+     * Rows per page as measured by the browser (resources/js/desk-filters.js); 0 until then.
+     */
+    public int $perPage = 0;
 
     public string $filter = 'all';
 
@@ -50,12 +63,79 @@ trait IsDeskPanel
     }
 
     /**
-     * "Done" in the filter popup: the draft choices arrive with this call, so
-     * the list starts again from its first page.
+     * "Done" in the filter popup: the whole draft arrives with this call
+     * (property => value), nothing before it, so the list starts again from
+     * its first page. Only facets and the panel's own filter properties
+     * (filterProperties) can be written this way.
+     *
+     * @param  array<string, mixed>  $draft
      */
-    public function applyFilters(): void
+    public function applyFilters(array $draft = []): void
     {
+        $allowed = $this->filterProperties();
+
+        foreach ($draft as $name => $value) {
+            if (! is_string($name) || ! (is_string($value) || is_int($value))) {
+                continue;
+            }
+
+            $value = (string) $value;
+
+            if (str_starts_with($name, 'facets.')) {
+                $facet = substr($name, strlen('facets.'));
+
+                if ($facet !== '' && ! str_contains($facet, '.')) {
+                    $this->facets[$facet] = $value;
+                }
+
+                continue;
+            }
+
+            if (! in_array($name, $allowed, true)) {
+                continue;
+            }
+
+            $this->{$name} = $value;
+            $hook = 'updated'.Str::studly($name);
+
+            if (method_exists($this, $hook)) {
+                $this->{$hook}($value);
+            }
+        }
+
+        $this->facets = array_filter($this->facets, fn (mixed $value): bool => is_string($value) && $value !== '');
         $this->page = 0;
+    }
+
+    /**
+     * The panel's own filter properties (besides the facets) that "Done"
+     * may write.
+     *
+     * @return list<string>
+     */
+    protected function filterProperties(): array
+    {
+        return ['filter'];
+    }
+
+    /**
+     * The browser measured how many rows fit the card. The first row on
+     * screen stays on screen.
+     */
+    public function fitRows(int $rows): void
+    {
+        $rows = max(1, min(self::MaxPerPage, $rows));
+        $first = $this->page * $this->rowsPerPage(self::PerPage);
+        $this->perPage = $rows;
+        $this->page = intdiv($first, $rows);
+    }
+
+    /**
+     * Rows per page: the measured count, else the panel's own estimate.
+     */
+    protected function rowsPerPage(int $estimate): int
+    {
+        return $this->perPage > 0 ? $this->perPage : $estimate;
     }
 
     public function clearFilters(): void
@@ -82,6 +162,18 @@ trait IsDeskPanel
     }
 
     /**
+     * The attributes that let the browser fit a page of rows to the card
+     * (resources/js/desk-filters.js): put them on the list element whose
+     * children are the rows; a child marked data-fit-head is a heading.
+     *
+     * @param  array{per: int, total: int}  $pg
+     */
+    public function fitAttributes(array $pg): HtmlString
+    {
+        return new HtmlString('data-fit data-fit-per="'.$pg['per'].'" data-fit-total="'.$pg['total'].'"');
+    }
+
+    /**
      * One page of the list, clamping the page to the last one that exists.
      *
      * @template TItem
@@ -91,6 +183,7 @@ trait IsDeskPanel
      */
     protected function paginate(Collection $items, int $per): array
     {
+        $per = $this->rowsPerPage($per);
         $facets = $this->facetOptions($items);
         $items = $this->matchingFacets($items);
         $total = $items->count();

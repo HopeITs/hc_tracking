@@ -72,7 +72,7 @@ new class extends Component {
     </x-slot:filters>
 
     @if ($pg['total'] > 0)
-        <ol class="dk-ladder dk-tr">
+        <ol class="dk-ladder dk-tr" {{ $this->fitAttributes($pg) }}>
             @foreach ($pg['slice'] as $transfer)
                 @php
                     $state = $transfer->state();

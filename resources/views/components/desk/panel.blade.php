@@ -8,12 +8,16 @@
     'facets' => [],
     'filtered' => false,
     'filterable' => true,
+    'search' => null,
+    'searchValue' => '',
 ])
 
 @php
     $title = __("desk.panel.{$id}.title");
     $sizes = \App\Support\Desk\Panels::Sizes;
     $filtered = $filtered || collect($facets)->contains(fn (array $choice): bool => $choice['value'] !== '');
+    /* No funnel when the popup would only say there is nothing to filter. */
+    $filterable = $filterable && ($facets !== [] || isset($filters));
 @endphp
 
 {{--
@@ -22,7 +26,7 @@
     panel (resources/js/desk.js); the menu's actions call the Desk page
     (pages::desk.index) through $wire.$parent.
 --}}
-<section {{ $attributes->class('dk-panel') }} style="--span:{{ $sizes[$size] }}" data-panel="{{ $id }}" data-idx="{{ $index }}" aria-labelledby="dk-ph-{{ $id }}" x-data="deskPanel(@js($id))" x-on:keydown.escape="menu = false">
+<section {{ $attributes->class('dk-panel') }} style="--span:{{ $sizes[$size] }}" data-panel="{{ $id }}" data-idx="{{ $index }}" aria-labelledby="dk-ph-{{ $id }}" x-data="deskPanel(@js($id))" @if ($search !== null) x-init="searching = @js($searchValue !== '')" @endif x-on:keydown.escape="menu = false">
     <header class="dk-ph">
         <button type="button" class="dk-grip" draggable="true" data-drag="{{ $id }}" aria-label="{{ __('desk.panel_move', ['panel' => $title]) }}" title="{{ __('desk.panel_drag') }}">
             <x-desk.icon name="grip" />
@@ -32,6 +36,11 @@
             <span class="dk-pc dk-num" data-panel-count>{{ $count }}</span>
         @endif
         <span class="dk-pspace"></span>
+        @if ($search !== null)
+        <button type="button" @class(['dk-iconbtn dk-sm dk-psearch-btn', 'dk-on' => $searchValue !== '']) x-on:click="searching = ! searching; if (searching) { $nextTick(() => $refs.search?.focus()) }" x-bind:aria-expanded="searching.toString()" aria-label="{{ __('desk.panel_search', ['panel' => $title]) }}" title="{{ __('desk.search') }}" data-panel-search-toggle>
+            <x-desk.icon name="search" />
+        </button>
+        @endif
         @if ($filterable)
         <button type="button" @class(['dk-iconbtn dk-sm dk-pfilter', 'dk-on' => $filtered]) x-on:click="openFilters()" aria-haspopup="dialog" aria-label="{{ __('desk.panel_filter', ['panel' => $title]) }}" title="{{ __('desk.filter') }}" data-panel-filter>
             <flux:icon.funnel variant="outline" class="size-4" />
@@ -64,6 +73,14 @@
         </span>
     </header>
 
+    @if ($search !== null)
+        {{-- Search narrows the list as you type (it is a search, not a filter, so it needs no Done). --}}
+        <div class="dk-psearch" x-show="searching" x-cloak data-panel-search>
+            <x-desk.icon name="search" />
+            <input type="search" x-ref="search" wire:model.live.debounce.300ms="{{ $search }}" placeholder="{{ __('desk.search_placeholder', ['panel' => $title]) }}" aria-label="{{ __('desk.panel_search', ['panel' => $title]) }}" x-on:keydown.escape.stop="if ($el.value === '') { searching = false } else { $el.value = ''; $wire.$set('{{ $search }}', '') }">
+        </div>
+    @endif
+
     @isset($tools)
         <div class="dk-ptools" data-panel-tools>{{ $tools }}</div>
     @endisset
@@ -88,9 +105,6 @@
                     <button type="button" class="dk-iconbtn" x-on:click="discardFilters()" aria-label="{{ __('common.close') }}"><flux:icon.x-mark variant="outline" class="size-5" /></button>
                 </div>
                 <div class="dk-sh-b dk-pf-body">
-                    @if ($facets === [] && ! isset($filters))
-                        <p class="dk-pempty">{{ __('desk.filter_none') }}</p>
-                    @endif
                     <div class="dk-pf-grid directory-filters">
                         @foreach ($facets as $facet => $choice)
                             <x-ui.header-filter-select :label="$choice['label']" wire:model="facets.{{ $facet }}" :value="$choice['value']" deferred wire:key="pf-{{ $id }}-{{ $facet }}">

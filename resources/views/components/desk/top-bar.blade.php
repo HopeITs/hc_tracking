@@ -96,10 +96,6 @@
                             </span>
                         </div>
                         <a role="menuitem" href="{{ route('security.edit') }}" wire:navigate data-test="security-menu-item"><x-desk.icon name="lock" />{{ __('common.security') }}</a>
-                        <a role="menuitem" href="{{ route('notification-settings.edit') }}" wire:navigate><x-desk.icon name="bell" />{{ __('desk.my_notifications') }}</a>
-                        @can('notification-settings.manage')
-                            <a role="menuitem" href="{{ route('admin.notification-settings.edit') }}" wire:navigate data-user-menu-rules><flux:icon.adjustments-horizontal variant="outline" class="size-[18px]" />{{ __('navigation.notification_settings') }}</a>
-                        @endcan
                         <div class="dk-narrow-tools">
                             <span x-data="{ state: window.hcApp?.state() ?? 'unavailable' }" x-on:hc-app-install-change.window="state = $event.detail" x-show="state === 'available'" x-cloak class="contents">
                                 <button type="button" role="menuitem" x-on:click="open = false; $flux.modal('install-app').show()" data-test="settings-install-app"><x-desk.icon name="download" />{{ __('desk.install_app') }}</button>

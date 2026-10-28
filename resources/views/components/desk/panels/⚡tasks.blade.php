@@ -34,7 +34,29 @@ new class extends Component {
 
     public function mount(): void
     {
-        $this->filter = 'open';
+        $this->filter = TaskStatus::Todo->value;
+    }
+
+    /**
+     * A task sits in one of the four phases; anything else reads as To do.
+     */
+    public function updatedFilter(string $filter): void
+    {
+        $this->filter = TaskStatus::tryFrom($filter)?->value ?? TaskStatus::Todo->value;
+    }
+
+    public function setFilter(string $filter): void
+    {
+        $this->updatedFilter($filter);
+        $this->page = 0;
+    }
+
+    /**
+     * @return list<string>
+     */
+    protected function filterProperties(): array
+    {
+        return ['scope', 'filter'];
     }
 
     public function updatedScope(string $scope): void
@@ -156,8 +178,8 @@ new class extends Component {
 @php
     $rows = $this->rows;
     $open = $rows->where('status', '!=', TaskStatus::Done);
-    $status = TaskStatus::tryFrom($filter);
-    $list = $status === null ? $open->values() : $rows->where('status', $status)->values();
+    $status = TaskStatus::tryFrom($filter) ?? TaskStatus::Todo;
+    $list = $rows->where('status', $status)->values();
     $pg = $this->paginate($list, self::PerPage);
     $today = \Carbon\CarbonImmutable::today();
     $user = auth()->user();
@@ -177,16 +199,15 @@ new class extends Component {
     </x-slot:filters>
 
     <x-slot:tools>
-        <div class="dk-seg" role="group">
-            <button type="button" wire:click="setFilter('open')" aria-pressed="{{ $status === null ? 'true' : 'false' }}">{{ __('desk.tasks_open') }} <span class="dk-num">{{ $open->count() }}</span></button>
+        <div class="dk-seg dk-seg-fill" role="group" aria-label="{{ __('desk.tasks_phase') }}">
             @foreach (TaskStatus::cases() as $option)
-                <button type="button" wire:click="setFilter('{{ $option->value }}')" aria-pressed="{{ $option === $status ? 'true' : 'false' }}">{{ $option->label() }} <span class="dk-num">{{ $rows->where('status', $option)->count() }}</span></button>
+                <button type="button" wire:click="setFilter('{{ $option->value }}')" aria-pressed="{{ $option === $status ? 'true' : 'false' }}" title="{{ $option->label() }}"><span class="dk-seg-l">{{ $option->label() }}</span> <span class="dk-num">{{ $rows->where('status', $option)->count() }}</span></button>
             @endforeach
         </div>
     </x-slot:tools>
 
     @if ($pg['total'] > 0)
-        <ul class="dk-tk">
+        <ul class="dk-tk" {{ $this->fitAttributes($pg) }}>
             @foreach ($pg['slice'] as $task)
                 @php
                     $done = $task->status === TaskStatus::Done;

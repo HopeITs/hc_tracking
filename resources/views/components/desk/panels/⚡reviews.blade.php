@@ -45,7 +45,7 @@ new class extends Component {
 
 <x-desk.panel :facets="$pg['facets']" id="reviews" register="reviews.index" :size="$size" :index="$index" :total="$total" :count="$rows->isNotEmpty() ? $rows->count() : null">
     @if ($pg['total'] > 0)
-        <ul class="dk-rv">
+        <ul class="dk-rv" {{ $this->fitAttributes($pg) }}>
             @foreach ($pg['slice'] as $review)
                 @php
                     $waited = $review->created_at === null ? 0 : (int) $review->created_at->startOfDay()->diffInDays(\Carbon\CarbonImmutable::today());

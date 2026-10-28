@@ -26,9 +26,9 @@ final class Destinations
     public const array Groups = ['overview', 'strategy_planning', 'projects_delivery', 'monitoring_evaluation', 'funding_finance', 'workspace', 'administration', 'you'];
 
     /**
-     * Pages reached from the top bar instead of the sidebar: the inbox from the
-     * bell, notification preferences and rules from the avatar menu and the
-     * bell's panel. The Ask bar still finds them.
+     * Pages reached from the top bar instead of the sidebar: the inbox,
+     * notification preferences and rules from the bell's panel (not the
+     * avatar menu). The Ask bar still finds them.
      *
      * @var list<string>
      */

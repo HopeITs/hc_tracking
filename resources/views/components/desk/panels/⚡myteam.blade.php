@@ -30,6 +30,16 @@ new class extends Component {
     use ReadsDashboardWork;
 
     /**
+     * The name (or job title) typed in the panel's search box.
+     */
+    public string $search = '';
+
+    public function updatedSearch(): void
+    {
+        $this->page = 0;
+    }
+
+    /**
      * @return list<array{employeeId: int, name: string, initials: string, title: string, overdue: int, lateReports: int, userId: int|null, relation: string}>
      */
     #[Computed]
@@ -119,12 +129,14 @@ new class extends Component {
 
 @php
     $people = $this->people;
-    $pg = $this->paginate(collect($people), self::PerPage);
+    $query = mb_strtolower(trim($search));
+    $found = collect($people)->when($query !== '', fn ($list) => $list->filter(fn (array $person): bool => str_contains(mb_strtolower($person['name'].' '.$person['title']), $query))->values());
+    $pg = $this->paginate($found, self::PerPage);
 @endphp
 
-<x-desk.panel :facets="$pg['facets']" id="myteam" :size="$size" :index="$index" :total="$total" :count="count($people)">
+<x-desk.panel :facets="$pg['facets']" search="search" :search-value="$search" id="myteam" :size="$size" :index="$index" :total="$total" :count="count($people)">
     @if ($pg['total'] > 0)
-        <ul class="dk-team">
+        <ul class="dk-team" {{ $this->fitAttributes($pg) }}>
             @foreach ($pg['slice'] as $person)
                 @php
                     $behind = $person['overdue'] + $person['lateReports'];
@@ -148,7 +160,7 @@ new class extends Component {
             @endforeach
         </ul>
     @else
-        <p class="dk-pempty">{{ __('desk.panel.myteam.empty') }}</p>
+        <p class="dk-pempty">{{ $people !== [] ? __('desk.search_none', ['query' => $search]) : __('desk.panel.myteam.empty') }}</p>
     @endif
 
     <x-slot:foot>
