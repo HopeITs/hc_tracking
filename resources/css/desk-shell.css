@@ -200,9 +200,16 @@
  * height; confirmations stay small; a wide non-form dialog (file preview,
  * inspector) keeps the wide size. Below 40rem forms.css makes it full screen.
  */
-[data-flux-modal] > dialog.modal-shell { width: min(var(--pop-w), calc(100vw - 32px)); max-width: none; max-height: calc(100dvh - 48px); border-radius: 18px; }
-[data-flux-modal] > dialog.modal-shell-sm { width: min(440px, calc(100vw - 32px)); }
-[data-flux-modal] > dialog.modal-shell-xl:not(:has(.modal-shell-frame[data-wizard])):not(:has(section.form-section)) { width: min(1020px, calc(100vw - 32px)); }
+/*
+ * The :not() pair matches flux-overrides.css's catch-all dialog width (calc(100% - 2rem)),
+ * which otherwise out-ranks these and stretches every popup across the page. Scoped
+ * to 40rem and up so forms.css's full-screen phone layout still applies below it.
+ */
+@media (width >= 40rem) {
+    [data-flux-modal] > dialog.modal-shell:not([data-flux-flyout]):not([data-flux-modal-overflow]) { width: min(var(--pop-w), calc(100vw - 32px)); max-width: none; max-height: calc(100dvh - 48px); border-radius: 18px; }
+    [data-flux-modal] > dialog.modal-shell-sm:not([data-flux-flyout]):not([data-flux-modal-overflow]) { width: min(440px, calc(100vw - 32px)); }
+    [data-flux-modal] > dialog.modal-shell-xl:not([data-flux-flyout]):not([data-flux-modal-overflow]):not(:has(.modal-shell-frame[data-wizard])):not(:has(section.form-section)) { width: min(1020px, calc(100vw - 32px)); }
+}
 [data-flux-modal] > dialog.modal-shell:has(.modal-shell-frame[data-wizard]) { height: var(--pop-h); }
 [data-flux-modal] > dialog.filter-dialog { height: var(--pop-h); }
 
