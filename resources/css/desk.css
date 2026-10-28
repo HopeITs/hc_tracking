@@ -172,7 +172,7 @@
  }
 .dk-stage-name{ font-size:12px;font-weight:700;color:var(--ink-3);margin-top:5px;display:block }
 /* Lens values */
-.dk-meter{ position:relative;height:6px;border-radius:6px;background:var(--sunk);overflow:hidden;margin-top:6px }
+.dk-meter{ display:block;position:relative;height:6px;border-radius:6px;background:var(--sunk);overflow:hidden;margin-top:6px }
 .dk-meter b{ position:absolute;inset-block:0;inset-inline-start:0;border-radius:6px;background:var(--money) }
 .dk-meter.dk-res b{ background:var(--ink-2) }
 .dk-meter .dk-tick{ position:absolute;inset-block:-3px;width:2px;background:var(--ink);opacity:.55 }
@@ -491,9 +491,10 @@
 .dk-hello{ display:flex;flex-wrap:wrap;align-items:flex-end;justify-content:space-between;gap:12px 24px;padding-block:4px 20px }
 .dk-hello h1{ font-size:clamp(26px,3.2vw,40px);max-width:none }
 .dk-hello .dk-lede{ font-size:15.5px }
-.dk-grid{ display:grid;grid-template-columns:repeat(12,minmax(0,1fr));grid-auto-flow:row dense;align-items:start;gap:14px }
-.dk-panel{ grid-column:span var(--span);max-height:420px;display:flex;flex-direction:column;min-width:0;background:var(--paper);border:1px solid var(--line);border-radius:14px;position:relative;transition:box-shadow .2s,transform .2s,opacity .2s }
-.dk-panel[style*="--span:12"]{ max-height:none }
+/* Every panel is the same height (--panel-h), so rows and columns stay aligned whatever is resized or moved */
+:root{ --panel-h:440px }
+.dk-grid{ display:grid;grid-template-columns:repeat(12,minmax(0,1fr));grid-auto-rows:var(--panel-h);grid-auto-flow:row dense;align-items:stretch;gap:14px }
+.dk-panel{ grid-column:span var(--span);height:var(--panel-h);display:flex;flex-direction:column;min-width:0;background:var(--paper);border:1px solid var(--line);border-radius:14px;position:relative;transition:box-shadow .2s,transform .2s,opacity .2s }
 .dk-panel.dk-dragging{ opacity:.4 }
 .dk-panel.dk-drop{ box-shadow:0 0 0 2px var(--brand) }
 .dk-ph{ display:flex;align-items:center;gap:6px;padding:10px 10px 6px 6px;min-width:0 }
@@ -516,12 +517,11 @@
 .dk-pop>button:hover{ background:var(--sunk) }
 .dk-pop>button.dk-danger{ color:var(--bad) }
 .dk-ptools{ display:flex;flex-wrap:wrap;gap:6px;align-items:center;padding:0 12px 8px }
-.dk-pb{ flex:0 1 auto;min-height:0;overflow:auto;padding:0 12px 8px;overscroll-behavior:contain }
-.dk-panel[style*="--span:12"] .dk-pb{ overflow:visible }
-.dk-pf{ display:flex;align-items:center;justify-content:space-between;gap:8px;padding:6px 10px 8px 12px;border-top:1px solid var(--line);min-height:42px }
+.dk-pb{ flex:1 1 auto;min-height:0;overflow:hidden;padding:0 12px 8px;overscroll-behavior:contain }
+.dk-pf{ margin-top:auto;flex:none;display:flex;align-items:center;justify-content:space-between;gap:8px;padding:6px 10px 8px 12px;border-top:1px solid var(--line);min-height:42px }
 .dk-pgb{ display:inline-flex;align-items:center;gap:4px }
 .dk-pempty{ padding:20px 4px;color:var(--ink-3);font-size:14px }
-.dk-addtile{ grid-column:span 3;min-height:180px;border:2px dashed var(--line-2);border-radius:14px;background:none;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px;color:var(--ink-3);cursor:pointer;font-weight:800;font-size:14px }
+.dk-addtile{ grid-column:span 3;height:var(--panel-h);border:2px dashed var(--line-2);border-radius:14px;background:none;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px;color:var(--ink-3);cursor:pointer;font-weight:800;font-size:14px }
 .dk-grid-tail{ margin-top:14px }
 .dk-addtile:hover{ border-color:var(--ink-3);color:var(--ink) }
 .dk-addtile small{ font-weight:400;font-size:12.5px }
@@ -699,8 +699,8 @@ a.dk-gl-a:hover strong{ text-decoration:underline;text-decoration-thickness:2px 
 @media (max-width: 1279px){ .dk-panel[style*="--span:8"] .dk-glance{ grid-template-columns:repeat(3,minmax(0,1fr));row-gap:8px } }
 /* Proposal pipeline: fixed columns so the status pill sits at the same x on every row; two lines at S/M */
 .dk-pl-sum{ font-size:12.5px;color:var(--ink-3);margin:0 0 6px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis }
-.dk-pl>li{ display:grid;grid-template-columns:minmax(0,1.4fr) minmax(0,1fr) 132px 74px 28px;grid-template-areas:"n d s t o";align-items:center;gap:2px 12px;padding-block:9px;border-bottom:1px solid var(--line) }
-.dk-pl.dk-pl-money>li{ grid-template-columns:minmax(0,1.4fr) minmax(0,1fr) 132px 104px 74px 28px;grid-template-areas:"n d s m t o" }
+.dk-pl>li{ display:grid;grid-template-columns:minmax(0,1.4fr) minmax(0,1fr) 168px 74px 28px;grid-template-areas:"n d s t o";align-items:center;gap:2px 12px;padding-block:9px;border-bottom:1px solid var(--line) }
+.dk-pl.dk-pl-money>li{ grid-template-columns:minmax(0,1.4fr) minmax(0,1fr) 168px 104px 74px 28px;grid-template-areas:"n d s m t o" }
 .dk-pl>li:last-child{ border-bottom:0 }
 .dk-pl-n{ grid-area:n;min-width:0;font-size:14px;font-weight:700;color:var(--ink);overflow:hidden;text-overflow:ellipsis;white-space:nowrap }
 .dk-pl-d{ grid-area:d;min-width:0;font-size:12.5px;color:var(--ink-3);overflow:hidden;text-overflow:ellipsis;white-space:nowrap }
@@ -710,8 +710,8 @@ a.dk-gl-a:hover strong{ text-decoration:underline;text-decoration-thickness:2px 
 .dk-pl-t{ grid-area:t;text-align:end;font-size:12px;color:var(--ink-3);white-space:nowrap }
 .dk-pl-t.dk-bad{ color:var(--bad);font-weight:700 }
 .dk-pl-o{ grid-area:o;display:flex;justify-content:flex-end }
-.dk-panel[style*="--span:6"] .dk-pl>li{ grid-template-columns:minmax(0,1fr) 132px 74px 28px;grid-template-areas:"n s t o" "d s t o" }
-.dk-panel[style*="--span:6"] .dk-pl.dk-pl-money>li{ grid-template-columns:minmax(0,1fr) 120px 96px 70px 28px;grid-template-areas:"n s m t o" "d s m t o" }
+.dk-panel[style*="--span:6"] .dk-pl>li{ grid-template-columns:minmax(0,1fr) 168px 74px 28px;grid-template-areas:"n s t o" "d s t o" }
+.dk-panel[style*="--span:6"] .dk-pl.dk-pl-money>li{ grid-template-columns:minmax(0,1fr) 160px 96px 70px 28px;grid-template-areas:"n s m t o" "d s m t o" }
 .dk-panel[style*="--span:3"] .dk-pl>li,.dk-panel[style*="--span:4"] .dk-pl>li,.dk-panel[style*="--span:3"] .dk-pl.dk-pl-money>li,.dk-panel[style*="--span:4"] .dk-pl.dk-pl-money>li{ grid-template-columns:minmax(0,1fr) auto;grid-template-areas:"n s" "d d" "m t";row-gap:3px }
 .dk-panel[style*="--span:3"] .dk-pl-o,.dk-panel[style*="--span:4"] .dk-pl-o{ display:none }
 .dk-panel[style*="--span:3"] .dk-pl-m,.dk-panel[style*="--span:4"] .dk-pl-m{ text-align:start }
@@ -723,7 +723,7 @@ a.dk-gl-a:hover strong{ text-decoration:underline;text-decoration-thickness:2px 
 .dk-fp>li:last-child{ border-bottom:0 }
 .dk-fp-n{ grid-area:n;min-width:0;font-size:14px;font-weight:700;color:var(--ink);overflow:hidden;text-overflow:ellipsis;white-space:nowrap }
 .dk-fp-n .dk-is{ font-weight:400;font-size:12.5px }
-.dk-fp-bar{ grid-area:b }
+.dk-fp-bar{ grid-area:b;display:block;min-width:0 }
 .dk-fp-bar .dk-meter{ margin:0 }
 [data-status="overdue"] .dk-fp-bar .dk-meter b{ background:var(--bad) }
 .dk-fp-v{ grid-area:v;font-size:12.5px;white-space:nowrap;text-align:end }
@@ -778,7 +778,7 @@ a.dk-gl-a:hover strong{ text-decoration:underline;text-decoration-thickness:2px 
 .dk-ap>li{ display:grid;grid-template-columns:minmax(0,1fr) minmax(80px,140px) 76px;grid-template-areas:"n b v" "m m m";align-items:center;gap:3px 12px;padding-block:9px;border-bottom:1px solid var(--line) }
 .dk-ap>li:last-child{ border-bottom:0 }
 .dk-ap-n{ grid-area:n;min-width:0;font-size:14px;font-weight:700;color:var(--ink);overflow:hidden;text-overflow:ellipsis;white-space:nowrap }
-.dk-ap-bar{ grid-area:b }
+.dk-ap-bar{ grid-area:b;display:block;min-width:0 }
 .dk-ap-bar .dk-meter{ margin:0 }
 .dk-ap>li.dk-behind .dk-meter b{ background:var(--warn) }
 .dk-ap-v{ grid-area:v;text-align:end;font-size:12px;color:var(--ink-3);white-space:nowrap }
@@ -800,7 +800,7 @@ a.dk-gl-a:hover strong{ text-decoration:underline;text-decoration-thickness:2px 
 .dk-tg-n .dk-mono{ color:var(--ink-3);font-weight:700;font-size:12px }
 .dk-tg-n .dk-is{ font-weight:400;font-size:12.5px }
 .dk-tg-s{ grid-area:s;justify-self:end }
-.dk-tg-b{ grid-area:b;min-width:0 }
+.dk-tg-b{ grid-area:b;min-width:0;display:block }
 .dk-tg-b .dk-meter{ margin:0 }
 .dk-tg-v{ grid-area:v;justify-self:end;font-size:12px;color:var(--ink-3);white-space:nowrap }
 .dk-tg-v strong{ font-size:13.5px;color:var(--ink) }
@@ -1003,8 +1003,8 @@ a.dk-gl-a:hover strong{ text-decoration:underline;text-decoration-thickness:2px 
 .dk-panel .dk-rows .dk-hc{ grid-area:h;justify-self:end }
 .dk-panel .dk-rows .dk-chev{ grid-area:c }
  }
-@media (max-width: 760px){ .dk-panel{ grid-column:1 / -1!important;height:auto;max-height:560px }
-.dk-panel[style*="--span:12"]{ max-height:none }
+@media (max-width: 760px){ .dk-panel{ grid-column:1 / -1!important;height:var(--panel-h) }
+
 .dk-addtile{ grid-column:1 / -1 }
 .dk-panel .dk-inds>li{ grid-template-columns:minmax(0,1fr) auto;grid-template-areas:"c v" "n n" "m m" }
 .dk-panel .dk-inds .dk-mono{ grid-area:c }
@@ -1333,3 +1333,23 @@ a.dk-gl-a:hover strong{ text-decoration:underline;text-decoration-thickness:2px 
 .dk-adm li:has(>.dk-adm-row){ padding-block:0 }
 .dk-adm .dk-adm-row{ display:flex;justify-content:space-between;align-items:center;gap:12px;width:100%;padding-block:10px;background:none;border:0;color:inherit;text-align:start;text-decoration:none;cursor:pointer }
 .dk-adm li.dk-lockd .dk-adm-row{ cursor:help }
+/* Meta lines that carry a date or a late flag wrap to a second line instead of clipping it */
+.dk-panel .dk-needs .dk-is,.dk-panel.dk-needs .dk-is,.dk-panel .dk-rv-m,.dk-panel .dk-ms-meta{ display:-webkit-box!important;-webkit-line-clamp:2;-webkit-box-orient:vertical;white-space:normal!important }
+.dk-ms-meta>span:last-child,.dk-tk .dk-is>span:last-child,.dk-pj-v>span{ flex:none }
+/* Needs you at S/M: the action buttons move under the text, so titles keep their width */
+.dk-panel.dk-needs[style*="--span:3"] .dk-items>li,.dk-panel.dk-needs[style*="--span:4"] .dk-items>li{ grid-template-columns:12px minmax(0,1fr)!important }
+.dk-panel.dk-needs[style*="--span:3"] .dk-items .dk-acts,.dk-panel.dk-needs[style*="--span:4"] .dk-items .dk-acts{ grid-column:2!important;justify-content:flex-start;padding-top:4px!important }
+.dk-pl-m:empty{ display:none }
+/* Targets at S/M: the values take their own line so the name keeps the width */
+.dk-panel[style*="--span:3"] .dk-tg>li,.dk-panel[style*="--span:4"] .dk-tg>li{ grid-template-areas:"n s" "b b" "v v" }
+.dk-panel[style*="--span:3"] .dk-tg-v,.dk-panel[style*="--span:4"] .dk-tg-v{ justify-self:start;max-width:100%;overflow:hidden;text-overflow:ellipsis }
+/* A name with its type or project after it stays on one line */
+.dk-panel :is(.dk-dn-n,.dk-fp-n,.dk-tg-n,.dk-pj-n a) .dk-is{ display:inline!important }
+.dk-pl-t:empty{ display:none }
+.dk-panel[style*="--span:8"] .dk-tg-b,.dk-panel[style*="--span:12"] .dk-tg-b{ max-width:360px }
+/* Fit the fixed panel height at S/M: avatars sit under the stepper instead of on their own line; tighter rows */
+.dk-panel[style*="--span:3"] .dk-tk-av,.dk-panel[style*="--span:4"] .dk-tk-av{ grid-column:2;grid-row:2;justify-content:flex-end }
+.dk-panel[style*="--span:3"] .dk-tk-main,.dk-panel[style*="--span:4"] .dk-tk-main{ grid-row:1 / span 2 }
+.dk-panel[style*="--span:3"] .dk-tk>li,.dk-panel[style*="--span:4"] .dk-tk>li{ row-gap:2px;padding-block:7px }
+.dk-panel[style*="--span:3"] .dk-dn>li,.dk-panel[style*="--span:4"] .dk-dn>li{ padding-block:6px;row-gap:2px }
+.dk-panel[style*="--span:3"] .dk-mx-list>li{ padding-block:6px }

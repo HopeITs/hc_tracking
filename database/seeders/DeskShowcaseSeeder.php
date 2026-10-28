@@ -4,6 +4,8 @@ namespace Database\Seeders;
 
 use App\Enums\ArStatus;
 use App\Enums\DeliveryState;
+use App\Enums\MealCoverageScope;
+use App\Enums\MilestoneStatus;
 use App\Enums\MonthlyReportStatus;
 use App\Enums\ReviewerSlot;
 use App\Enums\ReviewStage;
@@ -16,6 +18,7 @@ use App\Models\FundingAgreementInstallment;
 use App\Models\HrDepartment;
 use App\Models\Indicator;
 use App\Models\IndicatorProgress;
+use App\Models\MealCoverageAssignment;
 use App\Models\Milestone;
 use App\Models\MonthlyReport;
 use App\Models\Project;
@@ -107,10 +110,13 @@ class DeskShowcaseSeeder extends Seeder
                 }
             }
 
-            // Milestones due this week.
-            foreach ($projects->take(4) as $i => $project) {
+            // Open milestones (the demo data has none): late, due this week, later.
+            foreach ($projects->take(6) as $i => $project) {
                 Milestone::query()->where('project_id', $project->id)->orderBy('id')->limit(1)
-                    ->update(['planned_end_date' => $today->addDays($i + 1)->toDateString()]);
+                    ->update([
+                        'planned_end_date' => $today->addDays([-5, 1, 3, 6, 15, 30][$i])->toDateString(),
+                        'status' => $i % 2 === 0 ? MilestoneStatus::Ongoing : MilestoneStatus::Planned,
+                    ]);
             }
 
             // Monthly reports waiting for validation, by people other than the administrators.
@@ -123,6 +129,16 @@ class DeskShowcaseSeeder extends Seeder
                     ['project_id' => $project->id, 'period' => $period],
                     ['status' => MonthlyReportStatus::Submitted, 'prepared_by' => $preparer, 'submitted_by' => $preparer, 'submitted_at' => now()->subDays($i + 1)],
                 );
+
+                // Each administrator is the MEAL officer of some of these projects, so To validate has rows.
+                $officer = $admins->values()->get($i % max(1, $admins->count()));
+
+                if ($officer !== null) {
+                    MealCoverageAssignment::query()->firstOrCreate(
+                        ['scope_type' => MealCoverageScope::Project, 'project_id' => $project->id],
+                        ['employee_id' => $officer->employee_id],
+                    );
+                }
             }
 
             // Report templates for MEAL to confirm.
