@@ -138,6 +138,42 @@
     .dk-story .dk-row2-r { display: flex; flex-wrap: wrap; align-items: center; justify-content: flex-end; gap: 6px 10px; }
     .dk-story .dk-row-on { background: var(--tint); box-shadow: inset 3px 0 0 var(--brand); }
     [dir="rtl"] .dk-story .dk-row-on { box-shadow: inset -3px 0 0 var(--brand); }
+
+    /* Funding tab: a summary strip, then sections that fold open and shut. */
+    .dk-story .dk-pjfund { display: grid; gap: 12px; }
+    .dk-story .dk-fold-h { width: 100%; justify-content: flex-start; text-align: start; cursor: pointer; border-bottom-color: transparent; transition: background-color .15s; }
+    .dk-story .dk-fold-h:hover { background: var(--tint); }
+    .dk-story .dk-fold-h .dk-meta { padding: 1px 8px; border-radius: 999px; background: var(--tint); font-weight: 700; }
+    .dk-story .dk-fold-on > .dk-fold-h { border-bottom-color: var(--line); }
+    .dk-story .dk-fold-i { margin-inline-start: auto; width: 16px; height: 16px; color: var(--ink-3); transition: transform .2s; }
+    [dir="rtl"] .dk-story .dk-fold-i { transform: scaleX(-1); }
+    .dk-story .dk-fold-on > .dk-fold-h .dk-fold-i,
+    .dk-story [aria-expanded="true"] > .dk-fold-i { transform: rotate(90deg); }
+    .dk-story .dk-fold-t .dk-fold-i { margin: 0; }
+    /* Proposals on this project: one aligned grid; under 720px each row stacks into a labelled card. */
+    .dk-story .dk-prows { container: prows / inline-size; }
+    .dk-story .dk-prow { display: grid; grid-template-columns: minmax(0, 2.4fr) minmax(0, 1fr) minmax(0, 1.1fr) minmax(0, 1.6fr) minmax(0, 1fr) 4.5rem; align-items: center; gap: 16px; padding: 14px 18px; font-size: 13px; color: var(--ink-2); }
+    .dk-story .dk-prow-h { padding-block: 9px; border-bottom: 1px solid var(--line); background: var(--tint); font-size: 11.5px; font-weight: 700; letter-spacing: .04em; text-transform: uppercase; color: var(--ink-3); }
+    .dk-story .dk-prow-wrap + .dk-prow-wrap { border-top: 1px solid var(--line); }
+    .dk-story .dk-prow-wrap { transition: background-color .15s; }
+    .dk-story .dk-prow-wrap:hover { background: color-mix(in oklab, var(--tint) 55%, transparent); }
+    .dk-story .dk-prow-name { display: grid; gap: 3px; min-width: 0; }
+    .dk-story .dk-prow-name > a, .dk-story .dk-prow-name > strong { font-size: 14px; font-weight: 800; line-height: 1.3; color: var(--ink); text-decoration: none; overflow-wrap: anywhere; }
+    .dk-story .dk-prow-name > a:hover { text-decoration: underline; }
+    .dk-story .dk-prow-sub { display: block; font-size: 12px; color: var(--ink-3); }
+    .dk-story .dk-prow-money { display: grid; gap: 5px; }
+    .dk-story .dk-prow-money + .dk-prow-money { margin-top: 8px; }
+    .dk-story .dk-prow-money .dk-prow-sub { display: inline; }
+    .dk-story .dk-prow-acts { display: flex; justify-content: flex-end; gap: 4px; }
+    @container prows (max-width: 720px) {
+        .dk-story .dk-prow-h { display: none; }
+        .dk-story .dk-prow { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 12px 16px; }
+        .dk-story .dk-prow-name { grid-column: 1 / -2; }
+        .dk-story .dk-prow-acts { grid-column: -2 / -1; grid-row: 1; }
+        .dk-story .dk-prow [data-label]::before { content: attr(data-label); display: block; margin-bottom: 3px; font-size: 11px; font-weight: 700; letter-spacing: .04em; text-transform: uppercase; color: var(--ink-3); }
+    }
+    .dk-story .dk-pjprop { margin: 0 18px 18px; padding-top: 16px; border-top: 1px dashed var(--line); }
+    .dk-story .dk-fold-hint { padding: 10px 18px 0; }
     .dk-story .dk-pjup { display: grid; grid-template-columns: 7.5rem minmax(0, 1fr) auto; align-items: baseline; gap: 12px; }
     .dk-story .dk-pjup-d { font-size: 13px; font-weight: 700; color: var(--ink-2); }
     .dk-story .dk-pjup-d.dk-bad { color: var(--bad); }
@@ -174,4 +210,38 @@
 @layer utilities {
     .dk-story .dk-pjsec [data-panel] { border-color: var(--line); border-radius: 14px; background: var(--paper); box-shadow: none; }
     .dk-story .dk-subtabs [role="tab"] { border-bottom-width: 0; }
+
+    /*
+     * The proposal embedded under its row on the Funding tab: a sunken tray
+     * with every part on its own card (lifecycle, attention, vitals, each
+     * section of the open tab, activity). The proposal page colours and
+     * spaces itself with utilities, hence this layer.
+     */
+    .dk-story .dk-pjprop { margin: 0 12px 12px; padding: 14px; border: 0; border-radius: 14px; background: var(--sunk); }
+    .dk-story [data-embedded-proposal] [data-tab-panel] > .flex-col { gap: 12px; }
+    .dk-story [data-embedded-proposal] :is(
+        [data-lifecycle],
+        [data-warnings],
+        [data-bench],
+        [data-record-activity],
+        [data-tab-panel] > section,
+        [data-tab-panel] > dl,
+        [data-tab-panel] > ul,
+        [data-tab-panel] > form,
+        [data-tab-panel] > .divide-y,
+        [data-tab-panel] > .register,
+        [data-tab-panel] > .flex-col > section:not(.rounded-xl),
+        [data-tab-panel] > .flex-col > div.border-b,
+        [data-tab-panel] > .flex-col > article,
+        [data-tab-panel] > .grid > *
+    ) { margin-top: 12px; padding: 16px 18px; border: 1px solid var(--line); border-radius: 12px; background: var(--paper); }
+    .dk-story [data-embedded-proposal] [data-tab-panel] > .register { padding: 0; overflow: hidden; }
+    .dk-story [data-embedded-proposal] [data-tab-panel] > section > div:is(.mt-8, .mt-10) { margin-top: 18px; padding-top: 16px; border-top: 1px solid var(--line); }
+    .dk-story [data-embedded-proposal] [data-warnings] { border-inline-start: 3px solid var(--brand); }
+    .dk-story [data-embedded-proposal] [data-compact-proposal] { margin-top: 12px; gap: 12px; }
+    .dk-story [data-embedded-proposal] [data-compact-proposal] > * > [data-bench] { margin-top: 0; }
+    .dk-story [data-embedded-proposal] [data-tab-panel] { margin-top: 0; }
+    .dk-story [data-embedded-proposal] [data-tab-panel] > .grid { gap: 12px; margin-top: 0; }
+    .dk-story [data-embedded-proposal] [data-tab-panel] > .mb-6 { margin-block: 12px 0; }
+    .dk-story [data-embedded-proposal] [data-relation-tabs] { margin-top: 12px; padding-inline: 4px; }
 }

@@ -138,7 +138,6 @@ return [
     'nothing_coming_up' => 'No milestone is waiting. Everything planned is reached.',
     'no_reports_yet' => 'Monthly reports start once the project is running.',
     'donors' => 'Donors',
-    'open_below' => 'Open below',
     'history' => [
         'years' => 'Years',
     ],
