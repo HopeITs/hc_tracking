@@ -85,6 +85,13 @@ new #[Layout('layouts::desk'), Title('titles.proposal')] class extends Component
     public bool $embedded = false;
 
     /**
+     * Embedded on the project's Funding tab: only the lifecycle, the
+     * attention list and the vitals in a grid. Picking a tab (from a warning,
+     * a vital or "Show all details") opens the full proposal in place.
+     */
+    public bool $compact = false;
+
+    /**
      * Deep link from the "Record agreement" notification action: opens the
      * agreement form once for a proposal that may take one, then clears itself.
      */
@@ -121,6 +128,15 @@ new #[Layout('layouts::desk'), Title('titles.proposal')] class extends Component
         return auth()->user()?->can('funding-agreements.create') === true
             && $this->proposal->status->isApprovedByDonor()
             && ! DonorProposal::query()->where('proposal_id', $this->proposalId)->exists();
+    }
+
+    /**
+     * A tab picked in the compact view needs the tab panel, so the full
+     * proposal opens in place. Runs on browser updates only, not in mount().
+     */
+    public function updatingTab(): void
+    {
+        $this->compact = false;
     }
 
     public function updatedTab(): void
@@ -313,8 +329,8 @@ new #[Layout('layouts::desk'), Title('titles.proposal')] class extends Component
 
 <section @class(['dossier @container/detail flex w-full flex-col text-secondary-dark dark:text-ink', 'min-h-full flex-1 bg-white dark:bg-surface-0' => ! $embedded]) @if ($embedded) data-embedded-proposal @endif>
     @if ($embedded)
-        <header class="flex flex-col gap-3 @3xl/detail:flex-row @3xl/detail:items-start @3xl/detail:justify-between" data-embedded-proposal-head>
-            <div class="min-w-0">
+        <header @class(['flex flex-col gap-3 @3xl/detail:flex-row @3xl/detail:items-start @3xl/detail:justify-between', '@3xl/detail:justify-end' => $compact]) data-embedded-proposal-head>
+            <div @class(['min-w-0', 'sr-only' => $compact])>
                 <h4 class="text-xl font-bold leading-tight text-secondary-dark dark:text-ink" dir="auto">
                     {{ $this->proposal->name }}
                     @if (app(\App\Notifications\UnreadSubjects::class)->has(auth()->user(), 'proposal', $this->proposal->id))
@@ -355,41 +371,62 @@ new #[Layout('layouts::desk'), Title('titles.proposal')] class extends Component
 
     @include('pages.proposals._show-lifecycle')
 
-    @include('pages.proposals._show-renewal-chain')
+    @if ($compact)
+        {{-- Compact (project Funding tab): what needs attention beside the four readings, then the way in. --}}
+        <div @class(['mt-6 grid gap-x-10 gap-y-6 @3xl/detail:items-start [&>*]:mt-0!', '@3xl/detail:grid-cols-[minmax(0,1fr)_minmax(0,1.15fr)]' => $this->warnings !== []]) data-compact-proposal>
+            @include('pages.proposals._show-warnings')
+            <div class="[&>[data-bench]]:mt-0! [&>[data-bench]]:@3xl/detail:grid-cols-2! [&_[data-vital]_span.text-4xl]:text-3xl! [&_[data-vital]_span.text-4xl]:@xl/detail:text-4xl! [&_[data-vital]_span.text-4xl]:@5xl/detail:text-4xl!">
+                @include('pages.proposals._show-vitals')
+            </div>
+        </div>
 
-    @include('pages.proposals._show-warnings')
+        <div class="mt-6 flex flex-wrap items-center gap-2 border-t border-dashed border-secondary-soft pt-4 dark:border-line">
+            <button type="button" class="dk-btn dk-sm dk-primary" wire:click="$set('tab', 'status')" data-show-all-details>{{ __('proposals.show_all_details') }}</button>
+            <a class="dk-btn dk-sm" href="{{ route('proposals.show', $this->proposal) }}" wire:navigate>{{ __('proposals.open_proposal_page') }}<x-desk.icon name="arrow" class="dk-flip" /></a>
+        </div>
+    @else
+        @include('pages.proposals._show-renewal-chain')
 
-    @include('pages.proposals._show-vitals')
+        @include('pages.proposals._show-warnings')
 
-    <x-ui.relation-tabs :tabs="$this->tabs" :active="$tab" wire-target="tab" class="mt-8 flex-nowrap! overflow-x-auto [scrollbar-width:none] *:shrink-0 @3xl/detail:flex-wrap!" />
+        @include('pages.proposals._show-vitals')
 
-    <div id="tab-panel" class="mt-6 min-w-0" wire:key="tab-{{ $tab }}" data-tab-panel="{{ $tab }}">
-        @if ($tab === 'funding')
-            @include('pages.proposals._show-funding-tab')
-
-        @elseif ($tab === 'projects')
-            @include('pages.proposals._show-projects-tab')
-        @elseif ($tab === 'logframe')
-            @include('pages.proposals._tab-logframe')
-        @elseif ($tab === 'targets')
-            @include('pages.proposals._tab-targets')
-        @elseif ($tab === 'plan')
-            @include('pages.proposals._tab-plan')
-        @elseif ($tab === 'deadlines')
-            @include('pages.proposals._show-deadlines-tab')
-        @elseif ($tab === 'reports')
-            @include('pages.proposals._show-reports-tab')
-        @elseif ($tab === 'documents')
-            @include('pages.proposals._show-documents-tab')
-        @else
-            @include('pages.proposals._show-status-tab')
+        @if ($embedded)
+            <div class="mt-8 flex justify-end">
+                <button type="button" class="dk-btn dk-sm" wire:click="$set('compact', true)" data-hide-details>{{ __('proposals.hide_details') }}</button>
+            </div>
         @endif
-    </div>
 
-    <section aria-labelledby="record-activity-heading" class="grid gap-3 mt-10" data-record-activity>
-        <h2 id="record-activity-heading" class="text-base font-bold">{{ __('activity.title') }}</h2>
-        <livewire:activity.timeline :subjects="['proposal' => [$this->proposal->id]]" :key="'proposal-activity-'.$this->proposal->id" />
-    </section>
+        <x-ui.relation-tabs :tabs="$this->tabs" :active="$tab" wire-target="tab" @class(['flex-nowrap! overflow-x-auto [scrollbar-width:none] *:shrink-0 @3xl/detail:flex-wrap!', 'mt-8' => ! $embedded, 'mt-2' => $embedded]) />
+
+        <div id="tab-panel" class="mt-6 min-w-0" wire:key="tab-{{ $tab }}" data-tab-panel="{{ $tab }}">
+            @if ($tab === 'funding')
+                @include('pages.proposals._show-funding-tab')
+
+            @elseif ($tab === 'projects')
+                @include('pages.proposals._show-projects-tab')
+            @elseif ($tab === 'logframe')
+                @include('pages.proposals._tab-logframe')
+            @elseif ($tab === 'targets')
+                @include('pages.proposals._tab-targets')
+            @elseif ($tab === 'plan')
+                @include('pages.proposals._tab-plan')
+            @elseif ($tab === 'deadlines')
+                @include('pages.proposals._show-deadlines-tab')
+            @elseif ($tab === 'reports')
+                @include('pages.proposals._show-reports-tab')
+            @elseif ($tab === 'documents')
+                @include('pages.proposals._show-documents-tab')
+            @else
+                @include('pages.proposals._show-status-tab')
+            @endif
+        </div>
+
+        <section aria-labelledby="record-activity-heading" class="grid gap-3 mt-10" data-record-activity>
+            <h2 id="record-activity-heading" class="text-base font-bold">{{ __('activity.title') }}</h2>
+            <livewire:activity.timeline :subjects="['proposal' => [$this->proposal->id]]" :key="'proposal-activity-'.$this->proposal->id" />
+        </section>
+    @endif
 
     @include('pages.proposals._show-modals')
 </section>
