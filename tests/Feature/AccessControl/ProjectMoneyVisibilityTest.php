@@ -133,57 +133,6 @@ test('Public Relations Manager opens the proposal from the project page but sees
         ->assertDontSee('123,457');
 });
 
-test('the project Plan gantt shows transfer and donor report rows only to viewers of transfers and agreements', function () {
-    ['project' => $project, 'proposal' => $proposal, 'transfer' => $transfer, 'report' => $report] = seedProjectMoneyFixture();
-    $rows = fn (string $role): array => collect(
-        Livewire::actingAs(userWithRole($role))
-            ->test('pages::projects.show', ['project' => $project])
-            ->instance()
-            ->ganttPayload['rows']
-    )->keyBy('id')->all();
-
-    $managers = $rows('Managers');
-    expect($managers)->not->toHaveKeys(['obligations', 'transfer-'.$transfer->id, 'report-'.$report->id])
-        ->and($managers['proposal-'.$proposal->id]['name'])->toBe('Harbour Clean Water')
-        ->and($managers['proposal-'.$proposal->id]['url'])->toBeNull();
-
-    $fundraiser = $rows(fundraiserWithoutAgreements());
-    expect($fundraiser)->not->toHaveKeys(['obligations', 'transfer-'.$transfer->id, 'report-'.$report->id])
-        ->and($fundraiser['proposal-'.$proposal->id]['url'])->toBe(route('proposals.show', $proposal));
-
-    foreach (['Financial', 'General Manager'] as $role) {
-        $money = $rows($role);
-
-        expect($money)->toHaveKeys(['obligations', 'transfer-'.$transfer->id, 'report-'.$report->id])
-            ->and($money['transfer-'.$transfer->id]['money'])->toBe('45,678 USD')
-            ->and($money['transfer-'.$transfer->id]['url'])->toBe(route('transfers.index'))
-            ->and($money['proposal-'.$proposal->id]['url'])->toBe(route('proposals.show', $proposal));
-    }
-});
-
-test('the obligations group carries only the half the viewer may see', function () {
-    ['project' => $project, 'transfer' => $transfer, 'report' => $report] = seedProjectMoneyFixture();
-    $viewer = userWithRole('Managers');
-
-    $rowsFor = function () use ($project, $viewer): array {
-        return collect(
-            Livewire::actingAs($viewer)
-                ->test('pages::projects.show', ['project' => $project])
-                ->instance()
-                ->ganttPayload['rows']
-        )->keyBy('id')->all();
-    };
-
-    $viewer->givePermissionTo('transfers.view');
-    expect($rowsFor())->toHaveKeys(['obligations', 'transfer-'.$transfer->id])
-        ->and($rowsFor())->not->toHaveKey('report-'.$report->id);
-
-    $viewer->revokePermissionTo('transfers.view');
-    $viewer->givePermissionTo('funding-agreements.view');
-    expect($rowsFor())->toHaveKeys(['obligations', 'report-'.$report->id])
-        ->and($rowsFor())->not->toHaveKey('transfer-'.$transfer->id);
-});
-
 test('a Managers user sees no proposal rows and no pipeline lens on the timeline, and the pipeline value is ignored', function () {
     ['project' => $project] = seedProjectMoneyFixture();
     $manager = userWithRole('Managers');

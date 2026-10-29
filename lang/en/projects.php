@@ -200,7 +200,6 @@ return [
     'select_a_center' => 'Select a center',
     'dates_prohibited_draft' => 'Project dates are set when the proposal is approved.',
     'close_only_active' => 'Only an active project can be closed.',
-    'plan_after_approval' => 'The schedule is activated once the proposal is approved.',
     'no_active_proposal' => 'No active proposal',
     'close_project' => 'Close project',
     'project_closed' => 'Project closed',

@@ -366,7 +366,7 @@ trait BuildsPortfolioGantt
             owner: $project->user?->name,
             url: route('projects.show', $project),
         ) + [
-            'planUrl' => route('projects.show', ['project' => $project, 'tab' => 'plan']),
+            'planUrl' => route('projects.show', $project),
             'program' => $project->relationLoaded('program') ? $project->program?->name : null,
         ]);
 
