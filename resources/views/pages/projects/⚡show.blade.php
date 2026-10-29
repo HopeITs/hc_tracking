@@ -5,9 +5,7 @@ use App\Actions\Targets\ScopeIndicatorToProject;
 use App\Enums\MilestoneStatus;
 use App\Enums\ProjectStatus;
 use App\Livewire\Concerns\AddsQuickTask;
-use App\Livewire\Concerns\BuildsProjectGantt;
 use App\Livewire\Concerns\ChecksFinanceVisibility;
-use App\Livewire\Concerns\EditsProjectGantt;
 use App\Livewire\Concerns\Projects\ArchivesProjects;
 use App\Livewire\Concerns\Projects\ManagesProjectAssignment;
 use App\Livewire\Concerns\Projects\ManagesProjectFiles;
@@ -37,9 +35,7 @@ use Livewire\WithFileUploads;
 new #[Layout('layouts::desk'), Title('titles.project')] class extends Component {
     use AddsQuickTask;
     use ArchivesProjects;
-    use BuildsProjectGantt;
     use ChecksFinanceVisibility;
-    use EditsProjectGantt;
     use ManagesProjectAssignment, ManagesProjectForm {
         ManagesProjectAssignment::refreshFromInbox insteadof ManagesProjectForm;
     }
@@ -56,13 +52,16 @@ new #[Layout('layouts::desk'), Title('titles.project')] class extends Component 
     #[Url(except: 'milestones')]
     public string $tab = 'milestones';
 
+    /**
+     * The page's open section: overview, work, funding or files. Switched in
+     * the browser (no round trip); resolved in mount() when the link names none.
+     */
+    #[Url(as: 'view', except: '')]
+    public string $section = '';
+
     /** The owner assignment dialog: the owner acknowledges or rejects. */
     #[Url(as: 'respond', except: '')]
     public string $respond = '';
-
-    /** The Plan tab's proposal filter (T31, D-05): '' = every linked proposal's plan, else one proposal id. */
-    #[Url(as: 'plan_proposal', except: '')]
-    public string $planProposal = '';
 
     public function mount(Project $project): void
     {
@@ -79,6 +78,29 @@ new #[Layout('layouts::desk'), Title('titles.project')] class extends Component 
         }
 
         $this->respond = '';
+
+        $this->section = $this->resolveSection($project);
+    }
+
+    /**
+     * The section a link opens on. An old `?tab=` link keeps its meaning
+     * (files and activity, proposals, or a working tab); a link into a
+     * proposal opens Funding; otherwise a running project opens on its work
+     * and every other one on its overview.
+     */
+    private function resolveSection(Project $project): string
+    {
+        if (in_array($this->section, ['overview', 'work', 'funding', 'files'], true)) {
+            return $this->section;
+        }
+
+        return match (true) {
+            in_array($this->tab, ['files', 'activity'], true) => 'files',
+            $this->tab === 'proposals', $this->storyProposal !== '', request()->query('ptab') !== null => 'funding',
+            $this->tab !== 'milestones' => 'work',
+            $project->status === ProjectStatus::Active => 'work',
+            default => 'overview',
+        };
     }
 
     /** The Close Project confirmation: a flux:modal only opens from a boolean bound with wire:model. */
@@ -254,18 +276,6 @@ new #[Layout('layouts::desk'), Title('titles.project')] class extends Component 
     }
 
     /**
-     * The Plan tab's Gantt payload: fundraising, delivery and donor
-     * obligations for this project as one WBS row list.
-     *
-     * @return array{rows: list<array<string, mixed>>, from: string, to: string, today: string}
-     */
-    #[Computed]
-    public function ganttPayload(): array
-    {
-        return $this->projectGanttPayload($this->project, $this->ganttBaselineId, $this->planProposal === '' ? null : (int) $this->planProposal);
-    }
-
-    /**
      * The delivery chapter's tab strip. Proposals, files and activity sit in
      * the Story's side column, so an old `?tab=files` link shows milestones here.
      *
@@ -277,7 +287,6 @@ new #[Layout('layouts::desk'), Title('titles.project')] class extends Component 
         $tabs = [
             ['key' => 'milestones', 'label' => __('common.milestones'), 'count' => $this->project->milestones_count],
             ['key' => 'tasks', 'label' => __('common.tasks'), 'count' => $this->tasks->count()],
-            ['key' => 'plan', 'label' => __('gantt.plan'), 'count' => null],
             ['key' => 'risks', 'label' => __('common.risks'), 'count' => $this->project->risks_count],
             ['key' => 'targets', 'label' => __('common.targets'), 'count' => $this->project->plan_indicators_count],
         ];
@@ -289,16 +298,25 @@ new #[Layout('layouts::desk'), Title('titles.project')] class extends Component 
         return $tabs;
     }
 
+    /**
+     * The next three milestones still to reach, for the Overview.
+     *
+     * @return \Illuminate\Support\Collection<int, \App\Models\Milestone>
+     */
+    #[Computed]
+    public function upcomingMilestones(): \Illuminate\Support\Collection
+    {
+        return $this->milestonesFlat
+            ->reject(fn ($milestone): bool => in_array($milestone->status, [MilestoneStatus::Reached, MilestoneStatus::Cancelled], true))
+            ->sortBy(fn ($milestone): string => $milestone->planned_end_date?->toDateString() ?? '9999-12-31')
+            ->take(3)
+            ->values();
+    }
+
     #[Computed]
     public function deliveryTab(): string
     {
-        $deliveryTabs = ['milestones', 'tasks', 'plan', 'risks', 'targets'];
-
-        if ($this->canViewReportTemplate) {
-            $deliveryTabs[] = 'template';
-        }
-
-        return in_array($this->tab, $deliveryTabs, true) ? $this->tab : 'milestones';
+        return in_array($this->tab, ['milestones', 'tasks', 'risks', 'targets', ...($this->canViewReportTemplate ? ['template'] : [])], true) ? $this->tab : 'milestones';
     }
 };
 ?>

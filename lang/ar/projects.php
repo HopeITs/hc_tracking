@@ -200,7 +200,6 @@ return [
     'select_a_center' => 'اختر مركزًا',
     'dates_prohibited_draft' => 'تُحدَّد تواريخ المشروع عند اعتماد المقترح',
     'close_only_active' => 'لا يُغلق إلا مشروع نشط',
-    'plan_after_approval' => 'تُفعَّل الخطة الزمنية بعد اعتماد المقترح',
     'no_active_proposal' => 'لا يوجد مقترح فعّال',
     'close_project' => 'إغلاق المشروع',
     'project_closed' => 'تم إغلاق المشروع',

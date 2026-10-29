@@ -270,37 +270,17 @@
 
 /*
  * ---------- Inner pages on a card grid ----------
- * The project Story (and the proposal folded into it): the facts line, the stage
- * rail, every chapter and every side block sit in their own bordered card,
- * aligned to the page grid. The spine and its dots stay outside the cards, so
- * the dot-and-thread motif still links the chapters. Headline figures inside
- * stay typographic; only functional groupings are boxed.
+ * The program page's facts line sits in one bordered card. The project page
+ * has its own flat layout (desk-story.css).
  */
 @layer components {
     .dk-story .dk-facts { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); border: 1px solid var(--line); border-radius: 14px; background: var(--paper); margin-bottom: 14px; overflow: hidden; }
     .dk-story .dk-facts > div, [dir="rtl"] .dk-story .dk-facts > div { padding: 14px 18px; margin: 0; border: 0; border-inline-end: 1px solid var(--line); border-bottom: 1px solid var(--line); }
-    .dk-story .dk-rail { margin-inline: 0; padding-inline: 18px; border: 1px solid var(--line); border-radius: 14px; margin-block: 4px 18px; }
-    .dk-story .dk-story-grid { gap: 0 24px; }
-    .dk-story .dk-chapters { margin-top: 0; }
-    .dk-story .dk-ch-body { margin-bottom: 12px; padding: 18px 20px; border: 1px solid var(--line); border-radius: 14px; background: var(--paper); }
-    .dk-story .dk-ch.dk-now .dk-ch-body { padding: 20px 22px 26px; border-color: var(--ink-3); box-shadow: 0 1px 2px rgb(16 24 40 / .05), 0 6px 18px -10px rgb(16 24 40 / .18); }
-    .dk-story .dk-ch.dk-later .dk-ch-body { background: transparent; border-style: dashed; }
-    .dk-story .dk-ch .dk-spine i { margin-top: 22px; }
-    .dk-story .dk-ch.dk-now .dk-spine i { margin-top: 19px; }
-    .dk-story .dk-ch:last-child .dk-spine::before { height: 26px; }
-    .dk-story .dk-story-side { gap: 12px; padding-top: 0; }
-    .dk-story .dk-sblock { padding: 16px 18px; border: 1px solid var(--line); border-radius: 14px; background: var(--paper); min-width: 0; }
-    .dk-story .dk-sblock > h3 { padding-bottom: 8px; margin-bottom: 10px; border-bottom: 1px solid var(--line); }
-    .dk-story .dk-story-acts { margin-bottom: 12px; }
 
     /* Record popups: the record's own header becomes the first card. */
     .dk-record-body [data-detail-header] { padding: 18px 20px; border: 1px solid var(--line) !important; border-radius: 14px; background: var(--paper); }
     .dk-record-body { background: var(--ground); }
 
-    @media (max-width: 760px) {
-        .dk-story .dk-ch { grid-template-columns: 18px minmax(0, 1fr); gap: 0 10px; }
-        .dk-story .dk-ch-body { padding: 14px 14px; }
-    }
 }
 
 /* ---------- Top bar tools: one gray capsule of round buttons (the old header look) ---------- */
