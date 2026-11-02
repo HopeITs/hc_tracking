@@ -43,6 +43,7 @@ function authorizationCoverageExemptions(): array
         'app/Livewire/Concerns/Desk/ArrangesPanels.php:removePanel' => 'Saves only the signed-in user\'s own Desk layout.',
         'app/Livewire/Concerns/Desk/ArrangesPanels.php:addPanel' => 'Saves only the signed-in user\'s own Desk layout, and only a panel from the library they may see.',
         'app/Livewire/Concerns/Desk/ArrangesPanels.php:resetLayout' => 'Clears only the signed-in user\'s own Desk layout.',
+        'resources/views/components/desk/panels/⚡notes.blade.php:updatedNotes' => 'Saves only the signed-in user\'s own Desk notes.',
     ];
 }
 

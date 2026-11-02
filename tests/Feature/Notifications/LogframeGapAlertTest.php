@@ -155,7 +155,15 @@ test('a single alert names the program and opens its pre-filled create form', fu
 
     expect($notification->data['key'])->toBe('notifications.alerts.logframe_missing.single')
         ->and($notification->data['params']['subject'])->toBe($this->program->name)
-        ->and(app(SubjectLinks::class)->urlFor($notification))->toBe(route('results.index', ['program' => $this->program->id, 'create' => 1]));
+        ->and($notification->data['link'])->toMatchArray(['route' => 'results.index'])
+        ->and($notification->data['link']['parameters'])->toEqualCanonicalizing(['program' => $this->program->id, 'create' => 1]);
+
+    // MySQL's JSON column stores object keys in its own order, so compare the parts, not the string.
+    $url = app(SubjectLinks::class)->urlFor($notification);
+    parse_str((string) parse_url((string) $url, PHP_URL_QUERY), $query);
+
+    expect(parse_url((string) $url, PHP_URL_PATH))->toBe(parse_url(route('results.index'), PHP_URL_PATH))
+        ->and($query)->toEqual(['program' => (string) $this->program->id, 'create' => '1']);
 });
 
 describe('the daily rule', function () {

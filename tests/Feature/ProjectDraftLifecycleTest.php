@@ -327,8 +327,8 @@ test('the draft invariant holds after an approval: waiting drafts hold dates, ac
 
     $this->actingAs(userWithRole('Financial'));
     app(ApproveProposal::class)->handle($proposal, ProposalStatus::Submitted, [
-        'actual_date_begin' => '2026-11-01',
-        'actual_date_end' => '2027-10-31',
+        'actual_date_begin' => today()->toDateString(),
+        'actual_date_end' => today()->addYear()->toDateString(),
         'decision_date' => today()->toDateString(),
         'approval_note' => 'The donor confirmed by email.',
     ]);

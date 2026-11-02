@@ -29,7 +29,7 @@ test('the home page is the desk: greeting, the role layout and the add tile', fu
         ->assertOk()
         ->assertSee('data-desk-hello', false)
         ->assertSee('data-panel="glance"', false)
-        ->assertSee('data-panel="projects"', false)
+        ->assertSee('data-panel="flow"', false)
         ->assertSeeHtml('class="dk-addtile"')
         ->assertDontSee('data-desk-customize-trigger', false);
 });
@@ -53,7 +53,7 @@ test('desk pages keep the copyright footer', function () {
 test('an empty portfolio renders the empty lines of the work panels', function () {
     $user = User::factory()->role('General Manager')->create();
 
-    Livewire::actingAs($user)->test('desk.panels.needs', ['size' => 'L'])->assertSee(__('desk.panel.needs.empty'));
+    Livewire::actingAs($user)->test('desk.panels.needs', ['size' => 'L'])->assertSee(__('desk-cards.deck.done_title'));
     Livewire::actingAs($user)->test('desk.panels.coming', ['size' => 'M'])->assertSee(__('desk.panel.coming.empty'));
 });
 

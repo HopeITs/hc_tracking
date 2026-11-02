@@ -1195,6 +1195,7 @@ test('the calendar view places tasks on their due date and lists unscheduled tas
 });
 
 test('the calendar view labels a missed todo chip differently from an overdue in progress chip', function () {
+    $this->travelTo(now()->startOfMonth()->addDays(10));
     $user = User::factory()->role('General Manager')->create();
     $missedTask = Task::factory()->create([
         'title' => 'Missed on calendar',

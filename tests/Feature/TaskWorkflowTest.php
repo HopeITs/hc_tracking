@@ -138,8 +138,8 @@ test('the desk tasks card lists mine (assigned or created), my department, and o
     $other = userWithRole('Managers', insertHrEmployee());
 
     workflowTask($me, [$stranger], ['title' => 'I asked for this', 'status' => TaskStatus::UnderReview]);
-    workflowTask($other, [$me->employee_id], ['title' => 'Given to me']);
-    workflowTask($other, [$colleague], ['title' => 'Colleague work']);
+    workflowTask($other, [$me->employee_id], ['title' => 'Given to me', 'status' => TaskStatus::Todo]);
+    workflowTask($other, [$colleague], ['title' => 'Colleague work', 'status' => TaskStatus::Todo]);
 
     $card = Livewire::actingAs($me)->test('desk.panels.tasks', ['size' => 'L'])
         ->assertSee('Given to me')

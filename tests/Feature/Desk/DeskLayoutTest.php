@@ -13,13 +13,13 @@ function deskPanelIds(User $user): array
 }
 
 test('each role starts from its own layout, and a Super Admin from the General Manager one', function () {
-    expect(deskPanelIds(User::factory()->role('Team Member')->create()))->toBe(['needs', 'tasks', 'coming', 'milestones', 'projects'])
-        ->and(deskPanelIds(User::factory()->role('Super Admin')->create()))->toContain('glance', 'money', 'matrix')
-        ->and(deskPanelIds(User::factory()->role('Financial')->create()))->toBe(['needs', 'money', 'transfers', 'deliverables', 'duties', 'projects']);
+    expect(deskPanelIds(User::factory()->role('Team Member')->create()))->toBe(['needs', 'overdue', 'flow', 'notes', 'tasks', 'coming', 'milestones', 'projects'])
+        ->and(deskPanelIds(User::factory()->role('Super Admin')->create()))->toContain('glance', 'money', 'pipeline')
+        ->and(deskPanelIds(User::factory()->role('Financial')->create()))->toBe(['needs', 'overdue', 'flow', 'money', 'transfers', 'deliverables', 'duties', 'projects']);
 });
 
 test('a role without a layout falls back to the Team Member one, minus what it may not see', function () {
-    expect(deskPanelIds(User::factory()->create()))->toBe(['needs']);
+    expect(deskPanelIds(User::factory()->create()))->toBe(['needs', 'overdue', 'notes']);
 });
 
 test('a saved layout drops forbidden, unknown and repeated panels and fixes a bad size', function () {
@@ -33,8 +33,8 @@ test('a saved layout drops forbidden, unknown and repeated panels and fixes a ba
     ]]);
 
     expect(app(Panels::class)->layoutFor($user))->toBe([
-        ['panel' => 'tasks', 'size' => 'L'],
-        ['panel' => 'needs', 'size' => 'XL'],
+        ['panel' => 'tasks', 'size' => 'L', 'cols' => 6, 'rows' => 4],
+        ['panel' => 'needs', 'size' => 'XL', 'cols' => 12, 'rows' => 4],
     ]);
 });
 
@@ -92,7 +92,7 @@ test('resizing, moving, removing, adding and resetting are saved on the user at 
     $desk = Livewire::actingAs($user)->test('pages::desk.index');
 
     $desk->call('resizePanel', 'tasks', 'XL');
-    expect($user->fresh()->desk_layout[1])->toBe(['panel' => 'tasks', 'size' => 'XL']);
+    expect(collect($user->fresh()->desk_layout)->firstWhere('panel', 'tasks'))->toMatchArray(['panel' => 'tasks', 'size' => 'XL', 'cols' => 12]);
 
     $desk->call('movePanel', 'projects', 0);
     expect($user->fresh()->desk_layout[0]['panel'])->toBe('projects');
@@ -155,9 +155,9 @@ test('the customize sheet saves its whole draft only on Done, dropping what the 
         ['panel' => 'coming', 'size' => 'XL'],
     ]);
 
-    expect($user->fresh()->desk_layout)->toBe([
-        ['panel' => 'coming', 'size' => 'S'],
-        ['panel' => 'tasks', 'size' => 'L'],
+    expect($user->fresh()->desk_layout)->toEqual([
+        ['panel' => 'coming', 'size' => 'S', 'cols' => 3, 'rows' => 4],
+        ['panel' => 'tasks', 'size' => 'L', 'cols' => 6, 'rows' => 4],
     ]);
 
     $desk->call('saveLayout', null);

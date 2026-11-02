@@ -102,5 +102,5 @@ test('a delivered deliverable I requested can be accepted from the row', functio
 
 test('nothing waiting shows the all clear state', function () {
     Livewire::actingAs(userWithRole('Managers', insertHrEmployee()))->test('desk.panels.needs', ['size' => 'L'])
-        ->assertSee(__('desk.panel.needs.clear'));
+        ->assertSee(__('desk-cards.deck.done_title'));
 });

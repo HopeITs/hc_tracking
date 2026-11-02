@@ -274,7 +274,7 @@ new class extends Component {
             @else
                 @forelse ($this->sections as $section => $rows)
                     @if ($section === 'pinned')
-                        <div class="mt-2 rounded-xl bg-status-critical-soft/60 p-1 pt-2.5 dark:bg-secondary-soft/60" data-bell-pinned>
+                        <div class="mt-2 rounded-xl bg-status-critical-soft/60 p-1 pt-2.5 dark:bg-surface-2/60" data-bell-pinned>
                             <p class="flex items-center gap-2 px-2.5 pb-0.5 text-xs font-bold text-status-critical">
                                 <span class="notification-beacon relative size-1.5 rounded-full bg-primary dark:bg-status-critical text-primary dark:text-brand-text" aria-hidden="true"></span>
                                 {{ __("notifications.sections.{$section}") }}
