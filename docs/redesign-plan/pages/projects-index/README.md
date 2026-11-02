@@ -309,5 +309,5 @@ Tab order: search → city → program → owner → view toggle → sort → Ad
 - No delete action (tested absence).
 - No bulk actions, no export, no inline status editing on rows.
 - No new model methods/accessors on `Project`; progress stays a page-level computation.
-- No figure housing on this page (reserved for dashboard, executive summary, detail headers).
+- No figure housing on this page (reserved for dashboard and detail headers).
 - Don't change the search semantics or the modal's validation rules/messages.

@@ -476,6 +476,28 @@ test('the results framework can open the form already tied to a statement, or op
         ->assertSet('inspectingIndicatorId', $indicator->id);
 });
 
+test('the project page can open the form already scoped to a project', function () {
+    $user = User::factory()->role('General Manager')->create();
+    $project = Project::factory()->create();
+
+    Livewire::actingAs($user)
+        ->withQueryParams(['create' => 1, 'project' => $project->id])
+        ->test('pages::indicators.index')
+        ->assertSet('showIndicatorModal', true)
+        ->assertSet('indicatorProjectId', (string) $project->id)
+        ->assertSet('indicatorResultId', '');
+});
+
+test('a project deep link to a project that does not exist opens nothing', function () {
+    $user = User::factory()->role('General Manager')->create();
+
+    Livewire::actingAs($user)
+        ->withQueryParams(['create' => 1, 'project' => 999999])
+        ->test('pages::indicators.index')
+        ->assertSet('showIndicatorModal', false)
+        ->assertSet('indicatorProjectId', '');
+});
+
 test('only projects delivering the result program are offered, and any other is refused', function () {
     $user = User::factory()->role('General Manager')->create();
     $program = Program::factory()->create();

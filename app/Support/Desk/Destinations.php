@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Support\Desk;
 
+use App\Models\DonorReport;
 use App\Models\ProposalReviewer;
 use App\Models\User;
 use Closure;
@@ -26,9 +27,9 @@ final class Destinations
     public const array Groups = ['overview', 'strategy_planning', 'projects_delivery', 'monitoring_evaluation', 'funding_finance', 'workspace', 'administration', 'you'];
 
     /**
-     * Pages reached from the top bar instead of the sidebar: the inbox from the
-     * bell, notification preferences and rules from the avatar menu and the
-     * bell's panel. The Ask bar still finds them.
+     * Pages reached from the top bar instead of the sidebar: the inbox,
+     * notification preferences and rules from the bell's panel (not the
+     * avatar menu). The Ask bar still finds them.
      *
      * @var list<string>
      */
@@ -126,7 +127,6 @@ final class Destinations
         return [
             $page('dashboard', 'desk.your_desk', 'grid', 'home', 'overview', $everyone),
             $page('reviews.index', 'common.my_reviews', 'file', 'document-magnifying-glass', 'overview', $this->hasReviews(...)),
-            $page('executive-summary.index', 'common.executive_summary', 'chart', 'presentation-chart-bar', 'overview', $can('executive-summary.view')),
 
             $page('strategies.index', 'common.strategies', 'chart', 'light-bulb', 'strategy_planning', $can('strategies.view'), 'strategies'),
             $page('programs.index', 'common.programs', 'folder', 'rectangle-group', 'strategy_planning', $can('programs.view'), 'programs'),
@@ -145,6 +145,7 @@ final class Destinations
             $page('reports.monthly-matrix', 'navigation.monthly_matrix', 'table', 'table-cells', 'monitoring_evaluation', $can('reports.view')),
             $page('monthly-reports.index', 'navigation.monthly_reports', 'cal', 'newspaper', 'monitoring_evaluation', $can('reports.view'), 'monthly-reports'),
             $page('report-templates.index', 'navigation.report_templates', 'file', 'clipboard-document-check', 'monitoring_evaluation', $can('report-templates.manage'), 'report-templates'),
+            $page('donor-reports.index', 'navigation.donor_reports', 'file', 'document-text', 'monitoring_evaluation', fn (User $user): bool => $user->can('viewAny', DonorReport::class)),
             $page('donor-reports.compose', 'navigation.donor_report_builder', 'file', 'document-plus', 'monitoring_evaluation', $can('reports.aggregate')),
             $page('reporting-duties.index', 'navigation.reporting_duties', 'file', 'inbox-stack', 'monitoring_evaluation', fn (User $user): bool => $user->can('funding-agreements.update') || $user->hasReportingDuties(), 'donor-reports'),
 

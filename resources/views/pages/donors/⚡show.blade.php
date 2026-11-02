@@ -255,6 +255,7 @@ new #[Layout('layouts::desk'), Title('titles.donor')] class extends Component {
 <x-desk.record-sheet register="pages::donors.index" :close-url="route('donors.index')" :title="$donor->name">
 <section class="@container/detail flex min-h-full w-full flex-1 flex-col bg-white text-secondary-dark dark:bg-surface-0 dark:text-ink" data-donor-dossier>
     <x-ui.detail-header
+        :back="\App\Support\BackUrl::for(route('donors.index'))"
         :breadcrumbs="[
             ['label' => __('common.donors'), 'url' => route('donors.index')],
             ['label' => $donor->name],

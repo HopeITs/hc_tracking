@@ -8,6 +8,7 @@ use App\Livewire\Concerns\Indicators\ManagesIndicatorReadings;
 use App\Livewire\Concerns\Indicators\PresentsIndicators;
 use App\Livewire\Concerns\Indicators\SummarisesIndicators;
 use App\Models\Indicator;
+use App\Models\Project;
 use App\Models\Result;
 use Illuminate\Support\Facades\Gate;
 use Livewire\Attributes\Layout;
@@ -60,17 +61,27 @@ new #[Layout('layouts::desk'), Title('titles.indicators')] class extends Compone
      * Deep links from the rest of the chain.
      *
      * `?create=<result id>` opens the indicator form already tied to that
-     * statement (the results framework's "Add indicator"); `?inspect=<id>`
-     * opens one indicator's chain. Read once here rather than bound with #[Url],
-     * so closing the dialog and refreshing does not reopen it.
+     * statement (the results framework's "Add indicator");
+     * `?create=1&project=<project id>` opens it already scoped to that project
+     * (the project page's "New indicator"); `?inspect=<id>` opens one
+     * indicator's chain. Read once here rather than bound with #[Url], so
+     * closing the dialog and refreshing does not reopen it.
      */
     public function mount(): void
     {
-        $createForResult = request()->integer('create');
+        $create = request()->integer('create');
+        $createForProject = request()->integer('project');
 
-        if ($createForResult > 0 && Gate::allows('indicators.create') && Result::query()->whereKey($createForResult)->exists()) {
-            $this->openCreateModal();
-            $this->indicatorResultId = (string) $createForResult;
+        if ($create > 0 && Gate::allows('indicators.create')) {
+            if ($createForProject > 0) {
+                if (Project::query()->whereKey($createForProject)->exists()) {
+                    $this->openCreateModal();
+                    $this->indicatorProjectId = (string) $createForProject;
+                }
+            } elseif (Result::query()->whereKey($create)->exists()) {
+                $this->openCreateModal();
+                $this->indicatorResultId = (string) $create;
+            }
         }
 
         $inspect = request()->integer('inspect');

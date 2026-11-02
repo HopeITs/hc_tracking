@@ -82,6 +82,11 @@ return [
         'donor' => 'Donor',
         'internal' => 'Internal',
     ],
+    'donor_report_state' => [
+        'due' => 'To submit',
+        'overdue' => 'Overdue',
+        'submitted' => 'Submitted',
+    ],
     'review_stage' => [
         'concept_note' => 'Concept note',
         'proposal' => 'Proposal',

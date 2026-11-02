@@ -222,6 +222,7 @@ new #[Layout('layouts::desk'), Title('titles.funding_agreement')] class extends 
     x-data="{ lit: null, tranches: @js($tranchesForDial) }"
 >
     <x-ui.detail-header
+        :back="\App\Support\BackUrl::for(route('funding-agreements.index'))"
         :breadcrumbs="[
             ['label' => __('common.funding_agreements'), 'url' => route('funding-agreements.index')],
             ['label' => $donor->name.' · '.$proposal->name],

@@ -9,6 +9,7 @@ use App\Livewire\Concerns\Desk\IsDeskPanel;
 use App\Models\HrEmployee;
 use App\Models\MonthlyReport;
 use App\Models\Task;
+use App\Models\TaskAssignee;
 use App\Models\User;
 use Carbon\CarbonImmutable;
 use Flux\Flux;
@@ -22,7 +23,9 @@ use Livewire\Component;
  * optional note; the poke is about their oldest overdue task, else their
  * oldest late monthly report, else nothing in particular. The subject is
  * looked up only when Poke is pressed, so the panel costs the same queries
- * for any team.
+ * for any team. Each person also shows a load meter (open tasks, the late
+ * share in red) and a word: Free (nothing open), Busy, or Overloaded (any
+ * task late, or more than OverloadedAbove open).
  */
 new class extends Component {
     use IsDeskPanel;
@@ -30,7 +33,22 @@ new class extends Component {
     use ReadsDashboardWork;
 
     /**
-     * @return list<array{employeeId: int, name: string, initials: string, title: string, overdue: int, lateReports: int, userId: int|null, relation: string}>
+     * More open tasks than this and a person reads as Overloaded.
+     */
+    public const int OverloadedAbove = 8;
+
+    /**
+     * The name (or job title) typed in the panel's search box.
+     */
+    public string $search = '';
+
+    public function updatedSearch(): void
+    {
+        $this->page = 0;
+    }
+
+    /**
+     * @return list<array{employeeId: int, name: string, initials: string, title: string, overdue: int, open: int, load: string, lateReports: int, userId: int|null, relation: string}>
      */
     #[Computed]
     public function people(): array
@@ -50,12 +68,25 @@ new class extends Component {
             ->selectRaw('prepared_by, count(*) as total')
             ->groupBy('prepared_by')
             ->pluck('total', 'prepared_by') : collect();
+        $open = TaskAssignee::query()
+            ->whereIn('employee_id', $ids)
+            ->whereIn('task_id', $this->visible(Task::query(), 'tasks')->select('id')->where('status', '!=', TaskStatus::Done))
+            ->groupBy('employee_id')
+            ->selectRaw('employee_id, count(*) as total')
+            ->pluck('total', 'employee_id');
 
-        return array_values(array_map(function (array $person) use ($users, $lateReports): array {
+        return array_values(array_map(function (array $person) use ($users, $lateReports, $open): array {
             $user = $users->get($person['employeeId']);
+            $openTasks = (int) ($open[$person['employeeId']] ?? 0);
 
             return [
                 ...$person,
+                'open' => $openTasks,
+                'load' => match (true) {
+                    $openTasks === 0 => 'free',
+                    $person['overdue'] > 0 || $openTasks > self::OverloadedAbove => 'overloaded',
+                    default => 'busy',
+                },
                 'initials' => $user?->initials() ?? mb_substr($person['name'], 0, 1),
                 'title' => (string) (HrEmployee::positionSummary($person['employeeId']) ?? ''),
                 'lateReports' => $user === null ? 0 : (int) ($lateReports[$user->id] ?? 0),
@@ -119,12 +150,22 @@ new class extends Component {
 
 @php
     $people = $this->people;
-    $pg = $this->paginate(collect($people), self::PerPage);
+    $query = mb_strtolower(trim($search));
+    $found = collect($people)->when($query !== '', fn ($list) => $list->filter(fn (array $person): bool => str_contains(mb_strtolower($person['name'].' '.$person['title']), $query))->values());
+    $pg = $this->paginate($found, self::PerPage);
 @endphp
 
-<x-desk.panel :facets="$pg['facets']" id="myteam" :size="$size" :index="$index" :total="$total" :count="count($people)">
+<x-desk.panel :facets="$pg['facets']" search="search" :search-value="$search" id="myteam" :size="$size" :cols="$gridCols" :height="$gridRows" :index="$index" :total="$total" :count="count($people)">
+    @if ($people !== [])
+        @php
+            $loads = array_count_values(array_column($people, 'load'));
+        @endphp
+        <p class="dk-load-sum">
+            <span class="dk-load-dot dk-free" aria-hidden="true"></span>{{ __('desk-cards.team.summary', ['free' => $loads['free'] ?? 0, 'overloaded' => $loads['overloaded'] ?? 0]) }}
+        </p>
+    @endif
     @if ($pg['total'] > 0)
-        <ul class="dk-team">
+        <ul class="dk-team" {{ $this->fitAttributes($pg) }}>
             @foreach ($pg['slice'] as $person)
                 @php
                     $behind = $person['overdue'] + $person['lateReports'];
@@ -134,6 +175,14 @@ new class extends Component {
                     <span class="dk-tm-who">
                         <strong title="{{ $person['name'] }}">{{ $person['name'] }}</strong>
                         <span class="dk-is" title="{{ $person['title'] }}">{{ __('desk.relation.'.$person['relation']) }}@if ($person['title'] !== '') · {{ $person['title'] }}@endif</span>
+                    </span>
+                    @php
+                        $scale = max(self::OverloadedAbove, $person['open']);
+                    @endphp
+                    <span class="dk-tm-meter" title="{{ __('desk-cards.team.meter', ['open' => $person['open'], 'late' => $person['overdue']]) }}">
+                        <span class="dk-load-word dk-{{ $person['load'] }}">{{ __('desk-cards.team.status.'.$person['load']) }}</span>
+                        <span class="dk-load-bar" aria-hidden="true"><b style="width:{{ round($person['open'] / $scale * 100) }}%"></b><i style="width:{{ round(min($person['overdue'], $person['open']) / $scale * 100) }}%"></i></span>
+                        <span class="dk-load-n dk-num">{{ trans_choice('desk-cards.team.open', $person['open'], ['count' => $person['open']]) }}</span>
                     </span>
                     <span class="dk-tm-load">
                         @if ($behind > 0)
@@ -148,7 +197,7 @@ new class extends Component {
             @endforeach
         </ul>
     @else
-        <p class="dk-pempty">{{ __('desk.panel.myteam.empty') }}</p>
+        <p class="dk-pempty">{{ $people !== [] ? __('desk.search_none', ['query' => $search]) : __('desk.panel.myteam.empty') }}</p>
     @endif
 
     <x-slot:foot>

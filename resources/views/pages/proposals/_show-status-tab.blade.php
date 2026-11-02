@@ -6,6 +6,14 @@
 --}}
             @include('pages.proposals._show-reviewers')
 
+            @if ($this->finalReportAcceptance !== null)
+                {{-- The donor accepted the final report (D-02c): the last requirement before the proposal closes. --}}
+                <p class="mt-6 flex items-center gap-2 rounded-lg border border-status-good bg-status-good-soft px-3 py-2 text-sm font-semibold text-status-good" data-test="final-report-accepted">
+                    <flux:icon.document-check variant="micro" class="size-4 shrink-0" aria-hidden="true" />
+                    <span>{{ __('proposals.final_report_accepted_by', ['date' => $this->finalReportAcceptance['date'], 'name' => $this->finalReportAcceptance['name']]) }}</span>
+                </p>
+            @endif
+
             {{-- Why the status moved, and whatever was written down about this proposal. --}}
             <div class="mt-10 grid gap-x-10 gap-y-8 @3xl/detail:grid-cols-[minmax(0,1.6fr)_minmax(0,1fr)]">
                 <section aria-labelledby="moves-heading" class="min-w-0" data-status-history>

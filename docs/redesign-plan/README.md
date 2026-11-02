@@ -73,7 +73,7 @@ Wave 2   QA owner:         06-qa-and-polish                                     
 
 | Topic | Decision |
 | --- | --- |
-| Visual world | **The Operations Board** ([01 §6](01-design-system.md)): every record reads as *scheduled · actual · status*; figure housing with flap figures (dashboard, executive summary, one key figure in detail headers only), timetable rows, lifecycle stage rail, flat status blocks, one flap motion grammar. |
+| Visual world | **The Operations Board** ([01 §6](01-design-system.md)): every record reads as *scheduled · actual · status*; figure housing with flap figures (dashboard, one key figure in detail headers only), timetable rows, lifecycle stage rail, flat status blocks, one flap motion grammar. |
 | Brand anchor | Somar Sans, primary `#be1f24`, grays `#58595b` `#6d6e71` `#939598` `#dcddde`, persistent sidebar. Kept. |
 | Palette extension | Approved: status green, status amber, funding teal, plus board/housing surfaces. Only for status, surfaces and charts, never as brand colour. |
 | Charts | **ApexCharts 4.7** (already in `package.json`), wrapped by `x-ui.chart`. Small inline visuals (bars, rings, sparklines, timelines, heat cells) are server-rendered Blade components. |
@@ -91,7 +91,7 @@ Wave 2   QA owner:         06-qa-and-polish                                     
 | --- | --- | --- |
 | Foundation | `01`, `02`, `03` | 0 |
 | Shell | `04`, `05` | 0b |
-| A · Command center | dashboard, executive-summary | 1 |
+| A · Command center | dashboard | 1 |
 | B · Strategy | strategies-index, strategies-show, programs-index, programs-show | 1 |
 | C · Plans & logframe | yearly-plans-index, yearly-plans-show, results-index | 1 |
 | D · Projects | projects-index, projects-show, milestones-index, risks-index | 1 |
@@ -115,7 +115,6 @@ Wave 2   QA owner:         06-qa-and-polish                                     
 | F6 | [05-command-palette.md](05-command-palette.md) | all | Shell | | todo |
 | F7 | [06-qa-and-polish.md](06-qa-and-polish.md) | all | QA | | todo |
 | P1 | [pages/dashboard/](pages/dashboard/README.md) | `dashboard` | A | | todo |
-| P2 | [pages/executive-summary/](pages/executive-summary/README.md) | `executive-summary.index` | A | | todo |
 | P3 | [pages/strategies-index/](pages/strategies-index/README.md) | `strategies.index` | B | | todo |
 | P4 | [pages/strategies-show/](pages/strategies-show/README.md) | `strategies.show` | B | | todo |
 | P5 | [pages/programs-index/](pages/programs-index/README.md) | `programs.index` | B | | todo |

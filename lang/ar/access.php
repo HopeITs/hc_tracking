@@ -35,7 +35,6 @@ return [
         'narrative-questions' => 'الأسئلة السردية',
         'tasks' => 'المهام',
         'calendar' => 'التقويم',
-        'executive-summary' => 'الملخص التنفيذي',
         'accounts' => 'الحسابات',
         'cities' => 'المدن',
         'activity-log' => 'سجل النشاط',

@@ -60,7 +60,7 @@ new class extends Component {
     $format = __('desk.date_long');
 @endphp
 
-<x-desk.panel :facets="$pg['facets']" :filtered="$filter !== 'all'" id="transfers" register="transfers.index" :size="$size" :index="$index" :total="$total" :count="$this->lateCount > 0 ? $this->lateCount : null">
+<x-desk.panel :facets="$pg['facets']" :filtered="$filter !== 'all'" id="transfers" register="transfers.index" :size="$size" :cols="$gridCols" :height="$gridRows" :index="$index" :total="$total" :count="$this->lateCount > 0 ? $this->lateCount : null">
     <x-slot:filters>
         <div class="contents" data-filter-defaults='{"filter":"all"}'>
             <x-ui.header-filter-select :label="__('desk.facet.status')" wire:model="filter" :value="$filter" deferred>
@@ -72,7 +72,7 @@ new class extends Component {
     </x-slot:filters>
 
     @if ($pg['total'] > 0)
-        <ol class="dk-ladder dk-tr">
+        <ol class="dk-ladder dk-tr" {{ $this->fitAttributes($pg) }}>
             @foreach ($pg['slice'] as $transfer)
                 @php
                     $state = $transfer->state();

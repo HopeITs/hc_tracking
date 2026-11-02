@@ -30,7 +30,9 @@
 
         @if ($showsInbox)
             <livewire:desk.ask />
-            <livewire:desk.page-panels :route-name="request()->route()?->getName() ?? ''" :page-title="filled($title ?? null) ? __($title) : null" />
+            @if (request()->routeIs('dashboard'))
+                <livewire:desk.page-panels :route-name="request()->route()?->getName() ?? ''" :page-title="filled($title ?? null) ? __($title) : null" />
+            @endif
         @endif
 
         <x-tour.overlay />

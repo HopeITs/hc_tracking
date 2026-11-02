@@ -18,7 +18,7 @@ use Livewire\WithFileUploads;
 
 /**
  * Stands in for projects/show, with every trait that page gained when it was
- * split (its Gantt traits are analysed through ProjectPageHost).
+ * split.
  *
  * The real page is a single-file Livewire component inside Blade, which
  * PHPStan cannot read, so without this class the project traits are never

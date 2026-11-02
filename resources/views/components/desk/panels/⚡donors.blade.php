@@ -114,9 +114,9 @@ new class extends Component {
     $money = $this->money;
 @endphp
 
-<x-desk.panel :facets="$pg['facets']" id="donors" register="donors.index" :size="$size" :index="$index" :total="$total" :count="$pg['total']">
+<x-desk.panel :facets="$pg['facets']" id="donors" register="donors.index" :size="$size" :cols="$gridCols" :height="$gridRows" :index="$index" :total="$total" :count="$pg['total']">
     @if ($pg['total'] > 0)
-        <ul @class(['dk-dn', 'dk-dn-money' => $money !== []])>
+        <ul @class(['dk-dn', 'dk-dn-money' => $money !== []]) {{ $this->fitAttributes($pg) }}>
             @foreach ($pg['slice'] as $donor)
                 @php
                     $lines = $money[$donor->id] ?? [];

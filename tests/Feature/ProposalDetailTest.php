@@ -699,3 +699,25 @@ test('the tab labels read in Arabic', function () {
         ->assertSeeText('المراحل')
         ->assertDontSeeHtml('data-under-construction="plan"');
 });
+
+test('proposal detail shows a back link to the register when nothing referred the visitor', function () {
+    $user = User::factory()->role('Financial')->create();
+    $proposal = Proposal::factory()->create();
+
+    $this->actingAs($user)
+        ->get(route('proposals.show', $proposal))
+        ->assertOk()
+        ->assertSeeHtml('href="'.route('proposals.index').'" wire:navigate data-detail-back');
+});
+
+test('proposal detail sends the back link to the in-app page the visitor came from', function () {
+    $user = User::factory()->role('Financial')->create();
+    $proposal = Proposal::factory()->create();
+    $from = route('projects.index').'?view=board';
+
+    $this->actingAs($user)
+        ->withHeader('referer', $from)
+        ->get(route('proposals.show', $proposal))
+        ->assertOk()
+        ->assertSeeHtml('href="'.$from.'" wire:navigate data-detail-back');
+});

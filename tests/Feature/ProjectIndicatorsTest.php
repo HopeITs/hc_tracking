@@ -116,6 +116,19 @@ test('users without indicator rights see no scope button and are refused', funct
     expect(DB::table('indicators')->where('id', $this->programIndicator->id)->value('project_id'))->toBeNull();
 })->with(['Public Relations Manager', 'Financial']);
 
+test('the targets tab offers a New indicator link to the indicator directory scoped to this project', function () {
+    projectTargetsTab($this->meal, $this->project)
+        ->assertSeeHtml('data-new-indicator')
+        ->assertSeeHtml('href="'.e(route('indicators.index', ['create' => 1, 'project' => $this->project->id])).'"')
+        ->assertSee(__('projects.new_indicator'));
+});
+
+test('users without indicators.create see no New indicator link', function () {
+    projectTargetsTab(User::factory()->role('Financial')->create(), $this->project)
+        ->assertSee(__('projects.project_indicators'))
+        ->assertDontSeeHtml('data-new-indicator');
+});
+
 function insertAnnualPlanFor(Program $program): int
 {
     return AnnualPlan::factory()->create(['program_id' => $program->id])->id;

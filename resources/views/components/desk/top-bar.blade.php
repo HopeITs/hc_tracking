@@ -33,11 +33,11 @@
                 <span class="dk-inner">
                     <flux:icon.magnifying-glass variant="outline" class="size-5" />
                     <span class="dk-ph">{{ __('desk.ask_placeholder') }}</span>
-                    <kbd>/</kbd>
                 </span>
             </button>
 
-            @if ($showsInbox)
+            {{-- Panels belong to My desk only (user decision 2026-10-28). --}}
+            @if ($showsInbox && request()->routeIs('dashboard'))
                 <button type="button" class="dk-btn dk-panels-btn" x-data x-on:click="$dispatch('dk-panels-open')" aria-haspopup="dialog" data-panels-trigger>
                     <flux:icon.squares-2x2 variant="outline" class="size-5" />
                     <span class="dk-panels-l">{{ __('navigation.panels') }}</span>
@@ -96,10 +96,6 @@
                             </span>
                         </div>
                         <a role="menuitem" href="{{ route('security.edit') }}" wire:navigate data-test="security-menu-item"><x-desk.icon name="lock" />{{ __('common.security') }}</a>
-                        <a role="menuitem" href="{{ route('notification-settings.edit') }}" wire:navigate><x-desk.icon name="bell" />{{ __('desk.my_notifications') }}</a>
-                        @can('notification-settings.manage')
-                            <a role="menuitem" href="{{ route('admin.notification-settings.edit') }}" wire:navigate data-user-menu-rules><flux:icon.adjustments-horizontal variant="outline" class="size-[18px]" />{{ __('navigation.notification_settings') }}</a>
-                        @endcan
                         <div class="dk-narrow-tools">
                             <span x-data="{ state: window.hcApp?.state() ?? 'unavailable' }" x-on:hc-app-install-change.window="state = $event.detail" x-show="state === 'available'" x-cloak class="contents">
                                 <button type="button" role="menuitem" x-on:click="open = false; $flux.modal('install-app').show()" data-test="settings-install-app"><x-desk.icon name="download" />{{ __('desk.install_app') }}</button>

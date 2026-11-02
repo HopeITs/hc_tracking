@@ -1,6 +1,4 @@
 @php
-    use App\Enums\MilestoneStatus;
-
     /** @var array{month: \Carbon\CarbonImmutable, weeks: ?array<int, array<int, \Carbon\CarbonImmutable>>, days: ?array<int, \Carbon\CarbonImmutable>, milestonesByDay: \Illuminate\Support\Collection<string, \Illuminate\Support\Collection<int, \App\Models\Milestone>>} $calendar */
     $calendar = $this->calendarGrid;
     $today = \Carbon\CarbonImmutable::today();
@@ -10,12 +8,7 @@
             return 'bg-status-critical-soft text-primary dark:text-brand-text';
         }
 
-        return match ($milestone->status) {
-            MilestoneStatus::Reached => 'bg-status-good-soft text-status-good',
-            MilestoneStatus::Ongoing => 'bg-status-warn-soft text-status-warn',
-            MilestoneStatus::Postponed, MilestoneStatus::Cancelled => 'bg-secondary-soft text-secondary-medium dark:bg-surface-2 dark:text-ink-muted',
-            MilestoneStatus::Planned => 'bg-white text-secondary-dark ring-1 ring-secondary-soft dark:bg-surface-1 dark:text-ink dark:ring-line',
-        };
+        return $milestone->status->tone()->badgeClasses();
     };
 
     $periodHeading = match ($viewMode) {

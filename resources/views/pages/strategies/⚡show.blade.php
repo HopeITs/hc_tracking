@@ -236,6 +236,7 @@ new #[Layout('layouts::desk'), Title('titles.strategy')] class extends Component
 <x-desk.record-sheet register="pages::strategies.index" :close-url="route('strategies.index')" :title="$strategy->name">
 <section class="@container/detail flex min-h-full w-full flex-1 flex-col gap-4 bg-white text-secondary-dark dark:bg-surface-0 dark:text-ink">
     <x-ui.detail-header
+        :back="\App\Support\BackUrl::for(route('strategies.index'))"
         :breadcrumbs="[
             ['label' => __('common.strategies'), 'url' => route('strategies.index')],
             ['label' => $strategy->name],

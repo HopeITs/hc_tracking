@@ -9,6 +9,7 @@
 @use('App\Models\TransfersTracking')
 @use('App\Support\AgreementMoney')
             <div class="mb-6 flex flex-wrap items-center justify-end gap-2">
+                @unless ($embedded)
                 <x-ui.view-toggle
                     class="me-auto"
                     :label="__('finance_tables.view_label')"
@@ -19,6 +20,7 @@
                         ['key' => 'overview', 'label' => __('finance_tables.view_overview'), 'icon' => 'chart-bar'],
                     ]"
                 />
+                @endunless
                 @can('transfers.create')
                 <x-ui.button size="sm" icon="calendar-days" class="min-h-10 touch-manipulation" wire:click="openTransferCreate" :disabled="$this->agreements->isEmpty()" data-test="schedule-tranche">{{ __('proposals.schedule_tranche') }}</x-ui.button>
                 @endcan
@@ -27,7 +29,7 @@
                 @endcan
             </div>
 
-            @if ($this->view === 'overview')
+            @if ($this->view === 'overview' && ! $embedded)
             @if ($this->agreements->isEmpty())
                 <x-ui.empty-state icon="banknotes" :heading="__('proposals.no_funding_agreements')" :body="__('proposals.agreements_signed_against_this_proposal_will_appear_here')" />
             @else

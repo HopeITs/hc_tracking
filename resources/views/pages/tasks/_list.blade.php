@@ -20,13 +20,7 @@
 
     $groupColor = function (string $key) use ($group): string {
         if ($group === 'status') {
-            return match (TaskStatus::tryFrom($key)) {
-                TaskStatus::Todo => 'bg-secondary-light',
-                TaskStatus::InProgress => 'bg-status-active',
-                TaskStatus::UnderReview => 'bg-status-warn',
-                TaskStatus::Done => 'bg-status-good',
-                default => 'bg-secondary-light',
-            };
+            return TaskStatus::tryFrom($key)?->tone()->dotClass() ?? 'bg-secondary-light';
         }
 
         if ($group === 'priority') {

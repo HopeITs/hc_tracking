@@ -40,7 +40,7 @@ use Livewire\Attributes\Computed;
 trait FiltersProjectDirectory
 {
     /** The views this page can render the filtered portfolio in. */
-    private const VIEWS = ['board', 'timeline', 'table'];
+    private const VIEWS = ['list', 'timeline'];
 
     /** The orders the portfolio can be read in. */
     private const SORTS = ['name', 'start_date', 'end_date', 'updated_at'];
@@ -107,14 +107,23 @@ trait FiltersProjectDirectory
     }
 
     /**
-     * Fall back to the board rather than rendering nothing for a view name
-     * that is not one of ours.
+     * Fall back to the list rather than rendering nothing for a view name
+     * that is not one of ours (old `?view=board` and `?view=table` links too).
      */
     public function updatedView(): void
     {
         if (! in_array($this->view, self::VIEWS, true)) {
-            $this->view = 'board';
+            $this->view = 'list';
         }
+    }
+
+    /**
+     * Normalise a view name read from the query string on first load, which
+     * Livewire hydrates without calling updatedView().
+     */
+    public function mountFiltersProjectDirectory(): void
+    {
+        $this->updatedView();
     }
 
     public function updatedSort(): void
@@ -258,17 +267,6 @@ trait FiltersProjectDirectory
      */
     protected function applySort(Builder $query): Builder
     {
-        if ($this->view === 'board') {
-            $cases = ProjectStatus::live();
-            $arms = [];
-
-            foreach (array_keys($cases) as $position) {
-                $arms[] = 'when status = ? then '.$position;
-            }
-
-            $query->orderByRaw('case '.implode(' ', $arms).' else '.count($cases).' end', array_column($cases, 'value'));
-        }
-
         // Nulls sort last in both date orders, which is what the raw
         // "is null" ordering in front of each column buys.
         return match ($this->sort) {

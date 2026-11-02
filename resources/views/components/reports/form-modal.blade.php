@@ -79,9 +79,8 @@
             </div>
         </x-ui.form-section>
 
-        <x-ui.form-section :title="__('reports.section_summary')" :fields="['executiveSummary', 'keyAchievements', 'challenges', 'lessonsLearned', 'nextPeriodPlans']">
+        <x-ui.form-section :title="__('reports.section_summary')" :fields="['keyAchievements', 'challenges', 'lessonsLearned', 'nextPeriodPlans']">
             <div class="grid gap-x-4 gap-y-3 @2xl/modal:grid-cols-2">
-                <x-ui.form-textarea wire:model="executiveSummary" :label="__('reports.executive_summary')" rows="2" class="@2xl/modal:col-span-2" />
                 <x-ui.form-textarea wire:model="keyAchievements" :label="__('reports.key_achievements')" rows="2" />
                 <x-ui.form-textarea wire:model="challenges" :label="__('reports.challenges')" rows="2" />
                 <x-ui.form-textarea wire:model="lessonsLearned" :label="__('reports.lessons_learned')" rows="2" />

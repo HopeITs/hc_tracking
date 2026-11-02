@@ -223,6 +223,7 @@ new #[Layout('layouts::desk'), Title('titles.task')] class extends Component
     @php $assignees = $this->task->taskAssignees->pluck('employee')->filter(); @endphp
 
     <x-ui.detail-header
+        :back="\App\Support\BackUrl::for(route('tasks.index'))"
         id="task-detail-heading"
         :breadcrumbs="[
             ['label' => __('common.tasks'), 'url' => route('tasks.index')],

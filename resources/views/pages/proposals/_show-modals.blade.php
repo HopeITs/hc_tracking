@@ -9,6 +9,8 @@
 
     @include('pages.proposals._approve-modal')
 
+    @include('pages.proposals._final-report-modal')
+
     @include('pages.proposals._proposal-form')
 
     <x-funding.agreement-modal

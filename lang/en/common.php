@@ -46,7 +46,6 @@ return [
     'drop_or_browse' => ':drop or :browse',
     'edit_name' => 'Edit :name',
     'email' => 'Email',
-    'executive_summary' => 'Executive Summary',
     'external_project_number' => 'External project number',
     'fields_need_attention' => ':count field needs attention|:count fields need attention',
     'funding' => 'Funding',

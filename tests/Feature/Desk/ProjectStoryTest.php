@@ -103,7 +103,7 @@ test('a proposal on no project still opens its own page on the desk', function (
     $this->actingAs(userWithRole('General Manager'))
         ->get(route('proposals.show', ['proposal' => $loose, 'tab' => 'plan']))
         ->assertOk()
-        ->assertSeeHtml('data-proposal-back')
+        ->assertSeeHtml('data-detail-back')
         ->assertSeeHtml('data-tab-panel="plan"');
 });
 
@@ -118,19 +118,43 @@ test('the Story embeds the chosen proposal on the asked tab and ignores a propos
     Livewire::actingAs($viewer)->withQueryParams(['proposal' => (string) $second->id, 'ptab' => 'deadlines'])
         ->test('pages::projects.show', ['project' => $project])
         ->assertSet('embeddedProposalId', $second->id)
-        ->assertSeeHtml('data-test="story-proposal-switch"')
-        ->assertSeeHtml('data-proposal-id="'.$second->id.'"');
+        ->assertSeeHtml('data-proposal-id="'.$second->id.'"')
+        ->assertSeeHtml('data-tab-panel="deadlines"')
+        ->assertDontSeeHtml('data-compact-proposal');
 
     Livewire::actingAs($viewer)->withQueryParams(['ptab' => 'deadlines'])
         ->test('pages::proposals.show', ['proposal' => $second, 'embedded' => true])
         ->assertSet('tab', 'deadlines')
         ->assertSeeHtml('data-tab-panel="deadlines"')
         ->assertSeeHtml('data-embedded-proposal-head')
-        ->assertDontSeeHtml('data-proposal-back');
+        ->assertDontSeeHtml('data-detail-back');
 
     Livewire::actingAs($viewer)->withQueryParams(['proposal' => (string) $stranger->id])
         ->test('pages::projects.show', ['project' => $project])
         ->assertSet('embeddedProposalId', $lead->id);
+});
+
+test('the compact embedded proposal hides the tabs until one is picked', function () {
+    $proposal = storyProject(ProposalStatus::Submitted)->proposals()->first();
+
+    Livewire::actingAs(userWithRole('General Manager'))
+        ->test('pages::proposals.show', ['proposal' => $proposal, 'embedded' => true, 'compact' => true])
+        ->assertSeeHtml('data-compact-proposal')
+        ->assertDontSeeHtml('data-tab-panel')
+        ->set('tab', 'deadlines')
+        ->assertSet('compact', false)
+        ->assertSeeHtml('data-tab-panel="deadlines"')
+        ->assertSeeHtml('data-hide-details')
+        ->set('compact', true)
+        ->assertDontSeeHtml('data-tab-panel');
+});
+
+test('the embedded proposal funding tab shows the table without the overview toggle', function () {
+    $proposal = storyProject(ProposalStatus::Approved)->proposals()->first();
+
+    Livewire::actingAs(userWithRole('General Manager'))->withQueryParams(['ptab' => 'funding'])
+        ->test('pages::proposals.show', ['proposal' => $proposal, 'embedded' => true])
+        ->assertDontSee(__('finance_tables.view_overview'));
 });
 
 test('the embedded proposal keeps money from a viewer without money permission', function () {

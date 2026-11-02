@@ -5,22 +5,22 @@ use App\Enums\MilestoneStatus;
 use App\Enums\MonthlyReportStatus;
 use App\Enums\ProjectStatus;
 use App\Enums\ProposalStatus;
-use App\Enums\ReportStatus;
 use App\Enums\ReportTemplateStatus;
+use App\Enums\ResultType;
 use App\Enums\TaskStatus;
 use App\Models\Activity;
-use App\Models\AnnualPlan;
 use App\Models\Donor;
 use App\Models\DonorProposal;
 use App\Models\DonorReport;
 use App\Models\Indicator;
+use App\Models\LibraryIndicator;
 use App\Models\Milestone;
 use App\Models\MonthlyReport;
 use App\Models\PlanIndicator;
 use App\Models\Project;
 use App\Models\Proposal;
-use App\Models\Report;
 use App\Models\ReportTemplate;
+use App\Models\Result;
 use App\Models\Task;
 use App\Models\TransfersTracking;
 use App\Models\User;
@@ -80,6 +80,25 @@ test('the stepper moves a task assigned to me up to under review, never to done'
     expect($mine->fresh()->status)->toBe(TaskStatus::UnderReview);
 });
 
+test('the tasks card filters by the four phases only, starting on To do', function () {
+    $me = userWithRole('Team Member', insertHrEmployee());
+    Task::factory()->create(['title' => 'Still to do', 'created_by' => $me->id]);
+    Task::factory()->create(['title' => 'Being done', 'created_by' => $me->id, 'status' => TaskStatus::InProgress]);
+
+    $card = Livewire::actingAs($me)->test('desk.panels.tasks', ['size' => 'L'])
+        ->assertSet('filter', TaskStatus::Todo->value)
+        ->assertSee('Still to do')
+        ->assertDontSee('Being done')
+        ->assertDontSeeHtml("setFilter('open')");
+
+    foreach (TaskStatus::cases() as $phase) {
+        $card->assertSeeHtml("setFilter('{$phase->value}')");
+    }
+
+    $card->call('setFilter', 'open')->assertSet('filter', TaskStatus::Todo->value)
+        ->call('setFilter', TaskStatus::InProgress->value)->assertSee('Being done')->assertDontSee('Still to do');
+});
+
 test('a task outside the viewer\'s list cannot be completed from the panel', function () {
     $me = userWithRole('Team Member', insertHrEmployee());
     $other = Task::factory()->create(['title' => 'Somebody else']);
@@ -136,9 +155,39 @@ test('the dates lens opens the timeline as its full register', function () {
     Project::factory()->create();
 
     Livewire::actingAs(User::factory()->role('General Manager')->create())->test('desk.panels.projects', ['size' => 'XL'])
+        ->assertSeeHtml('href="'.route('timeline.index').'"')
+        ->call('setLens', 'stage')
         ->assertSeeHtml('href="'.route('projects.index').'"')
         ->call('setLens', 'dates')
         ->assertSeeHtml('href="'.route('timeline.index').'"');
+});
+
+test('the projects panel opens on the dates lens and keeps start and end under the name in every lens', function () {
+    Project::factory()->create(['name' => 'Aleppo Wells', 'start_date' => '2026-01-01', 'end_date' => '2026-12-31']);
+    Project::factory()->create(['name' => 'Undated Clinic', 'start_date' => null, 'end_date' => null]);
+
+    Livewire::actingAs(User::factory()->role('General Manager')->create())->test('desk.panels.projects', ['size' => 'XL'])
+        ->assertSet('lens', 'dates')
+        ->assertSeeHtml('data-lens="dates"')
+        ->call('setLens', 'stage')
+        ->assertSeeHtml('data-lens="stage"')
+        ->assertSee('Jan 2026 → Dec 2026')
+        ->assertSee('— → —')
+        ->call('setLens', 'nonsense')
+        ->assertSet('lens', 'dates');
+});
+
+test('a target behind links to its indicator and to its project', function () {
+    $project = Project::factory()->create(['name' => 'Aleppo Wells']);
+    $indicator = Indicator::factory()->forProject($project->id)->create(['name' => 'People reached', 'baseline' => 0, 'target' => 1000]);
+    $user = User::factory()->role('Super Admin')->create();
+    insertIndicatorProgress($indicator->id, $user->id, '2026-03-31', '10.00');
+
+    Livewire::actingAs($user)->test('desk.panels.targets', ['size' => 'L'])
+        ->assertSeeHtml('href="'.route('indicators.index', ['inspect' => $indicator->id]).'" wire:navigate')
+        ->assertSeeHtml('href="'.route('projects.show', $project).'" wire:navigate')
+        ->assertSee('People reached')
+        ->assertSee('Aleppo Wells');
 });
 
 test('someone who owns no project sees every project without picking a scope', function () {
@@ -273,25 +322,6 @@ test('each project lens shows its own line: money counts only its currency, resu
         ->call('setLens', 'money')->assertSee('€40,000');
 });
 
-test('annual plans compare done against expected and count the targets behind', function () {
-    $plan = AnnualPlan::factory()->create(['year' => 2026]);
-    $indicator = Indicator::factory()->create(['measure' => 'numeric']);
-    $behind = PlanIndicator::factory()->create(['source_id' => $plan->id, 'indicator_id' => $indicator->id, 'target' => 100]);
-    $ahead = PlanIndicator::factory()->create(['source_id' => $plan->id, 'indicator_id' => $indicator->id, 'target' => 100]);
-    Report::factory()->create(['plan_indicator_id' => $behind->id, 'status' => ReportStatus::Approved, 'value' => 10]);
-    Report::factory()->create(['plan_indicator_id' => $ahead->id, 'status' => ReportStatus::Approved, 'value' => 90]);
-
-    $card = Livewire::actingAs(User::factory()->role('Super Admin')->create())->test('desk.panels.plans', ['size' => 'L']);
-    $row = $card->instance()->rows->first();
-
-    expect($row['done'])->toBe(50.0)
-        ->and($row['behind'])->toBe(1)
-        ->and($row['onPace'])->toBeFalse()
-        ->and(round($card->instance()->expected()))->toBe(71.0);
-
-    $card->set('facets', ['status' => __('desk.plan_on_pace')])->assertSee(__('desk.panel.plans.empty'));
-});
-
 test('report templates status lists running projects missing a template first, then pending, then approved', function () {
     $this->seed(RolesAndPermissionsSeeder::class);
     $missing = Project::factory()->create(['name' => 'No Template Yet', 'status' => ProjectStatus::Active]);
@@ -307,6 +337,46 @@ test('report templates status lists running projects missing a template first, t
         ['No Template Yet', 'missing'], ['Pending One', 'pending'], ['Approved One', 'approved'],
     ]);
     $card->assertSee(__('desk.template_action.missing'))->assertDontSee('Closed Long Ago');
+});
+
+test('Create on a project with no template pre-fills it and opens its Report template tab; Review and Open link to that tab', function () {
+    $this->seed(RolesAndPermissionsSeeder::class);
+    $project = Project::factory()->approved()->create(['name' => 'Ready To Plan', 'start_date' => '2026-11-01', 'end_date' => '2027-10-31']);
+    $pending = Project::factory()->create(['name' => 'Pending One', 'status' => ProjectStatus::Active]);
+    ReportTemplate::factory()->create(['project_id' => $pending->id, 'status' => ReportTemplateStatus::Pending]);
+    $proposal = Proposal::factory()->create(['status' => ProposalStatus::Approved, 'actual_date_begin' => '2026-11-15', 'actual_date_end' => '2027-10-20']);
+    $proposal->projects()->attach($project->id, ['target_beneficiaries' => 120]);
+    $output = Result::factory()->create(['type' => ResultType::Output, 'program_id' => $project->program_id, 'proposal_id' => $proposal->id]);
+    $indicator = Indicator::factory()->create(['result_id' => $output->id, 'library_indicator_id' => LibraryIndicator::factory()->create()->id]);
+    PlanIndicator::factory()->forProposal($proposal)->create(['indicator_id' => $indicator->id, 'project_id' => $project->id]);
+
+    Livewire::actingAs(User::factory()->role('MEAL')->create())->test('desk.panels.templates', ['size' => 'L'])
+        ->assertSeeHtml('data-template-create="'.$project->id.'"')
+        ->assertSeeHtml(e(route('projects.show', ['project' => $pending, 'tab' => 'template'])))
+        ->call('createTemplate', $project->id)
+        ->assertRedirect(route('projects.show', ['project' => $project, 'tab' => 'template']));
+
+    expect(ReportTemplate::query()->where('project_id', $project->id)->value('status'))->toBe(ReportTemplateStatus::Pending);
+});
+
+test('Create on a project with nothing to plan makes no template and stays on the desk', function () {
+    $this->seed(RolesAndPermissionsSeeder::class);
+    $project = Project::factory()->create(['name' => 'No Targets Yet', 'status' => ProjectStatus::Active]);
+
+    Livewire::actingAs(User::factory()->role('MEAL')->create())->test('desk.panels.templates', ['size' => 'L'])
+        ->call('createTemplate', $project->id)
+        ->assertNoRedirect();
+
+    expect(ReportTemplate::query()->where('project_id', $project->id)->exists())->toBeFalse();
+});
+
+test('someone who does not manage report templates cannot create one from the panel', function () {
+    $this->seed(RolesAndPermissionsSeeder::class);
+    $project = Project::factory()->create(['status' => ProjectStatus::Active]);
+
+    Livewire::actingAs(User::factory()->role('Team Member')->create())->test('desk.panels.templates', ['size' => 'L'])
+        ->call('createTemplate', $project->id)
+        ->assertForbidden();
 });
 
 test('transfers switch view from the filter popup, and a bad value falls back to what is still to arrive', function () {

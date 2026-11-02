@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Enums;
 
+use App\Enums\Concerns\HasStatusTone;
 use App\Enums\Concerns\HasTranslatedLabel;
 
 /**
@@ -15,7 +16,7 @@ use App\Enums\Concerns\HasTranslatedLabel;
  * "Missed" and "overdue" are NOT members here — they are derived, not stored.
  * See Milestone::isMissed() and Milestone::isOverdue().
  */
-enum MilestoneStatus: string
+enum MilestoneStatus: string implements HasStatusTone
 {
     use HasTranslatedLabel;
 
@@ -33,5 +34,19 @@ enum MilestoneStatus: string
     public static function values(): array
     {
         return array_column(self::cases(), 'value');
+    }
+
+    /**
+     * The shared visual tone for this case (W-28); exhaustive, no default arm.
+     */
+    public function tone(): StatusTone
+    {
+        return match ($this) {
+            self::Planned => StatusTone::Neutral,
+            self::Ongoing => StatusTone::Active,
+            self::Reached => StatusTone::Good,
+            self::Postponed => StatusTone::Warn,
+            self::Cancelled => StatusTone::Neutral,
+        };
     }
 }

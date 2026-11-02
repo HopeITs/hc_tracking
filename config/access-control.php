@@ -38,7 +38,6 @@ $groups = [
     'narrative-questions' => ['manage'],
     'tasks' => ['view', 'create', 'update', 'delete'],
     'calendar' => ['view'],
-    'executive-summary' => ['view'],
     'accounts' => ['view', 'create', 'update', 'delete'],
     'cities' => ['view'],
     'activity-log' => ['view'],
@@ -56,7 +55,7 @@ foreach ($groups as $module => $actions) {
 // Every role views every module (user decision 2026-09-25) — except the
 // activity log (Super Admin and General Manager) and the money pages (user
 // decision 2026-09-29), which only the finance-facing roles below add back.
-$financeViews = ['transfers.view', 'funding-agreements.view', 'accounts.view', 'executive-summary.view'];
+$financeViews = ['transfers.view', 'funding-agreements.view', 'accounts.view'];
 $fundraisingViews = ['donors.view', 'proposals.view'];
 $restrictedViews = ['activity-log.view', ...$financeViews, ...$fundraisingViews];
 $viewEverything = array_values(array_filter(

@@ -114,7 +114,7 @@ test('the portfolio reads every project\'s critical path and predecessors', func
     expect($rows['milestone-'.$last->id])->toMatchArray(['critical' => true, 'float' => 0, 'predecessors' => $rows['milestone-'.$first->id]['wbs'].'FS'])
         ->and($rows['milestone-'.$first->id]['critical'])->toBeFalse()
         ->and($rows['milestone-'.$first->id]['float'])->toBeGreaterThan(0)
-        ->and($rows['project-'.$project->id])->toMatchArray(['planUrl' => route('projects.show', ['project' => $project, 'tab' => 'plan'])]);
+        ->and($rows['project-'.$project->id])->toMatchArray(['planUrl' => route('projects.show', $project)]);
 });
 
 test('the portfolio groups projects by status or by owner', function () {

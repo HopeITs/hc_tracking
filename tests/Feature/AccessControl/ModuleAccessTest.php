@@ -48,7 +48,6 @@ dataset('fundraising pages', [
 ]);
 
 dataset('finance pages', [
-    'executive summary' => [fn (): string => route('executive-summary.index')],
     'funding agreements' => [fn (): string => route('funding-agreements.index')],
     'funding agreement' => [fn (): string => route('funding-agreements.show', DonorProposal::factory()->create())],
     'transfers' => [fn (): string => route('transfers.index')],
@@ -101,7 +100,6 @@ test('Public Relations Manager opens the funding agreements', function (Closure 
 test('Public Relations Manager is refused the other finance pages', function (Closure $url) {
     $this->actingAs(userWithRole('Public Relations Manager'))->get($url())->assertForbidden();
 })->with([
-    'executive summary' => [fn (): string => route('executive-summary.index')],
     'transfers' => [fn (): string => route('transfers.index')],
     'accounts' => [fn (): string => route('admin.accounts.index')],
 ]);

@@ -1,6 +1,12 @@
-@props(['breadcrumbs' => [], 'title', 'subtitle' => null, 'titleClass' => null, 'unread' => false])
+@props(['breadcrumbs' => [], 'title', 'subtitle' => null, 'titleClass' => null, 'unread' => false, 'back' => null])
 
 <header data-detail-header {{ $attributes->class('flex flex-col gap-3 border-b border-secondary-soft pb-4 dark:border-line') }}>
+    @if ($back !== null)
+        <div>
+            <a class="dk-back" href="{{ $back }}" wire:navigate data-detail-back><x-desk.icon name="back" class="dk-flip" />{{ __('common.back') }}</a>
+        </div>
+    @endif
+
     @if ($breadcrumbs !== [])
         <nav aria-label="{{ __('ui.breadcrumb') }}" class="flex flex-wrap items-center gap-1.5 text-xs text-secondary-medium dark:text-ink-muted">
             @foreach ($breadcrumbs as $index => $crumb)

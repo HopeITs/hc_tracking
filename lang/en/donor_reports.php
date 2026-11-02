@@ -148,4 +148,14 @@ return [
         'fundraising_manager' => 'Default: the Projects & Fundraising Manager',
         'finance_manager' => 'Default: the Finance Manager',
     ],
+
+    // Register
+    'search_reports' => 'Search donor reports',
+    'search_by_proposal' => 'Proposal name',
+    'all_proposals' => 'All proposals',
+    'all_states' => 'All states',
+    'report' => 'Report',
+    'none' => 'No donor reports yet',
+    'none_body' => 'Reports owed to donors appear here once they are recorded on an agreement or composed.',
+    'no_matching' => 'No matching donor reports',
 ];

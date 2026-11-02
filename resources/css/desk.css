@@ -172,7 +172,7 @@
  }
 .dk-stage-name{ font-size:12px;font-weight:700;color:var(--ink-3);margin-top:5px;display:block }
 /* Lens values */
-.dk-meter{ position:relative;height:6px;border-radius:6px;background:var(--sunk);overflow:hidden;margin-top:6px }
+.dk-meter{ display:block;position:relative;height:6px;border-radius:6px;background:var(--sunk);overflow:hidden;margin-top:6px }
 .dk-meter b{ position:absolute;inset-block:0;inset-inline-start:0;border-radius:6px;background:var(--money) }
 .dk-meter.dk-res b{ background:var(--ink-2) }
 .dk-meter .dk-tick{ position:absolute;inset-block:-3px;width:2px;background:var(--ink);opacity:.55 }
@@ -488,48 +488,81 @@
 .dk-seg button{ border:0;background:none;height:26px;padding-inline:9px;border-radius:7px;font-size:12px;font-weight:700;color:var(--ink-3);cursor:pointer;display:inline-flex;align-items:center;gap:5px;white-space:nowrap }
 .dk-seg button[aria-pressed="true"]{ background:var(--paper);color:var(--ink);box-shadow:0 1px 2px rgba(0,0,0,.12) }
 .dk-seg button svg.dk-i{ width:15px;height:15px }
-.dk-hello{ display:flex;flex-wrap:wrap;align-items:flex-end;justify-content:space-between;gap:12px 24px;padding-block:4px 20px }
+.dk-hello{ display:grid;grid-template-columns:minmax(0,1fr);grid-template-areas:"main" "start";align-items:end;gap:18px 32px;padding-block:4px 24px }
+.dk-hello-main{ grid-area:main;min-width:0 }
+/* Start something: pill-shaped create actions; one scrolling row on phones */
+.dk-start{ grid-area:start;display:flex;flex-wrap:wrap;align-items:center;gap:10px 14px;min-width:0 }
+.dk-start-row{ display:flex;align-items:center;gap:8px;min-width:0;flex-wrap:wrap }
+.dk-start-h{ font-size:12px;font-weight:800;letter-spacing:.08em;text-transform:uppercase;color:var(--ink-3);margin-inline-end:2px }
+[lang="ar"] .dk-start-h{ letter-spacing:0;font-size:13px }
+.dk-start-btn{ display:inline-flex;align-items:center;gap:7px;height:36px;padding-inline:12px 14px;border-radius:999px;border:1px solid var(--line-2);background:var(--paper);color:var(--ink);font-weight:700;font-size:13.5px;white-space:nowrap;text-decoration:none;flex:none;transition:border-color .15s,background .15s }
+.dk-start-btn:hover{ border-color:var(--ink-3);background:var(--tint) }
+.dk-start-btn svg.dk-i{ width:16px;height:16px;color:var(--ink-3) }
+/* Undo after removing a panel */
+.dk-undo{ position:fixed;z-index:40;inset-block-end:calc(20px + env(safe-area-inset-bottom,0px));inset-inline-start:50%;translate:-50% 0;display:flex;align-items:center;gap:10px;padding:8px 8px 8px 16px;border-radius:999px;background:var(--ink);color:var(--paper);box-shadow:var(--dk-shadow);font-size:13.5px;font-weight:700;max-width:calc(100vw - 32px) }
+[dir="rtl"] .dk-undo{ translate:50% 0;padding:8px 16px 8px 8px }
+.dk-undo .dk-btn{ background:var(--paper);color:var(--ink);border-color:transparent }
+.dk-undo .dk-iconbtn{ color:var(--paper) }
+.dk-draft-n{ margin:0 }
+@media (max-width: 760px){ .dk-start{ flex-wrap:nowrap;flex-direction:column;align-items:stretch }
+.dk-start-row{ flex-wrap:nowrap;overflow-x:auto;scrollbar-width:none;margin-inline:-16px;padding-inline:16px;scroll-snap-type:x proximity }
+.dk-start-row::-webkit-scrollbar{ display:none }
+.dk-start-btn{ scroll-snap-align:start }
+ }
 .dk-hello h1{ font-size:clamp(26px,3.2vw,40px);max-width:none }
 .dk-hello .dk-lede{ font-size:15.5px }
-.dk-grid{ display:grid;grid-template-columns:repeat(12,minmax(0,1fr));grid-auto-flow:row dense;align-items:start;gap:14px }
-.dk-panel{ grid-column:span var(--span);max-height:420px;display:flex;flex-direction:column;min-width:0;background:var(--paper);border:1px solid var(--line);border-radius:14px;position:relative;transition:box-shadow .2s,transform .2s,opacity .2s }
-.dk-panel[style*="--span:12"]{ max-height:none }
+/* Every panel is the same height (--panel-h), so rows and columns stay aligned whatever is resized or moved */
+/* Panels are a fixed height each (body never spills), measured in row units: a panel spans --rows units of --row-unit plus the gaps between them, so --panel-h is always its real height */
+:root{ --row-unit:104px;--grid-gap:14px;--panel-r:18px;--panel-shadow:0 1px 2px color-mix(in srgb,var(--ink) 6%,transparent),0 6px 18px -8px color-mix(in srgb,var(--ink) 14%,transparent);--panel-h:calc(4 * var(--row-unit) + 3 * var(--grid-gap)) }
+.dk-grid{ display:grid;grid-template-columns:repeat(12,minmax(0,1fr));grid-auto-rows:var(--row-unit);grid-auto-flow:row dense;align-items:stretch;gap:var(--grid-gap) }
+.dk-panel{ --panel-h:calc(var(--rows,4) * var(--row-unit) + (var(--rows,4) - 1) * var(--grid-gap));grid-column:span var(--span);grid-row:span var(--rows,4);height:var(--panel-h);display:flex;flex-direction:column;min-width:0;background:var(--paper);border:1px solid var(--line);border-radius:var(--panel-r);box-shadow:var(--panel-shadow);position:relative;transition:box-shadow .2s,transform .2s,opacity .2s }
+.dark .dk-panel{ --panel-shadow:0 1px 0 color-mix(in srgb,var(--ink) 5%,transparent) inset,0 10px 24px -12px var(--scrim) }
 .dk-panel.dk-dragging{ opacity:.4 }
 .dk-panel.dk-drop{ box-shadow:0 0 0 2px var(--brand) }
-.dk-ph{ display:flex;align-items:center;gap:6px;padding:10px 10px 6px 6px;min-width:0 }
-[dir="rtl"] .dk-ph{ padding:10px 6px 6px 10px }
-.dk-ph h2{ font-size:14px;font-weight:800;white-space:nowrap;overflow:hidden;text-overflow:ellipsis }
+.dk-panel.dk-resizing{ box-shadow:0 0 0 2px var(--ink-3);z-index:5 }
+/* Staggered rise on first paint; Livewire morphs keep the element, so it does not replay */
+@keyframes dk-rise{ from{ opacity:0;translate:0 10px } to{ opacity:1;translate:none } }
+@media (prefers-reduced-motion: no-preference){ .dk-grid>.dk-panel{ animation:dk-rise .42s cubic-bezier(.2,.7,.2,1) both;animation-delay:calc(min(var(--i,0),10) * 45ms) } }
+.dk-ph{ display:flex;align-items:flex-start;gap:8px;padding:14px 16px 8px 12px;min-width:0 }
+[dir="rtl"] .dk-ph{ padding:14px 12px 8px 16px }
+.dk-ph h2{ font-size:15px;font-weight:800;line-height:1.3;padding-top:3px;min-width:0;overflow-wrap:anywhere;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden }
+.dk-ph>.dk-pc{ margin-top:4px }
+/* Header tools fade in on hover / keyboard focus where a pointer can hover; always shown on touch */
+@media (hover: hover){
+.dk-ph>.dk-psearch-btn,.dk-ph>.dk-pfilter,.dk-ph>[data-panel-register],.dk-ph>.dk-pmenu{ opacity:0;transition:opacity .15s }
+.dk-panel:hover .dk-ph>*,.dk-panel:focus-within .dk-ph>*,.dk-ph>.dk-on,.dk-ph>.dk-pmenu:has([aria-expanded="true"]){ opacity:1 }
+}
 .dk-pc{ font-size:11.5px;font-weight:800;min-width:22px;height:20px;padding-inline:6px;border-radius:999px;background:var(--brand);color:var(--on-brand);display:inline-grid;place-items:center }
 .dk-pspace{ flex:1 }
-.dk-grip{ width:24px;height:28px;border:0;background:none;color:var(--faint);cursor:grab;border-radius:6px;display:grid;place-items:center;flex:none }
-.dk-grip:hover{ background:var(--sunk);color:var(--ink-2) }
+.dk-grip{ width:30px;height:30px;border:0;background:var(--sunk);color:var(--ink-2);cursor:grab;border-radius:9px;display:grid;place-items:center;flex:none }
+.dk-grip>svg{ grid-area:1/1;transition:opacity .15s }
+.dk-grip:hover{ color:var(--ink) }
 .dk-grip:active{ cursor:grabbing }
-.dk-grip svg.dk-i{ width:16px;height:16px;fill:currentColor;stroke:none }
+.dk-grip svg.dk-grip-dots{ width:16px;height:16px;fill:currentColor;stroke:none;opacity:0 }
+.dk-panel:hover .dk-grip-dots,.dk-grip:focus-visible .dk-grip-dots{ opacity:1 }
+.dk-pop>button svg.dk-up{ transform:rotate(-90deg) }
 .dk-pmenu{ position:relative }
 .dk-pop{ position:absolute;z-index:25;top:34px;inset-inline-end:0;width:220px;background:var(--paper);border:1px solid var(--line);border-radius:12px;box-shadow:var(--dk-shadow);padding:8px;display:grid;gap:2px }
 .dk-pop-h{ font-size:11px;font-weight:800;letter-spacing:.08em;text-transform:uppercase;color:var(--ink-3);padding:2px 6px }
 [lang="ar"] .dk-pop-h{ letter-spacing:0;font-size:12px }
-.dk-pop .dk-sizes{ display:grid;grid-template-columns:repeat(5,1fr);gap:3px;padding:2px 2px 6px;border-bottom:1px solid var(--line);margin-bottom:4px }
-.dk-pop .dk-sizes button{ height:30px;border-radius:7px;border:1px solid var(--line-2);background:none;font-weight:800;font-size:12px;cursor:pointer }
-.dk-pop .dk-sizes button[aria-checked="true"]{ background:var(--ink);color:var(--paper);border-color:var(--ink) }
 .dk-pop>button{ display:flex;align-items:center;gap:8px;height:34px;padding-inline:8px;border:0;background:none;border-radius:8px;font-size:13px;font-weight:700;cursor:pointer;color:var(--ink);text-align:start }
 .dk-pop>button:hover{ background:var(--sunk) }
 .dk-pop>button.dk-danger{ color:var(--bad) }
-.dk-ptools{ display:flex;flex-wrap:wrap;gap:6px;align-items:center;padding:0 12px 8px }
-.dk-pb{ flex:0 1 auto;min-height:0;overflow:auto;padding:0 12px 8px;overscroll-behavior:contain }
-.dk-panel[style*="--span:12"] .dk-pb{ overflow:visible }
-.dk-pf{ display:flex;align-items:center;justify-content:space-between;gap:8px;padding:6px 10px 8px 12px;border-top:1px solid var(--line);min-height:42px }
+.dk-ptools{ display:flex;flex-wrap:wrap;gap:6px;align-items:center;padding:0 16px 8px }
+.dk-pb{ flex:1 1 auto;min-height:0;overflow:clip;padding:0 16px 10px }
+.dk-pf{ margin-top:auto;flex:none;display:flex;align-items:center;justify-content:space-between;gap:8px;padding:6px 10px 8px 12px;border-top:1px solid var(--line);min-height:42px }
 .dk-pgb{ display:inline-flex;align-items:center;gap:4px }
 .dk-pempty{ padding:20px 4px;color:var(--ink-3);font-size:14px }
-.dk-addtile{ grid-column:span 3;min-height:180px;border:2px dashed var(--line-2);border-radius:14px;background:none;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px;color:var(--ink-3);cursor:pointer;font-weight:800;font-size:14px }
-.dk-grid-tail{ margin-top:14px }
+.dk-addtile{ grid-column:span 3;height:calc(2 * var(--row-unit) + var(--grid-gap));border:2px dashed var(--line-2);border-radius:var(--panel-r);background:none;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px;color:var(--ink-3);cursor:pointer;font-weight:800;font-size:14px }
+.dk-grid-tail{ margin-top:var(--grid-gap);grid-auto-rows:auto }
 .dk-addtile:hover{ border-color:var(--ink-3);color:var(--ink) }
 .dk-addtile small{ font-weight:400;font-size:12.5px }
 .dk-addtile svg.dk-i{ width:26px;height:26px }
 /* items inside panels */
 .dk-panel .dk-items>li{ grid-template-columns:12px minmax(0,1fr);padding-block:11px;gap:4px 10px }
 /* Needs you: the primary card, a quiet brand accent on its leading edge */
-.dk-panel.dk-needs{ border-inline-start:3px solid var(--brand) }
+.dk-panel.dk-needs{ border-color:color-mix(in srgb,var(--brand) 22%,var(--line)) }
+.dk-panel.dk-needs::before{ content:"";position:absolute;inset-block-start:0;inset-inline:18px;height:3px;border-radius:0 0 3px 3px;background:var(--brand) }
 .dk-needs .dk-it{ overflow:hidden;text-overflow:ellipsis;white-space:nowrap }
 .dk-needs .dk-who{ color:var(--ink-2);font-weight:700 }
 .dk-allclear{ display:flex;align-items:center;gap:12px;padding:18px 4px }
@@ -635,12 +668,6 @@ button.dk-step.dk-go:hover,button.dk-step.dk-go:focus-visible{ background:var(--
 .dk-ag-m a,.dk-ag-m .dk-is{ overflow:hidden;text-overflow:ellipsis;white-space:nowrap }
 .dk-ag-m a{ font-size:14px;font-weight:700;color:var(--ink) }
 .dk-ag-m .dk-is{ font-size:12.5px;margin-top:1px }
-.dk-mcal{ display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:3px;margin-bottom:6px }
-.dk-mcal .dk-wd{ font-size:10.5px;color:var(--ink-3);text-align:center;font-weight:800;padding-bottom:2px }
-.dk-mday{ display:grid;grid-template-rows:1fr 8px;place-items:center;aspect-ratio:1/1;max-height:46px;width:100%;padding:3px 0;border:0;border-radius:8px;background:none;cursor:pointer;color:var(--ink-2);font-size:12.5px;line-height:1 }
-.dk-mday:hover{ background:var(--sunk) }
-.dk-mday.dk-today{ color:var(--brand-ink);font-weight:800;box-shadow:inset 0 0 0 2px var(--brand) }
-.dk-mday.dk-on{ background:var(--sunk);color:var(--ink) }
 .dk-mdots{ display:flex;align-items:center;gap:2px;height:8px }
 .dk-mdots i{ width:5px;height:5px;border-radius:50%;background:var(--k,var(--ink-3)) }
 .dk-mdots b{ font-size:8.5px;font-weight:800;color:var(--ink-3) }
@@ -678,29 +705,10 @@ button.dk-step.dk-go:hover,button.dk-step.dk-go:focus-visible{ background:var(--
 .dk-legend button:hover{ background:var(--sunk) }
 .dk-legend button.dk-on{ background:var(--sunk);color:var(--ink);font-weight:700 }
 .dk-legend button .dk-num{ color:var(--ink-2) }
-/* At a glance: a typographic row with thin dividers at W/XL, two columns at M/L, a list at S */
-.dk-glance{ display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:0 }
-.dk-glance>li{ min-width:0;border-bottom:1px solid var(--line) }
-.dk-gl-a{ display:grid;gap:2px;align-content:start;padding:10px 12px 10px 0;color:inherit;border-radius:8px }
-[dir="rtl"] .dk-gl-a{ padding:10px 0 10px 12px }
-a.dk-gl-a:hover strong{ text-decoration:underline;text-decoration-thickness:2px }
-.dk-gl-a strong{ font-size:clamp(26px,2.6vw,36px);font-weight:800;letter-spacing:-.02em;line-height:1.05;color:var(--ink) }
-.dk-gl-l{ font-size:12.5px;color:var(--ink-2);line-height:1.35 }
-.dk-gl-d{ font-size:12px;font-weight:700;color:var(--ink-3) }
-.dk-gl-d.dk-good{ color:var(--good) }
-.dk-gl-d.dk-bad{ color:var(--bad) }
-.dk-panel[style*="--span:8"] .dk-glance,.dk-panel[style*="--span:12"] .dk-glance{ grid-template-columns:repeat(var(--figs),minmax(0,1fr)) }
-.dk-panel[style*="--span:8"] .dk-glance>li,.dk-panel[style*="--span:12"] .dk-glance>li{ border-bottom:0;border-inline-end:1px solid var(--line);padding-inline-start:14px }
-.dk-panel[style*="--span:8"] .dk-glance>li:first-child,.dk-panel[style*="--span:12"] .dk-glance>li:first-child{ padding-inline-start:0 }
-.dk-panel[style*="--span:8"] .dk-glance>li:last-child,.dk-panel[style*="--span:12"] .dk-glance>li:last-child{ border-inline-end:0 }
-.dk-panel[style*="--span:3"] .dk-glance{ grid-template-columns:1fr }
-.dk-panel[style*="--span:3"] .dk-gl-a{ grid-template-columns:auto minmax(0,1fr);align-items:baseline;column-gap:10px;padding-block:7px }
-.dk-panel[style*="--span:3"] .dk-gl-a strong{ font-size:22px;grid-row:span 2 }
-@media (max-width: 1279px){ .dk-panel[style*="--span:8"] .dk-glance{ grid-template-columns:repeat(3,minmax(0,1fr));row-gap:8px } }
 /* Proposal pipeline: fixed columns so the status pill sits at the same x on every row; two lines at S/M */
 .dk-pl-sum{ font-size:12.5px;color:var(--ink-3);margin:0 0 6px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis }
-.dk-pl>li{ display:grid;grid-template-columns:minmax(0,1.4fr) minmax(0,1fr) 132px 74px 28px;grid-template-areas:"n d s t o";align-items:center;gap:2px 12px;padding-block:9px;border-bottom:1px solid var(--line) }
-.dk-pl.dk-pl-money>li{ grid-template-columns:minmax(0,1.4fr) minmax(0,1fr) 132px 104px 74px 28px;grid-template-areas:"n d s m t o" }
+.dk-pl>li{ display:grid;grid-template-columns:minmax(0,1.4fr) minmax(0,1fr) 168px 74px 28px;grid-template-areas:"n d s t o";align-items:center;gap:2px 12px;padding-block:9px;border-bottom:1px solid var(--line) }
+.dk-pl.dk-pl-money>li{ grid-template-columns:minmax(0,1.4fr) minmax(0,1fr) 168px 104px 74px 28px;grid-template-areas:"n d s m t o" }
 .dk-pl>li:last-child{ border-bottom:0 }
 .dk-pl-n{ grid-area:n;min-width:0;font-size:14px;font-weight:700;color:var(--ink);overflow:hidden;text-overflow:ellipsis;white-space:nowrap }
 .dk-pl-d{ grid-area:d;min-width:0;font-size:12.5px;color:var(--ink-3);overflow:hidden;text-overflow:ellipsis;white-space:nowrap }
@@ -710,10 +718,12 @@ a.dk-gl-a:hover strong{ text-decoration:underline;text-decoration-thickness:2px 
 .dk-pl-t{ grid-area:t;text-align:end;font-size:12px;color:var(--ink-3);white-space:nowrap }
 .dk-pl-t.dk-bad{ color:var(--bad);font-weight:700 }
 .dk-pl-o{ grid-area:o;display:flex;justify-content:flex-end }
-.dk-panel[style*="--span:6"] .dk-pl>li{ grid-template-columns:minmax(0,1fr) 132px 74px 28px;grid-template-areas:"n s t o" "d s t o" }
-.dk-panel[style*="--span:6"] .dk-pl.dk-pl-money>li{ grid-template-columns:minmax(0,1fr) 120px 96px 70px 28px;grid-template-areas:"n s m t o" "d s m t o" }
+.dk-panel[style*="--span:6"] .dk-pl>li{ grid-template-columns:minmax(0,1fr) 168px 74px 28px;grid-template-areas:"n s t o" "d s t o" }
+.dk-panel[style*="--span:6"] .dk-pl.dk-pl-money>li{ grid-template-columns:minmax(0,1fr) 160px 96px 70px 28px;grid-template-areas:"n s m t o" "d s m t o" }
 .dk-panel[style*="--span:3"] .dk-pl>li,.dk-panel[style*="--span:4"] .dk-pl>li,.dk-panel[style*="--span:3"] .dk-pl.dk-pl-money>li,.dk-panel[style*="--span:4"] .dk-pl.dk-pl-money>li{ grid-template-columns:minmax(0,1fr) auto;grid-template-areas:"n s" "d d" "m t";row-gap:3px }
 .dk-panel[style*="--span:3"] .dk-pl-o,.dk-panel[style*="--span:4"] .dk-pl-o{ display:none }
+/* Phone-width pipeline card (any span): name and status, donor, then money and deadline. Unlayered to beat the span rules above. */
+@container pb (max-width: 379px){ .dk-panel .dk-pb .dk-pl>li,.dk-panel .dk-pb .dk-pl.dk-pl-money>li{ grid-template-columns:minmax(0,1fr) auto;grid-template-areas:"n s" "d d" "m t";row-gap:3px } .dk-panel .dk-pb .dk-pl-o{ display:none } }
 .dk-panel[style*="--span:3"] .dk-pl-m,.dk-panel[style*="--span:4"] .dk-pl-m{ text-align:start }
 .dk-panel[style*="--span:3"] .dk-pl-d::after,.dk-panel[style*="--span:4"] .dk-pl-d::after{ content:attr(data-owner) }
 /* Funding position: small totals line, then agreement rows (name · bar · amounts · next tranche) */
@@ -723,7 +733,7 @@ a.dk-gl-a:hover strong{ text-decoration:underline;text-decoration-thickness:2px 
 .dk-fp>li:last-child{ border-bottom:0 }
 .dk-fp-n{ grid-area:n;min-width:0;font-size:14px;font-weight:700;color:var(--ink);overflow:hidden;text-overflow:ellipsis;white-space:nowrap }
 .dk-fp-n .dk-is{ font-weight:400;font-size:12.5px }
-.dk-fp-bar{ grid-area:b }
+.dk-fp-bar{ grid-area:b;display:block;min-width:0 }
 .dk-fp-bar .dk-meter{ margin:0 }
 [data-status="overdue"] .dk-fp-bar .dk-meter b{ background:var(--bad) }
 .dk-fp-v{ grid-area:v;font-size:12.5px;white-space:nowrap;text-align:end }
@@ -774,17 +784,6 @@ a.dk-gl-a:hover strong{ text-decoration:underline;text-decoration-thickness:2px 
 .dk-pj-tl i{ position:absolute;top:-3px;width:2px;height:12px;background:var(--brand);border-radius:1px }
 .dk-pj-h{ grid-area:h;justify-self:end;white-space:nowrap }
 .dk-panel[style*="--span:3"] .dk-pj>li,.dk-panel[style*="--span:4"] .dk-pj>li{ grid-template-columns:minmax(0,1fr) auto;grid-template-areas:"n h" "l l" }
-/* Annual plans: program · done bar with expected tick · done/expected; targets behind · owner below */
-.dk-ap>li{ display:grid;grid-template-columns:minmax(0,1fr) minmax(80px,140px) 76px;grid-template-areas:"n b v" "m m m";align-items:center;gap:3px 12px;padding-block:9px;border-bottom:1px solid var(--line) }
-.dk-ap>li:last-child{ border-bottom:0 }
-.dk-ap-n{ grid-area:n;min-width:0;font-size:14px;font-weight:700;color:var(--ink);overflow:hidden;text-overflow:ellipsis;white-space:nowrap }
-.dk-ap-bar{ grid-area:b }
-.dk-ap-bar .dk-meter{ margin:0 }
-.dk-ap>li.dk-behind .dk-meter b{ background:var(--warn) }
-.dk-ap-v{ grid-area:v;text-align:end;font-size:12px;color:var(--ink-3);white-space:nowrap }
-.dk-ap-v b{ font-size:13.5px;color:var(--ink) }
-.dk-ap-m{ grid-area:m;margin:0;font-size:12.5px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap }
-.dk-panel[style*="--span:3"] .dk-ap>li{ grid-template-columns:minmax(0,1fr) auto;grid-template-areas:"n v" "b b" "m m" }
 /* My reviews + Report templates status: name · pill on line 1, meta · action on line 2 */
 .dk-rv>li,.dk-tp>li{ display:grid;grid-template-columns:minmax(0,1fr) auto;grid-template-areas:"n s" "m a";align-items:center;gap:3px 12px;padding-block:9px;border-bottom:1px solid var(--line) }
 .dk-rv>li:last-child,.dk-tp>li:last-child{ border-bottom:0 }
@@ -799,8 +798,10 @@ a.dk-gl-a:hover strong{ text-decoration:underline;text-decoration-thickness:2px 
 .dk-tg-n{ grid-area:n;min-width:0;font-size:14px;font-weight:700;color:var(--ink);overflow:hidden;text-overflow:ellipsis;white-space:nowrap }
 .dk-tg-n .dk-mono{ color:var(--ink-3);font-weight:700;font-size:12px }
 .dk-tg-n .dk-is{ font-weight:400;font-size:12.5px }
+.dk-tg-n a{ color:inherit;text-decoration:none }
+.dk-tg-n a:hover{ text-decoration:underline }
 .dk-tg-s{ grid-area:s;justify-self:end }
-.dk-tg-b{ grid-area:b;min-width:0 }
+.dk-tg-b{ grid-area:b;min-width:0;display:block }
 .dk-tg-b .dk-meter{ margin:0 }
 .dk-tg-v{ grid-area:v;justify-self:end;font-size:12px;color:var(--ink-3);white-space:nowrap }
 .dk-tg-v strong{ font-size:13.5px;color:var(--ink) }
@@ -984,15 +985,12 @@ a.dk-gl-a:hover strong{ text-decoration:underline;text-decoration-thickness:2px 
 .dk-lib .dk-li-ic{ width:34px;height:34px;border-radius:9px;background:var(--sunk);display:grid;place-items:center;flex:none;color:var(--ink-2) }
 .dk-lib .dk-li-t{ flex:1;min-width:0 }
 .dk-lib .dk-li-t strong{ font-size:14px }
-.dk-lib .dk-lockd{ opacity:.65 }
-.dk-adm li.dk-lockd{ color:var(--faint) }
 .dk-adm li svg.dk-i{ width:14px;height:14px;margin-inline-end:6px }
 .dk-eyebrow+h2{ margin-top:2px }
-@media (max-width: 1280px){ .dk-panel[style*="--span:3"]{ grid-column:span 6 }
-.dk-panel[style*="--span:4"]{ grid-column:span 6 }
-.dk-panel[style*="--span:8"]{ grid-column:span 12 }
-.dk-addtile{ grid-column:span 6 }
-.dk-story-grid{ grid-template-columns:1fr }
+/* Laptops: S and M become half width, so a 1440 screen shows two roomy columns instead of four narrow ones */
+@media (max-width: 1535px){ .dk-addtile{ grid-column:span 6 }
+ }
+@media (max-width: 1280px){ .dk-story-grid{ grid-template-columns:1fr }
 .dk-story-side{ position:static }
  }
 @media (max-width: 1020px){ .dk-panel .dk-rows>li{ grid-template-columns:22px minmax(0,1fr) minmax(0,1fr) 18px;grid-template-areas:"a n h c" "a t t c" "a l l c" }
@@ -1003,8 +1001,9 @@ a.dk-gl-a:hover strong{ text-decoration:underline;text-decoration-thickness:2px 
 .dk-panel .dk-rows .dk-hc{ grid-area:h;justify-self:end }
 .dk-panel .dk-rows .dk-chev{ grid-area:c }
  }
-@media (max-width: 760px){ .dk-panel{ grid-column:1 / -1!important;height:auto;max-height:560px }
-.dk-panel[style*="--span:12"]{ max-height:none }
+@media (max-width: 760px){ .dk-panel{ grid-column:1 / -1!important;height:var(--panel-h) }
+.dk-grid{ --grid-gap:12px }
+
 .dk-addtile{ grid-column:1 / -1 }
 .dk-panel .dk-inds>li{ grid-template-columns:minmax(0,1fr) auto;grid-template-areas:"c v" "n n" "m m" }
 .dk-panel .dk-inds .dk-mono{ grid-area:c }
@@ -1333,3 +1332,23 @@ a.dk-gl-a:hover strong{ text-decoration:underline;text-decoration-thickness:2px 
 .dk-adm li:has(>.dk-adm-row){ padding-block:0 }
 .dk-adm .dk-adm-row{ display:flex;justify-content:space-between;align-items:center;gap:12px;width:100%;padding-block:10px;background:none;border:0;color:inherit;text-align:start;text-decoration:none;cursor:pointer }
 .dk-adm li.dk-lockd .dk-adm-row{ cursor:help }
+/* Meta lines that carry a date or a late flag wrap to a second line instead of clipping it */
+.dk-panel .dk-needs .dk-is,.dk-panel.dk-needs .dk-is,.dk-panel .dk-rv-m,.dk-panel .dk-ms-meta{ display:-webkit-box!important;-webkit-line-clamp:2;-webkit-box-orient:vertical;white-space:normal!important }
+.dk-ms-meta>span:last-child,.dk-tk .dk-is>span:last-child,.dk-pj-v>span{ flex:none }
+/* Needs you at S/M: the action buttons move under the text, so titles keep their width */
+.dk-panel.dk-needs[style*="--span:3"] .dk-items>li,.dk-panel.dk-needs[style*="--span:4"] .dk-items>li{ grid-template-columns:12px minmax(0,1fr)!important }
+.dk-panel.dk-needs[style*="--span:3"] .dk-items .dk-acts,.dk-panel.dk-needs[style*="--span:4"] .dk-items .dk-acts{ grid-column:2!important;justify-content:flex-start;padding-top:4px!important }
+.dk-pl-m:empty{ display:none }
+/* Targets at S/M: the values take their own line so the name keeps the width */
+.dk-panel[style*="--span:3"] .dk-tg>li,.dk-panel[style*="--span:4"] .dk-tg>li{ grid-template-areas:"n s" "b b" "v v" }
+.dk-panel[style*="--span:3"] .dk-tg-v,.dk-panel[style*="--span:4"] .dk-tg-v{ justify-self:start;max-width:100%;overflow:hidden;text-overflow:ellipsis }
+/* A name with its type or project after it stays on one line */
+.dk-panel :is(.dk-dn-n,.dk-fp-n,.dk-tg-n,.dk-pj-n a) .dk-is{ display:inline!important }
+.dk-pl-t:empty{ display:none }
+.dk-panel[style*="--span:8"] .dk-tg-b,.dk-panel[style*="--span:12"] .dk-tg-b{ max-width:360px }
+/* Fit the fixed panel height at S/M: avatars sit under the stepper instead of on their own line; tighter rows */
+.dk-panel[style*="--span:3"] .dk-tk-av,.dk-panel[style*="--span:4"] .dk-tk-av{ grid-column:2;grid-row:2;justify-content:flex-end }
+.dk-panel[style*="--span:3"] .dk-tk-main,.dk-panel[style*="--span:4"] .dk-tk-main{ grid-row:1 / span 2 }
+.dk-panel[style*="--span:3"] .dk-tk>li,.dk-panel[style*="--span:4"] .dk-tk>li{ row-gap:2px;padding-block:7px }
+.dk-panel[style*="--span:3"] .dk-dn>li,.dk-panel[style*="--span:4"] .dk-dn>li{ padding-block:6px;row-gap:2px }
+.dk-panel[style*="--span:3"] .dk-mx-list>li{ padding-block:6px }

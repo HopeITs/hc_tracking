@@ -35,7 +35,6 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
  * @property string|null $numerator
  * @property string|null $denominator
  * @property string|null $narrative_report_notes
- * @property string|null $executive_summary
  * @property string|null $key_achievements
  * @property string|null $challenges
  * @property string|null $lessons_learned
@@ -58,7 +57,6 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
     'monthly_report_id',
     'monthly_report_line_share_id',
     'narrative_report_notes',
-    'executive_summary',
     'key_achievements',
     'challenges',
     'lessons_learned',

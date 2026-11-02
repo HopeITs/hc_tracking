@@ -32,7 +32,6 @@ Before planning or editing, find the row whose globs match the file's path and r
 | {app/Livewire/Concerns/ManagesDonorForm.php,resources/views/components/donors/**,resources/views/pages/donors/**} | .ai/rules/donors.md |
 | {config/fortify.php,app/Console/Commands/**,app/Enums/**} | .ai/rules/enums.md |
 | {.env.example,.gitignore,.htaccess,.gitleaks.toml,.gitleaksignore} | .ai/rules/env-example-gitignore-htaccess-gitleaks-toml-gitleaksignore-gitlab-ci-yml.md |
-| resources/views/pages/executive-summary/** | .ai/rules/executive-summary.md |
 | database/factories/** | .ai/rules/factories.md |
 | {database/migrations/**,tests/Feature/DatabaseEncodingTest.php} | .ai/rules/feature.md |
 | {config/blaze.php,resources/views/flux/**} | .ai/rules/flux.md |

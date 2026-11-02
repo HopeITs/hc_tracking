@@ -27,13 +27,14 @@ test('the summary counts late reports and those waiting for validation', functio
         ->assertSee(['Late Wells', 'Waiting School', 'Fine Clinic']);
 });
 
-test('a legend state shows only the projects with it, and a second click shows all again', function () {
+test('the status filter, applied with Done, shows only the projects with that state, and clearing it shows all again', function () {
     Livewire::actingAs(userWithRole('General Manager', insertHrEmployee()))->test('desk.panels.matrix', ['size' => 'XL'])
-        ->call('toggleState', 'late')
+        ->assertDontSeeHtml('dk-legend')
+        ->call('applyFilters', ['state' => 'late'])
         ->assertSet('state', 'late')
         ->assertSee('Late Wells')
         ->assertDontSee('Fine Clinic')
-        ->call('toggleState', 'late')
+        ->call('applyFilters', ['state' => ''])
         ->assertSet('state', '')
         ->assertSee('Fine Clinic');
 });

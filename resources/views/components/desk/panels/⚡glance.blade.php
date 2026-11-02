@@ -125,15 +125,18 @@ new class extends Component {
     $figures = $this->figures;
 @endphp
 
-<x-desk.panel id="glance" :size="$size" :index="$index" :total="$total" :filterable="false">
-    <ul class="dk-glance" style="--figs:{{ max(1, count($figures)) }}">
+<x-desk.panel id="glance" :size="$size" :cols="$gridCols" :height="$gridRows" :index="$index" :total="$total" :filterable="false">
+    <ul class="dk-glance" data-figs="{{ count($figures) }}" style="--figs:{{ max(1, count($figures)) }}">
         @foreach ($figures as $figure)
             <li data-figure="{{ $figure['key'] }}">
                 @if ($figure['href'] !== null)<a href="{{ $figure['href'] }}" wire:navigate class="dk-gl-a">@else<span class="dk-gl-a">@endif
-                    <strong class="dk-num">{{ $figure['value'] }}</strong>
+                    @php
+                        preg_match('/^(\d+)(.*)$/u', $figure['value'], $parts);
+                    @endphp
+                    <strong class="dk-num">@if ($parts !== [])<span x-data="countUp({{ (int) $parts[1] }})" x-text="display">{{ $parts[1] }}</span>{{ $parts[2] }}@else{{ $figure['value'] }}@endif</strong>
                     <span class="dk-gl-l">{{ $figure['label'] }}</span>
                     @if ($figure['deltaText'] !== null)
-                        <span @class(['dk-gl-d dk-num', 'dk-good' => $figure['good'] === true, 'dk-bad' => $figure['good'] === false]) data-trend="{{ $figure['delta'] > 0 ? 'up' : ($figure['delta'] < 0 ? 'down' : 'same') }}">@if ($figure['delta'] > 0)▲@elseif ($figure['delta'] < 0)▼@endif {{ $figure['deltaText'] }}</span>
+                        <span @class(['dk-gl-d dk-num', 'dk-good' => $figure['good'] === true, 'dk-bad' => $figure['good'] === false]) data-trend="{{ $figure['delta'] > 0 ? 'up' : ($figure['delta'] < 0 ? 'down' : 'same') }}">@if ($figure['delta'] > 0)<span aria-hidden="true">↑</span>@elseif ($figure['delta'] < 0)<span aria-hidden="true">↓</span>@endif {{ $figure['deltaText'] }}</span>
                     @endif
                 @if ($figure['href'] !== null)</a>@else</span>@endif
             </li>

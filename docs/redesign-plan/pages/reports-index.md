@@ -12,7 +12,7 @@
 
 Filters: search, status (`ReportStatus`: draft, reviewed, approved), MEAL seen/unseen, author; "Record report" modal (target, planned date/value/submit date, narrative window start/end, six narrative textareas). Rows: indicator name link, planned date, project, file count, reported value vs target, status badge, MEAL badge, author chip, edit or lock icon (no delete by design). 15/page.
 
-Fields: `reports.plan_indicator_id, user_id, status, planned_date, period_start, period_end, value, narrative_report_notes, executive_summary, key_achievements, challenges, lessons_learned, next_period_plans, submit_date, is_seen_by_meal`.
+Fields: `reports.plan_indicator_id, user_id, status, planned_date, period_start, period_end, value, narrative_report_notes, key_achievements, challenges, lessons_learned, next_period_plans, submit_date, is_seen_by_meal`.
 
 ## Target layout
 

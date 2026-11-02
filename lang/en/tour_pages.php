@@ -26,7 +26,6 @@ return [
             'panel_foot' => ['title' => 'Pages inside a panel', 'body' => 'The bottom line says what you see (1–5 of 14); the arrows page through.'],
             'add' => ['title' => 'Add a panel', 'body' => 'The dashed tile says how many more panels your role can use. Click it to add one.'],
         ],
-        'executive_summary_index' => ['intro' => ['title' => 'Executive summary', 'body' => 'A leadership view of delivery, risk and funding for the period you choose. Change the filters to re-cut the whole page.']],
         'calendar_index' => ['intro' => ['title' => 'My calendar', 'body' => 'Your deadlines, tasks and milestones laid out by date. Click a day or an item to see or add what is happening.']],
         'strategies_index' => ['intro' => ['title' => 'Strategies', 'body' => 'The long-range goals everything else rolls up to. Open a strategy to see its programs and progress.']],
         'strategies_show' => ['intro' => ['title' => 'Strategy detail', 'body' => 'One strategy with its owner, progress and the programs that deliver it.']],

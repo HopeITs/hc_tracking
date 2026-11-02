@@ -51,11 +51,11 @@
         background-color: var(--color-white);
     }
 
+    /* One gray ring around the box; the input inside draws none (desk-shell.css). */
     .form-box:focus-within {
         border-color: var(--color-secondary-medium);
         background-color: var(--color-white);
-        outline: 2px solid var(--color-secondary-medium);
-        outline-offset: 2px;
+        box-shadow: 0 0 0 3px var(--color-sunk);
     }
 
     .form-box[data-invalid] {
@@ -133,7 +133,6 @@
     .dark .form-box:focus-within {
         border-color: var(--color-ink-muted);
         background-color: var(--color-surface-2);
-        outline-color: var(--color-ink-muted);
     }
 
     /* brand-text, not brand: an invalid border must clear 3 : 1 against a surface-3 dialog too. */

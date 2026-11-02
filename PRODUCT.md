@@ -12,7 +12,7 @@ Primary users are a **projects and fundraising manager** and their **program/pro
 
 ## Product Purpose
 
-HC Tracking is an internal management platform for planning, funding, and monitoring an organization's strategic programs. It exists to give the fundraising/programs team one place to track the full lifecycle: strategy → yearly plans → programs → projects → milestones/tasks → results/indicators/targets → risks, alongside the funding side: donors → proposals → funding agreements → transfers, plus cross-cutting reporting (an executive summary and detailed reports) and admin (users, cities, accounts). Success means the manager and officers can see status, risk, and progress at a glance and drill into detail without friction.
+HC Tracking is an internal management platform for planning, funding, and monitoring an organization's strategic programs. It exists to give the fundraising/programs team one place to track the full lifecycle: strategy → yearly plans → programs → projects → milestones/tasks → results/indicators/targets → risks, alongside the funding side: donors → proposals → funding agreements → transfers, plus cross-cutting reporting (detailed reports) and admin (users, cities, accounts). Success means the manager and officers can see status, risk, and progress at a glance and drill into detail without friction.
 
 ## Positioning
 
@@ -21,7 +21,7 @@ Not a generic CRUD admin panel. The product's edge is unifying **program deliver
 ## Operating Context
 
 - Built on Laravel 13 + Livewire/Volt ("pages::" namespaced Livewire full-page components) + Flux UI + Tailwind CSS v4.
-- Domains/routes in the app: executive-summary, strategies, programs, yearly-plans, projects, risks, milestones, results, indicators, targets, tasks, proposals, donors, funding-agreements, transfers, reports, admin (users, cities, accounts), plus a dashboard and settings area.
+- Domains/routes in the app: strategies, programs, yearly-plans, projects, risks, milestones, results, indicators, targets, tasks, proposals, donors, funding-agreements, transfers, reports, admin (users, cities, accounts), plus a dashboard and settings area.
 - Multi-language: the app ships translations (`lang/`) for all pages — i18n is a live, non-optional constraint on any redesign.
 - Auth via Laravel Fortify (login, 2FA, passkeys) behind `auth`/`verified` middleware; most of the app is gated.
 - Runs on an isolated PHP 8.5 toolchain in this environment (project convention, not a product fact for design).

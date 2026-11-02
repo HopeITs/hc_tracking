@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Enums;
 
+use App\Enums\Concerns\HasStatusTone;
 use App\Enums\Concerns\HasTranslatedLabel;
 
 /**
@@ -14,7 +15,7 @@ use App\Enums\Concerns\HasTranslatedLabel;
  * lower case and casing is part of the value; display capitalisation belongs
  * to the UI, not the database.
  */
-enum ProposalStatus: string
+enum ProposalStatus: string implements HasStatusTone
 {
     use HasTranslatedLabel;
 
@@ -168,5 +169,19 @@ enum ProposalStatus: string
     public static function values(): array
     {
         return array_column(self::cases(), 'value');
+    }
+
+    /**
+     * The shared visual tone for this case (W-28); exhaustive, no default arm.
+     */
+    public function tone(): StatusTone
+    {
+        return match ($this) {
+            self::ConceptNote, self::ConceptNoteReview, self::ConceptNoteSubmitted, self::ProposalDraft, self::ProposalReview => StatusTone::Neutral,
+            self::Submitted, self::Active, self::FinalReports => StatusTone::Active,
+            self::OnHold => StatusTone::Warn,
+            self::Approved, self::Completed => StatusTone::Good,
+            self::Rejected => StatusTone::Critical,
+        };
     }
 }

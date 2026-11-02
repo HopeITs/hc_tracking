@@ -1,0 +1,164 @@
+/* Desk free cell grid + "glass desk" surface (resources/js/desk-grid.js).
+ * Panels sit on a 12-column cell grid: --span = the entry's cols, --rows its
+ * row units. Below 1280px the spans collapse through --span-r (data-cols
+ * ranges), never [style*="--span"]. Glass and the
+ * ambient field are tokens + color-mix only; reduced motion = static.
+ * Own classes only, all prefixed dk-, in @layer components like desk.css. */
+
+@layer components {
+    /* ── Responsive spans ─────────────────────────────────────────── */
+    .dk-grid > .dk-panel { grid-column: span var(--span-r, var(--span)); }
+    /* --col pins a card pulled from its start edge; only the full 12-column grid honours it. */
+    @media (min-width: 1280px) {
+        .dk-grid > .dk-panel { grid-column: var(--col, auto) / span var(--span); }
+    }
+    @media (max-width: 1279px) {
+        .dk-panel:is([data-cols="1"], [data-cols="2"], [data-cols="3"]) { --span-r: 4; }
+        .dk-panel:is([data-cols="4"], [data-cols="5"], [data-cols="6"]) { --span-r: 6; }
+        .dk-panel:is([data-cols="7"], [data-cols="8"], [data-cols="9"], [data-cols="10"], [data-cols="11"], [data-cols="12"]) { --span-r: 12; }
+    }
+    @media (max-width: 1023px) {
+        .dk-panel:is([data-cols="1"], [data-cols="2"], [data-cols="3"]) { --span-r: 6; }
+    }
+
+    /* ── Ambient field: a slow, faint mesh behind the desk ─────────── */
+    [data-desk] { position: relative; isolation: isolate; }
+    [data-desk]::before {
+        content: ""; position: fixed; inset: -10vmax; z-index: -1; pointer-events: none;
+        background:
+            radial-gradient(40vmax 30vmax at 12% 8%, color-mix(in srgb, var(--brand) 7%, transparent), transparent 70%),
+            radial-gradient(36vmax 28vmax at 88% 18%, color-mix(in srgb, var(--good) 6%, transparent), transparent 70%),
+            radial-gradient(44vmax 34vmax at 60% 96%, color-mix(in srgb, var(--ink) 6%, transparent), transparent 70%);
+    }
+    .dark [data-desk]::before {
+        background:
+            radial-gradient(40vmax 30vmax at 12% 8%, color-mix(in srgb, var(--brand) 14%, transparent), transparent 70%),
+            radial-gradient(36vmax 28vmax at 88% 18%, color-mix(in srgb, var(--good) 9%, transparent), transparent 70%),
+            radial-gradient(44vmax 34vmax at 60% 96%, color-mix(in srgb, var(--ink) 7%, transparent), transparent 70%);
+    }
+    @media (prefers-reduced-motion: no-preference) {
+        [data-desk]::before { animation: dk-ambient 48s ease-in-out infinite alternate; }
+    }
+    @keyframes dk-ambient {
+        to { translate: 3vmax -2vmax; scale: 1.06; }
+    }
+
+    /* ── Glass panels ────────────────────── */
+    .dk-grid > .dk-panel {
+        background: color-mix(in srgb, var(--paper) 82%, transparent);
+        border-color: color-mix(in srgb, var(--line) 75%, transparent);
+    }
+    @supports ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
+        .dk-grid > .dk-panel { -webkit-backdrop-filter: blur(16px) saturate(1.25); backdrop-filter: blur(16px) saturate(1.25); }
+        .dark .dk-grid > .dk-panel { background: color-mix(in srgb, var(--paper) 72%, transparent); }
+    }
+    /* Glass makes each panel a stacking context: lift the one whose menu is open. */
+    .dk-grid > .dk-panel:has([aria-expanded="true"]), .dk-grid > .dk-panel:focus-within { z-index: 8; }
+
+    /* ── Header: the drag handle, title and its plain sentence ────── */
+    .dk-ph[data-drag] { cursor: grab; touch-action: pan-y; -webkit-user-select: none; user-select: none; -webkit-touch-callout: none; }
+    .dk-ph[data-drag] :is(button, a, input) { cursor: pointer; }
+    .dk-moving-doc, .dk-moving-doc * { cursor: grabbing !important; user-select: none !important; }
+    .dk-ph-t { min-width: 0; display: grid; gap: 2px; }
+    .dk-tagline { margin: 0; font-size: 13px; line-height: 1.35; color: var(--ink-2); display: -webkit-box; -webkit-line-clamp: 1; -webkit-box-orient: vertical; overflow: hidden; }
+    .dk-ph .dk-grip { position: absolute; inset-block-start: 14px; inset-inline-start: 3px; width: 14px; height: 22px; background: none; color: var(--ink-3); opacity: 0; transition: opacity .15s ease; display: grid; place-items: center; pointer-events: none; }
+    .dk-ph .dk-grip svg.dk-grip-dots { width: 14px; height: 14px; opacity: 1; }
+    .dk-panel:hover .dk-ph .dk-grip, .dk-editing .dk-ph .dk-grip { opacity: 1; }
+
+    /* A live pulse on the cards that need action. */
+    .dk-panel:is([data-health="brand"], [data-health="critical"]) .dk-ph-t h2 { display: flex; align-items: center; gap: 8px; }
+    .dk-panel:is([data-health="brand"], [data-health="critical"]) .dk-ph-t h2::before, .dk-live {
+        content: ""; flex: none; width: 8px; height: 8px; border-radius: 50%; background: var(--dk-pulse, var(--brand));
+        box-shadow: 0 0 0 0 color-mix(in srgb, var(--dk-pulse, var(--brand)) 55%, transparent);
+    }
+    .dk-panel[data-health="critical"] { --dk-pulse: var(--bad); }
+    @media (prefers-reduced-motion: no-preference) {
+        .dk-panel:is([data-health="brand"], [data-health="critical"]) .dk-ph-t h2::before, .dk-live { animation: dk-pulse 2.2s cubic-bezier(.2, .7, .2, 1) infinite; }
+    }
+    @keyframes dk-pulse { 70% { box-shadow: 0 0 0 7px transparent; } 100% { box-shadow: 0 0 0 0 transparent; } }
+
+    /* ── Move: the carried card floats; the rest spring aside ─────── */
+    .dk-grid > .dk-panel.dk-dragging {
+        z-index: 30; transition: none !important; filter: none !important;
+        box-shadow: 0 0 0 1.5px color-mix(in srgb, var(--brand) 70%, transparent), 0 30px 60px -24px color-mix(in srgb, var(--ink) 45%, transparent);
+    }
+
+    /* ── Resize handles: edges and corner ─────────────────────────── */
+    .dk-rz { position: absolute; z-index: 9; touch-action: none; -webkit-user-select: none; user-select: none; opacity: 0; transition: opacity .15s ease; }
+    .dk-rz::after { content: ""; position: absolute; border-radius: 99px; background: var(--ink-3); transition: background .15s, transform .15s; }
+    .dk-rz:hover::after { background: var(--brand); }
+    .dk-rz-end, .dk-rz-start { inset-block: 24px; width: 14px; cursor: ew-resize; }
+    .dk-rz-end { inset-inline-end: -7px; }
+    .dk-rz-start { inset-inline-start: -7px; }
+    .dk-rz-end::after, .dk-rz-start::after { inset-block: calc(50% - 16px); inset-inline-start: 5px; width: 4px; }
+    .dk-rz-top, .dk-rz-bottom { inset-inline: 32px; height: 14px; cursor: ns-resize; }
+    .dk-rz-top { inset-block-start: -7px; }
+    .dk-rz-bottom { inset-block-end: -7px; }
+    .dk-rz-top::after, .dk-rz-bottom::after { inset-inline: calc(50% - 16px); inset-block-start: 5px; height: 4px; }
+    .dk-rz-corner { inset-block-end: -4px; inset-inline-end: -4px; width: 24px; height: 24px; cursor: nwse-resize; }
+    [dir="rtl"] .dk-rz-corner { cursor: nesw-resize; }
+    .dk-rz-corner::after { inset-block-end: 8px; inset-inline-end: 8px; width: 10px; height: 10px; border-radius: 0; background: none; border-block-end: 2.5px solid var(--ink-3); border-inline-end: 2.5px solid var(--ink-3); border-end-end-radius: 6px; }
+    .dk-rz-corner:hover::after { background: none; border-color: var(--brand); }
+    @media (hover: hover) {
+        .dk-grid > .dk-panel:hover .dk-rz { opacity: 1; }
+    }
+    .dk-grid.dk-editing > .dk-panel .dk-rz, .dk-panel.dk-resizing .dk-rz { opacity: 1; }
+    .dk-grid.dk-moving .dk-rz { display: none; }
+    /* Below 1280px widths collapse to fixed steps (--span-r), so only height can be pulled there. */
+    @media (max-width: 1279px) { .dk-rz-end, .dk-rz-start, .dk-rz-corner { display: none; } }
+    @media (max-width: 760px) { .dk-rz { display: none; } }
+
+    .dk-resizing-doc, .dk-resizing-doc * { -webkit-user-select: none !important; user-select: none !important; }
+    .dk-resizing-doc:is([data-resize-edge="end"], [data-resize-edge="start"]) * { cursor: ew-resize !important; }
+    .dk-resizing-doc:is([data-resize-edge="top"], [data-resize-edge="bottom"]) * { cursor: ns-resize !important; }
+    .dk-resizing-doc[data-resize-edge="corner"] * { cursor: nwse-resize !important; }
+    [dir="rtl"].dk-resizing-doc[data-resize-edge="corner"] * { cursor: nesw-resize !important; }
+    .dk-panel.dk-resizing { box-shadow: 0 0 0 1.5px var(--ink-3); }
+
+    .dk-resize-badge { position: absolute; z-index: 10; inset-block-start: 50%; inset-inline-start: 50%; translate: -50% -50%; pointer-events: none; padding: 6px 14px; border-radius: 999px; background: var(--ink); color: var(--paper); font-size: 18px; font-weight: 800; font-variant-numeric: tabular-nums; letter-spacing: .02em; white-space: nowrap; }
+    [dir="rtl"] .dk-resize-badge { translate: 50% -50%; }
+
+    /* ── Edit desk: the cells show through, every handle is out ───── */
+    .dk-grid { position: relative; }
+    .dk-grid.dk-editing::before {
+        content: ""; position: absolute; inset: 0; z-index: 0; pointer-events: none; border-radius: 12px;
+        background: linear-gradient(to bottom, color-mix(in srgb, var(--ink) 7%, transparent) var(--row-unit), transparent 0) 0 0 / 100% calc(var(--row-unit) + var(--grid-gap));
+        -webkit-mask: linear-gradient(to right, #000 calc(100% - var(--grid-gap)), transparent 0) 0 0 / calc((100% + var(--grid-gap)) / 12) 100%;
+        mask: linear-gradient(to right, #000 calc(100% - var(--grid-gap)), transparent 0) 0 0 / calc((100% + var(--grid-gap)) / 12) 100%;
+        min-height: calc(4 * var(--row-unit) + 3 * var(--grid-gap));
+    }
+    .dk-grid.dk-editing > .dk-panel { outline: 1px dashed color-mix(in srgb, var(--ink) 30%, transparent); outline-offset: 3px; }
+
+    .dk-edit-toggle {
+        display: inline-flex; align-items: center; gap: 8px; min-height: 48px; padding-inline: 16px; flex: none;
+        border: 1px solid var(--line-2); border-radius: 10px; background: none; color: var(--ink); font: 700 14px/1 var(--font); cursor: pointer;
+        transition: background .15s, border-color .15s, box-shadow .2s;
+    }
+    .dk-edit-toggle:hover { background: var(--tint); }
+    .dk-edit-toggle[aria-pressed="true"] { background: var(--brand); border-color: var(--brand); color: var(--on-brand); box-shadow: 0 8px 24px -10px color-mix(in srgb, var(--brand) 70%, transparent); }
+    .dk-edit-toggle:focus-visible { outline: 2px solid var(--ink-2); outline-offset: 2px; }
+    @media (max-width: 760px) { .dk-edit-toggle { display: none; } }
+
+    .dk-edit-bar, .dk-hint {
+        display: flex; align-items: center; gap: 12px; margin: 0 0 var(--grid-gap); padding: 10px 12px 10px 16px; width: fit-content; max-width: 100%;
+        border-radius: 14px; font-size: 14px; color: var(--ink);
+        background: color-mix(in srgb, var(--paper) 80%, transparent); border: 1px solid color-mix(in srgb, var(--line) 80%, transparent);
+        box-shadow: var(--panel-shadow); -webkit-backdrop-filter: blur(12px); backdrop-filter: blur(12px);
+    }
+    .dk-hint p { margin: 0; font-weight: 600; }
+    .dk-hint .dk-live { --dk-pulse: var(--brand); }
+    .dk-edit-bar { font-weight: 600; color: var(--ink-2); }
+
+    /* ── Friendly empty states with the dot motif ─────────────────── */
+    .dk-pempty { display: grid; justify-items: center; gap: 10px; text-align: center; padding: 22px 8px; color: var(--ink-2); }
+    .dk-pempty::before {
+        content: ""; width: 64px; height: 16px;
+        background: radial-gradient(circle, var(--line-2) 3px, transparent 3.5px) 0 50% / 16px 16px repeat-x;
+        -webkit-mask: linear-gradient(to right, transparent, #000 30%, #000 70%, transparent); mask: linear-gradient(to right, transparent, #000 30%, #000 70%, transparent);
+    }
+
+    /* Bigger touch targets on coarse pointers. */
+    @media (pointer: coarse) {
+        .dk-panel .dk-iconbtn.dk-sm { min-width: 44px; min-height: 44px; }
+    }
+}

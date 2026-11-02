@@ -16,6 +16,15 @@ use App\Models\User;
 class DonorReportPolicy
 {
     /**
+     * Open the register of donor reports: anyone who may view one, or the
+     * responsible person on at least one.
+     */
+    public function viewAny(User $user): bool
+    {
+        return $user->can('funding-agreements.view') || $user->can('reports.aggregate') || $user->hasReportingDuties();
+    }
+
+    /**
      * Determine whether the user can view the model.
      */
     public function view(User $user, DonorReport $donorReport): bool

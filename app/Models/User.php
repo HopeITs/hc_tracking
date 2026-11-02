@@ -50,6 +50,7 @@ use Spatie\Permission\Traits\HasRoles;
  * @property string|null $locale
  * @property array<mixed>|null $desk_layout the saved Desk arrangement, list<array{panel: string, size: string}> as written; read through Panels::layoutFor(), which drops anything malformed
  * @property array<mixed>|null $page_panels the Panels popup's sets per route name, array<string, list<array{panel: string, size: string}>> as written; read through Panels::pageLayoutFor()
+ * @property string|null $desk_notes the Desk's private My notes card, at most 5000 characters
  * @property bool $notification_popups
  * @property CarbonImmutable|null $tour_seen_at
  * @property CarbonImmutable|null $email_verified_at
@@ -80,6 +81,7 @@ class User extends Authenticatable implements HasLocalePreference, PasskeyUser, 
         'locale' => null,
         'desk_layout' => null,
         'page_panels' => null,
+        'desk_notes' => null,
         'notification_popups' => false,
         'tour_seen_at' => null,
         'email_two_factor_enabled' => false,

@@ -51,8 +51,6 @@ trait ManagesReportForm
 
     public string $narrativeNotes = '';
 
-    public string $executiveSummary = '';
-
     public string $keyAchievements = '';
 
     public string $challenges = '';
@@ -258,7 +256,7 @@ trait ManagesReportForm
         $report = Report::query()
             ->select([
                 'id', 'user_id', 'status', 'plan_indicator_id', 'planned_date', 'period_start', 'period_end', 'value',
-                'numerator', 'denominator', 'narrative_report_notes', 'executive_summary', 'key_achievements', 'challenges',
+                'numerator', 'denominator', 'narrative_report_notes', 'key_achievements', 'challenges',
                 'lessons_learned', 'next_period_plans', 'monthly_report_id',
             ])
             ->findOrFail($reportId);
@@ -290,7 +288,6 @@ trait ManagesReportForm
         $this->numerator = $report->numerator === null ? '' : (string) $report->numerator;
         $this->denominator = $report->denominator === null ? '' : (string) $report->denominator;
         $this->narrativeNotes = $report->narrative_report_notes ?? '';
-        $this->executiveSummary = $report->executive_summary ?? '';
         $this->keyAchievements = $report->key_achievements ?? '';
         $this->challenges = $report->challenges ?? '';
         $this->lessonsLearned = $report->lessons_learned ?? '';
@@ -300,7 +297,7 @@ trait ManagesReportForm
 
     public function saveReport(): void
     {
-        foreach (['narrativeNotes', 'executiveSummary', 'keyAchievements', 'challenges', 'lessonsLearned', 'nextPeriodPlans'] as $field) {
+        foreach (['narrativeNotes', 'keyAchievements', 'challenges', 'lessonsLearned', 'nextPeriodPlans'] as $field) {
             $this->{$field} = trim($this->{$field});
         }
 
@@ -365,7 +362,6 @@ trait ManagesReportForm
                 'value' => ['required', 'numeric', 'min:0', $isPercentage ? 'max:100' : 'max:9999999999.99'],
             ]),
             'narrativeNotes' => ['nullable', 'string'],
-            'executiveSummary' => ['nullable', 'string'],
             'keyAchievements' => ['nullable', 'string'],
             'challenges' => ['nullable', 'string'],
             'lessonsLearned' => ['nullable', 'string'],
@@ -424,7 +420,6 @@ trait ManagesReportForm
             'numerator' => $takesRatio ? $validated['numerator'] : null,
             'denominator' => $takesRatio ? $validated['denominator'] : null,
             'narrative_report_notes' => $validated['narrativeNotes'] === '' ? null : $validated['narrativeNotes'],
-            'executive_summary' => $validated['executiveSummary'] === '' ? null : $validated['executiveSummary'],
             'key_achievements' => $validated['keyAchievements'] === '' ? null : $validated['keyAchievements'],
             'challenges' => $validated['challenges'] === '' ? null : $validated['challenges'],
             'lessons_learned' => $validated['lessonsLearned'] === '' ? null : $validated['lessonsLearned'],
@@ -470,7 +465,6 @@ trait ManagesReportForm
         $this->numerator = '';
         $this->denominator = '';
         $this->narrativeNotes = '';
-        $this->executiveSummary = '';
         $this->keyAchievements = '';
         $this->challenges = '';
         $this->lessonsLearned = '';

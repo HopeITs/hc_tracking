@@ -133,57 +133,6 @@ test('Public Relations Manager opens the proposal from the project page but sees
         ->assertDontSee('123,457');
 });
 
-test('the project Plan gantt shows transfer and donor report rows only to viewers of transfers and agreements', function () {
-    ['project' => $project, 'proposal' => $proposal, 'transfer' => $transfer, 'report' => $report] = seedProjectMoneyFixture();
-    $rows = fn (string $role): array => collect(
-        Livewire::actingAs(userWithRole($role))
-            ->test('pages::projects.show', ['project' => $project])
-            ->instance()
-            ->ganttPayload['rows']
-    )->keyBy('id')->all();
-
-    $managers = $rows('Managers');
-    expect($managers)->not->toHaveKeys(['obligations', 'transfer-'.$transfer->id, 'report-'.$report->id])
-        ->and($managers['proposal-'.$proposal->id]['name'])->toBe('Harbour Clean Water')
-        ->and($managers['proposal-'.$proposal->id]['url'])->toBeNull();
-
-    $fundraiser = $rows(fundraiserWithoutAgreements());
-    expect($fundraiser)->not->toHaveKeys(['obligations', 'transfer-'.$transfer->id, 'report-'.$report->id])
-        ->and($fundraiser['proposal-'.$proposal->id]['url'])->toBe(route('proposals.show', $proposal));
-
-    foreach (['Financial', 'General Manager'] as $role) {
-        $money = $rows($role);
-
-        expect($money)->toHaveKeys(['obligations', 'transfer-'.$transfer->id, 'report-'.$report->id])
-            ->and($money['transfer-'.$transfer->id]['money'])->toBe('45,678 USD')
-            ->and($money['transfer-'.$transfer->id]['url'])->toBe(route('transfers.index'))
-            ->and($money['proposal-'.$proposal->id]['url'])->toBe(route('proposals.show', $proposal));
-    }
-});
-
-test('the obligations group carries only the half the viewer may see', function () {
-    ['project' => $project, 'transfer' => $transfer, 'report' => $report] = seedProjectMoneyFixture();
-    $viewer = userWithRole('Managers');
-
-    $rowsFor = function () use ($project, $viewer): array {
-        return collect(
-            Livewire::actingAs($viewer)
-                ->test('pages::projects.show', ['project' => $project])
-                ->instance()
-                ->ganttPayload['rows']
-        )->keyBy('id')->all();
-    };
-
-    $viewer->givePermissionTo('transfers.view');
-    expect($rowsFor())->toHaveKeys(['obligations', 'transfer-'.$transfer->id])
-        ->and($rowsFor())->not->toHaveKey('report-'.$report->id);
-
-    $viewer->revokePermissionTo('transfers.view');
-    $viewer->givePermissionTo('funding-agreements.view');
-    expect($rowsFor())->toHaveKeys(['obligations', 'report-'.$report->id])
-        ->and($rowsFor())->not->toHaveKey('transfer-'.$transfer->id);
-});
-
 test('a Managers user sees no proposal rows and no pipeline lens on the timeline, and the pipeline value is ignored', function () {
     ['project' => $project] = seedProjectMoneyFixture();
     $manager = userWithRole('Managers');
@@ -403,7 +352,7 @@ test('the projects directory shows committed budgets in every view only to viewe
             'proposals' => ['Harbour Clean Water'],
         ]);
 
-    if ($view === 'board') {
+    if ($view === 'list') {
         $managers->assertSee('Aurora Foundation')->assertSee('Harbour Clean Water');
     }
 
@@ -413,16 +362,15 @@ test('the projects directory shows committed budgets in every view only to viewe
         ->assertSee('731,942');
 
     expect($financial->instance()->committedFunding)->toBe(['USD' => 731942.0]);
-})->with(['board', 'table', 'timeline']);
+})->with(['list', 'timeline']);
 
-test('the projects directory keeps the portfolio tile row whole when the committed funding tile is hidden', function () {
+test('the projects directory keeps the beneficiaries figure when the committed funding figure is hidden', function () {
     seedProjectMoneyFixture();
 
     Livewire::actingAs(userWithRole('Team Member'))
         ->test('pages::projects.index')
         ->assertSee(__('projects.tile_beneficiaries'))
-        ->assertDontSee(__('projects.tile_committed_funding'))
-        ->assertSeeHtml('dark:bg-line grid-cols-1');
+        ->assertDontSee(__('projects.tile_committed_funding'));
 });
 
 test('the project page loads no budget pivot for a viewer without funding agreements', function () {

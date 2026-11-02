@@ -3,7 +3,7 @@
 use App\Models\Permission;
 use App\Models\Role;
 
-const FINANCE_VIEWS = ['transfers.view', 'funding-agreements.view', 'accounts.view', 'executive-summary.view'];
+const FINANCE_VIEWS = ['transfers.view', 'funding-agreements.view', 'accounts.view'];
 
 const FUNDRAISING_VIEWS = ['donors.view', 'proposals.view'];
 
@@ -34,7 +34,6 @@ test('the money pages are open only to the finance-facing roles', function (stri
     'transfers' => ['transfers.view', ['Super Admin', 'General Manager', 'Financial']],
     'funding agreements' => ['funding-agreements.view', ['Super Admin', 'General Manager', 'Financial', 'Public Relations Manager']],
     'bank accounts' => ['accounts.view', ['Super Admin', 'General Manager', 'Financial']],
-    'executive summary' => ['executive-summary.view', ['Super Admin', 'General Manager', 'Financial']],
     'donors' => ['donors.view', ['Super Admin', 'General Manager', 'Financial', 'Public Relations Manager']],
     'proposals' => ['proposals.view', ['Super Admin', 'General Manager', 'Financial', 'Public Relations Manager']],
 ]);

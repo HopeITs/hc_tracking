@@ -192,6 +192,7 @@ new #[Layout('layouts::desk'), Title('titles.annual_plan')] class extends Compon
 <x-desk.record-sheet register="pages::annual-plans.index" :close-url="route('annual-plans.index')" :title="__('common.fy_year_program', ['year' => $plan->year, 'program' => $plan->program->name])" :subtitle="$plan->program->strategy?->name">
 <section class="@container/detail flex min-h-full w-full flex-1 flex-col gap-8 bg-white text-secondary-dark dark:bg-surface-0 dark:text-ink">
     <x-ui.detail-header
+        :back="\App\Support\BackUrl::for(route('annual-plans.index'))"
         :breadcrumbs="[
             ['label' => __('common.annual_plans'), 'url' => route('annual-plans.index')],
             ['label' => __('common.fy_year', ['year' => $plan->year])],

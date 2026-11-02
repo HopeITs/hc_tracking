@@ -30,7 +30,6 @@ return [
     'enter_a_file_name' => 'Enter a file name.',
     'enter_the_reported_value' => 'Enter the reported value.',
     'every_report_against_this_same_target_newest_first' => 'Every report against this same target, newest first.',
-    'executive_summary' => 'Executive summary',
     'file_deleted' => 'File deleted.',
     'file_display_name' => 'Display name',
     'file_updated' => 'File updated.',

@@ -49,20 +49,45 @@ test('a Super Admin may place every panel and open every page, role-tied ones in
         ->and(array_column(app(Destinations::class)->for($admin), 'route'))->toContain('reviews.index');
 });
 
-test('a panel lists four rows a page, and its filter popup has only dropdowns that wait for Done', function () {
+test('a panel pages its rows, fits the page to the card when measured, and its filter popup waits for Done', function () {
     $admin = User::factory()->role('Super Admin')->create();
-    Task::factory()->count(6)->create(['created_by' => $admin->id]);
+    Task::factory()->count(8)->create(['created_by' => $admin->id]);
 
     $panel = Livewire::actingAs($admin)
         ->test('desk.panels.tasks', ['size' => 'L', 'index' => 0, 'total' => 1]);
 
-    $panel->assertSee(__('desk.range_of', ['from' => 1, 'to' => 4, 'total' => 6]))
+    $panel->assertSee(__('desk.range_of', ['from' => 1, 'to' => 6, 'total' => 8]))
+        ->assertSeeHtml('data-fit data-fit-per="6" data-fit-total="8"')
         ->assertDontSeeHtml('data-directory-search')
         ->assertDontSeeHtml('wire:model.live')
         ->assertSeeHtml('x-on:click="applyFilters()"');
 
-    $panel->call('nextPage')->assertSet('page', 1)
+    $panel->call('fitRows', 3)
+        ->assertSet('perPage', 3)
+        ->assertSee(__('desk.range_of', ['from' => 1, 'to' => 3, 'total' => 8]))
+        ->call('nextPage')->assertSet('page', 1)
+        ->assertSee(__('desk.range_of', ['from' => 4, 'to' => 6, 'total' => 8]))
+        ->call('fitRows', 999)->assertSet('perPage', 24)
         ->call('applyFilters')->assertSet('page', 0);
+});
+
+test('Done writes only facets and the panel\'s own filter properties', function () {
+    $admin = User::factory()->role('Super Admin')->create();
+
+    Livewire::actingAs($admin)
+        ->test('desk.panels.tasks', ['size' => 'L', 'index' => 0, 'total' => 1])
+        ->call('applyFilters', ['scope' => 'department', 'facets.project' => 'Alpha', 'page' => 5, 'perPage' => 2, 'size' => 'XL'])
+        ->assertSet('scope', 'department')
+        ->assertSet('facets', ['project' => 'Alpha'])
+        ->assertSet('page', 0)
+        ->assertSet('perPage', 0)
+        ->assertSet('size', 'L');
+});
+
+test('a panel with nothing to filter has no filter button', function () {
+    Livewire::actingAs(User::factory()->role('Super Admin')->create())
+        ->test('desk.panels.reviews', ['size' => 'L', 'index' => 0, 'total' => 1])
+        ->assertDontSeeHtml('data-panel-filter');
 });
 
 test('a panel offers dropdown filters read from its own rows and applies them', function () {

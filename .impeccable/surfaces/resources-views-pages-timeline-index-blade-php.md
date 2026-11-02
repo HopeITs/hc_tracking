@@ -9,7 +9,7 @@ related_targets: ["resources/views/components/ui/gantt.blade.php","resources/js/
 
 Scope: `/timeline`, the department-wide Gantt. Mode: Operate.
 Audience: the projects & fundraising manager at portfolio altitude, and officers finding their own project fast. Job, in the user's words: "an enhanced pro version of MS Project" where every connection and all the data can be seen. Read-only: schedules are still edited on each project's Plan tab (links, baselines, undo live there); the timeline opens the record or the plan.
-Neighbour guard: `/dashboard` owns today's triage queue; `/executive-summary` owns fiscal promise vs delivery; `/funding-agreements` owns the money calendar. The timeline owns time, sequence and connection.
+Neighbour guard: `/dashboard` owns today's triage queue; `/funding-agreements` owns the money calendar. The timeline owns time, sequence and connection.
 Constraints: brief pins the form (MS Project-grade WBS table + Gantt: zoom, outline levels, critical path, predecessors, export). Shared engine `x-ui.gantt` also draws the project Plan tab (editable) and the agreement page; new features are opt-in so those keep working. Chart area stays LTR. Every string in lang/en + lang/ar. Currencies never summed.
 Answered by the user: take every idea (Route Map + Money × Work + Now Horizon), and the first screen answers all four: what is late/critical, next 30–90 days, funding vs delivery, overall span & progress.
 

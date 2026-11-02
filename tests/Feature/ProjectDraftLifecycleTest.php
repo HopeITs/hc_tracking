@@ -293,15 +293,11 @@ test('a draft with dates is only allowed behind a donor-approved proposal', func
     expect(draftsHoldingDatesWithoutApproval())->toBe([$dated->id]);
 });
 
-test('a draft project page shows the plan message and the no-active-proposal badge', function () {
+test('a draft project page shows the no-active-proposal badge', function () {
     $draft = Project::factory()->create();
 
     Livewire::actingAs($this->user)->test('pages::projects.show', ['project' => $draft])
-        ->assertSeeHtml('data-test="no-active-proposal"')
-        ->set('tab', 'plan')
-        ->assertSeeHtml('data-test="plan-after-approval"')
-        ->assertSee('The schedule is activated once the proposal is approved.')
-        ->assertDontSeeHtml('data-gantt');
+        ->assertSeeHtml('data-test="no-active-proposal"');
 
     Proposal::factory()->create(['status' => ProposalStatus::ProposalDraft])->projects()->attach($draft->id);
 
@@ -319,8 +315,6 @@ test('the draft messages read in Arabic', function () {
     $draft = Project::factory()->create();
 
     Livewire::actingAs($this->user)->test('pages::projects.show', ['project' => $draft])
-        ->set('tab', 'plan')
-        ->assertSee('تُفعَّل الخطة الزمنية بعد اعتماد المقترح')
         ->assertSee('لا يوجد مقترح فعّال');
 });
 

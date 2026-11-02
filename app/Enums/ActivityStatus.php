@@ -4,13 +4,14 @@ declare(strict_types=1);
 
 namespace App\Enums;
 
+use App\Enums\Concerns\HasStatusTone;
 use App\Enums\Concerns\HasTranslatedLabel;
 
 /**
  * The status of a logframe activity in a monthly report (contracts §13,
  * D-51). Unfinished statuses roll over to the next month; final ones stop it.
  */
-enum ActivityStatus: string
+enum ActivityStatus: string implements HasStatusTone
 {
     use HasTranslatedLabel;
 
@@ -55,5 +56,18 @@ enum ActivityStatus: string
     public static function values(): array
     {
         return array_column(self::cases(), 'value');
+    }
+
+    /**
+     * The shared visual tone for this case (W-28); exhaustive, no default arm.
+     */
+    public function tone(): StatusTone
+    {
+        return match ($this) {
+            self::NotStarted, self::Cancelled => StatusTone::Neutral,
+            self::Started, self::Ongoing => StatusTone::Active,
+            self::Suspended => StatusTone::Warn,
+            self::Completed, self::Conducted => StatusTone::Good,
+        };
     }
 }

@@ -30,7 +30,6 @@ return [
     'enter_a_file_name' => 'أدخل اسم الملف.',
     'enter_the_reported_value' => 'أدخل القيمة المبلغ عنها.',
     'every_report_against_this_same_target_newest_first' => 'كل تقرير مقابل هذا المستهدف نفسه، الأحدث أولًا.',
-    'executive_summary' => 'الملخص التنفيذي',
     'file_deleted' => 'تم حذف الملف.',
     'file_display_name' => 'الاسم المعروض',
     'file_updated' => 'تم تحديث الملف.',

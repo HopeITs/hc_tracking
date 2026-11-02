@@ -101,12 +101,12 @@ new class extends Component {
     $pg = $this->paginate($rows, self::PerPage);
 @endphp
 
-<x-desk.panel :facets="$pg['facets']" id="duties" register="reporting-duties.index" :size="$size" :index="$index" :total="$total" :count="$late > 0 ? $late : ($rows->count() ?: null)">
+<x-desk.panel :facets="$pg['facets']" id="duties" register="reporting-duties.index" :size="$size" :cols="$gridCols" :height="$gridRows" :index="$index" :total="$total" :count="$late > 0 ? $late : ($rows->count() ?: null)">
     @if ($rows->isNotEmpty())
         <p class="dk-pl-sum">{{ trans_choice('desk.duties_summary', $late, ['late' => $late, 'open' => $rows->count()]) }}</p>
     @endif
     @if ($pg['total'] > 0)
-        <ul class="dk-dr">
+        <ul class="dk-dr" {{ $this->fitAttributes($pg) }}>
             @foreach ($pg['slice'] as $report)
                 @php
                     $days = (int) $today->diffInDays($report->due_on, false);

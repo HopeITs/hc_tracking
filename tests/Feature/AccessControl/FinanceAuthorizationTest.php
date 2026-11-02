@@ -2,7 +2,6 @@
 
 use App\Models\Account;
 use App\Models\Donor;
-use App\Models\Project;
 use App\Models\Proposal;
 use Livewire\Features\SupportLockedProperties\CannotUpdateLockedPropertyException;
 use Livewire\Livewire;
@@ -74,5 +73,4 @@ test('the browser cannot point a preview, panel or baseline at another record', 
     'proposal file preview' => ['pages::proposals.show', fn (): array => ['proposal' => Proposal::factory()->create()], 'previewingFileId'],
     'indicator inspect panel' => ['pages::indicators.index', fn (): array => [], 'inspectingIndicatorId'],
     'expanded target' => ['pages::targets.index', fn (): array => [], 'expandedTargetId'],
-    'gantt baseline' => ['pages::projects.show', fn (): array => ['project' => Project::factory()->create()], 'ganttBaselineId'],
 ]);

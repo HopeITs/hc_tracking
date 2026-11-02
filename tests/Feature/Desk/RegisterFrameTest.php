@@ -16,7 +16,7 @@ test('every register opens in the desk frame with a way back to the desk', funct
     'funding-agreements.index', 'milestones.index', 'annual-plans.index', 'risks.index',
     'reports.index', 'monthly-reports.index', 'reporting-duties.index', 'reviews.index',
     'activity.index', 'calendar.index', 'department-tasks.index', 'targets.index', 'notifications.index',
-    'timeline.index', 'results.index', 'executive-summary.index', 'reports.monthly-matrix', 'indicator-library.index',
+    'timeline.index', 'results.index', 'reports.monthly-matrix', 'indicator-library.index',
 ]);
 
 test('the register view switch writes the page view', function () {

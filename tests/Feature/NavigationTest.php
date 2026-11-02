@@ -27,6 +27,22 @@ test('every page renders the sidebar and the top bar with its tools', function (
         ->assertSee('data-user-menu', false);
 });
 
+test('the panels button sits on My desk only', function () {
+    $this->actingAs(User::factory()->role('General Manager')->create())
+        ->get(route('projects.index'))
+        ->assertOk()
+        ->assertDontSee('data-panels-trigger', false);
+});
+
+test('the profile menu leaves notification preferences and rules to the bell', function () {
+    $html = $this->actingAs(User::factory()->role('Super Admin')->create())->get(route('dashboard'))->assertOk()->getContent();
+    $menu = str($html)->after('dk-usermenu-pop')->before('dk-usermenu-out')->toString();
+
+    expect($menu)->toContain(route('security.edit'))
+        ->not->toContain(route('notification-settings.edit'))
+        ->not->toContain(route('admin.notification-settings.edit'));
+});
+
 test('a Super Admin sidebar lists every page, grouped like the old sidebar, the Desk first', function () {
     $groups = app(Destinations::class)->sidebarFor(User::factory()->role('Super Admin')->create());
 
@@ -56,10 +72,18 @@ test('the donor report builder goes only to reports.aggregate holders, reporting
     $responsible = User::factory()->role('Team Member')->create(['employee_id' => $employeeId]);
     DonorReport::factory()->create(['responsible_employee_id' => $employeeId]);
 
-    expect(deskPageRoutes(User::factory()->role('Team Member')->create()))->not->toContain('donor-reports.compose')->not->toContain('reporting-duties.index')
-        ->and(deskPageRoutes($responsible))->toContain('reporting-duties.index')->not->toContain('donor-reports.compose')
-        ->and(deskPageRoutes(User::factory()->role('Financial')->create()))->toContain('reporting-duties.index')->not->toContain('donor-reports.compose')
-        ->and(deskPageRoutes(User::factory()->role('MEAL')->create()))->toContain('donor-reports.compose');
+    expect(deskPageRoutes(User::factory()->role('Team Member')->create()))->not->toContain('donor-reports.compose')->not->toContain('reporting-duties.index')->not->toContain('donor-reports.index')
+        ->and(deskPageRoutes($responsible))->toContain('reporting-duties.index', 'donor-reports.index')->not->toContain('donor-reports.compose')
+        ->and(deskPageRoutes(User::factory()->role('Financial')->create()))->toContain('reporting-duties.index', 'donor-reports.index')->not->toContain('donor-reports.compose')
+        ->and(deskPageRoutes(User::factory()->role('MEAL')->create()))->toContain('donor-reports.compose', 'donor-reports.index');
+});
+
+test('the donor reports register sits under monitoring and evaluation, labelled Donor reports, the builder labelled Reports', function () {
+    $groups = collect(app(Destinations::class)->sidebarFor(User::factory()->role('Super Admin')->create()))->keyBy('group');
+    $items = collect($groups->get('monitoring_evaluation')['items'])->keyBy('route');
+
+    expect($items->get('donor-reports.index')['label'])->toBe('Donor reports')
+        ->and($items->get('donor-reports.compose')['label'])->toBe('Reports');
 });
 
 test('funding pages follow the module permissions of each role', function () {

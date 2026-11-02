@@ -74,19 +74,20 @@ final class FluxMarkup
     }
 
     /**
-     * The filled task status chip (what x-ui.status-pill renders).
+     * The task status chip (what x-ui.status-pill renders): the shared
+     * StatusTone badge colours (W-28) with a status icon in front.
      */
     public static function statusPill(TaskStatus $case, string $extraClass = ''): HtmlString
     {
-        [$classes, $icon] = match ($case) {
-            TaskStatus::Todo => ['bg-white text-secondary-dark ring-1 ring-inset ring-secondary-soft dark:bg-surface-1 dark:text-ink dark:ring-line', 'stop'],
-            TaskStatus::InProgress => ['bg-status-active dark:bg-status-active-soft dark:text-status-active text-white', 'play'],
-            TaskStatus::UnderReview => ['bg-status-warn dark:bg-status-warn-soft dark:text-status-warn text-white', 'eye'],
-            TaskStatus::Done => ['bg-status-good dark:bg-status-good-soft dark:text-status-good text-white', 'check'],
+        $icon = match ($case) {
+            TaskStatus::Todo => 'stop',
+            TaskStatus::InProgress => 'play',
+            TaskStatus::UnderReview => 'eye',
+            TaskStatus::Done => 'check',
         };
 
         return new HtmlString(
-            '<span class="inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[11px] font-bold tracking-wide uppercase whitespace-nowrap '.$classes.($extraClass === '' ? '' : ' '.e($extraClass)).'">'
+            '<span class="inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-[11px] font-bold tracking-wide uppercase whitespace-nowrap '.$case->tone()->badgeClasses().($extraClass === '' ? '' : ' '.e($extraClass)).'" data-tone="'.$case->tone()->value.'">'
             .self::icon($icon, 'micro', 'size-3 shrink-0')
             .'<span class="truncate">'.e($case->label()).'</span></span>'
         );

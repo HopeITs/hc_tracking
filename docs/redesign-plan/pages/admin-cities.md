@@ -15,7 +15,7 @@ Read-only directory (cities are managed in the HR system, model `HrCity`): searc
 ## Target layout
 
 1. `x-ui.page-header`: title, count, description "Cities are managed in the HR system" (keep the existing meaning), filters: search + new `#[Url] reach` select (`with_projects` | `without_projects`).
-2. **Summary slot:** "{n} of {total} cities have projects" + `x-ui.progress-bar` (same notion as the executive summary's Geographic Reach, labelled "Portfolio").
+2. **Summary slot:** "{n} of {total} cities have projects" + `x-ui.progress-bar` (labelled "Portfolio").
 3. **Projects by city chart** (panel, collapsible): `x-ui.chart type="bar"` horizontal, top 10 cities by projects count.
 4. **One** `x-ui.data-table`: City (name + secondary_name meta, following `name`/`secondary_name` locale rules) · Projects (numeric; links to `projects.index?city={id}` when > 0) · Status (Active good chip / Inactive neutral chip). No actions column.
 5. Remove per-file class maps and `admin-directory` wrapper for this page.

@@ -103,7 +103,7 @@ new class extends Component {
     $format = __('desk.date_short');
 @endphp
 
-<x-desk.panel :facets="$pg['facets']" id="money" register="funding-agreements.index" :size="$size" :index="$index" :total="$total" :count="$rows->count()">
+<x-desk.panel :facets="$pg['facets']" id="money" register="funding-agreements.index" :size="$size" :cols="$gridCols" :height="$gridRows" :index="$index" :total="$total" :count="$rows->count()">
     @if ($this->fundingPosition->isNotEmpty())
         <p class="dk-fp-tot dk-num">
             @foreach ($this->fundingPosition as $total)
@@ -113,7 +113,7 @@ new class extends Component {
     @endif
 
     @if ($pg['total'] > 0)
-        <ul class="dk-fp">
+        <ul class="dk-fp" {{ $this->fitAttributes($pg) }}>
             @foreach ($pg['slice'] as $row)
                 @php
                     $currency = $row['agreement']->currency->value;

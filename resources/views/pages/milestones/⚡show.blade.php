@@ -455,6 +455,7 @@ new #[Layout('layouts::desk'), Title('titles.milestone')] class extends Componen
 <x-desk.record-sheet register="pages::milestones.index" :close-url="route('milestones.index')" :title="$this->milestone->name" :subtitle="$this->milestone->ownerName()">
 <section class="@container/detail flex min-h-full w-full flex-1 flex-col gap-4 bg-white text-secondary-dark dark:bg-surface-0 dark:text-ink" aria-labelledby="milestone-detail-heading">
     <x-ui.detail-header
+        :back="\App\Support\BackUrl::for(route('milestones.index'))"
         id="milestone-detail-heading"
         :breadcrumbs="[
             ['label' => __('common.milestones'), 'url' => route('milestones.index')],

@@ -2,7 +2,6 @@
 
 use App\Enums\MediaCollection;
 use App\Enums\ProjectStatus;
-use App\Models\Milestone;
 use App\Models\Program;
 use App\Models\Project;
 use App\Models\User;
@@ -78,13 +77,4 @@ test('managers archive and restore projects', function () {
 
     ($this->index)($manager)->call('restoreProject', $this->project->id);
     expect($this->project->fresh()->status)->not->toBe(ProjectStatus::Archived);
-});
-
-test('schedule edits need edit rights on the project', function () {
-    $milestone = Milestone::factory()->create(['project_id' => $this->project->id]);
-
-    ($this->show)(userWithRole('Team Member'))->call('ganttRename', 'milestone-'.$milestone->id, 'Renamed')->assertForbidden();
-    ($this->show)($this->owner)->call('ganttRename', 'milestone-'.$milestone->id, 'Renamed')->assertOk();
-
-    expect($milestone->fresh()->name)->toBe('Renamed');
 });

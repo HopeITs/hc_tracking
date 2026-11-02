@@ -200,3 +200,20 @@ test('the card costs the same queries for one or ten supervisees', function () {
 
     expect($queriesFor(10))->toBe($queriesFor(1));
 });
+
+test('the search box narrows the card to the people whose name matches, from the first page', function () {
+    $lead = userWithRole('Managers', insertHrEmployee());
+    teamSupervision($lead->employee_id, insertHrEmployee(firstNameEn: 'Rana'));
+    teamSupervision($lead->employee_id, insertHrEmployee(firstNameEn: 'Omar'));
+
+    Livewire::actingAs($lead)->test('desk.panels.myteam', ['size' => 'M'])
+        ->assertSeeHtml('data-panel-search-toggle')
+        ->assertSee(['Rana', 'Omar'])
+        ->set('page', 1)
+        ->set('search', 'ran')
+        ->assertSet('page', 0)
+        ->assertSee('Rana')
+        ->assertDontSee('Omar')
+        ->set('search', 'nobody here')
+        ->assertSee(__('desk.search_none', ['query' => 'nobody here']));
+});

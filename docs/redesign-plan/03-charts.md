@@ -1,6 +1,6 @@
 # 03 · Charts (ApexCharts + `x-ui.chart`)
 
-**Owner group:** Foundation · **Wave:** 0 (after 01, parallel with 02) · **Blocks:** dashboard, executive summary, any page with a chart
+**Owner group:** Foundation · **Wave:** 0 (after 01, parallel with 02) · **Blocks:** dashboard, any page with a chart
 
 ## Files you own
 

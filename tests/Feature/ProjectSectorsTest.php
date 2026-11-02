@@ -240,7 +240,7 @@ describe('display', function () {
         $wells->sectors()->attach($wash->id);
 
         Livewire::actingAs(userWithRole('General Manager'))->test('pages::projects.index')
-            ->set('view', 'table')
+            ->set('view', 'list')
             ->assertSee('Clinic project')
             ->assertSee('Wells project')
             ->assertSeeHtml('data-test="project-sectors-cell"')
@@ -264,7 +264,7 @@ describe('display', function () {
                 $queries++;
             });
 
-            Livewire::actingAs($user)->test('pages::projects.index')->set('view', 'table');
+            Livewire::actingAs($user)->test('pages::projects.index')->set('view', 'list');
 
             return $queries;
         };

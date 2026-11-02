@@ -20,6 +20,7 @@
 @endphp
 
 <x-ui.detail-header
+        :back="\App\Support\BackUrl::for(route('monthly-reports.index'))"
     :breadcrumbs="[
         ['label' => __('titles.monthly_reports'), 'url' => route('monthly-reports.index')],
         ['label' => $headerProject->name.' · '.$monthLabel],

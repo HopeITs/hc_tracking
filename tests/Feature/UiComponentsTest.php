@@ -3,6 +3,8 @@
 use App\Enums\Currency;
 use App\Enums\MilestoneStatus;
 use App\Enums\ProjectStatus;
+use App\Enums\RagStatus;
+use App\Enums\ResultType;
 use App\Enums\TaskStatus;
 use App\Models\User;
 use Carbon\CarbonImmutable;
@@ -23,40 +25,52 @@ test('the ui input carries the shared control classes', function () {
         ->and($html)->toContain('dark:bg-surface-2!');
 });
 
-test('the enum badge labels a case and tones it', function () {
+test('the enum badge labels a case and tones it as active', function () {
     $html = Blade::render('<x-ui.enum-badge :case="$case" />', ['case' => TaskStatus::InProgress]);
 
     expect($html)->toContain('In Progress')
-        ->and($html)->toContain('bg-secondary-dark');
+        ->and($html)->toContain('data-tone="active"')
+        ->and($html)->toContain('bg-status-active-soft');
 });
 
-test('the enum badge tones a stalled state with the primary colour', function () {
+test('the enum badge tones a stalled state as warn, not brand red', function () {
     $html = Blade::render('<x-ui.enum-badge :case="$case" />', ['case' => MilestoneStatus::Postponed]);
 
     expect($html)->toContain('Postponed')
-        ->and($html)->toContain('bg-primary');
+        ->and($html)->toContain('data-tone="warn"')
+        ->and($html)->toContain('bg-status-warn-soft')
+        ->and($html)->not->toContain('bg-primary');
 });
 
-test('the enum badge renders an active project as a solid dark badge', function () {
-    $html = Blade::render('<x-ui.enum-badge :case="$case" />', ['case' => ProjectStatus::Active]);
+test('the enum badge renders a red RAG status with the critical classes', function () {
+    $html = Blade::render('<x-ui.enum-badge :case="$case" />', ['case' => RagStatus::Red]);
 
-    expect($html)->toContain('Active')
-        ->and($html)->toContain('bg-secondary-dark');
+    expect($html)->toContain('data-tone="critical"')
+        ->and($html)->toContain('bg-status-critical-soft')
+        ->and($html)->toContain('text-status-critical')
+        ->and($html)->not->toContain('bg-primary');
 });
 
-test('the enum badge renders other project states as outlined badges', function (ProjectStatus $status) {
+test('the enum badge renders project states by their tone', function (ProjectStatus $status, string $tone) {
     $html = Blade::render('<x-ui.enum-badge :case="$case" />', ['case' => $status]);
 
-    expect($html)->toContain('border-secondary-light')
+    expect($html)->toContain('data-tone="'.$tone.'"')
         ->and($html)->not->toContain('bg-secondary-dark')
         ->and($html)->not->toContain('bg-primary');
 })->with([
-    'draft' => ProjectStatus::Draft,
-    'submitted' => ProjectStatus::Submitted,
-    'approved' => ProjectStatus::Approved,
-    'closed' => ProjectStatus::Closed,
-    'archived' => ProjectStatus::Archived,
+    'draft' => [ProjectStatus::Draft, 'neutral'],
+    'submitted' => [ProjectStatus::Submitted, 'active'],
+    'approved' => [ProjectStatus::Approved, 'good'],
+    'active' => [ProjectStatus::Active, 'active'],
+    'closed' => [ProjectStatus::Closed, 'good'],
+    'archived' => [ProjectStatus::Archived, 'neutral'],
 ]);
+
+test('the enum badge renders a non-status enum with the neutral tone', function () {
+    $html = Blade::render('<x-ui.enum-badge :case="$case" />', ['case' => ResultType::Output]);
+
+    expect($html)->toContain('data-tone="neutral"');
+});
 
 test('the enum badge renders an em dash for a null case', function () {
     $html = Blade::render('<x-ui.enum-badge :case="$case" />', ['case' => null]);

@@ -1,0 +1,236 @@
+/* Desk cards: Project flow, My notes, Past the deadline, the Needs you Focus
+ * deck and the My team load meter, then the sheet card language,
+ * density and the hero (briefing, command strip). Own classes only, all prefixed dk-, in
+ * @layer components like desk.css. Colours are desk.css :root aliases of the
+ * tokens.css tokens, so Graphite .dark applies without a second block. Width
+ * changes use the panel body's `pb` container, never [style*="--span"]. */
+
+@layer components {
+    /* ── Project flow: one proportional thread ────────────────────────
+     * Each stage's segment grows with its project count (flex-grow =
+     * --dk-flow-grow); empty stages keep a short stub so their label fits.
+     * Figure above, boundary dot on the thread, label and late dots below. */
+    .dk-flow-head { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 12px; margin: 0; padding: 0 0 4px; font-size: 13.5px; color: var(--ink-2); }
+    .dk-flow-head strong { color: var(--ink); font-weight: 800; }
+    .dk-flow-you { color: var(--bad); font-weight: 700; }
+    .dk-flow-ok { color: var(--good); font-weight: 700; }
+
+    .dk-flow { list-style: none; margin: 0; padding: 4px 0 0; display: flex; align-items: flex-start; min-width: 0; }
+    .dk-flow-step { position: relative; flex: var(--dk-flow-grow, 1) 1 0; min-width: 88px; }
+    .dk-flow-step.dk-flow-empty { flex: 0 0 88px; }
+    .dk-flow-step > a { display: grid; grid-template-rows: auto 20px auto auto; justify-items: start; gap: 4px; padding-block: 4px 8px; text-decoration: none; color: inherit; text-align: start; border-radius: 8px; }
+    .dk-flow-step > a:focus-visible { outline: 2px solid var(--ink-2); outline-offset: 2px; }
+
+    .dk-flow-n { font-size: clamp(24px, 2.2vw, 32px); font-weight: 800; line-height: 1; letter-spacing: -.02em; color: var(--ink); padding-inline-end: 8px; }
+    .dk-flow-empty .dk-flow-n { color: var(--faint); font-weight: 700; }
+
+    .dk-flow-dot { position: relative; justify-self: stretch; height: 20px; display: flex; align-items: center; }
+    .dk-flow-dot::before { content: ""; position: absolute; inset-inline: 0; top: 50%; height: 3px; margin-top: -1.5px; background: var(--ink-2); }
+    .dk-flow-empty .dk-flow-dot::before { height: 1px; margin-top: -.5px; background: var(--line-2); }
+    .dk-flow-dot i { position: relative; width: 12px; height: 12px; border-radius: 50%; border: 2.5px solid var(--ink-2); background: var(--paper); transition: transform .2s cubic-bezier(.2, .7, .2, 1); }
+    .dk-flow-empty .dk-flow-dot i { width: 8px; height: 8px; border-width: 1.5px; border-color: var(--line-2); }
+    .dk-flow-hot .dk-flow-dot i { border-color: var(--bad); }
+    .dk-flow-step:last-child .dk-flow-dot::after { content: ""; position: absolute; inset-inline-end: 0; top: 50%; width: 8px; height: 8px; margin-top: -4px; border-radius: 50%; background: var(--line-2); }
+    .dk-flow-step > a:hover .dk-flow-dot i, .dk-flow-step > a:focus-visible .dk-flow-dot i { transform: scale(1.3); }
+
+    .dk-flow-w { font-size: 12.5px; font-weight: 700; color: var(--ink-2); line-height: 1.3; padding-inline-end: 8px; overflow-wrap: anywhere; }
+    .dk-flow-late { display: flex; gap: 3px; }
+    .dk-flow-late i { width: 6px; height: 6px; border-radius: 50%; background: var(--bad); }
+
+    /* Hover / focus: the stage's top projects, late first. */
+    .dk-flow-tip { position: absolute; top: 40px; inset-inline-start: 0; z-index: 6; width: max-content; min-width: 180px; max-width: 260px; padding: 10px 12px; border-radius: 10px; background: var(--paper); border: 1px solid var(--line); box-shadow: var(--dk-shadow); opacity: 0; visibility: hidden; transform: translateY(-4px); transition: opacity .15s ease, transform .15s ease, visibility 0s .15s; pointer-events: none; }
+    .dk-flow-end .dk-flow-tip { inset-inline-start: auto; inset-inline-end: 0; }
+    .dk-flow-step:hover .dk-flow-tip, .dk-flow-step:focus-within .dk-flow-tip { opacity: 1; visibility: visible; transform: none; transition-delay: 0s; }
+    .dk-flow-tip-h { margin: 0 0 6px; font-size: 11.5px; font-weight: 800; letter-spacing: .08em; text-transform: uppercase; color: var(--ink-3); }
+    [lang="ar"] .dk-flow-tip-h { letter-spacing: 0; text-transform: none; font-size: 12.5px; }
+    .dk-flow-tip ul { list-style: none; margin: 0; padding: 0; display: grid; gap: 4px; }
+    .dk-flow-tip li { display: grid; grid-template-columns: 6px minmax(0, 1fr) auto; align-items: center; gap: 8px; font-size: 13px; font-weight: 700; color: var(--ink); }
+    .dk-flow-tip li i { width: 6px; height: 6px; border-radius: 50%; background: var(--ink-3); }
+    .dk-flow-tip li.dk-bad i { background: var(--bad); }
+    .dk-flow-tip li span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .dk-flow-tip li em { font-style: normal; font-size: 11.5px; color: var(--bad); }
+    .dk-flow-tip .dk-is { margin: 6px 0 0; font-size: 12px; }
+
+    /* Narrow card: the thread turns vertical, one stage a row. */
+    @container pb (max-width: 559px) {
+        .dk-flow { flex-direction: column; align-items: stretch; padding-top: 0; }
+        .dk-flow-step, .dk-flow-step.dk-flow-empty { flex: none; min-width: 0; }
+        .dk-flow-step > a { grid-template-rows: none; grid-template-columns: 20px 3ch minmax(0, 1fr) auto; align-items: center; gap: 10px; padding-block: 2px; }
+        .dk-flow-dot { grid-column: 1; grid-row: 1; height: 100%; min-height: 26px; justify-content: center; }
+        .dk-flow-dot::before, .dk-flow-empty .dk-flow-dot::before { inset-inline: auto; top: 0; bottom: 0; left: 50%; width: 2px; height: auto; margin: 0 0 0 -1px; }
+        [dir="rtl"] .dk-flow-dot::before, [dir="rtl"] .dk-flow-empty .dk-flow-dot::before { left: auto; right: 50%; margin: 0 -1px 0 0; }
+        .dk-flow-step:first-child .dk-flow-dot::before { top: 50%; }
+        .dk-flow-step:last-child .dk-flow-dot::before { bottom: 50%; }
+        .dk-flow-step:last-child .dk-flow-dot::after { display: none; }
+        .dk-flow-n { grid-column: 2; grid-row: 1; font-size: 18px; text-align: end; padding: 0; justify-self: end; }
+        .dk-flow-w { grid-column: 3; grid-row: 1; font-size: 13px; }
+        .dk-flow-late { grid-column: 4; grid-row: 1; }
+        .dk-flow-tip { display: none; }
+    }
+
+    /* ── My notes ─────────────────────────────────────────────────── */
+    .dk-notes { display: flex; flex-direction: column; gap: 8px; flex: 1; min-height: 0; }
+    .dk-notes-box { flex: 1; min-height: 0; width: 100%; resize: none; padding: 12px 14px; border: 1px solid var(--line); border-radius: 12px; background: var(--sunk); color: var(--ink); font-family: var(--font); font-size: 14.5px; line-height: 1.6; transition: border-color .15s ease, background .15s ease; }
+    .dk-notes-box::placeholder { color: var(--faint); }
+    .dk-notes-box:focus { outline: none; border-color: var(--ink-3); background: var(--paper); }
+    .dk-notes-box[aria-invalid="true"] { border-color: var(--bad); }
+    .dk-notes-foot { display: flex; align-items: center; justify-content: space-between; gap: 10px; font-size: 12.5px; color: var(--ink-3); }
+    .dk-notes-state { display: inline-flex; align-items: center; gap: 6px; min-width: 0; }
+    .dk-notes-state i { width: 7px; height: 7px; flex: none; border-radius: 50%; background: var(--good); transition: background .2s ease; }
+    .dk-notes-state.dk-saving i { background: var(--warn); animation: dk-cards-blink 1s ease-in-out infinite; }
+    .dk-notes-count { flex: none; }
+    .dk-notes-foot .dk-bad { color: var(--bad); }
+    @keyframes dk-cards-blink { 50% { opacity: .35; } }
+
+    /* ── Past the deadline ────────────────────────────────────────── */
+    .dk-od { list-style: none; margin: 0; padding: 0; }
+    .dk-od > li { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; align-items: center; gap: 4px 12px; padding-block: 9px; border-bottom: 1px solid var(--line); }
+    .dk-od > li:last-child { border-bottom: 0; }
+    .dk-od-kind { justify-self: start; padding: 2px 8px; border-radius: 6px; background: var(--sunk); color: var(--ink-2); font-size: 11.5px; font-weight: 700; white-space: nowrap; }
+    .dk-od-kind[data-kind="transfer"] { background: var(--money-soft); color: var(--money); }
+    .dk-od-kind[data-kind="milestone"] { background: var(--active-soft); color: var(--active); }
+    .dk-od-main { min-width: 0; display: grid; }
+    .dk-od-t { font-size: 14px; font-weight: 700; color: var(--ink); text-decoration: none; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .dk-od-t:hover { text-decoration: underline; }
+    .dk-od-main .dk-is { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; margin-top: 1px; }
+    .dk-od-late { color: var(--bad); font-size: 13px; font-weight: 800; white-space: nowrap; }
+    @container pb (max-width: 419px) {
+        .dk-od > li { grid-template-columns: minmax(0, 1fr) auto; }
+        .dk-od-main { grid-column: 1 / -1; grid-row: 2; }
+    }
+
+    /* ── Needs you: view toggle and the Focus deck ────────────────────
+     * The current decision sits on top; the next two peek out below it,
+     * smaller and fainter (their content hidden and inert). Stepping moves
+     * the old top card aside and lifts the next one. */
+    .dk-needs-view { margin-inline-start: 4px; }
+    .dk-needs .dk-pb { display: flex; flex-direction: column; }
+    .dk-focus { display: flex; flex-direction: column; gap: 8px; flex: 1; min-height: 0; border-radius: 10px; outline: none; touch-action: pan-y; }
+    .dk-focus:focus-visible { box-shadow: 0 0 0 2px var(--ink-2); }
+    .dk-focus-track { list-style: none; margin: 0; padding: 0 0 16px; flex: 1; min-height: 0; display: grid; grid-template: minmax(0, 1fr) / minmax(0, 1fr); }
+    .dk-focus-card { grid-area: 1 / 1; display: flex; flex-direction: column; gap: 6px; min-height: 0; padding: 20px 24px; border-radius: 10px; background: var(--sunk); border: 1px solid var(--line); overflow: clip; transform-origin: 50% 100%; transition: transform .42s cubic-bezier(.2, .7, .2, 1), opacity .32s ease; }
+    .dk-focus-card[data-state="top"] { z-index: 3; }
+    .dk-focus-card[data-state="peek1"] { z-index: 2; transform: translateY(8px) scale(.96); opacity: .75; }
+    .dk-focus-card[data-state="peek2"] { z-index: 1; transform: translateY(16px) scale(.92); opacity: .45; }
+    .dk-focus-card[data-state="gone"] { z-index: 0; transform: translateX(-32px) scale(.98); opacity: 0; pointer-events: none; }
+    [dir="rtl"] .dk-focus-card[data-state="gone"] { transform: translateX(32px) scale(.98); }
+    .dk-focus-card[data-state="hidden"] { z-index: 0; transform: translateY(16px) scale(.9); opacity: 0; pointer-events: none; }
+    .dk-focus-card:not([data-state="top"]) > * { visibility: hidden; }
+    .dk-focus-card.dk-focus-late[data-state="top"] { border-color: color-mix(in srgb, var(--bad) 35%, var(--line)); }
+    .dk-focus-eyebrow { display: flex; align-items: center; gap: 8px; margin: 0; font-size: 11.5px; font-weight: 800; letter-spacing: .08em; text-transform: uppercase; color: var(--ink-3); }
+    [lang="ar"] .dk-focus-eyebrow { letter-spacing: 0; text-transform: none; font-size: 12.5px; }
+    .dk-focus-eyebrow .dk-sev { margin-top: 0; }
+    .dk-focus-latechip { padding: 1px 8px; border-radius: 999px; background: var(--bad-soft); color: var(--bad); letter-spacing: 0; text-transform: none; font-size: 11.5px; }
+    .dk-focus-title { margin: 0; font-size: clamp(18px, 2vw, 24px); font-weight: 800; line-height: 1.25; color: var(--ink); text-wrap: balance; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+    .dk-focus-ctx { margin: 0; font-size: 14px; color: var(--ink-2); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .dk-focus-meta { display: flex; flex-wrap: wrap; gap: 4px 16px; margin: 0; font-size: 13px; color: var(--ink-3); }
+    .dk-focus-meta .dk-who { color: var(--ink-2); font-weight: 700; }
+    .dk-focus-meta .dk-bad { color: var(--bad); font-weight: 700; }
+    .dk-focus-acts { display: flex; flex-wrap: wrap; gap: 8px; margin-top: auto; padding-top: 8px; }
+
+    .dk-focus-nav { display: flex; align-items: center; justify-content: center; gap: 8px; flex: none; }
+    .dk-deck-ring { width: 28px; height: 28px; flex: none; }
+    .dk-deck-ring svg { width: 100%; height: 100%; transform: rotate(-90deg); }
+    [dir="rtl"] .dk-deck-ring svg { transform: rotate(-90deg) scaleY(-1); }
+    .dk-deck-ring circle { fill: none; stroke-width: 3.5; }
+    .dk-deck-ring-bg { stroke: var(--line); }
+    .dk-deck-ring-fg { stroke: var(--ink-2); stroke-linecap: round; stroke-dasharray: 100; transition: stroke-dashoffset .42s cubic-bezier(.2, .7, .2, 1); }
+    .dk-focus-pos { display: inline-flex; align-items: baseline; gap: 3px; min-width: 5ch; }
+    .dk-focus-pos b { font-size: 16px; font-weight: 800; color: var(--ink); }
+    .dk-focus-of { font-size: 12.5px; font-weight: 700; color: var(--ink-3); }
+
+    /* All done: a ring and a check that draw themselves once. */
+    .dk-celebrate { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 12px; padding: 16px; text-align: center; }
+    .dk-celebrate svg { width: 64px; height: 64px; fill: none; stroke: var(--good); stroke-width: 3; stroke-linecap: round; stroke-linejoin: round; }
+    .dk-celebrate circle, .dk-celebrate path { stroke-dasharray: 100; stroke-dashoffset: 0; }
+    .dk-celebrate circle { stroke: var(--good-soft); stroke-width: 4; }
+    .dk-celebrate p { display: grid; gap: 4px; margin: 0; }
+    .dk-celebrate strong { font-size: 20px; font-weight: 800; color: var(--ink); }
+    .dk-celebrate .dk-is { margin: 0; }
+    @keyframes dk-cards-draw { from { stroke-dashoffset: 100; } }
+    @media (prefers-reduced-motion: no-preference) {
+        .dk-celebrate circle { animation: dk-cards-draw .8s cubic-bezier(.2, .7, .2, 1) both; }
+        .dk-celebrate path { animation: dk-cards-draw .5s cubic-bezier(.2, .7, .2, 1) .55s both; }
+    }
+    @media (prefers-reduced-motion: reduce) {
+        .dk-focus-card, .dk-deck-ring-fg, .dk-notes-state.dk-saving i { transition: none; animation: none; }
+    }
+    @container pb (max-width: 419px) {
+        .dk-focus-card { padding: 16px; }
+    }
+    @container pb (min-width: 640px) {
+        .dk-focus-card { padding: 24px 28px; gap: 8px; }
+    }
+
+    /* ── My team: load meter and status word ──────────────────────── */
+    .dk-load-sum { display: flex; align-items: center; gap: 8px; padding: 0 2px 6px; font-size: 13px; font-weight: 700; color: var(--ink-2); }
+    .dk-load-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--good); }
+    .dk-pb .dk-team > li:has(.dk-tm-meter) { grid-template-columns: 30px minmax(0, 1fr) minmax(96px, 150px) 30px; }
+    .dk-pb .dk-team > li:has(.dk-tm-meter) .dk-tm-load { display: none; }
+    .dk-tm-meter { display: grid; grid-template-columns: auto 1fr; align-items: center; gap: 3px 8px; min-width: 0; }
+    .dk-load-word { font-size: 11.5px; font-weight: 800; padding: 1px 7px; border-radius: 999px; white-space: nowrap; }
+    .dk-load-word.dk-free { background: var(--good-soft); color: var(--good); }
+    .dk-load-word.dk-busy { background: var(--warn-soft); color: var(--warn); }
+    .dk-load-word.dk-overloaded { background: var(--bad-soft); color: var(--bad); }
+    .dk-load-bar { position: relative; height: 6px; border-radius: 6px; background: var(--line); overflow: hidden; }
+    .dk-load-bar b, .dk-load-bar i { position: absolute; inset-block: 0; inset-inline-start: 0; border-radius: 6px; }
+    .dk-load-bar b { background: var(--ink-3); }
+    .dk-load-bar i { background: var(--bad); }
+    .dk-load-n { grid-column: 1 / -1; font-size: 12px; color: var(--ink-3); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    @container pb (min-width: 640px) {
+        .dk-pb .dk-team > li:has(.dk-tm-meter) { grid-template-columns: 30px minmax(0, 1fr) minmax(150px, 220px) auto 30px; }
+        .dk-pb .dk-team > li:has(.dk-tm-meter) .dk-tm-load { display: flex; }
+    }
+    @container pb (max-width: 379px) {
+        .dk-pb .dk-team > li:has(.dk-tm-meter) { grid-template-columns: 30px minmax(0, 1fr) 30px; }
+        .dk-pb .dk-team > li:has(.dk-tm-meter) .dk-tm-meter { grid-column: 2; grid-row: 2; }
+    }
+
+    /* ── Sheets: the panel card language ──────────────────────────────
+     * Overrides desk.css's panel look (same layer, later file): 12px radius,
+     * a hairline and a soft lift instead of a heavy box, an uppercase
+     * eyebrow title, the count as a figure at the end, tools on hover and the
+     * grip only on hover. Resize rules stay in desk.css. */
+    :root { --panel-r: 12px; --panel-pad: 16px; --panel-shadow: 0 1px 1px color-mix(in srgb, var(--ink) 4%, transparent), 0 10px 28px -18px color-mix(in srgb, var(--ink) 22%, transparent); }
+    .dk-panel { border-color: color-mix(in srgb, var(--line) 80%, transparent); }
+    .dk-panel.dk-needs { border-color: color-mix(in srgb, var(--line) 80%, transparent); }
+    .dk-panel.dk-needs::before { content: none; }
+
+    .dk-ph, [dir="rtl"] .dk-ph { position: relative; align-items: center; gap: 4px; min-height: 52px; padding: 12px var(--panel-pad) 4px calc(var(--panel-pad) + 4px); }
+    [dir="rtl"] .dk-ph { padding: 12px calc(var(--panel-pad) + 4px) 4px var(--panel-pad); }
+    .dk-ph h2 { padding-top: 0; font-size: 11.5px; font-weight: 800; line-height: 16px; letter-spacing: .09em; text-transform: uppercase; color: var(--ink-3); }
+    [lang="ar"] .dk-ph h2 { font-size: 13px; line-height: 20px; letter-spacing: 0; text-transform: none; }
+    .dk-ph > .dk-pc { margin: 0; margin-inline-start: 8px; min-width: 0; height: auto; padding: 0; border-radius: 0; background: none; color: var(--ink); font-size: 28px; font-weight: 800; line-height: 1; letter-spacing: -.02em; display: block; }
+    .dk-panel[data-health="brand"] .dk-ph > .dk-pc { color: var(--brand-ink); }
+    .dk-panel[data-health="critical"] .dk-ph > .dk-pc { color: var(--bad); }
+    .dk-ph .dk-iconbtn { flex: none; }
+
+    .dk-ptools { padding: 0 var(--panel-pad) 8px; }
+    .dk-pb { padding: 0 var(--panel-pad) 12px; }
+    .dk-pf { padding: 4px 12px 4px var(--panel-pad); min-height: 44px; border-top-color: color-mix(in srgb, var(--line) 70%, transparent); }
+    [dir="rtl"] .dk-pf { padding: 4px var(--panel-pad) 4px 12px; }
+    .dk-panel .dk-items > li { min-height: 56px; }
+
+    /* Keyboard focus inside a sheet reads on both themes. */
+    .dk-panel :is(a, button, [tabindex]):focus-visible { outline: 2px solid var(--ink-2); outline-offset: 2px; }
+
+    /* ── Hero: briefing, command strip ──────────────────── */
+    .dk-hello { grid-template-columns: minmax(0, 1fr); }
+    .dk-hello h1 .dk-hello-link { color: inherit; text-decoration: underline; text-decoration-thickness: .06em; text-underline-offset: .16em; text-decoration-color: color-mix(in srgb, currentColor 28%, transparent); transition: text-decoration-color .15s ease; }
+    .dk-hello-link:hover, .dk-hello-link:focus-visible { text-decoration-color: currentColor; }
+    .dk-hello-link:focus-visible { outline: 2px solid var(--ink-2); outline-offset: 3px; border-radius: 4px; }
+    .dk-lede .dk-hello-link { color: var(--bad); font-weight: 700; text-decoration: underline; text-decoration-thickness: 1.5px; text-underline-offset: 3px; text-decoration-color: color-mix(in srgb, var(--bad) 35%, transparent); }
+
+
+    .dk-start { display: flex; flex-wrap: wrap; align-items: stretch; gap: 8px; }
+    .dk-start-row { flex: 1 1 auto; display: flex; flex-wrap: wrap; align-items: stretch; gap: 8px; min-width: 0; }
+    .dk-start-btn { flex: 1 1 auto; justify-content: center; height: 48px; gap: 10px; padding-inline: 16px; border: 1px solid var(--line-2); border-radius: 10px; background: var(--paper); color: var(--ink); font-size: 14px; font-weight: 700; }
+    .dk-start-ic { flex: none; width: 22px; height: 22px; }
+    .dk-start-btn .dk-start-ic { color: var(--brand-ink); }
+    .dk-start-btn:hover { border-color: var(--brand-ink); background: var(--tint); }
+    .dk-start-btn:focus-visible { outline: 2px solid var(--ink-2); outline-offset: 2px; }
+    @media (max-width: 760px) {
+        .dk-start-row { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); margin-inline: 0; padding-inline: 0; overflow: visible; }
+        .dk-start-btn { justify-content: flex-start; padding-inline: 12px; font-size: 13.5px; white-space: normal; }
+    }
+}

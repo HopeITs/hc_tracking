@@ -52,7 +52,7 @@
     $menuItemClasses = 'flex items-center px-2 py-1.5 w-full focus:outline-hidden select-none rounded-md text-start text-sm font-medium [&[disabled]]:opacity-50 text-zinc-800 data-active:bg-zinc-50 dark:text-white dark:data-active:bg-white/6 **:data-flux-menu-item-icon:text-zinc-400 dark:**:data-flux-menu-item-icon:text-white/60 [&[data-active]_[data-flux-menu-item-icon]]:text-current';
 @endphp
 
-{{-- `deferred` writes the choice to Livewire's client state only (the finance filters dialog applies it later), so the label and the check follow $wire instead of the server. --}}
+{{-- `deferred` hands the choice to the host dialog's pick() (finance filters, Desk panel filters), which keeps it as a draft until the dialog applies it; the label and the check read the draft through the host's value()/is(). --}}
 <div class="min-w-0" data-header-filter-select @if ($deferred) data-filter-models="{{ json_encode([$model]) }}" @endif>
     <label for="{{ $id }}" class="mb-1.5 block text-[11px] font-semibold uppercase leading-4 tracking-[0.1em] text-secondary-medium dark:text-ink-muted">
         {{ $label }}
@@ -68,7 +68,7 @@
             x-on:click="openEmployees()"
         >
             @if ($deferred)
-                <span class="truncate" x-text="{{ Illuminate\Support\Js::from(collect($options)->pluck('label', 'value')) }}[String($wire.{{ $model }} ?? '')] ?? {{ Illuminate\Support\Js::from($options[0]['label'] ?? '') }}">{{ $selectedLabel }}</span>
+                <span class="truncate" x-text="{{ Illuminate\Support\Js::from(collect($options)->pluck('label', 'value')) }}[String(value('{{ $model }}'))] ?? {{ Illuminate\Support\Js::from($options[0]['label'] ?? '') }}">{{ $selectedLabel }}</span>
             @else
                 <span class="truncate">{{ $selectedLabel }}</span>
             @endif

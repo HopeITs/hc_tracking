@@ -25,22 +25,31 @@ use Livewire\Component;
  * start → end with a today marker and days left. Stage and health come
  * from App\Support\Desk\ProjectStage.
  */
-new class extends Component {
+new class extends Component
+{
     use IsDeskPanel;
 
-    public string $lens = 'stage';
+    public string $lens = 'dates';
 
     public string $scope = 'mine';
 
     public function setLens(string $lens): void
     {
-        $this->lens = in_array($lens, ['stage', 'money', 'results', 'dates'], true) ? $lens : 'stage';
+        $this->lens = in_array($lens, ['stage', 'money', 'results', 'dates'], true) ? $lens : 'dates';
     }
 
     public function setScope(string $scope): void
     {
         $this->scope = $scope === 'all' ? 'all' : 'mine';
         $this->page = 0;
+    }
+
+    /**
+     * @return list<string>
+     */
+    protected function filterProperties(): array
+    {
+        return ['scope', 'filter'];
     }
 
     public function updatedScope(string $scope): void
@@ -158,12 +167,12 @@ new class extends Component {
         ->values();
     $pg = $this->paginate($list, self::PerPage);
     $lenses = array_filter(['stage', 'money', 'results', 'dates'], fn (string $key): bool => $key !== 'money' || $this->canViewFundingPosition());
-    $shownLens = in_array($lens, $lenses, true) ? $lens : 'stage';
+    $shownLens = in_array($lens, $lenses, true) ? $lens : 'dates';
     $today = CarbonImmutable::today();
     $stages = __('desk.stages');
 @endphp
 
-<x-desk.panel :facets="$pg['facets']" :filtered="$active !== 'all' || ($hasOthers && $scope !== 'mine')" id="projects" :register="$shownLens === 'dates' ? 'timeline.index' : 'projects.index'" :size="$size" :index="$index" :total="$total" :count="$list->count()">
+<x-desk.panel :facets="$pg['facets']" :filtered="$active !== 'all' || ($hasOthers && $scope !== 'mine')" id="projects" :register="$shownLens === 'dates' ? 'timeline.index' : 'projects.index'" :size="$size" :cols="$gridCols" :height="$gridRows" :index="$index" :total="$total" :count="$list->count()">
     <x-slot:filters>
         @if ($hasOthers)
             <div class="contents" data-filter-defaults='{"scope":"mine"}'>
@@ -191,7 +200,7 @@ new class extends Component {
     </x-slot:tools>
 
     @if ($pg['total'] > 0)
-        <ol class="dk-pj" data-lens="{{ $shownLens }}">
+        <ol class="dk-pj" {{ $this->fitAttributes($pg) }} data-lens="{{ $shownLens }}">
             @foreach ($pg['slice'] as $project)
                 @php
                     $line = $lines[$project->id];
@@ -201,6 +210,7 @@ new class extends Component {
                 <li wire:key="project-{{ $project->id }}">
                     <div class="dk-pj-n">
                         <a href="{{ route('projects.show', $project) }}" wire:navigate title="{{ $project->name }}">@if ($line['attention'] > 0)<span class="dk-att" title="{{ trans_choice('desk.attention_items', $line['attention'], ['count' => $line['attention']]) }}">{{ $line['attention'] }}</span>@endif{{ $project->name }}</a>
+                        <span class="dk-is dk-num" data-project-dates>{{ $project->start_date?->translatedFormat('M Y') ?? '—' }} → {{ $project->end_date?->translatedFormat('M Y') ?? '—' }}</span>
                         <span class="dk-is" title="{{ $line['donor'] }}">{{ $line['donor'] !== '' ? $line['donor'] : __('desk.no_donor_yet') }} · {{ $project->user?->name ?? '—' }}</span>
                     </div>
                     <div class="dk-pj-l">

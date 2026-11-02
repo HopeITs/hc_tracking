@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Enums;
 
+use App\Enums\Concerns\HasStatusTone;
 use App\Enums\Concerns\HasTranslatedLabel;
 
 /**
@@ -13,7 +14,7 @@ use App\Enums\Concerns\HasTranslatedLabel;
  * officer validates it or returns it to draft. Only validated figures count
  * towards achievement, through the `reports` mirrors (mirrorStatus()).
  */
-enum MonthlyReportStatus: string
+enum MonthlyReportStatus: string implements HasStatusTone
 {
     use HasTranslatedLabel;
 
@@ -50,5 +51,17 @@ enum MonthlyReportStatus: string
     public static function values(): array
     {
         return array_column(self::cases(), 'value');
+    }
+
+    /**
+     * The shared visual tone for this case (W-28); exhaustive, no default arm.
+     */
+    public function tone(): StatusTone
+    {
+        return match ($this) {
+            self::Draft => StatusTone::Neutral,
+            self::Submitted => StatusTone::Active,
+            self::Validated => StatusTone::Good,
+        };
     }
 }

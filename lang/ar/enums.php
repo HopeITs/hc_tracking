@@ -82,6 +82,11 @@ return [
         'donor' => 'المانح',
         'internal' => 'داخلي',
     ],
+    'donor_report_state' => [
+        'due' => 'بانتظار التسليم',
+        'overdue' => 'متأخر',
+        'submitted' => 'سُلِّم',
+    ],
     'review_stage' => [
         'concept_note' => 'المذكرة المفاهيمية',
         'proposal' => 'المقترح',

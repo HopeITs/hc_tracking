@@ -200,18 +200,21 @@
  * height; confirmations stay small; a wide non-form dialog (file preview,
  * inspector) keeps the wide size. Below 40rem forms.css makes it full screen.
  */
-[data-flux-modal] > dialog.modal-shell { width: min(var(--pop-w), calc(100vw - 32px)); max-width: none; max-height: calc(100dvh - 48px); border-radius: 18px; }
-[data-flux-modal] > dialog.modal-shell-sm { width: min(440px, calc(100vw - 32px)); }
-[data-flux-modal] > dialog.modal-shell-xl:not(:has(.modal-shell-frame[data-wizard])):not(:has(section.form-section)) { width: min(1020px, calc(100vw - 32px)); }
+/*
+ * The :not() pair matches flux-overrides.css's catch-all dialog width (calc(100% - 2rem)),
+ * which otherwise out-ranks these and stretches every popup across the page. Scoped
+ * to 40rem and up so forms.css's full-screen phone layout still applies below it.
+ */
+@media (width >= 40rem) {
+    [data-flux-modal] > dialog.modal-shell:not([data-flux-flyout]):not([data-flux-modal-overflow]) { width: min(var(--pop-w), calc(100vw - 32px)); max-width: none; max-height: calc(100dvh - 48px); border-radius: 18px; }
+    [data-flux-modal] > dialog.modal-shell-sm:not([data-flux-flyout]):not([data-flux-modal-overflow]) { width: min(440px, calc(100vw - 32px)); }
+    [data-flux-modal] > dialog.modal-shell-xl:not([data-flux-flyout]):not([data-flux-modal-overflow]):not(:has(.modal-shell-frame[data-wizard])):not(:has(section.form-section)) { width: min(1020px, calc(100vw - 32px)); }
+}
 [data-flux-modal] > dialog.modal-shell:has(.modal-shell-frame[data-wizard]) { height: var(--pop-h); }
 [data-flux-modal] > dialog.filter-dialog { height: var(--pop-h); }
 
-/* ---------- Desk panels: paginate, never scroll (no scroll trap) ---------- */
+/* ---------- Desk panels: one fixed height (desk.css --panel-h), paginate, never scroll, never spill ---------- */
 @layer components {
-    /* Panels size to one page of rows; panels in the same grid row stretch to one height, so rows stay aligned. */
-    .dk-panel { height: auto; min-height: 0; }
-    .dk-panel[style*="--span:12"] { min-height: 0; }
-    .dk-pb { overflow: visible; overscroll-behavior: auto; }
     .dk-pf { margin-top: auto; }
     .dk-panel .dk-mx-wrap { overflow-x: auto; overscroll-behavior-x: contain; }
 
@@ -244,11 +247,6 @@
     }
 }
 
-@layer components {
-    @media (max-width: 760px) {
-        .dk-panel { max-height: none; min-height: 0; }
-    }
-}
 
 /* ---------- Ask bar additions ---------- */
 @layer components {
@@ -272,37 +270,17 @@
 
 /*
  * ---------- Inner pages on a card grid ----------
- * The project Story (and the proposal folded into it): the facts line, the stage
- * rail, every chapter and every side block sit in their own bordered card,
- * aligned to the page grid. The spine and its dots stay outside the cards, so
- * the dot-and-thread motif still links the chapters. Headline figures inside
- * stay typographic; only functional groupings are boxed.
+ * The program page's facts line sits in one bordered card. The project page
+ * has its own flat layout (desk-story.css).
  */
 @layer components {
     .dk-story .dk-facts { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); border: 1px solid var(--line); border-radius: 14px; background: var(--paper); margin-bottom: 14px; overflow: hidden; }
     .dk-story .dk-facts > div, [dir="rtl"] .dk-story .dk-facts > div { padding: 14px 18px; margin: 0; border: 0; border-inline-end: 1px solid var(--line); border-bottom: 1px solid var(--line); }
-    .dk-story .dk-rail { margin-inline: 0; padding-inline: 18px; border: 1px solid var(--line); border-radius: 14px; margin-block: 4px 18px; }
-    .dk-story .dk-story-grid { gap: 0 24px; }
-    .dk-story .dk-chapters { margin-top: 0; }
-    .dk-story .dk-ch-body { margin-bottom: 12px; padding: 18px 20px; border: 1px solid var(--line); border-radius: 14px; background: var(--paper); }
-    .dk-story .dk-ch.dk-now .dk-ch-body { padding: 20px 22px 26px; border-color: var(--ink-3); box-shadow: 0 1px 2px rgb(16 24 40 / .05), 0 6px 18px -10px rgb(16 24 40 / .18); }
-    .dk-story .dk-ch.dk-later .dk-ch-body { background: transparent; border-style: dashed; }
-    .dk-story .dk-ch .dk-spine i { margin-top: 22px; }
-    .dk-story .dk-ch.dk-now .dk-spine i { margin-top: 19px; }
-    .dk-story .dk-ch:last-child .dk-spine::before { height: 26px; }
-    .dk-story .dk-story-side { gap: 12px; padding-top: 0; }
-    .dk-story .dk-sblock { padding: 16px 18px; border: 1px solid var(--line); border-radius: 14px; background: var(--paper); min-width: 0; }
-    .dk-story .dk-sblock > h3 { padding-bottom: 8px; margin-bottom: 10px; border-bottom: 1px solid var(--line); }
-    .dk-story .dk-story-acts { margin-bottom: 12px; }
 
     /* Record popups: the record's own header becomes the first card. */
     .dk-record-body [data-detail-header] { padding: 18px 20px; border: 1px solid var(--line) !important; border-radius: 14px; background: var(--paper); }
     .dk-record-body { background: var(--ground); }
 
-    @media (max-width: 760px) {
-        .dk-story .dk-ch { grid-template-columns: 18px minmax(0, 1fr); gap: 0 10px; }
-        .dk-story .dk-ch-body { padding: 14px 14px; }
-    }
 }
 
 /* ---------- Top bar tools: one gray capsule of round buttons (the old header look) ---------- */
@@ -317,10 +295,15 @@
     @media (max-width: 1099px) { .dk-capsule .dk-wide-tool { display: none !important; } }
 }
 
-/* Focus is gray everywhere; red is kept for real validation errors only (user decision 2026-10-27). */
+/*
+ * Focus is gray everywhere; red is kept for real validation errors only (user decision 2026-10-27).
+ * One ring per field: a bare input draws it itself, but an input inside a field box (the box
+ * carries the border) leaves it to the box, or the two rings read as an input inside an input.
+ */
 @layer components {
     .dk-scope :is(input, textarea, select):focus-visible { outline: none; border-color: var(--ink-3); box-shadow: 0 0 0 3px var(--sunk); }
-    .dk-scope .dk-pal-in input:focus-visible { box-shadow: none; }
+    .dk-scope :is(.form-box, .dk-reg-q, .dk-pf-search, .dk-psearch, .dk-pal-in, .dk-pm, .rules-stepper, .rules-event-search, .rules-chip-add) :is(input, textarea, select):focus-visible { border-color: transparent; box-shadow: none; }
+    .dk-reg-q:focus-within, .dk-pf-search:focus-within, .dk-psearch:focus-within { border-color: var(--ink-3); box-shadow: 0 0 0 3px var(--sunk); }
 }
 :where(input, textarea, select, button, a):focus-visible { outline-color: var(--color-secondary-medium); }
 
@@ -335,11 +318,8 @@
     .dk-pf-pop .dk-sh-f { justify-content: flex-end; }
 }
 
-/* ---------- Every panel one fixed height: one-line rows, the rest pages (user decision 2026-10-27) ---------- */
+/* ---------- Panel rows: one line each where they can; the page size is fitted to the card (desk-filters.js) ---------- */
 @layer components {
-    :root { --panel-h: 330px; }
-    .dk-panel, .dk-panel[style*="--span:12"] { height: var(--panel-h); min-height: 0; max-height: var(--panel-h); }
-    .dk-pb, .dk-panel[style*="--span:12"] .dk-pb { overflow: hidden; }
     .dk-ptools { flex-wrap: nowrap; overflow: hidden; }
     .dk-panel :is(.dk-it, .dk-tt, .dk-is, .dk-plist strong, .dk-rn strong, .dk-pm strong, .dk-mx th a) { display: block; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
     .dk-panel .dk-items > li { grid-template-columns: 12px minmax(0, 1fr) auto !important; align-items: center; padding-block: 8px; }
@@ -351,14 +331,11 @@
     .dk-funnel-chips .dk-fb { display: inline-flex !important; align-items: center; gap: 6px; flex: none; width: auto !important; height: 30px; padding-inline: 10px; border-radius: 999px; border: 1px solid var(--line-2); }
     .dk-funnel-chips .dk-fbar { display: none !important; }
     .dk-funnel-chips .dk-fb.dk-on { background: var(--ink); color: var(--paper); border-color: var(--ink); }
-    @media (max-width: 760px) { .dk-panel, .dk-panel[style*="--span:12"] { height: var(--panel-h); max-height: var(--panel-h); } }
 }
 @layer components {
-    :root { --panel-h: 362px; }
     .dk-panel .dk-people > li { display: grid; grid-template-columns: 30px minmax(0, 1fr) auto; grid-template-areas: "av pm act" "av st act"; column-gap: 10px; row-gap: 0; align-items: center; padding-block: 6px; text-align: start; }
     .dk-panel .dk-people .dk-av { grid-area: av; }
     .dk-panel .dk-people .dk-pm { grid-area: pm; min-width: 0; width: 100%; height: auto; justify-self: stretch; display: block; padding: 0; border: 0; border-radius: 0; background: none; text-align: start; }
-    .dk-panel .dk-people .dk-pm .dk-is { display: none; }
     .dk-panel .dk-people > li > .dk-small { grid-area: st; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
     .dk-panel .dk-people > li > .dk-btn { grid-area: act; }
 }
@@ -399,8 +376,128 @@
 /* Page content keeps its 28px top space; the rail's first icon starts on that same line. A stray gap on the sidebar's flex column pushed the icons 34px lower. */
 @layer components {
     .dk-side { gap: 0; }
-    .dk-hello { padding-top: 0; }
+    .dk-hello { padding-top: 16px; }
     .dk-scope main { padding-top: 28px; }
     .dk-side-scroll, html:not(.dk-nav-open) .dk-side-scroll { padding-top: 28px; }
     .dk-top { background: var(--paper); backdrop-filter: none; -webkit-backdrop-filter: none; }
+}
+
+/* ---------- Panel body: content fits the fixed card and fills it (desk-filters.js fit) ---------- */
+@layer components {
+    /* The body is a column: tools/summaries keep their height, the fitted list takes the rest. Its width is a container so rows lay out by the space they really get. */
+    /* overflow: clip, not hidden: a hidden box is a scroll container, and the wheel over a panel must scroll the page (panels page, they never scroll). */
+    .dk-pb { display: flex; flex-direction: column; overflow: clip; overscroll-behavior: auto; container: pb / inline-size; }
+    .dk-pb > * { flex: none; min-width: 0; }
+    /* A page that fills the card shares the room left between its rows, content centred in each. */
+    .dk-pb > .dk-fit-fill { flex: 1 1 auto; display: flex; flex-direction: column; min-height: 0; }
+    .dk-fit-fill > * { flex: 1 1 auto; align-content: center; align-items: center; }
+    .dk-fit-fill > [data-fit-head] { flex: 0 0 auto; }
+
+    /* Customize sheet: the draft's order is the list's order. */
+    .dk-lib-order { display: flex; flex-direction: column; }
+
+    /* Tasks: the four phases share the tools row; a label too long for its share truncates. */
+    .dk-ptools .dk-seg-fill { display: flex; flex-wrap: nowrap; width: 100%; }
+    .dk-seg-fill button { flex: 1 1 0; min-width: 0; justify-content: center; }
+    .dk-seg-fill .dk-seg-l { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .dk-seg-fill .dk-num { flex: none; }
+
+    /* At a glance: one typographic row of figures split by hairlines, no boxes; wraps to two or three per line on narrow cards. */
+    .dk-pb > .dk-glance { flex: 1 1 auto; min-height: 0; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); align-content: center; row-gap: 16px; margin: 0; padding: 0; list-style: none; }
+    .dk-glance > li { display: flex; min-width: 0; padding-inline: 16px; border-inline-start: 1px solid var(--line); }
+    .dk-glance > li:nth-child(2n + 1) { border-inline-start: 0; padding-inline-start: 0; }
+    .dk-gl-a { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 4px; padding-block: 4px; border-radius: 8px; color: inherit; text-decoration: none; }
+    a.dk-gl-a:hover strong { text-decoration: underline; text-decoration-thickness: 2px; text-underline-offset: 6px; }
+    a.dk-gl-a:focus-visible { outline: 2px solid var(--ink-2); outline-offset: 4px; }
+    .dk-gl-a strong { font-size: clamp(26px, 4.4cqi, 44px); font-weight: 800; letter-spacing: -.03em; line-height: 1; color: var(--ink); white-space: nowrap; font-variant-numeric: tabular-nums; }
+    .dk-gl-l { font-size: 12.5px; line-height: 1.35; color: var(--ink-2); display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+    .dk-gl-d { font-size: 12px; font-weight: 700; color: var(--ink-3); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .dk-gl-d.dk-good { color: var(--good); }
+    .dk-gl-d.dk-bad { color: var(--bad); }
+    @container pb (min-width: 420px) {
+        .dk-pb > .dk-glance { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+        .dk-glance > li:nth-child(2n + 1) { border-inline-start: 1px solid var(--line); padding-inline-start: 16px; }
+        .dk-glance > li:nth-child(3n + 1) { border-inline-start: 0; padding-inline-start: 0; }
+        .dk-pb > .dk-glance:is([data-figs="2"], [data-figs="4"]) { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+        .dk-glance:is([data-figs="2"], [data-figs="4"]) > li:nth-child(2n + 1) { border-inline-start: 0; padding-inline-start: 0; }
+        .dk-glance:is([data-figs="2"], [data-figs="4"]) > li:nth-child(2n) { border-inline-start: 1px solid var(--line); padding-inline-start: 16px; }
+    }
+    /* One row on wide cards. */
+    @container pb (min-width: 860px) {
+        .dk-pb > .dk-glance, .dk-pb > .dk-glance:is([data-figs]) { grid-template-columns: repeat(var(--figs), minmax(0, 1fr)); }
+        .dk-glance > li, .dk-glance:is([data-figs]) > li:nth-child(n) { border-inline-start: 1px solid var(--line); padding-inline: 20px; }
+        .dk-glance > li:first-child, .dk-glance:is([data-figs]) > li:first-child { border-inline-start: 0; padding-inline-start: 0; }
+    }
+
+    /* Waiting on others: kind icon · what is stuck and since when · days waiting and Poke. */
+    .dk-wait > li { display: grid; grid-template-columns: 32px minmax(0, 1fr) auto; align-items: center; gap: 6px 12px; padding-block: 10px; border-bottom: 1px solid var(--line); }
+    .dk-wait > li:last-child { border-bottom: 0; }
+    .dk-wt-ic { width: 32px; height: 32px; border-radius: 10px; display: grid; place-items: center; background: var(--sunk); color: var(--ink-2); }
+    .dk-scope .dk-wt-ic svg.dk-i { width: 16px; height: 16px; }
+    .dk-wt-task { background: var(--active-soft); color: var(--active); }
+    .dk-wt-monthly-report { background: var(--warn-soft); color: var(--warn); }
+    .dk-wt-review { background: var(--brand-soft); color: var(--brand-ink); }
+    .dk-wt-deliverable { background: var(--money-soft); color: var(--money); }
+    .dk-wt-m { min-width: 0; display: grid; gap: 2px; }
+    .dk-wt-t { font-size: 14px; font-weight: 700; line-height: 1.35; color: var(--ink); text-decoration: none; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; overflow-wrap: anywhere; }
+    .dk-wt-t:hover { text-decoration: underline; }
+    .dk-wt-m .dk-is { margin: 0; font-size: 12.5px; }
+    .dk-wt-a { display: flex; align-items: center; justify-content: flex-end; gap: 6px; }
+    @container pb (max-width: 380px) {
+        .dk-wait > li { grid-template-columns: 32px minmax(0, 1fr); }
+        .dk-wt-a { grid-column: 2; justify-content: flex-start; }
+    }
+
+    /* My agenda, Month: a real month grid (weekday header, one row per week, days of the next and last month muted) that fills the card. */
+    .dk-pb > .dk-mm-h { padding-bottom: 6px; }
+    .dk-pb > .dk-mcal { flex: 1 1 auto; min-height: 0; display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); grid-template-rows: auto repeat(var(--weeks, 6), minmax(0, 1fr)); gap: 1px; margin: 0; background: var(--line); border: 1px solid var(--line); border-radius: 10px; overflow: hidden; }
+    .dk-mcal .dk-wd { padding: 5px 0; background: var(--tint); font-size: 11px; font-weight: 800; color: var(--ink-3); text-align: center; text-transform: uppercase; letter-spacing: .04em; }
+    [lang="ar"] .dk-mcal .dk-wd { letter-spacing: 0; text-transform: none; }
+    .dk-mday { min-width: 0; min-height: 0; display: flex; flex-direction: column; align-items: flex-start; justify-content: space-between; gap: 2px; padding: 4px 6px; border: 0; border-radius: 0; background: var(--paper); color: var(--ink-2); font-size: 12px; font-weight: 700; line-height: 1; text-align: start; cursor: pointer; }
+    .dk-mday > .dk-num { display: inline-grid; place-items: center; min-width: 20px; height: 20px; border-radius: 999px; }
+    .dk-mday:not(.dk-mday-off):hover { background: var(--sunk); }
+    .dk-mday.dk-past { color: var(--ink-3); }
+    .dk-mday.dk-has { background: var(--tint); }
+    .dk-mday.dk-today > .dk-num { background: var(--brand); color: var(--on-brand); }
+    .dk-mday.dk-on { box-shadow: inset 0 0 0 2px var(--ink-3); }
+    .dk-mday-off { background: var(--ground); color: var(--faint); font-weight: 400; cursor: default; }
+    .dk-mday .dk-mdots { align-self: stretch; gap: 3px; }
+    @container pb (min-width: 480px) {
+        .dk-mday { padding: 6px 8px; font-size: 12.5px; }
+        .dk-mday .dk-mdots i { width: 6px; height: 6px; }
+    }
+}
+
+/* ---------- Wide cards: rows go on one line, so a page holds more of them ---------- */
+@layer components {
+    .dk-dn-v .dk-muted { white-space: nowrap; }
+    /* Donor money on one line: received of committed, then its bar. */
+    .dk-dn-v { display: flex; align-items: center; justify-content: flex-end; gap: 4px 8px; flex-wrap: wrap; }
+    .dk-dn-v .dk-meter { flex: none; width: 80px; margin: 0; }
+    .dk-panel .dk-dn-v { justify-content: flex-start; }
+    @container pb (min-width: 640px) {
+        .dk-dn > li, .dk-panel .dk-dn.dk-dn-money > li { grid-template-columns: minmax(0, 1fr) minmax(0, 1.3fr) auto; grid-template-areas: "n m s"; }
+        .dk-dn.dk-dn-money > li, .dk-panel .dk-dn.dk-dn-money > li { grid-template-columns: minmax(0, 1fr) minmax(0, 1.2fr) auto 190px; grid-template-areas: "n m s v"; }
+        .dk-panel .dk-dn-v { justify-content: flex-end; }
+        .dk-rv > li, .dk-tp > li { grid-template-columns: minmax(0, 1fr) minmax(0, 1.2fr) auto auto; grid-template-areas: "n m s a"; }
+    }
+}
+
+/* ---------- Proposal pipeline in a mid-width card: name and status on line 1, donor · money · deadline on line 2 ---------- */
+@layer components {
+    @container pb (min-width: 380px) and (max-width: 719px) {
+        .dk-panel .dk-pb .dk-pl > li, .dk-panel .dk-pb .dk-pl.dk-pl-money > li { grid-template-columns: minmax(0, 1fr) auto auto; grid-template-areas: "n s s" "d m t"; row-gap: 3px; }
+        .dk-panel .dk-pb .dk-pl-o { display: none; }
+        .dk-panel .dk-pb .dk-pl-d::after { content: attr(data-owner); }
+    }
+}
+
+/* ---------- Panel search (x-desk.panel search=): a box under the header, opened by the header's search button ---------- */
+@layer components {
+    .dk-psearch-btn { color: var(--ink-3); }
+    .dk-psearch-btn.dk-on { color: var(--on-brand); background: var(--brand); }
+    .dk-psearch { display: flex; align-items: center; gap: 8px; height: 36px; margin: 0 12px 8px; padding-inline: 10px; border: 1px solid var(--line-2); border-radius: 10px; background: var(--tint); color: var(--ink-3); flex: none; }
+    .dk-psearch:focus-within { border-color: var(--ink-3); background: var(--paper); }
+    .dk-scope .dk-psearch svg.dk-i { width: 16px; height: 16px; }
+    .dk-psearch input { flex: 1; min-width: 0; height: 100%; border: 0; background: none; outline: none; color: var(--ink); font-size: 13.5px; }
 }

@@ -38,7 +38,7 @@ new #[Layout('layouts::desk'), Title('titles.report')] class extends Component {
         return Report::query()
             ->select([
                 'id', 'plan_indicator_id', 'user_id', 'status', 'planned_date', 'period_start', 'period_end',
-                'value', 'narrative_report_notes', 'executive_summary', 'key_achievements', 'challenges',
+                'value', 'narrative_report_notes', 'key_achievements', 'challenges',
                 'lessons_learned', 'next_period_plans', 'submit_date', 'is_seen_by_meal', 'monthly_report_id',
             ])
             ->with([
@@ -175,6 +175,7 @@ new #[Layout('layouts::desk'), Title('titles.report')] class extends Component {
 <x-desk.record-sheet register="pages::reports.index" :close-url="route('reports.index')" :title="$planIndicator->indicator->name">
 <section class="@container/detail flex min-h-full w-full flex-1 flex-col gap-8 bg-white text-secondary-dark dark:bg-surface-0 dark:text-ink">
     <x-ui.detail-header
+        :back="\App\Support\BackUrl::for(route('reports.index'))"
         :breadcrumbs="[
             ['label' => __('common.reports'), 'url' => route('reports.index')],
             ['label' => $planIndicator->indicator->name],
@@ -311,7 +312,6 @@ new #[Layout('layouts::desk'), Title('titles.report')] class extends Component {
 
     @php
         $narrativeSections = [
-            'executive_summary' => ['label' => __('reports.executive_summary'), 'icon' => 'document-text'],
             'key_achievements' => ['label' => __('reports.key_achievements'), 'icon' => 'trophy'],
             'challenges' => ['label' => __('reports.challenges'), 'icon' => 'exclamation-triangle'],
             'lessons_learned' => ['label' => __('reports.lessons_learned'), 'icon' => 'light-bulb'],

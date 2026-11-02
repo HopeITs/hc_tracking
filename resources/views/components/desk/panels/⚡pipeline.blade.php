@@ -41,6 +41,14 @@ new class extends Component {
     }
 
     /**
+     * @return list<string>
+     */
+    protected function filterProperties(): array
+    {
+        return ['status'];
+    }
+
+    /**
      * @return array<string, int>
      */
     #[Computed]
@@ -131,7 +139,7 @@ new class extends Component {
     $summary = collect($counts)->filter()->sortDesc()->take(4)->map(fn (int $count, string $status): string => $count.' '.mb_strtolower(ProposalStatus::from($status)->label()))->implode(' · ');
 @endphp
 
-<x-desk.panel :facets="$pg['facets']" :filtered="$status !== ''" id="pipeline" register="proposals.index" :size="$size" :index="$index" :total="$total" :count="array_sum($counts)">
+<x-desk.panel :facets="$pg['facets']" :filtered="$status !== ''" id="pipeline" register="proposals.index" :size="$size" :cols="$gridCols" :height="$gridRows" :index="$index" :total="$total" :count="array_sum($counts)">
     <x-slot:filters>
         <div class="contents" data-filter-defaults='{"status":""}'>
             <x-ui.header-filter-select :label="__('desk.facet.status')" wire:model="status" :value="$status" deferred>
@@ -150,7 +158,7 @@ new class extends Component {
     @endif
 
     @if ($pg['total'] > 0)
-        <ul @class(['dk-pl', 'dk-pl-money' => $showMoney])>
+        <ul @class(['dk-pl', 'dk-pl-money' => $showMoney]) {{ $this->fitAttributes($pg) }}>
             @foreach ($pg['slice'] as $proposal)
                 @php
                     $tone = $this->tone($proposal->status);
@@ -165,17 +173,9 @@ new class extends Component {
                     <span class="dk-pl-d" title="{{ $donor }}" data-owner="{{ $owner !== '' ? ' · '.$owner : '' }}">{{ $donor !== '' ? $donor : __('desk.no_donor_yet') }}</span>
                     <span class="dk-pl-s"><span @class(['dk-pill', $tone !== '' ? 'dk-'.$tone : null]) title="{{ $proposal->status->label() }}">{{ $proposal->status->label() }}</span></span>
                     @if ($showMoney)
-                        <span class="dk-pl-m dk-num">
-                            @if ($agreement !== null && (float) $agreement->budget > 0)
-                                {{ Money::format($agreement->budget, $agreement->currency) }}
-                            @elseif ((float) $proposal->requested_budget > 0 && $proposal->requested_currency !== null)
-                                {{ Money::format($proposal->requested_budget, $proposal->requested_currency) }}
-                            @else
-                                —
-                            @endif
-                        </span>
+                        <span class="dk-pl-m dk-num">@if ($agreement !== null && (float) $agreement->budget > 0){{ Money::format($agreement->budget, $agreement->currency) }}@elseif ((float) $proposal->requested_budget > 0 && $proposal->requested_currency !== null){{ Money::format($proposal->requested_budget, $proposal->requested_currency) }}@endif</span>
                     @endif
-                    <span @class(['dk-pl-t dk-num', 'dk-bad' => $days !== null && $days < 0]) title="{{ $deadline?->translatedFormat(__('formats.date')) ?? __('desk.no_deadline') }}">{{ $days === null ? '—' : ($days < 0 ? trans_choice('desk.days_late', -$days, ['count' => -$days]) : trans_choice('desk.days_left', $days, ['count' => $days])) }}</span>
+                    <span @class(['dk-pl-t dk-num', 'dk-bad' => $days !== null && $days < 0]) title="{{ $deadline?->translatedFormat(__('formats.date')) ?? __('desk.no_deadline') }}">{{ $days === null ? '' : ($days < 0 ? trans_choice('desk.days_late', -$days, ['count' => -$days]) : trans_choice('desk.days_left', $days, ['count' => $days])) }}</span>
                     <span class="dk-pl-o" title="{{ $owner !== '' ? $owner : __('desk.no_owner') }}">@if ($owner !== '')<span class="dk-av dk-av-xs">{{ collect(preg_split('/\s+/u', trim($owner)))->take(2)->map(fn ($part) => mb_substr($part, 0, 1))->implode('') }}</span>@endif</span>
                 </li>
             @endforeach

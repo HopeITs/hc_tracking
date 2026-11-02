@@ -9,7 +9,6 @@ return [
     'dashboard' => 'Home',
     'donor' => 'Donor',
     'donors' => 'Donors',
-    'executive_summary' => 'Executive Summary',
     'funding_agreement' => 'Funding Agreement',
     'funding_agreements' => 'Funding Agreements',
     'indicators' => 'Indicators',
@@ -48,7 +47,8 @@ return [
     'notification_settings' => 'Notification Settings',
     'department_tasks' => 'Department Tasks',
     'donor_report' => 'Donor Report',
-    'donor_report_builder' => 'Donor Report Builder',
+    'donor_report_builder' => 'Reports',
+    'donor_reports' => 'Donor reports',
     'reporting_duties' => 'My Reporting Duties',
     'monthly_matrix' => 'Monthly Matrix',
 ];

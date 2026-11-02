@@ -35,7 +35,6 @@ return [
         'narrative-questions' => 'Narrative questions',
         'tasks' => 'Tasks',
         'calendar' => 'Calendar',
-        'executive-summary' => 'Executive summary',
         'accounts' => 'Accounts',
         'cities' => 'Cities',
         'activity-log' => 'Activity log',

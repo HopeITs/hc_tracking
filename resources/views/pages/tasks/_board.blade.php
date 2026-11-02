@@ -7,12 +7,7 @@
     $allTasks = $this->boardTasks;
     $canCreateTask = auth()->user()->can('create', App\Models\Task::class);
 
-    $columnAccent = fn (TaskStatus $case): string => match ($case) {
-        TaskStatus::Todo => 'bg-secondary-light',
-        TaskStatus::InProgress => 'bg-status-active',
-        TaskStatus::UnderReview => 'bg-status-warn',
-        TaskStatus::Done => 'bg-status-good',
-    };
+    $columnAccent = fn (TaskStatus $case): string => $case->tone()->dotClass();
 
     $columnIcon = fn (TaskStatus $case): string => match ($case) {
         TaskStatus::Todo => 'stop-circle',

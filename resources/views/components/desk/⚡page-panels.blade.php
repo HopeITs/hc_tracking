@@ -34,7 +34,7 @@ new class extends Component {
     }
 
     /**
-     * @return list<array{panel: string, size: string}>
+     * @return list<array{panel: string, size: string, cols: int, rows: int}>
      */
     #[Computed]
     public function layout(): array
@@ -52,7 +52,7 @@ new class extends Component {
     }
 
     /**
-     * @param  list<array{panel: string, size: string}>|null  $layout
+     * @param  list<array{panel: string, size: string, cols: int, rows: int}>|null  $layout
      */
     protected function storeLayout(?array $layout): void
     {
@@ -132,9 +132,14 @@ new class extends Component {
                                 <button type="button" class="dk-btn" x-on:click.stop="adding = true"><x-desk.icon name="plus" />{{ __('desk.add_panel') }}</button>
                             </div>
                         @else
+                            @foreach ($layout as $entry)
+                                @if (isset($entry['col']))
+                                    <style>#dk-panel-{{ $entry['panel'] }} { --col: {{ $entry['col'] }}; }</style>
+                                @endif
+                            @endforeach
                             <div class="dk-grid" data-desk-grid>
                                 @foreach ($layout as $i => $entry)
-                                    <livewire:is :component="'desk.panels.'.$entry['panel']" :size="$entry['size']" :index="$i" :total="count($layout)" :wire:key="'pp-panel-'.$routeName.'-'.$entry['panel']" />
+                                    <livewire:is :component="'desk.panels.'.$entry['panel']" :size="$entry['size']" :grid-cols="$entry['cols'] ?? 0" :grid-rows="$entry['rows'] ?? 0" :index="$i" :total="count($layout)" :wire:key="'pp-panel-'.$routeName.'-'.$entry['panel']" />
                                 @endforeach
                             </div>
                         @endif

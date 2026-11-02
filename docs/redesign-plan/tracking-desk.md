@@ -53,9 +53,9 @@ All navigation goes through `App\Support\Desk\Destinations`, which feeds the Ask
 
 ### Stage 1: top bar and Desk
 
-The sidebar, the old top header and the dashboard pages were deleted. See `.ai/rules/desk.md` for the full list of deleted files and the rule for each panel:
+The sidebar, the old top header and the dashboard pages were deleted in stage 1. Since shell v2 (`ee5c3850`) a sidebar is back as `x-desk.side-nav`: an icon rail fed by `Destinations::sidebarFor()`, expandable to labels, overlaid on mobile. See `.ai/rules/desk.md` for the full list of deleted files and the rule for each panel:
 
-- **Risks panel:** a 3×3 heat map (likelihood × severity, added in stage 6) above the list (open risks first, then risks that happened).
+- **Risks panel:** removed after the 23 Oct 2026 meeting (`205cc05b`); the heat map lives on the project page. (Earlier: a 3×3 heat map above the list.)
 - **Projects panel:** the stage comes from the proposal stage plus the project status. Health is "off track" when an item is late, "watch" when something is due within 7 days, and "on track" otherwise.
 - **Waiting on others** collects four things:
   - late tasks I created that are assigned to others
@@ -121,7 +121,7 @@ Nothing. On 2026-10-22 every test file the branch touched passed (592 tests), an
 
 - **Record sheets** (`x-desk.record-sheet`): task, milestone, annual plan, funding agreement, donor report (and compose), monthly report, report, donor, strategy and program pages open as a side sheet over their register. Old URLs keep working; the show component keeps all its logic; the register behind is deferred and inert. Closing (X, Esc, scrim) goes back to the register.
 - **Program** opens over the Projects register filtered to it.
-- **Timeline, Results, Executive summary, Monthly matrix, Indicator library** moved onto `x-desk.register`. Timeline is the full register behind the Desk's Dates lens (the panel's "open" link follows the lens). Results stays a register because program-level frameworks have no Story.
+- **Timeline, Results, Monthly matrix, Indicator library** moved onto `x-desk.register`. Timeline is the full register behind the Desk's Dates lens (the panel's "open" link follows the lens). Results stays a register because program-level frameworks have no Story.
 - **Risk heat map**: new nullable `risks.likelihood` / `risks.severity` (1–3), set in the risk sheet.
 - **Footer** stays, on every Desk page.
 - **Fixes found by the test run**: activity timeline missing root (500 on every record page), Results link hidden from MEAL, Monthly Matrix SQL failing under MySQL ONLY_FULL_GROUP_BY.
