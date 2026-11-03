@@ -33,6 +33,24 @@ final class TeamScope
     public const string Everyone = 'everyone';
 
     /**
+     * More open tasks than this and a person reads as Overloaded.
+     */
+    public const int OverloadedAbove = 8;
+
+    /**
+     * How loaded a person reads: free (nothing open), overloaded (any task
+     * late, or more than OverloadedAbove open), else busy.
+     */
+    public static function load(int $open, int $overdue): string
+    {
+        return match (true) {
+            $open === 0 => 'free',
+            $overdue > 0 || $open > self::OverloadedAbove => 'overloaded',
+            default => 'busy',
+        };
+    }
+
+    /**
      * @return array<int, string> employee id => relation
      */
     public static function for(User $user): array

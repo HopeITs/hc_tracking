@@ -1,5 +1,6 @@
 <?php
 
+use App\Enums\Locale;
 use App\Enums\MonthlyReportStatus;
 use App\Enums\ProjectStatus;
 use App\Enums\ReopenRequestStatus;
@@ -15,8 +16,9 @@ use Livewire\Component;
 
 /**
  * Monthly reports: which project has not submitted or not had validated
- * which month. At L, W and XL a project × month grid (six months at L,
- * twelve at W and XL); at S and M a "late first" list of the reports that
+ * which month. At L, W and XL a project × month grid of twelve months, where
+ * CSS shows only the newest that fit the card's rendered width (so a narrow
+ * card keeps its names readable); at S and M a "late first" list of the reports that
  * need someone (late, sent back, with MEAL). The legend is a filter: one
  * click shows only that state, a second click shows all again; the filter
  * popup offers the same choice next to the program.
@@ -56,9 +58,8 @@ new class extends Component {
     public function months(): array
     {
         $current = CarbonImmutable::today()->startOfMonth();
-        $count = $this->size === 'L' ? 6 : 12;
 
-        return array_map(fn (int $back): CarbonImmutable => $current->subMonths($back), range($count - 1, 0));
+        return array_map(fn (int $back): CarbonImmutable => $current->subMonths($back), range(11, 0));
     }
 
     /**
@@ -123,6 +124,16 @@ new class extends Component {
             ->values();
     }
 
+    /**
+     * One column header: three letters of the month, or in Arabic its number,
+     * because three letters of the Levantine names collide (two months read
+     * the same). The full name stays in the header's title.
+     */
+    public function monthLabel(CarbonImmutable $month): string
+    {
+        return app()->getLocale() === Locale::Arabic->value ? $month->format('n') : mb_substr($month->translatedFormat('M'), 0, 3);
+    }
+
     public function stateOf(MonthlyReport $report): string
     {
         return match (true) {
@@ -181,11 +192,13 @@ new class extends Component {
     @if ($pg['total'] === 0)
         <p class="dk-pempty">{{ __('desk.matrix_empty') }}</p>
     @elseif ($wide)
-        <div class="dk-mx2" {{ $this->fitAttributes($pg) }} style="--months:{{ count($months) }}" role="table" aria-label="{{ __('desk.panel.matrix.title') }}">
+        {{-- A narrow card hides the oldest months (desk.css): this line says so, and each row's marker keeps a late report in a hidden month visible. --}}
+        <p class="dk-mx-recent">{{ __('desk.matrix_latest_months') }}</p>
+        <div class="dk-mx2" {{ $this->fitAttributes($pg) }} role="table" aria-label="{{ __('desk.panel.matrix.title') }}">
             <div class="dk-mx2-r dk-mx2-h" role="row" data-fit-head>
                 <span role="columnheader">{{ __('desk.project') }}</span>
                 @foreach ($months as $month)
-                    <span role="columnheader" title="{{ $month->translatedFormat('F Y') }}">{{ mb_substr($month->translatedFormat('M'), 0, 3) }}</span>
+                    <span role="columnheader" title="{{ $month->translatedFormat('F Y') }}">{{ $this->monthLabel($month) }}</span>
                 @endforeach
                 <span role="columnheader">{{ __('desk.validated') }}</span>
             </div>
@@ -194,9 +207,10 @@ new class extends Component {
                     $byMonth = $project->monthlyReports->keyBy(fn ($report) => $report->period->format('Y-m'));
                     $owner = $project->user?->name;
                     $officer = $this->officers[$project->id] ?? '';
+                    $lateHere = $project->monthlyReports->filter(fn ($report) => $report->period->greaterThanOrEqualTo($from) && $this->stateOf($report) === 'late')->count();
                 @endphp
                 <div class="dk-mx2-r" role="row" wire:key="mx-{{ $project->id }}">
-                    <span class="dk-mx2-n" role="rowheader"><a href="{{ route('projects.show', $project) }}" wire:navigate title="{{ $project->name }}">{{ $project->name }}</a><span class="dk-is" title="{{ __('desk.matrix_people', ['owner' => $owner ?? '—', 'officer' => $officer !== '' ? $officer : '—']) }}">{{ $owner ?? '—' }} → {{ $officer !== '' ? $officer : '—' }}</span></span>
+                    <span class="dk-mx2-n" role="rowheader"><a href="{{ route('projects.show', $project) }}" wire:navigate title="{{ $project->name }}">{{ $project->name }}</a><span class="dk-is" title="{{ __('desk.matrix_people', ['owner' => $owner ?? '—', 'officer' => $officer !== '' ? $officer : '—']) }}">@if ($lateHere > 0)<b class="dk-mx2-late dk-num">{{ trans_choice('desk.matrix_row_late', $lateHere, ['count' => $lateHere]) }}</b>@endif{{ $owner ?? '—' }} → {{ $officer !== '' ? $officer : '—' }}</span></span>
                     @foreach ($months as $month)
                         @php
                             $report = $byMonth->get($month->format('Y-m'));

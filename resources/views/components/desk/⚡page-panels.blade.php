@@ -72,7 +72,7 @@ new class extends Component {
 <div
     x-data="{ open: false, adding: false }"
     @if ($isDesk)
-        x-on:dk-panels-open.window="$dispatch('dk-customize-open')"
+        x-on:dk-panels-open.window="$dispatch('dk-customize-open', { pane: 'layouts' })"
     @else
         x-on:dk-panels-open.window="open = true; window.hcLockPageScroll?.(); if (! $wire.loaded) { $wire.load() } $nextTick(() => $refs.close?.focus())"
         x-on:keydown.escape.window="if (open && ! document.querySelector('dialog[open]')) { if (adding) { adding = false } else { open = false; window.hcUnlockPageScroll?.() } }"

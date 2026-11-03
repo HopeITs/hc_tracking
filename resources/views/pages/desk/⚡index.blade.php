@@ -5,10 +5,12 @@ use App\Livewire\Concerns\Dashboard\ReadsDashboardWork;
 use App\Livewire\Concerns\Dashboard\ReadsDeskDecisions;
 use App\Livewire\Concerns\Desk\ArrangesPanels;
 use App\Support\Desk\Panels;
+use App\Support\Desk\ReadyLayoutSignals;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Livewire\Attributes\Computed;
 use Livewire\Attributes\Layout;
+use Livewire\Attributes\Renderless;
 use Livewire\Attributes\Title;
 use Livewire\Component;
 
@@ -40,6 +42,32 @@ new #[Layout('layouts::desk'), Title('titles.dashboard')] class extends Componen
     public function library(): array
     {
         return app(Panels::class)->availableTo(auth()->user());
+    }
+
+    /**
+     * The ready layouts the viewer is offered, for the Customize sheet.
+     *
+     * @return list<array{key: string, title: string, purpose: string, core: string, entries: list<array{panel: string, size: string, cols: int, rows: int}>}>
+     */
+    #[Computed]
+    public function readyLayouts(): array
+    {
+        return app(Panels::class)->readyLayoutsFor(auth()->user());
+    }
+
+    /**
+     * Each offered layout's live signal and the suggestion they lead to, asked
+     * for by the Customize sheet when it opens. Never part of a render.
+     *
+     * @return array{signals: array<string, array{text: string, tone: string, count: int}>, suggestion: array{key: string|null, reason: string|null}}
+     */
+    #[Renderless]
+    public function readySignals(ReadyLayoutSignals $reader): array
+    {
+        $user = auth()->user();
+        $signals = $reader->for($user, $this->needsCount);
+
+        return ['signals' => $signals, 'suggestion' => $reader->suggestionFor($user, $signals)];
     }
 
     /**
@@ -110,34 +138,26 @@ new #[Layout('layouts::desk'), Title('titles.dashboard')] class extends Componen
     $needsPlaced = in_array('needs', $placed, true);
 @endphp
 
-<div data-desk x-data="{ removed: null, timer: null, editing: false }" x-bind:class="{ 'dk-desk-editing': editing }" x-on:keydown.escape.window="editing = false" x-on:dk-panel-removed="removed = $event.detail; clearTimeout(timer); timer = setTimeout(() => removed = null, 6000)">
+<div data-desk x-data="{ removed: null, applied: null, timer: null }" x-on:dk-panel-removed="removed = $event.detail; applied = null; clearTimeout(timer); timer = setTimeout(() => removed = null, 6000)" x-on:dk-layout-applied="applied = $event.detail; removed = null; clearTimeout(timer); timer = setTimeout(() => applied = null, 8000)">
     <section class="dk-hello" data-desk-hello>
         <div class="dk-hello-main">
-            <p class="dk-eyebrow">{{ now()->translatedFormat(__('formats.date_long')) }} · {{ auth()->user()->name }}</p>
-            {{-- The briefing: the counts link down to the Needs you panel when it is on the desk. --}}
-            <h1>{{ rtrim($this->greeting(), '.!') }}{{ __('desk.sentence_end') }}
-                @if ($n === 0)
-                    {{ __('desk.hello_none') }}
-                @elseif ($needsPlaced)
-                    <a href="#dk-panel-needs" class="dk-hello-link" title="{{ __('desk-cards.hero.needs_link') }}">{!! trans_choice('desk.hello_count', $n, ['count' => $n]) !!}</a>
-                @else
-                    {!! trans_choice('desk.hello_count', $n, ['count' => $n]) !!}
-                @endif
-            </h1>
-            <p class="dk-lede">
-                @if ($n === 0)
-                    {{ __('desk.lede_done') }}
-                @elseif ($needs['late'] > 0 && $needsPlaced)
-                    <a href="#dk-panel-needs" class="dk-hello-link dk-late" title="{{ __('desk-cards.hero.late_link') }}">{{ trans_choice('desk.lede_late', $needs['late'], ['count' => $needs['late']]) }}</a>
-                @elseif ($needs['late'] > 0)
-                    {{ trans_choice('desk.lede_late', $needs['late'], ['count' => $needs['late']]) }}
-                @else
-                    {{ __('desk.lede_none_late') }}
-                @endif
-            </p>
+            <p class="dk-eyebrow">{{ now()->translatedFormat(__('formats.date_long')) }}</p>
+            <h1>{{ rtrim($this->greeting(), '.!') }}</h1>
         </div>
 
-        {{-- The command strip: the quick actions, and Edit desk (shows the grid cells and every handle). --}}
+        {{-- The day in two figures, across from the greeting; they lead down to the Needs you panel when that is on the desk. --}}
+        @if ($n === 0)
+            <p class="dk-hello-clear">{{ __('desk.hello_none') }}</p>
+        @else
+            <{{ $needsPlaced ? 'a href=#dk-panel-needs' : 'div' }} class="dk-hello-figs" @if ($needsPlaced) title="{{ __('desk-cards.hero.needs_link') }}" @endif data-desk-hello-figures>
+                <span class="dk-hello-fig"><b class="dk-num">{{ $n }}</b><span>{{ trans_choice('desk.hero_needs', $n) }}</span></span>
+                @if ($needs['late'] > 0)
+                    <span class="dk-hello-fig dk-late"><b class="dk-num">{{ $needs['late'] }}</b><span>{{ trans_choice('desk.hero_late', $needs['late']) }}</span></span>
+                @endif
+            </{{ $needsPlaced ? 'a' : 'div' }}>
+        @endif
+
+        {{-- The command strip: the quick actions. Customize opens from the top bar's Panels button. --}}
         <div class="dk-start" data-desk-start>
             @if ($this->quickActions !== [])
                 <div class="dk-start-row" role="group" aria-label="{{ __('desk.start_title') }}">
@@ -148,11 +168,6 @@ new #[Layout('layouts::desk'), Title('titles.dashboard')] class extends Componen
                     @endforeach
                 </div>
             @endif
-            <button type="button" class="dk-edit-toggle" x-on:click="editing = ! editing" x-bind:aria-pressed="editing.toString()" aria-pressed="false" data-desk-edit>
-                <flux:icon name="adjustments-horizontal" variant="outline" class="dk-start-ic" />
-                <span x-show="! editing">{{ __('desk-cards.edit.start') }}</span>
-                <span x-show="editing" x-cloak>{{ __('desk-cards.edit.done') }}</span>
-            </button>
         </div>
     </section>
 
@@ -163,14 +178,17 @@ new #[Layout('layouts::desk'), Title('titles.dashboard')] class extends Componen
         <button type="button" class="dk-btn dk-sm" x-on:click="dismiss()">{{ __('desk-cards.edit.got_it') }}</button>
     </div>
 
-    <p class="dk-edit-bar" x-show="editing" x-cloak x-transition.opacity role="status">{{ __('desk-cards.edit.bar') }}</p>
 
     @foreach ($layout as $entry)
         @if (isset($entry['col']))
             <style>#dk-panel-{{ $entry['panel'] }} { --col: {{ $entry['col'] }}; }</style>
         @endif
     @endforeach
-    <div class="dk-grid" id="dk-grid" data-desk-grid x-bind:class="{ 'dk-editing': editing }">
+    {{-- Below 1280px a true row keeps together (desk-grid.css reads --span-r only there). --}}
+    @foreach (app(Panels::class)->narrowSpansOf($layout) as $panel => $span)
+        <style>#dk-panel-{{ $panel }} { --span-r: {{ $span }}; }</style>
+    @endforeach
+    <div class="dk-grid" id="dk-grid" data-desk-grid>
         @foreach ($layout as $i => $entry)
             <livewire:is :component="'desk.panels.'.$entry['panel']" :size="$entry['size']" :grid-cols="$entry['cols'] ?? 0" :grid-rows="$entry['rows'] ?? 0" :index="$i" :total="count($layout)" :wire:key="'panel-'.$entry['panel']" />
         @endforeach
@@ -188,6 +206,13 @@ new #[Layout('layouts::desk'), Title('titles.dashboard')] class extends Componen
     @endif
 
     @include('pages.desk._customize-sheet')
+
+    {{-- A ready layout was put on the desk: Undo saves what was there before, null for someone still on the role's layout. --}}
+    <div class="dk-undo" role="status" aria-live="polite" x-show="applied" x-cloak x-transition.opacity data-desk-layout-applied>
+        <span x-text="applied ? {{ \Illuminate\Support\Js::from(__('desk.ready.applied', ['layout' => '__L__'])) }}.replace('__L__', applied.title) : ''"></span>
+        <button type="button" class="dk-btn dk-sm" x-on:click="$wire.saveLayout(applied.previous); applied = null" data-desk-layout-undo><x-desk.icon name="undo" />{{ __('desk.undo') }}</button>
+        <button type="button" class="dk-iconbtn dk-sm" x-on:click="applied = null" aria-label="{{ __('common.close') }}"><x-desk.icon name="x" /></button>
+    </div>
 
     {{-- Undo for a removed panel, for ~6 seconds (undoRemove puts it back where it was). --}}
     <div class="dk-undo" role="status" aria-live="polite" x-show="removed" x-cloak x-transition.opacity data-desk-undo>

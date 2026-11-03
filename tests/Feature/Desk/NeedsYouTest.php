@@ -46,6 +46,18 @@ test('a task sent for my review appears with who is waiting, my own plain task d
         ->assertDontSee('Road closure');
 });
 
+test('the Focus view has no footer and the List view has its pager footer', function () {
+    $me = userWithRole('Managers', insertHrEmployee());
+    needsTask($me, insertHrEmployee(), ['title' => 'Survey the wells', 'status' => TaskStatus::UnderReview, 'due_date' => '2026-09-17']);
+
+    Livewire::actingAs($me)->test('desk.panels.needs', ['size' => 'L'])
+        ->call('setView', 'focus')
+        ->assertSeeHtml('dk-focus')
+        ->assertDontSeeHtml('data-panel-foot')
+        ->call('setView', 'list')
+        ->assertSeeHtml('data-panel-foot');
+});
+
 test('a submitted monthly report waiting for my validation appears', function () {
     $meal = userWithRole('MEAL', insertHrEmployee());
     Activity::withoutRecording(fn () => MonthlyReport::factory()->create([

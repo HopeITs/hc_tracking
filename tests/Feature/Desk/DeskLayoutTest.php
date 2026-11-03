@@ -141,8 +141,6 @@ test('the customize sheet saves its whole draft only on Done, dropping what the 
     $user = User::factory()->role('Team Member')->create();
     $desk = Livewire::actingAs($user)->test('pages::desk.index')
         ->assertSeeHtml('data-customize-done')
-        // A string style binding would overwrite x-show's display:none and list every panel as placed.
-        ->assertSeeHtml("x-bind:style=\"{ order: position('needs') }\"")
         ->assertDontSeeHtml('wire:click="removePanel(')
         ->assertDontSeeHtml('wire:click="addPanel(');
 
@@ -179,12 +177,12 @@ test('the command strip has no Ask button and keeps the quick actions', function
         ->assertSeeHtml('data-desk-start-action="task"');
 });
 
-test('the customize sheet offers no ready layouts', function () {
+test('the customize sheet offers the ready layouts', function () {
     Livewire::actingAs(User::factory()->role('Team Member')->create())
         ->test('pages::desk.index')
         ->assertSeeHtml('data-desk-customize')
-        ->assertDontSeeHtml('data-customize-ready')
-        ->assertDontSeeHtml('data-ready-layout');
+        ->assertSeeHtml('data-customize-ready')
+        ->assertSeeHtml('data-ready-layout="today"');
 });
 
 test('a card is sized only from its own edges, with no size controls in its menu or the customize sheet', function () {

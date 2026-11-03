@@ -11,6 +11,7 @@ use App\Models\MonthlyReport;
 use App\Models\Task;
 use App\Models\TaskAssignee;
 use App\Models\User;
+use App\Support\Desk\TeamScope;
 use Carbon\CarbonImmutable;
 use Flux\Flux;
 use Livewire\Attributes\Computed;
@@ -25,17 +26,12 @@ use Livewire\Component;
  * looked up only when Poke is pressed, so the panel costs the same queries
  * for any team. Each person also shows a load meter (open tasks, the late
  * share in red) and a word: Free (nothing open), Busy, or Overloaded (any
- * task late, or more than OverloadedAbove open).
+ * task late, or more than TeamScope::OverloadedAbove open).
  */
 new class extends Component {
     use IsDeskPanel;
     use ReadsDashboardAttention;
     use ReadsDashboardWork;
-
-    /**
-     * More open tasks than this and a person reads as Overloaded.
-     */
-    public const int OverloadedAbove = 8;
 
     /**
      * The name (or job title) typed in the panel's search box.
@@ -82,11 +78,7 @@ new class extends Component {
             return [
                 ...$person,
                 'open' => $openTasks,
-                'load' => match (true) {
-                    $openTasks === 0 => 'free',
-                    $person['overdue'] > 0 || $openTasks > self::OverloadedAbove => 'overloaded',
-                    default => 'busy',
-                },
+                'load' => TeamScope::load($openTasks, $person['overdue']),
                 'initials' => $user?->initials() ?? mb_substr($person['name'], 0, 1),
                 'title' => (string) (HrEmployee::positionSummary($person['employeeId']) ?? ''),
                 'lateReports' => $user === null ? 0 : (int) ($lateReports[$user->id] ?? 0),
@@ -177,7 +169,7 @@ new class extends Component {
                         <span class="dk-is" title="{{ $person['title'] }}">{{ __('desk.relation.'.$person['relation']) }}@if ($person['title'] !== '') · {{ $person['title'] }}@endif</span>
                     </span>
                     @php
-                        $scale = max(self::OverloadedAbove, $person['open']);
+                        $scale = max(TeamScope::OverloadedAbove, $person['open']);
                     @endphp
                     <span class="dk-tm-meter" title="{{ __('desk-cards.team.meter', ['open' => $person['open'], 'late' => $person['overdue']]) }}">
                         <span class="dk-load-word dk-{{ $person['load'] }}">{{ __('desk-cards.team.status.'.$person['load']) }}</span>

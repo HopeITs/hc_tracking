@@ -69,8 +69,10 @@ final class Panels
         ['key' => 'task', 'route' => 'tasks.index', 'ability' => 'tasks.create', 'icon' => 'clipboard-document-check'],
         ['key' => 'report', 'route' => 'reports.index', 'ability' => 'reports.create', 'icon' => 'document-chart-bar'],
         ['key' => 'proposal', 'route' => 'proposals.index', 'ability' => 'proposals.create', 'icon' => 'document-plus'],
+        ['key' => 'donor', 'route' => 'donors.index', 'ability' => 'donors.create', 'icon' => 'gift'],
         ['key' => 'project', 'route' => 'projects.index', 'ability' => 'projects.create', 'icon' => 'folder-plus'],
         ['key' => 'milestone', 'route' => 'milestones.index', 'ability' => 'milestones.create', 'icon' => 'flag'],
+        ['key' => 'agreement', 'route' => 'funding-agreements.index', 'ability' => 'funding-agreements.create', 'icon' => 'document-currency-dollar'],
         ['key' => 'transfer', 'route' => 'transfers.index', 'ability' => 'transfers.create', 'icon' => 'banknotes'],
     ];
 
@@ -125,6 +127,229 @@ final class Panels
      * How many pages' Panels sets one person keeps.
      */
     private const int MaxStoredPages = 60;
+
+    /**
+     * The ready layouts of the Customize sheet: each names the panel without
+     * which it is not offered (core) and its rows, every row an ordered list
+     * of [panel, cols, rows] that totals twelve columns and shares one height.
+     *
+     * @var array<string, array{core: string, rows: list<list<array{0: string, 1: int, 2: int}>>}>
+     */
+    private const array ReadyLayouts = [
+        'today' => ['core' => 'needs', 'rows' => [
+            [['needs', 7, 4], ['coming', 5, 4]],
+            [['overdue', 6, 4], ['tasks', 6, 4]],
+            [['waiting', 8, 3], ['notes', 4, 3]],
+        ]],
+        'money' => ['core' => 'money', 'rows' => [
+            [['money', 8, 5], ['transfers', 4, 5]],
+            [['overdue', 5, 4], ['duties', 7, 4]],
+            [['pipeline', 12, 4]],
+        ]],
+        'donors' => ['core' => 'donors', 'rows' => [
+            [['donors', 7, 5], ['pipeline', 5, 5]],
+            [['duties', 6, 4], ['money', 6, 4]],
+            [['coming', 12, 3]],
+        ]],
+        'tasks' => ['core' => 'tasks', 'rows' => [
+            [['tasks', 8, 6], ['waiting', 4, 6]],
+            [['deliverables', 4, 4], ['overdue', 4, 4], ['coming', 4, 4]],
+            [['myteam', 12, 4]],
+        ]],
+        'delivery' => ['core' => 'projects', 'rows' => [
+            [['flow', 12, 2]],
+            [['projects', 8, 5], ['milestones', 4, 5]],
+            [['targets', 6, 4], ['tasks', 6, 4]],
+        ]],
+        'impact' => ['core' => 'targets', 'rows' => [
+            [['targets', 7, 5], ['validate', 5, 5]],
+            [['matrix', 12, 4]],
+            [['templates', 6, 3], ['duties', 6, 3]],
+        ]],
+        'fundraising' => ['core' => 'pipeline', 'rows' => [
+            [['pipeline', 8, 5], ['reviews', 4, 5]],
+            [['donors', 6, 4], ['coming', 6, 4]],
+        ]],
+        'team' => ['core' => 'myteam', 'rows' => [
+            [['myteam', 7, 5], ['waiting', 5, 5]],
+            [['tasks', 8, 4], ['needs', 4, 4]],
+            [['milestones', 12, 3]],
+        ]],
+        'overview' => ['core' => 'glance', 'rows' => [
+            [['glance', 12, 2]],
+            [['flow', 12, 2]],
+            [['needs', 6, 4], ['money', 6, 4]],
+            [['matrix', 12, 4]],
+        ]],
+    ];
+
+    /**
+     * What each panel holds, for the tint of its cell on a ready layout's mini map.
+     *
+     * @var array<string, 'money'|'people'|'work'|'results'>
+     */
+    private const array ReadyKinds = [
+        'money' => 'money', 'transfers' => 'money', 'pipeline' => 'money', 'donors' => 'money',
+        'myteam' => 'people', 'waiting' => 'people', 'reviews' => 'people',
+        'needs' => 'work', 'coming' => 'work', 'overdue' => 'work', 'tasks' => 'work', 'deliverables' => 'work', 'projects' => 'work', 'flow' => 'work', 'milestones' => 'work', 'notes' => 'work',
+        'targets' => 'results', 'validate' => 'results', 'matrix' => 'results', 'templates' => 'results', 'duties' => 'results', 'glance' => 'results',
+    ];
+
+    /**
+     * The ready layout each role is suggested, closest role first. An
+     * administrator gets the General Manager's, anyone else FallbackReady.
+     *
+     * @var array<string, string>
+     */
+    private const array ReadyFavourites = [
+        'General Manager' => 'overview',
+        'Public Relations Manager' => 'fundraising',
+        'Public Relations' => 'donors',
+        'MEAL' => 'impact',
+        'Financial' => 'money',
+        'Managers' => 'team',
+        'Media Team' => 'tasks',
+        'Team Member' => 'today',
+    ];
+
+    private const string FallbackReady = 'today';
+
+    /**
+     * A ready layout with fewer panels than this left is not offered.
+     */
+    private const int MinReadyPanels = 2;
+
+    /**
+     * The whole catalogue, before any viewer's permissions.
+     *
+     * @return array<string, array{core: string, rows: list<list<array{0: string, 1: int, 2: int}>>}>
+     */
+    public function readyCatalogue(): array
+    {
+        return self::ReadyLayouts;
+    }
+
+    /**
+     * The ready layouts this viewer is offered, composed for what they may
+     * see. A panel they may not see leaves its row: the row's last card widens
+     * to the grid's edge and an empty row disappears, but no panel ever moves
+     * to another row, so every row keeps one height. A layout goes when its
+     * core panel is unavailable or fewer than MinReadyPanels are left.
+     *
+     * @return list<array{key: string, title: string, purpose: string, core: string, entries: list<array{panel: string, size: string, cols: int, rows: int}>}>
+     */
+    public function readyLayoutsFor(User $user): array
+    {
+        $available = $this->availableTo($user);
+        $offered = [];
+
+        foreach (self::ReadyLayouts as $key => $layout) {
+            if (! isset($available[$layout['core']])) {
+                continue;
+            }
+
+            $entries = [];
+
+            foreach ($layout['rows'] as $row) {
+                $kept = array_values(array_filter($row, fn (array $cell): bool => isset($available[$cell[0]])));
+
+                foreach ($kept as $i => [$panel, $cols, $rows]) {
+                    $cols += $i === array_key_last($kept) ? self::MaxCols - array_sum(array_column($kept, 1)) : 0;
+                    $entries[] = $this->sized($panel, $this->nearestSize($cols), $cols, $rows);
+                }
+            }
+
+            if (count($entries) >= self::MinReadyPanels) {
+                $offered[] = [
+                    'key' => $key,
+                    'title' => (string) __("desk.ready.layouts.{$key}.title"),
+                    'purpose' => (string) __("desk.ready.layouts.{$key}.purpose"),
+                    'core' => $layout['core'],
+                    'entries' => $entries,
+                ];
+            }
+        }
+
+        return $offered;
+    }
+
+    /**
+     * Which ready layout the viewer's role leans on, among those offered:
+     * the first offered when neither it nor the fallback is.
+     *
+     * @param  list<string>  $offered
+     */
+    public function favouriteReadyLayoutFor(User $user, array $offered): ?string
+    {
+        $roles = $user->getRoleNames()->all();
+        $favourite = $user->isAdministrator() ? self::ReadyFavourites['General Manager'] : self::FallbackReady;
+
+        if (! $user->isAdministrator()) {
+            foreach (self::ReadyFavourites as $role => $key) {
+                if (in_array($role, $roles, true)) {
+                    $favourite = $key;
+
+                    break;
+                }
+            }
+        }
+
+        return match (true) {
+            in_array($favourite, $offered, true) => $favourite,
+            in_array(self::FallbackReady, $offered, true) => self::FallbackReady,
+            default => $offered[0] ?? null,
+        };
+    }
+
+    /**
+     * How the true rows of a layout span below 1280px, where a card's width
+     * alone would break them (8 + 4 becomes 12 + 6, and the 6 then sits beside
+     * a card of another height). A row is true when its two or three cards
+     * total twelve columns, share one height and none is pinned: two cards
+     * halve the width, a third takes the full width under them.
+     *
+     * @param  list<array{panel: string, size: string, cols: int, rows: int, col?: int}>  $layout
+     * @return array<string, int> panel => columns
+     */
+    public function narrowSpansOf(array $layout): array
+    {
+        $spans = [];
+        $row = [];
+
+        foreach ($layout as $entry) {
+            if (array_sum(array_column($row, 'cols')) + $entry['cols'] > self::MaxCols) {
+                $row = [];
+            }
+
+            $row[] = $entry;
+
+            if (array_sum(array_column($row, 'cols')) !== self::MaxCols) {
+                continue;
+            }
+
+            $isTrueRow = in_array(count($row), [2, 3], true)
+                && count(array_unique(array_column($row, 'rows'))) === 1
+                && array_column($row, 'col') === [];
+
+            if ($isTrueRow) {
+                foreach ($row as $i => $cell) {
+                    $spans[$cell['panel']] = $i < 2 ? 6 : self::MaxCols;
+                }
+            }
+
+            $row = [];
+        }
+
+        return $spans;
+    }
+
+    /**
+     * What a panel holds, for its group in the Customize sheet's Add panels list.
+     */
+    public function readyKindOf(string $panel): string
+    {
+        return self::ReadyKinds[$panel] ?? 'work';
+    }
 
     /**
      * Every panel the given user may see, keyed by id, in library order.

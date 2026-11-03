@@ -3,6 +3,7 @@
 use App\Livewire\Concerns\Desk\IsDeskPanel;
 use App\Models\DonorReport;
 use App\Models\HrEmployee;
+use App\Support\Desk\DeskWork;
 use Carbon\CarbonImmutable;
 use Illuminate\Support\Collection;
 use Livewire\Attributes\Computed;
@@ -26,25 +27,13 @@ new class extends Component {
     #[Computed]
     public function rows(): Collection
     {
-        $user = auth()->user();
-        $seesAll = $this->canView('funding-agreements') || $user->can('reports.aggregate');
-
-        if (! $seesAll && $user->employee_id === null) {
-            return new Collection;
-        }
-
         $today = CarbonImmutable::today();
 
-        return DonorReport::query()
+        return DeskWork::newestVersions(DeskWork::openDonorReports(auth()->user())
             ->select(['id', 'donor_proposal_id', 'title', 'type', 'period_start', 'period_end', 'version', 'due_on', 'responsible_employee_id', 'snapshot'])
             ->with(['donorProposal:id,donor_id,proposal_id', 'donorProposal.donor:id,name', 'donorProposal.proposal:id,name', 'donorProposal.proposal.projects:id,name'])
-            ->unless($seesAll, fn ($query) => $query->where('responsible_employee_id', $user->employee_id))
-            ->whereNull('submitted_on')
             ->orderByDesc('version')
-            ->get()
-            ->unique(fn (DonorReport $report): string => $report->period_start === null
-                ? 'report-'.$report->id
-                : implode('|', [$report->donor_proposal_id, $report->type->value, $report->period_start->toDateString(), $report->period_end?->toDateString()]))
+            ->get())
             ->sortBy(fn (DonorReport $report): string => ($report->due_on->lt($today) ? '0' : '1').$report->due_on->toDateString().str_pad((string) $report->id, 10, '0', STR_PAD_LEFT))
             ->values();
     }

@@ -16,6 +16,7 @@
     .dk-flow-ok { color: var(--good); font-weight: 700; }
 
     .dk-flow { list-style: none; margin: 0; padding: 4px 0 0; display: flex; align-items: flex-start; min-width: 0; }
+    .dk-pb:has(> .dk-flow) { justify-content: center; }
     .dk-flow-step { position: relative; flex: var(--dk-flow-grow, 1) 1 0; min-width: 88px; }
     .dk-flow-step.dk-flow-empty { flex: 0 0 88px; }
     .dk-flow-step > a { display: grid; grid-template-rows: auto 20px auto auto; justify-items: start; gap: 4px; padding-block: 4px 8px; text-decoration: none; color: inherit; text-align: start; border-radius: 8px; }
@@ -70,6 +71,8 @@
 
     /* ── My notes ─────────────────────────────────────────────────── */
     .dk-notes { display: flex; flex-direction: column; gap: 8px; flex: 1; min-height: 0; }
+    /* desk-shell.css sets .dk-pb > * to flex: none; these fill the card. */
+    .dk-pb > :is(.dk-notes, .dk-focus, .dk-celebrate) { flex: 1 1 auto; }
     .dk-notes-box { flex: 1; min-height: 0; width: 100%; resize: none; padding: 12px 14px; border: 1px solid var(--line); border-radius: 12px; background: var(--sunk); color: var(--ink); font-family: var(--font); font-size: 14.5px; line-height: 1.6; transition: border-color .15s ease, background .15s ease; }
     .dk-notes-box::placeholder { color: var(--faint); }
     .dk-notes-box:focus { outline: none; border-color: var(--ink-3); background: var(--paper); }
@@ -84,7 +87,7 @@
 
     /* ── Past the deadline ────────────────────────────────────────── */
     .dk-od { list-style: none; margin: 0; padding: 0; }
-    .dk-od > li { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; align-items: center; gap: 4px 12px; padding-block: 9px; border-bottom: 1px solid var(--line); }
+    .dk-od > li { display: grid; grid-template-columns: 100px minmax(0, 1fr) 112px; align-items: center; gap: 4px 12px; padding-block: 9px; border-bottom: 1px solid var(--line); }
     .dk-od > li:last-child { border-bottom: 0; }
     .dk-od-kind { justify-self: start; padding: 2px 8px; border-radius: 6px; background: var(--sunk); color: var(--ink-2); font-size: 11.5px; font-weight: 700; white-space: nowrap; }
     .dk-od-kind[data-kind="transfer"] { background: var(--money-soft); color: var(--money); }
@@ -93,7 +96,7 @@
     .dk-od-t { font-size: 14px; font-weight: 700; color: var(--ink); text-decoration: none; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
     .dk-od-t:hover { text-decoration: underline; }
     .dk-od-main .dk-is { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; margin-top: 1px; }
-    .dk-od-late { color: var(--bad); font-size: 13px; font-weight: 800; white-space: nowrap; }
+    .dk-od-late { justify-self: end; color: var(--bad); font-size: 13px; font-weight: 800; white-space: nowrap; }
     @container pb (max-width: 419px) {
         .dk-od > li { grid-template-columns: minmax(0, 1fr) auto; }
         .dk-od-main { grid-column: 1 / -1; grid-row: 2; }
@@ -178,8 +181,8 @@
     .dk-load-bar i { background: var(--bad); }
     .dk-load-n { grid-column: 1 / -1; font-size: 12px; color: var(--ink-3); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
     @container pb (min-width: 640px) {
-        .dk-pb .dk-team > li:has(.dk-tm-meter) { grid-template-columns: 30px minmax(0, 1fr) minmax(150px, 220px) auto 30px; }
-        .dk-pb .dk-team > li:has(.dk-tm-meter) .dk-tm-load { display: flex; }
+        .dk-pb .dk-team > li:has(.dk-tm-meter) { grid-template-columns: 30px minmax(0, 1fr) minmax(150px, 220px) 150px 30px; }
+        .dk-pb .dk-team > li:has(.dk-tm-meter) .dk-tm-load { display: flex; gap: 8px; }
     }
     @container pb (max-width: 379px) {
         .dk-pb .dk-team > li:has(.dk-tm-meter) { grid-template-columns: 30px minmax(0, 1fr) 30px; }
@@ -196,11 +199,11 @@
     .dk-panel.dk-needs { border-color: color-mix(in srgb, var(--line) 80%, transparent); }
     .dk-panel.dk-needs::before { content: none; }
 
-    .dk-ph, [dir="rtl"] .dk-ph { position: relative; align-items: center; gap: 4px; min-height: 52px; padding: 12px var(--panel-pad) 4px calc(var(--panel-pad) + 4px); }
+    .dk-ph, [dir="rtl"] .dk-ph { position: relative; align-items: center; gap: 2px; min-height: 52px; padding: 12px var(--panel-pad) 4px calc(var(--panel-pad) + 4px); }
     [dir="rtl"] .dk-ph { padding: 12px calc(var(--panel-pad) + 4px) 4px var(--panel-pad); }
     .dk-ph h2 { padding-top: 0; font-size: 11.5px; font-weight: 800; line-height: 16px; letter-spacing: .09em; text-transform: uppercase; color: var(--ink-3); }
     [lang="ar"] .dk-ph h2 { font-size: 13px; line-height: 20px; letter-spacing: 0; text-transform: none; }
-    .dk-ph > .dk-pc { margin: 0; margin-inline-start: 8px; min-width: 0; height: auto; padding: 0; border-radius: 0; background: none; color: var(--ink); font-size: 28px; font-weight: 800; line-height: 1; letter-spacing: -.02em; display: block; }
+    .dk-ph > .dk-pc { flex: none; margin: 0; margin-inline-start: 4px; min-width: 0; height: auto; padding: 0; border-radius: 0; background: none; color: var(--ink); font-size: 28px; font-weight: 800; line-height: 1; letter-spacing: -.02em; display: block; }
     .dk-panel[data-health="brand"] .dk-ph > .dk-pc { color: var(--brand-ink); }
     .dk-panel[data-health="critical"] .dk-ph > .dk-pc { color: var(--bad); }
     .dk-ph .dk-iconbtn { flex: none; }
@@ -215,11 +218,23 @@
     .dk-panel :is(a, button, [tabindex]):focus-visible { outline: 2px solid var(--ink-2); outline-offset: 2px; }
 
     /* ── Hero: briefing, command strip ──────────────────── */
-    .dk-hello { grid-template-columns: minmax(0, 1fr); }
-    .dk-hello h1 .dk-hello-link { color: inherit; text-decoration: underline; text-decoration-thickness: .06em; text-underline-offset: .16em; text-decoration-color: color-mix(in srgb, currentColor 28%, transparent); transition: text-decoration-color .15s ease; }
-    .dk-hello-link:hover, .dk-hello-link:focus-visible { text-decoration-color: currentColor; }
-    .dk-hello-link:focus-visible { outline: 2px solid var(--ink-2); outline-offset: 3px; border-radius: 4px; }
-    .dk-lede .dk-hello-link { color: var(--bad); font-weight: 700; text-decoration: underline; text-decoration-thickness: 1.5px; text-underline-offset: 3px; text-decoration-color: color-mix(in srgb, var(--bad) 35%, transparent); }
+    /* The greeting on one side, the day's two figures across from it; on a narrow screen they sit under it. */
+    .dk-hello { grid-template-columns: minmax(0, 1fr) auto; grid-template-areas: "main figs" "start start"; }
+    .dk-hello h1 { margin: 4px 0 0; }
+    .dk-hello-figs, .dk-hello-clear { grid-area: figs; align-self: end; margin: 0; }
+    .dk-hello-figs { display: flex; color: inherit; text-decoration: none; border-radius: 10px; }
+    .dk-hello-figs:focus-visible { outline: 2px solid var(--ink-2); outline-offset: 4px; }
+    .dk-hello-clear { font-size: 15px; font-weight: 600; color: var(--ink-2); }
+    .dk-hello-fig { display: flex; align-items: center; gap: 10px; padding-inline: 20px; border-inline-start: 1px solid var(--line-2); }
+    .dk-hello-fig:first-child { padding-inline-start: 0; border-inline-start: 0; }
+    .dk-hello-fig:last-child { padding-inline-end: 0; }
+    .dk-hello-fig b { font-size: clamp(28px, 3vw, 40px); font-weight: 800; line-height: 1; letter-spacing: -.02em; color: var(--ink); }
+    .dk-hello-fig > span { max-width: 9ch; font-size: 13px; font-weight: 600; line-height: 1.25; color: var(--ink-2); transition: color .15s ease; }
+    a.dk-hello-figs:hover .dk-hello-fig > span { color: var(--ink); }
+    .dk-hello-fig.dk-late b, .dk-hello-fig.dk-late > span, a.dk-hello-figs:hover .dk-hello-fig.dk-late > span { color: var(--brand-ink); }
+    @media (max-width: 760px) {
+        .dk-hello { grid-template-columns: minmax(0, 1fr); grid-template-areas: "main" "figs" "start"; }
+    }
 
 
     .dk-start { display: flex; flex-wrap: wrap; align-items: stretch; gap: 8px; }
@@ -233,4 +248,95 @@
         .dk-start-row { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); margin-inline: 0; padding-inline: 0; overflow: visible; }
         .dk-start-btn { justify-content: flex-start; padding-inline: 12px; font-size: 13.5px; white-space: normal; }
     }
+
+    /* ── Arabic: a truncating name takes its direction from its own text, so a
+     * Latin name keeps its start and loses its end, still aligned to the right. */
+    [dir="rtl"] .dk-panel :is(.dk-fp-n, .dk-dn-n, .dk-dn-m, .dk-dr-n, .dk-dr-m, .dk-tg-n, .dk-rv-n, .dk-tp-n, .dk-tp-m, .dk-pl-n, .dk-pl-d, .dk-ms-n, .dk-ms-p, .dk-mx-ln, .dk-mx2-n a, .dk-od-t, .dk-focus-ctx, .dk-it, .dk-tk-t, .dk-tk-p, .dk-tr-m, .dk-ag-m a, .dk-tm-who strong, .dk-pl-sum),
+    [dir="rtl"] .dk-panel:not(.dk-needs) .dk-is:not(.dk-rv-m) { unicode-bidi: plaintext; text-align: right; }
+    /* Line-clamped text stays out of that rule: plaintext (and dir="auto") drops the clamp's "...". Wrapped in the page's direction a Latin name still starts the first line.
+     * Where a short card clamps a title to one line, a true single line keeps both the name's start and the "...". */
+    [dir="rtl"] .dk-panel:is([data-rows="2"], [data-rows="3"]) .dk-focus-title, [dir="rtl"] .dk-panel[data-rows="2"] .dk-wt-t { display: block; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; unicode-bidi: plaintext; text-align: right; }
+
+    /* ── Short cards: a card's height never collapses with the screen, so
+     * data-rows is safe here (unlike its width). Each drops its secondary
+     * lines and keeps its essentials rather than clipping a row. */
+    .dk-panel[data-rows="2"] .dk-flow-tip, .dk-panel[data-rows="2"]:has(.dk-focus) .dk-needs-view { display: none; }
+    .dk-panel[data-rows="2"] [data-fit] > li { padding-block: 3px; }
+    .dk-panel[data-rows="2"] :is(.dk-load-n, .dk-pj-n .dk-is, .dk-deck-ring, .dk-ag-m .dk-is, .dk-wt-m .dk-is) { display: none; }
+    .dk-panel[data-rows="2"] .dk-pb { padding-block-end: 8px; }
+    .dk-panel[data-rows="2"] .dk-wt-t { -webkit-line-clamp: 1; }
+    .dk-panel[data-rows="2"] .dk-fp-tot { margin-block-end: 2px; }
+    .dk-panel[data-rows="2"] .dk-pb .dk-fp > li { row-gap: 1px; }
+    /* !important: the two-line clamp in desk.css is unlayered. */
+    .dk-panel[data-rows="2"].dk-needs .dk-is { -webkit-line-clamp: 1 !important; }
+    .dk-panel[data-rows="2"] .dk-pb .dk-pj > li { row-gap: 0; }
+    .dk-panel[data-rows="2"] .dk-pj-l { gap: 0; }
+    @container pb (max-width: 479px) {
+        .dk-panel[data-rows="2"] .dk-pj-l:has(.dk-thread) .dk-pj-v { display: none; }
+    }
+    @container pb (max-width: 379px) {
+        .dk-panel[data-rows="2"] .dk-pb .dk-team > li { row-gap: 2px; }
+        .dk-panel[data-rows="2"] .dk-pb .dk-team .dk-poke { grid-column: 3; grid-row: 1 / span 2; }
+    }
+    @container pb (min-width: 560px) {
+        .dk-panel[data-rows="2"] .dk-flow-step > a { padding-block: 0; gap: 2px; grid-template-rows: auto 12px auto; }
+        .dk-panel[data-rows="2"] .dk-flow-dot { height: 12px; }
+        .dk-panel[data-rows="2"] .dk-flow-n { font-size: 22px; }
+        .dk-panel[data-rows="2"] .dk-flow-w { max-width: 100%; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .dk-panel[data-rows="2"] .dk-flow-step.dk-flow-empty { flex: 0 0 auto; min-width: 88px; }
+    }
+    @container pb (max-width: 559px) {
+        .dk-panel[data-rows="2"] .dk-pb .dk-flow { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); column-gap: 12px; }
+        .dk-panel[data-rows="2"] .dk-pb .dk-flow-dot { display: none; }
+        .dk-panel[data-rows="2"] .dk-pb .dk-flow-step > a { padding-block: 2px; gap: 6px; grid-template-columns: 2ch minmax(0, 1fr) auto; }
+        .dk-panel[data-rows="2"] .dk-pb .dk-flow-n { grid-column: 1; font-size: 15px; }
+        .dk-panel[data-rows="2"] .dk-pb .dk-flow-w { grid-column: 2; min-width: 0; padding: 0; font-size: 12px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .dk-panel[data-rows="2"] .dk-pb .dk-flow-w { justify-self: stretch; }
+        .dk-panel[data-rows="2"] .dk-pb .dk-flow-late { grid-column: 3; }
+    }
+    /* Too narrow for dots beside a label: the head keeps the late count and the stage's figure turns red. */
+    @container pb (max-width: 359px) {
+        .dk-panel[data-rows="2"] .dk-pb .dk-flow-late { display: none; }
+        .dk-panel[data-rows="2"] .dk-pb .dk-flow-hot .dk-flow-n { color: var(--bad); }
+    }
+
+    .dk-panel[data-rows="2"] .dk-pb > .dk-glance { row-gap: 6px; }
+    .dk-panel[data-rows="2"] .dk-gl-a { gap: 1px; padding-block: 0; }
+    .dk-panel[data-rows="2"] .dk-gl-a strong { font-size: 20px; }
+    .dk-panel[data-rows="2"] .dk-gl-l { -webkit-line-clamp: 1; font-size: 12px; }
+    .dk-panel[data-rows="2"] .dk-gl-d { display: none; }
+    /* Wide, the figures sit on one row, so two row units hold them at full size. */
+    @container pb (min-width: 860px) {
+        .dk-panel[data-rows="2"] .dk-gl-a { gap: 4px; }
+        .dk-panel[data-rows="2"] .dk-gl-a strong { font-size: clamp(26px, 3.4cqi, 38px); }
+        .dk-panel[data-rows="2"] .dk-gl-l { -webkit-line-clamp: 2; font-size: 12.5px; }
+        .dk-panel[data-rows="2"] .dk-gl-d { display: -webkit-box; }
+    }
+    @container pb (max-width: 419px) {
+        .dk-panel[data-rows="3"] .dk-gl-d { display: none; }
+    }
+
+    .dk-panel[data-rows="2"] .dk-load { display: none; }
+    .dk-panel[data-rows="3"] .dk-ld { grid-template-rows: 16px auto; }
+    .dk-panel[data-rows="2"] .dk-pb .dk-ms-meta { flex-wrap: nowrap; }
+
+    .dk-panel:is([data-rows="2"], [data-rows="3"]) .dk-focus { gap: 4px; }
+    .dk-panel:is([data-rows="2"], [data-rows="3"]) .dk-focus-track { padding-block-end: 0; }
+    .dk-panel:is([data-rows="2"], [data-rows="3"]) .dk-focus-card:not([data-state="top"]) { opacity: 0; transform: none; }
+    .dk-panel:is([data-rows="2"], [data-rows="3"]) .dk-pb .dk-focus-card { padding: 8px 12px; gap: 2px; }
+    .dk-panel:is([data-rows="2"], [data-rows="3"]) .dk-focus-eyebrow, .dk-panel:is([data-rows="2"], [data-rows="3"]) .dk-focus-meta { display: none; }
+    .dk-panel:is([data-rows="2"], [data-rows="3"]) .dk-focus-title { font-size: 15px; -webkit-line-clamp: 1; }
+    .dk-panel:is([data-rows="2"], [data-rows="3"]) .dk-focus-acts { padding-top: 4px; }
+    .dk-panel[data-rows="2"] .dk-focus-ctx { display: none; }
+    .dk-panel[data-rows="2"] .dk-pb .dk-focus-card { padding-block: 6px; }
+    .dk-panel[data-rows="2"] .dk-focus-acts { padding-top: 0; }
+    .dk-panel[data-rows="2"] .dk-focus-acts > * { min-height: 32px; height: 32px; }
+    @media (pointer: coarse) {
+        .dk-panel[data-rows="2"] .dk-pb .dk-focus-card { padding-block: 3px; }
+    }
+    .dk-panel[data-rows="2"] .dk-focus { position: relative; }
+    .dk-panel[data-rows="2"] .dk-focus-nav { position: absolute; z-index: 4; inset-block-end: 8px; inset-inline-start: 8px; gap: 2px; }
+    .dk-panel[data-rows="2"] .dk-focus-pos { display: none; }
+    .dk-panel[data-rows="2"] .dk-focus-acts { justify-content: flex-end; }
+    .dk-panel:is([data-rows="2"], [data-rows="3"]) .dk-deck-ring { width: 20px; height: 20px; }
 }

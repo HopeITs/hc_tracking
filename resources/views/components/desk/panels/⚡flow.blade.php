@@ -43,7 +43,7 @@ new class extends Component {
                     <a href="{{ route('projects.index') }}" wire:navigate aria-label="{{ __('desk-cards.flow.stage_link', ['stage' => $words[$step['stage']], 'count' => $step['count']]) }}">
                         <b class="dk-flow-n dk-num" x-data="countUp({{ $step['count'] }})" x-text="display">{{ $step['count'] }}</b>
                         <span class="dk-flow-dot" aria-hidden="true"><i></i></span>
-                        <span class="dk-flow-w">{{ $words[$step['stage']] }}</span>
+                        <span class="dk-flow-w" title="{{ $words[$step['stage']] }}">{{ $words[$step['stage']] }}</span>
                         @if ($step['late'] > 0)
                             <span class="dk-flow-late" aria-hidden="true">
                                 @for ($d = 0; $d < min($step['late'], 5); $d++)<i></i>@endfor

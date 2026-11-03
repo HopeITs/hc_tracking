@@ -198,16 +198,17 @@ test('someone who owns no project sees every project without picking a scope', f
         ->assertDontSeeHtml('data-model="scope"');
 });
 
-test('an owner starts on their own projects and can switch to all', function () {
+test('an owner starts on every project and can narrow to their own', function () {
     $owner = userWithRole('Managers', insertHrEmployee());
     Project::factory()->create(['name' => 'My Wells', 'user_id' => $owner->employee_id]);
     Project::factory()->create(['name' => 'Their Clinic']);
 
     Livewire::actingAs($owner)->test('desk.panels.projects', ['size' => 'XL'])
         ->assertSee('My Wells')
-        ->assertDontSee('Their Clinic')
-        ->call('setScope', 'all')
-        ->assertSee('Their Clinic');
+        ->assertSee('Their Clinic')
+        ->call('setScope', 'mine')
+        ->assertSee('My Wells')
+        ->assertDontSee('Their Clinic');
 });
 
 test('the pipeline names the donor a proposal is written for before any agreement is signed', function () {

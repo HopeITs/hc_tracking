@@ -132,7 +132,8 @@
 @layer components {
     /* The Desk's own sheets (record sheets, Customize, Panels) open in the middle of the screen. */
     .dk-sheet { top: 50%; bottom: auto; left: 50%; right: auto; inset-inline-end: auto; transform: translate(-50%, -50%); width: min(var(--pop-w), calc(100vw - 32px)); height: var(--pop-h); max-height: calc(100dvh - 32px); border-radius: 18px; overflow: hidden; animation: dk-pop .2s cubic-bezier(.2, .8, .2, 1); }
-    [dir="rtl"] .dk-sheet { animation-name: dk-pop; }
+    /* inset-inline-end: auto above is `left: auto` in RTL, which would drop the centring and push a wide sheet off the screen. */
+    [dir="rtl"] .dk-sheet { left: 50%; animation-name: dk-pop; }
     .dk-sheet.dk-wide { width: min(var(--pop-w), calc(100vw - 32px)); }
     .dk-sheet.dk-xwide { width: min(1100px, calc(100vw - 32px)); height: calc(100dvh - 48px); }
     .dk-sheet .dk-sh-b { min-height: 0; }
@@ -324,6 +325,14 @@
     .dk-panel :is(.dk-it, .dk-tt, .dk-is, .dk-plist strong, .dk-rn strong, .dk-pm strong, .dk-mx th a) { display: block; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
     .dk-panel .dk-items > li { grid-template-columns: 12px minmax(0, 1fr) auto !important; align-items: center; padding-block: 8px; }
     .dk-panel .dk-items .dk-acts { grid-column: auto !important; padding-top: 0 !important; justify-content: flex-end; }
+    /* Needs you on a narrow card: the action buttons move under the text, so titles keep their width. A 2-row card has no room for the second line. */
+    @container pb (max-width: 479px) {
+        .dk-panel.dk-needs:not([data-rows="2"]) .dk-pb .dk-items > li { grid-template-columns: 12px minmax(0, 1fr) !important; }
+        .dk-panel.dk-needs:not([data-rows="2"]) .dk-pb .dk-items .dk-acts { grid-column: 2 !important; justify-content: flex-start; padding-top: 4px !important; }
+    }
+    /* Milestones: the owner truncates on its line; the date stays beside it, or wraps whole to the next. */
+    .dk-panel .dk-pb .dk-ms-meta { display: flex; flex-wrap: wrap; }
+    .dk-panel .dk-pb .dk-ms-p { max-width: 100%; }
     .dk-panel .dk-sev { margin-top: 0; }
     .dk-panel .dk-plist > li { padding-block: 7px; }
     /* Pipeline: the stage funnel becomes one row of chips, only stages that hold proposals. */
@@ -393,13 +402,10 @@
     .dk-fit-fill > * { flex: 1 1 auto; align-content: center; align-items: center; }
     .dk-fit-fill > [data-fit-head] { flex: 0 0 auto; }
 
-    /* Customize sheet: the draft's order is the list's order. */
-    .dk-lib-order { display: flex; flex-direction: column; }
-
-    /* Tasks: the four phases share the tools row; a label too long for its share truncates. */
+    /* Tasks: the four phases share the tools row by their text; a label too long for its share wraps at its space, the count stays beside it. */
     .dk-ptools .dk-seg-fill { display: flex; flex-wrap: nowrap; width: 100%; }
-    .dk-seg-fill button { flex: 1 1 0; min-width: 0; justify-content: center; }
-    .dk-seg-fill .dk-seg-l { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .dk-seg-fill button { flex: 1 1 auto; min-width: min-content; height: auto; min-height: 26px; padding-inline: 6px; justify-content: center; }
+    .dk-seg-fill .dk-seg-l { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: normal; line-height: 1.15; }
     .dk-seg-fill .dk-num { flex: none; }
 
     /* At a glance: one typographic row of figures split by hairlines, no boxes; wraps to two or three per line on narrow cards. */
@@ -411,7 +417,7 @@
     a.dk-gl-a:focus-visible { outline: 2px solid var(--ink-2); outline-offset: 4px; }
     .dk-gl-a strong { font-size: clamp(26px, 4.4cqi, 44px); font-weight: 800; letter-spacing: -.03em; line-height: 1; color: var(--ink); white-space: nowrap; font-variant-numeric: tabular-nums; }
     .dk-gl-l { font-size: 12.5px; line-height: 1.35; color: var(--ink-2); display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
-    .dk-gl-d { font-size: 12px; font-weight: 700; color: var(--ink-3); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .dk-gl-d { font-size: 12px; font-weight: 700; color: var(--ink-3); display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
     .dk-gl-d.dk-good { color: var(--good); }
     .dk-gl-d.dk-bad { color: var(--bad); }
     @container pb (min-width: 420px) {
@@ -476,10 +482,10 @@
     .dk-dn-v .dk-meter { flex: none; width: 80px; margin: 0; }
     .dk-panel .dk-dn-v { justify-content: flex-start; }
     @container pb (min-width: 640px) {
-        .dk-dn > li, .dk-panel .dk-dn.dk-dn-money > li { grid-template-columns: minmax(0, 1fr) minmax(0, 1.3fr) auto; grid-template-areas: "n m s"; }
-        .dk-dn.dk-dn-money > li, .dk-panel .dk-dn.dk-dn-money > li { grid-template-columns: minmax(0, 1fr) minmax(0, 1.2fr) auto 190px; grid-template-areas: "n m s v"; }
-        .dk-panel .dk-dn-v { justify-content: flex-end; }
-        .dk-rv > li, .dk-tp > li { grid-template-columns: minmax(0, 1fr) minmax(0, 1.2fr) auto auto; grid-template-areas: "n m s a"; }
+        .dk-dn > li, .dk-panel .dk-dn.dk-dn-money > li { grid-template-columns: minmax(0, 1fr) minmax(0, 1.3fr) 72px; grid-template-areas: "n m s"; }
+        .dk-dn.dk-dn-money > li, .dk-panel .dk-dn.dk-dn-money > li { grid-template-columns: minmax(0, 1fr) minmax(0, 1.2fr) 72px 230px; grid-template-areas: "n m s v"; }
+        .dk-panel .dk-dn-v { justify-content: flex-end; flex-wrap: nowrap; }
+        .dk-rv > li, .dk-tp > li { grid-template-columns: minmax(0, 1fr) minmax(0, 1.2fr) 120px 88px; grid-template-areas: "n m s a"; }
     }
 }
 

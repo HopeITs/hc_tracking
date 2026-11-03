@@ -186,9 +186,9 @@ new class extends Component {
         </div>
     @endif
 
-    <x-slot:foot>
-        @if (! $focus)
+    @if (! $focus)
+        <x-slot:foot>
             <x-desk.pager :pg="$pg" />
-        @endif
-    </x-slot:foot>
+        </x-slot:foot>
+    @endif
 </x-desk.panel>

@@ -1,5 +1,7 @@
 # Wave 2 · Meeting of 23 Oct 2026 (Rami · Rita · Mai · Alice · Anthony)
 
+How to run an item: `/lifecycle W-NN [slice]` · prompts in [`prompts/`](prompts/README.md) · session rules in [`AGENT.md`](AGENT.md) · ClickUp list **PT New**.
+
 Status: **draft plan, not approved**. Written 28 Oct 2026 from the meeting notes and a read of the code on `sub-main`. Follows the October pack (`docs/lifecycle/`): `contracts.md` and `decisions.md` stay the sources of truth; every item below that changes them is marked **[contract]** and needs a new D-number before any code.
 
 Legend · size: S ≤ ½ day · M 1–2 days · L 3–5 days. Owner: A = Team A (state machine, Phase 1 tables), B = Team B (UI, panels, M&E).

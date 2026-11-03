@@ -307,6 +307,16 @@ function setCells(panel, cols, rows, col) {
     panel.dataset.rows = rows;
 }
 
+/**
+ * While data-resizing is on, the panel does not fit its rows (desk-filters.js):
+ * that round trip would re-render it at its saved size mid-pull. Lift it once
+ * the new size is saved (or dropped) and let the panel fit again.
+ */
+function fitAgain(panel) {
+    delete panel.dataset.resizing;
+    panel.dispatchEvent(new CustomEvent('dk-panel-resized'));
+}
+
 function applyResize(cols, rows) {
     const { panel, grid, badge, edge, m, endLine, pinned } = resize;
     const col = edge === 'start' ? endLine - cols : (pinned !== null && pinned + cols <= 13 ? pinned : null);
@@ -374,6 +384,7 @@ document.addEventListener('pointerdown', (event) => {
         // Capture is a nicety; document listeners still see the drag.
     }
 
+    panel.dataset.resizing = '';
     panel.classList.add('dk-resizing');
     document.documentElement.classList.add('dk-resizing-doc');
     document.documentElement.dataset.resizeEdge = resize.edge;
@@ -426,6 +437,7 @@ function endResize(commit) {
 
     if (cols === startCols && rows === startRows) {
         panel.style.removeProperty('--col');
+        fitAgain(panel);
 
         return;
     }
@@ -435,12 +447,17 @@ function endResize(commit) {
             setCells(panel, startCols, startRows);
             panel.style.removeProperty('--col');
         }, panel);
+        fitAgain(panel);
 
         return;
     }
 
     seenHint();
-    hostOf(panel)?.resizePanelTo(panel.dataset.panel, cols, rows, col)?.then(() => panel.style.removeProperty('--col'));
+
+    const saving = hostOf(panel)?.resizePanelTo(panel.dataset.panel, cols, rows, col);
+
+    saving?.then(() => panel.style.removeProperty('--col'));
+    Promise.resolve(saving).finally(() => fitAgain(panel));
 }
 
 /* ── Shared release / cancel ──────────────────────────────────────── */

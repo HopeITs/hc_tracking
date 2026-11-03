@@ -1,10 +1,10 @@
 <?php
 
-use App\Enums\MilestoneStatus;
 use App\Enums\ProposalStatus;
 use App\Livewire\Concerns\Desk\IsDeskPanel;
 use App\Models\HrEmployee;
 use App\Models\Proposal;
+use App\Support\Desk\DeskWork;
 use App\Support\Desk\Money;
 use Carbon\CarbonImmutable;
 use Illuminate\Support\Collection;
@@ -54,7 +54,7 @@ new class extends Component {
     #[Computed]
     public function counts(): array
     {
-        $byStatus = $this->visible(Proposal::query(), 'proposals')->selectRaw('status, count(*) as total')->groupBy('status')->pluck('total', 'status');
+        $byStatus = DeskWork::pipelineProposals(auth()->user())->selectRaw('status, count(*) as total')->groupBy('status')->pluck('total', 'status');
 
         return collect(ProposalStatus::cases())->mapWithKeys(fn (ProposalStatus $status): array => [$status->value => (int) ($byStatus[$status->value] ?? 0)])->all();
     }
@@ -65,14 +65,14 @@ new class extends Component {
     #[Computed]
     public function rows(): Collection
     {
-        return $this->visible(Proposal::query(), 'proposals')
+        return DeskWork::pipelineProposals(auth()->user())
             ->select(['id', 'slug', 'name', 'status', 'donor_id', 'requested_budget', 'requested_currency', 'status_remind_on'])
             ->with([
                 'donor:id,name',
                 'donorProposals:id,proposal_id,donor_id,budget,currency',
                 'donorProposals.donor:id,name',
                 'projects:id,user_id',
-                'milestones' => fn ($query) => $query->select(['id', 'proposal_id', 'planned_end_date'])->whereIn('status', [MilestoneStatus::Planned, MilestoneStatus::Ongoing])->whereNotNull('planned_end_date'),
+                'milestones' => fn ($query) => DeskWork::deadlineMilestones($query->select(['id', 'proposal_id', 'planned_end_date'])),
             ])
             ->when($this->status !== '', fn ($query) => $query->where('status', $this->status))
             ->latest('id')

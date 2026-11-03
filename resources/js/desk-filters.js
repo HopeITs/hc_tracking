@@ -17,7 +17,8 @@
  * after each render: when its rows spill past the card the panel asks for
  * fewer rows a page ($wire.fitRows), when a page leaves room for more rows
  * (and more exist) it asks for more. What is left over is shared between the
- * rows (.dk-fit-fill), so a full page fills the card top to bottom.
+ * rows (.dk-fit-fill), so a full page fills the card top to bottom. It holds
+ * off while the card is being resized and measures again on dk-panel-resized.
  */
 document.addEventListener('alpine:init', () => {
     window.Alpine.data('deskPanel', (panelId) => ({
@@ -52,6 +53,7 @@ document.addEventListener('alpine:init', () => {
             };
 
             this.scheduleFit = schedule;
+            this.$root.addEventListener('dk-panel-resized', schedule);
             this.observers = [new ResizeObserver(schedule), new MutationObserver(schedule)];
             this.observers[0].observe(body);
             this.observers[1].observe(body, { childList: true, subtree: true });
@@ -141,7 +143,8 @@ document.addEventListener('alpine:init', () => {
         fit(body) {
             const list = body.querySelector('[data-fit]');
 
-            if (! list || this.fitBusy) {
+            // Not while the card is being resized (desk-grid.js): fitRows re-renders it at its saved size and the card would snap back mid-pull. It fits again once the new size is saved.
+            if (! list || this.fitBusy || 'resizing' in this.$root.dataset) {
                 return;
             }
 

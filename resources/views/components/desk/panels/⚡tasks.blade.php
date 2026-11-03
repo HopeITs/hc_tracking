@@ -7,6 +7,7 @@ use App\Livewire\Concerns\Dashboard\ReadsDashboardAttention;
 use App\Livewire\Concerns\Desk\IsDeskPanel;
 use App\Models\Milestone;
 use App\Models\Task;
+use App\Support\Desk\DeskWork;
 use App\Support\Desk\TeamScope;
 use App\Support\TaskWorkflow;
 use Flux\Flux;
@@ -159,18 +160,16 @@ new class extends Component {
     private function base(): Builder
     {
         $user = auth()->user();
-        $employeeIds = match ($this->scope) {
-            'team' => array_keys(TeamScope::for($user)),
-            'department' => $user->departmentEmployeeIds(),
-            default => [],
-        };
+
+        if ($this->scope === 'mine') {
+            return DeskWork::myTasks($user);
+        }
+
+        $employeeIds = $this->scope === 'team' ? array_keys(TeamScope::for($user)) : $user->departmentEmployeeIds();
 
         return $this->visible(Task::query(), 'tasks')
             ->whereNull('parent_task_id')
-            ->when($this->scope === 'mine', fn (Builder $query) => $query->where(fn (Builder $mine) => $mine
-                ->where('created_by', $user->id)
-                ->orWhereHas('taskAssignees', fn (Builder $assignee) => $assignee->where('employee_id', $user->employee_id ?? 0))))
-            ->when($this->scope !== 'mine', fn (Builder $query) => $query->whereHas('taskAssignees', fn (Builder $assignee) => $assignee->whereIn('employee_id', $employeeIds === [] ? [0] : $employeeIds)));
+            ->whereHas('taskAssignees', fn (Builder $assignee) => $assignee->whereIn('employee_id', $employeeIds === [] ? [0] : $employeeIds));
     }
 };
 ?>

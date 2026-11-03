@@ -1,23 +1,17 @@
 <?php
 
 use App\Actions\Desk\SendNudge;
-use App\Enums\DeliveryState;
-use App\Enums\MonthlyReportStatus;
-use App\Enums\TaskStatus;
 use App\Livewire\Concerns\Desk\IsDeskPanel;
 use App\Models\HrEmployee;
-use App\Models\Milestone;
 use App\Models\MonthlyReport;
-use App\Models\Project;
 use App\Models\Proposal;
 use App\Models\ProposalReviewer;
 use App\Models\Task;
+use App\Support\Desk\DeskWork;
 use App\Support\MealCoverage;
 use Carbon\CarbonImmutable;
 use Flux\Flux;
-use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Collection;
-use Illuminate\Support\Facades\DB;
 use Livewire\Attributes\Computed;
 use Livewire\Component;
 
@@ -40,17 +34,10 @@ new class extends Component {
     public function rows(): Collection
     {
         $user = auth()->user();
-        $today = CarbonImmutable::today();
         $format = __('desk.date_short');
-        $myProjectIds = fn (): Builder => Project::query()->select('id')->where('user_id', $user->employee_id ?? 0);
 
-        $tasks = $this->visible(Task::query(), 'tasks')
+        $tasks = DeskWork::waitingTasks($user)
             ->select(['id', 'slug', 'title', 'due_date', 'source_type', 'source_id'])
-            ->where('created_by', $user->id)
-            ->whereNull('department_id')
-            ->where('status', '!=', TaskStatus::Done)
-            ->whereDate('due_date', '<', $today)
-            ->whereHas('taskAssignees', fn (Builder $query) => $query->where('employee_id', '!=', $user->employee_id ?? 0))
             ->with('taskAssignees.employee:id,first_name_en,last_name_en,first_name_ar,last_name_ar')
             ->get()
             ->map(fn (Task $task): array => [
@@ -63,10 +50,8 @@ new class extends Component {
                 'targets' => $this->others($task->taskAssignees->pluck('employee_id')->all()),
             ]);
 
-        $reports = $this->visible(MonthlyReport::query(), 'reports')
+        $reports = DeskWork::waitingReports($user)
             ->select(['id', 'slug', 'project_id', 'period', 'submitted_at'])
-            ->where('submitted_by', $user->id)
-            ->where('status', MonthlyReportStatus::Submitted)
             ->with('project')
             ->get()
             ->map(fn (MonthlyReport $report): array => [
@@ -79,9 +64,7 @@ new class extends Component {
                 'targets' => $this->others($report->project === null ? [] : [MealCoverage::responsibleFor($report->project)]),
             ]);
 
-        $reviews = ProposalReviewer::query()
-            ->whereNull('seen_at')
-            ->whereIn('proposal_id', DB::table('project_proposal')->select('proposal_id')->whereIn('project_id', $myProjectIds()))
+        $reviews = DeskWork::waitingReviews($user)
             ->with('proposal')
             ->get();
         $reviewerNames = HrEmployee::query()->whereKey($reviews->pluck('employee_id')->unique()->values()->all())->get(HrEmployee::NameColumns)
@@ -96,14 +79,8 @@ new class extends Component {
                 'targets' => $review->proposal === null ? [] : $this->others([$review->employee_id]),
             ]);
 
-        $deliverables = $this->visible(Task::query(), 'tasks')
+        $deliverables = DeskWork::waitingDeliverables($user)
             ->select(['id', 'slug', 'title', 'kind', 'due_date', 'delivery_state'])
-            ->whereNotNull('department_id')
-            ->whereNull('parent_task_id')
-            ->where('status', '!=', TaskStatus::Done)
-            ->where(fn (Builder $query) => $query->whereNull('delivery_state')->orWhereIn('delivery_state', [DeliveryState::Requested, DeliveryState::Returned]))
-            ->where('source_type', 'milestone')
-            ->whereIn('source_id', Milestone::query()->select('id')->whereIn('project_id', $myProjectIds()))
             ->with('taskAssignees:id,task_id,employee_id')
             ->get()
             ->map(fn (Task $task): array => [

@@ -30,7 +30,7 @@ use Illuminate\Support\Number;
  * manage, or that they are responsible for; monthly reports still in draft
  * on their projects or prepared by them, on their due date; indicator
  * reports still in draft (reports viewers); pending tranches (transfers
- * viewers); and the donor reports they are responsible for. Proposals carry
+ * viewers; once sent, one past its date is in transit, not overdue); and the donor reports they are responsible for. Proposals carry
  * no deadline column, so none appear. Each query keeps the module checks.
  *
  * Calls transferHref() and taskParentName() from ReadsDashboardAttention.
@@ -121,6 +121,7 @@ trait ReadsDeskAgenda
             ->with(['donorProposal:id,donor_id', 'donorProposal.donor:id,name'])
             ->where('ar_status', ArStatus::Pending)
             ->whereBetween('scheduled_date', $window)
+            ->when($to->lt(CarbonImmutable::today()), fn (Builder $query) => $query->whereNull('transfer_date'))
             ->get()
             ->map(fn (TransfersTracking $transfer): array => [
                 'key' => 'transfer-'.$transfer->id,
