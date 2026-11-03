@@ -163,4 +163,6 @@ return [
     'due_before_requested' => 'The due date cannot be before the request date.',
     'set_the_due_date' => 'Set the due date.',
     'delivered_deliverable_keeps_its_kind' => 'A deliverable that has been handed over keeps its kind.',
+    'paused' => 'Paused',
+    'paused_center_inactive' => 'Paused: the project\'s center is inactive. Report tasks continue.',
 ];

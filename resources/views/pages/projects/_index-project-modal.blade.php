@@ -6,7 +6,7 @@
     <x-ui.modal
         wire:model="showProjectModal"
         size="xl"
-        :title="$editingProjectId === null ? __('projects.add_project') : __('projects.edit_project')"
+        :title="$editingProjectId === null ? __('projects.add_center') : __('projects.edit_project')"
         :description="__('projects.define_delivery_ownership_lifecycle_schedule_and_beneficiary')"
         submit="saveProject"
         close="closeProjectModal"
@@ -109,39 +109,47 @@
                 </div>
             </x-ui.form-section>
 
-            <x-ui.form-section :title="__('projects.section_placement')" :fields="['centerId', 'cityId', 'hostCenterId', 'programId', 'userId', 'sectorIds']">
+            <x-ui.form-section :title="__('projects.section_placement')" :fields="['cityId', 'programId', 'centerId', 'hostCenterId', 'userId', 'sectorIds']">
                 <div class="grid gap-x-4 gap-y-3 @2xl/modal:grid-cols-3">
-                    <x-ui.form-select wire:model.live="centerId" :label="__('projects.center')" :placeholder="__('projects.select_a_center')" :required="$hostCenterId === '' && ($editingProjectId === null || $savedCenterId !== null)">
-                        @foreach ($this->centerOptions as $centerOption)
-                            <option value="{{ $centerOption->id }}">{{ $centerOption->name }}@unless ($centerOption->is_active) · {{ __('projects.center_inactive') }}@endunless</option>
+                    {{-- «Add center» (W-02, D-55): the city first, then the program, the city's own centers, and a host from another city while no center is chosen. --}}
+                    <x-ui.form-select wire:model.live="cityId" :label="__('common.city')" :placeholder="__('projects.select_a_city')" required data-test="city-select">
+                        @foreach ($this->hostCityOptions as $cityOption)
+                            <option value="{{ $cityOption->id }}">{{ $cityOption->name }}</option>
                         @endforeach
                     </x-ui.form-select>
-
-                    {{-- A project in a city with no center is hosted by another center (D-55): city + host, offered only while no center is chosen. --}}
-                    @if ($centerId === '')
-                        <x-ui.form-select wire:model.live="cityId" :label="__('common.city')" :placeholder="__('projects.select_a_city')" :required="$hostCenterId !== ''" data-test="host-city-select">
-                            @foreach ($this->hostCityOptions as $cityOption)
-                                <option value="{{ $cityOption->id }}">{{ $cityOption->name }}</option>
-                            @endforeach
-                        </x-ui.form-select>
-
-                        <x-ui.form-select wire:model.live="hostCenterId" :label="__('projects.host_center')" :placeholder="__('projects.select_a_host_center')" :help="__('projects.host_center_help')" data-test="host-center-select">
-                            @foreach (\App\Models\HrCenter::options() as $hostOption)
-                                <option value="{{ $hostOption->id }}">{{ $hostOption->name }}</option>
-                            @endforeach
-                        </x-ui.form-select>
-                    @else
-                        {{-- The host fields are hidden beside a center; a refused host (tampered input) still says why. --}}
-                        @error('hostCenterId')
-                            <p role="alert" class="text-sm font-medium text-status-critical @2xl/modal:col-span-2">{{ $message }}</p>
-                        @enderror
-                    @endif
 
                     <x-ui.form-select wire:model.live="programId" :label="__('common.program')" :placeholder="__('projects.select_a_program')" required>
                         @foreach ($this->programOptions as $programOption)
                             <option value="{{ $programOption->id }}">{{ $programOption->name }}</option>
                         @endforeach
                     </x-ui.form-select>
+
+                    <x-ui.form-select
+                        wire:model.live="centerId"
+                        :label="__('projects.physical_center')"
+                        :placeholder="__('projects.select_a_physical_center')"
+                        :required="$hostCenterId === '' && ($editingProjectId === null || $savedCenterId !== null)"
+                        :disabled="$this->centerOptions->isEmpty()"
+                        :locked-reason="$cityId === '' ? __('projects.choose_city_first') : ($this->centerOptions->isEmpty() ? __('projects.no_centers_in_city') : null)"
+                        data-test="center-select"
+                    >
+                        @foreach ($this->centerOptions as $centerOption)
+                            <option value="{{ $centerOption->id }}">{{ $centerOption->name }}@unless ($centerOption->is_active) · {{ __('projects.center_inactive') }}@endunless</option>
+                        @endforeach
+                    </x-ui.form-select>
+
+                    @if ($centerId === '')
+                        <x-ui.form-select wire:model.live="hostCenterId" :label="__('projects.host_center')" :placeholder="__('projects.select_a_host_center')" :help="__('projects.host_center_help')" :required="$centerId === ''" data-test="host-center-select">
+                            @foreach ($this->hostCenterOptions as $hostOption)
+                                <option value="{{ $hostOption->id }}">{{ $hostOption->name }}</option>
+                            @endforeach
+                        </x-ui.form-select>
+                    @else
+                        {{-- The host field is hidden beside a center; a refused host (tampered input) still says why. --}}
+                        @error('hostCenterId')
+                            <p role="alert" class="text-sm font-medium text-status-critical @2xl/modal:col-span-2">{{ $message }}</p>
+                        @enderror
+                    @endif
 
                     <x-ui.form-select wire:model="userId" :label="__('projects.owner')" :placeholder="__('projects.select_an_owner')" required>
                         @foreach ($this->ownerOptions as $userOption)
@@ -230,7 +238,7 @@
 
         <x-slot:actions>
             <x-ui.button type="submit" tone="primary" data-test="save-project-button">
-                {{ $editingProjectId === null ? __('projects.create_project') : __('common.save_changes') }}
+                {{ $editingProjectId === null ? __('projects.add_center') : __('common.save_changes') }}
             </x-ui.button>
         </x-slot:actions>
     </x-ui.modal>

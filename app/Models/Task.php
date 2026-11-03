@@ -18,7 +18,9 @@ use Carbon\CarbonImmutable;
 use Database\Factories\TaskFactory;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Attributes\ObservedBy;
+use Illuminate\Database\Eloquent\Attributes\Scope;
 use Illuminate\Database\Eloquent\Attributes\ScopedBy;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Casts\AsEnumCollection;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
@@ -258,6 +260,63 @@ class Task extends Model implements TracksActivity
         $source = $this->loadedSource();
 
         return $source instanceof Milestone ? $source->project_id : null;
+    }
+
+    /**
+     * Whether this task belongs to a paused project (D-66): its source is
+     * the project itself, or a milestone of it. Read from the loaded
+     * `source` relation; a task with any other source is never paused.
+     */
+    public function isOfPausedProject(): bool
+    {
+        $source = $this->loadedSource();
+
+        return match (true) {
+            $source instanceof Project => $source->isPaused(),
+            $source instanceof Milestone => $source->project?->isPaused() ?? false,
+            default => false,
+        };
+    }
+
+    /**
+     * The kinds that keep alerting on a paused project; W-13 adds
+     * TaskKind::Report here (D-64, D-66).
+     *
+     * @return list<TaskKind>
+     */
+    public static function pauseExemptKinds(): array
+    {
+        return [];
+    }
+
+    /**
+     * Leave out the tasks of paused projects (D-66), whether sourced from
+     * the project itself or from one of its milestones, except tasks of a
+     * pause-exempt kind. Adds nothing while no project is paused.
+     *
+     * @param  Builder<static>  $query
+     */
+    #[Scope]
+    protected function notOfPausedProject(Builder $query): void
+    {
+        $paused = Project::pausedIds();
+
+        if ($paused === []) {
+            return;
+        }
+
+        $exemptKinds = array_map(fn (TaskKind $kind): string => $kind->value, self::pauseExemptKinds());
+
+        $query->where(function (Builder $outside) use ($paused, $exemptKinds): void {
+            $outside->whereNot(fn (Builder $ofPaused) => $ofPaused
+                ->where(fn (Builder $viaProject) => $viaProject->where('source_type', 'project')->whereIn('source_id', $paused))
+                ->orWhere(fn (Builder $viaMilestone) => $viaMilestone->where('source_type', 'milestone')
+                    ->whereIn('source_id', Milestone::query()->select('id')->whereIn('project_id', $paused))));
+
+            if ($exemptKinds !== []) {
+                $outside->orWhereIn('kind', $exemptKinds);
+            }
+        });
     }
 
     /**

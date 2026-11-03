@@ -392,3 +392,15 @@ test('transfers switch view from the filter popup, and a bad value falls back to
         ->set('filter', 'nonsense')
         ->assertSet('filter', 'all');
 });
+
+test('the projects card flags a project whose center is inactive (W-02, D-66)', function () {
+    $city = insertHrCity('Idleb', 'إدلب');
+    Project::factory()->create(['name' => 'Closed Center Project', 'center_id' => insertHrCenter($city, 'Closed Center', 'مركز مغلق', isActive: false), 'city_id' => $city]);
+    Project::factory()->create(['name' => 'Open Center Project', 'center_id' => insertHrCenter($city, 'Open Center', 'مركز مفتوح'), 'city_id' => $city]);
+
+    $panel = Livewire::actingAs(User::factory()->role('General Manager')->create())->test('desk.panels.projects', ['size' => 'XL'])->call('setScope', 'all')
+        ->assertSee('Closed Center Project')
+        ->assertSeeHtml('data-test="center-inactive-badge"');
+
+    expect(substr_count($panel->html(), 'data-test="center-inactive-badge"'))->toBe(1);
+});

@@ -260,24 +260,28 @@ final class SaveProject
     }
 
     /**
-     * «Program — Center» once both are chosen; the host center stands in
-     * for a hosted project.
+     * «Program — Center» when a center is sent, else «Program — City» when a
+     * city is (a hosted project, W-02); null while either side is missing.
+     * The same rule the form proposes with.
      *
      * @param  array<string, mixed>  $input
      */
     private function defaultName(array $input): ?string
     {
         $programId = $this->positiveInteger($input['programId']);
-        $centerId = $this->positiveInteger($input['centerId']) ?? $this->positiveInteger($input['hostCenterId']);
+        $centerId = $this->positiveInteger($input['centerId']);
+        $cityId = $this->positiveInteger($input['cityId']);
 
-        if ($programId === null || $centerId === null) {
+        if ($programId === null || ($centerId === null && $cityId === null)) {
             return null;
         }
 
         $program = Program::query()->find($programId, ['id']);
-        $center = HrCenter::remembered($centerId);
+        $placement = $centerId !== null
+            ? HrCenter::remembered($centerId)?->name
+            : HrCity::query()->find($cityId, ['id', 'name_en', 'name_ar'])?->name;
 
-        return $program === null || $center === null ? null : $program->name.' — '.$center->name;
+        return $program === null || $placement === null ? null : $program->name.' — '.$placement;
     }
 
     /**

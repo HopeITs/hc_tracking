@@ -25,6 +25,8 @@
         </p>
 
         <p class="mt-1 flex flex-wrap items-center gap-x-2 gap-y-0.5 text-xs {{ $mutedText }}">
+            <x-tasks.paused-chip :task="$task" />
+
             @if ($departmentName === '')
                 <span class="inline-flex items-center gap-1 font-semibold text-status-warn" data-department-unavailable>
                     <flux:icon.exclamation-triangle variant="micro" class="size-3.5 shrink-0" aria-hidden="true" />{{ __('department_tasks.department_unavailable') }}

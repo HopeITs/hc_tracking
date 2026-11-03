@@ -42,6 +42,7 @@ final class DataGapScanner implements Scanner
 
         $active = Project::query()
             ->where('status', ProjectStatus::Active->value)
+            ->notPaused()
             ->withCount(['milestones', 'indicators'])
             ->get(['id', 'name', 'user_id', 'end_date']);
 

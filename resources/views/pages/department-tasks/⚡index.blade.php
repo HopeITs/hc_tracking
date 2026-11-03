@@ -98,7 +98,7 @@ new #[Layout('layouts::desk'), Title('titles.department_tasks')] class extends C
                 'source' => fn (MorphTo $morphTo) => $morphTo
                     ->constrain([
                         Proposal::class => fn ($query) => $query->select(['id', 'slug', 'name', 'status']),
-                        Milestone::class => fn ($query) => $query->select(['id', 'slug', 'name', 'proposal_id']),
+                        Milestone::class => fn ($query) => $query->select(['id', 'slug', 'name', 'proposal_id', 'project_id'])->with('project:id,center_id'),
                     ])
                     ->morphWith([Milestone::class => ['proposal:id,slug,name,status']]),
             ])

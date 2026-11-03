@@ -22,7 +22,10 @@ use stdClass;
  * several are ambiguous; none leaves the project without a center (HR adds
  * centers for the missing cities, D-30c). Two open projects that would end up
  * on the same (center, program) are reported as conflicts and never applied
- * (D-30a). A center already set is kept unless --force.
+ * (D-30a). A center already set is kept unless --force. A project placed with a
+ * host center (host_center_id, D-55) is also kept and counted apart from the
+ * unmapped ones; with --force it is a candidate again, and a match clears the
+ * host, since a project never holds both.
  *
  * The report also lists HR programs sharing a code (D-10a) and whether the
  * pillar programs HR must add exist yet (D-35a). HR is only read; a dry run
@@ -62,16 +65,23 @@ class MapProjectCenters extends Command
         $cityNames = HrCity::query()->toBase()->pluck('name_en', 'id');
         $programNames = HrProgram::namesById();
 
-        $projects = Project::query()->orderBy('id')->get(['id', 'name', 'status', 'city_id', 'center_id', 'program_id']);
+        $projects = Project::query()->orderBy('id')->get(['id', 'name', 'status', 'city_id', 'center_id', 'host_center_id', 'program_id']);
 
         $proposals = [];
         $ambiguous = [];
         $withoutCenter = [];
         $skipped = 0;
+        $hosted = 0;
 
         foreach ($projects as $project) {
             if ($project->center_id !== null && ! $force) {
                 $skipped++;
+
+                continue;
+            }
+
+            if ($project->host_center_id !== null && ! $force) {
+                $hosted++;
 
                 continue;
             }
@@ -131,6 +141,7 @@ class MapProjectCenters extends Command
         ));
 
         $this->components->twoColumnDetail('Already mapped (kept; --force to re-map)', (string) $skipped);
+        $this->components->twoColumnDetail('Already placed by a host center (kept)', (string) $hosted);
 
         $this->reportPrograms();
 
@@ -224,7 +235,8 @@ class MapProjectCenters extends Command
 
     /**
      * Record the matched centers. The city already is the center's city, since
-     * the match was made within it.
+     * the match was made within it. A host center is cleared with the write, as
+     * a project never holds both.
      *
      * @param  array<int, int>  $matched  project id => center id
      * @param  Collection<int, Project>  $projects
@@ -235,11 +247,11 @@ class MapProjectCenters extends Command
             $updated = 0;
 
             foreach ($matched as $projectId => $centerId) {
-                if ($projects[$projectId]->center_id === $centerId) {
+                if ($projects[$projectId]->center_id === $centerId && $projects[$projectId]->host_center_id === null) {
                     continue;
                 }
 
-                $updated += Project::query()->whereKey($projectId)->update(['center_id' => $centerId]);
+                $updated += Project::query()->whereKey($projectId)->update(['center_id' => $centerId, 'host_center_id' => null]);
             }
 
             return $updated;

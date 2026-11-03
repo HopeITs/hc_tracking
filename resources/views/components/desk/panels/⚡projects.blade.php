@@ -212,6 +212,7 @@ new class extends Component
                         <span class="dk-is dk-num" data-project-dates>{{ $project->start_date?->translatedFormat('M Y') ?? '—' }} → {{ $project->end_date?->translatedFormat('M Y') ?? '—' }}</span>
                         <span class="dk-is" title="{{ $line['donor'] }}">{{ $line['donor'] !== '' ? $line['donor'] : __('desk.no_donor_yet') }} · {{ $project->user?->name ?? '—' }}</span>
                         <x-projects.host-center-badge :project="$project" class="dk-is" />
+                        <x-projects.center-inactive-badge :project="$project" class="dk-is" />
                     </div>
                     <div class="dk-pj-l">
                         @switch($shownLens)

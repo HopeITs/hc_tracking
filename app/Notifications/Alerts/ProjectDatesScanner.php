@@ -124,6 +124,7 @@ final class ProjectDatesScanner implements Scanner
 
         return Project::query()
             ->where('status', ProjectStatus::Active->value)
+            ->notPaused()
             ->where(function ($query) use ($events, $from, $to): void {
                 foreach (array_keys($events) as $key) {
                     $query->orWhereBetween(self::Events[$key][0], [$from, $to]);

@@ -170,6 +170,7 @@
                                             <span class="block truncate font-medium text-secondary-dark dark:text-ink" dir="auto">{{ $row['name'] }}</span>
                                             <span class="block truncate text-xs {{ $mutedText }}">{{ $row['place'] }}</span>
                                             <x-projects.host-center-badge :host-name="$row['hosted']" class="mt-0.5" />
+                                            <x-projects.center-inactive-badge :inactive="$row['centerInactive']" class="mt-0.5" />
                                         </span>
                                     </label>
                                 @empty
@@ -188,6 +189,7 @@
                                     <p class="truncate text-sm font-semibold text-secondary-dark dark:text-ink" dir="auto">{{ $row['name'] }}</p>
                                     <p class="truncate text-xs {{ $mutedText }}">{{ $row['place'] }}</p>
                                     <x-projects.host-center-badge :host-name="$row['hosted']" class="mt-0.5" />
+                                    <x-projects.center-inactive-badge :inactive="$row['centerInactive']" class="mt-0.5" />
                                 </div>
                                 @unless ($isRenewal)
                                     <x-ui.form-input wire:model="beneficiaries.{{ $row['id'] }}" :label="__('proposals.target_beneficiaries')" type="number" min="1" step="1" inputmode="numeric" dir="ltr" class="w-36" />

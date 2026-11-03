@@ -70,6 +70,38 @@ test('force overwrites a center already set', function () {
     expect($project->fresh()->center_id)->toBe($this->idlibCenter);
 });
 
+test('a hosted project is reported as placed and left alone', function () {
+    $host = insertHrCenter(insertHrCity('Aleppo'), 'Aleppo Host');
+    $hosted = Project::factory()->hostedBy($host)->create(['name' => 'Idlib Hosted', 'city_id' => $this->idlib, 'program_id' => $this->program->id]);
+
+    $this->artisan('hr:map-project-centers --apply')
+        ->expectsOutputToContain('Already placed by a host center (kept)')
+        ->expectsTable(['Project', 'Program', 'City', 'Center'], [])
+        ->expectsTable(['Project', 'Program', 'City', 'Active centers in the city'], [])
+        ->doesntExpectOutputToContain('Idlib Hosted')
+        ->expectsOutputToContain('Updated 0 project(s)')
+        ->assertSuccessful();
+
+    $row = DB::table('projects')->find($hosted->id, ['center_id', 'host_center_id']);
+
+    expect($row->center_id)->toBeNull()
+        ->and((int) $row->host_center_id)->toBe($host);
+});
+
+test('force re-maps a hosted project onto its physical center and clears the host', function () {
+    $host = insertHrCenter(insertHrCity('Aleppo'), 'Aleppo Host');
+    $hosted = Project::factory()->hostedBy($host)->create(['name' => 'Idlib Hosted', 'city_id' => $this->idlib, 'program_id' => $this->program->id]);
+
+    $this->artisan('hr:map-project-centers --apply --force')
+        ->expectsOutputToContain('Updated 1 project(s)')
+        ->assertSuccessful();
+
+    $row = DB::table('projects')->find($hosted->id, ['center_id', 'host_center_id']);
+
+    expect((int) $row->center_id)->toBe($this->idlibCenter)
+        ->and($row->host_center_id)->toBeNull();
+});
+
 test('two open projects that would share a center and program are reported and left alone', function () {
     $first = unmappedProject($this->idlib, $this->program->id, 'Idlib Micro A');
     $second = unmappedProject($this->idlib, $this->program->id, 'Idlib Micro B', ProjectStatus::Draft);

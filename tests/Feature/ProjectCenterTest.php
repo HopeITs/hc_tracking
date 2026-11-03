@@ -1,5 +1,6 @@
 <?php
 
+use App\Actions\Projects\SaveProject;
 use App\Enums\ProjectStatus;
 use App\Models\MealCoverageAssignment;
 use App\Models\Program;
@@ -7,6 +8,7 @@ use App\Models\Project;
 use App\Models\User;
 use App\Support\MealCoverage;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Validation\ValidationException;
 use Livewire\Livewire;
 
 beforeEach(function () {
@@ -37,7 +39,16 @@ test('creating a project stores its center and takes the city from the center', 
 });
 
 test('a city sent with a center is ignored: the center\'s city always wins', function () {
-    ($this->create)(['name' => 'Water', 'cityId' => (string) insertHrCity('Hama')])->assertHasNoErrors();
+    // Tampered input: the form itself drops a center outside the chosen city (W-02), so the rule is checked on the action.
+    $this->actingAs($this->user);
+    app(SaveProject::class)->handle(null, [
+        'name' => 'Water',
+        'centerId' => $this->centerId,
+        'cityId' => insertHrCity('Hama'),
+        'programId' => $this->program->id,
+        'userId' => $this->owner,
+        'sectorIds' => newProjectSectorIds(),
+    ], $this->user);
 
     expect(Project::query()->sole())
         ->center_id->toBe($this->centerId)
@@ -171,7 +182,7 @@ test('a project keeps its inactive center on edit and shows it as inactive', fun
     Livewire::actingAs($this->user)
         ->test('pages::projects.show', ['project' => $project->fresh()])
         ->assertSee('Old Center')
-        ->assertSee('Inactive center');
+        ->assertSee('Center inactive');
 });
 
 test('someone without project create rights still cannot create one', function () {
@@ -222,14 +233,14 @@ describe('hosted projects (W-01, D-55)', function () {
             ->city_id->toBe($this->idlebId);
     });
 
-    test('choosing the program and host center proposes «Program — Host center» as the name', function () {
+    test('choosing the program and host center proposes «Program — City» as the name', function () {
         Livewire::actingAs($this->user)
             ->test('pages::projects.index')
             ->call('openCreateModal')
             ->set('programId', (string) $this->program->id)
             ->set('cityId', (string) $this->idlebId)
             ->set('hostCenterId', (string) $this->hostId)
-            ->assertSet('name', $this->program->name.' — Head Office Aleppo');
+            ->assertSet('name', $this->program->name.' — Idleb');
     });
 
     test('a project needs a physical center or a host center', function () {
@@ -240,20 +251,35 @@ describe('hosted projects (W-01, D-55)', function () {
         expect(Project::query()->count())->toBe(0);
     });
 
+    // Tampered input (the form never offers a host beside a center, W-02): the action refuses it.
     test('a physical center and a host center cannot both be set', function () {
-        ($this->hosted)(['name' => 'Both', 'centerId' => (string) $this->centerId])
-            ->assertHasErrors(['hostCenterId'])
-            ->assertSee('Choose a physical center or a host center.');
+        $refused = fn () => app(SaveProject::class)->handle(null, [
+            'name' => 'Both',
+            'centerId' => $this->centerId,
+            'cityId' => $this->idlebId,
+            'hostCenterId' => $this->hostId,
+            'programId' => $this->program->id,
+            'userId' => $this->owner,
+            'sectorIds' => newProjectSectorIds(),
+        ], $this->user);
 
-        expect(Project::query()->count())->toBe(0);
+        expect($refused)->toThrow(fn (ValidationException $e) => expect($e->errors()['hostCenterId'][0])->toBe('Choose a physical center or a host center.'))
+            ->and(Project::query()->count())->toBe(0);
     });
 
     test('a project cannot be hosted by its own center', function () {
-        ($this->hosted)(['name' => 'Self', 'centerId' => (string) $this->centerId, 'hostCenterId' => (string) $this->centerId])
-            ->assertHasErrors(['hostCenterId'])
-            ->assertSee('A project cannot be hosted by its own center.');
+        $refused = fn () => app(SaveProject::class)->handle(null, [
+            'name' => 'Self',
+            'centerId' => $this->centerId,
+            'cityId' => $this->cityId,
+            'hostCenterId' => $this->centerId,
+            'programId' => $this->program->id,
+            'userId' => $this->owner,
+            'sectorIds' => newProjectSectorIds(),
+        ], $this->user);
 
-        expect(Project::query()->count())->toBe(0);
+        expect($refused)->toThrow(fn (ValidationException $e) => expect($e->errors()['hostCenterId'][0])->toBe('A project cannot be hosted by its own center.'))
+            ->and(Project::query()->count())->toBe(0);
     });
 
     test('the host center must exist and be active', function (string|int $hostCenterId) {
@@ -334,5 +360,62 @@ describe('hosted projects (W-01, D-55)', function () {
         $project = Project::factory()->create(['center_id' => null, 'host_center_id' => $this->hostId, 'city_id' => $this->idlebId]);
 
         expect(MealCoverage::responsibleFor($project))->toBe($officer);
+    });
+});
+
+describe('inactive center badge (W-02, D-66)', function () {
+    beforeEach(function () {
+        $this->closedCenterId = insertHrCenter($this->cityId, 'Closed Center', 'مركز مغلق', isActive: false);
+        $this->onClosed = Project::factory()->create([
+            'name' => 'Closed Center Project',
+            'center_id' => $this->closedCenterId,
+            'city_id' => $this->cityId,
+            'program_id' => $this->program->id,
+            'user_id' => $this->owner,
+        ]);
+        $this->onActive = Project::factory()->create([
+            'name' => 'Active Center Project',
+            'center_id' => $this->centerId,
+            'city_id' => $this->cityId,
+            'program_id' => $this->program->id,
+            'user_id' => $this->owner,
+        ]);
+    });
+
+    test('the project index flags only the project whose center is inactive', function () {
+        $page = Livewire::actingAs($this->user)->test('pages::projects.index')
+            ->assertSeeText('Closed Center Project')
+            ->assertSeeText('Active Center Project')
+            ->assertSeeHtml('data-test="center-inactive-badge"');
+
+        expect(substr_count($page->html(), 'data-test="center-inactive-badge"'))->toBe(1);
+    });
+
+    test('the project story header flags an inactive center and stays quiet for an active one', function () {
+        $this->actingAs($this->user)
+            ->get(route('projects.show', $this->onClosed))
+            ->assertOk()
+            ->assertSee('data-test="center-inactive-badge"', false);
+
+        $this->actingAs($this->user)
+            ->get(route('projects.show', $this->onActive))
+            ->assertOk()
+            ->assertDontSee('data-test="center-inactive-badge"', false);
+    });
+
+    test('the project index reads the centers once for every badge, never once per row', function () {
+        $queries = [];
+        DB::listen(function ($query) use (&$queries): void {
+            $queries[] = $query->sql;
+        });
+
+        Livewire::actingAs($this->user)->test('pages::projects.index')
+            ->assertSeeHtml('data-test="center-inactive-badge"');
+
+        $centerLookups = array_filter($queries, fn (string $sql): bool => str_contains($sql, 'from "hchr_centers"'));
+
+        // ProjectDirectoryTest's 24 + the unread-dot subjects query + one shared load of the HR centers lookup.
+        expect($centerLookups)->toHaveCount(1)
+            ->and(count($queries))->toBeLessThanOrEqual(26);
     });
 });

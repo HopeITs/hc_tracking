@@ -35,7 +35,9 @@ use stdClass;
 /**
  * Every open item that carries a date the deadline scanners watch. Closed
  * states follow the app's own definitions (Report::isOverdue(),
- * TransfersTracking::state(), ProjectStatus::isOpen()).
+ * TransfersTracking::state(), ProjectStatus::isOpen()). A paused project
+ * (D-66: its own HR center is inactive) drops its tasks, milestones and end
+ * date from the catalog, while its report work keeps firing.
  */
 final class DeadlineCatalog
 {
@@ -79,6 +81,7 @@ final class DeadlineCatalog
             ->whereDate('due_date', '<=', $limit)
             ->where('status', '!=', TaskStatus::Done->value)
             ->where(fn (Builder $query) => $this->outsideRejectedProposals($query))
+            ->notOfPausedProject()
             ->with('taskAssignees:id,task_id,employee_id')
             ->get();
 
@@ -108,6 +111,7 @@ final class DeadlineCatalog
             ->whereDate('due_date', '<=', $limit)
             ->where('status', '!=', TaskStatus::Done->value)
             ->where(fn (Builder $query) => $this->outsideRejectedProposals($query))
+            ->notOfPausedProject()
             ->with('taskAssignees:id,task_id,employee_id')
             ->get();
 
@@ -188,8 +192,13 @@ final class DeadlineCatalog
      */
     private function milestones(string $limit): array
     {
+        $pausedProjects = Project::pausedIds();
+
         $milestones = Milestone::query()
             ->leftJoin('projects', 'projects.id', '=', 'milestones.project_id')
+            ->when($pausedProjects !== [], fn (Builder $query) => $query->where(fn (Builder $outside) => $outside
+                ->whereNull('milestones.project_id')
+                ->orWhereNotIn('milestones.project_id', $pausedProjects)))
             ->whereNotNull('milestones.planned_end_date')
             ->whereDate('milestones.planned_end_date', '<=', $limit)
             ->whereNotIn('milestones.status', [MilestoneStatus::Reached->value, MilestoneStatus::Cancelled->value])
@@ -376,6 +385,7 @@ final class DeadlineCatalog
 
         $projects = Project::query()
             ->whereIn('status', $open)
+            ->notPaused()
             ->whereNotNull('end_date')
             ->whereDate('end_date', '<=', $limit)
             ->get(['id', 'name', 'end_date', 'user_id']);

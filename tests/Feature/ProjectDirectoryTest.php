@@ -519,7 +519,9 @@ test('the project directory renders within its query budget', function () {
     // + the two HR queries of EmployeeProfile behind the owner chips' positions
     // + the sector filter's options and the list preview's sector eager load (T34).
     // + one load of the linked proposals' statuses for the funding badge (T08).
-    expect($queries)->toBeLessThanOrEqual(24);
+    // + the unread-dot query of the Desk register (notifications subject ids).
+    // + one load of the HR centers lookup for the "Center inactive" badge (W-02), never one per row.
+    expect($queries)->toBeLessThanOrEqual(26);
 });
 
 test('a list preview names only the relations a project has and flags a materialised risk', function () {
@@ -712,7 +714,7 @@ test('the project form lays its fields along a three-section rail with no native
     expect($xpath->query($dialog)->length)->toBe(1)
         ->and($headings)->toBe(['Details', 'Placement', 'Beneficiaries'])
         ->and($xpath->query($dialog.'//select')->length)->toBe(0)
-        // Center, city and host center (the last two only while no center is chosen, W-01), program, owner.
+        // City, program, center, host center (only while no center is chosen, W-02), owner.
         ->and($xpath->query($dialog.'//*[@data-form-select]')->length)->toBe(5)
         ->and($xpath->query($dialog.'[@*[name()="wire:close"]="closeProjectModal"]')->length)->toBe(1)
         ->and($xpath->query($dialog.'//form[@*[name()="wire:submit"]="saveProject"]')->length)->toBe(1);

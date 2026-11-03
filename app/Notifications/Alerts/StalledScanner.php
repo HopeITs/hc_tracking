@@ -85,7 +85,7 @@ final class StalledScanner implements Scanner
      */
     private function tasks(CarbonImmutable $today, TaskStatus $status, int $threshold): array
     {
-        $tasks = Task::query()->select(['id', 'title', 'created_by', 'updated_at'])->where('status', $status->value)->with('taskAssignees:id,task_id,employee_id')->get();
+        $tasks = Task::query()->select(['id', 'title', 'created_by', 'updated_at'])->where('status', $status->value)->notOfPausedProject()->with('taskAssignees:id,task_id,employee_id')->get();
         $since = $this->statusSince('task', $tasks->modelKeys(), ['task.created', 'task.status_changed']);
         $users = $this->employees->usersFor($tasks->flatMap(fn (Task $task) => $task->taskAssignees->pluck('employee_id'))->map(fn ($id): int => (int) $id)->unique()->values()->all());
 

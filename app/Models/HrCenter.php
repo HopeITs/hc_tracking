@@ -58,6 +58,22 @@ class HrCenter extends HrModel
     }
 
     /**
+     * The ids of every center HR has marked inactive. A project run from one
+     * of them is paused (D-66): its non-report work stops alerting.
+     *
+     * @return list<int>
+     */
+    public static function inactiveIds(): array
+    {
+        $entries = self::rememberedHrLookup(fn (): array => self::loadLookup());
+
+        return array_values(array_map(
+            fn (array $row): int => (int) $row['id'],
+            array_filter($entries, fn (array $row): bool => ! (bool) $row['is_active']),
+        ));
+    }
+
+    /**
      * One center from the lookup, active or not, or null when HR has no such center.
      */
     public static function remembered(int $id): ?self

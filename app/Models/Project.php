@@ -29,6 +29,7 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Database\Eloquent\Relations\MorphMany;
 use Illuminate\Database\Eloquent\Relations\MorphOne;
+use Illuminate\Database\QueryException;
 
 /**
  * @property int $id
@@ -145,6 +146,58 @@ class Project extends Model implements TracksActivity
     public function isHosted(): bool
     {
         return $this->activityAttribute('host_center_id') !== null;
+    }
+
+    /**
+     * Whether the project is paused (D-66): it runs from its own HR center
+     * and HR has marked that center inactive. A hosted project is never
+     * paused by its host. While HR is unreachable nothing is paused.
+     */
+    public function isPaused(): bool
+    {
+        if ($this->activityAttribute('center_id') === null) {
+            return false;
+        }
+
+        try {
+            return $this->center()?->is_active === false;
+        } catch (QueryException) {
+            return false;
+        }
+    }
+
+    /**
+     * The ids of every paused project (D-66); none while HR is unreachable.
+     *
+     * @return list<int>
+     */
+    public static function pausedIds(): array
+    {
+        $inactiveCenters = self::inactiveCenterIds();
+
+        if ($inactiveCenters === []) {
+            return [];
+        }
+
+        return array_values(self::query()
+            ->whereIn('center_id', $inactiveCenters)
+            ->pluck('id')
+            ->map(fn (int|string $id): int => (int) $id)
+            ->all());
+    }
+
+    /**
+     * HrCenter::inactiveIds(), read as "no center is inactive" when HR is down.
+     *
+     * @return list<int>
+     */
+    private static function inactiveCenterIds(): array
+    {
+        try {
+            return HrCenter::inactiveIds();
+        } catch (QueryException) {
+            return [];
+        }
     }
 
     /**
@@ -452,6 +505,26 @@ class Project extends Model implements TracksActivity
     protected function open(Builder $query): void
     {
         $query->whereIn('status', self::openStatusValues());
+    }
+
+    /**
+     * Leave out paused projects (D-66): those run from an HR center that is
+     * inactive. Adds nothing while no center is inactive.
+     *
+     * @param  Builder<static>  $query
+     */
+    #[Scope]
+    protected function notPaused(Builder $query): void
+    {
+        $inactiveCenters = self::inactiveCenterIds();
+
+        if ($inactiveCenters === []) {
+            return;
+        }
+
+        $query->where(fn (Builder $paused) => $paused
+            ->whereNull('center_id')
+            ->orWhereNotIn('center_id', $inactiveCenters));
     }
 
     /**

@@ -11,6 +11,7 @@ use App\Models\Project;
 use App\Notifications\EmployeeRecipients;
 use App\Notifications\RecipientResolver;
 use Carbon\CarbonImmutable;
+use Illuminate\Database\Eloquent\Builder;
 
 /**
  * Indicators behind pace or silent past their reporting frequency. Like
@@ -33,7 +34,13 @@ final class OffTrackIndicatorScanner implements Scanner
             return 0;
         }
 
-        $indicators = Indicator::query()->with('progress')->get();
+        $pausedProjects = Project::pausedIds();
+        $indicators = Indicator::query()
+            ->when($pausedProjects !== [], fn (Builder $query) => $query->where(fn (Builder $outside) => $outside
+                ->whereNull('project_id')
+                ->orWhereNotIn('project_id', $pausedProjects)))
+            ->with('progress')
+            ->get();
         $owners = $this->ownerUsers(array_values($indicators->pluck('project_id')->filter()->map(fn (mixed $id): int => (int) $id)->unique()->all()));
         $meal = $this->resolver->usersWithRoles(['MEAL']);
         $paceStage = 'pace:'.$now->year;

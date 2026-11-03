@@ -163,4 +163,6 @@ return [
     'due_before_requested' => 'الموعد النهائي لا يسبق تاريخ الطلب',
     'set_the_due_date' => 'حدّد الموعد النهائي.',
     'delivered_deliverable_keeps_its_kind' => 'التسليم الذي سُلِّم يحتفظ بنوعه.',
+    'paused' => 'متوقف',
+    'paused_center_inactive' => 'متوقف مؤقتاً: مركز المشروع غير فعّال. مهام التقارير تستمر',
 ];

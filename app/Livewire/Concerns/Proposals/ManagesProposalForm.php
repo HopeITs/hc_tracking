@@ -127,7 +127,7 @@ trait ManagesProposalForm
      * search, at most ProjectPickerLimit of them, plus the ones already
      * chosen so a narrowed search never hides a choice.
      *
-     * @return list<array{id: int, name: string, place: string, hosted: ?string}>
+     * @return list<array{id: int, name: string, place: string, hosted: ?string, centerInactive: bool}>
      */
     #[Computed]
     public function proposalPickerProjects(): array
@@ -149,7 +149,7 @@ trait ManagesProposalForm
     /**
      * The chosen projects while creating, each with its beneficiaries input.
      *
-     * @return list<array{id: int, name: string, place: string, hosted: ?string}>
+     * @return list<array{id: int, name: string, place: string, hosted: ?string, centerInactive: bool}>
      */
     #[Computed]
     public function proposalChosenProjects(): array
@@ -165,7 +165,7 @@ trait ManagesProposalForm
      * The projects already linked to the proposal being edited, each with its
      * beneficiaries input. Links themselves change on the proposal page.
      *
-     * @return list<array{id: int, name: string, place: string, hosted: ?string}>
+     * @return list<array{id: int, name: string, place: string, hosted: ?string, centerInactive: bool}>
      */
     #[Computed]
     public function proposalLinkedProjects(): array
@@ -236,7 +236,7 @@ trait ManagesProposalForm
      * projects and the counts of framework nodes, milestones and tasks, plus
      * the number of a renewal draft that already exists. Counts only.
      *
-     * @return array{projects: list<array{id: int, name: string, place: string, hosted: ?string}>, results: int, milestones: int, tasks: int, existingDraft: ?string}|null
+     * @return array{projects: list<array{id: int, name: string, place: string, hosted: ?string, centerInactive: bool}>, results: int, milestones: int, tasks: int, existingDraft: ?string}|null
      */
     #[Computed]
     public function renewalPreview(): ?array
@@ -585,7 +585,7 @@ trait ManagesProposalForm
      * for shows its id.
      *
      * @param  iterable<Project>  $projects
-     * @return list<array{id: int, name: string, place: string, hosted: ?string}>
+     * @return list<array{id: int, name: string, place: string, hosted: ?string, centerInactive: bool}>
      */
     private function projectRows(iterable $projects): array
     {
@@ -604,10 +604,30 @@ trait ManagesProposalForm
                     $project->city->name ?? __('common.unknown_city'),
                 ], fn (?string $part): bool => $part !== null))),
                 'hosted' => $isHosted ? $this->centerName($project->host_center_id) : null,
+                'centerInactive' => $this->centerIsInactive($project->center_id),
             ];
         }
 
         return $rows;
+    }
+
+    /**
+     * Whether the project's physical center is no longer active in HR (D-66, W-02).
+     * False for no center and when HR cannot be read.
+     */
+    private function centerIsInactive(?int $centerId): bool
+    {
+        if ($centerId === null) {
+            return false;
+        }
+
+        try {
+            $center = HrCenter::remembered($centerId);
+        } catch (QueryException) {
+            return false;
+        }
+
+        return $center !== null && ! $center->is_active;
     }
 
     private function centerName(?int $centerId): string

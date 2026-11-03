@@ -574,3 +574,18 @@ test('editing from the register changes the beneficiaries and asks for a reason 
 
     expect(DB::table('project_proposal')->where('proposal_id', $proposal->id)->value('target_beneficiaries'))->toBe(450);
 });
+
+test('the project picker flags a project whose center is inactive (W-02, D-66)', function () {
+    $city = insertHrCity('Idleb', 'إدلب');
+    $closed = insertHrCenter($city, 'Closed Center', 'مركز مغلق', isActive: false);
+    $active = insertHrCenter($city, 'Open Center', 'مركز مفتوح');
+    Project::factory()->create(['name' => 'Closed Center Project', 'center_id' => $closed, 'city_id' => $city]);
+    Project::factory()->create(['name' => 'Open Center Project', 'center_id' => $active, 'city_id' => $city]);
+
+    $form = openProposalCreateForm(userWithRole('Financial'))
+        ->assertSeeText('Closed Center Project')
+        ->assertSeeText('Open Center Project')
+        ->assertSeeHtml('data-test="center-inactive-badge"');
+
+    expect(substr_count($form->html(), 'data-test="center-inactive-badge"'))->toBe(1);
+});

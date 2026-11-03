@@ -27,16 +27,22 @@ use Livewire\Attributes\On;
  * The create/edit project dialog: its form properties, the center and owner
  * pickers, opening, saving and closing it.
  *
- * A project runs from an HR center (D-30): the center is required for a new
- * project, the city is always the center's and is written here, and only one
- * open project may hold a (center, program) pair, checked under a lock by
- * Project::openProjectFor(). A project not yet mapped to a center keeps its
- * city and can still be edited until one is chosen.
+ * The form reads as «Add center» (W-02, D-55): the city comes first, then
+ * the program, the physical center (only the active centers of that city)
+ * and, while no center is chosen, a host center from another city. A project
+ * runs from an HR center (D-30): the city is always the center's and is
+ * written here, and only one open project may hold a (center ?? city,
+ * program) pair, checked under a lock by Project::openProjectFor(). A project
+ * not yet mapped to a center keeps its city and can still be edited until
+ * one is chosen.
  *
  * Used by projects/index and projects/show. The page provides the program and user pickers
  * (`programOptions()`, `userOptions()`), which `ownerOptions()` reads, and
  * WithPagination's resetPage().
  *
+ * @property-read Collection<int, HrCenter> $centerOptions  #[Computed] centerOptions() below
+ * @property-read Collection<int, HrCenter> $hostCenterOptions  #[Computed] hostCenterOptions() below
+ * @property-read Collection<int, HrCity> $hostCityOptions  #[Computed] hostCityOptions() below
  * @property-read Collection<int, HrEmployee> $ownerOptions  #[Computed] ownerOptions() below
  * @property-read Collection<int, Program> $programOptions  #[Computed] programOptions() on the page
  * @property-read Collection<int, HrEmployee> $userOptions  #[Computed] userOptions() on the page
@@ -71,12 +77,17 @@ trait ManagesProjectForm
     public string $centerId = '';
 
     /**
-     * The host center and the city of a project with no center of its own
-     * (D-55, W-01). Both are read only while no center is chosen; with a
-     * center the server takes the center's city and clears the host.
+     * The host center of a project with no center of its own (D-55, W-01),
+     * read only while no center is chosen; with a center the server clears
+     * it.
      */
     public string $hostCenterId = '';
 
+    /**
+     * The project's city, chosen first (W-02): it narrows the center picker
+     * and is the city of a hosted project. With a center the server takes
+     * the center's city.
+     */
     public string $cityId = '';
 
     public string $programId = '';
@@ -119,17 +130,24 @@ trait ManagesProjectForm
     public ?int $savedCenterId = null;
 
     /**
-     * Active centers, plus the edited project's own center when it is inactive.
+     * The active centers of the chosen city, plus the edited project's own
+     * center when it is inactive and stands in that city. Empty until a city
+     * is chosen.
      *
      * @return Collection<int, HrCenter>
      */
     #[Computed]
     public function centerOptions(): Collection
     {
-        $centers = HrCenter::options();
+        if (! ctype_digit($this->cityId)) {
+            return new Collection;
+        }
+
+        $cityId = (int) $this->cityId;
+        $centers = HrCenter::options()->filter(fn (HrCenter $center): bool => $center->city_id === $cityId)->values();
         $savedCenter = $this->savedCenterId === null ? null : HrCenter::remembered($this->savedCenterId);
 
-        if ($savedCenter !== null && ! $savedCenter->is_active) {
+        if ($savedCenter !== null && ! $savedCenter->is_active && $savedCenter->city_id === $cityId) {
             $centers->push($savedCenter);
         }
 
@@ -137,7 +155,21 @@ trait ManagesProjectForm
     }
 
     /**
-     * Active HR cities for a hosted project's city picker, in the interface
+     * The centers that may host a project of the chosen city: every active
+     * center except those of that city, which would be the project's own.
+     *
+     * @return Collection<int, HrCenter>
+     */
+    #[Computed]
+    public function hostCenterOptions(): Collection
+    {
+        $cityId = ctype_digit($this->cityId) ? (int) $this->cityId : null;
+
+        return HrCenter::options()->reject(fn (HrCenter $center): bool => $center->city_id === $cityId)->values();
+    }
+
+    /**
+     * Active HR cities for the form's city picker, in the interface
      * language. Named apart from the directory's cityOptions() filter.
      *
      * @return Collection<int, HrCity>
@@ -190,8 +222,8 @@ trait ManagesProjectForm
     }
 
     /**
-     * Choosing a center drops the host center and the city: both belong to a
-     * hosted project only, and the server takes the city from the center.
+     * Choosing a center drops the host center: a project with a center of its
+     * own is not hosted. The city stays, as the center is one of its own.
      */
     public function updatedCenterId(string $value): void
     {
@@ -199,7 +231,6 @@ trait ManagesProjectForm
 
         if ($value !== '') {
             $this->hostCenterId = '';
-            $this->cityId = '';
         }
 
         $this->proposeName();
@@ -211,9 +242,25 @@ trait ManagesProjectForm
         $this->proposeName();
     }
 
-    public function updatedCityId(): void
+    /**
+     * Choosing another city drops a center that is not in it and a host
+     * center that is (a center cannot host a project of its own city).
+     */
+    public function updatedCityId(string $value): void
     {
         $this->confirmNewProject = false;
+
+        $cityId = ctype_digit($value) ? (int) $value : null;
+
+        if (ctype_digit($this->centerId) && HrCenter::remembered((int) $this->centerId)?->city_id !== $cityId) {
+            $this->centerId = '';
+        }
+
+        if (ctype_digit($this->hostCenterId) && HrCenter::remembered((int) $this->hostCenterId)?->city_id === $cityId) {
+            $this->hostCenterId = '';
+        }
+
+        $this->proposeName();
     }
 
     public function updatedName(): void
@@ -350,26 +397,31 @@ trait ManagesProjectForm
     }
 
     /**
-     * Name a new project «Program — Center» once both are chosen (the host
-     * center stands in for a hosted project), unless the person already
+     * Name a new project «Program — Center» once both are chosen, or
+     * «Program — City» while only the city is, unless the person already
      * typed a name of their own.
      */
     protected function proposeName(): void
     {
-        $placementId = ctype_digit($this->centerId) ? $this->centerId : $this->hostCenterId;
-
-        if ($this->editingProjectId !== null || ! ctype_digit($this->programId) || ! ctype_digit($placementId)) {
+        if ($this->editingProjectId !== null || ! ctype_digit($this->programId) || ($this->name !== '' && $this->name !== $this->proposedName)) {
             return;
         }
 
-        $center = HrCenter::remembered((int) $placementId);
+        $placement = null;
+
+        if (ctype_digit($this->centerId)) {
+            $placement = HrCenter::remembered((int) $this->centerId)?->name;
+        } elseif (ctype_digit($this->cityId)) {
+            $placement = $this->hostCityOptions->firstWhere('id', (int) $this->cityId)?->name;
+        }
+
         $program = Program::query()->find((int) $this->programId, ['id']);
 
-        if ($center === null || $program === null || ($this->name !== '' && $this->name !== $this->proposedName)) {
+        if ($placement === null || $program === null) {
             return;
         }
 
-        $this->name = $this->proposedName = $program->name.' — '.$center->name;
+        $this->name = $this->proposedName = $program->name.' — '.$placement;
     }
 
     /**
@@ -430,8 +482,7 @@ trait ManagesProjectForm
         $this->targetGirls = self::formInteger($project->target_girls);
         $this->centerId = $project->center_id === null ? '' : (string) $project->center_id;
         $this->hostCenterId = $project->host_center_id === null ? '' : (string) $project->host_center_id;
-        // The city is only offered while the project has no center of its own.
-        $this->cityId = $project->center_id === null ? (string) $project->city_id : '';
+        $this->cityId = (string) $project->city_id;
         $this->savedCenterId = $project->center_id;
         $this->programId = (string) $project->program_id;
         $this->userId = (string) $project->user_id;

@@ -106,7 +106,7 @@ new #[Layout('layouts::desk'), Title('titles.task')] class extends Component
                 // below can show "milestone · project" without an extra
                 // query — the other four source types have nothing further
                 // to load.
-                'source' => fn (MorphTo $morphTo) => $morphTo->morphWith([Milestone::class => ['project:id,name', 'proposal:id,name']]),
+                'source' => fn (MorphTo $morphTo) => $morphTo->morphWith([Milestone::class => ['project:id,name,center_id', 'proposal:id,name']]),
                 'taskAssignees.employee:id,first_name_en,last_name_en,first_name_ar,last_name_ar',
                 'creator:id,hr_user_id',
                 'parentTask:id,title',
@@ -234,6 +234,7 @@ new #[Layout('layouts::desk'), Title('titles.task')] class extends Component
         :subtitle="$this->task->sourceLabel()"
     >
         <x-slot:meta>
+            <x-tasks.paused-chip :task="$this->task" />
             @if ($this->task->source instanceof \App\Models\Milestone && $this->task->source->project !== null)
                 <a href="{{ route('projects.show', $this->task->source->project) }}" wire:navigate class="font-medium hover:underline">
                     {{ $this->task->source->name }} · {{ $this->task->source->ownerName() }}

@@ -454,3 +454,9 @@ On the copy as on production:
 - Never put secrets, personal data or amounts in any document.
 
 Superseded, do not build: `report-templates:seed-existing` and `donor_attribution_confirmed_at` (replaced by `report-templates:prefill-active` and T13's setting); importing the Syria Cross / Children University workbooks (D-54).
+
+## Wave 2
+### W-02 · map legacy projects to HR centers ⛁
+1. `<php> artisan hr:map-project-centers --dry-run`, review Matched / Ambiguous / No center / Conflicts with management (D-30a, D-30c).
+2. `<php> artisan hr:map-project-centers --apply` writes `center_id` on the Matched rows only (hosted rows are kept; `--force` re-maps). Re-running is a no-op.
+3. Ambiguous and No-center rows are placed by a manager in the project form ("Add center": city → physical center or host center). Record the counts before and after.
