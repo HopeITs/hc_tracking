@@ -129,6 +129,10 @@ return [
         'rejected' => 'مرفوض',
         'superseded' => 'مستبدل',
     ],
+    'stage_template_creates' => [
+        'task' => 'مهمة قسم',
+        'final_report_milestone' => 'معلم التقرير النهائي',
+    ],
     'project_status' => [
         'draft' => 'مسودة',
         'submitted' => 'مقدَّم',

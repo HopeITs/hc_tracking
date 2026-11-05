@@ -725,7 +725,9 @@ test('the plan tab groups the milestones and the media, finance and other depart
         ->assertSeeText('Baseline survey')
         ->assertSeeHtml('data-department="'.$media['department'].'"')
         ->assertSeeHtml('data-test="add-plan-milestone-button"')
-        ->assertSeeHtml('data-test="add-final-report-button"');
+        // W-12 (D-63): the final-report milestone comes from the `approved`
+        // stage template now, so the plan tab offers no button for it.
+        ->assertDontSeeHtml('data-test="add-final-report-button"');
 
     $rows = collect($component->instance()->planGanttPayload['rows']);
 

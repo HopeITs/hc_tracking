@@ -29,6 +29,11 @@ final class EmployeeProfile
     use RemembersHrLookup;
 
     /**
+     * The HR job level grade that makes someone a department manager (D-65).
+     */
+    private const DepartmentManagerGrade = 5;
+
+    /**
      * The employee's current place in HR, or null when they hold no active contract.
      *
      * @return array{employee_id: int, position_id: ?int, position_title_en: ?string, position_title_ar: ?string, job_level: ?string, grade: ?int,
@@ -91,6 +96,46 @@ final class EmployeeProfile
     public static function managerOf(int $employeeId): ?int
     {
         return self::for($employeeId)['direct_manager_employee_id'] ?? null;
+    }
+
+    /**
+     * The manager of a department: the employee whose current HR position in
+     * it sits at job level grade 5, «Department Manager» (D-65). Null when
+     * the department has no such holder.
+     *
+     * Several holders is normal — Finance has three — so the same tie-break
+     * holderOfPosition() uses applies: the latest contract start date wins,
+     * and the pick is logged so an ambiguous department is visible rather
+     * than silent.
+     */
+    public static function managerOfDepartment(int $departmentId): ?int
+    {
+        $holder = null;
+        $holderStart = '';
+        $candidates = 0;
+
+        foreach (self::rememberedHrLookup(fn (): array => self::load()) as $employeeId => $entry) {
+            if (! is_array($entry) || $entry['department_id'] !== $departmentId || $entry['grade'] !== self::DepartmentManagerGrade) {
+                continue;
+            }
+
+            $candidates++;
+
+            if ($holder === null || [$entry['start_date'], $employeeId] > [$holderStart, $holder]) {
+                $holder = $employeeId;
+                $holderStart = $entry['start_date'];
+            }
+        }
+
+        if ($candidates > 1) {
+            Log::warning('Several department managers in HR; taking the latest contract.', [
+                'department_id' => $departmentId,
+                'candidates' => $candidates,
+                'chosen_employee_id' => $holder,
+            ]);
+        }
+
+        return $holder;
     }
 
     /**

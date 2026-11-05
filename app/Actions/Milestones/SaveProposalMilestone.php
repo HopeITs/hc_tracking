@@ -70,11 +70,40 @@ final class SaveProposalMilestone
      */
     public function addFinalReport(Proposal $proposal, array $input): Milestone
     {
-        return DB::transaction(function () use ($proposal, $input): Milestone {
+        return $this->writeFinalReport($proposal, $input, authorize: true);
+    }
+
+    /**
+     * The same milestone, opened by the `approved` stage template rather than
+     * by a person (D-63, W-12).
+     *
+     * No Gate: nobody is asking for this. The PR Manager decided it when
+     * they wrote the template, and the proposal's own approval was already
+     * authorised — while the approver (Public Relations Manager) does not
+     * hold `milestones.create` and so could never pass `planForProposal`.
+     * The same system-rule reasoning the T33 report-template prefiller
+     * already runs on. Everything else, the one-milestone rule included, is
+     * the path above.
+     *
+     * @param  array{planned_start_date?: string, planned_end_date?: ?string, responsible_employee_id?: int|string, department_id?: int|string, due_date?: ?string}  $input
+     */
+    public function addFinalReportFromTemplate(Proposal $proposal, array $input): Milestone
+    {
+        return $this->writeFinalReport($proposal, $input, authorize: false);
+    }
+
+    /**
+     * @param  array{planned_start_date?: string, planned_end_date?: ?string, responsible_employee_id?: int|string, department_id?: int|string, due_date?: ?string}  $input
+     */
+    private function writeFinalReport(Proposal $proposal, array $input, bool $authorize): Milestone
+    {
+        return DB::transaction(function () use ($proposal, $input, $authorize): Milestone {
             $locked = $this->lockProposal($proposal);
 
-            Gate::authorize('planForProposal', [Milestone::class, $locked]);
-            Gate::authorize('planDepartmentTask', [Task::class, $locked]);
+            if ($authorize) {
+                Gate::authorize('planForProposal', [Milestone::class, $locked]);
+                Gate::authorize('planDepartmentTask', [Task::class, $locked]);
+            }
 
             if ($locked->milestones()->where('is_final_report', true)->exists()) {
                 throw ValidationException::withMessages(['final_report' => __('milestones.final_report_exists')]);

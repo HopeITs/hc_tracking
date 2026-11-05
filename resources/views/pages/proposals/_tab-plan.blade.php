@@ -55,10 +55,11 @@
         </p>
 
         @if ($canPlanMilestones)
+            {{-- The final-report milestone is opened by the `approved` stage
+                 template now (D-63, W-12), not by hand; the admin page is
+                 where that rule is changed. SaveProposalMilestone's path is
+                 unchanged, it is only reached from the listener. --}}
             <div class="flex flex-wrap gap-2">
-                @unless ($hasFinalReport)
-                    <x-ui.button size="sm" icon="document-check" wire:click="openFinalReportForm" data-test="add-final-report-button">{{ __('milestones.add_final_report') }}</x-ui.button>
-                @endunless
                 <x-ui.button size="sm" tone="primary" icon="plus" wire:click="openPlanMilestoneForm" data-test="add-plan-milestone-button">{{ __('milestones.add_milestone') }}</x-ui.button>
             </div>
         @endif

@@ -129,6 +129,10 @@ return [
         'rejected' => 'Rejected',
         'superseded' => 'Superseded',
     ],
+    'stage_template_creates' => [
+        'task' => 'Department task',
+        'final_report_milestone' => 'Final report milestone',
+    ],
     'project_status' => [
         'draft' => 'Draft',
         'submitted' => 'Submitted',

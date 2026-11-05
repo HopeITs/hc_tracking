@@ -36,6 +36,7 @@ $groups = [
     'report-templates' => ['manage'],
     'evidence-types' => ['manage'],
     'narrative-questions' => ['manage'],
+    'stage-task-templates' => ['manage'],
     'tasks' => ['view', 'create', 'update', 'delete'],
     'calendar' => ['view'],
     'accounts' => ['view', 'create', 'update', 'delete'],
@@ -158,6 +159,8 @@ return [
             'projects.create',
             'funding-agreements.view', 'funding-agreements.create', 'funding-agreements.update',
             'reports.reopen', 'reports.aggregate',
+            // The stage task templates are the PR Manager's list (D-63).
+            'stage-task-templates.manage',
         ],
         'MEAL' => [
             ...$viewEverything, ...$taskWriter, ...$reportWriter, 'reports.approve', 'reports.mark-seen',

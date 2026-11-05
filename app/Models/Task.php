@@ -65,6 +65,7 @@ use Illuminate\Support\Collection;
     'source_type',
     'source_id',
     'department_id',
+    'stage_template_id',
     'kind',
     'media_kinds',
     'delivery_state',
