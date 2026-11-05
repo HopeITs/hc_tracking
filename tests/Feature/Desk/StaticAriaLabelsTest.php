@@ -6,7 +6,7 @@ use App\Models\User;
 use Livewire\Livewire;
 
 test('program cards print their open and edit labels instead of handing PHP to Alpine', function () {
-    $program = Program::factory()->create(['name' => 'Children University']);
+    $program = Program::factory()->create(['name_en' => 'Children University']);
 
     Livewire::actingAs(User::factory()->role('Super Admin')->create())
         ->test('pages::programs.index')

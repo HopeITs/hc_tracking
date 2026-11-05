@@ -31,7 +31,7 @@ test('program detail shows the program its strategy and its manager', function (
     $manager = insertHrEmployee(firstNameEn: 'Layla', lastNameEn: 'Haddad', firstNameAr: 'ليلى', lastNameAr: 'حداد');
     $strategy = Strategy::factory()->create(['name' => 'Country Strategy']);
     $program = Program::factory()->create([
-        'name' => 'Water Security',
+        'name_en' => 'Water Security',
         'strategy_id' => $strategy->id,
         'manager_id' => $manager,
     ]);
@@ -232,7 +232,7 @@ test('program plan timeline fills the strategy window and totals each plan', fun
 
 test('program detail renders a program with nothing attached', function () {
     $user = User::factory()->role('General Manager')->create();
-    $program = Program::factory()->create(['name' => 'Bare Program']);
+    $program = Program::factory()->create(['name_en' => 'Bare Program']);
 
     $this->actingAs($user)
         ->get(route('programs.show', $program))

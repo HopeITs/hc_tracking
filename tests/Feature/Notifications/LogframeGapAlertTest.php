@@ -21,6 +21,7 @@ use Carbon\CarbonImmutable;
 use Illuminate\Http\Request;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
 use Spatie\Permission\Models\Role;
 use Spatie\Permission\PermissionRegistrar;
@@ -191,30 +192,53 @@ describe('the daily rule', function () {
     });
 });
 
-describe('the HR sync', function () {
-    test('a direct syncFromHr() stays silent and returns only the new ids', function () {
-        $newId = insertHrProgram('Study Zone');
+describe('a program new to tracking', function () {
+    /**
+     * The question used to be asked for the rows the HR mirror inserted behind
+     * everyone's back. Since W-34b (D-68) nothing creates a program on its own
+     * except the one-time import, so that is what asks; the human path gets it
+     * in W-34b slice 2, when `SaveProgram` exists.
+     *
+     * The HR id below is pinned well clear of the tracking ids: the two
+     * databases number their rows independently, and the import matches on the
+     * id, so a program that happened to share an id with `$this->program`
+     * would read as an update rather than something new.
+     */
+    $hrOnlyProgram = fn (): int => tap(9001, fn (int $id) => DB::connection('hr')->table('programs')
+        ->insert(['id' => $id, 'name' => 'Study Zone', 'code' => '008', 'slug' => 'study-zone', 'is_active' => true]));
 
-        expect(Program::syncFromHr())->toBe([$newId])
-            ->and(Program::syncFromHr())->toBe([])
-            ->and(logframeAlertsFor($this->meal))->toHaveCount(0);
+    test('is asked about when the import brings it over from HR', function () use ($hrOnlyProgram) {
+        $newId = $hrOnlyProgram();
+
+        $this->artisan('programs:import-from-hr', ['--apply' => true])->assertExitCode(0);
+
+        expect(logframeAlertsFor($this->meal)->pluck('subject_id')->all())->toBe([$newId]);
     });
 
-    test('seeding programs never alerts', function () {
-        insertHrProgram('Study Zone');
+    test('is not asked about again on a second import', function () use ($hrOnlyProgram) {
+        $hrOnlyProgram();
 
-        Activity::withoutRecording(fn () => Program::syncFromHr());
+        $this->artisan('programs:import-from-hr', ['--apply' => true])->assertExitCode(0);
+        $this->artisan('programs:import-from-hr', ['--apply' => true])->assertExitCode(0);
+
+        expect(logframeAlertsFor($this->meal))->toHaveCount(1);
+    });
+
+    test('a dry run asks about nothing', function () use ($hrOnlyProgram) {
+        $hrOnlyProgram();
+
+        $this->artisan('programs:import-from-hr')->assertExitCode(0);
 
         expect(logframeAlertsFor($this->meal))->toHaveCount(0);
     });
 
-    test('the request middleware alerts for the programs it newly mirrored', function () {
-        $newId = insertHrProgram('Study Zone');
+    test('a sync of the HR managers alerts for nothing', function () {
+        insertHrProgram('Study Zone');
         Cache::forget(SyncProgramsFromHr::CacheKey);
 
         (new SyncProgramsFromHr)->handle(Request::create('/'), fn () => new Response);
 
-        expect(logframeAlertsFor($this->meal)->pluck('subject_id')->all())->toBe([$newId]);
+        expect(logframeAlertsFor($this->meal))->toHaveCount(0);
     });
 });
 

@@ -39,10 +39,15 @@ class AnnualPlan extends Model implements TracksActivity
     /**
      * "program-slug-year" — there is no title field of its own, so the slug
      * is built from the program it covers and its fiscal year.
+     *
+     * Read through `getRouteKey()` rather than the column: since W-34b (D-68)
+     * the program's slug is a column of ours, and plenty of callers load a
+     * program with a narrow `select(['id', ...])` that leaves it out.
+     * `HasSlug::getRouteKey()` fills it in from one lookup when that happens.
      */
     protected function slugSource(): string
     {
-        return $this->program?->slug.'-'.$this->year;
+        return $this->program?->getRouteKey().'-'.$this->year;
     }
 
     /**

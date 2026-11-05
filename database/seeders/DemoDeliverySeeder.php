@@ -6,7 +6,6 @@ use App\Enums\ProjectStatus;
 use App\Models\AnnualPlan;
 use App\Models\Donor;
 use App\Models\DonorProposal;
-use App\Models\HrProgram;
 use App\Models\Program;
 use App\Models\Project;
 use App\Models\Proposal;
@@ -93,12 +92,12 @@ class DemoDeliverySeeder extends Seeder
      */
     protected function programsToAssign(): Collection
     {
-        if (HrProgram::query()->doesntExist()) {
+        if (Program::query()->doesntExist()) {
             return Program::factory()->unassigned()->count(4)->sequence(
-                ['name' => 'WASH'],
-                ['name' => 'Shelter'],
-                ['name' => 'Protection'],
-                ['name' => 'Livelihoods'],
+                ['name_en' => 'WASH'],
+                ['name_en' => 'Shelter'],
+                ['name_en' => 'Protection'],
+                ['name_en' => 'Livelihoods'],
             )->create();
         }
 

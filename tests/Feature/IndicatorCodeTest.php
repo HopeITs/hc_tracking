@@ -3,6 +3,7 @@
 use App\Actions\IndicatorLibrary\SaveLibraryIndicator;
 use App\Models\Indicator;
 use App\Models\LibraryIndicator;
+use App\Models\Program;
 use App\Support\IndicatorCode;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
@@ -17,8 +18,8 @@ function nextIndicatorCode(?int $programId, string $levelRef): array
     return DB::transaction(fn (): array => IndicatorCode::next($programId, $levelRef));
 }
 
-it('builds the code from the HR program code, the level and the next serial', function (string $levelRef, string $expected) {
-    $programId = insertHrProgram(code: '002');
+it('builds the code from the program code, the level and the next serial', function (string $levelRef, string $expected) {
+    $programId = Program::factory()->create(['code' => '002'])->id;
     LibraryIndicator::factory()->create(['program_id' => $programId, 'level_ref' => 'OP1.2', 'serial' => 1, 'code' => '002.OP1.2.1']);
     LibraryIndicator::factory()->create(['program_id' => $programId, 'level_ref' => 'OP1.2', 'serial' => 2, 'code' => '002.OP1.2.2']);
 
@@ -33,8 +34,8 @@ it('uses HC for an institutional entry', function () {
 });
 
 it('numbers each program and level on its own', function () {
-    $first = insertHrProgram(code: '002');
-    $second = insertHrProgram(code: '005');
+    $first = Program::factory()->create(['code' => '002'])->id;
+    $second = Program::factory()->create(['code' => '005'])->id;
     LibraryIndicator::factory()->create(['program_id' => $first, 'level_ref' => 'OC1', 'serial' => 1, 'code' => '002.OC1.1']);
 
     expect(nextIndicatorCode($first, 'OC1')['serial'])->toBe(2)
@@ -44,7 +45,7 @@ it('numbers each program and level on its own', function () {
 });
 
 it('never gives out the serial of a deactivated entry again', function () {
-    $programId = insertHrProgram(code: '002');
+    $programId = Program::factory()->create(['code' => '002'])->id;
     LibraryIndicator::factory()->create(['program_id' => $programId, 'level_ref' => 'OP1', 'serial' => 1, 'code' => '002.OP1.1']);
     LibraryIndicator::factory()->inactive()->create(['program_id' => $programId, 'level_ref' => 'OP1', 'serial' => 2, 'code' => '002.OP1.2']);
 
@@ -53,7 +54,7 @@ it('never gives out the serial of a deactivated entry again', function () {
 
 it('gives two saves at the same program and level different codes', function () {
     $this->actingAs(userWithRole('MEAL'));
-    $programId = insertHrProgram(code: '002');
+    $programId = Program::factory()->create(['code' => '002'])->id;
     $input = libraryIndicatorInput(['institutional' => false, 'program_id' => $programId, 'level_ref' => 'OP1.2']);
 
     $first = app(SaveLibraryIndicator::class)->handle(null, $input);
@@ -73,17 +74,17 @@ it('refuses to hand out a code outside a transaction', function () {
     }
 });
 
-it('refuses a program whose code HR has given to two programs', function () {
-    insertHrProgram(code: '003');
-    $programId = insertHrProgram(code: '003');
+it('refuses a program whose code another program carries too', function () {
+    Program::factory()->create(['code' => '003']);
+    $programId = Program::factory()->create(['code' => '003'])->id;
 
     nextIndicatorCode($programId, 'OP1');
-})->throws(ValidationException::class, "This program's code is duplicated in HR. Ask the HR team to fix it.");
+})->throws(ValidationException::class, "This program's code is used by another program as well. Fix it on the Programs page first.");
 
-it('writes nothing when the HR program code is duplicated', function () {
+it('writes nothing when the program code is duplicated', function () {
     $this->actingAs(userWithRole('MEAL'));
-    insertHrProgram(code: '009');
-    $programId = insertHrProgram(code: '009');
+    Program::factory()->create(['code' => '009']);
+    $programId = Program::factory()->create(['code' => '009'])->id;
 
     try {
         app(SaveLibraryIndicator::class)->handle(null, libraryIndicatorInput(['institutional' => false, 'program_id' => $programId]));
@@ -117,7 +118,7 @@ it('refuses to move an entry in use to another level, keeping its code', functio
 
 it('gives an unused entry moved to another program and level a new code', function () {
     $this->actingAs(userWithRole('MEAL'));
-    $programId = insertHrProgram(code: '002');
+    $programId = Program::factory()->create(['code' => '002'])->id;
     $entry = app(SaveLibraryIndicator::class)->handle(null, libraryIndicatorInput());
 
     $moved = app(SaveLibraryIndicator::class)->handle($entry->id, libraryIndicatorInput(['institutional' => false, 'program_id' => $programId, 'level_ref' => 'AC1.1']));

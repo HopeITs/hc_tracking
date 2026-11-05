@@ -272,7 +272,7 @@ test('confirming a delete opens the dialog and cancelling closes it', function (
 
 test('a target shows the program behind its plan and the donors behind its proposal', function () {
     $user = User::factory()->role('General Manager')->create();
-    $program = Program::factory()->create(['name' => 'Livelihoods Programme']);
+    $program = Program::factory()->create(['name_en' => 'Livelihoods Programme']);
     $plan = AnnualPlan::factory()->create(['program_id' => $program->id]);
     $proposal = Proposal::factory()->create(['name' => 'Winter Response Proposal']);
     $donor = Donor::factory()->create(['name' => 'Northern Relief Fund']);

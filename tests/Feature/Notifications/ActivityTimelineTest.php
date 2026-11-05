@@ -90,7 +90,7 @@ test('a program save that links a strategy and manager names the strategy, and c
     $actor = Activity::withoutRecording(fn () => User::factory()->create(['name' => 'Sami']));
     $managerId = insertHrEmployee(firstNameEn: 'Layla', lastNameEn: 'Haddad');
     $strategy = Strategy::factory()->create(['name' => 'Country Strategy 2026-2030']);
-    $program = Activity::withoutRecording(fn () => Program::factory()->unassigned()->create(['name' => 'Water Security']));
+    $program = Activity::withoutRecording(fn () => Program::factory()->unassigned()->create(['name_en' => 'Water Security']));
 
     $this->actingAs($actor);
     $program->update(['strategy_id' => $strategy->id, 'manager_id' => $managerId]);

@@ -32,8 +32,8 @@ test('projects can be filtered by search city program owner and status', functio
     $secondOwner = insertHrEmployee(firstNameEn: 'Omar', lastNameEn: 'Khalil', firstNameAr: 'عمر', lastNameAr: 'خليل');
     $aleppo = insertHrCity('Aleppo');
     $homs = insertHrCity('Homs');
-    $water = Program::factory()->create(['name' => 'Water Security']);
-    $shelter = Program::factory()->create(['name' => 'Safe Shelter']);
+    $water = Program::factory()->create(['name_en' => 'Water Security']);
+    $shelter = Program::factory()->create(['name_en' => 'Safe Shelter']);
 
     Project::factory()->active()->create(['name' => 'Aleppo Wells', 'city_id' => $aleppo, 'program_id' => $water->id, 'user_id' => $firstOwner]);
     Project::factory()->closed()->create(['name' => 'Homs Shelter', 'city_id' => $homs, 'program_id' => $shelter->id, 'user_id' => $secondOwner]);
@@ -56,8 +56,8 @@ test('projects can be filtered by strategy across every one of its programs', fu
     $user = User::factory()->role('General Manager')->create();
     $waterStrategy = Strategy::factory()->create();
     $otherStrategy = Strategy::factory()->create();
-    $water = Program::factory()->create(['name' => 'Water Security', 'strategy_id' => $waterStrategy->id]);
-    $shelter = Program::factory()->create(['name' => 'Safe Shelter', 'strategy_id' => $otherStrategy->id]);
+    $water = Program::factory()->create(['name_en' => 'Water Security', 'strategy_id' => $waterStrategy->id]);
+    $shelter = Program::factory()->create(['name_en' => 'Safe Shelter', 'strategy_id' => $otherStrategy->id]);
 
     Project::factory()->create(['name' => 'Aleppo Wells', 'program_id' => $water->id]);
     Project::factory()->create(['name' => 'Homs Shelter', 'program_id' => $shelter->id]);
@@ -520,7 +520,9 @@ test('the project directory renders within its query budget', function () {
     // + the sector filter's options and the list preview's sector eager load (T34).
     // + one read of the HR centers lookup for the «Center inactive» badge (W-02), flat however many rows.
     // + one load of the linked proposals' statuses for the funding badge (T08).
-    expect($queries)->toBeLessThanOrEqual(25);
+    // + one read of the program name lookup, which W-34b moved from the HR
+    //   connection onto ours (D-68); flat however many projects are listed.
+    expect($queries)->toBeLessThanOrEqual(26);
 });
 
 test('a list preview names only the relations a project has and flags a materialised risk', function () {

@@ -101,7 +101,7 @@ test('an empty box offers example questions', function () {
 });
 
 test('names find programs, which open their own page', function () {
-    $program = Program::factory()->create(['name' => 'Aleppo Relief']);
+    $program = Program::factory()->create(['name_en' => 'Aleppo Relief']);
 
     $group = collect(askAs(User::factory()->role('General Manager')->create(), 'aleppo relief')['groups'])->firstWhere('name', 'Programs');
 

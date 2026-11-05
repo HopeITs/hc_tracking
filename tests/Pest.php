@@ -147,7 +147,7 @@ function insertStrategy(): int
 function insertProgram(int $strategyId, int $managerId, string $name = 'WASH'): int
 {
     return Program::factory()->create([
-        'name' => $name,
+        'name_en' => $name,
         'strategy_id' => $strategyId,
         'manager_id' => $managerId,
     ])->id;

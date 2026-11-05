@@ -14,7 +14,7 @@
                 <x-ui.form-select wire:model.live="copySourceId" :label="__('results_framework.copy_framework_source')" :placeholder="__('results_framework.copy_framework_choose')" required>
                     @foreach ($this->copySources as $source)
                         <option value="{{ $source['id'] }}" data-test="copy-source-option-{{ $source['id'] }}">
-                            {{ Str::limit($source['statement'], 70) }} · {{ $source['type']->label() }}@if ($source['program_id'] !== null) · {{ \App\Models\HrProgram::nameOf($source['program_id']) }}@endif
+                            {{ Str::limit($source['statement'], 70) }} · {{ $source['type']->label() }}@if ($source['program_id'] !== null) · {{ \App\Models\Program::nameOf($source['program_id']) }}@endif
                         </option>
                     @endforeach
                 </x-ui.form-select>

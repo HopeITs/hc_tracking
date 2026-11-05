@@ -11,7 +11,6 @@ use App\Enums\IndicatorCollector;
 use App\Enums\IndicatorMeasure;
 use App\Enums\ResultType;
 use App\Models\Activity;
-use App\Models\HrProgram;
 use App\Models\Indicator;
 use App\Models\LibraryIndicator;
 use App\Models\Program;
@@ -322,27 +321,27 @@ class ImportProgramFramework extends Command
     }
 
     /**
-     * Whether the program's HR code is the file's and no other program has
-     * it (D-10a); prints why not.
+     * Whether the program's code is the file's and no other program has it
+     * (D-10a); prints why not. The code is tracking's own since W-34b (D-68).
      */
     private function programCodeMatches(string $fileCode): bool
     {
-        $code = trim((string) HrProgram::query()->whereKey($this->programId)->value('code'));
+        $code = Program::codeOf($this->programId);
 
         if ($code === '') {
-            $this->error("Program {$this->programId} is not in HR or has no code there.");
+            $this->error("Program {$this->programId} does not exist or has no code.");
 
             return false;
         }
 
         if ($code !== $fileCode) {
-            $this->error("Program {$this->programId} has the HR code {$code}, but the file is for program code {$fileCode}.");
+            $this->error("Program {$this->programId} has the code {$code}, but the file is for program code {$fileCode}.");
 
             return false;
         }
 
-        if (HrProgram::query()->where('code', $code)->count() > 1) {
-            $this->error("HR program code {$code} is used by more than one program. Ask the HR team to fix it, then run this again.");
+        if (Program::query()->where('code', $code)->count() > 1) {
+            $this->error("Program code {$code} is used by more than one program. Fix it on the Programs page, then run this again.");
 
             return false;
         }
@@ -359,10 +358,6 @@ class ImportProgramFramework extends Command
      */
     private function import(array $nodes): array
     {
-        if (! Program::query()->whereKey($this->programId)->exists()) {
-            Program::syncFromHr();
-        }
-
         $existingIds = Result::query()->programFramework()->where('program_id', $this->programId)->orderBy('id')->pluck('id')->all();
 
         foreach (LibraryIndicator::query()->where('program_id', $this->programId)->orderBy('id')->get() as $entry) {

@@ -26,7 +26,8 @@ const PillarHrPrograms = [
 ];
 
 /**
- * Insert the HR programs above under their real ids.
+ * Insert the programs above under their real ids, in tracking (which owns
+ * them since W-34b) and in HR (whose names the command's report still quotes).
  */
 function insertPillarHrPrograms(): void
 {
@@ -38,15 +39,28 @@ function insertPillarHrPrograms(): void
             'slug' => "program-{$id}",
             'is_active' => true,
         ]);
+
+        trackedProgram($id);
     }
 }
 
 /**
- * The tracking row of an HR program, created without a strategy.
+ * The tracking row of a program, by default with no strategy and no pillar.
  */
 function trackedProgram(int $id, ?int $strategyId = null, ?int $pillarId = null): void
 {
-    DB::table('programs')->insert(['id' => $id, 'strategy_id' => $strategyId, 'strategic_pillar_id' => $pillarId, 'created_at' => now(), 'updated_at' => now()]);
+    DB::table('programs')->updateOrInsert(
+        ['id' => $id],
+        [
+            'name_en' => PillarHrPrograms[$id] ?? 'Program '.$id,
+            'code' => sprintf('%03d', $id),
+            'slug' => "program-{$id}",
+            'strategy_id' => $strategyId,
+            'strategic_pillar_id' => $pillarId,
+            'created_at' => now(),
+            'updated_at' => now(),
+        ],
+    );
 }
 
 /**
@@ -131,13 +145,14 @@ test('a second run changes nothing', function () {
 test('a dry run writes nothing', function () {
     insertPillarHrPrograms();
     $strategy = Strategy::factory()->create();
+    $programs = DB::table('programs')->orderBy('id')->get()->toArray();
 
     $this->artisan('strategy:import-pillars', ['file' => StrategyPillarsFile, '--strategy' => $strategy->id, '--dry-run' => true])
         ->expectsOutputToContain('P1')
         ->assertSuccessful();
 
     expect(DB::table('strategic_pillars')->count())->toBe(0)
-        ->and(DB::table('programs')->count())->toBe(0);
+        ->and(DB::table('programs')->orderBy('id')->get()->toArray())->toEqual($programs);
 });
 
 test('an unknown strategy stops the run', function () {

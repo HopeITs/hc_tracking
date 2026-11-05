@@ -3,8 +3,8 @@
 namespace Database\Seeders;
 
 use App\Enums\ProjectStatus;
-use App\Models\Program;
 use App\Models\Project;
+use App\Support\ProgramImport;
 use Database\Seeders\Concerns\PicksHrRecords;
 use Illuminate\Database\Seeder;
 
@@ -21,8 +21,8 @@ use Illuminate\Database\Seeder;
  * or with every other real seeder, in dependency order, via RealDataSeeder.
  *
  * `city_id` and `program_id` are real HR ids, not demo ones — see the HR
- * note in .ai/rules/models.md. `Program::syncFromHr()` mirrors the programs
- * table first so the local FK on `program_id` is satisfiable. `user_id` has
+ * note in .ai/rules/models.md. `ProgramImport` brings the programs
+ * over from HR first so the local FK on `program_id` is satisfiable. `user_id` has
  * no source data (the list has no owner per project) and the column is
  * NOT NULL, so every row is assigned the first active HR employee.
  *
@@ -35,7 +35,7 @@ class RealProjectsSeeder extends Seeder
 
     public function run(): void
     {
-        Program::syncFromHr();
+        app(ProgramImport::class)->apply();
 
         $ownerId = $this->hrEmployeeIds()->first();
 

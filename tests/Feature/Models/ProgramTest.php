@@ -36,9 +36,9 @@ test('a program has its projects, annual plans and results', function () {
 });
 
 test('programs sort by their hr name in either direction', function () {
-    $shelter = Program::factory()->create(['name' => 'Shelter']);
-    $health = Program::factory()->create(['name' => 'Health']);
-    $wash = Program::factory()->create(['name' => 'WASH']);
+    $shelter = Program::factory()->create(['name_en' => 'Shelter']);
+    $health = Program::factory()->create(['name_en' => 'Health']);
+    $wash = Program::factory()->create(['name_en' => 'WASH']);
 
     $ascending = Program::query()->orderByName()->pluck('id')->all();
     $descending = Program::query()->orderByName('desc')->pluck('id')->all();

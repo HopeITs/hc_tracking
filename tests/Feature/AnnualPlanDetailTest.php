@@ -20,7 +20,7 @@ test('guests are redirected from annual plan detail', function () {
 test('annual plan detail shows the plan its program manager and year', function () {
     $user = User::factory()->role('General Manager')->create();
     $manager = insertHrEmployee(firstNameEn: 'Layla', lastNameEn: 'Haddad');
-    $program = Program::factory()->create(['name' => 'Water Security']);
+    $program = Program::factory()->create(['name_en' => 'Water Security']);
     $plan = AnnualPlan::factory()->create([
         'program_id' => $program->id,
         'manager_id' => $manager,

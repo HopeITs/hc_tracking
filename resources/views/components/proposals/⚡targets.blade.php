@@ -8,7 +8,6 @@ use App\Enums\IndicatorMeasure;
 use App\Livewire\Concerns\IndicatorLibrary\ManagesLibraryEntryForm;
 use App\Models\HrCenter;
 use App\Models\HrCity;
-use App\Models\HrProgram;
 use App\Models\Indicator;
 use App\Models\LibraryIndicator;
 use App\Models\PlanIndicator;
@@ -386,7 +385,7 @@ new class extends Component {
             $groups[] = [
                 'key' => $programId === null ? 'institutional' : (string) $programId,
                 'programId' => $programId,
-                'label' => $programId === null ? __('targets.institutional_indicators') : HrProgram::nameOf($programId),
+                'label' => $programId === null ? __('targets.institutional_indicators') : Program::nameOf($programId),
                 'levels' => collect(['G', 'CC', 'OC', 'OP', 'AC'])
                     ->map(fn (string $kind): array => [
                         'kind' => $kind,

@@ -7,7 +7,7 @@ return [
     'measure_locked' => 'The measure cannot change because this indicator has targets.',
     'in_use' => 'This indicator is in use. Deactivate it instead.',
     'follow_up_months_required' => 'Enter after how many months the follow-up is measured.',
-    'program_code_duplicated' => "This program's code is duplicated in HR. Ask the HR team to fix it.",
+    'program_code_duplicated' => "This program's code is used by another program as well. Fix it on the Programs page first.",
     'code_frozen' => 'The program and level cannot change because this indicator is in use.',
     'stale' => 'Someone else changed this indicator. Reload the page and try again.',
 

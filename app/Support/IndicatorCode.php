@@ -4,8 +4,8 @@ declare(strict_types=1);
 
 namespace App\Support;
 
-use App\Models\HrProgram;
 use App\Models\LibraryIndicator;
+use App\Models\Program;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
 use LogicException;
@@ -60,20 +60,22 @@ final class IndicatorCode
     }
 
     /**
-     * The HR code of a program, refused when HR has given it to another
-     * program as well (D-10a): codes must be unique across the organisation.
+     * The code of a program, refused when another program carries it as well
+     * (D-10a): codes must be unique across the organisation.
+     *
+     * The code came from HR until W-34b (D-68) and is now ours.
      *
      * @throws ValidationException
      */
     private static function programCode(int $programId): string
     {
-        $code = trim((string) HrProgram::query()->whereKey($programId)->value('code'));
+        $code = Program::codeOf($programId);
 
         if ($code === '') {
             throw ValidationException::withMessages(['program_id' => __('indicator_library.program_required')]);
         }
 
-        if (HrProgram::query()->where('code', $code)->count() > 1) {
+        if (Program::query()->where('code', $code)->count() > 1) {
             throw ValidationException::withMessages(['program_id' => __('indicator_library.program_code_duplicated')]);
         }
 

@@ -161,10 +161,6 @@ class ImportStrategyPillars extends Command
         $hrIds = array_filter(array_column(array_merge(...array_column($pillars, 'programs')), 'hr_program_id'));
         $hrNames = HrProgram::query()->whereKey($hrIds)->pluck('name', 'id')->map(fn (mixed $name): string => trim((string) $name))->all();
 
-        if (Program::query()->whereKey(array_keys($hrNames))->count() < count($hrNames)) {
-            Program::syncFromHr();
-        }
-
         $programs = Program::query()->whereKey(array_keys($hrNames))->lockForUpdate()->orderBy('id')->get()->keyBy('id');
 
         foreach ($pillars as $index => $source) {

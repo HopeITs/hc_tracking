@@ -22,7 +22,7 @@ test('strategy detail shows the strategy its period and its programs', function 
         'end_year' => 2030,
     ]);
     Program::factory()->create([
-        'name' => 'Water Security',
+        'name_en' => 'Water Security',
         'strategy_id' => $strategy->id,
         'manager_id' => $manager,
     ]);
@@ -41,8 +41,8 @@ test('strategy detail does not show another strategy programs', function () {
     $subject = Strategy::factory()->create(['name' => 'Country Strategy']);
     $other = Strategy::factory()->create(['name' => 'Regional Strategy']);
 
-    Program::factory()->create(['name' => 'Water Security', 'strategy_id' => $subject->id]);
-    Program::factory()->create(['name' => 'Safe Shelter', 'strategy_id' => $other->id]);
+    Program::factory()->create(['name_en' => 'Water Security', 'strategy_id' => $subject->id]);
+    Program::factory()->create(['name_en' => 'Safe Shelter', 'strategy_id' => $other->id]);
 
     $this->actingAs($user)
         ->get(route('strategies.show', $subject))
@@ -65,7 +65,7 @@ test('strategy detail renders a strategy with no programs', function () {
 test('plan coverage is the share of the strategy span with an annual plan carrying a committed target, capped at 100', function () {
     $user = User::factory()->role('General Manager')->create();
     $strategy = Strategy::factory()->create(['start_year' => 2026, 'end_year' => 2029]);
-    $program = Program::factory()->create(['name' => 'Water Security', 'strategy_id' => $strategy->id]);
+    $program = Program::factory()->create(['name_en' => 'Water Security', 'strategy_id' => $strategy->id]);
 
     // 2 of the 4 span years covered (2027 is outside the span and must not count).
     $covered2026 = AnnualPlan::factory()->create(['program_id' => $program->id, 'year' => 2026]);
@@ -99,8 +99,8 @@ test('an annual plan with no committed indicator targets does not count toward c
 test('each program row shows its own covered-years fraction and tones the bar accordingly', function () {
     $user = User::factory()->role('General Manager')->create();
     $strategy = Strategy::factory()->create(['start_year' => 2026, 'end_year' => 2027]);
-    $uncovered = Program::factory()->create(['name' => 'Uncovered Program', 'strategy_id' => $strategy->id]);
-    $fullyCovered = Program::factory()->create(['name' => 'Fully Covered Program', 'strategy_id' => $strategy->id]);
+    $uncovered = Program::factory()->create(['name_en' => 'Uncovered Program', 'strategy_id' => $strategy->id]);
+    $fullyCovered = Program::factory()->create(['name_en' => 'Fully Covered Program', 'strategy_id' => $strategy->id]);
 
     $plan2026 = AnnualPlan::factory()->create(['program_id' => $fullyCovered->id, 'year' => 2026]);
     $plan2027 = AnnualPlan::factory()->create(['program_id' => $fullyCovered->id, 'year' => 2027]);
@@ -133,8 +133,8 @@ test('the strategy detail stat tiles each carry an icon badge', function () {
 test('the strategy detail programs table sorts by projects descending', function () {
     $user = User::factory()->role('General Manager')->create();
     $strategy = Strategy::factory()->create();
-    $fewer = Program::factory()->create(['name' => 'Fewer Projects Program', 'strategy_id' => $strategy->id]);
-    $more = Program::factory()->create(['name' => 'More Projects Program', 'strategy_id' => $strategy->id]);
+    $fewer = Program::factory()->create(['name_en' => 'Fewer Projects Program', 'strategy_id' => $strategy->id]);
+    $more = Program::factory()->create(['name_en' => 'More Projects Program', 'strategy_id' => $strategy->id]);
     Project::factory()->count(3)->create(['program_id' => $more->id]);
     Project::factory()->count(1)->create(['program_id' => $fewer->id]);
 
@@ -147,7 +147,7 @@ test('the strategy detail programs table sorts by projects descending', function
 test('the strategy detail programs table paginates at 15 rows and totals reflect every program', function () {
     $user = User::factory()->role('General Manager')->create();
     $strategy = Strategy::factory()->create(['start_year' => 2026, 'end_year' => 2026]);
-    $programs = Program::factory()->count(17)->sequence(fn ($sequence) => ['name' => 'Program '.str_pad((string) ($sequence->index + 1), 2, '0', STR_PAD_LEFT)])->create(['strategy_id' => $strategy->id]);
+    $programs = Program::factory()->count(17)->sequence(fn ($sequence) => ['name_en' => 'Program '.str_pad((string) ($sequence->index + 1), 2, '0', STR_PAD_LEFT)])->create(['strategy_id' => $strategy->id]);
     $row = fn (int $index): string => 'wire:key="strategy-program-'.$programs[$index]->id.'"';
 
     // The Pillars section above lists every program (T32), so pages are told apart by the table rows.

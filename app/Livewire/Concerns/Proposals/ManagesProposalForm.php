@@ -12,8 +12,8 @@ use App\Enums\MediaCollection;
 use App\Enums\ProposalStatus;
 use App\Models\Donor;
 use App\Models\HrCenter;
-use App\Models\HrProgram;
 use App\Models\Milestone;
+use App\Models\Program;
 use App\Models\Project;
 use App\Models\Proposal;
 use App\Models\Result;
@@ -728,7 +728,7 @@ trait ManagesProposalForm
     private function programName(int $programId): string
     {
         try {
-            $name = HrProgram::nameOf($programId);
+            $name = Program::nameOf($programId);
         } catch (QueryException) {
             $name = '';
         }

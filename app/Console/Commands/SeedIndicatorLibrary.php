@@ -10,9 +10,9 @@ use App\Enums\IndicatorCollector;
 use App\Enums\IndicatorMeasure;
 use App\Enums\ResultType;
 use App\Models\Activity;
-use App\Models\HrProgram;
 use App\Models\Indicator;
 use App\Models\LibraryIndicator;
+use App\Models\Program;
 use App\Models\Result;
 use App\Support\ArabicText;
 use App\Support\IndicatorCode;
@@ -321,15 +321,15 @@ class SeedIndicatorLibrary extends Command
             return [];
         }
 
-        $hrPrograms = HrProgram::query()->get(['id', 'code', 'name']);
-        $programsByCode = $hrPrograms->groupBy(fn (HrProgram $program): string => trim((string) $program->code));
+        $programsByCode = Program::query()->toBase()->get(['id', 'code', 'name_en'])
+            ->groupBy(fn (object $program): string => trim((string) $program->code));
         $problems = [];
 
         foreach ($needed as $programId) {
-            $code = trim((string) $hrPrograms->firstWhere('id', $programId)?->code);
+            $code = Program::codeOf($programId);
 
             if ($code === '') {
-                $problems[$programId] = "Program {$programId} has no code in HR.";
+                $problems[$programId] = "Program {$programId} does not exist or has no code.";
 
                 continue;
             }
@@ -337,8 +337,8 @@ class SeedIndicatorLibrary extends Command
             $sharing = $programsByCode->get($code);
 
             if ($sharing !== null && $sharing->count() > 1) {
-                $names = $sharing->map(fn (HrProgram $program): string => "{$program->id} ".trim($program->name))->implode(', ');
-                $problems[$programId] = "HR program code {$code} is used by more than one program: {$names}.";
+                $names = $sharing->map(fn (object $program): string => "{$program->id} ".trim((string) $program->name_en))->implode(', ');
+                $problems[$programId] = "Program code {$code} is used by more than one program: {$names}.";
             }
         }
 
@@ -361,7 +361,7 @@ class SeedIndicatorLibrary extends Command
             $serials[($row->program_id ?? 'none').'|'.$row->level_ref] = (int) $row->top_serial;
         }
 
-        $hrCodes = HrProgram::query()
+        $programCodes = Program::query()
             ->whereIn('id', array_filter(array_column($groups, 'programId')))
             ->pluck('code', 'id')
             ->map(fn (mixed $code): string => trim((string) $code))
@@ -380,7 +380,7 @@ class SeedIndicatorLibrary extends Command
 
             $slot = ($group['programId'] ?? 'none').'|'.$group['levelRef'];
             $serials[$slot] = ($serials[$slot] ?? 0) + 1;
-            $prefix = $group['programId'] === null ? IndicatorCode::Institutional : $hrCodes[$group['programId']];
+            $prefix = $group['programId'] === null ? IndicatorCode::Institutional : $programCodes[$group['programId']];
             $groups[$index]['code'] = "{$prefix}.{$group['levelRef']}.{$serials[$slot]}";
         }
 

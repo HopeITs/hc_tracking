@@ -19,7 +19,7 @@ test('program managers get their program digest and the general manager the whol
     $manager = userWithRole('Managers', $managerEmployee);
     $generalManager = userWithRole('General Manager');
     Activity::withoutRecording(function () use ($managerEmployee): void {
-        $program = Program::factory()->create(['manager_id' => $managerEmployee, 'name' => 'WASH']);
+        $program = Program::factory()->create(['manager_id' => $managerEmployee, 'name_en' => 'WASH']);
         $project = Project::factory()->create(['program_id' => $program->id, 'end_date' => '2027-12-31']);
         $milestone = Milestone::factory()->create(['project_id' => $project->id, 'planned_end_date' => '2027-12-31']);
         Task::factory()->create(['source_type' => 'milestone', 'source_id' => $milestone->id, 'due_date' => '2026-09-15']);

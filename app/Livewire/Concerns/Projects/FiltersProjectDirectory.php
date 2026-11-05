@@ -8,7 +8,7 @@ use App\Enums\MilestoneStatus;
 use App\Enums\ProjectStatus;
 use App\Models\HrCity;
 use App\Models\HrEmployee;
-use App\Models\HrProgram;
+use App\Models\Program;
 use App\Models\Project;
 use App\Models\Sector;
 use App\Support\Like;
@@ -231,7 +231,7 @@ trait FiltersProjectDirectory
                     $query
                         ->where('name', 'like', Like::contains($search))
                         ->orWhereIn('city_id', $matches['cities'])
-                        ->orWhereIn('program_id', HrProgram::idsMatchingName($search))
+                        ->orWhereIn('program_id', Program::idsMatchingName($search))
                         ->orWhereIn('user_id', $matches['owners']);
                 });
             })

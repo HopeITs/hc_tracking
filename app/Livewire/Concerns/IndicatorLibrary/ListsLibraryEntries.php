@@ -4,8 +4,8 @@ declare(strict_types=1);
 
 namespace App\Livewire\Concerns\IndicatorLibrary;
 
-use App\Models\HrProgram;
 use App\Models\LibraryIndicator;
+use App\Models\Program;
 use App\Support\ArabicText;
 use App\Support\Like;
 use Illuminate\Database\Eloquent\Builder;
@@ -61,7 +61,7 @@ trait ListsLibraryEntries
     #[Computed]
     public function entries(): Collection
     {
-        $programOrder = array_flip(HrProgram::idsOrderedByName());
+        $programOrder = array_flip(Program::idsOrderedByName());
 
         return LibraryIndicator::query()
             ->withCount('indicators')
@@ -127,7 +127,7 @@ trait ListsLibraryEntries
      */
     public function pagedGroups(): BaseCollection
     {
-        $names = HrProgram::namesById();
+        $names = Program::namesById();
 
         return collect($this->pagedEntries->items())
             ->groupBy(fn (LibraryIndicator $entry): string => $entry->program_id === null ? 'institutional' : (string) $entry->program_id)
@@ -147,9 +147,9 @@ trait ListsLibraryEntries
     public function programFilterOptions(): array
     {
         $used = $this->entries->pluck('program_id')->filter()->unique()->flip();
-        $names = HrProgram::namesById();
+        $names = Program::namesById();
 
-        return collect(HrProgram::idsOrderedByName())
+        return collect(Program::idsOrderedByName())
             ->filter(fn (int $id): bool => $used->has($id))
             ->mapWithKeys(fn (int $id): array => [$id => $names[$id]])
             ->all();

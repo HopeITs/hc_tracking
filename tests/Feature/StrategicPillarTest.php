@@ -170,8 +170,8 @@ describe('authorization', function () {
 describe('the strategy page', function () {
     it('lists the pillars with their programs and the programs without a pillar', function () {
         $pillar = StrategicPillar::factory()->for($this->strategy)->create(['code' => 'P1', 'name_en' => 'Economic empowerment']);
-        Program::factory()->create(['name' => 'Alpha Program', 'strategy_id' => $this->strategy->id, 'strategic_pillar_id' => $pillar->id]);
-        Program::factory()->create(['name' => 'Loose Program', 'strategy_id' => $this->strategy->id]);
+        Program::factory()->create(['name_en' => 'Alpha Program', 'strategy_id' => $this->strategy->id, 'strategic_pillar_id' => $pillar->id]);
+        Program::factory()->create(['name_en' => 'Loose Program', 'strategy_id' => $this->strategy->id]);
 
         strategyPage($this->manager, $this->strategy)
             ->assertSee('Economic empowerment')

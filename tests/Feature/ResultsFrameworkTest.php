@@ -23,7 +23,7 @@ test('guests are redirected from the results framework', function () {
 
 test('results render as a nested logframe grouped by program', function () {
     $user = User::factory()->role('General Manager')->create();
-    $program = Program::factory()->create(['name' => 'Water Security']);
+    $program = Program::factory()->create(['name_en' => 'Water Security']);
 
     $impact = Result::factory()->create([
         'program_id' => $program->id,
@@ -80,7 +80,7 @@ test('results can be filtered by program and type', function () {
 
 test('a program with a purely numeric name does not break either view', function () {
     $user = User::factory()->role('General Manager')->create();
-    $program = Program::factory()->create(['name' => '2024']);
+    $program = Program::factory()->create(['name_en' => '2024']);
 
     Result::factory()->create([
         'program_id' => $program->id,
@@ -557,7 +557,7 @@ test('a target reads its achievement from approved reports only, and an unmeasur
 
 test('each proposal framework reads as its own group after the program groups', function () {
     $user = User::factory()->role('General Manager')->create();
-    $program = Program::factory()->create(['name' => 'Water Security']);
+    $program = Program::factory()->create(['name_en' => 'Water Security']);
     $proposal = Proposal::factory()->create(['name' => 'Dry Season Response']);
     Result::factory()->type(ResultType::Impact)->create(['program_id' => $program->id, 'statement' => 'Program-level impact.']);
     $proposalOutput = Result::factory()->type(ResultType::Output)->create(['program_id' => $program->id, 'proposal_id' => $proposal->id, 'statement' => 'Proposal-level output.']);
@@ -660,7 +660,7 @@ test('the results page holds a flat query count across both kinds of framework',
 
 describe('the create deep link (T14)', function () {
     beforeEach(function () {
-        $this->program = Program::factory()->create(['name' => 'Water Security']);
+        $this->program = Program::factory()->create(['name_en' => 'Water Security']);
         $this->deepLink = fn (User $user, array $query) => Livewire::withQueryParams($query)->actingAs($user)->test('pages::results.index');
     });
 

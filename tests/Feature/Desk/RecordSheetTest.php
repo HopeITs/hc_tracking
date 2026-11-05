@@ -29,7 +29,7 @@ test('the register behind the sheet is inert so only the sheet takes focus', fun
 });
 
 test('a program opens as its own page, not a sheet over the projects register', function () {
-    $program = Program::factory()->create(['name' => 'Children University']);
+    $program = Program::factory()->create(['name_en' => 'Children University']);
 
     $this->actingAs(User::factory()->role('Super Admin')->create())
         ->get(route('programs.show', $program))

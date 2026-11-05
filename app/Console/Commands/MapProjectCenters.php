@@ -8,6 +8,7 @@ use App\Models\HrCenter;
 use App\Models\HrCity;
 use App\Models\HrPosition;
 use App\Models\HrProgram;
+use App\Models\Program;
 use App\Models\Project;
 use Illuminate\Console\Command;
 use Illuminate\Support\Collection;
@@ -63,7 +64,7 @@ class MapProjectCenters extends Command
         $centers = HrCenter::query()->toBase()->get(['id', 'name_en', 'city_id', 'is_active'])->keyBy('id');
         $centerIdsByCityAndProgram = $this->centerIdsByCityAndProgram($centers);
         $cityNames = HrCity::query()->toBase()->pluck('name_en', 'id');
-        $programNames = HrProgram::namesById();
+        $programNames = Program::namesById();
 
         $projects = Project::query()->orderBy('id')->get(['id', 'name', 'status', 'city_id', 'center_id', 'host_center_id', 'program_id']);
 
