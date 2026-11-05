@@ -41,6 +41,8 @@ return [
     'transfers' => 'Transfers',
     'user_directory' => 'User Directory',
     'activity_log' => 'Activity Log',
+    'ai_usage' => 'AI results',
+    'ai_features' => 'AI features',
     'notification_rules' => 'Notification Rules',
     'notifications' => 'Notifications',
     'my_reviews' => 'My Reviews',

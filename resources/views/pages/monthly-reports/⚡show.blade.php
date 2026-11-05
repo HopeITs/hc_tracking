@@ -1,5 +1,7 @@
 <?php
 
+use App\Livewire\Concerns\MonthlyReports\ChecksMonthlyReportQuality;
+use App\Livewire\Concerns\MonthlyReports\DraftsMonthlyReportNarrative;
 use App\Livewire\Concerns\MonthlyReports\EditsMonthlyReportActivities;
 use App\Livewire\Concerns\MonthlyReports\EditsMonthlyReportLines;
 use App\Livewire\Concerns\MonthlyReports\ManagesMonthlyReportFiles;
@@ -12,6 +14,8 @@ use Livewire\Attributes\Title;
 use Livewire\Component;
 
 new #[Layout('layouts::desk'), Title('titles.monthly_report')] class extends Component {
+    use ChecksMonthlyReportQuality;
+    use DraftsMonthlyReportNarrative;
     use EditsMonthlyReportActivities;
     use EditsMonthlyReportLines;
     use ManagesMonthlyReportFiles;
@@ -67,6 +71,8 @@ new #[Layout('layouts::desk'), Title('titles.monthly_report')] class extends Com
     @include('pages.monthly-reports._show-activities')
 
     @include('pages.monthly-reports._show-answers')
+
+    @include('pages.monthly-reports._show-checks')
 
     @include('pages.monthly-reports._show-actionbar')
 

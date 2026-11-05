@@ -2,6 +2,7 @@
 
 use App\Models\Account;
 use App\Models\Activity;
+use App\Models\AiDraft;
 use App\Models\AiRequest;
 use App\Models\DonorProposal;
 use App\Models\FundingAgreementInstallment;
@@ -64,6 +65,7 @@ use Illuminate\Support\Facades\Gate;
 function modelsGuardedWithoutPolicy(): array
 {
     return [
+        AiDraft::class => ['reports', 'An AI-drafted answer: written and rated only from its monthly report page, under MonthlyReportPolicy::update.'],
         AiRequest::class => ['ai', 'The AI usage ledger: written only by App\Support\Ai\AiGateway, read only under ai.view-usage.'],
         Account::class => ['accounts', 'accounts.* permissions on the admin accounts page and the transfer forms.'],
         Activity::class => ['activity-log', 'The global log needs activity-log.view; a record\'s own Activity tab follows that record\'s page.'],

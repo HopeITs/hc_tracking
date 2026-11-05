@@ -2,6 +2,7 @@
 
 use App\Enums\ActivityKind;
 use App\Enums\ActivityStatus;
+use App\Enums\AiDraftRating;
 use App\Enums\CollectionFrequency;
 use App\Enums\DenominatorBasis;
 use App\Enums\DonorAttribution;
@@ -12,8 +13,11 @@ use App\Enums\NarrativeQuestionFrequency;
 use App\Enums\ProposalStatus;
 use App\Enums\ReopenRequestStatus;
 use App\Enums\ResultType;
+use App\Jobs\RunAiPrompt;
 use App\Models\Activity;
 use App\Models\ActivitySchedule;
+use App\Models\AiDraft;
+use App\Models\AiRequest;
 use App\Models\Donor;
 use App\Models\EvidenceType;
 use App\Models\Indicator;
@@ -36,10 +40,14 @@ use App\Models\ReportTemplateLine;
 use App\Models\ReportTemplateQuestion;
 use App\Models\Result;
 use App\Models\User;
+use App\Support\Ai\Agents\MonthlyNarrativeDrafter;
+use App\Support\Ai\AiGateway;
 use Carbon\CarbonImmutable;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Queue;
 use Illuminate\Support\Facades\Storage;
 use Livewire\Livewire;
+use Spatie\Permission\PermissionRegistrar;
 
 /*
 | The Monthly Report page (T17B slice 1; contracts §13, §13.1 items 2, 6, 7
@@ -706,4 +714,196 @@ test('the progress line counts what the preparer filled and lists what is still 
         ->assertSeeText(__('monthly_reports.progress_done', ['done' => 3, 'total' => 3]))
         ->assertSeeText(__('monthly_reports.all_done'))
         ->assertDontSeeHtml('data-still-needed');
+});
+
+/*
+| Draft with AI (AI trial, step 5): the narrative drafter fills only the
+| answers left empty, from this month's facts, and saves them like typed ones.
+*/
+
+function mrsQuestions(Project $project): array
+{
+    $template = Activity::withoutRecording(fn (): ReportTemplate => ReportTemplate::factory()->confirmed()->create(['project_id' => $project->id]));
+
+    return [
+        ReportTemplateQuestion::factory()->create(['report_template_id' => $template->id, 'text_en' => 'What went well?']),
+        ReportTemplateQuestion::factory()->create(['report_template_id' => $template->id, 'text_en' => 'What was difficult?']),
+    ];
+}
+
+/**
+ * Run the draft job the page queued, with the drafter answering $answers.
+ *
+ * @param  list<array{question_id: int, answer: string}>|string  $answers
+ */
+function mrsRunQueuedDraft(array|string $answers): void
+{
+    MonthlyNarrativeDrafter::fake([is_string($answers) ? $answers : json_encode(['answers' => $answers])]);
+
+    Queue::pushed(RunAiPrompt::class)->each(fn (RunAiPrompt $job) => $job->handle(app(AiGateway::class)));
+}
+
+test('Draft with AI is offered to the preparer of a draft only', function () {
+    $project = mrsProject();
+    mrsQuestions($project);
+    $draft = mrsReport($project);
+
+    mrsPage($draft)->assertSeeText(__('monthly_reports.ai_draft'));
+    mrsPage(mrsReport($project, '2026-09-01', MonthlyReportStatus::Submitted))->assertDontSeeText(__('monthly_reports.ai_draft'));
+
+    $this->owner->roles->first()->revokePermissionTo('ai.draft');
+    app(PermissionRegistrar::class)->forgetCachedPermissions();
+
+    mrsPage($draft)->assertDontSeeText(__('monthly_reports.ai_draft'));
+});
+
+test('the draft is queued with this month\'s facts and fills only the empty answers', function () {
+    Queue::fake();
+    $project = mrsProject();
+    [$wentWell, $difficult] = mrsQuestions($project);
+    $report = mrsReport($project);
+    mrsLine($report, ['code' => 'P1.1', 'name_en' => 'Children reached']);
+
+    $page = mrsPage($report)
+        ->set('answers.'.$difficult->id, 'Fuel shortages.')
+        ->call('draftNarrativeWithAi')
+        ->assertSeeText(__('monthly_reports.ai_drafting'));
+
+    Queue::assertPushedOn('ai', RunAiPrompt::class, fn (RunAiPrompt $job): bool => $job->feature === 'monthly-report-narrative'
+        && str_contains($job->prompt, 'Hope Center Aleppo')
+        && str_contains($job->prompt, 'P1.1')
+        && str_contains($job->prompt, "{$wentWell->id}: What went well?"));
+
+    mrsRunQueuedDraft([
+        ['question_id' => $wentWell->id, 'answer' => 'Sessions ran as planned.'],
+        ['question_id' => $difficult->id, 'answer' => 'AI text that must not replace the officer\'s.'],
+    ]);
+
+    $page->call('collectAiDraft')
+        ->assertDispatched('toast-show', mrsToast(trans_choice('monthly_reports.ai_draft_filled', 1, ['count' => 1])))
+        ->assertSet('answers.'.$wentWell->id, 'Sessions ran as planned.')
+        ->assertSet('answers.'.$difficult->id, 'Fuel shortages.')
+        ->assertSet('aiDraftKey', null);
+
+    expect(MonthlyReportAnswer::query()->pluck('answer', 'report_template_question_id')->all())->toEqual([
+        $wentWell->id => 'Sessions ran as planned.',
+        $difficult->id => 'Fuel shortages.',
+    ]);
+
+    $draft = AiDraft::query()->sole();
+    expect($draft->drafted_text)->toBe('Sessions ran as planned.')
+        ->and($draft->answer->report_template_question_id)->toBe($wentWell->id)
+        ->and($draft->ai_request_id)->toBe(AiRequest::query()->sole()->id)
+        ->and($draft->user_id)->toBe($this->owner->id)
+        ->and($draft->rating)->toBeNull();
+});
+
+test('the officer rates a drafted answer once; answers they wrote get no rating', function () {
+    Queue::fake();
+    $project = mrsProject();
+    [$wentWell, $difficult] = mrsQuestions($project);
+    $page = mrsPage(mrsReport($project))
+        ->set('answers.'.$difficult->id, 'Fuel shortages.')
+        ->call('draftNarrativeWithAi');
+
+    mrsRunQueuedDraft([['question_id' => $wentWell->id, 'answer' => 'Sessions ran as planned.']]);
+
+    $page->call('collectAiDraft')
+        ->assertSeeText(__('monthly_reports.ai_draft_ask'))
+        ->assertSeeHtml('data-ai-draft-rating="'.$wentWell->id.'"')
+        ->assertDontSeeHtml('data-ai-draft-rating="'.$difficult->id.'"')
+        ->call('rateAiDraft', $wentWell->id, 'not_helpful')
+        ->assertSeeText(__('monthly_reports.ai_draft_rated'))
+        ->assertDontSeeText(__('monthly_reports.ai_draft_ask'))
+        ->call('rateAiDraft', $difficult->id, 'helpful')
+        ->call('rateAiDraft', $wentWell->id, 'made-up');
+
+    expect(AiDraft::query()->sole()->rating)->toBe(AiDraftRating::NotHelpful);
+});
+
+test('a draft measures how much of it the officer kept', function (?string $current, int $kept) {
+    $draft = AiDraft::factory()->make(['drafted_text' => 'Sessions ran as planned.']);
+
+    expect($draft->keptPercent($current))->toBe($kept);
+})->with([
+    'kept as drafted' => ['Sessions ran as planned.', 100],
+    'cleared' => ['', 0],
+    'never saved' => [null, 0],
+]);
+
+test('a draft in the wrong shape saves nothing and says so', function () {
+    Queue::fake();
+    $project = mrsProject();
+    mrsQuestions($project);
+    $page = mrsPage(mrsReport($project))->call('draftNarrativeWithAi');
+
+    mrsRunQueuedDraft('Sorry, I cannot help with that.');
+
+    $page->call('collectAiDraft')
+        ->assertDispatched('toast-show', mrsToast(__('monthly_reports.ai_draft_failed')))
+        ->assertSet('aiDraftKey', null);
+
+    expect(MonthlyReportAnswer::query()->count())->toBe(0);
+});
+
+test('collecting while the draft is still running keeps waiting', function () {
+    Queue::fake();
+    $project = mrsProject();
+    mrsQuestions($project);
+
+    mrsPage(mrsReport($project))
+        ->call('draftNarrativeWithAi')
+        ->call('collectAiDraft')
+        ->assertSeeText(__('monthly_reports.ai_drafting'))
+        ->assertNotSet('aiDraftKey', null);
+});
+
+/*
+| Smart check (AI trial, step 8): unusual figures against the last three
+| submitted months, and narrative numbers that match no figure.
+*/
+
+test('the smart check flags a figure far above its usual level and a narrative number no figure backs', function () {
+    $project = mrsProject();
+    [$wentWell] = mrsQuestions($project);
+    $report = mrsReport($project);
+    $line = mrsLine($report, ['name_en' => 'Children reached']);
+    MonthlyReportLine::query()->whereKey($line->id)->update(['value' => 134, 'note' => 'Two groups added in week 3']);
+
+    foreach (['2026-07-01' => 40, '2026-08-01' => 44, '2026-09-01' => 36] as $month => $value) {
+        $previous = mrsLine(mrsReport($project, $month, MonthlyReportStatus::Submitted));
+        MonthlyReportLine::query()->whereKey($previous->id)->update(['value' => $value, 'library_indicator_id' => $line->library_indicator_id]);
+    }
+
+    MonthlyReportAnswer::query()->create(['monthly_report_id' => $report->id, 'report_template_question_id' => $wentWell->id, 'question_text' => 'x', 'answer' => 'We reached 134 children, 150 caregivers and 2 groups in 2026.']);
+
+    mrsPage($report)
+        ->assertSeeText(__('ai.checks.heading'))
+        ->assertSeeHtml('data-check="spike"')
+        ->assertSeeText(__('ai.checks.unmatched_number', ['number' => '150', 'question' => 'What went well?']))
+        ->assertDontSeeText(__('ai.checks.unmatched_number', ['number' => '134', 'question' => 'What went well?']))
+        ->assertDontSeeText(__('ai.checks.unmatched_number', ['number' => '2,026', 'question' => 'What went well?']));
+});
+
+test('the smart check stays quiet on an ordinary month and on a validated one', function () {
+    $project = mrsProject();
+    $report = mrsReport($project);
+    MonthlyReportLine::query()->whereKey(mrsLine($report)->id)->update(['value' => 40]);
+
+    mrsPage($report)->assertDontSeeText(__('ai.checks.heading'));
+    mrsPage(mrsReport($project, '2026-09-01', MonthlyReportStatus::Validated))->assertDontSeeText(__('ai.checks.heading'));
+});
+
+test('someone who may not fill the report cannot rate its drafts', function () {
+    $project = mrsProject();
+    [$wentWell] = mrsQuestions($project);
+    $report = mrsReport($project);
+    $answer = MonthlyReportAnswer::query()->create(['monthly_report_id' => $report->id, 'report_template_question_id' => $wentWell->id, 'question_text' => 'x', 'answer' => 'Drafted.']);
+    AiDraft::factory()->create(['monthly_report_answer_id' => $answer->id, 'drafted_text' => 'Drafted.']);
+
+    mrsPage($report, $this->officer)
+        ->call('rateAiDraft', $wentWell->id, 'helpful')
+        ->assertForbidden();
+
+    expect(AiDraft::query()->sole()->rating)->toBeNull();
 });

@@ -22,6 +22,12 @@ use Throwable;
 class AiGateway
 {
     /**
+     * The ledger row of the latest call this gateway made, so a caller can
+     * link what it stores (an AI draft) to the call that produced it.
+     */
+    public ?int $lastRequestId = null;
+
+    /**
      * Send a prompt to an agent and record the call in the usage ledger.
      *
      * @param  'default'|'fast'  $tier  "fast" for short summaries, "default" for drafting.
@@ -93,7 +99,7 @@ class AiGateway
         int $outputTokens = 0,
         ?string $error = null,
     ): void {
-        AiRequest::create([
+        $this->lastRequestId = AiRequest::create([
             'user_id' => $user?->id,
             'feature' => $feature,
             'provider' => $provider,
@@ -103,6 +109,6 @@ class AiGateway
             'output_tokens' => $outputTokens,
             'duration_ms' => (int) round((hrtime(true) - $startedAt) / 1_000_000),
             'error' => $error === null ? null : Str::limit($error, 497),
-        ]);
+        ])->id;
     }
 }

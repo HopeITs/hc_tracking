@@ -823,6 +823,7 @@ return [
             'column_item' => 'Item',
             'column_count' => 'Count',
             'footer' => 'Open HC Tracking for the details. This email never contains amounts.',
+            'briefing_note' => 'Written by AI from the counts below.',
         ],
     ],
 

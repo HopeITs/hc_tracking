@@ -2,6 +2,7 @@
 
 return [
     'activity_log' => 'سجل النشاط',
+    'ai_usage' => 'نتائج الذكاء الاصطناعي',
     'notification_settings' => 'قواعد الإشعارات',
     'administration' => 'الإدارة',
     'application_navigation' => 'التنقل في التطبيق',
@@ -41,6 +42,8 @@ return [
     'help' => 'المساعدة',
     'help_tour_hint' => 'جولة إرشادية في هذه الصفحة خطوة بخطوة',
     'help_guideline_hint' => 'الدليل المكتوب، في علامة تبويب جديدة',
+    'ai_features' => 'ميزات الذكاء الاصطناعي',
+    'help_ai_hint' => 'ماذا يفعل المساعد الذكي وكيف تستخدمه',
     'help_report_hint' => 'أخبر فريق تقنية المعلومات بما حدث',
     'help_install_hint' => 'افتح HC Tracking في نافذة خاصة به',
     'display' => 'اللغة والمظهر',

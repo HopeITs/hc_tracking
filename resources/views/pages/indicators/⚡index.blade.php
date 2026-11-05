@@ -148,7 +148,7 @@ new #[Layout('layouts::desk'), Title('titles.indicators')] class extends Compone
      */
     protected function forgetIndicators(): void
     {
-        foreach (['allIndicators', 'rows', 'filteredRows', 'pagedRows', 'overview', 'focusCounts', 'inspected', 'inspectedReadings'] as $property) {
+        foreach (['allIndicators', 'rows', 'filteredRows', 'pagedRows', 'overview', 'focusCounts', 'inspected', 'inspectedReadings', 'inspectedForecast'] as $property) {
             unset($this->{$property});
         }
     }

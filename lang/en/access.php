@@ -57,6 +57,7 @@ return [
         'manage-reviewers' => 'Manage reviewers',
         'correct-status' => 'Correct status',
         'draft' => 'Draft with AI',
+        'summarize' => 'Summarize with AI',
         'view-usage' => 'View usage',
     ],
 ];

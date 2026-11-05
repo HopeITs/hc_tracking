@@ -20,13 +20,16 @@ use App\Livewire\Concerns\Proposals\ReadsProposalDelivery;
 use App\Livewire\Concerns\Proposals\ReadsProposalFunding;
 use App\Livewire\Concerns\Proposals\ReadsProposalHealth;
 use App\Livewire\Concerns\Proposals\ReadsProposalVitals;
+use App\Livewire\Concerns\SummarizesWithAi;
 use App\Livewire\Concerns\SwitchesFundingView;
 use App\Models\Activity;
+use App\Models\Donor;
 use App\Models\DonorProposal;
 use App\Models\Media;
 use App\Models\Proposal;
 use App\Models\ProposalStatusNote;
 use App\Models\TransfersTracking;
+use App\Support\Ai\RecordFacts;
 use Illuminate\Database\Eloquent\Collection;
 use Livewire\Attributes\Computed;
 use Livewire\Attributes\Layout;
@@ -58,6 +61,7 @@ new #[Layout('layouts::desk'), Title('titles.proposal')] class extends Component
     use ReadsProposalFunding;
     use ReadsProposalHealth;
     use ReadsProposalVitals;
+    use SummarizesWithAi;
     use SwitchesFundingView;
     use WithFileUploads;
 
@@ -340,6 +344,28 @@ new #[Layout('layouts::desk'), Title('titles.proposal')] class extends Component
             $this->canRecordFinalReportAcceptance, $this->finalReportAcceptance,
         );
     }
+
+    protected function aiSummaryKind(): string
+    {
+        return 'proposal-'.$this->proposalId;
+    }
+
+    /**
+     * What this page shows the viewer, as facts for the AI brief: its
+     * readings (money only when the viewer sees it), warnings and deadlines.
+     */
+    protected function aiSummaryFacts(): string
+    {
+        $proposal = $this->proposal;
+
+        return RecordFacts::proposal(
+            $proposal,
+            (string) Donor::query()->whereKey($proposal->donor_id)->value('name'),
+            $this->vitals,
+            $this->warnings,
+            $this->deadlines,
+        );
+    }
 };
 ?>
 
@@ -417,6 +443,10 @@ new #[Layout('layouts::desk'), Title('titles.proposal')] class extends Component
         </div>
     @else
         @include('pages.proposals._show-renewal-chain')
+
+        @unless ($embedded)
+            <x-ai.brief class="mt-6" />
+        @endunless
 
         @include('pages.proposals._show-warnings')
 

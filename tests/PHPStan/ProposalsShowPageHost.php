@@ -20,6 +20,7 @@ use App\Livewire\Concerns\Proposals\ReadsProposalDelivery;
 use App\Livewire\Concerns\Proposals\ReadsProposalFunding;
 use App\Livewire\Concerns\Proposals\ReadsProposalHealth;
 use App\Livewire\Concerns\Proposals\ReadsProposalVitals;
+use App\Livewire\Concerns\SummarizesWithAi;
 use App\Livewire\Concerns\SwitchesFundingView;
 use Livewire\Component;
 use Livewire\WithFileUploads;
@@ -50,6 +51,7 @@ abstract class ProposalsShowPageHost extends Component
     use ReadsProposalFunding;
     use ReadsProposalHealth;
     use ReadsProposalVitals;
+    use SummarizesWithAi;
     use SwitchesFundingView;
     use WithFileUploads;
 

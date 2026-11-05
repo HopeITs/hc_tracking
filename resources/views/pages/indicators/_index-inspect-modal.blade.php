@@ -61,6 +61,28 @@
                     </div>
                 </div>
 
+                @if ($forecast = $this->inspectedForecast)
+                    @php
+                        $forecastTone = ['reaches' => 'bg-status-good', 'falls_short' => 'bg-status-warn', 'moving_away' => 'bg-status-critical', 'flat' => 'bg-status-warn'][$forecast['state']];
+                    @endphp
+                    <section aria-labelledby="inspect-forecast-heading" class="flex flex-col gap-1.5 border-b border-secondary-soft pb-4 dark:border-line" data-indicator-forecast="{{ $forecast['state'] }}">
+                        <h3 id="inspect-forecast-heading" class="type-label inline-flex items-center gap-1.5 text-secondary-medium dark:text-ink-muted">
+                            <flux:icon.arrow-trending-up variant="micro" class="size-3.5" aria-hidden="true" />{{ __('ai.forecast.heading') }}
+                        </h3>
+                        <p class="flex items-start gap-2 text-sm">
+                            <span class="mt-1.5 size-2 shrink-0 rounded-full {{ $forecastTone }}" aria-hidden="true"></span>
+                            <span>{{ __('ai.forecast.'.$forecast['state'], [
+                                'projected' => $this->figure($forecast['projected']).($unit !== null ? ' '.$unit : ''),
+                                'percent' => $forecast['projected_percent'] === null ? '—' : number_format($forecast['projected_percent']).'%',
+                                'end' => $forecast['window_end']->translatedFormat(__('formats.date')),
+                                'date' => $forecast['reaches_on']?->translatedFormat(__('formats.date')) ?? '',
+                                'pace' => $this->figure(abs($forecast['per_month'])),
+                            ]) }}</span>
+                        </p>
+                        <p class="type-meta text-secondary-medium dark:text-ink-muted">{{ __('ai.forecast.note', ['count' => $row['readings']]) }}</p>
+                    </section>
+                @endif
+
                 <div class="grid gap-5 lg:grid-cols-2">
                     <section aria-labelledby="inspect-readings-heading">
                         <h3 id="inspect-readings-heading" class="type-label text-secondary-medium dark:text-ink-muted">

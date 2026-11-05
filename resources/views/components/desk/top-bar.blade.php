@@ -75,6 +75,10 @@
                             <flux:icon.sparkles variant="outline" class="dk-menu-ic" />
                             <span class="dk-menu-t"><strong>{{ __('tour.start') }}</strong><small>{{ __('navigation.help_tour_hint') }}</small></span>
                         </button>
+                        <a role="menuitem" href="{{ route('help.ai-features') }}" wire:navigate x-on:click="close()" data-ai-features-link>
+                            <flux:icon.cpu-chip variant="outline" class="dk-menu-ic" />
+                            <span class="dk-menu-t"><strong>{{ __('navigation.ai_features') }}</strong><small>{{ __('navigation.help_ai_hint') }}</small></span>
+                        </a>
                         <a role="menuitem" href="{{ $guidelineUrl }}" target="_blank" rel="noopener noreferrer" x-on:click="close()" data-guideline>
                             <flux:icon.book-open variant="outline" class="dk-menu-ic" />
                             <span class="dk-menu-t"><strong>{{ __('navigation.guideline') }}</strong><small>{{ __('navigation.help_guideline_hint') }}</small></span>

@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace Tests\PHPStan;
 
+use App\Livewire\Concerns\MonthlyReports\ChecksMonthlyReportQuality;
+use App\Livewire\Concerns\MonthlyReports\DraftsMonthlyReportNarrative;
 use App\Livewire\Concerns\MonthlyReports\EditsMonthlyReportActivities;
 use App\Livewire\Concerns\MonthlyReports\EditsMonthlyReportLines;
 use App\Livewire\Concerns\MonthlyReports\ManagesMonthlyReportFiles;
@@ -20,6 +22,8 @@ use Livewire\Component;
  */
 abstract class MonthlyReportShowPageHost extends Component
 {
+    use ChecksMonthlyReportQuality;
+    use DraftsMonthlyReportNarrative;
     use EditsMonthlyReportActivities;
     use EditsMonthlyReportLines;
     use ManagesMonthlyReportFiles;

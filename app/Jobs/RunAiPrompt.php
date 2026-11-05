@@ -61,7 +61,7 @@ final class RunAiPrompt implements ShouldQueue
     {
         $requestKey = (string) Str::uuid7();
 
-        Cache::put(self::cacheKey($requestKey), ['status' => 'pending', 'user_id' => $user->id, 'text' => null], self::RESULT_TTL_SECONDS);
+        Cache::put(self::cacheKey($requestKey), ['status' => 'pending', 'user_id' => $user->id, 'text' => null, 'request_id' => null], self::RESULT_TTL_SECONDS);
 
         self::dispatch($agent, $prompt, $feature, $user->id, $requestKey, $tier);
 
@@ -71,7 +71,7 @@ final class RunAiPrompt implements ShouldQueue
     /**
      * The state of a request, only for the user who started it.
      *
-     * @return array{status: 'pending'|'done'|'failed', text: string|null}|null
+     * @return array{status: 'pending'|'done'|'failed', text: string|null, request_id: int|null}|null
      */
     public static function resultFor(string $requestKey, User $user): ?array
     {
@@ -81,7 +81,7 @@ final class RunAiPrompt implements ShouldQueue
             return null;
         }
 
-        return ['status' => $stored['status'], 'text' => $stored['text']];
+        return ['status' => $stored['status'], 'text' => $stored['text'], 'request_id' => $stored['request_id'] ?? null];
     }
 
     public function handle(AiGateway $gateway): void
@@ -90,7 +90,7 @@ final class RunAiPrompt implements ShouldQueue
         $response = $gateway->prompt($this->agent, $this->prompt, $this->feature, $user, $this->tier);
         $text = $gateway->answerText($response);
 
-        $this->store('done', $text);
+        $this->store('done', $text, $gateway->lastRequestId);
 
         $this->push(true, $text);
     }
@@ -119,9 +119,9 @@ final class RunAiPrompt implements ShouldQueue
         }
     }
 
-    private function store(string $status, ?string $text): void
+    private function store(string $status, ?string $text, ?int $aiRequestId = null): void
     {
-        Cache::put(self::cacheKey($this->requestKey), ['status' => $status, 'user_id' => $this->userId, 'text' => $text], self::RESULT_TTL_SECONDS);
+        Cache::put(self::cacheKey($this->requestKey), ['status' => $status, 'user_id' => $this->userId, 'text' => $text, 'request_id' => $aiRequestId], self::RESULT_TTL_SECONDS);
     }
 
     private static function cacheKey(string $requestKey): string

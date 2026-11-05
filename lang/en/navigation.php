@@ -2,6 +2,7 @@
 
 return [
     'activity_log' => 'Activity Log',
+    'ai_usage' => 'AI results',
     'notification_settings' => 'Notification Rules',
     'administration' => 'Administration',
     'application_navigation' => 'Application navigation',
@@ -41,6 +42,8 @@ return [
     'help' => 'Help',
     'help_tour_hint' => 'A guided walk through this page',
     'help_guideline_hint' => 'The written guide, in a new tab',
+    'ai_features' => 'AI features',
+    'help_ai_hint' => 'What the AI assistant does and how to use it',
     'help_report_hint' => 'Tell the IT team what went wrong',
     'help_install_hint' => 'Open HC Tracking in its own window',
     'display' => 'Language and theme',

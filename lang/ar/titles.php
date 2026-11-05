@@ -41,6 +41,8 @@ return [
     'transfers' => 'التحويلات',
     'user_directory' => 'دليل المستخدمين',
     'activity_log' => 'سجل النشاط',
+    'ai_usage' => 'نتائج الذكاء الاصطناعي',
+    'ai_features' => 'ميزات الذكاء الاصطناعي',
     'notification_rules' => 'قواعد الإشعارات',
     'notifications' => 'الإشعارات',
     'my_reviews' => 'مراجعاتي',

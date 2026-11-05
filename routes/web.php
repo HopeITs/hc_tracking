@@ -262,8 +262,15 @@ Route::middleware(['auth', EnsureTwoFactorIsEnabled::class])->group(function () 
         ->can('activity-log.view')
         ->name('activity.index');
 
+    Route::livewire('admin/ai-usage', 'pages::admin.ai-usage')
+        ->can('ai.view-usage')
+        ->name('admin.ai-usage.index');
+
     Route::livewire('notifications-settings', 'pages::notifications.settings')
         ->name('notification-settings.edit');
+
+    Route::livewire('help/ai-features', 'pages::help.ai-features')
+        ->name('help.ai-features');
 
     Route::livewire('notifications', 'pages::notifications.index')
         ->name('notifications.index');

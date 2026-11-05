@@ -41,6 +41,13 @@ return [
     'queue_connection' => env('AI_QUEUE_CONNECTION', 'ai'),
 
     /*
+    | The AI paragraph on top of the monthly digest email
+    | (App\Support\Ai\MonthlyDigestBriefing). Off: the mail goes out as before.
+    */
+
+    'digest_briefing' => (bool) env('AI_DIGEST_BRIEFING', true),
+
+    /*
     | Extra options per provider driver, applied by App\Support\Ai\HcAgent.
     | Ollama: skip qwen3's hidden "thinking" pass (it spent ~1,200 tokens and
     | left the answer empty) and keep the model in memory between calls.

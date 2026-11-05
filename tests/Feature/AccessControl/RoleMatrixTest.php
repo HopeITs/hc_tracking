@@ -102,7 +102,7 @@ test('each role holds every view permission plus exactly its approved write perm
 })->with([
     'Team Member' => ['Team Member', []],
     'Media Team' => ['Media Team', ['tasks.create', 'tasks.update', 'reports.create', 'reports.update']],
-    'Public Relations' => ['Public Relations', ['tasks.create', 'tasks.update', 'reports.create', 'reports.update', 'ai.draft']],
+    'Public Relations' => ['Public Relations', ['tasks.create', 'tasks.update', 'reports.create', 'reports.update', 'ai.draft', 'ai.summarize']],
     'Public Relations Manager' => ['Public Relations Manager', [
         ...FUNDRAISING_VIEWS,
         'tasks.create', 'tasks.update', 'reports.create', 'reports.update',
@@ -111,7 +111,7 @@ test('each role holds every view permission plus exactly its approved write perm
         'funding-agreements.view', 'funding-agreements.create', 'funding-agreements.update',
         'proposals.manage-reviewers', 'proposals.correct-status',
         'reports.reopen', 'reports.aggregate',
-        'ai.draft',
+        'ai.draft', 'ai.summarize',
     ]],
     'MEAL' => ['MEAL', [
         'tasks.create', 'tasks.update', 'reports.create', 'reports.update', 'reports.approve', 'reports.mark-seen',
@@ -122,7 +122,7 @@ test('each role holds every view permission plus exactly its approved write perm
         'reports.reopen', 'reports.aggregate',
         'meal-coverage.manage', 'sectors.manage',
         'report-templates.manage', 'evidence-types.manage', 'narrative-questions.manage',
-        'ai.draft',
+        'ai.draft', 'ai.summarize',
     ]],
     'Financial' => ['Financial', [
         ...FINANCE_VIEWS, ...FUNDRAISING_VIEWS,
@@ -143,7 +143,7 @@ test('each role holds every view permission plus exactly its approved write perm
         'risks.create', 'risks.update', 'risks.delete',
         'indicators.create', 'indicators.update',
         'results.create', 'results.update',
-        'ai.draft',
+        'ai.draft', 'ai.summarize',
     ]],
 ]);
 
@@ -166,6 +166,12 @@ test('AI drafting is piloted with MEAL, both Public Relations roles and Managers
     $holders = Role::query()->whereHas('permissions', fn ($query) => $query->where('name', 'ai.draft'))->pluck('name')->all();
 
     expect($holders)->toEqualCanonicalizing(['Super Admin', 'MEAL', 'Public Relations', 'Public Relations Manager', 'Managers']);
+});
+
+test('AI record summaries go to the drafting pilot and the General Manager', function () {
+    $holders = Role::query()->whereHas('permissions', fn ($query) => $query->where('name', 'ai.summarize'))->pluck('name')->all();
+
+    expect($holders)->toEqualCanonicalizing(['Super Admin', 'General Manager', 'MEAL', 'Public Relations', 'Public Relations Manager', 'Managers']);
 });
 
 test('only Super Admin and General Manager see the AI usage log by default', function () {

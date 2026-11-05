@@ -204,6 +204,7 @@ final class Destinations
             $page('admin.users.index', 'navigation.user_directory', 'users', 'users', 'administration', fn (User $user): bool => $user->can('viewAny', User::class), 'access-management'),
             $page('admin.notification-settings.edit', 'navigation.notification_settings', 'bell', 'adjustments-horizontal', 'administration', $can('notification-settings.manage')),
             $page('activity.index', 'navigation.activity_log', 'undo', 'clipboard-document-list', 'administration', $can('activity-log.view')),
+            $page('admin.ai-usage.index', 'navigation.ai_usage', 'spark', 'sparkles', 'administration', $can('ai.view-usage')),
             $page('admin.cities.index', 'common.cities', 'map', 'map-pin', 'administration', $can('cities.view')),
             $page('admin.sectors.index', 'navigation.sectors', 'grid', 'tag', 'administration', $can('sectors.view')),
             $page('admin.evidence-types.index', 'navigation.evidence_types', 'file', 'paper-clip', 'administration', $can('evidence-types.manage')),

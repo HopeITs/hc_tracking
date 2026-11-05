@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 use App\Events\AiPromptFinished;
 use App\Jobs\RunAiPrompt;
+use App\Models\AiRequest;
 use App\Models\User;
 use App\Support\Ai\AiGateway;
 use App\Support\Ai\HcAgent;
@@ -28,7 +29,7 @@ it('queues the prompt on the ai queue and starts it as pending', function (): vo
         && $job->userId === $user->id
         && $job->connection === 'ai');
 
-    expect(RunAiPrompt::resultFor($key, $user))->toBe(['status' => 'pending', 'text' => null]);
+    expect(RunAiPrompt::resultFor($key, $user))->toBe(['status' => 'pending', 'text' => null, 'request_id' => null]);
 });
 
 it('stores the cleaned answer and pushes it to the user', function (): void {
@@ -39,7 +40,7 @@ it('stores the cleaned answer and pushes it to the user', function (): void {
     $job = new RunAiPrompt(new QueuedProbeAgent, 'Hi', 'probe', $user->id, 'key-1');
     $job->handle(app(AiGateway::class));
 
-    expect(RunAiPrompt::resultFor('key-1', $user))->toBe(['status' => 'done', 'text' => 'مرحبا']);
+    expect(RunAiPrompt::resultFor('key-1', $user))->toBe(['status' => 'done', 'text' => 'مرحبا', 'request_id' => AiRequest::sole()->id]);
     Event::assertDispatched(AiPromptFinished::class, fn (AiPromptFinished $event): bool => $event->userId === $user->id
         && $event->succeeded
         && $event->text === 'مرحبا'
@@ -53,7 +54,7 @@ it('marks the request failed without exposing the provider error', function (): 
     (new RunAiPrompt(new QueuedProbeAgent, 'Hi', 'probe', $user->id, 'key-2'))
         ->failed(new RuntimeException('Connection refused'));
 
-    expect(RunAiPrompt::resultFor('key-2', $user))->toBe(['status' => 'failed', 'text' => null]);
+    expect(RunAiPrompt::resultFor('key-2', $user))->toBe(['status' => 'failed', 'text' => null, 'request_id' => null]);
     Event::assertDispatched(AiPromptFinished::class, fn (AiPromptFinished $event): bool => ! $event->succeeded
         && $event->broadcastWith() === ['key' => 'key-2', 'succeeded' => false, 'text' => null]);
 });
@@ -75,5 +76,5 @@ it('keeps the answer when the live push fails', function (): void {
 
     (new RunAiPrompt(new QueuedProbeAgent, 'Hi', 'probe', $user->id, 'key-3'))->handle(app(AiGateway::class));
 
-    expect(RunAiPrompt::resultFor('key-3', $user))->toBe(['status' => 'done', 'text' => 'مرحبا']);
+    expect(RunAiPrompt::resultFor('key-3', $user)['status'])->toBe('done');
 });

@@ -13,6 +13,14 @@
 {{ __('notifications.digests.monthly.nothing_pending') }}
 </x-mail::panel>
 @else
+@if (filled($briefing ?? null))
+<x-mail::panel>
+{{ $briefing }}
+
+*{{ __('notifications.mail.monthly_digest.briefing_note') }}*
+</x-mail::panel>
+
+@endif
 @foreach ($sections as $section => $lines)
 ## {{ __('notifications.digests.monthly.sections.'.$section) }}
 

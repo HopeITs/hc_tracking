@@ -14,6 +14,8 @@ use App\Livewire\Concerns\Projects\ManagesReportTemplate;
 use App\Livewire\Concerns\Projects\ReadsProjectDelivery;
 use App\Livewire\Concerns\Projects\ReadsProjectFunding;
 use App\Livewire\Concerns\Projects\ReadsProjectStory;
+use App\Livewire\Concerns\SummarizesWithAi;
+use App\Support\Ai\RecordFacts;
 use App\Enums\AssignmentStatus;
 use App\Models\HrEmployee;
 use App\Models\Program;
@@ -44,6 +46,7 @@ new #[Layout('layouts::desk'), Title('titles.project')] class extends Component 
     use ReadsProjectDelivery;
     use ReadsProjectFunding;
     use ReadsProjectStory;
+    use SummarizesWithAi;
     use WithFileUploads;
 
     #[Locked]
@@ -319,11 +322,32 @@ new #[Layout('layouts::desk'), Title('titles.project')] class extends Component 
     {
         return in_array($this->tab, ['milestones', 'tasks', 'risks', 'targets', ...($this->canViewReportTemplate ? ['template'] : [])], true) ? $this->tab : 'milestones';
     }
+
+    protected function aiSummaryKind(): string
+    {
+        return 'project-'.$this->projectId;
+    }
+
+    /**
+     * What this page shows the viewer, as facts for the AI brief. Money only
+     * for viewers who see it on the page.
+     */
+    protected function aiSummaryFacts(): string
+    {
+        $money = $this->canViewMoney()
+            ? array_values($this->fundingByCurrency->map(fn (array $row): string => $row['currency']->value.' committed '.number_format($row['committed'], 2).', received '.number_format($row['received'], 2))->all())
+            : [];
+
+        return RecordFacts::project($this->project, $this->story, $this->milestoneProgressPercent, $this->milestonesFlat, $this->tasks, $this->risks, $money);
+    }
 };
 ?>
 
 <section class="dk-story" data-story>
     @include('pages.projects._story-header')
+
+    <x-ai.brief class="mt-6" />
+
     @php
         $ownerAssignment = $this->ownerAssignment;
         $assignmentViewer = auth()->user();

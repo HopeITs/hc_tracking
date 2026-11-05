@@ -6,6 +6,7 @@ namespace App\Notifications;
 
 use App\Enums\Locale;
 use App\Models\User;
+use App\Support\Ai\MonthlyDigestBriefing;
 use Carbon\CarbonImmutable;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
@@ -53,6 +54,7 @@ final class MonthlyDigestMail extends Notification implements ShouldQueue
     {
         $monthLabel = (Locale::tryFrom(app()->getLocale()) ?? Locale::English)
             ->formatDate(CarbonImmutable::parse($this->month.'-01'), __('notifications.digests.monthly.month_format'));
+        $nothingPending = array_sum(array_map('array_sum', $this->sections)) === 0;
 
         return (new MailMessage)
             ->subject(__('notifications.mail.monthly_digest.subject', ['month' => $monthLabel]))
@@ -60,7 +62,8 @@ final class MonthlyDigestMail extends Notification implements ShouldQueue
                 'monthLabel' => $monthLabel,
                 'allPrograms' => $this->allPrograms,
                 'sections' => $this->sections,
-                'nothingPending' => array_sum(array_map('array_sum', $this->sections)) === 0,
+                'nothingPending' => $nothingPending,
+                'briefing' => $nothingPending ? null : app(MonthlyDigestBriefing::class)->for($monthLabel, $this->allPrograms, $this->sections, app()->getLocale()),
             ]);
     }
 }

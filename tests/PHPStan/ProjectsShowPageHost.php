@@ -13,6 +13,7 @@ use App\Livewire\Concerns\Projects\ManagesReportTemplate;
 use App\Livewire\Concerns\Projects\ReadsProjectDelivery;
 use App\Livewire\Concerns\Projects\ReadsProjectFunding;
 use App\Livewire\Concerns\Projects\ReadsProjectStory;
+use App\Livewire\Concerns\SummarizesWithAi;
 use Livewire\Component;
 use Livewire\WithFileUploads;
 
@@ -37,6 +38,7 @@ abstract class ProjectsShowPageHost extends Component
     use ReadsProjectDelivery;
     use ReadsProjectFunding;
     use ReadsProjectStory;
+    use SummarizesWithAi;
     use WithFileUploads;
 
     public int $projectId;

@@ -42,7 +42,7 @@ $groups = [
     'cities' => ['view'],
     'activity-log' => ['view'],
     'notification-settings' => ['manage'],
-    'ai' => ['draft', 'view-usage'],
+    'ai' => ['draft', 'summarize', 'view-usage'],
 ];
 
 $allPermissions = [];
@@ -77,9 +77,10 @@ $reportWriter = ['reports.create', 'reports.update'];
 $mealOnly = ['meal-coverage.manage', 'report-templates.manage', 'evidence-types.manage', 'narrative-questions.manage'];
 $targetWriter = ['targets.create', 'targets.update'];
 
-// AI trial pilot (user decision 2026-11-05): drafting for MEAL, both Public
-// Relations roles and Managers; the usage log for the General Manager.
-$aiDrafter = ['ai.draft'];
+// AI trial pilot (user decision 2026-11-05): drafting and record summaries
+// for MEAL, both Public Relations roles and Managers; the General Manager
+// reads summaries and the usage log but drafts nothing.
+$aiDrafter = ['ai.draft', 'ai.summarize'];
 
 return [
 
@@ -203,7 +204,7 @@ return [
             'reports.reopen',
             ...$mealOnly,
             ...$targetWriter,
-            ...$aiDrafter,
+            'ai.draft',
         ])),
     ],
 ];

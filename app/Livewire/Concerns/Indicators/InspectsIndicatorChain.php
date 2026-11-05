@@ -4,7 +4,10 @@ declare(strict_types=1);
 
 namespace App\Livewire\Concerns\Indicators;
 
+use App\Models\Indicator;
 use App\Models\IndicatorProgress;
+use App\Support\Ai\IndicatorForecast;
+use Carbon\CarbonImmutable;
 use Illuminate\Support\Collection as BaseCollection;
 use Livewire\Attributes\Computed;
 use Livewire\Attributes\Locked;
@@ -65,6 +68,29 @@ trait InspectsIndicatorChain
             ])
             ->reverse()
             ->values();
+    }
+
+    /**
+     * Where the inspected indicator is heading by the end of this year, from
+     * the trend of its readings; null with too few readings or no target.
+     *
+     * @return array{state: 'reaches'|'falls_short'|'moving_away'|'flat', projected: float, projected_percent: float|null, reaches_on: CarbonImmutable|null, window_end: CarbonImmutable, per_month: float}|null
+     */
+    #[Computed]
+    public function inspectedForecast(): ?array
+    {
+        $row = $this->inspected;
+
+        if ($row === null || ! $row['indicator'] instanceof Indicator) {
+            return null;
+        }
+
+        return IndicatorForecast::for(
+            $row['indicator']->progress,
+            (float) $row['baseline'],
+            $row['targetValue'] === null ? null : (float) $row['targetValue'],
+            CarbonImmutable::now()->endOfYear()->startOfDay(),
+        );
     }
 
     public function openInspectModal(int $indicatorId): void
