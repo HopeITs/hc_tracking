@@ -74,6 +74,8 @@ return [
         'final_report_acceptance' => 'Final report acceptance',
         'need_assessment' => 'Need assessment',
         'donor_approval' => 'Donor approval',
+        'negotiation' => 'Negotiation file',
+        'amendment' => 'Amendment',
         'report_submission' => 'Delivered report',
     ],
     'reporting_period' => [
@@ -90,6 +92,14 @@ return [
         'due' => 'To submit',
         'overdue' => 'Overdue',
         'submitted' => 'Submitted',
+    ],
+    'status_note_kind' => [
+        'transition' => 'Status change',
+        'correction' => 'Correction',
+        'negotiation' => 'Negotiation',
+        'on_hold' => 'Put on hold',
+        'off_hold' => 'Taken off hold',
+        'extension' => 'Extension',
     ],
     'review_stage' => [
         'concept_note' => 'Concept note',
@@ -132,6 +142,14 @@ return [
     'stage_template_creates' => [
         'task' => 'Department task',
         'final_report_milestone' => 'Final report milestone',
+    ],
+    'status_note_kind' => [
+        'transition' => 'Status change',
+        'correction' => 'Correction',
+        'negotiation' => 'Negotiation',
+        'on_hold' => 'Put on hold',
+        'off_hold' => 'Taken off hold',
+        'extension' => 'Extension',
     ],
     'project_status' => [
         'draft' => 'Draft',
@@ -201,8 +219,8 @@ return [
         'conducted' => 'Conducted',
     ],
     'donor_attribution' => [
-        'shared' => 'Shared (highest target)',
-        'split' => 'Split (sum of targets)',
+        'shared' => 'Count once (highest target)',
+        'split' => 'Add together (sum of targets)',
     ],
     'result_type' => [
         'impact' => 'Impact',
@@ -215,6 +233,7 @@ return [
         'general' => 'General',
         'media_deliverable' => 'Media deliverable',
         'financial' => 'Financial',
+        'report' => 'Report',
     ],
     'deliverable_kind' => [
         'video' => 'Video',

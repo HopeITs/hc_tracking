@@ -165,7 +165,7 @@ trait ManagesProposalPlan
         return [
             'media' => $ordered->filter(fn (Task $task): bool => $task->kind === TaskKind::MediaDeliverable)->values(),
             'finance' => $ordered->filter(fn (Task $task): bool => $task->kind === TaskKind::Financial)->values(),
-            'other' => $ordered->filter(fn (Task $task): bool => $task->kind === TaskKind::General)->values(),
+            'other' => $ordered->filter(fn (Task $task): bool => in_array($task->kind, [TaskKind::General, TaskKind::Report], true))->values(),
         ];
     }
 

@@ -20,6 +20,8 @@ return [
     'project_starts' => 'Project starts',
     'project_timeline' => 'Project timeline',
     'proposal_deadline' => 'Proposal deadline',
+    'extended_end' => 'Extended',
+    'extended_end_title' => 'Extended end date of this proposal',
     'related_dates' => 'Related dates',
     'report_deadline' => 'Report deadline',
     'showing_type' => 'Showing: :type',

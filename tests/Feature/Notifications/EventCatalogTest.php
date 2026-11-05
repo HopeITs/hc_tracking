@@ -19,7 +19,7 @@ function contractEventKeys(): array
         'proposal.created', 'proposal.status_changed', 'proposal.review_requested', 'proposal.reviewer_added', 'proposal.reviewer_removed',
         'proposal.reviewer_seen', 'proposal.need_assessment_added', 'proposal.approved', 'proposal.approved_without_agreement',
         'proposal.on_hold_reminder', 'proposal.final_report_accepted', 'proposal.beneficiaries_changed', 'proposal.targets_saved',
-        'proposal.project_linked', 'proposal.project_unlinked', 'proposal.deleted',
+        'proposal.project_linked', 'proposal.project_unlinked', 'proposal.deleted', 'proposal.risk_attached', 'proposal.risk_detached',
         'agreement.recorded', 'transfer.generated', 'transfer.received', 'transfer.late',
         'monthly_reports.generated', 'monthly_report.due', 'monthly_report.overdue', 'monthly_report.submitted', 'monthly_report.validated',
         'monthly_report.returned', 'monthly_report.reopen_requested', 'monthly_report.reopen_decided', 'monthly_report.reopen_escalated',
@@ -27,6 +27,10 @@ function contractEventKeys(): array
         'donor_report.saved', 'donor_report.submitted', 'donor_report.due', 'donor_report.overdue',
         // W-04 (D-57): a donor requested from the proposal form, and the General Manager's decision.
         'donor.requested', 'donor.approved', 'donor.declined',
+        // W-07 (D-59): a negotiation note recorded while a proposal is submitted.
+        'proposal.negotiation_noted',
+        // W-08 (D-60): an active proposal extended to a later end date.
+        'proposal.extended',
         'department_task.created', 'department_task.due', 'department_task.overdue', 'department_task.delivered', 'department_task.returned',
         'library_indicator.created', 'library_indicator.updated', 'library_indicator.deactivated', 'library_indicator.reactivated',
         'meal_coverage.assigned', 'meal_coverage.responsible_changed', 'meal_coverage.project_assigned',
@@ -92,8 +96,8 @@ test('importance, oversight and critical follow the contract', function () {
         'meal_coverage.assigned', 'meal_coverage.project_assigned', 'meal_coverage.responsible_changed',
         'program.logframe_missing',
         'project.archived', 'project.created', 'project.sectors_changed',
-        'proposal.created', 'proposal.deleted', 'proposal.need_assessment_added', 'proposal.project_linked', 'proposal.project_unlinked',
-        'proposal.reviewer_removed', 'proposal.reviewer_seen', 'proposal.targets_saved',
+        'proposal.created', 'proposal.deleted', 'proposal.need_assessment_added', 'proposal.negotiation_noted', 'proposal.project_linked', 'proposal.project_unlinked',
+        'proposal.reviewer_removed', 'proposal.reviewer_seen', 'proposal.risk_attached', 'proposal.risk_detached', 'proposal.targets_saved',
         'result.created', 'result.deleted', 'result.updated',
         'supervision.added', 'supervision.removed',
     ])

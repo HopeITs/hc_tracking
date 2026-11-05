@@ -1,5 +1,5 @@
     {{-- Plan pulse: how much of the plan is being reported on, and how that reporting is landing. --}}
-    <section class="overflow-hidden rounded-xl border border-board-line bg-board" aria-labelledby="plan-pulse-heading">
+    <x-ui.panel aria-labelledby="plan-pulse-heading">
         <div class="border-b border-board-line bg-board-head px-5 py-4">
             <h2 id="plan-pulse-heading" class="text-base font-bold">{{ __('annual_plans.plan_pulse') }}</h2>
             <p class="mt-0.5 type-meta text-secondary-medium dark:text-ink-muted">{{ __('annual_plans.plan_pulse_hint') }}</p>
@@ -80,4 +80,4 @@
                 @endforeach
             </div>
         @endif
-    </section>
+    </x-ui.panel>

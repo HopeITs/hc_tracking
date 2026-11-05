@@ -89,14 +89,14 @@ trait BuildsMonthlyMatrix
     public function proposalPeriod(): ?array
     {
         $id = $this->resolvedFilters['proposal'];
-        $proposal = $id === null ? null : Proposal::query()->select(['id', 'actual_date_begin', 'actual_date_end', 'planned_date_begin', 'planned_date_end'])->find($id);
+        $proposal = $id === null ? null : Proposal::query()->select(['id', 'actual_date_begin', 'actual_date_end', 'extended_date_end', 'planned_date_begin', 'planned_date_end'])->find($id);
         $begin = $proposal === null ? null : ($proposal->actual_date_begin ?? $proposal->planned_date_begin);
 
         if ($begin === null) {
             return null;
         }
 
-        $end = $proposal->actual_date_end ?? $proposal->planned_date_end ?? $begin->addYear();
+        $end = $proposal->effectiveDateEnd() ?? $proposal->planned_date_end ?? $begin->addYear();
         $months = (int) $begin->startOfMonth()->diffInMonths($end->startOfMonth()) + 1;
 
         return ['begin' => CarbonImmutable::instance($begin)->startOfMonth(), 'years' => max(1, (int) ceil($months / 12))];
@@ -476,7 +476,7 @@ trait BuildsMonthlyMatrix
                 $covers->where(function (Builder $proposalTargets) use ($from, $to): void {
                     $proposalTargets->whereNotNull('pp.id')
                         ->whereRaw('(case when pp.actual_date_begin is not null and pp.actual_date_end is not null then pp.actual_date_begin else pp.planned_date_begin end) <= ?', [$to->toDateString()])
-                        ->whereRaw('(case when pp.actual_date_begin is not null and pp.actual_date_end is not null then pp.actual_date_end else pp.planned_date_end end) >= ?', [$from->toDateString()]);
+                        ->whereRaw('(case when pp.actual_date_begin is not null and pp.actual_date_end is not null then coalesce(pp.extended_date_end, pp.actual_date_end) else pp.planned_date_end end) >= ?', [$from->toDateString()]);
                 })->orWhere(function (Builder $planTargets) use ($from, $to): void {
                     $planTargets->whereNotNull('ap.id')->whereBetween('ap.year', [$from->year, $to->year]);
                 });

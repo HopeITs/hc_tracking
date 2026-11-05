@@ -128,3 +128,82 @@ test('every allowlisted writer exists', function () {
         expect($sources)->toHaveKey($path);
     }
 });
+
+/*
+| contracts.md §4, W-06: `proposals.on_hold_since` is the hold (D-58), and
+| only the two actions below set or clear it. Every other writer that moves
+| the proposal clears it as a consequence of the move, which is why
+| TransitionProposal and ApproveProposal are allowed here too.
+*/
+
+/**
+ * The §4 writers of the hold flag.
+ *
+ * @return list<string>
+ */
+function proposalOnHoldWriters(): array
+{
+    return [
+        'app/Actions/Proposals/SetProposalOnHold.php',
+        'app/Actions/Proposals/ClearProposalOnHold.php',
+        'app/Actions/Proposals/TransitionProposal.php',
+        'app/Actions/Proposals/ApproveProposal.php',
+    ];
+}
+
+/**
+ * The line numbers of every recognisable `on_hold_since` write in a source.
+ *
+ * @return list<int>
+ */
+function proposalOnHoldWrites(string $source): array
+{
+    $column = '[\'"]on_hold_since[\'"]\s*=>';
+    $patterns = [
+        '/\$(?:this->)?\w*(?:proposal|locked)\w*->on_hold_since\s*=(?![=>])/i',
+        '/\$(?:this->)?\w*(?:proposal|locked)\w*->setAttribute\(\s*[\'"]on_hold_since[\'"]/i',
+        '/\$(?:this->)?\w*(?:proposal|locked)\w*->(?:fill|forceFill|update|updateQuietly)\(\s*\[[^\]]*'.$column.'/i',
+        '/Proposal::[^;]*?(?:create|forceCreate|update|updateOrCreate|firstOrCreate|insert|upsert)\(\s*\[[^\]]*'.$column.'/',
+        '/table\(\s*[\'"]proposals[\'"]\s*\)[^;]*?(?:update|insert|upsert|updateOrInsert)\(\s*\[[^\]]*'.$column.'/',
+    ];
+
+    $lines = [];
+
+    foreach ($patterns as $pattern) {
+        preg_match_all($pattern, $source, $matches, PREG_OFFSET_CAPTURE);
+
+        foreach ($matches[0] as [, $offset]) {
+            $lines[] = substr_count(substr($source, 0, $offset), "\n") + 1;
+        }
+    }
+
+    sort($lines);
+
+    return array_values(array_unique($lines));
+}
+
+test('the hold scan recognises each way of writing the flag', function (string $source) {
+    expect(proposalOnHoldWrites("<?php\n".$source))->not->toBeEmpty();
+})->with([
+    'assignment' => '$locked->on_hold_since = null;',
+    'fill' => '$proposal->fill([\'on_hold_since\' => $date])->save();',
+    'mass update' => "Proposal::query()->whereKey(\$ids)->update(['on_hold_since' => null]);",
+    'query builder' => "DB::table('proposals')->where('id', 1)->update(['on_hold_since' => null]);",
+]);
+
+test('only the contracts §4 writers write the hold flag', function () {
+    $allowed = proposalOnHoldWriters();
+    $offenders = [];
+
+    foreach (proposalStatusScannedSources() as $path => $source) {
+        if (in_array($path, $allowed, true)) {
+            continue;
+        }
+
+        foreach (proposalOnHoldWrites($source) as $line) {
+            $offenders[] = "{$path}:{$line}";
+        }
+    }
+
+    expect($offenders)->toBe([]);
+});

@@ -698,7 +698,7 @@
                                 <span x-show="shown.owner" class="flex min-w-0 items-center gap-1.5">
                                     <template x-if="item.row.owner && item.row.kind !== 'group'">
                                         <span class="flex min-w-0 items-center gap-1.5" x-bind:title="item.row.owner">
-                                            <img :src="item.row.ownerAvatar ?? '{{ asset(\App\Models\HrEmployee::DefaultAvatar) }}'" alt="" loading="lazy" decoding="async" class="size-5 shrink-0 rounded-full bg-[#c2151c] object-cover" aria-hidden="true">
+                                            <img :src="item.row.ownerAvatar ?? '{{ asset(\App\Models\HrEmployee::DefaultAvatar) }}'" alt="" loading="lazy" decoding="async" class="size-5 shrink-0 rounded-full bg-hr-avatar object-cover" aria-hidden="true">
                                             <span class="truncate text-secondary-dark dark:text-ink-muted" dir="auto" x-text="item.row.owner"></span>
                                         </span>
                                     </template>
@@ -965,7 +965,7 @@
                                 <div x-show="inspected.row.owner" class="col-span-2">
                                     <dt class="{{ $inspectorLabel }}" x-text="inspected.row.kind === 'proposal' ? @js(__('gantt.inspector.donors')) : @js(__('gantt.owner'))"></dt>
                                     <dd class="mt-1 flex items-center gap-2 font-semibold text-secondary-dark dark:text-ink">
-                                        <img x-show="inspected.row.kind !== 'proposal'" :src="inspected.row.ownerAvatar ?? '{{ asset(\App\Models\HrEmployee::DefaultAvatar) }}'" alt="" loading="lazy" decoding="async" class="size-6 rounded-full bg-[#c2151c] object-cover" aria-hidden="true">
+                                        <img x-show="inspected.row.kind !== 'proposal'" :src="inspected.row.ownerAvatar ?? '{{ asset(\App\Models\HrEmployee::DefaultAvatar) }}'" alt="" loading="lazy" decoding="async" class="size-6 rounded-full bg-hr-avatar object-cover" aria-hidden="true">
                                         <span dir="auto" x-text="inspected.row.owner"></span>
                                     </dd>
                                 </div>

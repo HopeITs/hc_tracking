@@ -80,6 +80,7 @@ test('no page renders the whole employee list into server-side options', functio
     // projects index, cities that share the name · secondary_name markup) on purpose.
     $allowed = [
         'annual-plans/⚡index.blade.php' => 'only employees who already own a plan',
+        'programs/⚡index.blade.php' => 'only employees who already manage a program',
         'projects/⚡index.blade.php' => 'the city filter, not people',
         'projects/_index-project-modal.blade.php' => 'only the program managers a project owner may be picked from',
     ];

@@ -128,7 +128,7 @@ final class SaveDepartmentTask
             'title' => ['required', 'string', 'max:255'],
             'description' => ['nullable', 'string'],
             'department_id' => ['required', 'integer', Rule::exists(HrDepartment::class, 'id')],
-            'kind' => ['required', Rule::enum(TaskKind::class)],
+            'kind' => ['required', Rule::in(TaskKind::departmentValues())],
             'media_kinds' => ['nullable', 'array', 'required_if:kind,'.TaskKind::MediaDeliverable->value],
             'media_kinds.*' => ['string', Rule::in(DeliverableKind::values())],
             'requested_on' => ['required', 'date_format:Y-m-d'],

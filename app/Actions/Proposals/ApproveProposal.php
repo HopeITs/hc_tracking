@@ -69,6 +69,8 @@ final class ApproveProposal
             $locked->actual_date_end = CarbonImmutable::parse($validated['actual_date_end']);
             $locked->approval_note = $approvalNote === '' ? null : $approvalNote;
             $locked->status_remind_on = null;
+            // Approval ends any hold with it (D-58, W-06).
+            $locked->on_hold_since = null;
             $locked->save();
 
             $context = trim((string) ($validated['note'] ?? ''));
@@ -152,10 +154,9 @@ final class ApproveProposal
             throw ValidationException::withMessages(['status' => __('proposals.stale_status')]);
         }
 
-        $isApprovable = $from === ProposalStatus::Submitted
-            || ($from === ProposalStatus::OnHold && $proposal->statusBefore(ProposalStatus::OnHold) === ProposalStatus::Submitted);
-
-        if (! $isApprovable) {
+        // A proposal on hold is still `submitted` since W-06 (D-58), so it
+        // needs no arm of its own; approval clears the flag below.
+        if ($from !== ProposalStatus::Submitted) {
             throw ValidationException::withMessages([
                 'status' => __('proposals.transition_not_allowed', ['from' => $from->label(), 'to' => ProposalStatus::Approved->label()]),
             ]);

@@ -52,7 +52,8 @@
                 @if (in_array($task->id, $this->unreadIds, true))
                     <span class="size-2 shrink-0 rounded-full bg-primary dark:bg-ink" data-unread-dot="task-{{ $task->id }}" title="{{ __('notifications.has_unread') }}"><span class="sr-only">{{ __('notifications.has_unread') }}</span></span>
                 @endif
-                <a href="{{ route('tasks.show', $task) }}" wire:navigate title="{{ $task->title }}" @class(['min-w-0 line-clamp-2 text-sm font-semibold break-words hover:underline', 'text-secondary-light line-through' => $isDone])>{{ $task->title }}</a>
+                @if ($task->isReportTask())<x-ui.enum-badge :case="$task->kind" data-test="report-task-chip" />@endif
+                <a href="{{ $task->reportUrl() ?? route('tasks.show', $task) }}" wire:navigate title="{{ $task->title }}" @class(['min-w-0 line-clamp-2 text-sm font-semibold break-words hover:underline', 'text-secondary-light line-through' => $isDone])>{{ $task->title }}</a>
             </div>
             @unless ($isSubtask)
                 <p class="truncate text-xs text-secondary-medium dark:text-ink-muted">{{ $task->sourceLabel() }}</p>

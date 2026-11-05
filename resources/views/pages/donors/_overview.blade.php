@@ -12,7 +12,7 @@
 @endphp
 
         {{-- Overview: one framed band — the money by funder beside what is due next. --}}
-        <div class="overflow-hidden rounded-2xl border {{ $hairline }} bg-white dark:bg-surface-1" data-donor-overview>
+        <x-ui.panel as="div" data-donor-overview>
             {{-- Pulse strip --}}
             <dl @class(['grid grid-cols-2 border-b bg-board-head/70 dark:bg-white/[0.03]', $hairline, '@3xl/directory:grid-cols-4' => $canTransfers, '@3xl/directory:grid-cols-3' => ! $canTransfers]) data-donor-pulse>
                 @foreach ([
@@ -175,7 +175,7 @@
                     </nav>
                 </aside>
             </div>
-        </div>
+        </x-ui.panel>
 
         {{-- The ledger: aligned columns, one donor per row. --}}
         <section aria-labelledby="ledger-heading" class="pt-4">

@@ -65,7 +65,7 @@ new class extends Component {
     public function proposal(): Proposal
     {
         return Proposal::query()
-            ->select(['id', 'status', 'planned_date_begin', 'planned_date_end', 'actual_date_begin', 'actual_date_end'])
+            ->select(['id', 'status', 'planned_date_begin', 'planned_date_end', 'actual_date_begin', 'actual_date_end', 'extended_date_end'])
             ->findOrFail($this->proposalId);
     }
 

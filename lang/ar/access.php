@@ -31,6 +31,7 @@ return [
         'supervisions' => 'الإشراف',
         'sectors' => 'القطاعات',
         'report-templates' => 'قوالب التقارير',
+        'risk-library' => 'مكتبة المخاطر',
         'evidence-types' => 'أنواع الأدلة',
         'narrative-questions' => 'الأسئلة السردية',
         'tasks' => 'المهام',

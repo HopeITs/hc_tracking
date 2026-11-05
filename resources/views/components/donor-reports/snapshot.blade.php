@@ -16,7 +16,7 @@
     $muted = 'text-secondary-medium dark:text-ink-muted';
     $ink = 'text-secondary-dark dark:text-ink';
     $hairline = 'border-secondary-soft dark:border-line';
-    $panel = 'rounded-xl border border-secondary-soft bg-white p-4 sm:p-5 dark:border-transparent dark:bg-surface-1 dark:shadow-raised';
+    $panel = 'rounded-panel border border-panel-border bg-white p-4 sm:p-5 dark:bg-surface-1 dark:shadow-raised';
     $th = 'px-3 py-2 text-start text-xs font-semibold uppercase tracking-wide '.$muted;
     $td = 'px-3 py-2 align-top';
     $number = function (?float $value): string {

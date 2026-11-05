@@ -29,11 +29,6 @@ final class EmployeeProfile
     use RemembersHrLookup;
 
     /**
-     * The HR job level grade that makes someone a department manager (D-65).
-     */
-    private const DepartmentManagerGrade = 5;
-
-    /**
      * The employee's current place in HR, or null when they hold no active contract.
      *
      * @return array{employee_id: int, position_id: ?int, position_title_en: ?string, position_title_ar: ?string, job_level: ?string, grade: ?int,
@@ -99,14 +94,67 @@ final class EmployeeProfile
     }
 
     /**
-     * The manager of a department: the employee whose current HR position in
-     * it sits at job level grade 5, «Department Manager» (D-65). Null when
-     * the department has no such holder.
+     * Whether the employee's current position carries the department-manager
+     * job level (W-14, D-65). This is the one definition of "department
+     * manager": the level name matches
+     * config('access-control.department_manager_job_level').
      *
-     * Several holders is normal — Finance has three — so the same tie-break
-     * holderOfPosition() uses applies: the latest contract start date wins,
-     * and the pick is logged so an ambiguous department is visible rather
-     * than silent.
+     * Both HR names are tried, so the answer never depends on the interface
+     * language — self::for()['job_level'] is localised and must not be used
+     * here. The comparison is normalised because HR may store the dash, the
+     * spacing or the capitalisation differently. Nothing is stored locally and
+     * no extra HR query is made: the remembered lookup already holds the level.
+     */
+    public static function isDepartmentManager(int $employeeId): bool
+    {
+        /** @var array<string, mixed>|false|null $entry */
+        $entry = self::rememberedHrLookupEntry($employeeId, fn (): array => self::load());
+
+        if (! is_array($entry) || $entry['is_active'] !== true) {
+            return false;
+        }
+
+        $wanted = self::normalizedJobLevel((string) config('access-control.department_manager_job_level'));
+
+        if ($wanted === '') {
+            return false;
+        }
+
+        foreach ([$entry['job_level_en'], $entry['job_level_ar']] as $name) {
+            if (is_string($name) && self::normalizedJobLevel($name) === $wanted) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    /**
+     * A job level name reduced to what the comparison cares about: every dash
+     * variant as "-" with no space around it, runs of whitespace as one space,
+     * trimmed and case-folded.
+     */
+    private static function normalizedJobLevel(string $name): string
+    {
+        $name = str_replace(["\u{2010}", "\u{2011}", "\u{2012}", "\u{2013}", "\u{2014}", "\u{2015}", "\u{2212}"], '-', $name);
+        $name = preg_replace('/\s*-\s*/u', '-', $name) ?? $name;
+
+        return mb_strtolower(trim(preg_replace('/\s+/u', ' ', $name) ?? $name));
+    }
+
+    /**
+     * Who manages a department: the active employee whose current position in
+     * it carries the department-manager job level. Null when it has none.
+     *
+     * The "is this person a department manager" half is W-14's
+     * isDepartmentManager() above and is not repeated here — D-65 has one
+     * definition, and a rule written twice drifts. This adds only the other
+     * half, picking one holder when a department has several, which is
+     * normal: on the live HR data Finance has three. The tie-break is the one
+     * holderOfPosition() already uses, the latest contract start date, and an
+     * ambiguous department is logged rather than resolved silently.
+     *
+     * Reads the lookup already in memory: no extra HR query.
      */
     public static function managerOfDepartment(int $departmentId): ?int
     {
@@ -115,7 +163,7 @@ final class EmployeeProfile
         $candidates = 0;
 
         foreach (self::rememberedHrLookup(fn (): array => self::load()) as $employeeId => $entry) {
-            if (! is_array($entry) || $entry['department_id'] !== $departmentId || $entry['grade'] !== self::DepartmentManagerGrade) {
+            if (! is_array($entry) || $entry['department_id'] !== $departmentId || ! self::isDepartmentManager($employeeId)) {
                 continue;
             }
 

@@ -15,7 +15,8 @@ function deskPanelIds(User $user): array
 test('each role starts from its own layout, and a Super Admin from the General Manager one', function () {
     expect(deskPanelIds(User::factory()->role('Team Member')->create()))->toBe(['needs', 'overdue', 'flow', 'notes', 'tasks', 'coming', 'milestones', 'projects'])
         ->and(deskPanelIds(User::factory()->role('Super Admin')->create()))->toContain('glance', 'money', 'pipeline')
-        ->and(deskPanelIds(User::factory()->role('Financial')->create()))->toBe(['needs', 'overdue', 'flow', 'money', 'transfers', 'deliverables', 'duties', 'projects']);
+        /* A department manager, so the deliverables panel is still offered (W-14, D-65). */
+        ->and(deskPanelIds(User::factory()->role('Financial')->create(['employee_id' => insertHrDepartmentManager()])))->toBe(['needs', 'overdue', 'flow', 'money', 'transfers', 'deliverables', 'duties', 'projects']);
 });
 
 test('a role without a layout falls back to the Team Member one, minus what it may not see', function () {
@@ -93,6 +94,44 @@ test('a drag or pulled edge saves the arrangement it showed, kept within the gri
     expect(collect($user->fresh()->desk_layout)->firstWhere('panel', 'needs'))->toMatchArray(['rows' => Panels::MaxRows]);
 });
 
+test('a card dropped into a full row is saved there, and the card it pushed opens the next row', function () {
+    $user = User::factory()->role('Team Member')->create();
+    $pushed = [
+        ['panel' => 'needs', 'cols' => 3, 'rows' => 4],
+        ['panel' => 'overdue', 'cols' => 3, 'rows' => 4],
+        ['panel' => 'tasks', 'cols' => 3, 'rows' => 4],
+        ['panel' => 'flow', 'cols' => 3, 'rows' => 4],
+        ['panel' => 'notes', 'cols' => 4, 'rows' => 5],
+        ['panel' => 'coming', 'cols' => 4, 'rows' => 5],
+        ['panel' => 'milestones', 'cols' => 4, 'rows' => 5],
+        ['panel' => 'projects', 'cols' => 12, 'rows' => 4],
+    ];
+
+    Livewire::actingAs($user)->test('pages::desk.index')->call('arrangePanels', $pushed);
+
+    expect(array_map(fn (array $entry): array => ['panel' => $entry['panel'], 'cols' => $entry['cols'], 'rows' => $entry['rows']], app(Panels::class)->layoutFor($user->fresh())))
+        ->toBe($pushed);
+});
+
+test('a card grown past its neighbours is saved wider, with them wrapped to the start of the next row', function () {
+    $user = User::factory()->role('Team Member')->create();
+    $grown = [
+        ['panel' => 'needs', 'cols' => 4, 'rows' => 3],
+        ['panel' => 'notes', 'cols' => 8, 'rows' => 3],
+        ['panel' => 'overdue', 'cols' => 3, 'rows' => 4],
+        ['panel' => 'flow', 'cols' => 3, 'rows' => 4],
+        ['panel' => 'tasks', 'cols' => 3, 'rows' => 4],
+        ['panel' => 'coming', 'cols' => 3, 'rows' => 4],
+        ['panel' => 'milestones', 'cols' => 6, 'rows' => 4],
+        ['panel' => 'projects', 'cols' => 6, 'rows' => 4],
+    ];
+
+    Livewire::actingAs($user)->test('pages::desk.index')->call('arrangePanels', $grown);
+
+    expect(array_map(fn (array $entry): array => ['panel' => $entry['panel'], 'cols' => $entry['cols'], 'rows' => $entry['rows']], app(Panels::class)->layoutFor($user->fresh())))
+        ->toBe($grown);
+});
+
 test('an arrangement that does not hold exactly the placed panels is ignored', function () {
     $user = User::factory()->role('Team Member')->create();
     $desk = Livewire::actingAs($user)->test('pages::desk.index');
@@ -160,6 +199,13 @@ test('the customize sheet no longer lists the panels a role may not see', functi
         ->test('pages::desk.index')
         ->assertDontSeeHtml('data-locked-panel')
         ->assertDontSee(__('desk.panel.money.locked'));
+});
+
+test('the customize sheet offers the To-do panel under Add, with the work panels', function () {
+    Livewire::actingAs(User::factory()->role('Team Member')->create())
+        ->test('pages::desk.index')
+        ->assertSeeHtml('x-show="isAddable(\'todo\')" data-customize-add="todo"')
+        ->assertSee(__('desk.customize_sheet.add_panel', ['panel' => __('desk.panel.todo.title')]));
 });
 
 test('the customize sheet says there is nothing to add once every allowed panel is placed', function () {

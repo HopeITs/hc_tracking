@@ -21,6 +21,7 @@ return [
     'guideline' => 'دليل الاستخدام',
     'indicator_library' => 'مكتبة المؤشرات',
     'sectors' => 'القطاعات',
+    'risk_library' => 'مكتبة المخاطر',
     'evidence_types' => 'أنواع الشواهد',
     'monthly_reports' => 'التقارير الشهرية',
     'report_templates' => 'قوالب بانتظار التأكيد',

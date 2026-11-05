@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Tests\PHPStan;
 
+use App\Livewire\Concerns\FiltersByStrategy;
 use App\Livewire\Concerns\Indicators\BuildsIndicatorRows;
 use App\Livewire\Concerns\Indicators\InspectsIndicatorChain;
 use App\Livewire\Concerns\Indicators\ManagesIndicatorForm;
@@ -24,6 +25,7 @@ use Livewire\WithPagination;
 abstract class IndicatorsIndexPageHost extends Component
 {
     use BuildsIndicatorRows;
+    use FiltersByStrategy;
     use InspectsIndicatorChain;
     use ManagesIndicatorForm;
     use ManagesIndicatorReadings;

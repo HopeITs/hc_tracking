@@ -78,9 +78,15 @@
 
     /* ── Move: the carried card floats; the rest spring aside ─────── */
     .dk-grid > .dk-panel.dk-dragging {
-        z-index: 30; transition: none !important; filter: none !important;
+        z-index: 30; opacity: 1; transition: none !important; filter: none !important;
         box-shadow: 0 0 0 1.5px color-mix(in srgb, var(--brand) 70%, transparent), 0 30px 60px -24px color-mix(in srgb, var(--ink) 45%, transparent);
     }
+
+    /* Dropping beside a card: a bar in the gap on the side it will land (desk-grid.js). */
+    .dk-grid > .dk-panel.dk-drop-before { box-shadow: -6px 0 0 -2px var(--brand); }
+    .dk-grid > .dk-panel.dk-drop-after { box-shadow: 6px 0 0 -2px var(--brand); }
+    [dir="rtl"] .dk-grid > .dk-panel.dk-drop-before { box-shadow: 6px 0 0 -2px var(--brand); }
+    [dir="rtl"] .dk-grid > .dk-panel.dk-drop-after { box-shadow: -6px 0 0 -2px var(--brand); }
 
     /* ── Resize handles: edges and corner ─────────────────────────── */
     .dk-rz { position: absolute; z-index: 9; touch-action: none; -webkit-user-select: none; user-select: none; opacity: 0; transition: opacity .15s ease; }

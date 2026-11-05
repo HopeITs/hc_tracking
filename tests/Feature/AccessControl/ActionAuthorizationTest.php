@@ -21,6 +21,26 @@ function lifecycleActionStubs(): array
 }
 
 /**
+ * Helper actions that are only ever called from inside another action's
+ * transaction, after that action has authorized the person (contracts.md §6:
+ * "No Gate: the caller has already authorised"). They may read the signed-in
+ * user for the activity actor, unlike a system action. The test below keeps
+ * the exemption honest: it fails if any caller stops authorizing.
+ *
+ * @return list<string> action file => the actions that call it
+ */
+function callerAuthorizedActions(): array
+{
+    return [
+        'Tasks/SyncReportTask.php' => [
+            'FundingAgreements/MarkDonorReportSubmitted.php',
+            'FundingAgreements/DeleteDonorReport.php',
+            'DonorReports/SaveDonorReportSnapshot.php',
+        ], // W-13 (D-64): keeps a donor report's task in step with the report
+    ];
+}
+
+/**
  * Actions that run as the system, from a queue, with no signed-in user. They
  * take ids from an already-authorized event or job, re-read every row and
  * record their activity with the system actor, so they have no Gate to call.
@@ -37,7 +57,7 @@ function systemActions(): array
 
 it('authorizes inside every sensitive action', function (string $directory) {
     $files = File::files(app_path("Actions/{$directory}"));
-    $stubs = [...lifecycleActionStubs(), ...systemActions()];
+    $stubs = [...lifecycleActionStubs(), ...systemActions(), ...array_keys(callerAuthorizedActions())];
 
     expect($files)->not->toBeEmpty();
 
@@ -57,6 +77,18 @@ it('exempts only queued system actions that never read the signed-in user', func
 
     expect($source)->not->toContain('Auth::')->not->toContain('auth()')->not->toContain('Gate::');
 })->with(systemActions());
+
+it('exempts a caller-authorized action only while every caller authorizes', function () {
+    foreach (callerAuthorizedActions() as $action => $callers) {
+        expect(File::get(app_path("Actions/{$action}")))->not->toContain('Gate::');
+
+        foreach ($callers as $caller) {
+            expect(File::get(app_path("Actions/{$caller}")))
+                ->toMatch('/Gate::(forUser\([^)]*\)->)?authorize\(/')
+                ->toContain(pathinfo($action, PATHINFO_FILENAME));
+        }
+    }
+});
 
 // A loop, not a dataset: Pest rejects an empty dataset, and the list empties as tasks land.
 it('exempts only actions that are still contract stubs', function () {

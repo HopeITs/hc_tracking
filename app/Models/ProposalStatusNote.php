@@ -6,12 +6,14 @@ namespace App\Models;
 
 use App\Concerns\RecordsParentActivity;
 use App\Enums\ProposalStatus;
+use App\Enums\StatusNoteKind;
 use Carbon\CarbonImmutable;
 use Database\Factories\ProposalStatusNoteFactory;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\MorphMany;
 use Illuminate\Support\Str;
 
 /**
@@ -21,6 +23,7 @@ use Illuminate\Support\Str;
  * @property int $proposal_id
  * @property ProposalStatus $status
  * @property string $context
+ * @property StatusNoteKind $kind
  * @property CarbonImmutable $date
  * @property CarbonImmutable|null $meeting_at
  * @property bool $is_correction
@@ -28,19 +31,20 @@ use Illuminate\Support\Str;
  * @property CarbonImmutable|null $created_at
  * @property CarbonImmutable|null $updated_at
  */
-#[Fillable(['proposal_id', 'status', 'context', 'date', 'meeting_at', 'is_correction', 'changed_by'])]
+#[Fillable(['proposal_id', 'status', 'context', 'kind', 'date', 'meeting_at', 'is_correction', 'changed_by'])]
 class ProposalStatusNote extends Model
 {
     /** @use HasFactory<ProposalStatusNoteFactory> */
     use HasFactory, RecordsParentActivity;
 
     /**
-     * Mirror the column default so an unrefreshed note still reports it.
+     * Mirror the column defaults so an unrefreshed note still reports them.
      *
-     * @var array<string, bool>
+     * @var array<string, bool|string>
      */
     protected $attributes = [
         'is_correction' => false,
+        'kind' => StatusNoteKind::Transition->value,
     ];
 
     /**
@@ -65,6 +69,16 @@ class ProposalStatusNote extends Model
     }
 
     /**
+     * The files attached to a negotiation or extension note.
+     *
+     * @return MorphMany<Media, $this>
+     */
+    public function media(): MorphMany
+    {
+        return $this->morphMany(Media::class, 'mediable');
+    }
+
+    /**
      * Get the attributes that should be cast.
      *
      * @return array<string, string|class-string>
@@ -73,6 +87,7 @@ class ProposalStatusNote extends Model
     {
         return [
             'status' => ProposalStatus::class,
+            'kind' => StatusNoteKind::class,
             'date' => 'date',
             'meeting_at' => 'immutable_datetime',
             'is_correction' => 'boolean',
@@ -89,7 +104,8 @@ class ProposalStatusNote extends Model
 
     protected function parentActivityEvent(string $hook): ?string
     {
-        return $hook === 'created' ? 'proposal.status_note_added' : null;
+        // Negotiation and extension notes log their own event (AddNegotiationNote, ExtendProposal) with names and dates only.
+        return $hook === 'created' && ! in_array($this->kind, [StatusNoteKind::Negotiation, StatusNoteKind::Extension], true) ? 'proposal.status_note_added' : null;
     }
 
     /**

@@ -360,6 +360,11 @@ return [
             'description' => 'Your own quick notes and reminders, private to you, always one glance away.',
             'locked' => 'Everyone has this panel.',
         ],
+        'todo' => [
+            'title' => 'My to-do',
+            'description' => 'A short private list: add what you must do, tick it off, drag to reorder. Only you can see it.',
+            'locked' => 'Everyone has this panel.',
+        ],
         'overdue' => [
             'title' => 'Past the deadline',
             'description' => 'Tasks, milestones and reports of yours that missed their date, oldest first, so nothing late hides.',

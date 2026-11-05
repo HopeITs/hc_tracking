@@ -267,7 +267,7 @@ new #[Layout('layouts::desk'), Title('titles.program')] class extends Component 
         <div class="dk-story-h">
             <div>
                 <p class="dk-eyebrow">{{ __('common.program') }}</p>
-                <h1>
+                <h1 class="page-title">
                     {{ $this->program->name }}
                     @if (app(\App\Notifications\UnreadSubjects::class)->has(auth()->user(), 'program', $this->program->id))
                         <span class="inline-block size-2.5 rounded-full bg-primary align-middle dark:bg-ink" data-unread-dot title="{{ __('notifications.has_unread') }}"><span class="sr-only">{{ __('notifications.has_unread') }}</span></span>

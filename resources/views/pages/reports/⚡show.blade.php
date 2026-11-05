@@ -183,7 +183,6 @@ new #[Layout('layouts::desk'), Title('titles.report')] class extends Component {
         :title="$planIndicator->indicator->name"
         :unread="app(\App\Notifications\UnreadSubjects::class)->has(auth()->user(), 'report', $this->reportId)"
         :subtitle="$planIndicator->indicator->result->statement"
-        title-class="text-3xl! font-extrabold! leading-none! tracking-tight!"
     >
         <x-slot:meta>
             <span class="tabular-nums">{{ __('reports.period_to_date', ['date' => $report->planned_date?->translatedFormat(__('formats.date'))]) }}</span>

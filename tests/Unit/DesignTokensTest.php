@@ -62,6 +62,39 @@ test('the stylesheet exposes the project design tokens', function () {
     ]);
 });
 
+test('panels share one radius token and one border token that follows the line colour in both themes', function () {
+    $tokens = file_get_contents(dirname(__DIR__, 2).'/resources/css/tokens.css');
+    [$light, $dark] = explode('.dark {', $tokens, 2);
+
+    expect($light)->toContain('--radius-panel: 0.75rem;')
+        ->toContain('--color-panel-border: var(--color-line);')
+        ->and($dark)->toContain('--color-panel-border: var(--color-line);');
+});
+
+test('every page title shares the HR title style and the eyebrow uses the faint grey', function () {
+    $css = dirname(__DIR__, 2).'/resources/css';
+    [$light, $dark] = explode('.dark {', file_get_contents($css.'/tokens.css'), 2);
+    $views = bladeViews();
+
+    expect($light)->toContain('--text-h1: 2.125rem;')
+        ->toContain('--text-h1--line-height: 1.2;')
+        ->toContain('--color-heading: #414042;')
+        ->and($dark)->toContain('--color-heading: var(--color-desk-ink);')
+        ->and(file_get_contents($css.'/typography.css'))->toContain('@utility page-title')
+        ->and(file_get_contents($css.'/desk.css'))->toContain('.dk-eyebrow{ font-size:12px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--faint) }');
+
+    foreach (['pages/desk/⚡index.blade.php', 'components/desk/register.blade.php', 'pages/projects/_story-header.blade.php', 'pages/programs/⚡show.blade.php'] as $path) {
+        expect($views[$path])->toContain('<h1 class="page-title"');
+    }
+
+    expect($views['pages/desk/⚡index.blade.php'])->toContain('<span class="dk-hello-fig"><b class="dk-num page-title">')
+        ->toContain('<span class="dk-hello-fig dk-late"><b class="dk-num page-title text-brand-ink!">');
+
+    expect($views['components/ui/page-header.blade.php'])->toContain('class="page-title!"')
+        ->and($views['components/ui/detail-header.blade.php'])->toContain('class="page-title! {{ $titleClass }}"')
+        ->and(implode("\n", $views))->not->toMatch('/title-class="[^"]*(text-3xl|text-\[|font-|leading-|tracking-)/');
+});
+
 test('the stylesheet never selects elements by their translated text', function () {
     expect(stylesheetSource())->not->toMatch('/\[(aria-label|title|placeholder|alt)\s*[~|^$*]?=/');
 });

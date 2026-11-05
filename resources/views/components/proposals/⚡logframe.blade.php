@@ -1,6 +1,7 @@
 <?php
 
 use App\Livewire\Concerns\Proposals\CopiesProgramFramework;
+use App\Livewire\Concerns\Proposals\ManagesProposalRisks;
 use App\Livewire\Concerns\Results\BuildsResultsFramework;
 use App\Livewire\Concerns\Results\BuildsResultsTree;
 use App\Livewire\Concerns\Results\FiltersResultsChain;
@@ -37,6 +38,7 @@ new class extends Component {
     use CopiesProgramFramework;
     use BuildsResultsTree;
     use FiltersResultsChain;
+    use ManagesProposalRisks;
     use ManagesResultForm;
 
     #[Locked]
@@ -220,7 +222,7 @@ new class extends Component {
     @else
         <div class="space-y-5" data-test="logframe-tree">
             @foreach ($roots['tree'] as $node)
-                <x-ui.framework-node :node="$node" :depth="0" :order="$loop->index" :editable="$editable" wire:key="logframe-root-{{ $node['result']->id }}" />
+                <x-ui.framework-node :node="$node" :depth="0" :order="$loop->index" :editable="$editable" :risk-counts="$this->riskCounts" wire:key="logframe-root-{{ $node['result']->id }}" />
             @endforeach
         </div>
 
@@ -228,14 +230,20 @@ new class extends Component {
             <section class="space-y-3" aria-labelledby="logframe-cross-cutting-heading" data-test="logframe-cross-cutting">
                 <h3 id="logframe-cross-cutting-heading" class="type-label text-secondary-medium dark:text-ink-muted">{{ __('results_framework.cross_cutting_group') }}</h3>
                 @foreach ($roots['crossCutting'] as $node)
-                    <x-ui.framework-node :node="$node" :depth="0" :order="$loop->index" :editable="$editable" wire:key="logframe-cross-cutting-{{ $node['result']->id }}" />
+                    <x-ui.framework-node :node="$node" :depth="0" :order="$loop->index" :editable="$editable" :risk-counts="$this->riskCounts" wire:key="logframe-cross-cutting-{{ $node['result']->id }}" />
                 @endforeach
             </section>
         @endif
 
         {{-- Re-mounted when an activity is added, renamed, retyped or removed above, so its rows follow the tree. --}}
         <livewire:proposals.activity-calendar :proposal-id="$proposalId" wire:key="activity-calendar-{{ $this->activitiesFingerprint }}" />
+
+        @if ($this->riskHeat['total'] > 0)
+            <x-ui.risk-heat-map :cells="$this->riskHeat['cells']" :unrated="$this->riskHeat['unrated']" data-test="proposal-risk-heat" />
+        @endif
     @endif
+
+    @include('components.proposals._logframe-risks-drawer')
 
     @include('pages.results._index-result-modal')
 

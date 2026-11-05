@@ -427,3 +427,13 @@ test('the risk form is rendered only while its modal is open', function () {
         ->call('openCreateModal')
         ->assertSeeHtml('wire:model="impact"');
 });
+
+test('the legacy register stays reachable for one release and says where risks live now', function () {
+    $user = User::factory()->role('General Manager')->create();
+
+    $this->actingAs($user)->get(route('risks.index'))
+        ->assertOk()
+        ->assertSee('data-test="risk-register-moved-notice"', false)
+        ->assertSee(__('risks.moved_notice'))
+        ->assertSee(route('proposals.index'), false);
+});

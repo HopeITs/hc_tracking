@@ -64,7 +64,7 @@ new #[Layout('layouts::desk'), Title('titles.funding_agreement')] class extends 
             ->select(['id', 'donor_id', 'proposal_id', 'budget', 'currency', 'external_project_number', 'created_at', 'updated_at'])
             ->with([
                 'donor:id,name,type,contact_person,email,phone,country,last_contacted_on,next_step,next_step_due_on',
-                'proposal:id,name,internal_project_number,status,planned_date_begin,planned_date_end,actual_date_begin,actual_date_end',
+                'proposal:id,name,internal_project_number,status,planned_date_begin,planned_date_end,actual_date_begin,actual_date_end,extended_date_end',
             ])
             ->findOrFail($this->agreementId);
     }
@@ -229,7 +229,7 @@ new #[Layout('layouts::desk'), Title('titles.funding_agreement')] class extends 
         ]"
         :title="$donor->name.' · '.$proposal->name"
         :unread="app(\App\Notifications\UnreadSubjects::class)->has(auth()->user(), 'donor_proposal', $this->agreementId)"
-        title-class="text-3xl! font-bold! leading-tight! tracking-tight! text-balance @3xl/detail:text-[2.5rem]!"
+        title-class="text-balance"
     >
         <x-slot:meta>
             <x-ui.project-number :number="$proposal->internal_project_number" kind="internal" label class="{{ $inkText }}" />

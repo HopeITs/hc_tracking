@@ -1,8 +1,13 @@
-@props(['title' => null, 'subtitle' => null, 'count' => null])
+@props(['title' => null, 'subtitle' => null, 'count' => null, 'as' => 'section', 'clip' => true])
 
-<section data-panel {{ $attributes->class('overflow-hidden rounded-xl border border-secondary-soft bg-white shadow-card dark:border-transparent dark:bg-surface-1 dark:shadow-raised') }}>
+@php
+    $tag = in_array($as, ['section', 'aside', 'article', 'div', 'ol', 'ul'], true) ? $as : 'section';
+@endphp
+
+{{-- The bordered card (W-29): radius and border from the panel tokens. clip=false keeps sticky children working (overflow-hidden would trap them). --}}
+<{{ $tag }} data-panel {{ $attributes->class(['rounded-panel border border-panel-border bg-white shadow-card dark:bg-surface-1 dark:shadow-raised', 'overflow-hidden' => $clip]) }}>
     @if ($title !== null || isset($toolbar))
-        <div class="flex min-h-12 flex-wrap items-center justify-between gap-2 border-b border-secondary-soft px-4 py-3 dark:border-line">
+        <div class="flex min-h-12 flex-wrap items-center justify-between gap-2 border-b border-panel-border px-4 py-3">
             <div class="min-w-0">
                 @if ($title !== null)
                     <div class="flex items-center gap-2">
@@ -23,6 +28,6 @@
     {{ $slot }}
 
     @isset($footer)
-        <div class="border-t border-secondary-soft px-4 pb-3 dark:border-line">{{ $footer }}</div>
+        <div class="border-t border-panel-border px-4 pb-3">{{ $footer }}</div>
     @endisset
-</section>
+</{{ $tag }}>

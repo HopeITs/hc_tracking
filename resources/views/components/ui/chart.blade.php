@@ -50,24 +50,27 @@
             <div x-ref="canvas"></div>
         </div>
 
-        <table class="sr-only">
-            <caption>{{ $label }}</caption>
-            <tbody>
-                @if ($type === 'donut')
-                    @foreach (array_values($categories) as $index => $category)
-                        <tr><th scope="row">{{ $category }}</th><td>{{ $series[$index] ?? 0 }}</td></tr>
-                    @endforeach
-                @else
-                    @foreach ($series as $entry)
+        {{-- The 1px box sits on a div: a table ignores width and overflow, so sr-only on the table itself still widens the page. --}}
+        <div class="sr-only">
+            <table>
+                <caption>{{ $label }}</caption>
+                <tbody>
+                    @if ($type === 'donut')
                         @foreach (array_values($categories) as $index => $category)
-                            <tr>
-                                <th scope="row">{{ ($entry['name'] ?? '') !== '' ? $entry['name'].' · ' : '' }}{{ $category }}</th>
-                                <td>{{ $entry['data'][$index] ?? 0 }}{{ $currency ? ' '.$currency : '' }}</td>
-                            </tr>
+                            <tr><th scope="row">{{ $category }}</th><td>{{ $series[$index] ?? 0 }}</td></tr>
                         @endforeach
-                    @endforeach
-                @endif
-            </tbody>
-        </table>
+                    @else
+                        @foreach ($series as $entry)
+                            @foreach (array_values($categories) as $index => $category)
+                                <tr>
+                                    <th scope="row">{{ ($entry['name'] ?? '') !== '' ? $entry['name'].' · ' : '' }}{{ $category }}</th>
+                                    <td>{{ $entry['data'][$index] ?? 0 }}{{ $currency ? ' '.$currency : '' }}</td>
+                                </tr>
+                            @endforeach
+                        @endforeach
+                    @endif
+                </tbody>
+            </table>
+        </div>
     @endif
 </figure>

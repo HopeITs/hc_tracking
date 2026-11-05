@@ -142,8 +142,8 @@ test('the task page form follows the same rules', function () {
 
 test('the desk tasks card lists mine (assigned or created), my department, and offers approve on reviews', function () {
     $department = insertHrDepartment();
-    $me = userWithRole('Managers', insertHrEmployee());
-    insertHrContract($me->employee_id, insertHrPosition($department));
+    /* The `department` scope belongs to a grade-5 department manager (W-14, D-65). */
+    $me = userWithRole('Managers', insertHrDepartmentManager($department));
     $colleague = insertHrEmployee();
     insertHrContract($colleague, insertHrPosition($department));
     $stranger = insertHrEmployee();

@@ -1,6 +1,7 @@
 <?php
 
 return [
+    'negotiation_pending_suffix' => ' — بانتظار المراجعة: :names',
     'review_meeting_suffix' => ' — اجتماع المراجعة :at',
     'system' => 'النظام',
     'report_template_org_wide_targets' => 'المستهدفات على مستوى المنظمة',
@@ -412,6 +413,8 @@ return [
             'created' => 'أضاف :actor البرنامج «:subject»',
             'created_you' => 'جعلك :actor مديرًا للبرنامج الجديد «:subject»',
             'manager_changed' => 'جعل :actor :to مديرًا للبرنامج «:subject»',
+            'manager_removed' => 'أزال :actor :from من إدارة البرنامج «:subject»',
+            'manager_and_strategy_changed' => 'ربط :actor البرنامج «:subject» بـ :strategy وجعل :to مديرًا له',
             'manager_changed_you' => 'جعلك :actor مديرًا للبرنامج «:subject»',
             'updated' => 'حدّث :actor البرنامج «:subject»',
             'deleted' => 'حذف :actor البرنامج «:subject»',
@@ -424,6 +427,7 @@ return [
             'created' => 'أنشأ :actor الخطة السنوية «:subject»',
             'created_you' => 'جعلك :actor مديرًا للخطة السنوية الجديدة «:subject»',
             'manager_changed' => 'جعل :actor :to مديرًا للخطة السنوية «:subject»',
+            'manager_removed' => 'أزال :actor :from من إدارة الخطة السنوية «:subject»',
             'manager_changed_you' => 'جعلك :actor مديرًا للخطة السنوية «:subject»',
             'updated' => 'حدّث :actor الخطة السنوية «:subject»',
             'deleted' => 'حذف :actor الخطة السنوية «:subject»',
@@ -553,6 +557,14 @@ return [
                 'title' => 'فكّ ربط مشروع',
                 'body' => 'فكّ :actor ربط مشروع من «:subject»',
             ],
+            'risk_attached' => [
+                'title' => 'إضافة خطر',
+                'body' => 'أضاف :actor الخطر «:value» إلى «:subject»',
+            ],
+            'risk_detached' => [
+                'title' => 'إزالة خطر',
+                'body' => 'أزال :actor الخطر «:value» من «:subject»',
+            ],
             'updated' => 'حدّث :actor المقترح «:subject»',
             'deleted' => [
                 'title' => 'حذف مقترح',
@@ -577,6 +589,14 @@ return [
                 'body' => 'راجَع :actor المقترح «:subject»',
             ],
             'reviewer_note_updated' => 'عدّل :actor ملاحظة مراجعته على المقترح «:subject»',
+            'negotiation_noted' => [
+                'title' => 'ملاحظة تفاوض جديدة',
+                'body' => 'سجّل :actor ملاحظة تفاوض مع المانح على المقترح «:subject»:pending',
+            ],
+            'extended' => [
+                'title' => 'تمديد مقترح',
+                'body' => 'مدّد :actor المقترح «:subject» حتى :value',
+            ],
             'need_assessment_added' => [
                 'title' => 'إضافة تقييم احتياج',
                 'body' => 'أرفق :actor تقييم احتياج بالمقترح «:subject»',

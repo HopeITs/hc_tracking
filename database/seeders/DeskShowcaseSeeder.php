@@ -21,6 +21,7 @@ use App\Models\IndicatorProgress;
 use App\Models\MealCoverageAssignment;
 use App\Models\Milestone;
 use App\Models\MonthlyReport;
+use App\Models\Program;
 use App\Models\Project;
 use App\Models\Proposal;
 use App\Models\ProposalReviewer;
@@ -153,6 +154,8 @@ class DeskShowcaseSeeder extends Seeder
                 }
             }
 
+            $this->linkProgramsToCurrentStrategy($today->year);
+
             $this->seedDecisionsAndWaiting($admins, $employees, $projects, $underReview, $today);
             $this->seedTransfers($today);
             $this->seedTargetsBehind($admins->first()?->id ?? $preparer, $today);
@@ -248,6 +251,28 @@ class DeskShowcaseSeeder extends Seeder
                 ]);
                 $task->taskAssignees()->create(['employee_id' => $employees[$i % count($employees)]]);
             }
+        }
+    }
+
+    /**
+     * Every program without a strategy joins the one covering this year,
+     * spread over its pillars, so the strategy roll-ups have something to read.
+     */
+    private function linkProgramsToCurrentStrategy(int $year): void
+    {
+        $strategy = Strategy::query()->where('start_year', '<=', $year)->where('end_year', '>=', $year)->orderBy('id')->first();
+
+        if ($strategy === null) {
+            return;
+        }
+
+        $pillarIds = StrategicPillar::query()->where('strategy_id', $strategy->id)->orderBy('code')->pluck('id')->values();
+
+        foreach (Program::query()->whereNull('strategy_id')->orderBy('id')->get() as $i => $program) {
+            $program->update([
+                'strategy_id' => $strategy->id,
+                'strategic_pillar_id' => $pillarIds->isEmpty() ? null : $pillarIds[$i % $pillarIds->count()],
+            ]);
         }
     }
 

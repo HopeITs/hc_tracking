@@ -44,7 +44,7 @@
             <x-projects.sector-chips :sectors="$project->sectors" class="ms-1.5 inline-flex! align-middle" data-test="project-sectors" />
         </div>
 
-        <h1>
+        <h1 class="page-title">
             {{ $project->name }}
             @if (app(\App\Notifications\UnreadSubjects::class)->has(auth()->user(), 'project', $project->id))
                 <span class="inline-block size-2.5 rounded-full bg-primary align-middle dark:bg-ink" data-unread-dot title="{{ __('notifications.has_unread') }}"><span class="sr-only">{{ __('notifications.has_unread') }}</span></span>

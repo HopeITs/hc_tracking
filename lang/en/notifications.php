@@ -1,6 +1,7 @@
 <?php
 
 return [
+    'negotiation_pending_suffix' => ' — still to review: :names',
     'review_meeting_suffix' => ' — review meeting :at',
     'system' => 'The system',
     'report_template_org_wide_targets' => 'the organization-wide targets',
@@ -412,6 +413,8 @@ return [
             'created' => ':actor added the program “:subject”',
             'created_you' => ':actor made you the manager of the new program “:subject”',
             'manager_changed' => ':actor made :to the manager of “:subject”',
+            'manager_removed' => ':actor removed :from as manager of “:subject”',
+            'manager_and_strategy_changed' => ':actor linked “:subject” to :strategy and made :to its manager',
             'manager_changed_you' => ':actor made you the manager of “:subject”',
             'updated' => ':actor updated the program “:subject”',
             'deleted' => ':actor deleted the program “:subject”',
@@ -424,6 +427,7 @@ return [
             'created' => ':actor created the annual plan “:subject”',
             'created_you' => ':actor made you the manager of the new annual plan “:subject”',
             'manager_changed' => ':actor made :to the manager of the annual plan “:subject”',
+            'manager_removed' => ':actor removed :from as manager of the annual plan “:subject”',
             'manager_changed_you' => ':actor made you the manager of the annual plan “:subject”',
             'updated' => ':actor updated the annual plan “:subject”',
             'deleted' => ':actor deleted the annual plan “:subject”',
@@ -553,6 +557,14 @@ return [
                 'title' => 'Project unlinked',
                 'body' => ':actor unlinked a project from “:subject”',
             ],
+            'risk_attached' => [
+                'title' => 'Risk added',
+                'body' => ':actor added the risk “:value” to “:subject”',
+            ],
+            'risk_detached' => [
+                'title' => 'Risk removed',
+                'body' => ':actor removed the risk “:value” from “:subject”',
+            ],
             'updated' => ':actor updated the proposal “:subject”',
             'deleted' => [
                 'title' => 'Proposal deleted',
@@ -577,6 +589,14 @@ return [
                 'body' => ':actor reviewed “:subject”',
             ],
             'reviewer_note_updated' => ':actor updated their review note on “:subject”',
+            'negotiation_noted' => [
+                'title' => 'Negotiation note added',
+                'body' => ':actor recorded a donor negotiation note on “:subject”:pending',
+            ],
+            'extended' => [
+                'title' => 'Proposal extended',
+                'body' => ':actor extended “:subject” until :value',
+            ],
             'need_assessment_added' => [
                 'title' => 'Need assessment added',
                 'body' => ':actor attached a need assessment to “:subject”',

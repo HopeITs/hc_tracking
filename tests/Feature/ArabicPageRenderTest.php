@@ -14,7 +14,8 @@ dataset('translated pages', [
 ]);
 
 test('a new page renders right to left in arabic with an arabic title and label', function (string $route, string $role, string $titleKey, string $labelKey) {
-    $user = userWithRole($role);
+    /* A department manager (W-14, D-65), so department-tasks opens like the rest. */
+    $user = userWithRole($role, insertHrDepartmentManager());
     $user->forceFill(['locale' => 'ar'])->save();
 
     $this->actingAs($user)
@@ -26,7 +27,7 @@ test('a new page renders right to left in arabic with an arabic title and label'
 })->with('translated pages');
 
 test('the same page renders left to right in english', function (string $route, string $role, string $titleKey, string $labelKey) {
-    $user = userWithRole($role);
+    $user = userWithRole($role, insertHrDepartmentManager());
     $user->forceFill(['locale' => 'en'])->save();
 
     $this->actingAs($user)

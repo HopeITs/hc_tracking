@@ -414,7 +414,7 @@ new #[Layout('layouts::desk'), Title('titles.department_tasks')] class extends C
 
             <x-ui.header-filter-select :label="__('department_tasks.kind')" wire:model.live="kind" :value="$kind">
                 <option value="">{{ __('department_tasks.all_kinds') }}</option>
-                @foreach (TaskKind::cases() as $kindCase)
+                @foreach (TaskKind::department() as $kindCase)
                     <option value="{{ $kindCase->value }}">{{ $kindCase->label() }}</option>
                 @endforeach
             </x-ui.header-filter-select>

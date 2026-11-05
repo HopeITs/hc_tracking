@@ -1,6 +1,8 @@
 <?php
 
+use App\Livewire\Concerns\FiltersByStrategy;
 use App\Support\Like;
+use App\Support\StrategyRollup;
 use App\Models\Project;
 use App\Models\Risk;
 use Flux\Flux;
@@ -18,6 +20,7 @@ use Livewire\Component;
 use Livewire\WithPagination;
 
 new #[Layout('layouts::desk'), Title('titles.risks')] class extends Component {
+    use FiltersByStrategy;
     use WithPagination;
 
     #[Url(except: '')]
@@ -31,6 +34,10 @@ new #[Layout('layouts::desk'), Title('titles.risks')] class extends Component {
 
     #[Url(except: false)]
     public bool $unmitigated = false;
+
+    /** Only risks scoring StrategyRollup::HighRiskScore or more on the heat map. */
+    #[Url(except: false)]
+    public bool $high = false;
 
     /** The register view: the risk list, or a Board by whether the risk happened. */
     #[Url(except: 'list')]
@@ -78,6 +85,12 @@ new #[Layout('layouts::desk'), Title('titles.risks')] class extends Component {
         $this->resetPage();
     }
 
+    public function toggleHigh(): void
+    {
+        $this->high = ! $this->high;
+        $this->resetPage();
+    }
+
     public function toggleUnmitigated(): void
     {
         $this->unmitigated = ! $this->unmitigated;
@@ -90,7 +103,8 @@ new #[Layout('layouts::desk'), Title('titles.risks')] class extends Component {
         $this->project = '';
         $this->materialisedOnly = false;
         $this->unmitigated = false;
-        $this->resetPage();
+        $this->high = false;
+        $this->clearStrategyFilter();
     }
 
     /**
@@ -102,7 +116,7 @@ new #[Layout('layouts::desk'), Title('titles.risks')] class extends Component {
     {
         $search = trim($this->search);
 
-        return Risk::query()
+        return $this->whereInStrategy(Risk::query(), 'risks.project_id')
             ->when($search !== '', function ($query) use ($search): void {
                 $query->where(function ($query) use ($search): void {
                     $query
@@ -112,6 +126,7 @@ new #[Layout('layouts::desk'), Title('titles.risks')] class extends Component {
                 });
             })
             ->when($includeProject && $this->project !== '', fn ($query) => $query->where('project_id', (int) $this->project))
+            ->when($this->high, fn ($query) => $query->whereRaw('likelihood * severity >= ?', [StrategyRollup::HighRiskScore]))
             ->when($includeMaterialised && $this->materialisedOnly, fn ($query) => $query->where('happened', true))
             // A risk only needs a solution once it has actually happened — a
             // risk that hasn't happened yet has nothing to mitigate, so this
@@ -401,7 +416,7 @@ new #[Layout('layouts::desk'), Title('titles.risks')] class extends Component {
 ?>
 
 @php
-    $filtersAreActive = $search !== '' || $project !== '' || $materialisedOnly || $unmitigated;
+    $filtersAreActive = $search !== '' || $project !== '' || $materialisedOnly || $unmitigated || $high || $this->strategyFilter !== null;
 @endphp
 
 <x-desk.register
@@ -424,6 +439,7 @@ new #[Layout('layouts::desk'), Title('titles.risks')] class extends Component {
         <x-desk.register-search :label="__('risks.search_risks')" :placeholder="__('risks.risk_impact_or_project')" wire:model.live.debounce.300ms="search" />
     </x-slot:search>
     <x-slot:filters>
+            <x-desk.strategy-chip :strategy="$this->strategyFilter" />
 
             <x-ui.header-filter-select :label="__('common.project')" wire:model.live="project" :value="$project">
                 <option value="">{{ __('common.all_projects') }}</option>
@@ -435,14 +451,23 @@ new #[Layout('layouts::desk'), Title('titles.risks')] class extends Component {
             <button type="button" class="dk-btn dk-sm" wire:click="toggleMaterialisedOnly" aria-pressed="{{ $materialisedOnly ? 'true' : 'false' }}" data-test="materialised-toggle">
                 {{ trans_choice('risks.challenges_count', $this->materialisedCount, ['count' => $this->materialisedCount]) }}
             </button>
+            <button type="button" class="dk-btn dk-sm" wire:click="toggleHigh" aria-pressed="{{ $high ? 'true' : 'false' }}" data-test="high-risk-toggle">
+                {{ __('risks.high_risks') }}
+            </button>
             <button type="button" class="dk-btn dk-sm" wire:click="toggleUnmitigated" aria-pressed="{{ $unmitigated ? 'true' : 'false' }}" data-test="unmitigated-toggle">
                 {{ trans_choice('risks.challenges_without_solution', $this->unmitigatedCount, ['count' => $this->unmitigatedCount]) }}
             </button>
         </x-slot:filters>
 
+    <p class="flex flex-wrap items-center gap-x-2 gap-y-1 rounded-lg border border-secondary-soft bg-ground px-3 py-2.5 type-meta text-secondary-dark dark:border-line dark:bg-surface-2 dark:text-ink" data-test="risk-register-moved-notice">
+        <flux:icon.information-circle variant="micro" class="size-4 shrink-0" aria-hidden="true" />
+        <span>{{ __('risks.moved_notice') }}</span>
+        <a href="{{ route('proposals.index') }}" wire:navigate class="font-semibold underline decoration-secondary-light underline-offset-2 hover:text-primary dark:hover:text-brand-text">{{ __('risks.moved_notice_link') }}</a>
+    </p>
+
     @php $chart = $this->projectRiskChart; $landscape = $this->riskLandscape; @endphp
     @if (count($chart['categories']) > 0)
-        <div x-data="{ open: true }" class="overflow-hidden rounded-xl border border-secondary-soft bg-white shadow-card dark:border-transparent dark:bg-surface-1 dark:shadow-raised">
+        <x-ui.panel as="div" x-data="{ open: true }">
             <button
                 type="button"
                 x-on:click="open = !open"
@@ -478,7 +503,7 @@ new #[Layout('layouts::desk'), Title('titles.risks')] class extends Component {
                     :height="max(count($chart['categories']) * 44, 160)"
                 />
             </div>
-        </div>
+        </x-ui.panel>
     @endif
 
     @if ($view === 'board')

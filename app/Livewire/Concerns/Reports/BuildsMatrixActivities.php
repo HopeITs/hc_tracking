@@ -104,7 +104,7 @@ trait BuildsMatrixActivities
             ->join('projects as pr', 'pr.id', '=', 'pl.project_id')
             ->whereIn('pp.status', array_map(fn (ProposalStatus $status): string => $status->value, ProposalStatus::approvedByDonor()))
             ->whereRaw('(case when pp.actual_date_begin is not null and pp.actual_date_end is not null then pp.actual_date_begin else pp.planned_date_begin end) <= ?', [$to->toDateString()])
-            ->whereRaw('(case when pp.actual_date_begin is not null and pp.actual_date_end is not null then pp.actual_date_end else pp.planned_date_end end) >= ?', [$from->toDateString()]);
+            ->whereRaw('(case when pp.actual_date_begin is not null and pp.actual_date_end is not null then coalesce(pp.extended_date_end, pp.actual_date_end) else pp.planned_date_end end) >= ?', [$from->toDateString()]);
 
         return $this->applyMatrixFilters($query)
             ->orderBy('pr.name')

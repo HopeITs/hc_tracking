@@ -300,7 +300,7 @@ final class ReportTemplatePrefiller
             $proposal = $proposalsById->get($target->source_id);
             $useActual = $proposal->actual_date_begin !== null && $proposal->actual_date_end !== null;
             $begin = $useActual ? $proposal->actual_date_begin : $proposal->planned_date_begin;
-            $end = $useActual ? $proposal->actual_date_end : $proposal->planned_date_end;
+            $end = $useActual ? $proposal->effectiveDateEnd() : $proposal->planned_date_end;
             $fixed = $library->denominator_basis === DenominatorBasis::Fixed;
 
             $lines[$target->id] = [

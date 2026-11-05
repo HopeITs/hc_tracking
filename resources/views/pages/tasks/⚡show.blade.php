@@ -112,6 +112,9 @@ new #[Layout('layouts::desk'), Title('titles.task')] class extends Component
                 'progress_percentage',
                 'evidence_required',
                 'created_by',
+                'kind',
+                'reportable_type',
+                'reportable_id',
             ])
             ->with([
                 // morphWith() eager loads the milestone's project on top of
@@ -253,6 +256,13 @@ new #[Layout('layouts::desk'), Title('titles.task')] class extends Component
                 </a>
             @elseif ($this->task->source instanceof \App\Models\Milestone)
                 <span class="font-medium">{{ $this->task->source->name }} · {{ $this->task->source->ownerName() }}</span>
+            @endif
+            @if ($this->task->isReportTask())
+                <x-ui.enum-badge :case="$this->task->kind" data-test="report-task-chip" />
+                @if ($this->task->reportUrl() !== null)
+                    <a href="{{ $this->task->reportUrl() }}" wire:navigate class="font-medium hover:underline">{{ __('tasks.open_report') }}</a>
+                @endif
+                <span class="basis-full text-xs text-secondary-medium dark:text-ink-muted" data-test="report-task-helper">{{ __('tasks.report_task_helper') }}</span>
             @endif
             <x-tasks.paused-chip :task="$this->task" :paused-ids="$this->pausedProjectIds" :full="true" />
             <span>{{ __('tasks.assigned_to_name', ['name' => $assignees->isEmpty() ? __('common.not_assigned') : $assignees->map->name->implode(', ')]) }}</span>

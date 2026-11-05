@@ -4,7 +4,7 @@
     ⚡users.blade.php; reads $this and $selectedRoleId.
 --}}
         <div class="grid min-w-0 gap-6 xl:grid-cols-[19rem_minmax(0,1fr)]">
-            <aside class="min-w-0 overflow-hidden rounded-xl border border-secondary-soft bg-white shadow-card dark:border-transparent dark:bg-surface-1 dark:shadow-raised">
+            <x-ui.panel as="aside" class="min-w-0">
                 @can('access-management.manage-roles')
                     <form wire:submit="createRole" class="border-b border-secondary-soft p-3 dark:border-line" data-test="create-role-form">
                         <label for="new-role-name" class="mb-2 block text-sm font-bold text-secondary-dark dark:text-ink">{{ __('roles.new_role') }}</label>
@@ -33,9 +33,9 @@
                         </button>
                     @endforeach
                 </div>
-            </aside>
+            </x-ui.panel>
 
-            <section class="min-w-0 rounded-xl border border-secondary-soft bg-white shadow-card dark:border-transparent dark:bg-surface-1 dark:shadow-raised">
+            <x-ui.panel :clip="false" class="min-w-0">
                 @if ($this->selectedRole)
                     <div class="flex flex-wrap items-start justify-between gap-4 border-b border-secondary-soft px-6 py-4 dark:border-line">
                         <div class="min-w-0">
@@ -111,7 +111,7 @@
                         @endcan
                     </form>
                 @endif
-            </section>
+            </x-ui.panel>
         </div>
 
         <x-ui.modal

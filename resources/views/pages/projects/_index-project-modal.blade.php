@@ -144,7 +144,9 @@
                     </x-ui.form-select>
 
                     {{-- The physical center is optional and offered from the chosen city's centers (W-02); a city without one is hosted below (D-55). --}}
-                    @php($centersEmpty = $this->centerOptions->isEmpty())
+                    @php
+                        $centersEmpty = $this->centerOptions->isEmpty();
+                    @endphp
                     <div class="contents" @if ($centersEmpty) data-center-select-disabled @endif>
                         <x-ui.form-select
                             wire:model.live="centerId"
@@ -185,7 +187,9 @@
             </x-ui.form-section>
 
             @if ($editingProjectId === null)
-                @php($pairProject = $this->existingPairProject)
+                @php
+                    $pairProject = $this->existingPairProject;
+                @endphp
                 @if ($pairProject !== null)
                     <div
                         class="flex flex-wrap items-center justify-between gap-3 rounded-lg border p-3 text-sm {{ $pairProject['state'] === 'open' ? 'border-status-warn/40 bg-status-warn-soft' : 'border-secondary-soft bg-secondary-soft/40 dark:border-line dark:bg-surface-2' }}"

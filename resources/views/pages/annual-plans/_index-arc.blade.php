@@ -1,5 +1,5 @@
         {{-- Layer one: the planning arc, and the year it points the cockpit at. --}}
-        <section class="overflow-hidden rounded-xl border border-board-line bg-board" aria-labelledby="planning-arc-heading">
+        <x-ui.panel aria-labelledby="planning-arc-heading">
             <div class="flex flex-wrap items-end justify-between gap-3 border-b border-board-line bg-board-head px-5 py-4">
                 <div class="min-w-0">
                     <h2 id="planning-arc-heading" class="text-base font-bold">{{ __('annual_plans.planning_arc') }}</h2>
@@ -172,4 +172,4 @@
                     </aside>
                 @endif
             </div>
-        </section>
+        </x-ui.panel>

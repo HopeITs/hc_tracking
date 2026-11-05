@@ -161,7 +161,8 @@ test('the strategy portfolio timeline and list link to the strategy and show its
         ->get(route('strategies.index'))
         ->assertOk()
         ->assertSee(route('strategies.show', $strategy), false)
-        ->assertSeeText('2 programs');
+        ->assertSeeHtml('data-test="strategy-programs-link"')
+        ->assertSeeInOrder(['data-test="strategy-programs-link"', '>2</a>'], false);
 });
 
 test('the strategy portfolio explains when the current year has no active period', function () {

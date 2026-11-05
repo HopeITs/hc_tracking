@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Tests\PHPStan;
 
+use App\Livewire\Concerns\FiltersByStrategy;
 use App\Livewire\Concerns\FiltersFinanceRegister;
 use App\Livewire\Concerns\FundingAgreements\ChartsAgreementCalendar;
 use App\Livewire\Concerns\FundingAgreements\ExportsAgreementRegister;
@@ -25,6 +26,7 @@ abstract class FundingAgreementsIndexPageHost extends Component
 {
     use ChartsAgreementCalendar;
     use ExportsAgreementRegister;
+    use FiltersByStrategy;
     use FiltersFinanceRegister;
     use ReadsAgreementRegister;
     use WithPagination;

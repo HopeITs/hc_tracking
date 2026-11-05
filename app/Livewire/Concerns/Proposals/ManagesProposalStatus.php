@@ -129,8 +129,7 @@ trait ManagesProposalStatus
             return [];
         }
 
-        $preHold = $subject->status === ProposalStatus::OnHold ? $subject->statusBefore(ProposalStatus::OnHold) : null;
-        $requirements = ProposalTransitions::requirements($subject->status, $to, $preHold) ?? [];
+        $requirements = ProposalTransitions::requirements($subject->status, $to) ?? [];
         $fields = [];
 
         if (array_intersect($requirements, ['reason', 'reason_min_10']) !== []) {

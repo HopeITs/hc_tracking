@@ -23,10 +23,14 @@ beforeEach(function () {
     $this->superAdmin = userWithRole('Super Admin');
 });
 
-function heldProposal(string $remindOn, ProposalStatus $status = ProposalStatus::OnHold): Proposal
+/**
+ * A proposal waiting on the donor. Since W-06 (D-58) the hold is the
+ * `on_hold_since` flag, not a status: the proposal stays `submitted`.
+ */
+function heldProposal(string $remindOn, bool $held = true): Proposal
 {
-    return Activity::withoutRecording(function () use ($remindOn, $status): Proposal {
-        $proposal = Proposal::factory()->create(['name' => 'Winter Kits', 'status' => $status, 'status_remind_on' => $remindOn]);
+    return Activity::withoutRecording(function () use ($remindOn, $held): Proposal {
+        $proposal = Proposal::factory()->create(['name' => 'Winter Kits', 'status' => ProposalStatus::Submitted, 'status_remind_on' => $remindOn, 'on_hold_since' => $held ? '2026-10-01' : null]);
         $proposal->projects()->attach(Project::factory()->create(['user_id' => test()->ownerEmployee])->id);
 
         return $proposal;
@@ -107,7 +111,7 @@ test('the reminder goes once per remind date and a new date re-arms it', functio
 });
 
 test('a proposal that left hold first gets no reminder', function () {
-    $proposal = heldProposal('2026-10-14', ProposalStatus::Submitted);
+    $proposal = heldProposal('2026-10-14', held: false);
 
     expect(scanOnHold('2026-10-14 06:00'))->toBe(0)
         ->and(onHoldRecipients($proposal))->toBe([]);

@@ -1,4 +1,4 @@
-@props(['node', 'depth' => 0, 'order' => 0, 'editable' => true])
+@props(['node', 'depth' => 0, 'order' => 0, 'editable' => true, 'riskCounts' => null])
 
 @php
     use App\Enums\RagStatus;
@@ -402,6 +402,24 @@
                 </div>
             </div>
         @endif
+
+        {{-- W-09: outcomes and outputs carry risks picked from the MEAL library; null riskCounts (results/index) shows nothing. --}}
+        @if ($riskCounts !== null && in_array($result->type, [ResultType::Outcome, ResultType::Output], true))
+            @php
+                $riskTotal = (int) ($riskCounts[$result->id] ?? 0);
+            @endphp
+            <div class="mt-3 flex flex-wrap items-center gap-x-3 gap-y-1.5 border-t border-secondary-soft px-4 py-2.5 dark:border-line" data-risks-row>
+                <flux:icon.shield-exclamation variant="micro" class="size-4 text-secondary-medium dark:text-ink-muted" aria-hidden="true" />
+                <span class="type-label text-secondary-medium dark:text-ink-muted">{{ __('risks.risks_and_assumptions') }}</span>
+                <span class="inline-flex items-center rounded-md border border-secondary-light px-2 py-0.5 text-xs font-semibold tabular-nums text-secondary-dark dark:border-line-strong dark:text-ink" data-test="risk-count-{{ $result->id }}">{{ trans_choice('risks.node_risk_count', $riskTotal, ['count' => $riskTotal]) }}</span>
+                <x-ui.button
+                    tone="ghost" size="sm" icon="shield-exclamation" class="ms-auto"
+                    wire:click="openRisks({{ $result->id }})"
+                    wire:loading.attr="disabled" wire:target="openRisks({{ $result->id }})"
+                    data-test="result-risks-{{ $result->id }}"
+                >{{ __('risks.open_risks') }}</x-ui.button>
+            </div>
+        @endif
     </article>
 
     @if ($children !== [])
@@ -427,7 +445,7 @@
                         ])></span>
                         <span aria-hidden="true" class="absolute start-0 top-7 h-px w-6 bg-secondary-soft dark:bg-line-strong"></span>
 
-                        <x-ui.framework-node :node="$child" :depth="$depth + 1" :order="$loop->index" :editable="$editable" />
+                        <x-ui.framework-node :node="$child" :depth="$depth + 1" :order="$loop->index" :editable="$editable" :risk-counts="$riskCounts" />
                     </li>
                 @endforeach
             </ol>

@@ -13,11 +13,14 @@ use App\Enums\ProposalStatus;
  * requirement keys. `→ approved` belongs to ApproveProposal, `approved →
  * active` to ActivateProject and every move out of a terminal status to
  * CorrectProposalStatus, so none of them appear in map().
+ *
+ * A hold is not a move (D-58, W-06): the proposal keeps its status and
+ * carries `on_hold_since`, so no row leads in or out of `on hold`.
  */
 final class ProposalTransitions
 {
     /**
-     * from => [to => requirement keys], for every source except on hold.
+     * from => [to => requirement keys].
      *
      * @var array<string, array<string, list<string>>>
      */
@@ -32,7 +35,6 @@ final class ProposalTransitions
         ],
         'concept note submitted' => [
             'proposal draft' => ['effective_date'],
-            'on hold' => ['reason', 'remind_on'],
             'rejected' => ['reason_min_10', 'effective_date'],
         ],
         'proposal draft' => [
@@ -44,7 +46,6 @@ final class ProposalTransitions
         ],
         'submitted' => [
             'proposal draft' => ['reason'],
-            'on hold' => ['reason', 'remind_on'],
             'rejected' => ['reason_min_10', 'effective_date'],
         ],
         'active' => [
@@ -53,44 +54,25 @@ final class ProposalTransitions
     ];
 
     /**
-     * pre-hold status => [to => requirement keys] for a proposal on hold. Each
-     * target takes the keys of the §2 row that leads to it.
-     *
-     * @var array<string, array<string, list<string>>>
-     */
-    private const array OnHoldMap = [
-        'concept note submitted' => [
-            'proposal draft' => ['effective_date'],
-            'rejected' => ['reason_min_10', 'effective_date'],
-        ],
-        'submitted' => [
-            'submitted' => ['effective_date', 'target_beneficiaries'],
-            'proposal draft' => ['reason'],
-            'rejected' => ['reason_min_10', 'effective_date'],
-        ],
-    ];
-
-    /**
      * The TransitionProposal table, keyed by status value.
      *
-     * @return array{map: array<string, array<string, list<string>>>, on_hold: array<string, array<string, list<string>>>}
+     * @return array<string, array<string, list<string>>>
      */
     public static function map(): array
     {
-        return ['map' => self::Map, 'on_hold' => self::OnHoldMap];
+        return self::Map;
     }
 
     /**
      * The statuses TransitionProposal may move a proposal to.
      *
-     * @param  ProposalStatus|null  $preHold  the status before the hold; only read when $from is on hold
      * @return list<ProposalStatus>
      */
-    public static function targets(ProposalStatus $from, ?ProposalStatus $preHold = null): array
+    public static function targets(ProposalStatus $from): array
     {
         return array_map(
             fn (string $to): ProposalStatus => ProposalStatus::from($to),
-            array_keys(self::row($from, $preHold)),
+            array_keys(self::Map[$from->value] ?? []),
         );
     }
 
@@ -100,9 +82,9 @@ final class ProposalTransitions
      *
      * @return list<string>|null
      */
-    public static function requirements(ProposalStatus $from, ProposalStatus $to, ?ProposalStatus $preHold = null): ?array
+    public static function requirements(ProposalStatus $from, ProposalStatus $to): ?array
     {
-        return self::row($from, $preHold)[$to->value] ?? null;
+        return self::Map[$from->value][$to->value] ?? null;
     }
 
     /**
@@ -121,17 +103,5 @@ final class ProposalTransitions
             ProposalStatus::live(),
             fn (ProposalStatus $to): bool => $to !== $from && $to !== ProposalStatus::Approved,
         ));
-    }
-
-    /**
-     * @return array<string, list<string>>
-     */
-    private static function row(ProposalStatus $from, ?ProposalStatus $preHold): array
-    {
-        if ($from === ProposalStatus::OnHold) {
-            return $preHold === null ? [] : self::OnHoldMap[$preHold->value] ?? [];
-        }
-
-        return self::Map[$from->value] ?? [];
     }
 }

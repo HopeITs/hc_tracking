@@ -866,3 +866,27 @@ test('the milestone, task and day-detail forms are rendered only while their mod
         ->call('openDayDetail', now()->toDateString())
         ->assertSeeHtml('data-test="calendar-daydetail-list"');
 });
+
+test('an active proposal with an extended end shows on the extended day, marked as extended', function () {
+    $employeeId = insertHrEmployee();
+    $user = linkUserToEmployee(User::factory()->role('General Manager')->create(), $employeeId);
+    $project = Project::factory()->create(['user_id' => $employeeId]);
+
+    $extended = Proposal::factory()->create([
+        'status' => 'active',
+        'planned_date_end' => Carbon::create(2026, 6, 15),
+        'extended_date_end' => Carbon::create(2026, 8, 20),
+    ]);
+    $plain = Proposal::factory()->create(['status' => 'active', 'planned_date_end' => Carbon::create(2026, 6, 16)]);
+    $extended->projects()->attach($project);
+    $plain->projects()->attach($project);
+
+    Livewire::actingAs($user)->test('pages::calendar.index')->set('month', '2026-06')
+        ->assertDontSee('data-test="calendar-proposal-'.$extended->id.'"', false)
+        ->assertSee('data-test="calendar-proposal-'.$plain->id.'"', false)
+        ->assertDontSee('data-test="calendar-proposal-extended-'.$plain->id.'"', false);
+
+    Livewire::actingAs($user)->test('pages::calendar.index')->set('month', '2026-08')
+        ->assertSee('data-test="calendar-proposal-'.$extended->id.'"', false)
+        ->assertSee('data-test="calendar-proposal-extended-'.$extended->id.'"', false);
+});

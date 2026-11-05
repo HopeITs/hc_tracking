@@ -20,8 +20,9 @@
 
 <div {{ $attributes->class('flex flex-col gap-4') }}>
     @foreach ($groups as $index => $group)
-        <article
-            class="logframe-reveal overflow-hidden rounded-xl border border-secondary-soft bg-white shadow-card dark:border-transparent dark:bg-surface-1 dark:shadow-raised"
+        <x-ui.panel
+            as="article"
+            class="logframe-reveal"
             style="--logframe-order: {{ $index }}"
             wire:key="target-result-{{ $group['result']->id }}"
         >
@@ -79,6 +80,6 @@
                     </div>
                 @endforeach
             </div>
-        </article>
+        </x-ui.panel>
     @endforeach
 </div>

@@ -26,7 +26,7 @@ final class DonorReportPeriods
     public static function window(Proposal $proposal, ReportingPeriod $type, string $startMonth, ?string $endMonth): array
     {
         $grantStart = $proposal->actual_date_begin;
-        $grantEnd = $proposal->actual_date_end;
+        $grantEnd = $proposal->effectiveDateEnd();
         $start = self::month($startMonth);
 
         if ($grantStart === null || $grantEnd === null || $start === null

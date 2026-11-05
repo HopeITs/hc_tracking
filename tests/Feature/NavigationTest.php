@@ -160,3 +160,11 @@ test('the help menu holds the tour, the guideline and the bug report behind one 
         ->and($xpath->query('.//*[@role="menu"]//a[@data-guideline]', $menu))->toHaveCount(1)
         ->and($xpath->query('.//*[@role="menu"]//a[@data-report-bug]', $menu))->toHaveCount(1);
 });
+
+test('the risk register is no longer in the sidebar, and the risk library is only for the MEAL Manager slot holder', function () {
+    $general = User::factory()->role('General Manager')->create();
+
+    expect(deskPageRoutes($general))->not->toContain('risks.index')
+        ->and(deskPageRoutes($general))->not->toContain('admin.risk-library.index')
+        ->and(deskPageRoutes(mealManager()))->toContain('admin.risk-library.index');
+});

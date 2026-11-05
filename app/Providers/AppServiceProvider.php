@@ -19,10 +19,12 @@ use App\Models\PlanIndicator;
 use App\Models\Program;
 use App\Models\Project;
 use App\Models\Proposal;
+use App\Models\ProposalStatusNote;
 use App\Models\Report;
 use App\Models\ReportTemplate;
 use App\Models\Result;
 use App\Models\Risk;
+use App\Models\RiskLibrary;
 use App\Models\Role;
 use App\Models\StrategicPillar;
 use App\Models\Strategy;
@@ -257,6 +259,7 @@ class AppServiceProvider extends ServiceProvider
         Relation::enforceMorphMap([
             'annual_plan' => AnnualPlan::class,
             'proposal' => Proposal::class,
+            'proposal_status_note' => ProposalStatusNote::class,
             'project' => Project::class,
             'milestone' => Milestone::class,
             'program' => Program::class,
@@ -265,6 +268,7 @@ class AppServiceProvider extends ServiceProvider
             'task' => Task::class,
             'strategy' => Strategy::class,
             'risk' => Risk::class,
+            'risk_library' => RiskLibrary::class,
             'indicator' => Indicator::class,
             'plan_indicator' => PlanIndicator::class,
             'result' => Result::class,

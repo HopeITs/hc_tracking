@@ -666,3 +666,71 @@ test('a donor requested by someone else cannot be selected through the event', f
         ->dispatch('donor-requested', donorId: $donor->id)
         ->assertSet('donorId', '');
 });
+
+/*
+| W-10 (D-62): the form reads in the order people fill it — identity, donor,
+| locations, dates, budget, starting stage, notes last. The concept-note
+| section arrives with W-24, and W-34a swaps the Locations contents.
+*/
+
+test('the form sections read in the order management asked for', function () {
+    openProposalCreateForm(userWithRole('Financial'))
+        ->assertSeeInOrder([
+            __('proposals.section_identity'),
+            __('proposals.section_donor'),
+            __('proposals.section_locations'),
+            __('proposals.section_planned_dates'),
+            __('proposals.section_budget'),
+            __('proposals.section_start'),
+            __('proposals.section_notes'),
+        ]);
+});
+
+test('the renewal preset opens the Identity section rather than a section of its own', function () {
+    $previous = linkedProposal();
+    $previous->forceFill(['status' => ProposalStatus::Active])->save();
+
+    $html = openProposalCreateForm(userWithRole('Financial'))->html();
+
+    // One heading, not two: the preset sits inside Identity, above the name.
+    $identityAt = mb_strpos($html, __('proposals.section_identity'));
+    $presetAt = mb_strpos($html, 'data-test="previous-proposal-select"');
+    $nameAt = mb_strpos($html, 'wire:model="name"');
+
+    expect($presetAt)->not->toBeFalse()
+        ->and($identityAt)->toBeLessThan($presetAt)
+        ->and($presetAt)->toBeLessThan($nameAt)
+        ->and($html)->not->toContain(__('proposals.start_from_previous'));
+});
+
+test('the budget section is absent, not hidden, for someone who may not see money', function () {
+    $form = openProposalCreateForm(userWithRole(fundraiserWithoutAgreements()));
+
+    $form->assertDontSeeText(__('proposals.section_budget'))
+        ->assertDontSeeHtml('wire:model="requestedBudget"')
+        // The order still holds either side of the missing section.
+        ->assertSeeInOrder([
+            __('proposals.section_planned_dates'),
+            __('proposals.section_start'),
+            __('proposals.section_notes'),
+        ]);
+});
+
+test('notes live in their own last section, not beside the name', function () {
+    $html = openProposalCreateForm(userWithRole('Financial'))->html();
+
+    $identityAt = mb_strpos($html, __('proposals.section_identity'));
+    $notesHeadingAt = mb_strpos($html, __('proposals.section_notes'));
+    $notesFieldAt = mb_strpos($html, 'wire:model="notes"');
+
+    expect($identityAt)->toBeLessThan($notesHeadingAt)
+        ->and($notesHeadingAt)->toBeLessThan($notesFieldAt);
+});
+
+test('the validation summary names the sections that hold the problems', function () {
+    openProposalCreateForm(userWithRole('Financial'))
+        ->call('saveProposal')
+        ->assertHasErrors(['name'])
+        ->assertSeeHtml('data-form-error-summary')
+        ->assertSeeText(__('proposals.section_identity'));
+});

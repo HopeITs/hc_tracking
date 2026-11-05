@@ -119,7 +119,7 @@ class PlanIndicator extends Model implements TracksActivity
             ],
             $source instanceof Proposal => [
                 $source->actual_date_begin ?? $source->planned_date_begin,
-                $source->actual_date_end ?? $source->planned_date_end,
+                $source->effectiveDateEnd() ?? $source->planned_date_end,
             ],
             default => null,
         };
@@ -143,7 +143,7 @@ class PlanIndicator extends Model implements TracksActivity
                         ->from('proposals')
                         ->whereColumn('proposals.id', 'plan_indicators.source_id')
                         ->whereRaw('(case when proposals.actual_date_begin is not null and proposals.actual_date_end is not null then proposals.actual_date_begin else proposals.planned_date_begin end) <= ?', [$to->toDateString()])
-                        ->whereRaw('(case when proposals.actual_date_begin is not null and proposals.actual_date_end is not null then proposals.actual_date_end else proposals.planned_date_end end) >= ?', [$from->toDateString()]);
+                        ->whereRaw('(case when proposals.actual_date_begin is not null and proposals.actual_date_end is not null then coalesce(proposals.extended_date_end, proposals.actual_date_end) else proposals.planned_date_end end) >= ?', [$from->toDateString()]);
                 });
             })->orWhere(function (Builder $planTargets) use ($from, $to): void {
                 $planTargets->where('plan_indicators.source_type', 'annual_plan')->whereExists(function (QueryBuilder $plan) use ($from, $to): void {

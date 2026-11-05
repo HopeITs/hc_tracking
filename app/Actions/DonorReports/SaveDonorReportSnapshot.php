@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Actions\DonorReports;
 
+use App\Actions\Tasks\SyncReportTask;
 use App\Enums\DonorReportType;
 use App\Enums\ReportAudience;
 use App\Enums\ReportingPeriod;
@@ -104,11 +105,15 @@ final class SaveDonorReportSnapshot
                 ->where('period_end', $attributes['period_end'])
                 ->max('version');
 
-            return DonorReport::query()->create([
+            $report = DonorReport::query()->create([
                 ...$attributes,
                 'donor_proposal_id' => $agreementId,
                 'version' => (int) $latest + 1,
             ]);
+
+            app(SyncReportTask::class)->handle($report);
+
+            return $report;
         });
 
         try {

@@ -8,6 +8,7 @@ use App\Models\Program;
 use App\Models\Project;
 use App\Models\Proposal;
 use App\Models\Report;
+use App\Models\Strategy;
 use App\Models\Task;
 use App\Models\TransfersTracking;
 use App\Models\User;
@@ -83,4 +84,23 @@ test('the funding agreement timeline includes its tranches', function () {
     $this->actingAs(userWithRole('Super Admin'))
         ->get(route('funding-agreements.show', $agreement))
         ->assertSeeText(__('notifications.events.transfer.scheduled', ['actor' => __('notifications.system'), 'subject' => $label]));
+});
+
+test('a program save that links a strategy and manager names the strategy, and clearing the manager reads "removed"', function () {
+    $actor = Activity::withoutRecording(fn () => User::factory()->create(['name' => 'Sami']));
+    $managerId = insertHrEmployee(firstNameEn: 'Layla', lastNameEn: 'Haddad');
+    $strategy = Strategy::factory()->create(['name' => 'Country Strategy 2026-2030']);
+    $program = Activity::withoutRecording(fn () => Program::factory()->unassigned()->create(['name' => 'Water Security']));
+
+    $this->actingAs($actor);
+    $program->update(['strategy_id' => $strategy->id, 'manager_id' => $managerId]);
+
+    Livewire::actingAs($actor)->test('activity.timeline', ['subjects' => ['program' => [$program->id]]])
+        ->assertSeeText('Sami linked “Water Security” to Country Strategy 2026-2030 and made Layla Haddad its manager')
+        ->assertSeeText('Country Strategy 2026-2030');
+
+    $program->update(['strategy_id' => null, 'manager_id' => null]);
+
+    Livewire::actingAs($actor)->test('activity.timeline', ['subjects' => ['program' => [$program->id]]])
+        ->assertSeeText('Sami removed Layla Haddad as manager of “Water Security”');
 });

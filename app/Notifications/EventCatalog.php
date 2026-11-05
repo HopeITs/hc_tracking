@@ -167,6 +167,8 @@ final class EventCatalog
                 'proposal.reviewer_removed' => self::entry('proposals', $digest, 'module_map', $all, activity: 'proposal.reviewer_removed'),
                 'proposal.reviewer_seen' => self::entry('proposals', $digest, 'module_map', $all, activity: 'proposal.reviewer_seen'),
                 'proposal.need_assessment_added' => self::entry('proposals', $digest, 'module_map', $all, activity: 'proposal.need_assessment_added'),
+                'proposal.negotiation_noted' => self::entry('proposals', $digest, 'module_map', $all, activity: 'proposal.negotiation_noted'),
+                'proposal.extended' => self::entry('proposals', $now, 'module_map', $all, activity: 'proposal.extended'),
                 'proposal.approved' => self::entry('proposals', $now, 'module_map', $all, critical: true, activity: 'proposal.approved'),
                 'proposal.on_hold_reminder' => self::entry('proposals', $now, 'scanner', $all),
                 'proposal.final_report_accepted' => self::entry('proposals', $now, 'module_map', $all, activity: 'proposal.final_report_accepted'),
@@ -177,6 +179,8 @@ final class EventCatalog
                 // The department work a stage opened by itself (D-63, W-12).
                 'proposal.stage_tasks_created' => self::entry('proposals', $digest, 'module_map', $all),
                 'proposal.deleted' => self::entry('proposals', $digest, 'module_map', $all, activity: 'proposal.deleted'),
+                'proposal.risk_attached' => self::entry('proposals', $digest, 'module_map', $all, activity: 'proposal.risk_attached'),
+                'proposal.risk_detached' => self::entry('proposals', $digest, 'module_map', $all, activity: 'proposal.risk_detached'),
                 // T31: the approval moved the plan to the grant period; the project owners hear of it only when a date was cut at the grant end.
                 'proposal.plan_rebased' => self::entry('proposals', $now, 'module_map', OversightMode::None, activity: 'proposal.plan_rebased'),
             ],

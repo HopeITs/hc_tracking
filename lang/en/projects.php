@@ -261,4 +261,8 @@ return [
     'no_centers_in_city' => 'No centers in this city yet',
     'choose_the_city_first' => 'Choose the city first',
     'center_inactive_badge' => 'Center inactive',
+
+    'risk_awareness_title' => 'Risks to be aware of',
+    'risk_awareness_note' => 'For your awareness, read only. Risks are added and removed on each proposal’s Logical Framework tab.',
+    'risk_awareness_register' => 'Logged on the project earlier',
 ];

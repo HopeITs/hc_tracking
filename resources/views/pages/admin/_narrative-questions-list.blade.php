@@ -56,8 +56,10 @@
                 <p class="type-meta basis-full text-secondary-medium dark:text-ink-muted">{{ __('narrative_questions.frequency_help.'.$frequencyValue) }}</p>
             </div>
 
-            <ol
-                class="divide-y divide-secondary-soft rounded-xl border border-secondary-soft dark:divide-line dark:border-transparent dark:bg-surface-1 dark:shadow-raised"
+            <x-ui.panel
+                as="ol"
+                :clip="false"
+                class="divide-y divide-secondary-soft dark:divide-line"
                 aria-label="{{ __('narrative_questions.list_label', ['frequency' => $groupFrequency->label()]) }}"
             >
                 @foreach ($groupQuestions as $question)
@@ -119,7 +121,7 @@
                         </div>
                     </li>
                 @endforeach
-            </ol>
+            </x-ui.panel>
         </section>
     @endforeach
 </div>

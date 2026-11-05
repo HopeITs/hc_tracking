@@ -261,7 +261,6 @@ new #[Layout('layouts::desk'), Title('titles.donor')] class extends Component {
             ['label' => $donor->name],
         ]"
         :title="$donor->name"
-        title-class="text-3xl! font-bold! leading-none! tracking-tight! @3xl/detail:text-[2.5rem]!"
     >
         <x-slot:meta>
             <x-donors.pending-badge :donor="$donor" />

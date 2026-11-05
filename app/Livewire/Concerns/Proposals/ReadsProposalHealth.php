@@ -165,7 +165,7 @@ trait ReadsProposalHealth
             );
         }
 
-        $grantEnd = $this->proposal->actual_date_end ?? $this->proposal->planned_date_end;
+        $grantEnd = $this->proposal->effectiveDateEnd() ?? $this->proposal->planned_date_end;
 
         if ($grantEnd !== null && $this->proposal->actual_date_end === null && ! in_array($this->proposal->status, [ProposalStatus::Completed, ProposalStatus::Rejected], true)) {
             $push('grant-end', 'grant', $grantEnd, __('proposals.grant_term_ends'), $this->proposal->name, null, $this->canViewAgreements() ? 'funding' : 'status');

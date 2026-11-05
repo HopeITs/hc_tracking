@@ -40,7 +40,7 @@ final class SaveAgreementInstallments
 
         DB::transaction(function () use ($agreement, $installments): void {
             $locked = DonorProposal::query()
-                ->with('proposal:id,planned_date_begin,planned_date_end,actual_date_begin,actual_date_end')
+                ->with('proposal:id,planned_date_begin,planned_date_end,actual_date_begin,actual_date_end,extended_date_end')
                 ->lockForUpdate()
                 ->findOrFail($agreement->id);
 
@@ -110,7 +110,7 @@ final class SaveAgreementInstallments
         // The term is the proposal's: actual dates once approved, else the planned ones.
         $proposal = $agreement->proposal;
         $termStart = $proposal->actual_date_begin ?? $proposal->planned_date_begin;
-        $termEnd = $proposal->actual_date_end ?? $proposal->planned_date_end;
+        $termEnd = $proposal->effectiveDateEnd() ?? $proposal->planned_date_end;
 
         $errors = [];
         $rows = [];

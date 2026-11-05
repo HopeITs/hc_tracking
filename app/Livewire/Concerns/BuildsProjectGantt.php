@@ -354,7 +354,7 @@ trait BuildsProjectGantt
     private function pushFundraisingRows(Project $project, Collection $rows): void
     {
         $proposals = $project->proposals()
-            ->select(['proposals.id', 'proposals.name', 'proposals.status', 'planned_date_begin', 'planned_date_end', 'actual_date_begin', 'actual_date_end'])
+            ->select(['proposals.id', 'proposals.name', 'proposals.status', 'planned_date_begin', 'planned_date_end', 'actual_date_begin', 'actual_date_end', 'extended_date_end'])
             ->orderBy('planned_date_begin')
             ->get();
 
@@ -379,7 +379,7 @@ trait BuildsProjectGantt
                 start: $proposal->planned_date_begin,
                 end: $proposal->planned_date_end,
                 actualStart: $proposal->actual_date_begin,
-                actualEnd: $proposal->actual_date_end,
+                actualEnd: $proposal->effectiveDateEnd(),
                 progress: $proposal->actual_date_end !== null ? 100 : 0,
                 status: $proposal->status->value,
                 statusLabel: $proposal->status->label(),

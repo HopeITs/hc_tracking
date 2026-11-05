@@ -42,6 +42,27 @@
 }
 
 /*
+ * Every page title (Desk greeting, registers, stories, page and detail headers) uses this one
+ * style, matching HR's h1. A utility, not a component, so it beats Flux heading sizes; pass it
+ * as page-title! on a flux:heading. Phones step it down; Arabic gets room for its ascenders.
+ */
+@utility page-title {
+    font-size: var(--text-h1);
+    line-height: var(--text-h1--line-height);
+    font-weight: 700;
+    letter-spacing: 0;
+    color: var(--color-heading);
+
+    @media (width < 40rem) {
+        font-size: 1.75rem;
+    }
+
+    &:lang(ar) {
+        line-height: 1.3;
+    }
+}
+
+/*
  * Arabic is a joined script: letter-spacing pulls its letters apart, and it has no
  * capitals for tracking to balance. Positive tracking utilities (tracking-wide*,
  * tracking-[0.1em]) reset under Arabic, so inline uppercase label runs follow the same

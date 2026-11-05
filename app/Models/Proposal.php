@@ -37,6 +37,7 @@ use Illuminate\Support\Facades\DB;
  * @property string|null $requested_budget
  * @property Currency|null $requested_currency
  * @property CarbonImmutable|null $status_remind_on
+ * @property CarbonImmutable|null $on_hold_since
  * @property string|null $approval_note
  * @property CarbonImmutable|null $final_report_accepted_on
  * @property int|null $final_report_accepted_by
@@ -45,6 +46,8 @@ use Illuminate\Support\Facades\DB;
  * @property CarbonImmutable $planned_date_end
  * @property CarbonImmutable|null $actual_date_begin
  * @property CarbonImmutable|null $actual_date_end
+ * @property CarbonImmutable|null $extended_date_end
+ * @property string|null $extension_reason
  * @property ProposalStatus $status
  * @property-read ProposalPhase $phase
  * @property string|null $notes
@@ -325,6 +328,17 @@ class Proposal extends Model implements TracksActivity
     }
 
     /**
+     * The risks picked from the library onto this proposal's logframe
+     * (W-09, D-61).
+     *
+     * @return HasMany<Risk, $this>
+     */
+    public function risks(): HasMany
+    {
+        return $this->hasMany(Risk::class);
+    }
+
+    /**
      * The indicator targets committed in this proposal.
      *
      * @return MorphMany<PlanIndicator, $this>
@@ -365,6 +379,34 @@ class Proposal extends Model implements TracksActivity
     }
 
     /**
+     * The grant's end date: the extended one once the proposal was extended
+     * (W-08, D-60), else the actual end set at approval. The original
+     * `actual_date_end` stays untouched.
+     */
+    public function effectiveDateEnd(): ?CarbonImmutable
+    {
+        return $this->extended_date_end ?? $this->actual_date_end;
+    }
+
+    /**
+     * Whether an active proposal runs to an extended end date (W-08), the
+     * case the calendar marks.
+     */
+    public function isExtendedAndActive(): bool
+    {
+        return $this->status === ProposalStatus::Active && $this->extended_date_end !== null;
+    }
+
+    /**
+     * The day the calendar shows the proposal's end on: the extended end of
+     * an active proposal, else the planned end.
+     */
+    public function calendarEndDate(): CarbonImmutable
+    {
+        return $this->isExtendedAndActive() ? $this->extended_date_end : $this->planned_date_end;
+    }
+
+    /**
      * The status the proposal held before it last entered $status: the
      * pre-hold status for on hold, the pre-rejection one for rejected.
      *
@@ -389,13 +431,36 @@ class Proposal extends Model implements TracksActivity
     }
 
     /**
-     * Whether ApproveProposal accepts the proposal now: submitted, or on hold
-     * entered from submitted (contracts.md §2).
+     * Whether ApproveProposal accepts the proposal now (contracts.md §2).
+     *
+     * A proposal on hold is still `submitted` since W-06, so the hold no
+     * longer needs an arm of its own: approval is allowed and clears it.
      */
     public function canBeApproved(): bool
     {
-        return $this->status === ProposalStatus::Submitted
-            || ($this->status === ProposalStatus::OnHold && $this->statusBefore(ProposalStatus::OnHold) === ProposalStatus::Submitted);
+        return $this->status === ProposalStatus::Submitted;
+    }
+
+    /**
+     * Whether the proposal is on hold (D-58, W-06): a flag it carries while
+     * it waits on the donor, not a status. Written only by SetProposalOnHold
+     * and ClearProposalOnHold (contracts.md §4).
+     */
+    public function isOnHold(): bool
+    {
+        return $this->on_hold_since !== null;
+    }
+
+    /**
+     * The status as people read it: «Submitted (On hold)» while the flag is
+     * set, the plain status label otherwise. The one place the two are put
+     * together, so every badge, picker and chart reads the same words.
+     */
+    public function statusLabel(): string
+    {
+        return $this->isOnHold()
+            ? __('proposals.status_on_hold_label', ['status' => $this->status->label()])
+            : $this->status->label();
     }
 
     /**
@@ -420,7 +485,6 @@ class Proposal extends Model implements TracksActivity
         };
 
         $stop = match ($this->status) {
-            ProposalStatus::OnHold => $before(ProposalStatus::OnHold),
             ProposalStatus::Rejected => $before(ProposalStatus::Rejected) === ProposalStatus::OnHold
                 ? $before(ProposalStatus::OnHold)
                 : $before(ProposalStatus::Rejected),
@@ -434,34 +498,25 @@ class Proposal extends Model implements TracksActivity
     /**
      * The statuses TransitionProposal may move this proposal to.
      *
-     * For a proposal on hold the pre-hold status comes from the loaded status
-     * notes when they are loaded (register rows), else from the audit trail.
-     *
      * @return list<ProposalStatus>
      */
     public function transitionTargets(): array
     {
-        $preHold = match (true) {
-            $this->status !== ProposalStatus::OnHold => null,
-            $this->relationLoaded('statusNotes') => $this->lifecycleStop(),
-            default => $this->statusBefore(ProposalStatus::OnHold),
-        };
-
-        return ProposalTransitions::targets($this->status, $preHold);
+        return ProposalTransitions::targets($this->status);
     }
 
     /**
      * The paperwork stage this proposal is at: concept_note, proposal or grant.
      *
-     * Derived, never stored. On hold and rejected keep the stage of the
-     * status they left; a rejection during a hold looks past the hold to the
-     * status before it.
+     * Derived, never stored. Rejected keeps the stage of the status it left;
+     * a rejection made during a hold (before W-06 retired the status) looks
+     * past the hold to the status before it.
      *
      * @return 'concept_note'|'proposal'|'grant'
      */
     public function stage(): string
     {
-        $before = in_array($this->status, [ProposalStatus::OnHold, ProposalStatus::Rejected], true)
+        $before = $this->status === ProposalStatus::Rejected
             ? $this->statusBefore($this->status)
             : null;
 
@@ -485,9 +540,11 @@ class Proposal extends Model implements TracksActivity
             'planned_date_end' => 'date',
             'actual_date_begin' => 'date',
             'actual_date_end' => 'date',
+            'extended_date_end' => 'date',
             'requested_budget' => 'decimal:2',
             'requested_currency' => Currency::class,
             'status_remind_on' => 'date',
+            'on_hold_since' => 'date',
             'final_report_accepted_on' => 'date',
         ];
     }

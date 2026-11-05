@@ -29,7 +29,7 @@ return [
         'calendar_index' => ['intro' => ['title' => 'My calendar', 'body' => 'Your deadlines, tasks and milestones laid out by date. Click a day or an item to see or add what is happening.']],
         'strategies_index' => ['intro' => ['title' => 'Strategies', 'body' => 'The long-range goals everything else rolls up to. Open a strategy to see its programs and progress.']],
         'strategies_show' => ['intro' => ['title' => 'Strategy detail', 'body' => 'One strategy with its owner, progress and the programs that deliver it.']],
-        'programs_index' => ['intro' => ['title' => 'Programs', 'body' => 'Each program groups the projects that deliver part of a strategy. Filter by strategy or lead, then open one for the full picture.']],
+        'programs_index' => ['intro' => ['title' => 'Programs', 'body' => 'Each program groups the projects that deliver part of a strategy. Filter by strategy or manager, open a program with the eye button, and use the pencil to link a strategy and manager.']],
         'programs_show' => [
             'intro' => ['title' => 'Program detail', 'body' => 'Everything about one program: its plan years, projects, results framework and the tasks that sit outside any project.'],
             'loose_tasks' => ['title' => 'Program-level tasks', 'body' => 'Work that belongs to the program itself rather than to a single project.'],

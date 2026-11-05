@@ -312,7 +312,7 @@ trait ReadsAgreementMoney
     {
         $proposal = $this->agreement->proposal;
         $begin = $proposal->actual_date_begin ?? $proposal->planned_date_begin;
-        $end = $proposal->actual_date_end ?? $proposal->planned_date_end;
+        $end = $proposal->effectiveDateEnd() ?? $proposal->planned_date_end;
         $today = CarbonImmutable::today();
 
         if ($begin === null || $end === null || $end->lt($begin)) {

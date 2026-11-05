@@ -66,6 +66,7 @@ test('holders of each lifecycle permission are exactly the contract roles', func
     'supervisions.manage' => ['supervisions.manage', ['General Manager']],
     'sectors.view' => ['sectors.view', BUSINESS_ROLES],
     'sectors.manage' => ['sectors.manage', ['MEAL', 'General Manager']],
+    'risk-library.manage' => ['risk-library.manage', ['MEAL', 'General Manager']],
     'report-templates.manage' => ['report-templates.manage', ['MEAL']],
     'evidence-types.manage' => ['evidence-types.manage', ['MEAL']],
     'narrative-questions.manage' => ['narrative-questions.manage', ['MEAL']],
@@ -119,7 +120,7 @@ test('each role holds every view permission plus exactly its approved write perm
         'targets.create', 'targets.update', 'targets.delete',
         'indicator-library.create', 'indicator-library.update', 'indicator-library.delete',
         'reports.reopen', 'reports.aggregate',
-        'meal-coverage.manage', 'sectors.manage',
+        'meal-coverage.manage', 'sectors.manage', 'risk-library.manage',
         'report-templates.manage', 'evidence-types.manage', 'narrative-questions.manage',
     ]],
     'Financial' => ['Financial', [

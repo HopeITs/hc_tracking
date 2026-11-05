@@ -31,6 +31,7 @@ return [
         'supervisions' => 'Supervisions',
         'sectors' => 'Sectors',
         'report-templates' => 'Report templates',
+        'risk-library' => 'Risk library',
         'evidence-types' => 'Evidence types',
         'narrative-questions' => 'Narrative questions',
         'tasks' => 'Tasks',

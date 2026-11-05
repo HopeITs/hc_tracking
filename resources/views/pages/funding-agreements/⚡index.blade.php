@@ -1,6 +1,7 @@
 <?php
 
 use App\Enums\Currency;
+use App\Livewire\Concerns\FiltersByStrategy;
 use App\Livewire\Concerns\FiltersFinanceRegister;
 use App\Livewire\Concerns\FundingAgreements\ChartsAgreementCalendar;
 use App\Livewire\Concerns\FundingAgreements\ExportsAgreementRegister;
@@ -16,6 +17,7 @@ use Livewire\WithPagination;
 new #[Layout('layouts::desk'), Title('titles.funding_agreements')] class extends Component {
     use ChartsAgreementCalendar;
     use ExportsAgreementRegister;
+    use FiltersByStrategy;
     use FiltersFinanceRegister;
     use ManagesAgreementForm;
     use ReadsAgreementRegister;
@@ -111,7 +113,7 @@ new #[Layout('layouts::desk'), Title('titles.funding_agreements')] class extends
     {
         $this->reset(['search', 'donor', 'currency', 'stage', 'flag', 'min', 'max']);
         $this->resetRegisterFilters();
-        $this->resetPage();
+        $this->clearStrategyFilter();
     }
 
     /**
@@ -231,6 +233,7 @@ new #[Layout('layouts::desk'), Title('titles.funding_agreements')] class extends
 >
     <x-slot:actions>
             <div class="flex flex-wrap items-center justify-end gap-2">
+                <x-desk.strategy-chip :strategy="$this->strategyFilter" />
                 @if ($this->hasAnyAgreement)
                     <x-funding.filters :active="$activeFilterCount" :results="$total">
                         <div class="directory-filters grid gap-3 sm:grid-cols-2">

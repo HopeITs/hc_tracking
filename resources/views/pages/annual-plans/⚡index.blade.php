@@ -112,7 +112,7 @@ new #[Layout('layouts::desk'), Title('titles.annual_plans')] class extends Compo
             icon="calendar-days"
             :heading="__('common.no_annual_plans_yet')"
             :body="__('annual_plans.once_a_program_has_an_annual_plan_its_fiscal_years_appear_he')"
-            class="rounded-xl border border-secondary-soft dark:border-line"
+            class="rounded-panel border border-panel-border"
         >
             <x-slot:action>
                 @can('create', App\Models\AnnualPlan::class)<x-ui.button size="sm" tone="primary" icon="plus" wire:click="openCreateModal">{{ __('annual_plans.new_annual_plan') }}</x-ui.button>@endcan

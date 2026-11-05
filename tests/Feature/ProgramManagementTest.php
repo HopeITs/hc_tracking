@@ -1,7 +1,9 @@
 <?php
 
+use App\Enums\ProjectStatus;
 use App\Http\Middleware\SyncProgramsFromHr;
 use App\Models\Program;
+use App\Models\Project;
 use App\Models\Strategy;
 use App\Models\User;
 use Illuminate\Support\Facades\Cache;
@@ -253,4 +255,94 @@ test('the assignment form is rendered only while its modal is open', function ()
         ->assertDontSeeHtml('wire:model="managerId"')
         ->call('openEditModal', $program->id)
         ->assertSeeHtml('wire:model="managerId"');
+});
+
+test('the strategy and manager filters can list programs nobody is linked to', function () {
+    Program::factory()->create(['name' => 'Linked Program']);
+    Program::factory()->unassigned()->create(['name' => 'Orphan Program']);
+
+    Livewire::actingAs(User::factory()->role('General Manager')->create())
+        ->test('pages::programs.index')
+        ->set('strategy', 'none')
+        ->assertSee('Orphan Program')
+        ->assertDontSee('Linked Program')
+        ->set('strategy', '')
+        ->set('manager', 'none')
+        ->assertSee('Orphan Program')
+        ->assertDontSee('Linked Program');
+});
+
+test('the manager filter lists only people who manage a program, with their count', function () {
+    $manager = insertHrEmployee(firstNameEn: 'Amal', lastNameEn: 'Manager');
+    insertHrEmployee(firstNameEn: 'Idle', lastNameEn: 'Bystander');
+    Program::factory()->count(2)->create(['manager_id' => $manager]);
+    Program::factory()->unassigned()->create();
+
+    Livewire::actingAs(User::factory()->role('General Manager')->create())
+        ->test('pages::programs.index')
+        ->assertSee('Amal Manager')
+        ->assertSee('(2)')
+        ->assertDontSee('Idle Bystander')
+        ->assertSee('Not assigned (1)');
+});
+
+test('each card says what is late, at risk or unfunded in its projects', function () {
+    $this->travelTo('2026-09-15 09:00:00');
+
+    $troubled = Program::factory()->create(['name' => 'Troubled Program']);
+    Project::factory()->create(['program_id' => $troubled->id, 'status' => ProjectStatus::Active, 'end_date' => '2026-08-01']);
+    Program::factory()->create(['name' => 'Empty Program']);
+
+    Livewire::actingAs(User::factory()->role('General Manager')->create())
+        ->test('pages::programs.index')
+        ->assertSeeHtml('data-program-health="critical"')
+        ->assertSee('1 project overdue')
+        ->assertSee('1 project not funded yet')
+        ->assertSeeHtml('data-program-health="none"')
+        ->assertSee('No projects yet');
+});
+
+test('a program with no strategy reads "Not linked yet" with an Assign shortcut', function () {
+    Program::factory()->unassigned()->create(['name' => 'Orphan Program']);
+
+    Livewire::actingAs(User::factory()->role('General Manager')->create())
+        ->test('pages::programs.index')
+        ->assertSeeHtml('data-program-unlinked')
+        ->assertSee('Not linked yet')
+        ->assertSee('Assign a strategy and manager to Orphan Program');
+});
+
+test('the card list says how many of the programs are showing', function () {
+    foreach (range(1, 9) as $number) {
+        Program::factory()->create(['name' => 'Program '.str_pad((string) $number, 2, '0', STR_PAD_LEFT)]);
+    }
+
+    Livewire::actingAs(User::factory()->role('General Manager')->create())
+        ->test('pages::programs.index')
+        ->assertSee('Showing 8 of 9 programs');
+});
+
+test('an empty search offers one reset button, not two', function () {
+    Program::factory()->create(['name' => 'Water Security']);
+
+    $html = Livewire::actingAs(User::factory()->role('General Manager')->create())
+        ->test('pages::programs.index')
+        ->set('search', 'zzzz-no-match')
+        ->assertSee('No matching programs')
+        ->html();
+
+    expect(substr_count($html, 'Reset filters'))->toBe(1);
+});
+
+test('the assignment sheet names what it assigns and guards unsaved changes', function () {
+    $program = Program::factory()->unassigned()->create(['name' => 'Water Security']);
+
+    Livewire::actingAs(User::factory()->role('General Manager')->create())
+        ->test('pages::programs.index')
+        ->assertDontSeeHtml('data-discard-guard')
+        ->call('openEditModal', $program->id)
+        ->assertSee('Link Water Security to a strategy and manager')
+        ->assertSeeHtml('data-discard-guard')
+        ->assertSet('originalStrategyId', '')
+        ->assertSeeText('Discard your changes?');
 });

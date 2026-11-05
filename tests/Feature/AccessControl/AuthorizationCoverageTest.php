@@ -44,6 +44,12 @@ function authorizationCoverageExemptions(): array
         'app/Livewire/Concerns/Desk/ArrangesPanels.php:addPanel' => 'Saves only the signed-in user\'s own Desk layout, and only a panel from the library they may see.',
         'app/Livewire/Concerns/Desk/ArrangesPanels.php:resetLayout' => 'Clears only the signed-in user\'s own Desk layout.',
         'resources/views/components/desk/panels/⚡notes.blade.php:updatedNotes' => 'Saves only the signed-in user\'s own Desk notes.',
+        'resources/views/components/desk/panels/⚡todo.blade.php:add' => 'Saves only the signed-in user\'s own to-dos.',
+        'resources/views/components/desk/panels/⚡todo.blade.php:toggle' => 'Saves only the signed-in user\'s own to-dos.',
+        'resources/views/components/desk/panels/⚡todo.blade.php:remove' => 'Saves only the signed-in user\'s own to-dos.',
+        'resources/views/components/desk/panels/⚡todo.blade.php:reorder' => 'Saves only the signed-in user\'s own to-dos.',
+        'resources/views/components/desk/panels/⚡todo.blade.php:move' => 'Saves only the signed-in user\'s own to-dos.',
+        'resources/views/components/desk/panels/⚡todo.blade.php:clearDone' => 'Saves only the signed-in user\'s own to-dos.',
     ];
 }
 

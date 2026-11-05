@@ -1,7 +1,11 @@
 <?php
 
 use App\Support\Like;
+use App\Models\Program;
 use App\Models\Strategy;
+use App\Support\StrategyRollup;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Validation\Rule;
 use Flux\Flux;
 use Illuminate\Pagination\LengthAwarePaginator;
 use Illuminate\Support\Carbon;
@@ -33,6 +37,25 @@ new #[Layout('layouts::desk'), Title('titles.strategies')] class extends Compone
     public string $name = '';
     public string $startYear = '';
     public string $endYear = '';
+
+    public bool $showProgramsModal = false;
+    #[Locked]
+    public ?int $managingStrategyId = null;
+    /** @var list<string> */
+    public array $selectedProgramIds = [];
+
+    /**
+     * A year typed after a failed save clears that field's stale error.
+     */
+    public function updatedStartYear(): void
+    {
+        $this->resetValidation('startYear');
+    }
+
+    public function updatedEndYear(): void
+    {
+        $this->resetValidation('endYear');
+    }
 
     public function updatedSearch(): void
     {
@@ -141,6 +164,8 @@ new #[Layout('layouts::desk'), Title('titles.strategies')] class extends Compone
             'endYear' => ['required', 'integer', 'min:1900', 'max:2100', 'gte:startYear'],
         ], [
             'name.required' => __('strategies.enter_a_strategy_name'),
+            'startYear.required' => __('strategies.enter_a_start_year'),
+            'endYear.required' => __('strategies.enter_an_end_year'),
             'endYear.gte' => __('strategies.end_year_must_not_be_before_the_start_year'),
         ]);
 
@@ -163,6 +188,8 @@ new #[Layout('layouts::desk'), Title('titles.strategies')] class extends Compone
 
     public function confirmDelete(int $strategyId): void
     {
+        Gate::authorize('delete', Strategy::query()->select(['id'])->findOrFail($strategyId));
+
         $this->deletingStrategyId = $strategyId;
         $this->showDeleteModal = true;
     }
@@ -199,6 +226,182 @@ new #[Layout('layouts::desk'), Title('titles.strategies')] class extends Compone
         Flux::toast(variant: 'success', text: __('strategies.strategy_deleted'));
     }
 
+    public function cancelDelete(): void
+    {
+        $this->showDeleteModal = false;
+        $this->deletingStrategyId = null;
+    }
+
+    /**
+     * The name of the strategy the delete dialog is asking about.
+     */
+    #[Computed]
+    public function deletingStrategyName(): ?string
+    {
+        return $this->deletingStrategyId === null
+            ? null
+            : Strategy::query()->whereKey($this->deletingStrategyId)->value('name');
+    }
+
+    /**
+     * Strategies whose years overlap the period typed in the form, for the
+     * warning under it. Overlaps are allowed (a country plan and a regional
+     * plan may run side by side); the form only says so.
+     *
+     * @return list<array{name: string, start_year: int, end_year: int}>
+     */
+    #[Computed]
+    public function overlappingStrategies(): array
+    {
+        if (! ctype_digit($this->startYear) || ! ctype_digit($this->endYear) || (int) $this->endYear < (int) $this->startYear) {
+            return [];
+        }
+
+        return array_values(Strategy::query()
+            ->select(['name', 'start_year', 'end_year'])
+            ->when($this->editingStrategyId !== null, fn ($query) => $query->whereKeyNot($this->editingStrategyId))
+            ->where('start_year', '<=', (int) $this->endYear)
+            ->where('end_year', '>=', (int) $this->startYear)
+            ->orderBy('start_year')
+            ->get()
+            ->map(fn (Strategy $strategy): array => ['name' => $strategy->name, 'start_year' => $strategy->start_year, 'end_year' => $strategy->end_year])
+            ->all());
+    }
+
+    /**
+     * What each strategy on this page adds up to (StrategyRollup), keyed by id.
+     *
+     * @return array<int, array<string, mixed>>
+     */
+    #[Computed]
+    public function rollups(): array
+    {
+        $ids = array_values($this->portfolio['paginated_strategies']->getCollection()->pluck('id')->map(fn (mixed $id): int => (int) $id)->all());
+
+        return $ids === [] ? [] : StrategyRollup::for(auth()->user(), $ids);
+    }
+
+    /**
+     * Whether the current user may link programs to strategies (programs.update).
+     */
+    #[Computed]
+    public function canLinkPrograms(): bool
+    {
+        return auth()->user()->can('programs.update');
+    }
+
+    /**
+     * Open the picker of the programs linked to one strategy, with its current
+     * programs already ticked.
+     */
+    public function openProgramsModal(int $strategyId): void
+    {
+        Gate::authorize('programs.update');
+
+        $strategy = Strategy::query()->select(['id'])->findOrFail($strategyId);
+
+        $this->resetValidation();
+        $this->managingStrategyId = $strategy->id;
+        $this->selectedProgramIds = array_values(Program::query()
+            ->where('strategy_id', $strategy->id)
+            ->pluck('id')
+            ->map(fn (mixed $id): string => (string) $id)
+            ->all());
+        $this->showProgramsModal = true;
+    }
+
+    /**
+     * The strategy the programs picker is open for.
+     */
+    #[Computed]
+    public function managingStrategy(): ?Strategy
+    {
+        return $this->managingStrategyId === null
+            ? null
+            : Strategy::query()->select(['id', 'name'])->find($this->managingStrategyId);
+    }
+
+    /**
+     * Every program, with the strategy it sits in now, for the picker.
+     *
+     * @return list<array{id: int, name: string, strategy_id: int|null, strategy_name: string|null}>
+     */
+    #[Computed]
+    public function programOptions(): array
+    {
+        return array_values(Program::query()
+            ->select(['id', 'strategy_id'])
+            ->with('strategy:id,name')
+            ->orderByName()
+            ->get()
+            ->map(fn (Program $program): array => [
+                'id' => $program->id,
+                'name' => $program->name,
+                'strategy_id' => $program->strategy_id,
+                'strategy_name' => $program->strategy?->name,
+            ])
+            ->all());
+    }
+
+    /**
+     * Ticked programs that sit in another strategy now and will move here.
+     *
+     * @return list<array{name: string, strategy_name: string}>
+     */
+    #[Computed]
+    public function programsMovingHere(): array
+    {
+        $selected = array_map('intval', $this->selectedProgramIds);
+
+        return array_values(collect($this->programOptions)
+            ->filter(fn (array $option): bool => in_array($option['id'], $selected, true)
+                && $option['strategy_id'] !== null
+                && $option['strategy_id'] !== $this->managingStrategyId)
+            ->map(fn (array $option): array => ['name' => $option['name'], 'strategy_name' => (string) $option['strategy_name']])
+            ->all());
+    }
+
+    /**
+     * Link the ticked programs to the strategy and unlink the ones unticked.
+     * A ticked program from another strategy moves here.
+     */
+    public function savePrograms(): void
+    {
+        Gate::authorize('programs.update');
+
+        $strategy = Strategy::query()->select(['id'])->findOrFail($this->managingStrategyId);
+
+        $validated = $this->validate([
+            'selectedProgramIds' => ['array'],
+            'selectedProgramIds.*' => ['integer', Rule::exists(Program::class, 'id')],
+        ]);
+
+        $programIds = array_map('intval', $validated['selectedProgramIds']);
+
+        DB::transaction(function () use ($strategy, $programIds): void {
+            Program::query()
+                ->where('strategy_id', $strategy->id)
+                ->whereNotIn('id', $programIds)
+                ->update(['strategy_id' => null]);
+
+            Program::query()
+                ->whereIn('id', $programIds)
+                ->update(['strategy_id' => $strategy->id]);
+        });
+
+        $this->closeProgramsModal();
+
+        Flux::toast(variant: 'success', text: __('strategies.programs_saved'));
+    }
+
+    public function closeProgramsModal(): void
+    {
+        $this->resetValidation();
+        $this->showProgramsModal = false;
+        $this->managingStrategyId = null;
+        $this->selectedProgramIds = [];
+    }
+
     public function closeStrategyModal(): void
     {
         $this->showStrategyModal = false;
@@ -216,8 +419,8 @@ new #[Layout('layouts::desk'), Title('titles.strategies')] class extends Compone
 
     /**
      * @return array{
-     *     strategies: Collection<int, array{id: int, name: string, start_year: int, end_year: int, duration_years: int, programs_count: int, status: string}>,
-     *     paginated_strategies: LengthAwarePaginator<int, array{id: int, name: string, start_year: int, end_year: int, duration_years: int, programs_count: int, status: string}>,
+     *     strategies: Collection<int, array{id: int, name: string, start_year: int, end_year: int, duration_years: int, programs_count: int, pillars_count: int, status: string}>,
+     *     paginated_strategies: LengthAwarePaginator<int, array{id: int, name: string, start_year: int, end_year: int, duration_years: int, programs_count: int, pillars_count: int, status: string}>,
      *     total: int,
      *     has_records: bool,
      *     status_counts: array{active: int, upcoming: int, completed: int},
@@ -235,7 +438,7 @@ new #[Layout('layouts::desk'), Title('titles.strategies')] class extends Compone
 
         $searchFiltered = Strategy::query()
             ->select(['id', 'name', 'start_year', 'end_year'])
-            ->withCount('programs')
+            ->withCount(['programs', 'pillars'])
             ->when($search !== '', fn ($query) => $query->where('name', 'like', Like::contains($search)))
             ->orderBy('name')
             ->orderBy('id')
@@ -254,6 +457,7 @@ new #[Layout('layouts::desk'), Title('titles.strategies')] class extends Compone
                     'end_year' => $strategy->end_year,
                     'duration_years' => $strategy->end_year - $strategy->start_year + 1,
                     'programs_count' => $strategy->programs_count,
+                    'pillars_count' => $strategy->pillars_count,
                     'status' => $status,
                 ];
             });
@@ -302,21 +506,21 @@ new #[Layout('layouts::desk'), Title('titles.strategies')] class extends Compone
 @php
     $portfolio = $this->portfolio;
 
-    $statusOptions = [
-        'active' => __('common.active'),
+    $statusLabel = fn (string $status): string => match ($status) {
+        'active' => __('strategies.status_active'),
         'upcoming' => __('strategies.upcoming'),
-        'completed' => __('common.completed'),
+        default => __('strategies.status_completed'),
+    };
+
+    $statusOptions = [
+        'active' => $statusLabel('active'),
+        'upcoming' => $statusLabel('upcoming'),
+        'completed' => $statusLabel('completed'),
     ];
 
     $toneFor = fn (string $status): string => match ($status) {
         'active' => 'good',
         default => 'neutral',
-    };
-
-    $statusLabel = fn (string $status): string => match ($status) {
-        'active' => __('common.active'),
-        'upcoming' => __('strategies.upcoming'),
-        default => __('common.completed'),
     };
 
     $statusChipClasses = fn (string $status): string => match ($status) {
@@ -328,7 +532,7 @@ new #[Layout('layouts::desk'), Title('titles.strategies')] class extends Compone
     $timelineItems = $portfolio['strategies']->map(fn ($strategy) => [
         'key' => $strategy['id'],
         'label' => $strategy['name'],
-        'sublabel' => trans_choice('strategies.count_program', $strategy['programs_count'], ['count' => $strategy['programs_count']]),
+        'sublabel' => $strategy['programs_count'] === 0 ? __('strategies.no_programs_linked_yet') : trans_choice('strategies.count_program', $strategy['programs_count'], ['count' => $strategy['programs_count']]),
         'start' => Carbon::create($strategy['start_year'], 1, 1),
         'end' => Carbon::create($strategy['end_year'], 12, 31),
         'tone' => $toneFor($strategy['status']),
@@ -340,7 +544,7 @@ new #[Layout('layouts::desk'), Title('titles.strategies')] class extends Compone
 @endphp
 
 <x-desk.register class="admin-directory @container/directory" heading-id="strategies-heading" :title="__('common.strategies')" :count="$portfolio['total']">
-    
+
         <x-slot:search>
             <x-desk.register-search id="strategy-search" data-directory-search :label="__('strategies.search_strategies')" :placeholder="__('strategies.search_by_name')" wire:model.live.debounce.300ms="search" />
         </x-slot:search>
@@ -360,7 +564,7 @@ new #[Layout('layouts::desk'), Title('titles.strategies')] class extends Compone
                 </x-ui.button>
             </x-slot:actions>
         @endif
-    
+
     <div class="flex items-center justify-between gap-3">
         <div class="min-w-0">
             @if ($portfolio['has_records'] && $portfolio['status_counts']['active'] === 0 && ! $portfolio['filters_active'])
@@ -376,8 +580,8 @@ new #[Layout('layouts::desk'), Title('titles.strategies')] class extends Compone
         </div>
 
         <div class="flex shrink-0 items-center gap-2">
-            <span wire:loading.delay.flex wire:target="search,filterByStatus,resetFilters" class="hidden items-center gap-1.5 text-xs text-secondary-medium dark:text-ink-muted"><flux:icon.arrow-path class="size-3.5 animate-spin" /> {{ __('common.updating') }}</span>
-            @if ($portfolio['filters_active'])
+            <span wire:loading.delay.flex wire:target="search,status,filterByStatus,resetFilters" class="hidden items-center gap-1.5 text-xs text-secondary-medium dark:text-ink-muted"><flux:icon.arrow-path class="size-3.5 animate-spin" /> {{ __('common.updating') }}</span>
+            @if ($portfolio['filters_active'] && $portfolio['strategies']->isNotEmpty())
                 <flux:button size="sm" variant="ghost" wire:click="resetFilters">{{ __('common.reset_filters') }}</flux:button>
             @endif
         </div>
@@ -397,61 +601,10 @@ new #[Layout('layouts::desk'), Title('titles.strategies')] class extends Compone
         </x-ui.empty-state>
     @else
         <div class="flex flex-1 flex-col gap-5">
-            <x-ui.timeline :from="$timelineFrom" :to="$timelineTo" :items="$timelineItems" />
+            {{-- The table below repeats every name and period, so on a phone the roadmap would only double the page. --}}
+            <x-ui.timeline compact class="@max-2xl:hidden" :from="$timelineFrom" :to="$timelineTo" :items="$timelineItems" />
 
-            <x-ui.data-table :caption="__('strategies.strategic_planning_cycles')">
-                <x-slot:head>
-                    <th scope="col">{{ __('common.strategy') }}</th>
-                    <th scope="col">{{ __('common.period') }}</th>
-                    <th scope="col">{{ __('strategies.duration') }}</th>
-                    <th scope="col">{{ __('common.status') }}</th>
-                    <th scope="col" class="text-end!">{{ __('common.programs') }}</th>
-                    <th scope="col" class="sr-only">{{ __('common.actions') }}</th>
-                </x-slot:head>
-
-                @foreach ($portfolio['paginated_strategies'] as $strategy)
-                    <tr wire:key="strategy-row-{{ $strategy['id'] }}">
-                        <x-ui.data-table.cell :label="__('common.strategy')">
-                            <span class="truncate font-semibold text-secondary-dark dark:text-ink">{{ $strategy['name'] }}</span>
-                        </x-ui.data-table.cell>
-                        <x-ui.data-table.cell :label="__('common.period')">
-                            <bdi class="tabular-nums">{{ $strategy['start_year'] }}–{{ $strategy['end_year'] }}</bdi>
-                        </x-ui.data-table.cell>
-                        <x-ui.data-table.cell :label="__('strategies.duration')">
-                            {{ trans_choice('strategies.count_years', $strategy['duration_years'], ['count' => $strategy['duration_years']]) }}
-                        </x-ui.data-table.cell>
-                        <x-ui.data-table.cell :label="__('common.status')">
-                            <span class="{{ $statusChipClasses($strategy['status']) }} inline-flex shrink-0 items-center rounded-md px-2.5 py-1 text-xs font-semibold">
-                                {{ $statusLabel($strategy['status']) }}
-                            </span>
-                        </x-ui.data-table.cell>
-                        <x-ui.data-table.cell :label="__('common.programs')" numeric>
-                            {{ $strategy['programs_count'] }}
-                        </x-ui.data-table.cell>
-                        <x-ui.data-table.cell :label="__('common.actions')">
-                            <div class="flex items-center justify-end gap-1 @3xl:justify-start">
-                                <x-ui.button tone="ghost" size="sm" icon="eye" class="size-9!" :href="route('strategies.show', tap(new Strategy, fn ($s) => $s->id = $strategy['id']))" wire:navigate :aria-label="__('common.view_name', ['name' => $strategy['name']])" />
-
-                                @if ($this->canEditStrategies)
-                                    <x-ui.button tone="ghost" size="sm" icon="pencil-square" class="size-9!" wire:click="openEditModal({{ $strategy['id'] }})" :aria-label="__('common.edit_name', ['name' => $strategy['name']])" data-test="edit-strategy-button" />
-                                @endif
-
-                                @if ($this->canDeleteStrategies)
-                                    @if ($strategy['programs_count'] === 0)
-                                        <x-ui.button tone="ghost" size="sm" icon="trash" class="size-9!" wire:click="confirmDelete({{ $strategy['id'] }})" :aria-label="__('common.delete_name', ['name' => $strategy['name']])" data-test="delete-strategy-button" />
-                                    @else
-                                        <flux:tooltip :content="__('strategies.strategies_with_linked_programs_cannot_be_deleted')">
-                                            <span class="inline-flex size-9 cursor-not-allowed items-center justify-center text-secondary-light" aria-disabled="true">
-                                                <flux:icon.lock-closed class="size-4" />
-                                            </span>
-                                        </flux:tooltip>
-                                    @endif
-                                @endif
-                            </div>
-                        </x-ui.data-table.cell>
-                    </tr>
-                @endforeach
-            </x-ui.data-table>
+            @include('pages.strategies._index-table')
 
             <flux:pagination :paginator="$portfolio['paginated_strategies']" class="text-secondary-medium! dark:text-ink-muted!" />
         </div>
@@ -469,8 +622,15 @@ new #[Layout('layouts::desk'), Title('titles.strategies')] class extends Compone
             @if ($showStrategyModal)
                 <div class="grid grid-cols-2 gap-x-4 gap-y-4">
                     <x-ui.form-input wire:model="name" :label="__('strategies.strategy_name')" maxlength="255" required autofocus class="col-span-2" />
-                    <x-ui.form-input wire:model="startYear" :label="__('strategies.period_start')" type="number" min="1900" max="2100" required />
-                    <x-ui.form-input wire:model="endYear" :label="__('strategies.period_end')" type="number" min="1900" max="2100" required />
+                    <x-ui.form-input wire:model.live.blur="startYear" :label="__('strategies.period_start')" type="number" min="1900" max="2100" required />
+                    <x-ui.form-input wire:model.live.blur="endYear" :label="__('strategies.period_end')" type="number" min="1900" max="2100" required />
+
+                    @if ($this->overlappingStrategies !== [])
+                        <div class="col-span-2 flex items-start gap-2 rounded-md bg-status-warn-soft px-3 py-2 text-sm text-secondary-dark dark:bg-surface-2 dark:text-ink" role="status" data-test="strategy-overlap-warning">
+                            <flux:icon.exclamation-triangle variant="mini" class="mt-0.5 size-4 shrink-0 text-status-warn" />
+                            <span>{{ __('strategies.overlaps_with', ['names' => collect($this->overlappingStrategies)->map(fn (array $other): string => "\u{2068}{$other['name']}\u{2069} \u{2066}({$other['start_year']}–{$other['end_year']})\u{2069}")->implode(__('strategies.list_separator'))]) }}</span>
+                        </div>
+                    @endif
                 </div>
             @endif
 
@@ -482,10 +642,86 @@ new #[Layout('layouts::desk'), Title('titles.strategies')] class extends Compone
         </x-ui.modal>
     @endif
 
+    @if ($this->canLinkPrograms)
+        <x-ui.modal
+            wire:model="showProgramsModal"
+            size="md"
+            :title="$this->managingStrategy === null ? __('strategies.manage_programs') : __('strategies.programs_of_named_strategy', ['name' => $this->managingStrategy->name])"
+            :description="__('strategies.programs_modal_hint')"
+            submit="savePrograms"
+            close="closeProgramsModal"
+        >
+            @if ($showProgramsModal)
+                <div class="flex flex-col gap-3" x-data="{ programSearch: '' }" data-test="strategy-programs-modal">
+                    <x-ui.input
+                        type="search"
+                        x-model="programSearch"
+                        icon="magnifying-glass"
+                        :placeholder="__('strategies.search_programs')"
+                        :aria-label="__('strategies.search_programs')"
+                        data-test="strategy-programs-search"
+                    />
+
+                    <p class="type-meta text-secondary-medium dark:text-ink-muted" aria-live="polite">
+                        {{ trans_choice('strategies.count_programs_selected', count($selectedProgramIds), ['count' => count($selectedProgramIds)]) }}
+                    </p>
+
+                    <ul class="flex max-h-80 flex-col divide-y divide-board-line overflow-y-auto rounded-lg border border-board-line">
+                        @forelse ($this->programOptions as $option)
+                            <li
+                                data-program-option
+                                wire:key="strategy-program-option-{{ $option['id'] }}"
+                                x-show="programSearch === '' || $el.textContent.toLowerCase().includes(programSearch.toLowerCase())"
+                            >
+                                <label class="flex cursor-pointer items-center gap-3 px-3 py-2.5 hover:bg-ground">
+                                    <input
+                                        type="checkbox"
+                                        wire:model.live="selectedProgramIds"
+                                        value="{{ $option['id'] }}"
+                                        class="size-4 shrink-0 accent-primary"
+                                        data-test="strategy-program-option"
+                                    />
+                                    <span class="min-w-0 flex-1">
+                                        <span class="block truncate text-sm font-semibold text-secondary-dark dark:text-ink">{{ $option['name'] }}</span>
+                                        @if ($option['strategy_id'] !== null && $option['strategy_id'] !== $managingStrategyId)
+                                            <span class="type-meta block truncate text-secondary-medium dark:text-ink-muted">{{ __('strategies.now_in', ['name' => $option['strategy_name']]) }}</span>
+                                        @endif
+                                    </span>
+                                </label>
+                            </li>
+                        @empty
+                            <li class="px-3 py-6 text-center text-sm text-secondary-medium dark:text-ink-muted">{{ __('strategies.no_programs_to_link') }}</li>
+                        @endforelse
+                        <li
+                            x-cloak
+                            x-show="programSearch !== '' && ! [...$root.querySelectorAll('[data-program-option]')].some((option) => option.textContent.toLowerCase().includes(programSearch.toLowerCase()))"
+                            class="px-3 py-6 text-center text-sm text-secondary-medium dark:text-ink-muted"
+                        >{{ __('strategies.no_programs_match') }}</li>
+                    </ul>
+
+                    @if ($this->programsMovingHere !== [])
+                        <div class="flex items-start gap-2 rounded-md bg-status-warn-soft px-3 py-2 text-sm text-secondary-dark dark:bg-surface-2 dark:text-ink" role="status" data-test="strategy-programs-move-warning">
+                            <flux:icon.exclamation-triangle variant="mini" class="mt-0.5 size-4 shrink-0 text-status-warn" />
+                            <span>{{ __('strategies.programs_will_move', ['names' => collect($this->programsMovingHere)->map(fn (array $moving): string => "\u{2068}{$moving['name']}\u{2069} (\u{2068}{$moving['strategy_name']}\u{2069})")->implode(__('strategies.list_separator'))]) }}</span>
+                        </div>
+                    @endif
+                </div>
+            @endif
+
+            <x-slot:actions>
+                <x-ui.button type="submit" tone="primary" data-test="save-strategy-programs">
+                    {{ __('common.save_changes') }}
+                </x-ui.button>
+            </x-slot:actions>
+        </x-ui.modal>
+    @endif
+
     @if ($this->canDeleteStrategies)
         <x-ui.confirm-modal
             wire:model="showDeleteModal"
-            :title="__('strategies.delete_this_strategy')"
+            :title="$this->deletingStrategyName === null ? __('strategies.delete_this_strategy') : __('strategies.delete_named_strategy', ['name' => $this->deletingStrategyName])"
+            :message="__('strategies.delete_strategy_cannot_be_undone')"
+            close="cancelDelete"
             confirm="deleteStrategy"
             :confirm-label="__('strategies.delete_strategy')"
             confirm-test="confirm-delete-strategy"

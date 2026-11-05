@@ -43,7 +43,7 @@
             <span x-show="item.sticky" class="absolute inset-y-0 start-0 w-1 bg-primary dark:bg-status-critical" aria-hidden="true"></span>
 
             <div class="flex gap-3 py-4 ps-4 pe-2">
-                <img x-bind:src="item.avatar || item.icon || @js(asset('app-icons/icon-192.png'))" alt="" x-bind:class="item.avatar ? 'rounded-full bg-[#c2151c] object-cover' : 'rounded-xl'" class="size-10 shrink-0" width="40" height="40" data-no-dim />
+                <img x-bind:src="item.avatar || item.icon || @js(asset('app-icons/icon-192.png'))" alt="" x-bind:class="item.avatar ? 'rounded-full bg-hr-avatar object-cover' : 'rounded-xl'" class="size-10 shrink-0" width="40" height="40" data-no-dim />
 
                 <div class="min-w-0 flex-1">
                     <div class="flex items-center gap-2">

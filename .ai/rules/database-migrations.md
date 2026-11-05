@@ -76,3 +76,10 @@ User decision 2026-09-14: migration 2026_09_14_111851_make_transfers_tracking_re
 
 ## report_files stores real files; legacy rows are reference-only
 Migration 2026_09_21_112152 added disk (default 'local', private), original_name, mime_type, size, uploaded_by (nullable, nullOnDelete) to report_files. Rows with original_name NULL predate real storage: no file on disk, shown as "Reference only", no download (ReportFile::isStored()). Uploads go to report-files/{report_id} on the local disk, max 5MB, FileType extensions only; download via reports.files.download (scoped to the report, IDOR guard). Upload/edit/replace/delete only while the report is Draft; download at any status. A DB cascade delete of a report does not remove its disk files.
+
+## A Default* list that arrives after its seed migration ran needs a second migration
+The `App\Support\Default*` lookup lists (`DefaultSectors`, `DefaultEvidenceTypes`, `DefaultNarrativeQuestions`, `DefaultRiskLibrary`) are seeded by both a data migration and a seeder, sharing one idempotent `ensure()`.
+
+When such a list ships EMPTY and the content arrives later, filling `all()` is not enough: the original data migration is already in the `migrations` table on every database that migrated, and a migration never runs twice, so those databases stay empty and only a seeder run would fill them. Add a second data migration calling the same `ensure()` (same shape: skip under `runningUnitTests()`, `down()` deleting only the defaults nothing references). `ensure()` being idempotent is what makes the extra pass safe.
+
+Done for the W-09 risk library on 4 Nov 2026: `2026_11_04_103125_seed_risk_library` ran with an empty list, `2026_11_04_152049_seed_risk_library_starting_list` carries the 18 rows.

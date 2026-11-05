@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Actions\FundingAgreements;
 
+use App\Actions\Tasks\SyncReportTask;
 use App\Models\DonorReport;
 use App\Support\StoredFiles;
 use Illuminate\Support\Facades\DB;
@@ -22,6 +23,7 @@ class DeleteDonorReport
         DB::transaction(function () use ($report): void {
             $files = $report->media()->get(['id', 'disk', 'path']);
 
+            app(SyncReportTask::class)->forget($report);
             $report->media()->delete();
             $report->delete();
 

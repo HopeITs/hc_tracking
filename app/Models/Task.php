@@ -12,6 +12,7 @@ use App\Enums\TaskKind;
 use App\Enums\TaskPriority;
 use App\Enums\TaskStatus;
 use App\Models\Scopes\TaskVisibilityScope;
+use App\Notifications\SubjectLinks;
 use App\Notifications\TracksActivity;
 use App\Observers\ScheduleItemObserver;
 use Carbon\CarbonImmutable;
@@ -57,6 +58,8 @@ use Illuminate\Support\Collection;
  * @property bool $evidence_required
  * @property int $created_by
  * @property int|null $copied_from_id
+ * @property string|null $reportable_type
+ * @property int|null $reportable_id
  * @property CarbonImmutable|null $created_at
  * @property CarbonImmutable|null $updated_at
  */
@@ -86,6 +89,8 @@ use Illuminate\Support\Collection;
     'evidence_required',
     'created_by',
     'copied_from_id',
+    'reportable_type',
+    'reportable_id',
 ])]
 #[ObservedBy(ScheduleItemObserver::class)]
 #[ScopedBy([TaskVisibilityScope::class])]
@@ -239,6 +244,36 @@ class Task extends Model implements TracksActivity
     public function source(): MorphTo
     {
         return $this->morphTo();
+    }
+
+    /**
+     * The report this task tracks, when it is a report task (W-13).
+     *
+     * @return MorphTo<Model, $this>
+     */
+    public function reportable(): MorphTo
+    {
+        return $this->morphTo();
+    }
+
+    /**
+     * The page of the report this task tracks (W-13), through SubjectLinks.
+     */
+    public function reportUrl(): ?string
+    {
+        if (! $this->isReportTask() || $this->reportable_type === null || $this->reportable_id === null) {
+            return null;
+        }
+
+        return app(SubjectLinks::class)->routeFor($this->reportable_type, $this->reportable_id);
+    }
+
+    /**
+     * Whether this is a report task (TaskKind::Report).
+     */
+    public function isReportTask(): bool
+    {
+        return $this->kind === TaskKind::Report;
     }
 
     /**

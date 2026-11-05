@@ -140,4 +140,7 @@ return [
     'back' => 'رجوع',
     'steps' => 'الخطوات',
     'step_of' => 'الخطوة :step من :total',
+    'discard_changes_question' => 'تجاهل تغييراتك؟',
+    'discard' => 'تجاهل',
+    'keep_editing' => 'متابعة التعديل',
 ];

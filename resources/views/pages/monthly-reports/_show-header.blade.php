@@ -28,7 +28,6 @@
     :title="$monthLabel"
     :subtitle="$headerProject->name"
     :unread="app(\App\Notifications\UnreadSubjects::class)->has(auth()->user(), 'monthly_report', $report->id)"
-    title-class="text-3xl! font-extrabold! leading-none! tracking-tight!"
 >
     <x-slot:meta>
         <x-monthly-reports.state-chip :state="$headerState" />

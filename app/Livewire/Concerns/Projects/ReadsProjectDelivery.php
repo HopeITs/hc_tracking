@@ -16,6 +16,7 @@ use App\Models\Task;
 use Carbon\CarbonImmutable;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Collection;
+use Illuminate\Support\Facades\DB;
 use Livewire\Attributes\Computed;
 
 /**
@@ -117,15 +118,26 @@ trait ReadsProjectDelivery
             ->get();
     }
 
-    /** @return Collection<int, Risk> */
+    /**
+     * The risks the project's manager should be aware of (W-09, D-61): those
+     * picked onto the logframes of the proposals linked to this project, plus
+     * the register rows logged against the project before the library
+     * existed. Read-only; one query. Newest framework risks sit with their
+     * proposal, the earlier register rows in a group of their own.
+     *
+     * @return Collection<int, Risk>
+     */
     #[Computed]
-    public function risks(): Collection
+    public function riskAwareness(): Collection
     {
         return Risk::query()
-            ->select(['id', 'name', 'impact', 'solution', 'happened', 'project_id'])
-            ->where('project_id', $this->projectId)
+            ->select(['id', 'name', 'name_en', 'impact', 'solution', 'happened', 'likelihood', 'severity', 'project_id', 'proposal_id'])
+            ->with('proposal:id,name')
+            ->where(fn (Builder $query) => $query
+                ->where('project_id', $this->projectId)
+                ->orWhereIn('proposal_id', DB::table('project_proposal')->select('proposal_id')->where('project_id', $this->projectId)))
             ->orderByDesc('happened')
-            ->orderBy('name')
+            ->orderBy('id')
             ->get();
     }
 

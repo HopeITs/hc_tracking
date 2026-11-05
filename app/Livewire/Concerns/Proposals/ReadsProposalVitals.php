@@ -146,6 +146,13 @@ trait ReadsProposalVitals
             default => __('proposals.days_into_the_grant_term'),
         };
 
+        if ($this->proposal->extended_date_end !== null && $this->proposal->actual_date_end !== null) {
+            $caption = __('proposals.ends_on_extended', [
+                'end' => $this->proposal->actual_date_end->translatedFormat(__('formats.date')),
+                'extended' => $this->proposal->extended_date_end->translatedFormat(__('formats.date')),
+            ]);
+        }
+
         return [
             'key' => 'time',
             'tab' => 'deadlines',

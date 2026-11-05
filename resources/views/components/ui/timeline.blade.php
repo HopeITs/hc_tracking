@@ -2,6 +2,8 @@
     'from' => null,
     'to' => null,
     'items' => [],
+    // Tighter rows with the sublabel beside the name, for a timeline that sits above a table repeating its detail.
+    'compact' => false,
 ])
 
 @php
@@ -55,6 +57,11 @@
         }
     }
 
+    // A long roadmap (two decades of strategies) would print its year labels
+    // on top of each other; label every Nth tick so at most ~10 show.
+    $labelEvery = max(1, (int) ceil($ticks->count() / 10));
+    $ticks = $ticks->filter(fn ($tick, int $index): bool => $index % $labelEvery === 0)->values();
+
     $toneClasses = fn (string $tone): string => match ($tone) {
         'good' => 'bg-status-good',
         'warn' => 'bg-status-warn',
@@ -85,7 +92,19 @@
         </div>
     @endif
 
-    <div class="flex flex-col divide-y divide-board-line rounded-xl border border-board-line bg-board shadow-card dark:shadow-raised dark:border-transparent">
+    @if ($ticks->isNotEmpty() && $todayPct !== null)
+        {{-- Names the vertical line drawn through every row below. --}}
+        <div class="hidden @2xl:block" aria-hidden="true" data-timeline-today-label>
+            <div class="flex items-center gap-4 px-3">
+                <div class="shrink-0" style="width: 13rem"></div>
+                <div class="relative h-4 min-w-0 flex-1">
+                    <span class="type-meta absolute top-0 -translate-x-1/2 font-semibold whitespace-nowrap text-primary rtl:translate-x-1/2 dark:text-brand-text" style="inset-inline-start: {{ $todayPct }}%">{{ __('ui.today') }}</span>
+                </div>
+            </div>
+        </div>
+    @endif
+
+    <x-ui.panel as="div" :clip="false" class="flex flex-col divide-y divide-board-line">
         @if ($rows->isEmpty())
             {{ $slot }}
         @endif
@@ -99,14 +118,14 @@
                 $width = max($endPct - $startPct, 1.5);
                 $tone = $item['tone'] ?? 'neutral';
             @endphp
-            <div class="flex flex-col gap-2 p-3 @2xl:flex-row @2xl:items-center @2xl:gap-4" wire:key="timeline-{{ $item['key'] }}">
+            <div @class(['flex flex-col gap-2 @2xl:flex-row @2xl:items-center @2xl:gap-4', 'p-3' => ! $compact, 'px-3 py-2' => $compact]) wire:key="timeline-{{ $item['key'] }}">
                 <div class="min-w-0 @2xl:w-52 @2xl:shrink-0">
                     @if (! empty($item['href']))
-                        <a href="{{ $item['href'] }}" wire:navigate class="truncate text-sm font-semibold text-secondary-dark hover:underline dark:text-ink">{{ $item['label'] }}</a>
+                        <a href="{{ $item['href'] }}" wire:navigate @class(['text-sm font-semibold text-secondary-dark hover:underline dark:text-ink', 'block truncate' => $compact, 'truncate' => ! $compact])>{{ $item['label'] }}</a>
                     @else
                         <p class="truncate text-sm font-semibold text-secondary-dark dark:text-ink">{{ $item['label'] }}</p>
                     @endif
-                    @if (! empty($item['sublabel']))
+                    @if (! empty($item['sublabel']) && ! $compact)
                         <p class="type-meta text-secondary-medium dark:text-ink-muted">{{ $item['sublabel'] }}</p>
                     @endif
                 </div>
@@ -131,5 +150,5 @@
                 </p>
             </div>
         @endforeach
-    </div>
+    </x-ui.panel>
 </div>

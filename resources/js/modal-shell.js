@@ -22,6 +22,7 @@ const WizardMinimumSections = 3;
 document.addEventListener('alpine:init', () => {
     window.Alpine.data('modalShell', (titleId, submitAction = null) => ({
         uploads: 0,
+        discardAsked: false,
         stopWatchingSubmit: null,
         wizard: false,
         step: 1,
@@ -56,6 +57,15 @@ document.addEventListener('alpine:init', () => {
             // A closed dialog starts at the first step next time it opens.
             this.dialog()?.addEventListener('close', () => {
                 this.step = 1;
+                this.discardAsked = false;
+            });
+
+            // Esc is the dialog's own cancel: hold it back once when there is unsaved work.
+            this.dialog()?.addEventListener('cancel', (event) => {
+                if (this.isDirty() && ! this.discardAsked) {
+                    event.preventDefault();
+                    this.discardAsked = true;
+                }
             });
         },
 
@@ -156,7 +166,40 @@ document.addEventListener('alpine:init', () => {
             return this.$root.closest('dialog');
         },
 
+        // Opt-in guard (x-ui.modal discard-guard): the form's current Livewire values against the ones it opened with.
+        isDirty() {
+            let guard = null;
+
+            try {
+                guard = JSON.parse(this.$root.dataset.discardGuard ?? 'null');
+            } catch {
+                return false;
+            }
+
+            if (! guard) {
+                return false;
+            }
+
+            return guard.fields.some((field) => String(this.$wire.$get(field) ?? '') !== String(guard.original?.[field] ?? ''));
+        },
+
+        // X, Cancel and Esc ask first when the form was changed; "Discard" closes for real.
         close() {
+            if (this.isDirty() && ! this.discardAsked) {
+                this.discardAsked = true;
+
+                return;
+            }
+
+            this.discard();
+        },
+
+        keepEditing() {
+            this.discardAsked = false;
+        },
+
+        discard() {
+            this.discardAsked = false;
             this.dialog()?.close();
         },
 

@@ -1,6 +1,7 @@
 <?php
 
 use App\Enums\IndicatorMeasure;
+use App\Livewire\Concerns\FiltersByStrategy;
 use App\Livewire\Concerns\Indicators\BuildsIndicatorRows;
 use App\Livewire\Concerns\Indicators\InspectsIndicatorChain;
 use App\Livewire\Concerns\Indicators\ManagesIndicatorForm;
@@ -19,6 +20,7 @@ use Livewire\WithPagination;
 
 new #[Layout('layouts::desk'), Title('titles.indicators')] class extends Component {
     use BuildsIndicatorRows;
+    use FiltersByStrategy;
     use InspectsIndicatorChain;
     use ManagesIndicatorForm;
     use ManagesIndicatorReadings;
@@ -119,7 +121,7 @@ new #[Layout('layouts::desk'), Title('titles.indicators')] class extends Compone
         $this->program = '';
         $this->rag = '';
         $this->focus = '';
-        $this->resetPage();
+        $this->clearStrategyFilter();
     }
 
     /**
@@ -156,7 +158,7 @@ new #[Layout('layouts::desk'), Title('titles.indicators')] class extends Compone
 @php
     use App\Enums\ResultType;
 
-    $filtersAreActive = $search !== '' || $result !== '' || $measure !== '' || $program !== '' || $rag !== '' || $focus !== '';
+    $filtersAreActive = $search !== '' || $result !== '' || $measure !== '' || $program !== '' || $rag !== '' || $focus !== '' || $this->strategyFilter !== null;
     $overview = $this->overview;
     $paged = $this->pagedRows;
     $focusCounts = $this->focusCounts;
@@ -233,6 +235,8 @@ new #[Layout('layouts::desk'), Title('titles.indicators')] class extends Compone
             <x-desk.register-search :label="__('indicators.search_indicators')" :placeholder="__('indicators.indicator_or_result_statement')" wire:model.live.debounce.300ms="search" />
         </x-slot:search>
         <x-slot:filters>
+            <x-desk.strategy-chip :strategy="$this->strategyFilter" />
+
             <x-ui.header-filter-select :label="__('common.program')" wire:model.live="program" :value="$program">
                 <option value="">{{ __('common.all_programs') }}</option>
                 <option value="none">{{ __('common.unassigned') }}</option>

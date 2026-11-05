@@ -23,9 +23,10 @@ test('the modal offers only the targets of the transition table, in English and 
     $component = statusModal('Financial', $proposal);
 
     expect(array_map(fn (ProposalStatus $status): string => $status->value, $component->instance()->statusTargets))
-        ->toBe(['proposal draft', 'on hold', 'rejected']);
+        ->toBe(['proposal draft', 'rejected']);
 
-    $component->assertSee(ProposalStatus::OnHold->label())
+    // A hold is not a move since W-06 (D-58): it has its own action in slice 2.
+    $component->assertDontSeeHtml('value="on hold"')
         ->assertSee(ProposalStatus::Rejected->label())
         ->assertDontSeeHtml('value="approved"')
         ->assertSee(__('proposals.approval_has_its_own_step'));
@@ -38,29 +39,12 @@ test('only the fields of the chosen target appear', function () {
         ->assertDontSeeHtml('wire:model="statusContext"')
         ->set('newStatus', ProposalStatus::ProposalDraft->value)
         ->assertSeeHtml('wire:model="statusContext"')
-        ->assertDontSeeHtml('wire:model="statusRemindOn"')
-        ->set('newStatus', ProposalStatus::OnHold->value)
-        ->assertSeeHtml('wire:model="statusContext"')
-        ->assertSeeHtml('wire:model="statusRemindOn"')
         ->assertDontSeeHtml('wire:model="statusDate"')
         ->set('newStatus', ProposalStatus::Rejected->value)
         ->assertSeeHtml('wire:model="statusDate"')
+        // No move asks for a reminder date any more (W-06, D-58): the hold
+        // action owns it.
         ->assertDontSeeHtml('wire:model="statusRemindOn"');
-});
-
-test('moving to on hold sets the reminder and records the reason', function () {
-    $proposal = Proposal::factory()->create(['status' => ProposalStatus::Submitted]);
-    $remindOn = now()->addWeek()->toDateString();
-
-    statusModal('Financial', $proposal)
-        ->set('newStatus', ProposalStatus::OnHold->value)
-        ->set('statusContext', 'Donor froze all grants.')
-        ->set('statusRemindOn', $remindOn)
-        ->call('changeStatus')
-        ->assertHasNoErrors();
-
-    expect($proposal->fresh()->status)->toBe(ProposalStatus::OnHold)
-        ->and($proposal->fresh()->status_remind_on->toDateString())->toBe($remindOn);
 });
 
 test('a target outside the table is refused on the status field and writes nothing', function () {
@@ -96,21 +80,21 @@ test('a proposal moved by someone else is refused with a reload prompt, and relo
         ->set('newStatus', ProposalStatus::ProposalDraft->value)
         ->set('statusContext', 'Donor asked to resubmit.');
 
-    $proposal->forceFill(['status' => ProposalStatus::OnHold])->save();
+    $proposal->forceFill(['status' => ProposalStatus::Rejected])->save();
     ProposalStatusNote::factory()->create(['proposal_id' => $proposal->id, 'status' => ProposalStatus::Submitted]);
-    ProposalStatusNote::factory()->create(['proposal_id' => $proposal->id, 'status' => ProposalStatus::OnHold]);
+    ProposalStatusNote::factory()->create(['proposal_id' => $proposal->id, 'status' => ProposalStatus::Rejected]);
 
     $component->call('changeStatus')
         ->assertSet('statusStale', true)
         ->assertSeeHtml('data-test="status-stale-alert"')
         ->assertSee(__('proposals.stale_status_explained'));
 
-    expect($proposal->fresh()->status)->toBe(ProposalStatus::OnHold)
+    expect($proposal->fresh()->status)->toBe(ProposalStatus::Rejected)
         ->and(ProposalStatusNote::query()->where('proposal_id', $proposal->id)->count())->toBe(2);
 
     $component->call('reloadStatusModal')
         ->assertSet('statusStale', false)
-        ->assertSet('statusExpectedFrom', ProposalStatus::OnHold->value);
+        ->assertSet('statusExpectedFrom', ProposalStatus::Rejected->value);
 });
 
 test('a user without proposals.update cannot open the modal', function () {

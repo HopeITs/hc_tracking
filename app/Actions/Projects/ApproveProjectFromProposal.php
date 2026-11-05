@@ -6,9 +6,9 @@ namespace App\Actions\Projects;
 
 use App\Enums\ProjectStatus;
 use App\Enums\ProposalStatus;
-use App\Events\ProjectPeriodChanged;
 use App\Models\Project;
 use App\Models\Proposal;
+use App\Support\ProjectPeriods;
 use Carbon\CarbonImmutable;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Gate;
@@ -111,22 +111,9 @@ final class ApproveProjectFromProposal
      */
     private function extendDates(Project $project, array $approved): bool
     {
-        $oldStart = $project->start_date;
-        $oldEnd = $project->end_date;
+        [$begin, $end] = $this->window($approved, $project->start_date, $project->end_date);
 
-        [$begin, $end] = $this->window($approved, $oldStart, $oldEnd);
-
-        if ($oldStart?->toDateString() === $begin->toDateString() && $oldEnd?->toDateString() === $end->toDateString()) {
-            return false;
-        }
-
-        $project->start_date = $begin;
-        $project->end_date = $end;
-        $project->save();
-
-        if ($project->status === ProjectStatus::Active && $oldStart !== null && $oldEnd !== null) {
-            ProjectPeriodChanged::dispatch($project->id, $oldStart, $oldEnd, $begin, $end);
-        }
+        ProjectPeriods::widen($project, $begin, $end);
 
         return false;
     }
@@ -136,7 +123,7 @@ final class ApproveProjectFromProposal
         return $proposal->status->isApprovedByDonor()
             && $proposal->status !== ProposalStatus::FinalReports
             && $proposal->actual_date_begin !== null
-            && $proposal->actual_date_end !== null;
+            && $proposal->effectiveDateEnd() !== null;
     }
 
     /**
@@ -158,7 +145,7 @@ final class ApproveProjectFromProposal
     private function window(array $approved, ?CarbonImmutable $currentStart, ?CarbonImmutable $currentEnd): array
     {
         $begins = array_map(fn (Proposal $proposal): CarbonImmutable => $proposal->actual_date_begin, $approved);
-        $ends = array_map(fn (Proposal $proposal): CarbonImmutable => $proposal->actual_date_end, $approved);
+        $ends = array_map(fn (Proposal $proposal): CarbonImmutable => $proposal->effectiveDateEnd(), $approved);
 
         if ($currentStart !== null) {
             $begins[] = $currentStart;

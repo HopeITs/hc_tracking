@@ -52,7 +52,7 @@
 
 <div class="relative" x-data="listLayoutSync">
     {{-- Skeleton, shown only while a filter/sort/group change is in flight. --}}
-    <div wire:loading wire:target="search,status,priority,assignee,sourceType,sourceId,sort,group" class="overflow-hidden rounded-xl border border-secondary-soft bg-white dark:border-line dark:bg-surface-1">
+    <x-ui.panel as="div" wire:loading wire:target="search,status,priority,assignee,sourceType,sourceId,sort,group">
         <div class="animate-pulse divide-y divide-secondary-soft p-3.5 motion-reduce:animate-none dark:divide-line">
             @for ($i = 0; $i < 6; $i++)
                 <div class="flex items-center gap-3 py-2.5">
@@ -64,10 +64,10 @@
                 </div>
             @endfor
         </div>
-    </div>
+    </x-ui.panel>
 
     <div wire:loading.remove wire:target="search,status,priority,assignee,sourceType,sourceId,sort,group" class="flex flex-col gap-4">
-        <div class="overflow-hidden rounded-xl border border-secondary-soft bg-white shadow-card dark:border-transparent dark:bg-surface-1 dark:shadow-raised">
+        <x-ui.panel as="div">
             <div class="border-b border-secondary-soft px-4 py-2.5 dark:border-line">
                 <p class="text-xs text-secondary-medium dark:text-ink-muted">{{ trans_choice('tasks.count_matching_task', $paginator->total(), ['count' => $paginator->total()]) }}</p>
             </div>
@@ -94,6 +94,6 @@
             <div class="border-t border-secondary-soft px-4 py-3 dark:border-line">
                 <flux:pagination :paginator="$paginator" class="text-secondary-medium! dark:text-ink-muted!" scroll-to="#task-directory-heading" />
             </div>
-        </div>
+        </x-ui.panel>
     </div>
 </div>

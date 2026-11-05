@@ -20,6 +20,8 @@ return [
     'project_starts' => 'بداية المشروع',
     'project_timeline' => 'الجدول الزمني للمشروع',
     'proposal_deadline' => 'الموعد النهائي للمقترح',
+    'extended_end' => 'ممدَّد',
+    'extended_end_title' => 'تاريخ النهاية الممدَّد لهذا المقترح',
     'related_dates' => 'التواريخ ذات الصلة',
     'report_deadline' => 'الموعد النهائي للتقرير',
     'showing_type' => 'عرض: :type',

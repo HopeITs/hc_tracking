@@ -8,6 +8,8 @@
     'cancelLabel' => null,
     'flush' => false,
     'sheet' => false,
+    /* Opt-in: ['fields' => [Livewire properties], 'original' => [property => value at open]]. Closing with a different value asks before discarding. */
+    'discardGuard' => null,
 ])
 
 @php
@@ -56,6 +58,7 @@
         class="modal-shell-frame"
         @if ($submit !== null) wire:submit="{{ $submit }}" novalidate @endif
         x-data="modalShell(@js($titleId), @js($submitAction))"
+        @if ($discardGuard !== null) data-discard-guard="{{ json_encode($discardGuard) }}" @endif
         x-bind:data-wizard="wizard ? '' : null"
         x-on:keydown.enter="onEnter($event)"
     >
@@ -101,6 +104,14 @@
         @endif
 
         <footer class="modal-shell-footer">
+            @if ($discardGuard !== null)
+                <div class="modal-shell-meta flex flex-wrap items-center gap-2" x-show="discardAsked" x-cloak role="alert" data-discard-notice>
+                    <span class="font-semibold">{{ __('common.discard_changes_question') }}</span>
+                    <button type="button" class="rounded-md px-2 py-1 font-semibold underline underline-offset-2" x-on:click="keepEditing()">{{ __('common.keep_editing') }}</button>
+                    <button type="button" class="rounded-md px-2 py-1 font-semibold text-status-critical underline underline-offset-2" x-on:click="discard()" data-discard-confirm>{{ __('common.discard') }}</button>
+                </div>
+            @endif
+
             @if (isset($footerMeta))
                 <div class="modal-shell-meta">{{ $footerMeta }}</div>
             @elseif ($requiredNote)

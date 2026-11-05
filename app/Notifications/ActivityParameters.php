@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Notifications;
 
 use App\Models\Activity;
+use App\Models\Strategy;
 use BackedEnum;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\Relation;
@@ -28,6 +29,13 @@ final class ActivityParameters
     private const LocalizedNames = ['employee', 'supervisor', 'supervisee'];
 
     /**
+     * Strategy names already read for this render, by id.
+     *
+     * @var array<int, string|null>
+     */
+    private array $strategyNames = [];
+
+    /**
      * @return array<string, mixed>
      */
     public function for(Activity $activity): array
@@ -47,6 +55,10 @@ final class ActivityParameters
             [$old, $new] = $activity->changes[$field];
             $params['from'] = $this->typedChange($activity, $field, $old, 0);
             $params['to'] = $this->typedChange($activity, $field, $new, 1);
+        }
+
+        if (array_key_exists('strategy_id', $activity->changes)) {
+            $params['strategy'] = $this->typedChange($activity, 'strategy_id', $activity->changes['strategy_id'][1], 1);
         }
 
         foreach (self::LocalizedNames as $key) {
@@ -71,6 +83,13 @@ final class ActivityParameters
             $params['proposal'] = $names === []
                 ? ['trans' => 'notifications.report_template_org_wide_targets']
                 : ['localized_list' => array_map(fn (string $name): array => ['en' => $name, 'ar' => $name], $names)];
+        }
+
+        if (array_key_exists('pending_reviewers', $activity->properties)) {
+            $pending = array_values(array_filter((array) $activity->properties['pending_reviewers'], fn (mixed $names): bool => is_array($names)));
+            $params['pending'] = $pending === []
+                ? ''
+                : ['trans' => 'notifications.negotiation_pending_suffix', 'params' => ['names' => ['localized_list' => $pending]]];
         }
 
         if (array_key_exists('meeting', $activity->properties)) {
@@ -101,6 +120,10 @@ final class ActivityParameters
             return ['localized' => $name];
         }
 
+        if ($field === 'strategy_id') {
+            return $this->strategyName((int) $value) ?? (string) $value;
+        }
+
         $cast = $this->castFor($activity->subject_type, $field);
 
         if ($cast !== null && enum_exists($cast) && is_subclass_of($cast, BackedEnum::class)) {
@@ -112,6 +135,15 @@ final class ActivityParameters
         }
 
         return (string) $value;
+    }
+
+    /**
+     * A strategy's name for an id kept in the log, so a change reads
+     * "Country Strategy 2026-2030" instead of "2". Null once it is deleted.
+     */
+    private function strategyName(int $strategyId): ?string
+    {
+        return $this->strategyNames[$strategyId] ??= Strategy::query()->whereKey($strategyId)->value('name');
     }
 
     private function castFor(string $subjectType, string $field): ?string

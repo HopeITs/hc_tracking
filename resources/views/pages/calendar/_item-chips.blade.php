@@ -78,6 +78,9 @@
         <span class="size-1.5 shrink-0 rounded-full {{ $typeDotClasses['proposal'] }}"></span>
         <flux:icon.paper-airplane variant="micro" class="size-3 shrink-0" />
         <span class="min-w-0 flex-1 truncate text-start font-medium">{{ $proposal->name }}</span>
+        @if ($proposal->isExtendedAndActive())
+            <span class="shrink-0 rounded border border-current px-1 text-[9px] font-semibold" title="{{ __('calendar.extended_end_title') }}" data-test="calendar-proposal-extended-{{ $proposal->id }}">{{ __('calendar.extended_end') }}</span>
+        @endif
     </a>
 @endforeach
 

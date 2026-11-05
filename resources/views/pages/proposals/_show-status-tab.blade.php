@@ -38,11 +38,26 @@
 
                                     <div class="min-w-0 flex-1">
                                         <div class="flex flex-wrap items-center justify-between gap-x-3 gap-y-1">
-                                            <x-ui.enum-badge :case="$note->status" />
+                                            <span class="flex flex-wrap items-center gap-1.5">
+                                                <x-ui.enum-badge :case="$note->status" />
+                                                @if ($note->kind !== \App\Enums\StatusNoteKind::Transition)
+                                                    <x-ui.enum-badge :case="$note->kind" data-test="note-kind" />
+                                                @endif
+                                            </span>
                                             <time datetime="{{ $note->date?->toDateString() }}" class="text-xs tabular-nums {{ $mutedText }}">{{ $note->date?->translatedFormat(__('formats.date')) }}</time>
                                         </div>
                                         @if ($note->context !== null)
                                             <p class="mt-1.5 text-sm {{ $inkText }}">{{ $note->context }}</p>
+                                        @endif
+                                        @if ($note->media->isNotEmpty())
+                                            <ul class="mt-1 divide-y divide-secondary-soft dark:divide-line">
+                                                @foreach ($note->media as $media)
+                                                    <li class="flex min-w-0 items-center gap-2 py-1.5 text-xs" wire:key="note-file-{{ $media->id }}" data-file="{{ $media->id }}">
+                                                        <flux:icon.paper-clip variant="micro" class="size-3.5 shrink-0 {{ $mutedText }}" aria-hidden="true" />
+                                                        <a href="{{ route('proposals.files.download', [$this->proposal, $media]) }}" class="min-w-0 truncate font-semibold underline-offset-4 hover:underline {{ $inkText }}" title="{{ $media->original_name }}">{{ $media->original_name }}</a>
+                                                    </li>
+                                                @endforeach
+                                            </ul>
                                         @endif
                                     </div>
                                 </li>

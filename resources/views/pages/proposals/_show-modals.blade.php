@@ -56,6 +56,64 @@
     </x-ui.confirm-modal>
 
     <x-ui.modal
+        wire:model="showNegotiationModal"
+        size="md"
+        :title="__('proposals.add_negotiation_note')"
+        :description="__('proposals.negotiation_note_help')"
+        submit="saveNegotiationNote"
+        close="closeNegotiationModal"
+        required-note
+        data-test="negotiation-modal"
+    >
+        @if ($showNegotiationModal)
+            <div class="grid gap-y-4">
+                <x-ui.form-textarea wire:model="negotiationText" :label="__('proposals.what_the_donor_asked_for')" required autofocus />
+                <x-ui.form-file
+                    wire:model="negotiationFile"
+                    :label="__('proposals.attachment_optional')"
+                    :accept="collect(FileType::values())->map(fn ($extension) => '.'.$extension)->implode(',')"
+                />
+            </div>
+        @endif
+
+        <x-slot:actions>
+            <x-ui.button type="submit" tone="primary" wire:loading.attr="disabled" wire:target="negotiationFile,saveNegotiationNote" data-test="save-negotiation-note-button">
+                {{ __('proposals.add_negotiation_note') }}
+            </x-ui.button>
+        </x-slot:actions>
+    </x-ui.modal>
+
+    <x-ui.modal
+        wire:model="showExtensionModal"
+        size="md"
+        :title="__('proposals.extend_proposal')"
+        :description="__('proposals.extend_help')"
+        submit="saveExtension"
+        close="closeExtensionModal"
+        required-note
+        data-test="extension-modal"
+    >
+        @if ($showExtensionModal)
+            <div class="grid gap-y-4">
+                <x-ui.form-input wire:model="extensionDateEnd" :label="__('proposals.extend_new_end')" type="date" :min="$this->proposal->effectiveDateEnd()?->addDay()->toDateString()" required autofocus data-test="extension-date-end" />
+                <x-ui.form-textarea wire:model="extensionReason" :label="__('proposals.extend_reason')" rows="3" required data-test="extension-reason" />
+                <x-ui.form-file
+                    wire:model="extensionFile"
+                    :label="__('proposals.extend_amendment')"
+                    :accept="collect(FileType::values())->map(fn ($extension) => '.'.$extension)->implode(',')"
+                />
+                <p class="text-sm text-secondary-dark dark:text-ink" data-test="extension-consequence">{{ __('proposals.extend_confirm') }}</p>
+            </div>
+        @endif
+
+        <x-slot:actions>
+            <x-ui.button type="submit" tone="primary" wire:loading.attr="disabled" wire:target="extensionFile,saveExtension" data-test="save-extension-button">
+                {{ __('proposals.extend_proposal') }}
+            </x-ui.button>
+        </x-slot:actions>
+    </x-ui.modal>
+
+    <x-ui.modal
         wire:model="showFileModal"
         size="md"
         :title="$editingFileId === null ? __('proposals.upload_file') : __('proposals.edit_file')"

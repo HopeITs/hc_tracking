@@ -683,6 +683,28 @@ function insertHrContract(int $employeeId, int $positionId, bool $isActive = tru
 }
 
 /**
+ * An HR employee who is a department manager under D-65: an active contract on
+ * a position carrying the configured manager job level. Returns the employee
+ * id, so pages and panels gated on User::canSeeDepartmentTasks() (W-14) open
+ * with userWithRole($role, insertHrDepartmentManager()).
+ *
+ * Pass $jobLevel to make the holder something else, or to store the level name
+ * the way HR might (a different dash, odd spacing).
+ */
+function insertHrDepartmentManager(?int $departmentId = null, ?string $jobLevel = null): int
+{
+    $jobLevel ??= (string) config('access-control.department_manager_job_level');
+    $employeeId = insertHrEmployee();
+
+    insertHrContract($employeeId, insertHrPosition(
+        $departmentId ?? insertHrDepartment(),
+        jobLevelId: insertHrJobLevel($jobLevel, $jobLevel, 5),
+    ));
+
+    return $employeeId;
+}
+
+/**
  * A user holding one role, optionally linked to an HR employee. Seeds the
  * access-control catalog first when it is missing.
  *

@@ -2,7 +2,9 @@
     The renewal chain of proposals/show (T10): previous ← this → next(s). Shown only when the
     proposal is part of a chain. Names, numbers and statuses only. Included by ⚡show.blade.php.
 --}}
-@php($chain = $this->renewalChain)
+@php
+    $chain = $this->renewalChain;
+@endphp
 @if ($chain['previous'] !== null || $chain['removed'] || $chain['next']->isNotEmpty())
     <nav class="mt-5 flex flex-wrap items-center gap-x-3 gap-y-2 text-sm" aria-label="{{ __('proposals.renewal_chain') }}" data-test="renewal-chain">
         <span class="type-label text-secondary-medium dark:text-ink-muted">{{ __('proposals.renewal_chain') }}</span>

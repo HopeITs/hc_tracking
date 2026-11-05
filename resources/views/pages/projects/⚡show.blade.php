@@ -223,7 +223,6 @@ new #[Layout('layouts::desk'), Title('titles.project')] class extends Component 
                     ->orderByDesc('id'),
             ])
             ->withCount([
-                'risks',
                 'milestones',
                 'planIndicators',
                 'proposals',
@@ -288,7 +287,6 @@ new #[Layout('layouts::desk'), Title('titles.project')] class extends Component 
         $tabs = [
             ['key' => 'milestones', 'label' => __('common.milestones'), 'count' => $this->project->milestones_count],
             ['key' => 'tasks', 'label' => __('common.tasks'), 'count' => $this->tasks->count()],
-            ['key' => 'risks', 'label' => __('common.risks'), 'count' => $this->project->risks_count],
             ['key' => 'targets', 'label' => __('common.targets'), 'count' => $this->project->plan_indicators_count],
         ];
 
@@ -317,7 +315,7 @@ new #[Layout('layouts::desk'), Title('titles.project')] class extends Component 
     #[Computed]
     public function deliveryTab(): string
     {
-        return in_array($this->tab, ['milestones', 'tasks', 'risks', 'targets', ...($this->canViewReportTemplate ? ['template'] : [])], true) ? $this->tab : 'milestones';
+        return in_array($this->tab, ['milestones', 'tasks', 'targets', ...($this->canViewReportTemplate ? ['template'] : [])], true) ? $this->tab : 'milestones';
     }
 };
 ?>

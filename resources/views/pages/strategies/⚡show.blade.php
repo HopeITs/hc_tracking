@@ -242,7 +242,6 @@ new #[Layout('layouts::desk'), Title('titles.strategy')] class extends Component
             ['label' => $strategy->name],
         ]"
         :title="$strategy->name"
-        title-class="text-3xl! font-bold! leading-none!"
         :subtitle="__('strategies.strategic_period_start_to_end', ['start' => $strategy->start_year, 'end' => $strategy->end_year])"
     >
         <x-slot:meta>

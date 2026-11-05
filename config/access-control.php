@@ -33,6 +33,7 @@ $groups = [
     'meal-coverage' => ['manage'],
     'supervisions' => ['manage'],
     'sectors' => ['view', 'manage'],
+    'risk-library' => ['manage'],
     'report-templates' => ['manage'],
     'evidence-types' => ['manage'],
     'narrative-questions' => ['manage'],
@@ -136,6 +137,30 @@ return [
 
     /*
     |--------------------------------------------------------------------------
+    | Department manager (W-14, D-65)
+    |--------------------------------------------------------------------------
+    |
+    | Reading a whole department's tasks — the desk Tasks panel's `department`
+    | scope and the department-tasks page — belongs to department managers,
+    | which D-65 defines as an HR job level rather than a role or a permission.
+    | App\Support\EmployeeProfile::isDepartmentManager() is the one definition;
+    | it matches this name against job_levels.name_en or name_ar on a
+    | normalised string, since HR may store the dash differently. Unrelated to
+    | the task_department_* keys above, which scope what a user sees at all.
+    |
+    | The name is what HR stores, not what D-65 writes. The ruling says
+    | "Department Manager – Grade 5"; `hr.job_levels` holds `Department
+    | Manager` with `grade` 5, and the grade is a column, not part of the
+    | name. Matched against the ruling's wording the predicate was true for
+    | 0 of 270 employees, so every department read as having no manager —
+    | W-14's whole scope and W-12's final-report milestone with it. Checked
+    | on the live HR data: this value matches 9 employees, one per department
+    | that has one. Flagged for Dev 1.
+    */
+    'department_manager_job_level' => 'Department Manager',
+
+    /*
+    |--------------------------------------------------------------------------
     | Role baselines
     |--------------------------------------------------------------------------
     |
@@ -169,7 +194,7 @@ return [
             'targets.create', 'targets.update', 'targets.delete',
             'indicator-library.create', 'indicator-library.update', 'indicator-library.delete',
             'reports.reopen', 'reports.aggregate',
-            ...$mealOnly, 'sectors.manage',
+            ...$mealOnly, 'sectors.manage', 'risk-library.manage',
         ],
         'Financial' => [
             ...$viewEverything, ...$financeViews, ...$fundraisingViews, ...$taskWriter,

@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Livewire\Concerns\Calendar;
 
+use App\Enums\ProposalStatus;
 use App\Enums\ReviewStage;
 use App\Models\Donor;
 use App\Models\DonorReport;
@@ -164,12 +165,12 @@ trait BuildsCalendarGrid
         $proposalsByDay = $ownedProjectIds === [] || ! $this->isTypeShown('proposal')
             ? new Collection
             : Proposal::query()
-                ->select(['id', 'slug', 'name', 'planned_date_end', 'actual_date_end'])
+                ->select(['id', 'slug', 'name', 'status', 'planned_date_end', 'actual_date_end', 'extended_date_end'])
                 ->whereHas('projects', fn (Builder $query) => $query->whereIn('projects.id', $ownedProjectIds))
-                ->whereBetween('planned_date_end', [$gridStart->toDateString(), $gridEnd->toDateString()])
-                ->orderBy('planned_date_end')
+                ->whereRaw('(case when status = ? and extended_date_end is not null then extended_date_end else planned_date_end end) between ? and ?', [ProposalStatus::Active->value, $gridStart->toDateString(), $gridEnd->toDateString()])
+                ->orderByRaw('(case when status = ? and extended_date_end is not null then extended_date_end else planned_date_end end)', [ProposalStatus::Active->value])
                 ->get()
-                ->groupBy(fn (Proposal $proposal): string => $proposal->planned_date_end->toDateString());
+                ->groupBy(fn (Proposal $proposal): string => $proposal->calendarEndDate()->toDateString());
 
         $transfersByDay = $ownedProjectIds === [] || ! $this->isTypeShown('transfer')
             ? new Collection

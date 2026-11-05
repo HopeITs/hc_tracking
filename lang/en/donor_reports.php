@@ -158,4 +158,5 @@ return [
     'none' => 'No donor reports yet',
     'none_body' => 'Reports owed to donors appear here once they are recorded on an agreement or composed.',
     'no_matching' => 'No matching donor reports',
+    'report_task_title' => 'Donor report: :donor · :period',
 ];

@@ -65,6 +65,7 @@
 
     {{-- Overview --}}
     <section class="dk-pjsec @container/detail" id="dk-section-overview" role="tabpanel" aria-labelledby="dk-tab-overview" x-show="section === 'overview'" @if ($openSection !== 'overview') style="display: none" @endif data-section="overview">
+        @include('pages.projects._show-risk-awareness')
         <div class="dk-pjgrid">
             <div class="dk-card dk-span-7" data-test="story-about">
                 <div class="dk-card-h"><h3>{{ __('story.description') }}</h3></div>
@@ -206,9 +207,6 @@
                 @switch($this->deliveryTab)
                     @case('tasks')
                         @include('pages.projects._show-tasks-tab')
-                        @break
-                    @case('risks')
-                        @include('pages.projects._show-risks-tab')
                         @break
                     @case('targets')
                         @include('pages.projects._show-targets-tab')

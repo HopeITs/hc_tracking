@@ -26,7 +26,7 @@
     <div class="flex flex-col gap-3 sm:flex-row sm:items-end">
         <div class="min-w-0 sm:me-auto">
             <div class="flex min-w-0 items-center gap-2">
-                <flux:heading size="lg" class="{{ $titleClass }}">{{ $title }}</flux:heading>
+                <flux:heading size="lg" class="page-title! {{ $titleClass }}">{{ $title }}</flux:heading>
                 @if ($unread)
                     <span class="size-2.5 shrink-0 rounded-full bg-primary dark:bg-ink" data-unread-dot title="{{ __('notifications.has_unread') }}"><span class="sr-only">{{ __('notifications.has_unread') }}</span></span>
                 @endif

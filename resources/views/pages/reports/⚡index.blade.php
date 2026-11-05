@@ -3,6 +3,7 @@
 use App\Support\Like;
 use App\Enums\ReportStatus;
 use App\Livewire\Concerns\Desk\PagesRegisterCalendar;
+use App\Livewire\Concerns\FiltersByStrategy;
 use App\Livewire\Concerns\ManagesReportForm;
 use App\Livewire\Concerns\Reports\ReadsReportPortfolio;
 use App\Models\AnnualPlan;
@@ -25,6 +26,7 @@ use Livewire\Component;
 use Livewire\WithPagination;
 
 new #[Layout('layouts::desk'), Title('titles.reports')] class extends Component {
+    use FiltersByStrategy;
     use ManagesReportForm;
     use PagesRegisterCalendar;
     use ReadsReportPortfolio;
@@ -131,7 +133,7 @@ new #[Layout('layouts::desk'), Title('titles.reports')] class extends Component 
         $this->project = '';
         $this->target = '';
         $this->overdue = '';
-        $this->resetPage();
+        $this->clearStrategyFilter();
     }
 
     /**
@@ -164,7 +166,9 @@ new #[Layout('layouts::desk'), Title('titles.reports')] class extends Component 
             ->when($this->project === 'none', fn ($query) => $query->whereHas('planIndicator', fn ($query) => $query->whereNull('project_id')))
             ->when($this->project !== '' && $this->project !== 'none', fn ($query) => $query
                 ->whereHas('planIndicator', fn ($query) => $query->where('project_id', (int) $this->project)))
-            ->when($this->target !== '', fn ($query) => $query->where('plan_indicator_id', (int) $this->target));
+            ->when($this->target !== '', fn ($query) => $query->where('plan_indicator_id', (int) $this->target))
+            ->when($this->strategyFilter !== null, fn ($query) => $query
+                ->whereHas('planIndicator', fn ($query) => $this->whereInStrategy($query, 'plan_indicators.project_id')));
     }
 
     /**
@@ -301,7 +305,7 @@ new #[Layout('layouts::desk'), Title('titles.reports')] class extends Component 
 ?>
 
 @php
-    $filtersAreActive = $search !== '' || $status !== '' || $seenByMeal !== '' || $author !== '' || $project !== '' || $target !== '' || $overdue !== '';
+    $filtersAreActive = $search !== '' || $status !== '' || $seenByMeal !== '' || $author !== '' || $project !== '' || $target !== '' || $overdue !== '' || $this->strategyFilter !== null;
     $insights = $this->insights;
 
     $statusSegments = collect(ReportStatus::cases())->map(fn (ReportStatus $case): array => [
@@ -402,6 +406,7 @@ new #[Layout('layouts::desk'), Title('titles.reports')] class extends Component 
         <x-desk.register-search :label="__('reports.search_reports')" :placeholder="__('reports.indicator_or_narrative')" wire:model.live.debounce.300ms="search" />
     </x-slot:search>
     <x-slot:filters>
+            <x-desk.strategy-chip :strategy="$this->strategyFilter" />
 
             <x-ui.header-filter-select :label="__('reports.reported_by')" wire:model.live="author" :value="$author">
                 <option value="">{{ __('common.anyone') }}</option>

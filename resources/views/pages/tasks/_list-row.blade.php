@@ -89,8 +89,11 @@
             @if (in_array($task->id, $this->unreadIds, true))
                 <span class="size-2 shrink-0 rounded-full bg-primary dark:bg-ink" data-unread-dot="task-{{ $task->id }}" title="{{ __('notifications.has_unread') }}"><span class="sr-only">{{ __('notifications.has_unread') }}</span></span>
             @endif
+            @if ($task->isReportTask())
+                <x-ui.enum-badge :case="$task->kind" data-test="report-task-chip" />
+            @endif
             <a
-                href="{{ route('tasks.show', $task) }}"
+                href="{{ $task->reportUrl() ?? route('tasks.show', $task) }}"
                 wire:navigate
                 title="{{ $task->title }}"
                 @class(['min-w-0 truncate text-sm font-semibold hover:underline', 'text-secondary-light line-through' => $isDone, 'text-secondary-dark dark:text-ink' => ! $isDone])

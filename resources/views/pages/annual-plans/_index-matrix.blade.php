@@ -1,5 +1,5 @@
         {{-- Layer two: the coverage matrix itself. --}}
-        <section class="overflow-hidden rounded-xl border border-board-line bg-board" aria-labelledby="coverage-matrix-heading">
+        <x-ui.panel aria-labelledby="coverage-matrix-heading">
             <div class="flex min-h-12 flex-wrap items-center justify-between gap-3 border-b border-board-line bg-board-head px-5 py-3">
                 <div class="min-w-0">
                     <h2 id="coverage-matrix-heading" class="text-base font-bold">{{ __('annual_plans.coverage_matrix') }}</h2>
@@ -351,4 +351,4 @@
                     <flux:pagination :paginator="$this->programRows" class="text-secondary-medium! [&_button]:text-secondary-medium! [&_button:hover]:bg-secondary-soft! dark:text-ink-muted! dark:[&_button]:text-ink-muted! dark:[&_button:hover]:bg-surface-2!" scroll-to="#annual-plan-matrix-heading" />
                 </div>
             @endif
-        </section>
+        </x-ui.panel>

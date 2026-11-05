@@ -438,7 +438,7 @@ new #[Layout('layouts::desk'), Title('titles.city_directory')] class extends Com
             icon="map-pin"
             :heading="__('cities.no_matching_cities')"
             :body="__('common.change_the_search_and_try_again')"
-            class="rounded-xl border border-secondary-soft dark:border-line"
+            class="rounded-panel border border-panel-border"
         >
             <x-slot:action>
                 <flux:button size="sm" :class="$secondaryButtonClasses" wire:click="clearSearch">

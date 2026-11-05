@@ -1,5 +1,6 @@
 <?php
 
+use App\Actions\Proposals\AddNegotiationNote;
 use App\Actions\Proposals\AddProposalReviewer;
 use App\Actions\Proposals\MarkProposalReviewed;
 use App\Actions\Proposals\SaveProposalFile;
@@ -16,6 +17,7 @@ use App\Models\Proposal;
 use App\Models\ProposalReviewer;
 use App\Models\User;
 use App\Models\UserNotification;
+use App\Notifications\ActivityParameters;
 use App\Notifications\Alerts\NotificationSettings;
 use App\Support\Slots;
 use App\Support\TransitionResult;
@@ -374,3 +376,29 @@ test('a need assessment needs proposals.update, or a reviewer who may create res
     'a reviewer without results.create' => ['Team Member', true],
     'MEAL who is not a reviewer' => ['MEAL', false],
 ]);
+
+test('a negotiation note tells the reviewers and the CEO, and names who has not reviewed yet', function () {
+    $ceo = holdReviewSlot(ReviewerSlot::Ceo);
+    $ceoUser = userWithRole('Team Member', $ceo);
+    $proposal = reviewableProposal(ProposalStatus::Submitted);
+    $seenId = insertHrEmployee(firstNameEn: 'Seen', lastNameEn: 'Reviewer');
+    $unseenId = insertHrEmployee(firstNameEn: 'Waiting', lastNameEn: 'Reviewer');
+    ProposalReviewer::factory()->create(['proposal_id' => $proposal->id, 'stage' => ReviewStage::Proposal, 'employee_id' => $seenId, 'seen_at' => now()]);
+    ProposalReviewer::factory()->create(['proposal_id' => $proposal->id, 'stage' => ReviewStage::Proposal, 'employee_id' => $unseenId]);
+    $unseenUser = userWithRole('Team Member', $unseenId);
+    $outsider = userWithRole('Team Member', insertHrEmployee());
+
+    $this->actingAs(userWithRole('Public Relations Manager'));
+    app(AddNegotiationNote::class)->handle($proposal, ProposalStatus::Submitted, ['text' => 'The donor asked for a shorter workplan.']);
+
+    $key = 'notifications.events.proposal.negotiation_noted';
+    $activity = Activity::query()->where('event', 'proposal.negotiation_noted')->sole();
+    $pending = app(ActivityParameters::class)->for($activity)['pending'];
+
+    expect(notificationKeysOf($ceoUser))->toBe([$key])
+        ->and(notificationKeysOf($unseenUser))->toBe([$key])
+        ->and(notificationKeysOf($outsider))->toBe([])
+        ->and($activity->properties['pending_reviewers'])->toHaveCount(1)
+        ->and($pending['params']['names']['localized_list'][0]['en'])->toContain('Waiting')
+        ->and(json_encode($activity->properties))->not->toContain('workplan');
+});

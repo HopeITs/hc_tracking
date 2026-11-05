@@ -46,7 +46,7 @@ trait ChartsProposalChronology
     {
         $today = CarbonImmutable::today();
         $start = $this->proposal->actual_date_begin ?? $this->proposal->planned_date_begin ?? $today;
-        $end = $this->proposal->actual_date_end ?? $this->proposal->planned_date_end ?? $start;
+        $end = $this->proposal->effectiveDateEnd() ?? $this->proposal->planned_date_end ?? $start;
 
         if ($end->lt($start)) {
             $end = $start;

@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Actions\FundingAgreements;
 
+use App\Actions\Tasks\SyncReportTask;
 use App\Enums\MediaCollection;
 use App\Enums\ReportAudience;
 use App\Models\DonorReport;
@@ -25,6 +26,7 @@ use Throwable;
  * - The submission date is on or before today.
  * - A donor-facing report needs at least one `report_submission` file (the
  *   ones already attached count); an internal one may have none.
+ * - The report's task (W-13) is closed in the same transaction.
  * - The report row is locked and re-checked: a second submission is refused
  *   and writes nothing. Files written before a failure are removed again.
  */
@@ -61,6 +63,8 @@ final class MarkDonorReportSubmitted
                 }
 
                 $locked->update(['submitted_on' => $submittedOn]);
+
+                app(SyncReportTask::class)->handle($locked);
 
                 return $locked;
             });

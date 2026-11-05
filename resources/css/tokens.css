@@ -99,6 +99,13 @@
     /* The full-page backdrop behind the sign-in card and the error pages (light only; dark uses surface-0). */
     --color-auth-ground: #e5e7eb;
 
+    /* HR's avatar red (HR's own --color-primary) behind employee photos, so a cut-out photo looks as it does in HR; same in both themes. */
+    --color-hr-avatar: #c2151c;
+
+    /* One recipe for bordered panels (W-29): x-ui.panel and the desk .dk-panel share this radius and border. */
+    --radius-panel: 0.75rem;
+    --color-panel-border: var(--color-line);
+
     /* Graphite dark-mode semantic layer — only referenced behind dark: or inside .dark; light values are equivalents so the utilities exist. */
     --color-surface-0: #ffffff;
     --color-surface-1: #ffffff;
@@ -137,6 +144,11 @@
 
     /* Fast start, long soft settle: the sidebar's collapse, expand and mobile drawer motion. */
     --ease-drawer: cubic-bezier(0.32, 0.72, 0, 1);
+
+    /* Page titles (.page-title in typography.css): HR's h1, 34px at a 1.2 line height in #414042 (an HR grey, not in the brand palette). */
+    --text-h1: 2.125rem;
+    --text-h1--line-height: 1.2;
+    --color-heading: #414042;
 
     /* Tracking Desk: figures stay in Somar Sans with tabular-nums (no mono face), per the approved font set. */
 
@@ -200,11 +212,13 @@
         --color-board: var(--color-surface-1);
         --color-board-line: var(--color-line);
         --color-board-head: var(--color-surface-2);
+        --color-panel-border: var(--color-line);
 
         --color-paper: #1c1d20;
         --color-tint: #242528;
         --color-sunk: #111214;
         --color-desk-ink: #ececee;
+        --color-heading: var(--color-desk-ink);
         --color-desk-ink-2: #c4c6ca;
         --color-desk-ink-3: #a8aaae;
         --color-desk-faint: #8a8c93;

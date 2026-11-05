@@ -20,8 +20,10 @@
     reached an end), so a keyboard user can keep pressing Enter. Flux re-enables
     the clicked button only after the request, hence the deferred focus.
 --}}
-<ol
-    class="divide-y divide-secondary-soft rounded-xl border border-secondary-soft dark:divide-line dark:border-transparent dark:bg-surface-1 dark:shadow-raised"
+<x-ui.panel
+    as="ol"
+    :clip="false"
+    class="divide-y divide-secondary-soft dark:divide-line"
     aria-label="{{ __('evidence_types.list_label') }}"
     data-evidence-types-list
     x-data="{
@@ -90,4 +92,4 @@
             </div>
         </li>
     @endforeach
-</ol>
+</x-ui.panel>

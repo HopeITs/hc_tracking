@@ -26,7 +26,9 @@ class ProposalFileDownloadController extends Controller
         Gate::authorize('view', $proposal);
 
         abort_unless(
-            $media->mediable_type === 'proposal' && $media->mediable_id === $proposal->id,
+            ($media->mediable_type === 'proposal' && $media->mediable_id === $proposal->id)
+            || ($media->mediable_type === 'proposal_status_note'
+                && $proposal->statusNotes()->whereKey($media->mediable_id)->exists()),
             404
         );
 

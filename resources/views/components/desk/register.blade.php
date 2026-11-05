@@ -21,7 +21,7 @@
 
     <div class="dk-reg-h">
         <div>
-            <h1 @if ($headingId) id="{{ $headingId }}" @endif>{{ $title }}@if ($count !== null) <span class="dk-pc dk-num" data-count-badge>{{ $count }}</span>@endif</h1>
+            <h1 class="page-title" @if ($headingId) id="{{ $headingId }}" @endif>{{ $title }}@if ($count !== null) <span class="dk-pc dk-num" data-count-badge>{{ $count }}</span>@endif</h1>
             @isset($figures)
                 <p class="dk-reg-figs" data-desk-register-figures>{{ $figures }}</p>
             @endisset

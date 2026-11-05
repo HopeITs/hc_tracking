@@ -140,4 +140,7 @@ return [
     'back' => 'Back',
     'steps' => 'Steps',
     'step_of' => 'Step :step of :total',
+    'discard_changes_question' => 'Discard your changes?',
+    'discard' => 'Discard',
+    'keep_editing' => 'Keep editing',
 ];

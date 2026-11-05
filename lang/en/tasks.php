@@ -165,4 +165,6 @@ return [
     'delivered_deliverable_keeps_its_kind' => 'A deliverable that has been handed over keeps its kind.',
     'paused' => 'Paused',
     'paused_center_inactive' => 'Paused: the project\'s center is inactive. Report tasks continue.',
+    'open_report' => 'Open the report',
+    'report_task_helper' => 'Marking this task done does not submit the report. Submit the report itself and this task closes.',
 ];

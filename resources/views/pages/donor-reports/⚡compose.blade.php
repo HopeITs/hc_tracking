@@ -83,7 +83,7 @@ new #[Layout('layouts::desk'), Title('titles.donor_report_builder')] class exten
             ->whereIn('status', $approved)
             ->whereHas('donor', fn (Builder $query) => $query->where('is_internal', false))
             ->orderBy('name')
-            ->get(['id', 'name', 'internal_project_number', 'donor_id', 'status', 'actual_date_begin', 'actual_date_end']);
+            ->get(['id', 'name', 'internal_project_number', 'donor_id', 'status', 'actual_date_begin', 'actual_date_end', 'extended_date_end']);
     }
 
     #[Computed]
@@ -215,7 +215,7 @@ new #[Layout('layouts::desk'), Title('titles.donor_report_builder')] class exten
 
 @php
     $muted = 'text-secondary-medium dark:text-ink-muted';
-    $panel = 'rounded-xl border border-secondary-soft p-4 sm:p-5 dark:border-transparent dark:bg-surface-1 dark:shadow-raised';
+    $panel = 'rounded-panel border border-panel-border p-4 sm:p-5 dark:bg-surface-1 dark:shadow-raised';
     $preview = $this->preview;
     $proposal = $this->selectedProposal;
     $slotHint = DonorReportResponsibles::slotFor(DonorReportType::tryFrom($type) ?? DonorReportType::Narrative);
@@ -247,7 +247,7 @@ new #[Layout('layouts::desk'), Title('titles.donor_report_builder')] class exten
                 />
 
                 <x-ui.form-input wire:model="startMonth" type="month" :label="__('donor_reports.start_month')" required
-                    :help="$proposal?->actual_date_begin !== null ? __('donor_reports.grant_window', ['start' => $proposal->actual_date_begin->format('Y-m'), 'end' => $proposal->actual_date_end?->format('Y-m') ?? '—']) : null" />
+                    :help="$proposal?->actual_date_begin !== null ? __('donor_reports.grant_window', ['start' => $proposal->actual_date_begin->format('Y-m'), 'end' => $proposal->effectiveDateEnd()?->format('Y-m') ?? '—']) : null" />
 
                 @if ($periodType === ReportingPeriod::Custom->value)
                     <x-ui.form-input wire:model="endMonth" type="month" :label="__('donor_reports.end_month')" required />

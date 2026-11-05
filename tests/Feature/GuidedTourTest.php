@@ -98,7 +98,8 @@ function tourPage(object $test, string $route, string $role, array $query, strin
     LibraryIndicator::factory()->create();
     $proposal = Proposal::factory()->create();
 
-    $user = userWithRole($role);
+    /* A department manager (W-14, D-65), so department-tasks opens like the rest. */
+    $user = userWithRole($role, insertHrDepartmentManager());
     $user->forceFill(['locale' => $locale])->save();
 
     $parameters = $route === 'proposals.show' ? ['proposal' => $proposal, ...$query] : $query;

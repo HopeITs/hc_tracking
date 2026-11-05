@@ -17,7 +17,11 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
  * @property int $id
  * @property string|null $impact
  * @property string $name
- * @property int $project_id
+ * @property string|null $name_en
+ * @property int|null $project_id
+ * @property int|null $library_risk_id
+ * @property int|null $proposal_id
+ * @property int|null $result_id
  * @property bool $happened
  * @property int|null $likelihood
  * @property int|null $severity
@@ -25,7 +29,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
  * @property CarbonImmutable|null $created_at
  * @property CarbonImmutable|null $updated_at
  */
-#[Fillable(['impact', 'name', 'project_id', 'happened', 'likelihood', 'severity', 'solution'])]
+#[Fillable(['impact', 'name', 'name_en', 'project_id', 'library_risk_id', 'proposal_id', 'result_id', 'happened', 'likelihood', 'severity', 'solution'])]
 class Risk extends Model implements TracksActivity
 {
     /** @use HasFactory<RiskFactory> */
@@ -39,6 +43,46 @@ class Risk extends Model implements TracksActivity
     public function project(): BelongsTo
     {
         return $this->belongsTo(Project::class);
+    }
+
+    /**
+     * The library entry this risk was picked from (W-09, D-61); null for a
+     * legacy risk logged against a project.
+     *
+     * @return BelongsTo<RiskLibrary, $this>
+     */
+    public function libraryRisk(): BelongsTo
+    {
+        return $this->belongsTo(RiskLibrary::class, 'library_risk_id');
+    }
+
+    /**
+     * The proposal whose logframe carries this risk.
+     *
+     * @return BelongsTo<Proposal, $this>
+     */
+    public function proposal(): BelongsTo
+    {
+        return $this->belongsTo(Proposal::class);
+    }
+
+    /**
+     * The logframe result this risk sits on.
+     *
+     * @return BelongsTo<Result, $this>
+     */
+    public function result(): BelongsTo
+    {
+        return $this->belongsTo(Result::class);
+    }
+
+    /**
+     * The name in the current language; a risk with no English name (a legacy
+     * row) shows its Arabic name everywhere.
+     */
+    public function localizedName(): string
+    {
+        return app()->getLocale() === 'ar' || blank($this->name_en) ? $this->name : $this->name_en;
     }
 
     /**

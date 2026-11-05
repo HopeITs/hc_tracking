@@ -463,7 +463,6 @@ new #[Layout('layouts::desk'), Title('titles.milestone')] class extends Componen
         ]"
         :title="$this->milestone->name"
         :unread="app(\App\Notifications\UnreadSubjects::class)->has(auth()->user(), 'milestone', $this->milestone->id)"
-        title-class="text-3xl! font-bold! leading-none!"
         :subtitle="$this->milestone->ownerName()"
     >
         <x-slot:meta>

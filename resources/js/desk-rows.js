@@ -7,7 +7,10 @@
  * A layout is an ordered list of { panel, cols, rows }. Its cards, in order,
  * fill rows of exactly twelve columns, and every card in a row has the row's
  * height. Every card can be pulled from every edge:
- *  - an inline edge between two neighbours trades columns between them;
+ *  - the end edge with cards after it takes columns from them, the nearest
+ *    first, and once they have no room left they wrap to the next row, the
+ *    last first (growing a card pushes what follows it down);
+ *  - the start edge between two neighbours trades columns between them;
  *  - an inline edge on the Desk's side frees columns when pulled inward, and
  *    the card next to it in order slides into them (the one after it for the
  *    end side, the one before it for the start side), its old row closing up;
@@ -148,9 +151,56 @@ export function resized(entries, index, edge, stepsX, stepsY) {
         above.forEach((i) => (next[i].rows = over - grown));
     }
 
+    /*
+     * The end edge with cards after it: the card takes the columns it is pulled
+     * to and the cards after it give them, the nearest first, down to MinCols.
+     * With no room left they wrap to the start of the next row like text, the
+     * last first, each once it would be more than half squeezed out; the card
+     * then takes their columns too.
+     */
+    const grow = () => {
+        const after = row.slice(k + 1);
+        const room = MaxCols - row.slice(0, k).reduce((sum, i) => sum + entries[i].cols, 0);
+        let cols = clamp(entries[index].cols + stepsX, MinCols, room);
+        let kept = after.length;
+
+        while (kept && kept * MinCols - (room - cols) > MinCols / 2) {
+            kept--;
+        }
+
+        cols = kept ? Math.min(cols, room - kept * MinCols) : room;
+
+        const widths = after.slice(0, kept).map((i) => entries[i].cols);
+        let spare = room - cols - widths.reduce((sum, width) => sum + width, 0);
+
+        widths.forEach((width, j) => {
+            const give = Math.min(width - MinCols, Math.max(0, -spare));
+
+            widths[j] -= give;
+            spare += give;
+        });
+
+        if (kept) {
+            widths[0] += spare;
+        }
+
+        next[index].cols = cols;
+        widths.forEach((width, j) => (next[after[j]].cols = width));
+
+        const wrapped = after.slice(kept);
+
+        if (wrapped.length) {
+            const flowed = rows.map((each) => each.map((i) => next[i]));
+
+            flowed[r] = flowed[r].slice(0, k + 1 + kept);
+            wrapped.reverse().forEach((i) => pushDown(flowed, r, next[i]));
+            wrap(flowed, r + 1);
+        }
+    };
+
     if (edge === 'end' || edge === 'corner') {
         if (k < row.length - 1) {
-            split(row[k], row[k + 1]);
+            grow();
         } else {
             slideIn(index + 1, rows[r + 1] ?? [], -stepsX);
         }
@@ -166,13 +216,32 @@ export function resized(entries, index, edge, stepsX, stepsY) {
 }
 
 /**
- * The layout with one card dropped next to another: 'before' or 'after' it
- * joins that card's row (the row shares its twelve columns again and the card
- * takes the row's height), 'above' or 'below' it gets a row of its own. The
- * row it left closes up. A row already holding four cards cannot take a fifth,
- * so the card gets a row of its own beside it instead.
+ * The layout with one card dropped on another: the two trade places and each
+ * keeps its own size. Every other card stays exactly where it was.
  */
-export function joined(entries, panel, target, place) {
+export function swapped(entries, panel, target) {
+    const next = entries.map((entry) => ({ ...entry }));
+    const from = next.findIndex((entry) => entry.panel === panel);
+    const to = next.findIndex((entry) => entry.panel === target);
+
+    if (from < 0 || to < 0 || from === to) {
+        return next;
+    }
+
+    [next[from], next[to]] = [next[to], next[from]];
+
+    return next;
+}
+
+/**
+ * The layout with one card dropped beside another ('before' or 'after' it):
+ * the card joins that row keeping its own width, the row shares its twelve
+ * columns again (fitRow) at its own height, and the row it left closes up.
+ * A row that now holds a fifth card pushes its last one (never the dropped
+ * card) to the start of the next row, at that row's height, and so on down;
+ * past the last row it opens a new one.
+ */
+export function inserted(entries, panel, target, place) {
     const rows = rowsIn(entries).map((row) => row.map((i) => ({ ...entries[i] })));
     const from = rows.findIndex((row) => row.some((entry) => entry.panel === panel));
     const source = rows[from];
@@ -181,31 +250,48 @@ export function joined(entries, panel, target, place) {
 
     source.splice(source.indexOf(carried), 1);
 
-    if (sameRow && (place === 'before' || place === 'after')) {
-        source.splice(source.findIndex((entry) => entry.panel === target) + (place === 'after' ? 1 : 0), 0, carried);
-
-        return rows.flat();
+    if (! sameRow) {
+        if (source.length) {
+            fitRow(source.map((entry) => entry.cols)).forEach((cols, i) => (source[i].cols = cols));
+        } else {
+            rows.splice(from, 1);
+        }
     }
 
-    if (source.length) {
-        fitRow(source.map((entry) => entry.cols)).forEach((cols, i) => (source[i].cols = cols));
-    } else {
-        rows.splice(from, 1);
-    }
-
-    const at = rows.findIndex((row) => row.some((entry) => entry.panel === target));
+    const at = rows.findIndex((candidate) => candidate.some((entry) => entry.panel === target));
     const row = rows[at];
 
-    if (place === 'above' || place === 'below' || row.length >= MaxCols / MinCols) {
-        rows.splice(at + (place === 'above' || place === 'before' ? 0 : 1), 0, [{ ...carried, cols: MaxCols }]);
-
-        return rows.flat();
-    }
-
-    row.splice(row.findIndex((entry) => entry.panel === target) + (place === 'after' ? 1 : 0), 0, { ...carried, rows: row[0].rows });
-    fitRow(row.map((entry) => entry.cols)).forEach((cols, i) => (row[i].cols = cols));
+    row.splice(row.findIndex((entry) => entry.panel === target) + (place === 'after' ? 1 : 0), 0, { ...carried, rows: row[0]?.rows ?? carried.rows });
+    wrap(rows, at, panel);
 
     return rows.flat();
+}
+
+/** Put a card first in the row after rows[r], at that row's height; past the last row it opens a new one. */
+function pushDown(rows, r, entry) {
+    if (r === rows.length - 1) {
+        rows.push([]);
+    }
+
+    entry.rows = rows[r + 1][0]?.rows ?? entry.rows;
+    rows[r + 1].unshift(entry);
+}
+
+/**
+ * From rows[from] down, a row holding more than four cards pushes its last
+ * one (never the card named keep) to the start of the next row, and so on
+ * down. Every row then shares its twelve columns again (fitRow).
+ */
+function wrap(rows, from, keep = null) {
+    for (let r = from; r < rows.length && rows[r].length > MaxCols / MinCols; r++) {
+        const full = rows[r];
+
+        while (full.length > MaxCols / MinCols) {
+            pushDown(rows, r, full.splice(full.at(-1).panel === keep ? -2 : -1, 1)[0]);
+        }
+    }
+
+    rows.forEach((each) => fitRow(each.map((entry) => entry.cols)).forEach((cols, i) => (each[i].cols = cols)));
 }
 
 /** Whether two layouts place the same cards, in the same order, at the same sizes. */

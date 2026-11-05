@@ -3,6 +3,7 @@
 use App\Enums\Currency;
 use App\Models\Donor;
 use App\Models\DonorProposal;
+use App\Models\Program;
 use App\Models\Project;
 use App\Models\Task;
 use App\Models\User;
@@ -97,4 +98,13 @@ test('"how many projects" counts only what the viewer may see', function () {
 
 test('an empty box offers example questions', function () {
     expect(askAs(User::factory()->role('Team Member')->create(), '')['suggestions'])->toContain(__('desk.ask_suggest.late'));
+});
+
+test('names find programs, which open their own page', function () {
+    $program = Program::factory()->create(['name' => 'Aleppo Relief']);
+
+    $group = collect(askAs(User::factory()->role('General Manager')->create(), 'aleppo relief')['groups'])->firstWhere('name', 'Programs');
+
+    expect(array_column($group['items'], 'label'))->toBe(['Aleppo Relief'])
+        ->and($group['items'][0]['href'])->toBe(route('programs.show', $program));
 });

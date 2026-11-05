@@ -115,7 +115,7 @@
                     <x-ui.form-segmented
                         wire:model.live="planTask.kind"
                         :label="__('department_tasks.kind')"
-                        :options="collect(TaskKind::cases())->map(fn (TaskKind $kind): array => ['value' => $kind->value, 'label' => $kind->label()])->all()"
+                        :options="collect(TaskKind::department())->map(fn (TaskKind $kind): array => ['value' => $kind->value, 'label' => $kind->label()])->all()"
                         :disabled="$editingPlanTaskId !== null && $isDeliverable"
                         required
                     />

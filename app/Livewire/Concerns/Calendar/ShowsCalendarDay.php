@@ -85,7 +85,7 @@ trait ShowsCalendarDay
         }
 
         foreach ($calendar['proposalsByDay']->get($date, new Collection) as $proposal) {
-            $rows->push(['type' => 'proposal', 'kind' => 'link', 'id' => $proposal->id, 'url' => route('proposals.show', $proposal), 'title' => $proposal->name, 'subLabel' => null]);
+            $rows->push(['type' => 'proposal', 'kind' => 'link', 'id' => $proposal->id, 'url' => route('proposals.show', $proposal), 'title' => $proposal->name, 'subLabel' => $proposal->isExtendedAndActive() ? __('calendar.extended_end_title') : null]);
         }
 
         foreach ($calendar['reviewMeetingsByDay']->get($date, new Collection) as $meeting) {

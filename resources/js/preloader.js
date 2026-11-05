@@ -20,6 +20,7 @@ const SHOW_DELAY_MS = 300;
 const MIN_VISIBLE_MS = 200;
 const LEAVE_MS = 200;
 const FAILSAFE_MS = 10000;
+const INTRO_MAX_MS = 1200;
 const INTRO_ANIMATIONS = ['hc-preloader-rise', 'hc-preloader-write'];
 
 let showTimer = null;
@@ -126,18 +127,21 @@ const finishBoot = async (element) => {
             isReady = true;
         });
 
+    // The intro plays out, but never longer than INTRO_MAX_MS (a tab whose
+    // animations are paused, such as a background tab, would otherwise hold
+    // the cover until the failsafe).
     const intro = element
         .getAnimations({ subtree: true })
         .filter((animation) => INTRO_ANIMATIONS.includes(animation.animationName))
         .map((animation) => animation.finished);
 
-    await Promise.allSettled(intro);
+    await Promise.race([Promise.allSettled(intro), wait(INTRO_MAX_MS)]);
 
     if (element.dataset.state !== 'boot') {
         return;
     }
 
-    if (intro.length > 0 && !isReady) {
+    if (!isReady) {
         setState(element, 'waiting');
     }
 
@@ -196,6 +200,20 @@ document.addEventListener('livewire:navigated', () => {
         leave(element);
     }
 });
+
+// Someone acting on the page never waits for the logo: the loader lets every
+// click through (pointer-events: none in preloader.css) and gets out of the way at
+// the first click, tap or key press.
+const dismissOnInput = () => {
+    const element = findPreloader();
+
+    if (element && element.dataset.state !== 'hidden') {
+        hideNow(element);
+    }
+};
+
+document.addEventListener('pointerdown', dismissOnInput, { capture: true, passive: true });
+document.addEventListener('keydown', dismissOnInput, { capture: true, passive: true });
 
 window.addEventListener('pageshow', (event) => {
     const element = findPreloader();

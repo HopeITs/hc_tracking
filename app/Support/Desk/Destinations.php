@@ -6,6 +6,8 @@ namespace App\Support\Desk;
 
 use App\Models\DonorReport;
 use App\Models\ProposalReviewer;
+use App\Models\RiskLibrary;
+use App\Models\Task;
 use App\Models\User;
 use Closure;
 use Illuminate\Support\Str;
@@ -161,7 +163,6 @@ final class Destinations
             $page('projects.index', 'common.projects', 'folder', 'folder-open', 'projects_delivery', $can('projects.view'), 'projects'),
             $page('milestones.index', 'common.milestones', 'flag', 'flag', 'projects_delivery', $can('milestones.view'), 'milestones'),
             $page('timeline.index', 'titles.timeline', 'cal', 'bars-3-bottom-left', 'projects_delivery', $can('projects.view')),
-            $page('risks.index', 'common.risks', 'info', 'exclamation-triangle', 'projects_delivery', $can('risks.view'), 'risks'),
 
             $page('results.index', 'common.results_framework', 'chart', 'trophy', 'monitoring_evaluation', $can('results.view'), 'results'),
             $page('indicator-library.index', 'navigation.indicator_library', 'chart', 'book-open', 'monitoring_evaluation', $can('indicator-library.view'), 'indicator-library'),
@@ -182,7 +183,7 @@ final class Destinations
             $page('admin.accounts.index', 'common.accounts', 'coins', 'building-library', 'funding_finance', $can('accounts.view'), 'accounts'),
 
             $page('tasks.index', 'common.tasks', 'check', 'check-circle', 'workspace', $can('tasks.view'), 'tasks'),
-            $page('department-tasks.index', 'titles.department_tasks', 'board', 'building-office-2', 'workspace', $can('tasks.view')),
+            $page('department-tasks.index', 'titles.department_tasks', 'board', 'building-office-2', 'workspace', fn (User $user): bool => $user->can('viewDepartmentQueue', Task::class)),
             $page('calendar.index', 'common.my_calendar', 'cal', 'calendar', 'workspace', $can('calendar.view')),
             $page('notifications.index', 'desk.notifications', 'bell', 'bell', 'workspace', $everyone),
 
@@ -191,6 +192,7 @@ final class Destinations
             $page('activity.index', 'navigation.activity_log', 'undo', 'clipboard-document-list', 'administration', $can('activity-log.view')),
             $page('admin.cities.index', 'common.cities', 'map', 'map-pin', 'administration', $can('cities.view')),
             $page('admin.sectors.index', 'navigation.sectors', 'grid', 'tag', 'administration', $can('sectors.view')),
+            $page('admin.risk-library.index', 'navigation.risk_library', 'info', 'shield-exclamation', 'administration', fn (User $user): bool => $user->can('viewAny', RiskLibrary::class)),
             $page('admin.evidence-types.index', 'navigation.evidence_types', 'file', 'paper-clip', 'administration', $can('evidence-types.manage')),
             $page('admin.narrative-questions.index', 'navigation.narrative_questions', 'info', 'question-mark-circle', 'administration', $can('narrative-questions.manage')),
 

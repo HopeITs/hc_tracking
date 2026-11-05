@@ -29,9 +29,9 @@
         color: var(--color-ink);
     }
 
+    /* Never catches a click: the first click or key press passes through to the page and dismisses the loader (preloader.js). */
     .hc-preloader:is([data-state='boot'], [data-state='waiting'], [data-state='shown']) {
         visibility: visible;
-        pointer-events: auto;
     }
 
     .hc-preloader:is([data-state='waiting'], [data-state='shown']) {

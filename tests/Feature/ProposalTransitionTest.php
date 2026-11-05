@@ -9,6 +9,7 @@ use App\Models\Project;
 use App\Models\Proposal;
 use App\Models\ProposalStatusNote;
 use App\Models\User;
+use App\Support\ProposalTransitions;
 use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Event;
@@ -18,7 +19,7 @@ use Illuminate\Validation\ValidationException;
  * A proposal at the given status that meets every §2 requirement: one linked
  * project with beneficiaries and a requested budget.
  */
-function transitionableProposal(ProposalStatus $status, ?ProposalStatus $preHold = null): Proposal
+function transitionableProposal(ProposalStatus $status): Proposal
 {
     $proposal = Proposal::factory()->create([
         'status' => $status,
@@ -26,11 +27,6 @@ function transitionableProposal(ProposalStatus $status, ?ProposalStatus $preHold
         'requested_currency' => Currency::Usd,
     ]);
     $proposal->projects()->attach(Project::factory()->create()->id, ['target_beneficiaries' => 400]);
-
-    if ($preHold !== null) {
-        ProposalStatusNote::factory()->create(['proposal_id' => $proposal->id, 'status' => $preHold, 'context' => 'Sent.']);
-        ProposalStatusNote::factory()->create(['proposal_id' => $proposal->id, 'status' => ProposalStatus::OnHold, 'context' => 'Donor paused the call.']);
-    }
 
     return $proposal;
 }
@@ -65,9 +61,9 @@ function refusedTransition(callable $move): array
 
 beforeEach(fn () => $this->travelTo('2026-10-13 10:00:00'));
 
-test('every allowed transition moves the status and writes one note by the actor', function (ProposalStatus $from, ProposalStatus $to, array $input, ?ProposalStatus $preHold) {
+test('every allowed transition moves the status and writes one note by the actor', function (ProposalStatus $from, ProposalStatus $to, array $input) {
     $actor = userWithRole('Financial');
-    $proposal = transitionableProposal($from, $preHold);
+    $proposal = transitionableProposal($from);
     $notesBefore = $proposal->statusNotes()->count();
 
     $result = transition($actor, $proposal, $to, $input);
@@ -84,19 +80,12 @@ test('every allowed transition moves the status and writes one note by the actor
     'concept note review → submitted' => [ProposalStatus::ConceptNoteReview, ProposalStatus::ConceptNoteSubmitted, ['effective_date' => '2026-10-12'], null],
     'concept note → proposal draft (skip)' => [ProposalStatus::ConceptNote, ProposalStatus::ProposalDraft, ['reason' => 'المقترح موجود مسبقًا'], null],
     'concept note submitted → proposal draft' => [ProposalStatus::ConceptNoteSubmitted, ProposalStatus::ProposalDraft, ['effective_date' => '2026-10-13'], null],
-    'concept note submitted → on hold' => [ProposalStatus::ConceptNoteSubmitted, ProposalStatus::OnHold, ['reason' => 'Donor paused the call.', 'remind_on' => '2026-11-01'], null],
     'concept note submitted → rejected' => [ProposalStatus::ConceptNoteSubmitted, ProposalStatus::Rejected, ['reason' => 'Outside the donor priorities.', 'effective_date' => '2026-10-10'], null],
     'proposal draft → review' => [ProposalStatus::ProposalDraft, ProposalStatus::ProposalReview, [], null],
     'proposal review → proposal draft' => [ProposalStatus::ProposalReview, ProposalStatus::ProposalDraft, ['reason' => 'Budget lines need detail.'], null],
     'proposal review → submitted' => [ProposalStatus::ProposalReview, ProposalStatus::Submitted, ['effective_date' => '2026-10-13'], null],
     'submitted → proposal draft' => [ProposalStatus::Submitted, ProposalStatus::ProposalDraft, ['reason' => 'Donor asked to resubmit.'], null],
-    'submitted → on hold' => [ProposalStatus::Submitted, ProposalStatus::OnHold, ['reason' => 'Donor freeze.', 'remind_on' => '2026-12-01'], null],
     'submitted → rejected' => [ProposalStatus::Submitted, ProposalStatus::Rejected, ['reason' => 'Donor declined the grant.', 'effective_date' => '2026-10-13'], null],
-    'on hold (concept note submitted) → proposal draft' => [ProposalStatus::OnHold, ProposalStatus::ProposalDraft, ['effective_date' => '2026-10-13'], ProposalStatus::ConceptNoteSubmitted],
-    'on hold (concept note submitted) → rejected' => [ProposalStatus::OnHold, ProposalStatus::Rejected, ['reason' => 'Call cancelled for good.', 'effective_date' => '2026-10-13'], ProposalStatus::ConceptNoteSubmitted],
-    'on hold (submitted) → submitted' => [ProposalStatus::OnHold, ProposalStatus::Submitted, ['effective_date' => '2026-10-13'], ProposalStatus::Submitted],
-    'on hold (submitted) → proposal draft' => [ProposalStatus::OnHold, ProposalStatus::ProposalDraft, ['reason' => 'Donor asked to resubmit.'], ProposalStatus::Submitted],
-    'on hold (submitted) → rejected' => [ProposalStatus::OnHold, ProposalStatus::Rejected, ['reason' => 'Donor declined the grant.', 'effective_date' => '2026-10-13'], ProposalStatus::Submitted],
 ]);
 
 test('a missing requirement refuses the move with its message and writes nothing', function (ProposalStatus $from, ProposalStatus $to, array $input, Closure $break, string $field, string $message) {
@@ -113,7 +102,6 @@ test('a missing requirement refuses the move with its message and writes nothing
     'reason' => [ProposalStatus::ConceptNoteReview, ProposalStatus::ConceptNote, ['reason' => '  '], fn () => null, 'reason', 'proposals.reason_required'],
     'reason_min_10' => [ProposalStatus::Submitted, ProposalStatus::Rejected, ['reason' => 'No fit.', 'effective_date' => '2026-10-13'], fn () => null, 'reason', 'proposals.rejection_reason'],
     'effective_date' => [ProposalStatus::ProposalReview, ProposalStatus::Submitted, ['effective_date' => '2026-10-14'], fn () => null, 'effective_date', 'proposals.date_not_future'],
-    'remind_on' => [ProposalStatus::Submitted, ProposalStatus::OnHold, ['reason' => 'Donor freeze.', 'remind_on' => '2026-10-13'], fn () => null, 'remind_on', 'proposals.remind_on_future'],
     'budget' => [ProposalStatus::ProposalDraft, ProposalStatus::ProposalReview, [], fn (Proposal $p) => $p->forceFill(['requested_budget' => null])->save(), 'budget', 'proposals.budget_required'],
     'target_beneficiaries' => [ProposalStatus::ProposalReview, ProposalStatus::Submitted, ['effective_date' => '2026-10-13'], fn (Proposal $p) => $p->projects()->updateExistingPivot($p->projects()->value('projects.id'), ['target_beneficiaries' => null]), 'target_beneficiaries', 'proposals.beneficiaries_required'],
 ]);
@@ -146,26 +134,27 @@ test('a target outside the table is refused and writes nothing', function (Propo
     'into the retired final reports' => [ProposalStatus::Active, ProposalStatus::FinalReports],
 ]);
 
-test('on hold offers only the targets of its pre-hold status', function () {
-    $proposal = transitionableProposal(ProposalStatus::OnHold, ProposalStatus::ConceptNoteSubmitted);
+test('on hold is no longer a move the table offers (D-58, W-06)', function (ProposalStatus $from) {
+    $proposal = transitionableProposal($from);
 
-    $errors = refusedTransition(fn () => transition(userWithRole('Financial'), $proposal, ProposalStatus::Submitted, ['effective_date' => '2026-10-13']));
+    $errors = refusedTransition(fn () => transition(userWithRole('Financial'), $proposal, ProposalStatus::OnHold, ['reason' => 'Donor freeze.', 'remind_on' => '2026-11-15']));
 
     expect($errors)->toHaveKey('status')
-        ->and($proposal->fresh()->status)->toBe(ProposalStatus::OnHold);
-});
+        ->and($proposal->fresh()->status)->toBe($from)
+        ->and(ProposalTransitions::targets($from))->not->toContain(ProposalStatus::OnHold);
+})->with([
+    'submitted' => ProposalStatus::Submitted,
+    'concept note submitted' => ProposalStatus::ConceptNoteSubmitted,
+]);
 
-test('entering on hold sets the reminder date and leaving clears it', function () {
-    $actor = userWithRole('Financial');
-    $proposal = transitionableProposal(ProposalStatus::Submitted);
-    ProposalStatusNote::factory()->create(['proposal_id' => $proposal->id, 'status' => ProposalStatus::Submitted, 'context' => 'Sent.']);
+test('the transition table has no row leading into or out of on hold', function () {
+    $table = ProposalTransitions::map();
 
-    transition($actor, $proposal, ProposalStatus::OnHold, ['reason' => 'Donor freeze.', 'remind_on' => '2026-11-15']);
-    $remindOn = $proposal->fresh()->status_remind_on?->toDateString();
-    transition($actor, $proposal, ProposalStatus::Submitted, ['effective_date' => '2026-10-13']);
+    expect($table)->not->toHaveKey(ProposalStatus::OnHold->value);
 
-    expect($remindOn)->toBe('2026-11-15')
-        ->and($proposal->fresh()->status_remind_on)->toBeNull();
+    foreach ($table as $from => $targets) {
+        expect(array_keys($targets))->not->toContain(ProposalStatus::OnHold->value, "row {$from}");
+    }
 });
 
 test('the note carries the effective date, or today and the standard note when none applies', function () {
@@ -255,15 +244,13 @@ test('a move rolled back by an outer transaction dispatches no event and writes 
         ->and($proposal->statusNotes()->count())->toBe(0);
 });
 
-test('on hold and rejected keep the stage of the status they left', function (ProposalStatus $status, ProposalStatus $before, string $stage) {
+test('rejected keeps the stage of the status it left', function (ProposalStatus $status, ProposalStatus $before, string $stage) {
     $proposal = Proposal::factory()->create(['status' => $status]);
     ProposalStatusNote::factory()->create(['proposal_id' => $proposal->id, 'status' => $before, 'context' => 'Earlier move.']);
     ProposalStatusNote::factory()->create(['proposal_id' => $proposal->id, 'status' => $status, 'context' => 'Latest move.']);
 
     expect($proposal->stage())->toBe($stage);
 })->with([
-    'on hold after the concept note was sent' => [ProposalStatus::OnHold, ProposalStatus::ConceptNoteSubmitted, 'concept_note'],
-    'on hold after the proposal was sent' => [ProposalStatus::OnHold, ProposalStatus::Submitted, 'proposal'],
     'rejected after the concept note was sent' => [ProposalStatus::Rejected, ProposalStatus::ConceptNoteSubmitted, 'concept_note'],
     'rejected after the proposal was sent' => [ProposalStatus::Rejected, ProposalStatus::Submitted, 'proposal'],
 ]);

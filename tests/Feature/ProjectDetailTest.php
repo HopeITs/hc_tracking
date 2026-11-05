@@ -168,18 +168,44 @@ test('project detail shows committed and received funding per currency', functio
         ->assertSeeText('400.00');
 });
 
-test('project detail shows only its own risks', function () {
+test('the project has no Risks tab; its risks show as a read-only awareness section', function () {
     $user = User::factory()->role('General Manager')->create();
     $subject = Project::factory()->create();
     $other = Project::factory()->create();
+    $linked = Proposal::factory()->create(['name' => 'Linked Emergency Grant']);
+    $unlinked = Proposal::factory()->create();
+    DB::table('project_proposal')->insert(['project_id' => $subject->id, 'proposal_id' => $linked->id]);
+    DB::table('project_proposal')->insert(['project_id' => $other->id, 'proposal_id' => $unlinked->id]);
+
     Risk::factory()->create(['project_id' => $subject->id, 'name' => 'Access restrictions']);
     Risk::factory()->create(['project_id' => $other->id, 'name' => 'Currency collapse']);
+    Risk::factory()->create(['project_id' => null, 'proposal_id' => $linked->id, 'name' => 'تأخر التمويل', 'name_en' => 'Funding delay', 'likelihood' => 3, 'severity' => 2]);
+    Risk::factory()->create(['project_id' => null, 'proposal_id' => $unlinked->id, 'name' => 'منع الوصول', 'name_en' => 'Foreign proposal risk']);
+
+    $component = Livewire::actingAs($user)
+        ->test('pages::projects.show', ['project' => $subject])
+        ->assertSeeHtml('data-test="risk-awareness"')
+        ->assertSee('Funding delay')
+        ->assertSee('Linked Emergency Grant')
+        ->assertSee('Access restrictions')
+        ->assertSee(__('risks.likelihood').': '.__('risks.rating_high'))
+        ->assertDontSee('Currency collapse')
+        ->assertDontSee('Foreign proposal risk')
+        ->assertDontSeeHtml('wire:click="detachRisk')
+        ->assertDontSeeHtml('wire:click="openRisks');
+
+    expect(collect($component->instance()->tabs)->pluck('key')->all())->not->toContain('risks');
+
+    $component->set('tab', 'risks')->assertSet('tab', 'risks');
+    expect($component->instance()->deliveryTab)->toBe('milestones');
+});
+
+test('a project with no risks shows no awareness section', function () {
+    $user = User::factory()->role('General Manager')->create();
 
     Livewire::actingAs($user)
-        ->test('pages::projects.show', ['project' => $subject])
-        ->set('tab', 'risks')
-        ->assertSee('Access restrictions')
-        ->assertDontSee('Currency collapse');
+        ->test('pages::projects.show', ['project' => Project::factory()->create()])
+        ->assertDontSeeHtml('data-test="risk-awareness"');
 });
 
 test('project detail tasks tab shows tasks raised directly on the project and on its milestones, but not on other projects', function () {

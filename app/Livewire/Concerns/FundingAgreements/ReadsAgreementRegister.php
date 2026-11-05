@@ -7,6 +7,7 @@ namespace App\Livewire\Concerns\FundingAgreements;
 use App\Enums\ArStatus;
 use App\Enums\Currency;
 use App\Models\DonorProposal;
+use App\Models\Strategy;
 use App\Models\TransfersTracking;
 use App\Support\AgreementMoney;
 use App\Support\Like;
@@ -35,6 +36,7 @@ use Livewire\Attributes\Computed;
  * @property string $flag
  * @property string $min
  * @property string $max
+ * @property-read Strategy|null $strategyFilter  #[Computed] FiltersByStrategy::strategyFilter()
  * @property-read LengthAwarePaginator<int, DonorProposal> $agreements  #[Computed] agreements()
  * @property-read LengthAwarePaginator<int, DonorProposal> $rows  #[Computed] rows()
  * @property-read Collection<int, array{currency: string, agreements: int, tranches: int, budget: float, scheduled: float, received: float, in_transit: float, overdue: float, failed: float, unscheduled: float, outstanding: float, due_in_year: float, received_in_year: float}> $totals  #[Computed] totals()
@@ -55,7 +57,7 @@ trait ReadsAgreementRegister
     {
         $search = trim($this->search);
 
-        return DonorProposal::query()
+        return $this->whereProposalInStrategy(DonorProposal::query(), 'donor_proposal.proposal_id')
             ->when($search !== '', function (Builder $query) use ($search): void {
                 $query->where(function (Builder $query) use ($search): void {
                     $query

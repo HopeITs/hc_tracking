@@ -83,6 +83,42 @@
     .dk-notes-state.dk-saving i { background: var(--warn); animation: dk-cards-blink 1s ease-in-out infinite; }
     .dk-notes-count { flex: none; }
     .dk-notes-foot .dk-bad { color: var(--bad); }
+
+    /* ── My to-do ─────────────────────────────────────────────────────
+     * Input on top, then the open lines (drag by the grip) and the done
+     * ones; only the list scrolls, so the card keeps its S height. The
+     * row is logical (inline-start), so Arabic puts the box on the right. */
+    .dk-pb > .dk-todo { flex: 1 1 auto; }
+    .dk-todo { display: flex; flex-direction: column; gap: 6px; min-height: 0; }
+    .dk-todo-add { display: flex; align-items: center; gap: 4px; flex: none; }
+    .dk-todo-input { flex: 1; min-width: 0; height: 36px; padding-inline: 12px; border: 1px solid var(--line); border-radius: 10px; background: var(--sunk); color: var(--ink); font-family: var(--font); font-size: 14px; transition: border-color .15s ease, background .15s ease; }
+    .dk-todo-input::placeholder { color: var(--faint); }
+    .dk-todo-input:focus { outline: none; border-color: var(--ink-3); background: var(--paper); }
+    .dk-todo-input[aria-invalid="true"] { border-color: var(--bad); }
+    .dk-todo-err { margin: 0; font-size: 12.5px; color: var(--bad); }
+    .dk-todo-empty { margin: auto 0; text-align: center; font-size: 13.5px; color: var(--ink-3); }
+    .dk-todo-scroll { flex: 1 1 auto; min-height: 0; overflow-y: auto; overscroll-behavior: auto; scrollbar-width: thin; margin-inline: -4px; padding-inline: 4px; }
+    .dk-todo-list { list-style: none; margin: 0; padding: 0; }
+    .dk-todo-row { display: flex; align-items: center; gap: 2px; min-height: 36px; border-bottom: 1px solid var(--line); background: var(--paper); }
+    .dk-todo-row:last-child { border-bottom: 0; }
+    .dk-todo-grip { display: inline-flex; flex: none; width: 16px; color: var(--faint); cursor: grab; opacity: 0; transition: opacity .15s ease; }
+    .dk-todo-grip svg { width: 14px; height: 14px; }
+    .dk-todo-row:hover .dk-todo-grip, .dk-todo-row:focus-within .dk-todo-grip { opacity: 1; }
+    .dk-todo-done .dk-todo-grip { cursor: default; }
+    .dk-todo-check { display: flex; flex: 1; align-items: center; gap: 10px; min-width: 0; padding: 7px 4px; border: 0; border-radius: 8px; background: none; color: var(--ink); font: inherit; font-size: 14px; text-align: start; cursor: pointer; }
+    .dk-todo-check:focus-visible { outline: 2px solid var(--ink-3); outline-offset: -2px; }
+    .dk-todo-check > i { display: inline-flex; flex: none; align-items: center; justify-content: center; width: 18px; height: 18px; border: 1.5px solid var(--ink-3); border-radius: 5px; color: var(--paper); transition: background .15s ease, border-color .15s ease; }
+    .dk-todo-check > i svg { width: 13px; height: 13px; stroke-width: 3; }
+    .dk-todo-check[aria-checked="true"] > i { border-color: var(--good); background: var(--good); }
+    .dk-todo-check:hover > i { border-color: var(--ink); }
+    .dk-todo-t { min-width: 0; overflow-wrap: anywhere; unicode-bidi: plaintext; }
+    .dk-todo-check[aria-checked="true"] .dk-todo-t { color: var(--ink-3); text-decoration: line-through; }
+    .dk-todo-x { flex: none; opacity: 0; }
+    .dk-todo-row:hover .dk-todo-x, .dk-todo-row:focus-within .dk-todo-x { opacity: 1; }
+    .dk-todo-done-h { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 10px 0 2px; font-size: 12.5px; color: var(--ink-3); }
+    .dk-todo-clear { padding: 2px 4px; border: 0; background: none; color: var(--ink-2); font: inherit; font-weight: 700; cursor: pointer; border-radius: 6px; }
+    .dk-todo-clear:hover { color: var(--ink); text-decoration: underline; }
+    @media (hover: none) { .dk-todo-grip, .dk-todo-x { opacity: 1; } }
     @keyframes dk-cards-blink { 50% { opacity: .35; } }
 
     /* ── Past the deadline ────────────────────────────────────────── */
@@ -190,13 +226,14 @@
     }
 
     /* ── Sheets: the panel card language ──────────────────────────────
-     * Overrides desk.css's panel look (same layer, later file): 12px radius,
-     * a hairline and a soft lift instead of a heavy box, an uppercase
+     * Overrides desk.css's panel look (same layer, later file): the shared
+     * panel radius and border tokens (tokens.css, as x-ui.panel), a soft lift
+     * instead of a heavy box, an uppercase
      * eyebrow title, the count as a figure at the end, tools on hover and the
      * grip only on hover. Resize rules stay in desk.css. */
-    :root { --panel-r: 12px; --panel-pad: 16px; --panel-shadow: 0 1px 1px color-mix(in srgb, var(--ink) 4%, transparent), 0 10px 28px -18px color-mix(in srgb, var(--ink) 22%, transparent); }
-    .dk-panel { border-color: color-mix(in srgb, var(--line) 80%, transparent); }
-    .dk-panel.dk-needs { border-color: color-mix(in srgb, var(--line) 80%, transparent); }
+    :root { --panel-r: var(--radius-panel); --panel-pad: 16px; --panel-shadow: 0 1px 1px color-mix(in srgb, var(--ink) 4%, transparent), 0 10px 28px -18px color-mix(in srgb, var(--ink) 22%, transparent); }
+    .dk-panel { border-color: var(--color-panel-border); }
+    .dk-panel.dk-needs { border-color: var(--color-panel-border); }
     .dk-panel.dk-needs::before { content: none; }
 
     .dk-ph, [dir="rtl"] .dk-ph { position: relative; align-items: center; gap: 2px; min-height: 52px; padding: 12px var(--panel-pad) 4px calc(var(--panel-pad) + 4px); }
@@ -220,7 +257,6 @@
     /* ── Hero: briefing, command strip ──────────────────── */
     /* The greeting on one side, the day's two figures across from it; on a narrow screen they sit under it. */
     .dk-hello { grid-template-columns: minmax(0, 1fr) auto; grid-template-areas: "main figs" "start start"; }
-    .dk-hello h1 { margin: 4px 0 0; }
     .dk-hello-figs, .dk-hello-clear { grid-area: figs; align-self: end; margin: 0; }
     .dk-hello-figs { display: flex; color: inherit; text-decoration: none; border-radius: 10px; }
     .dk-hello-figs:focus-visible { outline: 2px solid var(--ink-2); outline-offset: 4px; }
@@ -228,10 +264,10 @@
     .dk-hello-fig { display: flex; align-items: center; gap: 10px; padding-inline: 20px; border-inline-start: 1px solid var(--line-2); }
     .dk-hello-fig:first-child { padding-inline-start: 0; border-inline-start: 0; }
     .dk-hello-fig:last-child { padding-inline-end: 0; }
-    .dk-hello-fig b { font-size: clamp(28px, 3vw, 40px); font-weight: 800; line-height: 1; letter-spacing: -.02em; color: var(--ink); }
+    /* The figures wear .page-title, so they match the greeting beside them; the late figure adds text-brand-ink! to stay red like its label. */
     .dk-hello-fig > span { max-width: 9ch; font-size: 13px; font-weight: 600; line-height: 1.25; color: var(--ink-2); transition: color .15s ease; }
     a.dk-hello-figs:hover .dk-hello-fig > span { color: var(--ink); }
-    .dk-hello-fig.dk-late b, .dk-hello-fig.dk-late > span, a.dk-hello-figs:hover .dk-hello-fig.dk-late > span { color: var(--brand-ink); }
+    .dk-hello-fig.dk-late > span, a.dk-hello-figs:hover .dk-hello-fig.dk-late > span { color: var(--brand-ink); }
     @media (max-width: 760px) {
         .dk-hello { grid-template-columns: minmax(0, 1fr); grid-template-areas: "main" "figs" "start"; }
     }

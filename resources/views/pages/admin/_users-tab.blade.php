@@ -6,7 +6,7 @@
 @use('Illuminate\Support\Facades\Gate')
 
         <div class="grid min-w-0 gap-6 xl:grid-cols-[21rem_minmax(0,1fr)]">
-            <section class="flex min-w-0 flex-col overflow-hidden rounded-xl border border-secondary-soft bg-white shadow-card dark:border-transparent dark:bg-surface-1 dark:shadow-raised">
+            <x-ui.panel class="flex min-w-0 flex-col">
                 <div class="max-h-[min(62vh,44rem)] divide-y divide-secondary-soft overflow-y-auto overscroll-contain dark:divide-line">
                     @forelse ($this->users as $user)
                         <button type="button" wire:click="selectUser({{ $user->id }})" wire:key="access-user-{{ $user->id }}" @class([
@@ -50,9 +50,9 @@
                         class="text-secondary-medium! [&_button]:text-secondary-medium! [&_button:hover]:bg-secondary-soft! dark:text-ink-muted! dark:[&_button]:text-ink-muted! dark:[&_button:hover]:bg-surface-2!"
                     />
                 </div>
-            </section>
+            </x-ui.panel>
 
-            <section class="flex min-w-0 flex-col rounded-xl border border-secondary-soft bg-white shadow-card dark:border-transparent dark:bg-surface-1 dark:shadow-raised">
+            <x-ui.panel :clip="false" class="flex min-w-0 flex-col">
                 @if ($this->selectedUser)
                     @php
                         $selectedUser = $this->selectedUser;
@@ -134,5 +134,5 @@
                 @else
                     <x-ui.empty-state icon="user" :heading="__('access.select-employee')" :body="__('access.select-employee-help')" class="min-h-[clamp(22rem,55vh,38rem)] flex-1" />
                 @endif
-            </section>
+            </x-ui.panel>
         </div>

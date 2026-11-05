@@ -1,6 +1,7 @@
 <?php
 
 use App\Enums\MilestoneStatus;
+use App\Livewire\Concerns\FiltersByStrategy;
 use App\Livewire\Concerns\Milestones\ManagesMilestoneDirectoryForm;
 use App\Livewire\Concerns\NavigatesCalendarPeriods;
 use App\Models\Milestone;
@@ -16,10 +17,13 @@ use Livewire\Attributes\Layout;
 use Livewire\Attributes\Title;
 use Livewire\Attributes\Url;
 use Livewire\Component;
+use Livewire\WithPagination;
 
 new #[Layout('layouts::desk'), Title('titles.milestones')] class extends Component {
+    use FiltersByStrategy;
     use ManagesMilestoneDirectoryForm;
     use NavigatesCalendarPeriods;
+    use WithPagination;
 
     #[Url(except: '')]
     public string $project = '';
@@ -47,6 +51,7 @@ new #[Layout('layouts::desk'), Title('titles.milestones')] class extends Compone
         $this->project = '';
         $this->status = '';
         $this->responsible = '';
+        $this->clearStrategyFilter();
     }
 
     /**
@@ -142,7 +147,7 @@ new #[Layout('layouts::desk'), Title('titles.milestones')] class extends Compone
 
     public function filterByStatus(?string $status = null): void
     {
-        $this->status = $status !== null && MilestoneStatus::tryFrom($status) !== null ? $status : '';
+        $this->status = $status !== null && ($status === 'missed' || MilestoneStatus::tryFrom($status) !== null) ? $status : '';
     }
 
     public function filterByResponsible(?int $responsibleId = null): void
@@ -185,7 +190,7 @@ new #[Layout('layouts::desk'), Title('titles.milestones')] class extends Compone
             ->orderBy('sequence')
             ->orderBy('id');
 
-        $projects = Project::query()
+        $projects = $this->whereInStrategy(Project::query(), 'projects.id')
             ->select(['id', 'name', 'city_id'])
             ->when($this->project !== '', fn (Builder $query) => $query->whereKey((int) $this->project))
             ->with([
@@ -196,7 +201,8 @@ new #[Layout('layouts::desk'), Title('titles.milestones')] class extends Compone
             ->orderBy('id')
             ->get();
 
-        $proposals = $this->project !== '' ? new Collection : Proposal::query()
+        // Proposal-level milestones belong to no project, so no strategy either.
+        $proposals = $this->project !== '' || $this->strategyFilter !== null ? new Collection : Proposal::query()
             ->select(['id', 'name', 'slug'])
             ->whereHas('milestones', fn (Builder $query) => $query->whereNull('project_id'))
             ->with(['milestones' => fn ($query) => $loadMilestones($query->whereNull('project_id'))])
@@ -285,7 +291,13 @@ new #[Layout('layouts::desk'), Title('titles.milestones')] class extends Compone
 
     protected function matchesMilestoneFilters(Milestone $milestone): bool
     {
-        return ($this->status === '' || $milestone->status->value === $this->status)
+        $matchesStatus = match ($this->status) {
+            '' => true,
+            'missed' => $milestone->isMissed(),
+            default => $milestone->status->value === $this->status,
+        };
+
+        return $matchesStatus
             && ($this->responsible === '' || $milestone->responsible_user_id === (int) $this->responsible);
     }
 
@@ -293,7 +305,7 @@ new #[Layout('layouts::desk'), Title('titles.milestones')] class extends Compone
 ?>
 
 @php
-    $filtersAreActive = $project !== '' || $status !== '' || $responsible !== '';
+    $filtersAreActive = $project !== '' || $status !== '' || $responsible !== '' || $this->strategyFilter !== null;
     $milestoneViews = [
         'list' => ['icon' => 'table', 'label' => __('milestones.list_view'), 'test' => 'milestone-view-list'],
         'timeline' => ['icon' => 'chart', 'label' => __('milestones.timeline_view'), 'test' => 'milestone-view-timeline'],
@@ -322,6 +334,8 @@ new #[Layout('layouts::desk'), Title('titles.milestones')] class extends Compone
             @endcan
         </x-slot:actions>
     <x-slot:filters>
+            <x-desk.strategy-chip :strategy="$this->strategyFilter" />
+
             <x-ui.header-filter-select id="milestone-project-filter" :label="__('common.project')" wire:model.live="project" :value="$project">
                 <option value="">{{ __('common.all_projects') }}</option>
                 @foreach ($this->projectOptions as $projectOption)
@@ -334,6 +348,7 @@ new #[Layout('layouts::desk'), Title('titles.milestones')] class extends Compone
                 @foreach (MilestoneStatus::cases() as $statusCase)
                     <option value="{{ $statusCase->value }}">{{ $statusCase->label() }}</option>
                 @endforeach
+                <option value="missed">{{ __('milestones.missed') }}</option>
             </x-ui.header-filter-select>
 
             <x-ui.header-filter-select id="milestone-responsible-filter" :label="__('milestones.responsible')" wire:model.live="responsible" :value="$responsible" employees>

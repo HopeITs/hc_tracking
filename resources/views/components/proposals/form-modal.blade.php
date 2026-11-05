@@ -2,11 +2,18 @@
     The proposal form v2, rendered by every page that uses App\Livewire\Concerns\Proposals\ManagesProposalForm
     (proposals/index and proposals/show). Its wire:model bindings resolve against that page's component.
 
-    Sections, in reading and tab order: basics; donor and money; projects and beneficiaries; planned dates;
-    starting stage (create only). Create chooses the projects (a server-searched picker, each row naming its
-    center, program and city) with a beneficiaries input beside each chosen one. Edit shows the linked
-    projects with their beneficiaries only: links change on the proposal page's Projects tab. The budget is
-    rendered only for a money holder; for anyone else it is absent, not hidden.
+    Sections, in reading and tab order (D-62, W-10): identity (renewal preset, name, number); donor;
+    locations; planned dates; budget; starting stage (create only); notes last. Reordering the markup is
+    what sets the tab order, so keep the submit button in the actions slot, after everything.
+
+    Two sections are slots their own tasks fill. Locations still holds the project picker (`projectIds`);
+    W-34a replaces its contents with location rows. A concept-note section belongs between Locations and
+    Dates and arrives with W-24 — it is left out rather than rendered empty.
+
+    Create chooses the projects (a server-searched picker, each row naming its center, program and city)
+    with a beneficiaries input beside each chosen one. Edit shows the linked projects with their
+    beneficiaries only: links change on the proposal page's Projects tab. The budget is rendered only for a
+    money holder; for anyone else the whole section is absent, not hidden.
 --}}
 @use('App\Enums\Currency')
 @use('App\Enums\ProposalStatus')
@@ -34,6 +41,27 @@
     $projectRows = $editing ? $linkedProjects : ($isRenewal ? $renewal['projects'] : $chosenProjects);
     $chosenCount = count($chosenProjects);
     $projectsError = $errors->first('projectIds') ?: $errors->first('beneficiaries');
+
+    /*
+     * Which validation keys each section holds, in the order the sections
+     * render (D-62). Defined once: every x-ui.form-section below takes its
+     * `fields` from here, and the error summary names the sections that hold
+     * a failure from the same map, so the two can never disagree.
+     */
+    $sectionFields = [
+        __('proposals.section_identity') => ['previousProposalId', 'name', 'internalProjectNumber'],
+        __('proposals.section_donor') => ['donorId'],
+        __('proposals.section_locations') => ['projectIds', 'beneficiaries', 'beneficiariesReason', ...array_map(fn (array $row): string => 'beneficiaries.'.$row['id'], $projectRows)],
+        __('proposals.section_planned_dates') => ['plannedDateBegin', 'plannedDateEnd'],
+        __('proposals.section_budget') => ['requestedBudget', 'requestedCurrency'],
+        __('proposals.section_start') => ['startingStage', 'skipReason'],
+        __('proposals.section_notes') => ['notes'],
+    ];
+
+    $failingSections = array_keys(array_filter(
+        $sectionFields,
+        fn (array $fields): bool => collect($fields)->contains(fn (string $field): bool => $errors->has($field)),
+    ));
 @endphp
 
 <x-ui.modal
@@ -49,7 +77,12 @@
         @if ($errors->any())
             <div class="mb-4 flex flex-wrap items-center gap-x-3 gap-y-2 rounded-lg border border-status-critical bg-status-critical-soft px-3 py-2 text-sm" role="alert" data-form-error-summary>
                 <flux:icon.exclamation-circle variant="micro" class="size-4 shrink-0 text-status-critical" aria-hidden="true" />
-                <p class="min-w-0 flex-1 font-semibold text-status-critical">{{ trans_choice('common.fields_need_attention', $errors->count(), ['count' => $errors->count()]) }}</p>
+                <div class="min-w-0 flex-1">
+                    <p class="font-semibold text-status-critical">{{ trans_choice('common.fields_need_attention', $errors->count(), ['count' => $errors->count()]) }}</p>
+                    @if ($failingSections !== [])
+                        <p class="text-xs text-status-critical" data-form-error-sections>{{ __('proposals.form_error_summary_sections', ['sections' => implode(' · ', $failingSections)]) }}</p>
+                    @endif
+                </div>
                 <button
                     type="button"
                     class="text-sm font-semibold text-secondary-dark underline underline-offset-4 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-secondary-medium dark:text-ink"
@@ -58,9 +91,12 @@
             </div>
         @endif
 
-        @if (! $editing && $renewable !== [])
-            <x-ui.form-section :title="__('proposals.start_from_previous')" :fields="['previousProposalId']" data-test="renewal-section">
-                <div class="grid gap-y-3">
+        {{-- 1 · Identity: the renewal preset first, then the name and the number.
+             W-03 makes the number read-only; until then the editable field keeps this slot. --}}
+        <x-ui.form-section :title="__('proposals.section_identity')" :fields="$sectionFields[__('proposals.section_identity')]" data-test="identity-section">
+            <div class="grid gap-x-4 gap-y-3 @2xl/modal:grid-cols-2">
+                @if (! $editing && $renewable !== [])
+                <div class="grid gap-y-3 @2xl/modal:col-span-2" data-test="renewal-preset">
                     <x-ui.form-select wire:model.live="previousProposalId" :label="__('proposals.previous_proposal_label')" :placeholder="__('proposals.choose_previous')" :help="__('proposals.choose_previous')" data-test="previous-proposal-select">
                         @foreach ($renewable as $option)
                             <option value="{{ $option['id'] }}">{{ $option['label'] }}</option>
@@ -90,11 +126,8 @@
                         </div>
                     @endif
                 </div>
-            </x-ui.form-section>
-        @endif
+                @endif
 
-        <x-ui.form-section :title="__('proposals.section_basics')" :fields="['name', 'internalProjectNumber', 'notes']">
-            <div class="grid gap-x-4 gap-y-3 @2xl/modal:grid-cols-2">
                 <x-ui.form-input wire:model="name" :label="__('proposals.proposal_name')" maxlength="255" required autofocus dir="auto" />
 
                 <div class="min-w-0">
@@ -103,13 +136,12 @@
                         <x-ui.project-number :number="$storedNumber" kind="internal" class="mt-1.5 text-xs {{ $mutedText }}" />
                     @endif
                 </div>
-
-                <x-ui.form-textarea wire:model="notes" :label="__('common.notes')" rows="2" dir="auto" class="@2xl/modal:col-span-2" />
             </div>
         </x-ui.form-section>
 
+        {{-- 2 · Donor. --}}
         @unless ($isRenewal)
-        <x-ui.form-section :title="$showsMoney ? __('proposals.section_donor_and_budget') : __('proposals.section_donor')" :fields="['donorId', 'requestedBudget', 'requestedCurrency']">
+        <x-ui.form-section :title="__('proposals.section_donor')" :fields="$sectionFields[__('proposals.section_donor')]">
             <div class="grid gap-x-4 gap-y-3 @2xl/modal:grid-cols-2">
                 @if ($lockedDonorName !== null)
                     <x-ui.form-field :label="__('funding_agreements.donor')" for="proposal-locked-donor" :help="__('proposals.the_donor_cannot_change_after_the_concept_note')" :error="$errors->first('donorId')" class="@2xl/modal:col-span-2">
@@ -140,23 +172,16 @@
                         </div>
                     @endif
                 @endif
-
-                @if ($showsMoney)
-                    <x-ui.form-input wire:model="requestedBudget" :label="__('proposals.requested_budget')" :help="__('proposals.requested_budget_help')" type="number" step="0.01" min="0" dir="ltr" />
-                    <x-ui.form-segmented
-                        wire:model="requestedCurrency"
-                        :label="__('common.currency')"
-                        :options="collect(Currency::cases())->map(fn (Currency $currencyCase): array => ['value' => $currencyCase->value, 'label' => $currencyCase->value])->all()"
-                    />
-                @endif
             </div>
         </x-ui.form-section>
         @endunless
 
+        {{-- 3 · Locations. W-34a replaces the picker inside with its rows; the
+             section and its place in the order stay. --}}
         <x-ui.form-section
-            :title="__('proposals.section_projects')"
+            :title="__('proposals.section_locations')"
             :hint="$editing ? __('proposals.links_change_in_the_projects_tab') : __('proposals.beneficiaries_can_wait_until_the_proposal_review')"
-            :fields="['projectIds', 'beneficiaries', 'beneficiariesReason', ...array_map(fn (array $row): string => 'beneficiaries.'.$row['id'], $projectRows)]"
+            :fields="$sectionFields[__('proposals.section_locations')]"
         >
             <div class="grid gap-y-3">
                 @unless ($editing || $isRenewal)
@@ -227,15 +252,33 @@
             </div>
         </x-ui.form-section>
 
-        <x-ui.form-section :title="__('proposals.section_planned_dates')" :fields="['plannedDateBegin', 'plannedDateEnd']">
+        {{-- W-24 adds the concept-note section here, between Locations and Dates. --}}
+
+        {{-- 4 · Dates. --}}
+        <x-ui.form-section :title="__('proposals.section_planned_dates')" :fields="$sectionFields[__('proposals.section_planned_dates')]">
             <div class="grid grid-cols-2 gap-x-4 gap-y-3">
                 <x-ui.form-input wire:model="plannedDateBegin" :label="__('proposals.planned_start')" type="date" required />
                 <x-ui.form-input wire:model="plannedDateEnd" :label="__('proposals.planned_end')" type="date" required />
             </div>
         </x-ui.form-section>
 
+        {{-- 5 · Budget. Absent, not hidden, for anyone without the money permissions. --}}
+        @if ($showsMoney && ! $isRenewal)
+            <x-ui.form-section :title="__('proposals.section_budget')" :fields="$sectionFields[__('proposals.section_budget')]">
+                <div class="grid gap-x-4 gap-y-3 @2xl/modal:grid-cols-2">
+                    <x-ui.form-input wire:model="requestedBudget" :label="__('proposals.requested_budget')" :help="__('proposals.requested_budget_help')" type="number" step="0.01" min="0" dir="ltr" />
+                    <x-ui.form-segmented
+                        wire:model="requestedCurrency"
+                        :label="__('common.currency')"
+                        :options="collect(Currency::cases())->map(fn (Currency $currencyCase): array => ['value' => $currencyCase->value, 'label' => $currencyCase->value])->all()"
+                    />
+                </div>
+            </x-ui.form-section>
+        @endif
+
+        {{-- 6 · Starting stage, on create only. --}}
         @unless ($editing || $isRenewal)
-            <x-ui.form-section :title="__('proposals.section_start')" :fields="['startingStage', 'skipReason']">
+            <x-ui.form-section :title="__('proposals.section_start')" :fields="$sectionFields[__('proposals.section_start')]">
                 <div class="grid gap-y-3">
                     <x-ui.form-segmented
                         wire:model.live="startingStage"
@@ -257,6 +300,11 @@
                 </div>
             </x-ui.form-section>
         @endunless
+
+        {{-- 7 · Notes, last (D-62). --}}
+        <x-ui.form-section :title="__('proposals.section_notes')" :fields="$sectionFields[__('proposals.section_notes')]">
+            <x-ui.form-textarea wire:model="notes" :label="__('common.notes')" rows="2" dir="auto" />
+        </x-ui.form-section>
     @endif
 
     <x-slot:actions>

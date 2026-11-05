@@ -5,16 +5,34 @@ paths:
 
 # Views
 
-## Never use the @php(...) single-line shorthand — it silently corrupts the page
-In this project's Blade version, the `@php($var = expr)` single-line shorthand directive does NOT compile. It's left in the compiled output as literal, unterminated PHP: `<?php($var = expr)` with no closing `?>` and no semicolon — which then swallows every directive after it on the page (including unrelated @foreach/@if elsewhere), producing a ParseError like "unexpected token endforeach/endif" whose line number points nowhere near the real cause. This has recurred more than once (⚡show.blade.php in strategies).
-
-Always use the full block form instead, even for one assignment:
+## Never use the @php(...) single-line shorthand — it is a landmine that arms later
+Always use the full block form, even for one assignment:
 ```
 @php
     $var = expr;
 @endphp
 ```
-Before trusting a Blade page compiles, run `resources/views/pages/**` (or the specific file) through the project's `bisect_blade.php` (compiles the raw source with `blade.compiler->compileString()` and lints the result with `php -l`) rather than only reasoning about `@if`/`@endif` balance — a stray `@php(...)` produces no visible brace imbalance in the source, only in the compiled output.
+
+**Do not conclude this rule is stale when a shorthand you test appears to work.** It usually does work, right up to the moment someone else edits the file. Mechanism, verified against laravel/framework v13.34.0 on 2026-11-04:
+
+`BladeCompiler::storePhpBlocks` runs *before* any directive is compiled and extracts raw blocks with `/(?<!@)@php(.*?)@endphp/s`.
+
+- A shorthand with **no later `@php...@endphp` block in the same file** is never matched by that regex. It falls through to `compilePhp`, which emits `<?php ($var = expr); ?>` — valid, and the page is fine.
+- A shorthand with a **later `@php...@endphp` block in the same file** is matched: the regex spans from the shorthand to that block's `@endphp` and stores *everything between* as one raw PHP block. Nothing in that span is compiled any more.
+
+What that then looks like has two shapes, and only one of them is loud:
+
+- **Always:** the whole span is emitted to the browser as literal text — you see raw `@if (...)`, `@foreach (...)` and the shorthand itself on the page — and no directive inside it runs. Variables the swallowed block assigned are never set, so later `{{ $var }}` hits an undefined variable.
+- **Only when the span cuts through a directive pair** (openers inside it, their `@endif`/`@endforeach` outside) are those closers left orphaned, and *that* is what produces the fatal "unexpected token endif/endforeach" at a line nowhere near the cause. This is the failure that has recurred more than once (⚡show.blade.php in strategies).
+
+The literal-text leak is why there is often no error: the stored block begins `<?php(` with no space, which is **not** a valid PHP open tag, so the span is never parsed as PHP at all and `php -l` passes. (Written with a space — `@php (...)` — it *is* a valid open tag and fails right there instead.) So do not count on a parse error to catch this: when the span happens to enclose balanced pairs, the page simply renders its own source and loses its variables, which is the harder version to diagnose.
+
+So the hazard is not the shorthand alone — it is the shorthand *plus* any block form added below it later on. Adding one innocuous `@php ... @endphp` anywhere beneath an existing shorthand breaks everything between the two. Two consequences:
+
+- When a file holds several shorthands, convert **all** of them in one go. Converting only the later one arms the earlier one, because the new `@endphp` becomes the regex's closer.
+- The order matters, not the count: only shorthands *above* an `@endphp` are at risk.
+
+To check a page really compiles, compile the raw source with `blade.compiler->compileString()` and lint the result with `php -l`, rather than reasoning about `@if`/`@endif` balance — a stray `@php(...)` produces no visible brace imbalance in the source, only in the compiled output. (Earlier revisions of this rule pointed at a `bisect_blade.php` helper; no such script is in the tree, so write the equivalent as a throwaway. Driving `BladeCompiler` standalone needs `withoutComponentTags()`, since component-tag compilation wants a container and runs after the raw-block extraction anyway.)
 
 ## flux:input's bare class= lands on the wrapper, not the &lt;input&gt; — use input:class=
 Found via the login page: `<flux:input class="...">` puts those classes on Flux's outer `data-flux-input` wrapper div, which has no visible border/background of its own — the actual visible box is the inner `<input>` element, which keeps 100% of Flux's own default styling untouched. Confirmed by inspecting the live DOM: the wrapper had my custom classes, the `<input>` still had Flux's stock `bg-white border-zinc-200 rounded-lg` etc.

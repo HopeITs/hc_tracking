@@ -64,6 +64,14 @@
         background-color: var(--paper);
     }
 
+    /* A phone finger needs 44px, not the desktop 36px. */
+    @media (max-width: 720px) {
+        .dk-scope .dk-reg-bar .filter-picker [data-flux-button] {
+            min-height: 44px;
+            height: 44px;
+        }
+    }
+
     /*
      * The page's own actions (x-ui.button / flux:button, the funding Filters
      * trigger) read as the Desk's .dk-btn. x-ui.button tones are !important
@@ -107,8 +115,8 @@
      */
     [data-desk-register] [data-panel],
     [data-desk-register] [data-data-table] {
-        border: 1px solid var(--line);
-        border-radius: 12px;
+        border: 1px solid var(--color-panel-border);
+        border-radius: var(--radius-panel);
         background: var(--paper);
         box-shadow: none;
     }
@@ -202,7 +210,7 @@
 
 .dk-record-body [data-panel] {
     border: 0;
-    border-top: 1px solid var(--line);
+    border-top: 1px solid var(--color-panel-border);
     border-radius: 0;
     background: none;
     box-shadow: none;

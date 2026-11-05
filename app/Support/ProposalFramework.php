@@ -56,7 +56,7 @@ final class ProposalFramework
     {
         $isActual = $proposal->actual_date_begin !== null && $proposal->actual_date_end !== null;
         $begin = $isActual ? $proposal->actual_date_begin : $proposal->planned_date_begin;
-        $end = $isActual ? $proposal->actual_date_end : $proposal->planned_date_end;
+        $end = $isActual ? $proposal->effectiveDateEnd() : $proposal->planned_date_end;
 
         return [$begin->startOfMonth(), $end->startOfMonth()];
     }

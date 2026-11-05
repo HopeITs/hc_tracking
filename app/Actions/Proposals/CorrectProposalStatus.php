@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Actions\Proposals;
 
 use App\Enums\ProposalStatus;
+use App\Enums\StatusNoteKind;
 use App\Events\ProposalStatusChanged;
 use App\Models\Proposal;
 use App\Models\ProposalStatusNote;
@@ -60,6 +61,7 @@ final class CorrectProposalStatus
                 'date' => today()->toDateString(),
                 'changed_by' => Auth::id(),
                 'is_correction' => true,
+                'kind' => StatusNoteKind::Correction,
             ]);
 
             ProposalStatusChanged::dispatch($locked->id, $from, $to, Auth::id(), true);

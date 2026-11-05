@@ -264,7 +264,7 @@ test('program detail calculates milestone progress without cancelled milestones'
     Livewire::actingAs(User::factory()->role('General Manager')->create())
         ->test('pages::programs.show', ['program' => $program])
         ->assertSee('40%')
-        ->assertSee('40 of 100 weighted points reached');
+        ->assertSee('40 of 100 progress points reached');
 });
 
 test('program detail narrows projects with its delivery search', function () {

@@ -204,6 +204,14 @@
                         <div>
                             <dt class="type-label {{ $mutedText }}">{{ __('proposals.actual_end') }}</dt>
                             <dd class="mt-1 text-sm font-bold tabular-nums {{ $inkText }}">{{ $this->proposal->actual_date_end?->translatedFormat(__('formats.date')) ?? '—' }}</dd>
+                            @if ($this->proposal->extended_date_end !== null)
+                                <dd class="mt-1 text-xs font-semibold {{ $inkText }}" data-test="extended-to">
+                                    {{ __('proposals.extended_to', ['date' => $this->proposal->extended_date_end->translatedFormat(__('formats.date'))]) }}
+                                    @if ($this->latestAmendment !== null)
+                                        <a href="{{ route('proposals.files.download', [$this->proposal, $this->latestAmendment]) }}" class="ms-1 underline-offset-4 hover:underline" title="{{ $this->latestAmendment->original_name }}" data-test="amendment-link">{{ __('enums.media_collection.amendment') }}</a>
+                                    @endif
+                                </dd>
+                            @endif
                         </div>
                     </dl>
                 </div>

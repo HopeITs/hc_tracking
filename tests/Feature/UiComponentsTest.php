@@ -162,7 +162,7 @@ test('the page header matches the directory title and count design without a des
 
     expect($html)->toContain('Projects')
         ->and($html)->toContain('8')
-        ->and($html)->toContain('text-3xl! font-bold! leading-none!')
+        ->and($html)->toContain('page-title!')
         ->and($html)->toContain('bg-primary')
         ->and($html)->toContain('data-page-header-controls')
         ->and($html)->not->toContain('Delivery sites.');
@@ -251,6 +251,76 @@ test('the panel renders its title and body', function () {
     $html = Blade::render('<x-ui.panel title="Risks">Body text</x-ui.panel>');
 
     expect($html)->toContain('Risks')->and($html)->toContain('Body text');
+});
+
+test('the chart keeps its screen-reader table inside a one-pixel box so it never widens the page', function () {
+    $xpath = formXPath(Blade::render('<x-ui.chart type="bar" label="Risks by project" :series="[[\'name\' => \'Challenges\', \'data\' => [3, 1]]]" :categories="[\'A very long project name\', \'Another project\']" />'));
+    $table = $xpath->query('//figure[@data-chart]//table')->item(0);
+
+    expect($table->parentNode->nodeName)->toBe('div')
+        ->and($table->parentNode->getAttribute('class'))->toBe('sr-only')
+        ->and($table->getAttribute('class'))->not->toContain('sr-only')
+        ->and(trim($xpath->query('//figure[@data-chart]//table//th')->item(0)->textContent))->toBe('Challenges · A very long project name');
+});
+
+test('the panel draws its radius and border from the shared panel tokens', function () {
+    $root = formXPath(Blade::render('<x-ui.panel>Body</x-ui.panel>'))->query('//*[@data-panel]')->item(0);
+    $classes = explode(' ', $root->getAttribute('class'));
+
+    expect($root->nodeName)->toBe('section')
+        ->and($classes)->toContain('rounded-panel', 'border', 'border-panel-border', 'overflow-hidden')
+        ->and($classes)->not->toContain('rounded-xl')
+        ->and($classes)->not->toContain('border-secondary-soft')
+        ->and($classes)->not->toContain('dark:border-transparent');
+});
+
+test('a panel can render as another element and leave its overflow unclipped for sticky children', function () {
+    $root = formXPath(Blade::render('<x-ui.panel as="aside" :clip="false" data-test="roles">Body</x-ui.panel>'))->query('//*[@data-panel]')->item(0);
+
+    expect($root->nodeName)->toBe('aside')
+        ->and($root->getAttribute('data-test'))->toBe('roles')
+        ->and(explode(' ', $root->getAttribute('class')))->not->toContain('overflow-hidden');
+});
+
+test('a section renders its heading, description, actions and key without a border', function () {
+    $xpath = formXPath(Blade::render(<<<'BLADE'
+        <x-ui.section title="Delivery" description="Who delivers it" key="delivery" data-tour="delivery">
+            <x-slot:actions><button type="button">Edit</button></x-slot:actions>
+            <p>Body</p>
+        </x-ui.section>
+        BLADE));
+    $root = $xpath->query('//section[@data-section]')->item(0);
+    $heading = $xpath->query('//section/header//h2')->item(0);
+    $classes = explode(' ', $root->getAttribute('class'));
+
+    expect($root->getAttribute('data-section'))->toBe('delivery')
+        ->and($root->getAttribute('data-tour'))->toBe('delivery')
+        ->and(trim($heading->textContent))->toBe('Delivery')
+        ->and(explode(' ', $heading->getAttribute('class')))->toContain('type-label')
+        ->and($root->getAttribute('aria-labelledby'))->toBe($heading->getAttribute('id'))
+        ->and(trim($xpath->query('//section/header//p')->item(0)->textContent))->toBe('Who delivers it')
+        ->and(trim($xpath->query('//section/header//button')->item(0)->textContent))->toBe('Edit')
+        ->and(explode(' ', $xpath->query('//section/header')->item(0)->getAttribute('class')))->toContain('border-b', 'border-panel-border')
+        ->and(trim($xpath->query('//section/div[@data-section-body]')->item(0)->textContent))->toBe('Body')
+        ->and(collect($classes)->filter(fn (string $class): bool => preg_match('/^(dark:)?(border|shadow|rounded)/', $class) === 1)->all())->toBe([]);
+});
+
+test('a section heading follows its level and the body drops its padding when unpadded', function () {
+    $xpath = formXPath(Blade::render('<x-ui.section title="Files" :level="3" :padded="false"><p>Body</p></x-ui.section>'));
+    $body = $xpath->query('//section/div[@data-section-body]')->item(0);
+
+    expect($xpath->query('//section/header//h3')->length)->toBe(1)
+        ->and($xpath->query('//section/header//h2')->length)->toBe(0)
+        ->and($xpath->query('//section[@data-section]')->length)->toBe(0)
+        ->and($xpath->query('//section[@aria-labelledby]')->length)->toBe(0)
+        ->and(explode(' ', $body->getAttribute('class')))->not->toContain('pt-4');
+});
+
+test('a section without a title renders only its body', function () {
+    $xpath = formXPath(Blade::render('<x-ui.section><p>Body</p></x-ui.section>'));
+
+    expect($xpath->query('//section/header')->length)->toBe(0)
+        ->and(trim($xpath->query('//section/div[@data-section-body]')->item(0)->textContent))->toBe('Body');
 });
 
 test('the detail header links every breadcrumb but the last', function () {

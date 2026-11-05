@@ -79,7 +79,7 @@
             icon="building-library"
             :heading="$search !== '' || $state !== '' || $currencyFilter !== '' ? __('accounts.no_matching_accounts') : __('accounts.no_accounts_yet')"
             :body="$search !== '' || $state !== '' || $currencyFilter !== '' ? __('common.change_the_search_or_filters_and_try_again') : __('accounts.open_the_first_account')"
-            class="rounded-xl border border-secondary-soft dark:border-line"
+            class="rounded-panel border border-panel-border"
         />
     @else
         <div class="grid grid-cols-1 gap-4 @sm/directory:grid-cols-2 @4xl/directory:grid-cols-3 @7xl/directory:grid-cols-4">

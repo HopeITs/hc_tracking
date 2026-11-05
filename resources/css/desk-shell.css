@@ -10,6 +10,13 @@
         --side-open: 252px;
         --side-w: var(--side-rail);
         --top-h: 64px;
+        /* The page column: content at most --page-w wide, centred with equal outer space on both sides
+           (never less than --page-gutter). The top bar and .dk-wrap pad by the same --page-edge, so the
+           breadcrumb, the greeting and the panels share one start line and the avatar, the figures and
+           the panels one end line. 100% resolves against each user's own container: the main column. */
+        --page-w: 1500px;
+        --page-gutter: clamp(16px, 3.5vw, 48px);
+        --page-edge: max(var(--page-gutter), calc((100% - var(--page-w)) / 2));
         --pop-w: 760px;
         --pop-h: min(640px, calc(100dvh - 96px));
     }
@@ -78,7 +85,7 @@
     html.dk-scrolled .dk-top { box-shadow: 0 10px 24px -18px rgb(16 24 40 / .32); }
     .dark.dk-scrolled .dk-top { box-shadow: 0 12px 28px -16px rgb(0 0 0 / .7); }
 
-    .dk-top-in { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 480px) minmax(max-content, 1fr); align-items: center; gap: 16px; height: var(--top-h); padding-inline: 24px max(16px, calc((100% - 1680px) / 2 + 16px)); }
+    .dk-top-in { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 480px) minmax(max-content, 1fr); align-items: center; gap: 16px; height: var(--top-h); padding-inline: var(--page-edge); }
     .dk-top-start { min-width: 0; display: flex; align-items: center; gap: 6px; container: top-start / inline-size; }
     .dk-top-end { display: flex; align-items: center; justify-content: flex-end; gap: 6px; }
     .dk-top-menu, .dk-top-mark { display: none; }
@@ -166,7 +173,7 @@
     .dk-tip:focus-visible::after { opacity: 1; transform: translate(-50%, 0); }
     .dk-tip[aria-expanded="true"]::after { opacity: 0 !important; transition-delay: 0s !important; }
 
-    /* The avatar button: the photo alone, its end on the page content's edge (the bar's end padding matches .dk-wrap). */
+    /* The avatar button: the photo alone, its end on the page content's edge (the bar and .dk-wrap both pad by --page-edge). */
     .dk-usermenu { display: flex; margin-inline-start: 10px; }
     .dk-me { display: flex; line-height: 0; padding: 0; border: 0; border-radius: 999px; background: none; cursor: pointer; transition: transform .08s; }
     .dk-me:active { transform: scale(.95); }

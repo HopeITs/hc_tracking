@@ -153,3 +153,21 @@ test('an unreachable responsible hands the reminder to the slot holder, then to 
         ->and(donorReportNotifications($financial->id, $financialReport->id))->toHaveCount(1)
         ->and(donorReportNotifications($financial->id, $narrative->id))->toHaveCount(0);
 });
+
+test('an active proposal ends on its extended date, another status on its planned date', function () {
+    Activity::withoutRecording(function (): void {
+        Proposal::factory()->create([
+            'status' => 'active', 'name' => 'Extended active', 'planned_date_end' => '2026-09-28',
+            'actual_date_begin' => '2026-01-01', 'actual_date_end' => '2026-09-28', 'extended_date_end' => '2027-03-31',
+        ]);
+        Proposal::factory()->create([
+            'status' => 'active', 'name' => 'Ending active', 'planned_date_end' => '2027-12-31',
+            'actual_date_begin' => '2026-01-01', 'actual_date_end' => '2026-09-30',
+        ]);
+    });
+
+    $items = app(DeadlineCatalog::class)->items(CarbonImmutable::parse('2026-10-15'))->where('subjectType', 'proposal');
+
+    expect($items->pluck('label')->all())->toContain('Ending active')
+        ->not->toContain('Extended active');
+});

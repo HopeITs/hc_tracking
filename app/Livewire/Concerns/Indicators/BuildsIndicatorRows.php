@@ -14,6 +14,7 @@ use App\Models\PlanIndicator;
 use App\Models\Proposal;
 use App\Models\Report;
 use App\Models\Result;
+use App\Models\Strategy;
 use Carbon\CarbonImmutable;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Database\Eloquent\Relations\MorphTo;
@@ -35,6 +36,8 @@ use Livewire\Attributes\Computed;
  * @property string $program #[Url] filter on the page
  * @property string $rag #[Url] filter on the page
  * @property string $focus #[Url] filter on the page
+ * @property-read Strategy|null $strategyFilter  #[Computed] FiltersByStrategy::strategyFilter()
+ * @property-read list<int> $strategyProgramIds  #[Computed] FiltersByStrategy::strategyProgramIds()
  * @property-read Collection<int, Indicator> $allIndicators  #[Computed] allIndicators()
  * @property-read array<int, array<string, mixed>> $rows  #[Computed] rows()
  * @property-read BaseCollection<int, array<string, mixed>> $filteredRows  #[Computed] filteredRows()
@@ -304,6 +307,10 @@ trait BuildsIndicatorRows
         }
 
         if ($this->program !== '' && $this->program !== 'none' && $indicator->result->program_id !== (int) $this->program) {
+            return false;
+        }
+
+        if ($this->strategyFilter !== null && ! in_array($indicator->result->program_id, $this->strategyProgramIds, true)) {
             return false;
         }
 

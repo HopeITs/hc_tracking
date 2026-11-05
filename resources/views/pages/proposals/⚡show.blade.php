@@ -7,8 +7,10 @@ use App\Livewire\Concerns\ManagesTransferForm;
 use App\Livewire\Concerns\PreviewsFiles;
 use App\Livewire\Concerns\Proposals\ChartsProposalChronology;
 use App\Livewire\Concerns\Proposals\ManagesFinalReportAcceptance;
+use App\Livewire\Concerns\Proposals\ManagesNegotiationNotes;
 use App\Livewire\Concerns\Proposals\ManagesProposalApproval;
 use App\Livewire\Concerns\Proposals\ManagesProposalFiles;
+use App\Livewire\Concerns\Proposals\ManagesProposalExtension;
 use App\Livewire\Concerns\Proposals\ManagesProposalForm;
 use App\Livewire\Concerns\Proposals\ManagesProposalPlan;
 use App\Livewire\Concerns\Proposals\ManagesProposalRecord;
@@ -41,7 +43,9 @@ new #[Layout('layouts::desk'), Title('titles.proposal')] class extends Component
     use ChecksFinanceVisibility;
     use ManagesAgreementForm;
     use ManagesFinalReportAcceptance;
+    use ManagesNegotiationNotes;
     use ManagesProposalApproval;
+    use ManagesProposalExtension;
     use ManagesProposalFiles;
     use ManagesProposalForm;
     use ManagesProposalPlan;
@@ -117,6 +121,8 @@ new #[Layout('layouts::desk'), Title('titles.proposal')] class extends Component
         }
 
         $this->recordAgreementLink = false;
+
+        $this->openExtensionFromLink();
     }
 
     /**
@@ -180,7 +186,7 @@ new #[Layout('layouts::desk'), Title('titles.proposal')] class extends Component
     public function proposal(): Proposal
     {
         return Proposal::query()
-            ->select(['id', 'name', 'internal_project_number', 'planned_date_begin', 'planned_date_end', 'actual_date_begin', 'actual_date_end', 'status', 'notes', 'updated_at', 'donor_id', 'final_report_accepted_on', 'final_report_accepted_by'])
+            ->select(['id', 'name', 'internal_project_number', 'planned_date_begin', 'planned_date_end', 'actual_date_begin', 'actual_date_end', 'extended_date_end', 'extension_reason', 'status', 'notes', 'updated_at', 'donor_id', 'final_report_accepted_on', 'final_report_accepted_by'])
             ->findOrFail($this->proposalId);
     }
 
@@ -223,7 +229,8 @@ new #[Layout('layouts::desk'), Title('titles.proposal')] class extends Component
     public function statusNotes(): Collection
     {
         return ProposalStatusNote::query()
-            ->select(['id', 'proposal_id', 'status', 'context', 'date'])
+            ->select(['id', 'proposal_id', 'status', 'context', 'date', 'kind'])
+            ->with('media')
             ->where('proposal_id', $this->proposalId)
             ->orderByDesc('date')
             ->orderByDesc('id')
@@ -356,7 +363,6 @@ new #[Layout('layouts::desk'), Title('titles.proposal')] class extends Component
             ]"
             :title="$this->proposal->name"
             :unread="app(\App\Notifications\UnreadSubjects::class)->has(auth()->user(), 'proposal', $this->proposal->id)"
-            title-class="text-3xl! font-bold! leading-none! tracking-tight! @3xl/detail:text-[2.5rem]!"
         >
             <x-slot:meta>
                 <x-ui.project-number :number="$this->proposal->internal_project_number" kind="internal" label />

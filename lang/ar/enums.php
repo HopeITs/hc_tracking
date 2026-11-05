@@ -74,6 +74,8 @@ return [
         'final_report_acceptance' => 'موافقة الممول على التقرير الختامي',
         'need_assessment' => 'تقييم الاحتياج',
         'donor_approval' => 'موافقة المانح',
+        'negotiation' => 'ملف التفاوض',
+        'amendment' => 'ملحق التمديد',
         'report_submission' => 'التقرير المُسلَّم',
     ],
     'reporting_period' => [
@@ -90,6 +92,14 @@ return [
         'due' => 'بانتظار التسليم',
         'overdue' => 'متأخر',
         'submitted' => 'سُلِّم',
+    ],
+    'status_note_kind' => [
+        'transition' => 'تغيير حالة',
+        'correction' => 'تصحيح',
+        'negotiation' => 'تفاوض',
+        'on_hold' => 'تعليق',
+        'off_hold' => 'إلغاء التعليق',
+        'extension' => 'تمديد',
     ],
     'review_stage' => [
         'concept_note' => 'المذكرة المفاهيمية',
@@ -132,6 +142,14 @@ return [
     'stage_template_creates' => [
         'task' => 'مهمة قسم',
         'final_report_milestone' => 'معلم التقرير النهائي',
+    ],
+    'status_note_kind' => [
+        'transition' => 'تغيير حالة',
+        'correction' => 'تصحيح',
+        'negotiation' => 'تفاوض',
+        'on_hold' => 'تعليق',
+        'off_hold' => 'رفع التعليق',
+        'extension' => 'تمديد',
     ],
     'project_status' => [
         'draft' => 'مسودة',
@@ -201,8 +219,8 @@ return [
         'conducted' => 'نُفّذ',
     ],
     'donor_attribution' => [
-        'shared' => 'مشترك (المستهدف الأعلى)',
-        'split' => 'مقسّم (مجموع المستهدفات)',
+        'shared' => 'يُحتسب مرة واحدة (المستهدف الأعلى)',
+        'split' => 'تُجمع (مجموع المستهدفات)',
     ],
     'result_type' => [
         'impact' => 'الأثر',
@@ -215,6 +233,7 @@ return [
         'general' => 'عامة',
         'media_deliverable' => 'تسليم إعلامي',
         'financial' => 'مالية',
+        'report' => 'تقرير',
     ],
     'deliverable_kind' => [
         'video' => 'فيديو',

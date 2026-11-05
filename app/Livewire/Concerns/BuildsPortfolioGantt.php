@@ -78,7 +78,7 @@ trait BuildsPortfolioGantt
         $projectIds = $projects->modelKeys();
 
         $proposals = ! $this->ganttViewerCan('proposals.view') ? new EloquentCollection : Proposal::query()
-            ->select(['id', 'name', 'status', 'planned_date_begin', 'planned_date_end', 'actual_date_begin', 'actual_date_end'])
+            ->select(['id', 'name', 'status', 'planned_date_begin', 'planned_date_end', 'actual_date_begin', 'actual_date_end', 'extended_date_end'])
             ->whereHas('projects', fn ($query) => $query->whereIn('projects.id', $projectIds))
             ->with([$this->proposalDonorRelation(), 'projects:id'])
             ->orderBy('planned_date_begin')
@@ -119,7 +119,7 @@ trait BuildsPortfolioGantt
         }
 
         $proposals = Proposal::query()
-            ->select(['id', 'name', 'status', 'planned_date_begin', 'planned_date_end', 'actual_date_begin', 'actual_date_end'])
+            ->select(['id', 'name', 'status', 'planned_date_begin', 'planned_date_end', 'actual_date_begin', 'actual_date_end', 'extended_date_end'])
             ->when($phase !== null && ProposalPhase::tryFrom($phase) !== null, fn ($query) => $query->whereIn('status', ProposalPhase::from($phase)->statuses()))
             ->with([
                 $this->proposalDonorRelation(),
@@ -179,7 +179,7 @@ trait BuildsPortfolioGantt
      */
     protected function agreementGanttPayload(DonorProposal $agreement): array
     {
-        $proposal = $agreement->proposal()->first(['id', 'name', 'status', 'planned_date_begin', 'planned_date_end', 'actual_date_begin', 'actual_date_end']);
+        $proposal = $agreement->proposal()->first(['id', 'name', 'status', 'planned_date_begin', 'planned_date_end', 'actual_date_begin', 'actual_date_end', 'extended_date_end']);
         $rows = $this->newGanttRows();
 
         if ($proposal !== null) {
@@ -194,7 +194,7 @@ trait BuildsPortfolioGantt
                 start: $proposal->planned_date_begin,
                 end: $proposal->planned_date_end ?? $proposal->planned_date_begin,
                 actualStart: $proposal->actual_date_begin,
-                actualEnd: $proposal->actual_date_end,
+                actualEnd: $proposal->effectiveDateEnd(),
                 progress: $this->proposalProgress($proposal->status),
                 status: $proposal->status->value,
                 statusLabel: $proposal->status->label(),
@@ -401,7 +401,7 @@ trait BuildsPortfolioGantt
             start: $proposal->planned_date_begin,
             end: $proposal->planned_date_end ?? $proposal->planned_date_begin,
             actualStart: $proposal->actual_date_begin,
-            actualEnd: $proposal->actual_date_end,
+            actualEnd: $proposal->effectiveDateEnd(),
             progress: $this->proposalProgress($proposal->status),
             status: $proposal->status->value,
             statusLabel: $proposal->status->label(),

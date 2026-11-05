@@ -21,8 +21,8 @@ beforeEach(function () {
     $this->travelTo('2026-10-15 10:30:00');
 
     $this->media = insertHrDepartment('Media');
-    $this->mediaEmployee = insertHrEmployee();
-    insertHrContract($this->mediaEmployee, insertHrPosition($this->media));
+    /* The page belongs to a grade-5 department manager (W-14, D-65). */
+    $this->mediaEmployee = insertHrDepartmentManager($this->media);
     $this->mediaUser = userWithRole('Media Team', $this->mediaEmployee);
 
     $this->requester = User::factory()->create();

@@ -8,6 +8,7 @@ use App\Models\AnnualPlan;
 use App\Models\Donor;
 use App\Models\Indicator;
 use App\Models\Milestone;
+use App\Models\Program;
 use App\Models\Project;
 use App\Models\Proposal;
 use App\Models\Risk;
@@ -113,8 +114,8 @@ new class extends Component {
             foreach ($this->fundingPosition as $line) {
                 $answers[] = [
                     'title' => __('desk.ask_money_title', [
-                        'received' => Number::format($line['received'], maxPrecision: 0),
-                        'committed' => Number::format($line['committed'], maxPrecision: 0),
+                        'received' => $this->formatCount($line['received']),
+                        'committed' => $this->formatCount($line['committed']),
                         'currency' => $line['currency'],
                     ]),
                     'body' => $line['share'] === null ? '' : __('desk.ask_money_body', ['share' => $line['share'], 'currency' => $line['currency']]),
@@ -126,7 +127,7 @@ new class extends Component {
             $count = $this->countOf($entity, in_array('mine', $intents, true));
 
             if ($count !== null) {
-                $answers[] = ['title' => __('desk.ask_count_title', ['count' => Number::format($count), 'things' => __('desk.ask_things.'.$entity)]), 'body' => __('desk.ask_count_body')];
+                $answers[] = ['title' => __('desk.ask_count_title', ['count' => $this->formatCount($count), 'things' => __('desk.ask_things.'.$entity)]), 'body' => __('desk.ask_count_body')];
             }
         }
 
@@ -211,6 +212,17 @@ new class extends Component {
     }
 
     /**
+     * A whole number in the reader's language. Number::format needs PHP's intl
+     * extension, which a machine may lack; the answer must still show.
+     */
+    private function formatCount(int|float $number): string
+    {
+        return extension_loaded('intl')
+            ? (string) Number::format($number, maxPrecision: 0)
+            : number_format($number);
+    }
+
+    /**
      * How many rows of a module the viewer may see; null for modules without a count.
      */
     private function countOf(string $module, bool $mine): ?int
@@ -251,6 +263,17 @@ new class extends Component {
         ];
 
         $groups = [];
+
+        if ($entity === null && $this->canView('programs')) {
+            $programs = Program::query()->select(['id']);
+
+            foreach (preg_split('/\s+/u', $terms) ?: [] as $word) {
+                $programs->whereNameLike($word);
+            }
+
+            $groups[] = ['name' => __('common.programs'), 'items' => $programs->orderByName()->limit(self::GroupLimit)->get()
+                ->map(fn (Program $program): array => ['icon' => 'grid', 'label' => $program->name, 'sub' => __('common.programs'), 'href' => route('programs.show', $program)])->all()];
+        }
 
         foreach ($sources as $module => [$query, $column, $icon, $name, $row]) {
             if (($entity !== null && $entity !== $module) || ! $this->canView($module)) {

@@ -59,6 +59,21 @@ test('creating a strategy requires a name and a valid year span', function () {
         ->assertHasErrors(['endYear']);
 });
 
+test('typing a year after a failed save clears only that year error', function () {
+    $manager = User::factory()->role('Managers')->create();
+
+    Livewire::actingAs($manager)
+        ->test('pages::strategies.index')
+        ->call('openCreateModal')
+        ->call('saveStrategy')
+        ->assertHasErrors(['name', 'startYear', 'endYear'])
+        ->set('startYear', '2027')
+        ->assertHasNoErrors(['startYear'])
+        ->assertHasErrors(['name', 'endYear'])
+        ->set('endYear', '2028')
+        ->assertHasNoErrors(['endYear']);
+});
+
 test('a manager can edit a strategy', function () {
     $manager = User::factory()->role('Managers')->create();
     $strategy = Strategy::factory()->create(['name' => 'Draft Strategy', 'start_year' => 2026, 'end_year' => 2028]);
@@ -75,7 +90,7 @@ test('a manager can edit a strategy', function () {
     expect($strategy->refresh())->name->toBe('Renamed Strategy')->end_year->toBe(2030);
 });
 
-test('the create, edit and delete modals show only a title, no description', function () {
+test('the create and edit modals show only a title; the delete modal names the strategy and says it is final', function () {
     $manager = User::factory()->role('Managers')->create();
     $strategy = Strategy::factory()->create();
 
@@ -92,8 +107,8 @@ test('the create, edit and delete modals show only a title, no description', fun
         ->toContain(__('strategies.edit_strategy'))
         ->not->toContain(__('strategies.strategy_names_need_not_be_unique'));
     expect($deleteHtml)
-        ->toContain(__('strategies.delete_this_strategy'))
-        ->not->toContain(__('strategies.only_a_strategy_with_no_linked_programs_can_be_deleted'));
+        ->toContain(e(__('strategies.delete_named_strategy', ['name' => $strategy->name])))
+        ->toContain(e(__('strategies.delete_strategy_cannot_be_undone')));
 });
 
 test('confirming deletion opens the delete modal for the right strategy', function () {
@@ -185,7 +200,6 @@ test('team members and meal staff cannot manage strategies', function (string $r
     Livewire::actingAs($user)
         ->test('pages::strategies.index')
         ->call('confirmDelete', $strategy->id)
-        ->call('deleteStrategy')
         ->assertForbidden();
 
     $this->assertModelExists($strategy);
@@ -259,7 +273,7 @@ test('the strategy form is rendered only while its modal is open', function () {
 
     Livewire::actingAs($manager)
         ->test('pages::strategies.index')
-        ->assertDontSeeHtml('wire:model="startYear"')
+        ->assertDontSeeHtml('wire:model.live.blur="startYear"')
         ->call('openCreateModal')
-        ->assertSeeHtml('wire:model="startYear"');
+        ->assertSeeHtml('wire:model.live.blur="startYear"');
 });

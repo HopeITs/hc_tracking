@@ -1,6 +1,7 @@
 <?php
 
 use App\Actions\Proposals\ApproveProposal;
+use App\Actions\Proposals\SetProposalOnHold;
 use App\Enums\AssignmentStatus;
 use App\Enums\MediaCollection;
 use App\Enums\ProjectStatus;
@@ -260,15 +261,25 @@ test('archived and closed projects are skipped and named', function () {
         ->and($archived->fresh()->status)->toBe(ProjectStatus::Archived);
 });
 
-test('approval is allowed from on hold entered from submitted', function () {
-    $proposal = submittedProposal(ProposalStatus::OnHold);
-    ProposalStatusNote::factory()->create(['proposal_id' => $proposal->id, 'status' => ProposalStatus::Submitted, 'context' => 'Sent.']);
-    ProposalStatusNote::factory()->create(['proposal_id' => $proposal->id, 'status' => ProposalStatus::OnHold, 'context' => 'Paused.']);
+test('approval is allowed while the proposal is on hold, and clears the hold', function () {
+    // A hold keeps the status since W-06 (D-58), so this is a plain
+    // submitted → approved move with a flag to clear on the way.
+    $actor = userWithRole('Financial');
+    $proposal = submittedProposal(ProposalStatus::Submitted);
     linkedProject($proposal);
 
-    approve(userWithRole('Financial'), $proposal);
+    $this->actingAs($actor);
+    app(SetProposalOnHold::class)->handle($proposal, ProposalStatus::Submitted, [
+        'reason' => 'Donor paused the call.',
+        'remind_on' => now()->addMonth()->toDateString(),
+    ]);
 
-    expect($proposal->fresh()->status)->toBe(ProposalStatus::Approved);
+    approve($actor, $proposal->fresh());
+
+    expect($proposal->fresh())
+        ->status->toBe(ProposalStatus::Approved)
+        ->on_hold_since->toBeNull()
+        ->status_remind_on->toBeNull();
 });
 
 test('approval is refused with no write from the wrong status', function (ProposalStatus $status, ?ProposalStatus $preHold) {
@@ -293,7 +304,7 @@ test('approval is refused with no write from the wrong status', function (Propos
     Event::assertNotDispatched(ProposalStatusChanged::class);
 })->with([
     'proposal draft' => [ProposalStatus::ProposalDraft, null],
-    'on hold from concept note submitted' => [ProposalStatus::OnHold, ProposalStatus::ConceptNoteSubmitted],
+    'concept note submitted' => [ProposalStatus::ConceptNoteSubmitted, null],
     'rejected' => [ProposalStatus::Rejected, null],
 ]);
 

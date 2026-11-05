@@ -25,6 +25,13 @@ enum ProposalStatus: string implements HasStatusTone
     case ProposalDraft = 'proposal draft';
     case ProposalReview = 'proposal review';
     case Submitted = 'submitted';
+
+    /**
+     * @deprecated Retired by D-58 (W-06): a hold is `proposals.on_hold_since`
+     *             on a proposal that keeps its status. Kept only so old rows
+     *             and notes still render; no transition leads in or out, and
+     *             W-06 moved its proposals back to their pre-hold status.
+     */
     case OnHold = 'on hold';
     case Approved = 'approved';
     case Rejected = 'rejected';
@@ -42,13 +49,16 @@ enum ProposalStatus: string implements HasStatusTone
      * Every status a proposal can hold today, in lifecycle order.
      *
      * Pickers, filters and charts iterate this, never cases(), so the retired
-     * FinalReports never reappears as a choice.
+     * FinalReports and OnHold never reappear as a choice.
      *
      * @return list<self>
      */
     public static function live(): array
     {
-        return array_values(array_filter(self::cases(), fn (self $status): bool => $status !== self::FinalReports));
+        return array_values(array_filter(
+            self::cases(),
+            fn (self $status): bool => $status !== self::FinalReports && $status !== self::OnHold,
+        ));
     }
 
     /**

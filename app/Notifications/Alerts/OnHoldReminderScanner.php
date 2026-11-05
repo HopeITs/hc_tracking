@@ -6,7 +6,6 @@ namespace App\Notifications\Alerts;
 
 use App\Enums\EventImportance;
 use App\Enums\NotificationPriority;
-use App\Enums\ProposalStatus;
 use App\Models\Project;
 use App\Models\Proposal;
 use App\Models\User;
@@ -21,6 +20,9 @@ use Carbon\CarbonImmutable;
  * projects; its editors (holders of `proposals.update`) and oversight are
  * told too. Once per remind date: the stage is the date, so a new date
  * re-arms it, and a proposal that left hold drops out of the query.
+ *
+ * The hold is the `on_hold_since` flag since W-06 (D-58), not a status, so
+ * that is what this reads; the proposal itself stays `submitted`.
  */
 final class OnHoldReminderScanner implements Scanner
 {
@@ -46,7 +48,7 @@ final class OnHoldReminderScanner implements Scanner
         }
 
         $proposals = Proposal::query()
-            ->where('status', ProposalStatus::OnHold->value)
+            ->whereNotNull('on_hold_since')
             ->whereDate('status_remind_on', '<=', $today->toDateString())
             ->with('projects:projects.id,projects.user_id')
             ->get(['id', 'name', 'status_remind_on']);

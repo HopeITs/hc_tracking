@@ -35,6 +35,17 @@ class TaskPolicy
     }
 
     /**
+     * Determine whether the user can open the department-tasks queue: the
+     * module permission, plus the department-manager rule (W-14, D-65). The
+     * desk Tasks panel's `department` scope asks the same question through
+     * User::canSeeDepartmentTasks().
+     */
+    public function viewDepartmentQueue(User $user): bool
+    {
+        return $user->can('tasks.view') && $user->canSeeDepartmentTasks();
+    }
+
+    /**
      * Determine whether the user can create models.
      */
     public function create(User $user): bool

@@ -4,14 +4,21 @@ declare(strict_types=1);
 
 namespace App\Policies;
 
+use App\Models\Proposal;
 use App\Models\Risk;
 use App\Models\User;
+use Illuminate\Support\Facades\Gate;
 
 /**
  * Risks follow their project: besides holders of the risks.* permissions, the
  * project's owner and its program's manager (see User::ownedProjectIds()) log
  * and edit the risks of projects they answer for. Deleting stays with
  * risks.delete.
+ *
+ * Since W-09 (D-61) new risks are picked from the library onto a proposal's
+ * logframe: `attach` and `detach` follow whoever may update that proposal
+ * (ProposalPolicy::update). The project-based abilities above serve the
+ * legacy rows only.
  */
 class RiskPolicy
 {
@@ -60,6 +67,22 @@ class RiskPolicy
     public function delete(User $user, Risk $risk): bool
     {
         return $user->can('risks.delete');
+    }
+
+    /**
+     * Determine whether the user can pick a library risk onto the proposal's logframe.
+     */
+    public function attach(User $user, Proposal $proposal): bool
+    {
+        return Gate::forUser($user)->allows('update', $proposal);
+    }
+
+    /**
+     * Determine whether the user can remove a risk from the proposal's logframe.
+     */
+    public function detach(User $user, Proposal $proposal): bool
+    {
+        return Gate::forUser($user)->allows('update', $proposal);
     }
 
     /**

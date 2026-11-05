@@ -22,10 +22,34 @@ final class ActivityPresenter
     public function sentence(Activity $activity, ?string $locale = null): string
     {
         return $this->presenter->sentence([
-            'key' => 'notifications.events.'.$activity->event,
+            'key' => $this->sentenceKey($activity),
             'params' => $this->parameters->for($activity),
             'count' => 1,
         ], $locale);
+    }
+
+    /**
+     * The lang line for an activity. A manager change reads differently when
+     * the manager was cleared ("removed X as manager", never "made none the
+     * manager") or when the same save also linked a strategy.
+     */
+    private function sentenceKey(Activity $activity): string
+    {
+        $key = 'notifications.events.'.$activity->event;
+
+        if (! in_array($activity->event, ['program.manager_changed', 'annual_plan.manager_changed'], true)) {
+            return $key;
+        }
+
+        if (blank($activity->changes['manager_id'][1] ?? null)) {
+            return 'notifications.events.'.Str::before($activity->event, '.').'.manager_removed';
+        }
+
+        if ($activity->event === 'program.manager_changed' && filled($activity->changes['strategy_id'][1] ?? null)) {
+            return 'notifications.events.program.manager_and_strategy_changed';
+        }
+
+        return $key;
     }
 
     /**

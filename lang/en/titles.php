@@ -14,6 +14,7 @@ return [
     'indicators' => 'Indicators',
     'indicator_library' => 'Indicator Library',
     'sectors' => 'Sectors',
+    'risk_library' => 'Risk library',
     'evidence_types' => 'Evidence types',
     'narrative_questions' => 'Narrative questions',
     'milestone' => 'Milestone',

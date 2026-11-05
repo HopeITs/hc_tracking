@@ -21,6 +21,7 @@ return [
     'guideline' => 'User guideline',
     'indicator_library' => 'Indicator Library',
     'sectors' => 'Sectors',
+    'risk_library' => 'Risk library',
     'evidence_types' => 'Evidence types',
     'monthly_reports' => 'Monthly Reports',
     'report_templates' => 'Templates to confirm',

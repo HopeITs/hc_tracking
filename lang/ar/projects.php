@@ -261,4 +261,8 @@ return [
     'no_centers_in_city' => 'لا توجد مراكز في هذه المدينة بعد',
     'choose_the_city_first' => 'اختر المدينة أولاً',
     'center_inactive_badge' => 'المركز متوقف',
+
+    'risk_awareness_title' => 'مخاطر للعلم',
+    'risk_awareness_note' => 'للاطلاع فقط، وتُضاف المخاطر وتُزال من تبويب الإطار المنطقي في كل مقترح.',
+    'risk_awareness_register' => 'سُجّلت على المشروع سابقًا',
 ];

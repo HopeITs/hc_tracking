@@ -142,7 +142,7 @@ new #[Layout('layouts::desk'), Title('titles.dashboard')] class extends Componen
     <section class="dk-hello" data-desk-hello>
         <div class="dk-hello-main">
             <p class="dk-eyebrow">{{ now()->translatedFormat(__('formats.date_long')) }}</p>
-            <h1>{{ rtrim($this->greeting(), '.!') }}</h1>
+            <h1 class="page-title">{{ rtrim($this->greeting(), '.!') }}</h1>
         </div>
 
         {{-- The day in two figures, across from the greeting; they lead down to the Needs you panel when that is on the desk. --}}
@@ -150,9 +150,9 @@ new #[Layout('layouts::desk'), Title('titles.dashboard')] class extends Componen
             <p class="dk-hello-clear">{{ __('desk.hello_none') }}</p>
         @else
             <{{ $needsPlaced ? 'a href=#dk-panel-needs' : 'div' }} class="dk-hello-figs" @if ($needsPlaced) title="{{ __('desk-cards.hero.needs_link') }}" @endif data-desk-hello-figures>
-                <span class="dk-hello-fig"><b class="dk-num">{{ $n }}</b><span>{{ trans_choice('desk.hero_needs', $n) }}</span></span>
+                <span class="dk-hello-fig"><b class="dk-num page-title">{{ $n }}</b><span>{{ trans_choice('desk.hero_needs', $n) }}</span></span>
                 @if ($needs['late'] > 0)
-                    <span class="dk-hello-fig dk-late"><b class="dk-num">{{ $needs['late'] }}</b><span>{{ trans_choice('desk.hero_late', $needs['late']) }}</span></span>
+                    <span class="dk-hello-fig dk-late"><b class="dk-num page-title text-brand-ink!">{{ $needs['late'] }}</b><span>{{ trans_choice('desk.hero_late', $needs['late']) }}</span></span>
                 @endif
             </{{ $needsPlaced ? 'a' : 'div' }}>
         @endif
