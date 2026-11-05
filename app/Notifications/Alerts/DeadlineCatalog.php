@@ -21,9 +21,12 @@ use App\Models\Proposal;
 use App\Models\Report;
 use App\Models\Task;
 use App\Models\TransfersTracking;
+use App\Models\User;
 use App\Notifications\EmployeeRecipients;
+use App\Notifications\EventCatalog;
 use App\Notifications\Recipients\OversightRecipients;
 use App\Notifications\TracksActivity;
+use App\Support\AgreementMoney;
 use App\Support\DonorReportResponsibles;
 use App\Support\MonthlyReportPeriods;
 use App\Support\Slots;
@@ -55,6 +58,13 @@ final class DeadlineCatalog
     {
         $limit = $dueOnOrBefore->toDateString();
 
+        // An active proposal ending with funds left gets W-33's sentence
+        // instead of the generic "is due" one: same subject, same date, same
+        // people, so two items would collide in the ledger and the vaguer of
+        // the two would win on a coin toss.
+        $endingWithFunds = $this->endingWithFunds($limit);
+        $saidByExtension = array_map(fn (DeadlineItem $item): int => $item->subjectId, $endingWithFunds);
+
         return collect([
             ...$this->tasks($limit),
             ...$this->departmentTasks($limit),
@@ -62,7 +72,8 @@ final class DeadlineCatalog
             ...$this->reports($limit),
             ...$this->monthlyReports($dueOnOrBefore),
             ...$this->donorReports($limit),
-            ...$this->proposals($limit),
+            ...$this->proposals($limit, $saidByExtension),
+            ...$endingWithFunds,
             ...$this->transfers($limit),
             ...$this->projects($limit),
         ]);
@@ -336,11 +347,13 @@ final class DeadlineCatalog
     }
 
     /**
+     * @param  list<int>  $except  proposals W-33 is already telling these people about
      * @return list<DeadlineItem>
      */
-    private function proposals(string $limit): array
+    private function proposals(string $limit, array $except = []): array
     {
         return array_values(Proposal::query()
+            ->when($except !== [], fn (Builder $query) => $query->whereNotIn('proposals.id', $except))
             // A held proposal is `submitted` since W-06 (D-58), so the hold is
             // read from its flag; it stays out of the deadline chase either way.
             ->whereNotIn('status', [ProposalStatus::Completed->value, ProposalStatus::Rejected->value])
@@ -352,6 +365,58 @@ final class DeadlineCatalog
                 $proposal->status === ProposalStatus::Active ? ($proposal->effectiveDateEnd() ?? $proposal->planned_date_end) : $proposal->planned_date_end,
                 [], self::FinanceWatchers,
             ))->all());
+    }
+
+    /**
+     * An active proposal whose agreement still has money to come, ending
+     * soon: Finance is told so an extension can be asked for in time (D-60,
+     * W-33). «Still has funds» is AgreementMoney's outstanding rule, the
+     * budget the donor has not transferred yet.
+     *
+     * The join to `donor_proposal` is what keeps a proposal without an
+     * agreement out — by construction, not by a filter someone has to
+     * remember — and the money comes from one sub-query over all of them,
+     * never a query per row. No amount leaves this method: the item carries
+     * only the fact that something remains.
+     *
+     * @return list<DeadlineItem>
+     */
+    private function endingWithFunds(string $limit): array
+    {
+        $recipients = $this->extensionRecipientIds();
+        $leadDays = max(1, (int) $this->settings->get('extension_lead_days'));
+
+        return array_values(Proposal::query()
+            ->join('donor_proposal', 'donor_proposal.proposal_id', '=', 'proposals.id')
+            ->leftJoinSub(AgreementMoney::perAgreement(), 'money', 'money.donor_proposal_id', '=', 'donor_proposal.id')
+            ->where('proposals.status', ProposalStatus::Active->value)
+            ->whereRaw(AgreementMoney::OUTSTANDING_SQL.' > 0')
+            ->whereRaw('coalesce(proposals.extended_date_end, proposals.actual_date_end, proposals.planned_date_end) <= ?', [$limit])
+            ->get(['proposals.id', 'proposals.name', 'proposals.planned_date_end', 'proposals.actual_date_end', 'proposals.extended_date_end', 'proposals.status'])
+            ->map(fn (Proposal $proposal): DeadlineItem => new DeadlineItem(
+                'proposal', $proposal->id, 'proposals', $proposal->name,
+                $proposal->effectiveDateEnd() ?? $proposal->planned_date_end,
+                $recipients, [],
+                eventKey: 'proposal.ending_with_funds',
+                dueSoonStages: [$leadDays, 0],
+                messageKey: 'notifications.alerts.ending_with_funds',
+            ))->all());
+    }
+
+    /**
+     * Who hears it: the people who may see agreement money, among Finance
+     * and the Public Relations Manager. Never Super Admin (D-20a).
+     *
+     * @return list<int>
+     */
+    private function extensionRecipientIds(): array
+    {
+        return array_values(User::permission('funding-agreements.view')
+            ->whereHas('roles', fn ($query) => $query->whereIn('name', self::FinanceWatchers))
+            ->whereDoesntHave('roles', fn ($query) => $query->where('name', EventCatalog::SuperAdminRole))
+            ->pluck('users.id')
+            ->map(fn (int|string $id): int => (int) $id)
+            ->all());
     }
 
     /**

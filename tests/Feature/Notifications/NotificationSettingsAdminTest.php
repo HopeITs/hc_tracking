@@ -137,6 +137,7 @@ test('the reset-to-defaults values are the shipped defaults, not the stored rule
             'stalledReportDraft' => 7,
             'stalledReportReviewed' => 5,
             'stalledProposal' => 30,
+            'extensionLead' => 60,
             'offTrackPace' => 80,
             'dailyBriefTime' => '07:30',
             'weeklyDigestTime' => '08:00',

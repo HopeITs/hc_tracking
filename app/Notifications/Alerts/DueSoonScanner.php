@@ -79,7 +79,9 @@ final class DueSoonScanner implements Scanner
             $payload = $this->dispatcher->payload(
                 $item->module,
                 $remaining === 0 ? NotificationPriority::Important : NotificationPriority::Info,
-                'notifications.alerts.due_soon.'.$key,
+                // An item may carry its own sentence when "due" is not what it
+                // is telling people (W-33); it takes the same placeholders.
+                $item->messageKey ?? 'notifications.alerts.due_soon.'.$key,
                 [
                     'subject' => $item->label,
                     'days' => (string) $remaining,

@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Notifications;
 
 use App\Enums\ArStatus;
+use App\Enums\ProposalStatus;
 use App\Enums\ReportStatus;
 use App\Enums\TaskStatus;
 use App\Models\Assignment;
@@ -41,7 +42,10 @@ final class QuickActions
             'task' => $this->taskActions($subjectId, $user),
             'report' => $this->reportActions($subjectId, $user),
             'project' => $this->assignmentActions($subjectType, $subjectId, $user),
-            'proposal' => $this->canRecordAgreementFor($subjectId, $user) ? ['agreement.record'] : [],
+            'proposal' => array_values(array_filter([
+                $this->canRecordAgreementFor($subjectId, $user) ? 'agreement.record' : null,
+                $this->canExtend($subjectId, $user) ? 'proposal.request_extension' : null,
+            ])),
             'transfer' => $user->can('transfers.update') && TransfersTracking::query()->whereKey($subjectId)->toBase()->value('ar_status') === ArStatus::Pending->value
                 ? ['transfer.mark_received'] : [],
             default => [],
@@ -125,6 +129,7 @@ final class QuickActions
                 : $this->result(false, 'forbidden'),
             'assignment.acknowledge', 'assignment.reject' => $this->runAssignment($user, $notification, $type),
             'agreement.record' => $this->runRecordAgreement($user, $id),
+            'proposal.request_extension' => $this->runRequestExtension($user, $id),
             'alert.snooze' => $this->snooze($user, $notification),
             default => $this->result(false, 'unavailable'),
         };
@@ -143,6 +148,38 @@ final class QuickActions
         $proposal = Proposal::query()->withCount('donorProposals')->find($proposalId, ['id', 'status']);
 
         return $proposal !== null && $proposal->status->isApprovedByDonor() && $proposal->donor_proposals_count === 0;
+    }
+
+    /**
+     * Asking for an extension is offered on an active proposal to the people
+     * who may change it (D-60, W-33). It only opens W-08's modal; that modal
+     * and ExtendProposal re-check everything on save.
+     */
+    private function canExtend(int $proposalId, User $user): bool
+    {
+        if (! $user->can('proposals.update')) {
+            return false;
+        }
+
+        return Proposal::query()->whereKey($proposalId)->toBase()->value('status') === ProposalStatus::Active->value;
+    }
+
+    /**
+     * Opens the proposal page with W-08's extension modal ready.
+     *
+     * @return array{ok: bool, message: string, redirect: string|null}
+     */
+    private function runRequestExtension(User $user, int $proposalId): array
+    {
+        if (! $this->canExtend($proposalId, $user)) {
+            return $this->result(false, 'forbidden');
+        }
+
+        $url = app(SubjectLinks::class)->routeFor('proposal', $proposalId);
+
+        return $url === null
+            ? $this->result(false, 'missing')
+            : ['ok' => true, 'message' => 'notifications.quick.opening_extension', 'redirect' => $url.'?extend=1'];
     }
 
     /**

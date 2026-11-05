@@ -171,6 +171,9 @@ final class EventCatalog
                 'proposal.extended' => self::entry('proposals', $now, 'module_map', $all, activity: 'proposal.extended'),
                 'proposal.approved' => self::entry('proposals', $now, 'module_map', $all, critical: true, activity: 'proposal.approved'),
                 'proposal.on_hold_reminder' => self::entry('proposals', $now, 'scanner', $all),
+                // An active proposal ending with money still to come (D-60, W-33).
+                // `.due` is the suffix DueSoonScanner looks up, as for department_task.
+                'proposal.ending_with_funds.due' => self::entry('proposals', $now, 'scanner', $all),
                 'proposal.final_report_accepted' => self::entry('proposals', $now, 'module_map', $all, activity: 'proposal.final_report_accepted'),
                 'proposal.beneficiaries_changed' => self::entry('proposals', $now, 'module_map', $all, activity: 'proposal.beneficiaries_changed'),
                 'proposal.targets_saved' => self::entry('proposals', $digest, 'module_map', $all, activity: 'proposal.targets_saved'),

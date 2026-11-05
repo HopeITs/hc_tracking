@@ -18,7 +18,7 @@ function contractEventKeys(): array
         'project.period_changed', 'project.started', 'project.ended', 'project.closed', 'project.archived', 'project.sectors_changed',
         'proposal.created', 'proposal.status_changed', 'proposal.review_requested', 'proposal.reviewer_added', 'proposal.reviewer_removed',
         'proposal.reviewer_seen', 'proposal.need_assessment_added', 'proposal.approved', 'proposal.approved_without_agreement',
-        'proposal.on_hold_reminder', 'proposal.final_report_accepted', 'proposal.beneficiaries_changed', 'proposal.targets_saved',
+        'proposal.on_hold_reminder', 'proposal.ending_with_funds.due', 'proposal.final_report_accepted', 'proposal.beneficiaries_changed', 'proposal.targets_saved',
         'proposal.project_linked', 'proposal.project_unlinked', 'proposal.deleted', 'proposal.risk_attached', 'proposal.risk_detached',
         'agreement.recorded', 'transfer.generated', 'transfer.received', 'transfer.late',
         'monthly_reports.generated', 'monthly_report.due', 'monthly_report.overdue', 'monthly_report.submitted', 'monthly_report.validated',

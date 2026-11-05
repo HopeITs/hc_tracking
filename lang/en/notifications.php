@@ -188,6 +188,7 @@ return [
         'project_started' => 'The project “:subject” started on :date',
         'project_ended' => 'The project “:subject” ended on :date',
         'on_hold_reminder' => 'The proposal “:subject” is on hold and its review date (:date) has come',
+        'ending_with_funds' => 'The proposal “:subject” ends on :date and its agreement still has funds',
         'logframe_missing' => [
             'single' => 'The program “:subject” has no program framework yet — create it',
             'grouped' => 'Programs without a program framework yet: :count — create them',
@@ -259,6 +260,8 @@ return [
         'stalled_report_draft' => 'Report in draft',
         'stalled_report_reviewed' => 'Report awaiting approval',
         'stalled_proposal' => 'Proposal with no status change',
+        'extension_lead' => 'Extension alert',
+        'extension_lead_help' => 'An active proposal whose agreement still has funds warns Finance this many working days before it ends.',
 
         'off_track' => 'Indicator off track below',
         'off_track_hint' => 'Of the progress expected by today.',
@@ -312,6 +315,7 @@ return [
             'report_approve' => 'Approve',
             'transfer_mark_received' => 'Mark received',
             'agreement_record' => 'Record agreement',
+            'proposal_request_extension' => 'Request extension',
             'alert_snooze' => 'Snooze reminder',
             'assignment_acknowledge' => 'Acknowledge',
             'assignment_reject' => 'Reject',
@@ -320,6 +324,7 @@ return [
         'snoozed' => 'Reminder snoozed until tomorrow.',
         'opening' => 'Opening the tranche…',
         'opening_record' => 'Opening the record…',
+        'opening_extension' => 'Opening the extension…',
         'already_done' => 'Already done — nothing changed.',
         'already_started' => 'Already started — nothing changed.',
         'forbidden' => 'You are not allowed to do that.',
@@ -612,6 +617,12 @@ return [
             'on_hold_reminder' => [
                 'title' => 'On-hold reminder',
                 'body' => '“:subject” is still on hold',
+            ],
+            'ending_with_funds' => [
+                'due' => [
+                    'title' => 'Extension alert',
+                    'body' => '“:subject” ends soon and its agreement still has funds',
+                ],
             ],
             'targets_saved' => [
                 'title' => 'Targets saved',
