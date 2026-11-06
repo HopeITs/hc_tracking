@@ -234,3 +234,92 @@ test('the saved report page runs a fixed number of queries however many centers 
 
     expect($count(10))->toBe($count(2));
 });
+
+/*
+| Page review, 6 Nov 2026: every proposal with an agreement had a start date
+| and no end date, so the builder answered "The period is outside the grant."
+| for every period; the report page said neither its donor nor its proposal,
+| linked "Reports" to the builder, and nobody could name its responsible.
+*/
+
+test('a grant missing its actual end, or both actual dates, is named as such, not called outside the grant', function (array $missing) {
+    $this->proposal->forceFill([...$missing, 'extended_date_end' => null])->saveQuietly();
+
+    Livewire::actingAs($this->aggregatorOnly)->test('pages::donor-reports.compose')
+        ->set('proposalId', (string) $this->proposal->id)
+        ->assertSeeHtml('data-grant-has-no-dates')
+        ->assertSeeText(__('donor_reports.grant_has_no_dates'))
+        ->assertSeeText(__('donor_reports.grant_dates_who'))
+        ->assertSeeHtml('disabled')
+        ->set('startMonth', '2026-09')
+        ->call('compose')
+        ->assertHasErrors(['startMonth' => __('donor_reports.grant_has_no_dates')])
+        ->assertHasNoErrors(['startMonth' => __('donor_reports.period_outside_grant')]);
+})->with([
+    'no end date' => [['actual_date_end' => null]],
+    'no actual dates at all' => [['actual_date_begin' => null, 'actual_date_end' => null]],
+]);
+
+test('the report page names its donor and proposal and leads back to the donor reports list', function () {
+    $report = drpSaved($this->aggregatorOnly);
+
+    // The page's own markup, without the side menu (which rightly links to the builder).
+    $page = Livewire::actingAs($this->aggregatorOnly)->test('pages::donor-reports.show', ['donorReport' => $report])->html();
+
+    expect($page)
+        ->toContain('data-report-owner')
+        ->toContain(e($this->proposal->name))
+        ->toContain('href="'.route('donor-reports.index').'"')
+        ->not->toContain('href="'.route('donor-reports.compose').'"');
+});
+
+test('a report compiler names who delivers a report, and only an active employee', function () {
+    $report = drpSaved($this->aggregatorOnly);
+    $employeeId = insertHrEmployee(firstNameEn: 'Lina', lastNameEn: 'Writer');
+    $inactiveId = insertHrEmployee(firstNameEn: 'Old', lastNameEn: 'Hand', isActive: false);
+
+    Livewire::actingAs($this->aggregatorOnly)->test('pages::donor-reports.show', ['donorReport' => $report])
+        ->call('openAssign')
+        ->set('responsibleEmployeeId', (string) $inactiveId)
+        ->call('assign')
+        ->assertHasErrors(['responsibleEmployeeId' => __('donor_reports.responsible_inactive')])
+        ->set('responsibleEmployeeId', (string) $employeeId)
+        ->call('assign')
+        ->assertHasNoErrors()
+        ->assertSet('showAssignModal', false);
+
+    expect($report->fresh()->responsible_employee_id)->toBe($employeeId);
+});
+
+test('nobody names a responsible without the right, nor on a submitted report', function () {
+    $report = drpSaved($this->aggregatorOnly);
+    $viewer = User::factory()->create();
+    $viewer->givePermissionTo('funding-agreements.view');
+
+    Livewire::actingAs($viewer)->test('pages::donor-reports.show', ['donorReport' => $report])
+        ->assertDontSeeHtml('data-test="assign-responsible"')
+        ->call('openAssign')
+        ->assertForbidden();
+
+    $report->forceFill(['submitted_on' => '2026-11-14'])->saveQuietly();
+
+    Livewire::actingAs($this->aggregatorOnly)->test('pages::donor-reports.show', ['donorReport' => $report->fresh()])
+        ->call('openAssign')
+        ->assertForbidden();
+});
+
+test('the builder links straight to setting the grant dates for someone who edits proposals, and says who can for others', function () {
+    $this->proposal->forceFill(['actual_date_end' => null, 'extended_date_end' => null])->saveQuietly();
+
+    Livewire::actingAs($this->aggregatorOnly)->test('pages::donor-reports.compose')
+        ->set('proposalId', (string) $this->proposal->id)
+        ->assertSeeText(__('donor_reports.grant_dates_who'))
+        ->assertDontSeeHtml('data-set-grant-dates');
+
+    $this->aggregatorOnly->givePermissionTo('proposals.update');
+
+    Livewire::actingAs($this->aggregatorOnly->fresh())->test('pages::donor-reports.compose')
+        ->set('proposalId', (string) $this->proposal->id)
+        ->assertSeeHtml('data-set-grant-dates')
+        ->assertSee(e(route('proposals.show', ['proposal' => $this->proposal, 'grant_dates' => 1])), false);
+});

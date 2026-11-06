@@ -28,6 +28,10 @@
     @elseif (in_array($this->proposal->status, [\App\Enums\ProposalStatus::Submitted, \App\Enums\ProposalStatus::ConceptNoteSubmitted], true))
     <x-ui.button size="sm" icon="pause-circle" class="min-h-10 touch-manipulation" wire:click="openHoldModal" data-test="open-hold-modal">{{ __('proposals.put_on_hold') }}</x-ui.button>
     @endif
+    {{-- Older grants were approved without their actual dates; donor reports need them (SetGrantDates). --}}
+    @if ($this->proposal->status->isApprovedByDonor() && $this->proposal->lacksGrantDates())
+    <x-ui.button tone="primary" size="sm" icon="calendar" class="min-h-10 touch-manipulation" wire:click="openGrantDatesModal" data-test="open-grant-dates-modal">{{ __('proposals.set_grant_dates') }}</x-ui.button>
+    @endif
     @if ($this->proposal->status === \App\Enums\ProposalStatus::Active)
     <x-ui.button size="sm" icon="calendar-days" class="min-h-10 touch-manipulation" wire:click="openExtensionModal" data-test="open-extension-modal">{{ __('proposals.extend_proposal') }}</x-ui.button>
     @endif

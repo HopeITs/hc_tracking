@@ -149,6 +149,28 @@
     </x-ui.modal>
 
     <x-ui.modal
+        wire:model="showGrantDatesModal"
+        size="md"
+        :title="__('proposals.set_grant_dates')"
+        :description="__('proposals.grant_dates_help')"
+        submit="saveGrantDates"
+        close="closeGrantDatesModal"
+        required-note
+        data-test="grant-dates-modal"
+    >
+        @if ($showGrantDatesModal)
+            <div class="grid gap-y-4 @md/modal:grid-cols-2 @md/modal:gap-x-4">
+                <x-ui.form-input wire:model="grantDateBegin" :label="__('proposals.grant_dates_begin')" type="date" required :disabled="$this->proposal->actual_date_begin !== null" data-test="grant-date-begin" />
+                <x-ui.form-input wire:model="grantDateEnd" :label="__('proposals.grant_dates_end')" type="date" required data-test="grant-date-end" />
+            </div>
+        @endif
+
+        <x-slot:actions>
+            <x-ui.button type="submit" tone="primary" wire:loading.attr="disabled" wire:target="saveGrantDates" data-test="save-grant-dates">{{ __('proposals.set_grant_dates') }}</x-ui.button>
+        </x-slot:actions>
+    </x-ui.modal>
+
+    <x-ui.modal
         wire:model="showExtensionModal"
         size="md"
         :title="__('proposals.extend_proposal')"

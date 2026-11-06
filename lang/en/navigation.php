@@ -34,7 +34,7 @@ return [
     'toggle_sidebar' => 'Collapse or expand the sidebar',
     'report_a_problem' => 'Report a problem or bug',
     'user_directory' => 'User Directory',
-    'donor_report_builder' => 'Reports',
+    'donor_report_builder' => 'Build a donor report',
     'donor_reports' => 'Donor reports',
     'reporting_duties' => 'My Reporting Duties',
     'monthly_matrix' => 'Monthly Matrix',

@@ -48,7 +48,7 @@ return [
     'notification_settings' => 'إعدادات الإشعارات',
     'department_tasks' => 'مهام الأقسام',
     'donor_report' => 'تقرير المانح',
-    'donor_report_builder' => 'التقارير',
+    'donor_report_builder' => 'إعداد تقرير مانح',
     'donor_reports' => 'تقارير المانحين',
     'reporting_duties' => 'مهام التقارير',
     'monthly_matrix' => 'المصفوفة الشهرية',

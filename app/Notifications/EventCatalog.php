@@ -190,6 +190,8 @@ final class EventCatalog
                 'program_request.linked' => self::entry('proposals', $now, 'module_map', $all, activity: 'program_request.linked'),
                 // T31: the approval moved the plan to the grant period; the project owners hear of it only when a date was cut at the grant end.
                 'proposal.plan_rebased' => self::entry('proposals', $now, 'module_map', OversightMode::None, activity: 'proposal.plan_rebased'),
+                // Page review follow-up (6 Nov 2026): missing actual grant dates filled in after approval.
+                'proposal.grant_dates_set' => self::entry('proposals', $digest, 'module_map', $all, activity: 'proposal.grant_dates_set'),
             ],
             // funding-agreements
             [

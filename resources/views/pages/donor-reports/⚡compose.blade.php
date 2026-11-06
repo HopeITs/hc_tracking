@@ -225,24 +225,25 @@ new #[Layout('layouts::desk'), Title('titles.donor_report_builder')] class exten
 
 <section class="@container flex w-full flex-1 flex-col gap-8 text-secondary-dark dark:text-ink" data-donor-report-builder>
     <x-ui.detail-header
-        :back="\App\Support\BackUrl::for(route('reporting-duties.index'))"
+        :back="\App\Support\BackUrl::for(route('donor-reports.index'))"
         id="donor-report-builder-heading"
         :breadcrumbs="[
-            ['label' => __('navigation.reporting_duties'), 'url' => route('reporting-duties.index')],
+            ['label' => __('titles.donor_reports'), 'url' => route('donor-reports.index')],
             ['label' => __('navigation.donor_report_builder')],
         ]"
         :title="__('titles.donor_report_builder')"
     />
 
     {{-- 1. Proposal and period. --}}
-    <form wire:submit="compose" class="{{ $panel }} grid grid-cols-1 gap-4" data-tour="donor-report-builder-period">
+    {{-- novalidate: the server names every missing field in the page's own words, not the browser's. --}}
+    <form wire:submit="compose" novalidate class="{{ $panel }} grid grid-cols-1 gap-4" data-tour="donor-report-builder-period">
         <h2 class="text-base font-bold">{{ __('donor_reports.step_period') }}</h2>
 
         @if ($this->proposals->isEmpty())
             <p class="text-sm {{ $muted }}" data-no-eligible-proposals>{{ __('donor_reports.no_eligible_proposals') }}</p>
         @else
             <div class="grid gap-4 md:grid-cols-2">
-                <x-ui.form-select wire:model.live="proposalId" :label="__('donor_reports.proposal')" :placeholder="__('donor_reports.choose_proposal')" required searchable>
+                <x-ui.form-select wire:model.live="proposalId" :label="__('donor_reports.proposal')" :placeholder="__('donor_reports.choose_proposal')" required searchable class="min-w-0 md:col-span-2">
                     @foreach ($this->proposals as $option)
                         <option value="{{ $option->id }}">{{ $option->name }} · {{ $option->internal_project_number }}</option>
                     @endforeach
@@ -252,11 +253,12 @@ new #[Layout('layouts::desk'), Title('titles.donor_report_builder')] class exten
                     wire:model.live="periodType"
                     :label="__('donor_reports.period_type')"
                     required
+                    class="md:col-span-2"
                     :options="collect(ReportingPeriod::cases())->map(fn (ReportingPeriod $case): array => ['value' => $case->value, 'label' => $case->label()])->all()"
                 />
 
                 <x-ui.form-input wire:model="startMonth" type="month" :label="__('donor_reports.start_month')" required
-                    :help="$proposal?->actual_date_begin !== null ? __('donor_reports.grant_window', ['start' => $proposal->actual_date_begin->format('Y-m'), 'end' => $proposal->effectiveDateEnd()?->format('Y-m') ?? '—']) : null" />
+                    :help="$proposal?->actual_date_begin !== null && $proposal->effectiveDateEnd() !== null ? __('donor_reports.grant_window', ['start' => $proposal->actual_date_begin->format('Y-m'), 'end' => $proposal->effectiveDateEnd()->format('Y-m')]) : null" />
 
                 @if ($periodType === ReportingPeriod::Custom->value)
                     <x-ui.form-input wire:model="endMonth" type="month" :label="__('donor_reports.end_month')" required />
@@ -264,8 +266,25 @@ new #[Layout('layouts::desk'), Title('titles.donor_report_builder')] class exten
             </div>
             <flux:error name="proposalId" />
 
+            @php
+                $grantHasNoDates = $proposal !== null && ($proposal->actual_date_begin === null || $proposal->effectiveDateEnd() === null);
+            @endphp
+            @if ($grantHasNoDates)
+                {{-- Said as soon as the proposal is picked. The actual dates are only recorded with the donor's
+                     approval and no page edits them afterwards, so the message names who can fix it instead of
+                     linking to a page with nothing to do (page review follow-up, 6 Nov 2026). --}}
+                <p class="rounded-lg bg-status-warn-soft px-3 py-2 text-sm" data-grant-has-no-dates>
+                    <strong>{{ __('donor_reports.grant_has_no_dates') }}</strong>
+                    @can('update', $proposal)
+                        <a href="{{ route('proposals.show', ['proposal' => $proposal, 'grant_dates' => 1]) }}" wire:navigate class="font-semibold underline underline-offset-2" data-set-grant-dates>{{ __('donor_reports.set_grant_dates_link') }}</a>
+                    @else
+                        {{ __('donor_reports.grant_dates_who') }}
+                    @endcan
+                </p>
+            @endif
+
             <div>
-                <x-ui.button type="submit" tone="primary" icon="eye" wire:loading.attr="disabled" wire:target="compose" data-test="compose-preview">
+                <x-ui.button type="submit" tone="primary" icon="eye" :disabled="$grantHasNoDates" wire:loading.attr="disabled" wire:target="compose" data-test="compose-preview">
                     <span wire:loading.remove wire:target="compose">{{ __('donor_reports.preview') }}</span>
                     <span wire:loading wire:target="compose">{{ __('donor_reports.composing') }}</span>
                 </x-ui.button>

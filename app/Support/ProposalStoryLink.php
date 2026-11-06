@@ -34,7 +34,7 @@ final class ProposalStoryLink
      * is linked to (the standalone proposal page serves them then). Reads the
      * proposal's loaded projects relation when there is one.
      */
-    public static function story(User $viewer, Proposal $proposal, ?string $tab = null, bool $recordAgreement = false, string $fragment = 'proposal'): ?string
+    public static function story(User $viewer, Proposal $proposal, ?string $tab = null, bool $recordAgreement = false, string $fragment = 'proposal', bool $setGrantDates = false): ?string
     {
         if (! $viewer->can('projects.view')) {
             return null;
@@ -55,6 +55,8 @@ final class ProposalStoryLink
             'proposal' => $proposal->id,
             'ptab' => $tab,
             'record_agreement' => $recordAgreement ? 1 : null,
+            // The donor report builder's "Set the grant dates" link opens that dialog on the Story too.
+            'grant_dates' => $setGrantDates ? 1 : null,
         ], fn (mixed $value): bool => $value !== null)).'#'.$fragment;
     }
 

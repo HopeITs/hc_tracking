@@ -72,10 +72,11 @@ new #[Layout('layouts::desk'), Title('titles.donor_reports')] class extends Comp
 
         return $this->visible()
             ->with(['donorProposal:id,proposal_id,donor_id', 'donorProposal.proposal:id,name,slug', 'donorProposal.donor:id,name'])
-            ->when($this->search !== '', fn (Builder $query) => $query->whereHas(
-                'donorProposal.proposal',
-                fn (Builder $proposals) => $proposals->where('name', 'like', Like::contains($this->search)),
-            ))
+            // Search reads what the row shows: proposal, donor and report name.
+            ->when($this->search !== '', fn (Builder $query) => $query->where(fn (Builder $match) => $match
+                ->where('title', 'like', Like::contains($this->search))
+                ->orWhereHas('donorProposal.proposal', fn (Builder $proposals) => $proposals->where('name', 'like', Like::contains($this->search)))
+                ->orWhereHas('donorProposal.donor', fn (Builder $donors) => $donors->where('name', 'like', Like::contains($this->search)))))
             ->when($this->donor !== '', fn (Builder $query) => $query->whereHas('donorProposal', fn (Builder $agreements) => $agreements->where('donor_id', (int) $this->donor)))
             ->when($this->proposal !== '', fn (Builder $query) => $query->whereHas('donorProposal', fn (Builder $agreements) => $agreements->where('proposal_id', (int) $this->proposal)))
             ->when($this->state === DonorReportState::Submitted->value, fn (Builder $query) => $query->whereNotNull('submitted_on'))
@@ -169,6 +170,7 @@ new #[Layout('layouts::desk'), Title('titles.donor_reports')] class extends Comp
 
 @php
     $muted = 'text-secondary-medium dark:text-ink-muted';
+    $today = CarbonImmutable::today();
     $canOpenProposals = auth()->user()->can('proposals.view');
     $responsibles = $this->responsibles;
 @endphp
@@ -180,6 +182,12 @@ new #[Layout('layouts::desk'), Title('titles.donor_reports')] class extends Comp
     :count="$this->reports->total()"
     data-donor-reports
 >
+    @can('reports.aggregate')
+        <x-slot:actions>
+            <x-ui.button tone="primary" icon="plus" class="pointer-coarse:min-h-11" :href="route('donor-reports.compose')" wire:navigate data-test="new-donor-report">{{ __('donor_reports.new_report') }}</x-ui.button>
+        </x-slot:actions>
+    @endcan
+
     <x-slot:search>
         <x-desk.register-search :label="__('donor_reports.search_reports')" :placeholder="__('donor_reports.search_by_proposal')" wire:model.live.debounce.300ms="search" />
     </x-slot:search>
@@ -209,7 +217,11 @@ new #[Layout('layouts::desk'), Title('titles.donor_reports')] class extends Comp
     @if (! $this->hasAnyReport)
         <x-ui.empty-state icon="document-check" :heading="__('donor_reports.none')" :body="__('donor_reports.none_body')" />
     @elseif ($this->reports->isEmpty())
-        <x-ui.empty-state icon="document-check" :heading="__('donor_reports.no_matching')" :body="__('common.change_the_search_or_filters_and_try_again')" />
+        <x-ui.empty-state icon="document-check" :heading="__('donor_reports.no_matching')" :body="__('common.change_the_search_or_filters_and_try_again')">
+            <x-slot:action>
+                <x-ui.button size="sm" wire:click="clearFilters" data-test="clear-donor-report-filters">{{ __('common.reset_filters') }}</x-ui.button>
+            </x-slot:action>
+        </x-ui.empty-state>
     @else
         <x-ui.data-table :caption="__('titles.donor_reports')" data-tour="donor-reports-list">
             <x-slot:head>
@@ -255,8 +267,18 @@ new #[Layout('layouts::desk'), Title('titles.donor_reports')] class extends Comp
                             —
                         @endif
                     </td>
-                    <td data-donor-report-state="{{ DonorReportState::of($report)->value }}">
-                        <x-ui.enum-badge :case="DonorReportState::of($report)" />
+                    @php
+                        $reportState = DonorReportState::of($report);
+                        $daysLeft = (int) $today->diffInDays($report->due_on, false);
+                    @endphp
+                    <td data-donor-report-state="{{ $reportState->value }}">
+                        <x-ui.enum-badge :case="$reportState" />
+                        {{-- How urgent, in days, as the agreement page says it. --}}
+                        @if ($reportState === DonorReportState::Due)
+                            <span class="mt-1 block text-xs {{ $muted }}" data-days-left>{{ trans_choice('funding_agreements.due_in_days', $daysLeft, ['count' => $daysLeft]) }}</span>
+                        @elseif ($reportState === DonorReportState::Overdue)
+                            <span class="mt-1 block text-xs font-semibold text-status-critical" data-days-left>{{ trans_choice('funding_agreements.count_days_overdue', -$daysLeft, ['count' => -$daysLeft]) }}</span>
+                        @endif
                     </td>
                     <td>
                         @if ($responsible !== null)
@@ -269,15 +291,17 @@ new #[Layout('layouts::desk'), Title('titles.donor_reports')] class extends Comp
                     <td>{{ $report->submitted_on?->translatedFormat(__('formats.date')) ?? '—' }}</td>
                     <td>
                         <span class="flex items-center justify-end">
-                            <x-ui.button tone="ghost" size="sm" icon="eye" class="size-8!" :href="route('donor-reports.show', $report)" wire:navigate :aria-label="__('common.view_name', ['name' => $report->title])" />
+                            <x-ui.button tone="ghost" size="sm" icon="eye" class="size-8! pointer-coarse:size-11!" :href="route('donor-reports.show', $report)" wire:navigate :aria-label="__('common.view_name', ['name' => collect([$report->title, $reportProposal?->name])->filter()->implode(' · ')])" />
                         </span>
                     </td>
                 </tr>
             @endforeach
         </x-ui.data-table>
 
-        <div class="mt-4">
-            <flux:pagination :paginator="$this->reports" class="text-secondary-medium! dark:text-ink-muted!" scroll-to="#donor-reports-heading" />
-        </div>
+        @if ($this->reports->hasPages())
+            <div class="mt-4">
+                <flux:pagination :paginator="$this->reports" class="text-secondary-medium! dark:text-ink-muted!" scroll-to="#donor-reports-heading" />
+            </div>
+        @endif
     @endif
 </x-desk.register>

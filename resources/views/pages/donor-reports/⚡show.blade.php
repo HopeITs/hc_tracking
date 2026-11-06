@@ -1,5 +1,6 @@
 <?php
 
+use App\Actions\DonorReports\AssignDonorReportResponsible;
 use App\Actions\DonorReports\DeleteDonorReportFile;
 use App\Actions\DonorReports\RegenerateDonorReport;
 use App\Actions\DonorReports\SaveDonorReportFile;
@@ -42,6 +43,10 @@ new #[Layout('layouts::desk'), Title('titles.donor_report')] class extends Compo
 
     public bool $showFileDeleteModal = false;
 
+    public bool $showAssignModal = false;
+
+    public string $responsibleEmployeeId = '';
+
     #[Locked]
     public ?int $deletingFileId = null;
 
@@ -53,7 +58,7 @@ new #[Layout('layouts::desk'), Title('titles.donor_report')] class extends Compo
     #[Computed]
     public function report(): DonorReport
     {
-        return DonorReport::query()->with('donorProposal:id,slug,proposal_id,donor_id')->findOrFail($this->reportId);
+        return DonorReport::query()->with(['donorProposal:id,slug,proposal_id,donor_id', 'donorProposal.donor:id,name', 'donorProposal.proposal:id,name,slug'])->findOrFail($this->reportId);
     }
 
     /**
@@ -109,6 +114,43 @@ new #[Layout('layouts::desk'), Title('titles.donor_report')] class extends Compo
     public function showFinance(): bool
     {
         return auth()->user()->can('funding-agreements.view');
+    }
+
+    public function openAssign(): void
+    {
+        Gate::authorize('assign', $this->report);
+
+        $this->resetValidation('responsibleEmployeeId');
+        $this->responsibleEmployeeId = (string) ($this->report->responsible_employee_id ?? '');
+        $this->showAssignModal = true;
+    }
+
+    public function closeAssign(): void
+    {
+        $this->showAssignModal = false;
+    }
+
+    /**
+     * Name who delivers the report (AssignDonorReportResponsible).
+     */
+    public function assign(): void
+    {
+        /** @var User $user */
+        $user = auth()->user();
+
+        // A refused try must not leave its message behind once the next one succeeds.
+        $this->resetValidation('responsibleEmployeeId');
+
+        app(AssignDonorReportResponsible::class)->handle(
+            $this->report,
+            $this->responsibleEmployeeId === '' ? null : (int) $this->responsibleEmployeeId,
+            $user,
+        );
+
+        $this->showAssignModal = false;
+        unset($this->report, $this->responsible);
+
+        Flux::toast(variant: 'success', text: __('donor_reports.responsible_saved'));
     }
 
     public function openRegenerate(): void
@@ -208,17 +250,22 @@ new #[Layout('layouts::desk'), Title('titles.donor_report')] class extends Compo
     $muted = 'text-secondary-medium dark:text-ink-muted';
     $responsible = $this->responsible;
     $canSeeAgreement = auth()->user()->can('funding-agreements.view');
+    // The way back is the Donor reports list for everyone who may open a report (page review 6 Nov 2026: it led to the builder).
     $breadcrumbs = [
-        auth()->user()->can('reports.aggregate')
-            ? ['label' => __('navigation.donor_report_builder'), 'url' => route('donor-reports.compose')]
-            : ['label' => __('navigation.reporting_duties'), 'url' => route('reporting-duties.index')],
+        ['label' => __('titles.donor_reports'), 'url' => route('donor-reports.index')],
         ['label' => $report->title],
     ];
+    $donorName = $report->donorProposal?->donor?->name ?? ($header['donor_name'] ?? null);
+    $reportProposal = $report->donorProposal?->proposal;
 @endphp
 
 <section class="@container/detail flex w-full flex-1 flex-col gap-8 text-secondary-dark dark:text-ink" data-donor-report-page>
-    <x-ui.detail-header :back="\App\Support\BackUrl::for(route('reporting-duties.index'))" :breadcrumbs="$breadcrumbs" :title="$report->title">
+    <x-ui.detail-header :back="\App\Support\BackUrl::for(route('donor-reports.index'))" :breadcrumbs="$breadcrumbs" :title="$report->title">
         <x-slot:meta>
+            {{-- Whose report it is, first: several reports share a title. --}}
+            @if (filled($donorName) || $reportProposal !== null)
+                <span class="font-semibold" data-report-owner><bdi>{{ collect([$donorName, $reportProposal?->name])->filter()->implode(' · ') }}</bdi></span>
+            @endif
             <span>{{ $report->type->label() }}</span>
             <span>{{ $report->audience->label() }}</span>
             @if ($report->isComposed())
@@ -268,7 +315,12 @@ new #[Layout('layouts::desk'), Title('titles.donor_report')] class extends Compo
     {{-- Who delivers it. --}}
     <section class="grid grid-cols-1 gap-4 md:grid-cols-[minmax(0,1fr)_minmax(0,2fr)]" data-tour="donor-report-delivery">
         <x-ui.panel as="div" :clip="false" class="p-4">
-            <h2 class="text-sm font-semibold">{{ __('donor_reports.responsible') }}</h2>
+            <div class="flex items-center justify-between gap-2">
+                <h2 class="text-sm font-semibold">{{ __('donor_reports.responsible') }}</h2>
+                @can('assign', $report)
+                    <x-ui.button size="sm" wire:click="openAssign" data-test="assign-responsible">{{ $responsible === null ? __('donor_reports.assign') : __('donor_reports.change') }}</x-ui.button>
+                @endcan
+            </div>
             <x-ui.employee-chip :employee="$responsible['employee'] ?? null" class="mt-2" />
             @if ($responsible !== null && ! $responsible['reachable'])
                 <p class="mt-2 text-xs text-status-critical" data-responsible-warning>{{ __('donor_reports.responsible_unreachable') }}</p>
@@ -375,6 +427,25 @@ new #[Layout('layouts::desk'), Title('titles.donor_report')] class extends Compo
         :confirm-label="__('donor_reports.remove_file')"
         confirm-test="confirm-remove-file"
     />
+
+    @can('assign', $report)
+        <x-ui.modal
+            wire:model="showAssignModal"
+            size="sm"
+            :title="__('donor_reports.assign_title', ['title' => $report->title])"
+            :description="__('donor_reports.responsible_help')"
+            submit="assign"
+            close="closeAssign"
+        >
+            @if ($showAssignModal)
+                <x-ui.form-select wire:model="responsibleEmployeeId" :label="__('donor_reports.responsible')" :placeholder="__('common.not_assigned')" employees />
+            @endif
+
+            <x-slot:actions>
+                <x-ui.button type="submit" tone="primary" data-test="save-responsible">{{ __('common.save_changes') }}</x-ui.button>
+            </x-slot:actions>
+        </x-ui.modal>
+    @endcan
 
     <x-donor-reports.submit-modal :open="$showSubmitModal" :needs-file="$submissionNeedsFile" :file-count="$submissionFileCount" />
 </section>

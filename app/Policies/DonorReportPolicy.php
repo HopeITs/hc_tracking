@@ -41,6 +41,16 @@ class DonorReportPolicy
     }
 
     /**
+     * Name who delivers the report: agreement editors and report compilers,
+     * while the report is not submitted (a submitted report is frozen).
+     */
+    public function assign(User $user, DonorReport $donorReport): bool
+    {
+        return ! $donorReport->isSubmitted()
+            && ($user->can('funding-agreements.update') || $user->can('reports.aggregate'));
+    }
+
+    /**
      * Attach a delivered report file.
      */
     public function uploadFile(User $user, DonorReport $donorReport): bool

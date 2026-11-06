@@ -97,6 +97,7 @@ test('every proposal link lands on its project Story with the proposal, tab and 
     'bare' => [[], []],
     'a tab' => [['tab' => 'plan'], ['ptab' => 'plan']],
     'the record-agreement link' => [['record_agreement' => '1'], ['record_agreement' => 1]],
+    'the set-grant-dates link' => [['grant_dates' => '1'], ['grant_dates' => 1]],
 ]);
 
 test('a bare proposal link opened by a reviewer it still waits on lands on their own review; a tab they ask for wins', function () {

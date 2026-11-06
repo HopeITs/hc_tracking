@@ -413,6 +413,16 @@ class Proposal extends Model implements TracksActivity
     }
 
     /**
+     * Whether the grant is missing its actual start or end date (approved
+     * from older data without them). Donor reports cannot place a period on
+     * such a grant until SetGrantDates fills them in.
+     */
+    public function lacksGrantDates(): bool
+    {
+        return $this->actual_date_begin === null || $this->effectiveDateEnd() === null;
+    }
+
+    /**
      * The grant's end date: the extended one once the proposal was extended
      * (W-08, D-60), else the actual end set at approval. The original
      * `actual_date_end` stays untouched.

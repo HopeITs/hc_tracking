@@ -15,7 +15,8 @@ use Symfony\Component\HttpFoundation\Response;
  * user decision 2026-10-20 "remove the proposal page, redirect all"): every
  * GET of a proposal lands on its project's Story with that proposal shown in
  * the Proposal block, on the tab asked for (?tab= becomes ?ptab=), and the
- * record-agreement deep link carried over so its dialog opens there. A link
+ * record-agreement and grant-dates deep links carried over so their dialogs
+ * open there. A link
  * that names no tab, opened by a reviewer whose review still waits on them,
  * lands on their own review (ProposalStoryLink::review).
  *
@@ -42,6 +43,7 @@ class RedirectProposalToStory
             $toReview ? 'status' : $tab,
             $request->boolean('record_agreement'),
             $toReview ? ProposalStoryLink::MyReview : 'proposal',
+            setGrantDates: $request->boolean('grant_dates'),
         );
 
         return $story === null ? $next($request) : redirect()->to($story);

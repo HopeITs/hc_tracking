@@ -34,7 +34,7 @@ return [
     'toggle_sidebar' => 'طي القائمة الجانبية أو توسيعها',
     'report_a_problem' => 'الإبلاغ عن مشكلة أو خطأ',
     'user_directory' => 'دليل المستخدمين',
-    'donor_report_builder' => 'التقارير',
+    'donor_report_builder' => 'إعداد تقرير مانح',
     'donor_reports' => 'تقارير المانحين',
     'reporting_duties' => 'مهام التقارير',
     'monthly_matrix' => 'المصفوفة الشهرية',

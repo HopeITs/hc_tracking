@@ -108,3 +108,44 @@ test('GET /donor-reports is the register, not the show page binding', function (
         ->assertSee('data-donor-reports', false)
         ->assertSee('Safe Schools');
 });
+
+/*
+| Page review, 6 Nov 2026: search read proposal names only, an empty filter
+| had no way out, the list hid how many days were left and offered no way to
+| start a report.
+*/
+
+test('search also finds a report by its donor and by its title', function () {
+    $list = Livewire::actingAs(User::factory()->role('Financial')->create())->test('pages::donor-reports.index');
+
+    $list->set('search', 'Nordic')->assertSeeText('Final financial')->assertDontSeeText('Q1 narrative');
+    $list->set('search', 'Q1 narr')->assertSeeText('Q1 narrative')->assertDontSeeText('Final financial');
+});
+
+test('a filter with no result offers a way back to every report', function () {
+    Livewire::actingAs(User::factory()->role('Financial')->create())
+        ->test('pages::donor-reports.index')
+        ->set('state', 'overdue')
+        ->assertSeeHtml('data-test="clear-donor-report-filters"')
+        ->call('clearFilters')
+        ->assertSet('state', '')
+        ->assertSeeText('Q1 narrative');
+});
+
+test('a report still to submit says how many days are left, and one page shows no pager', function () {
+    Livewire::actingAs(User::factory()->role('Financial')->create())
+        ->test('pages::donor-reports.index')
+        ->assertSeeText(trans_choice('funding_agreements.due_in_days', 5, ['count' => 5]))
+        ->assertDontSeeText('Showing 1 to 2 of 2 results');
+});
+
+test('only a report compiler is offered a new donor report from the list', function () {
+    $compiler = User::factory()->create();
+    $compiler->givePermissionTo('reports.aggregate');
+
+    Livewire::actingAs($compiler)->test('pages::donor-reports.index')
+        ->assertSeeHtml('data-test="new-donor-report"');
+
+    Livewire::actingAs(User::factory()->role('Financial')->create())->test('pages::donor-reports.index')
+        ->assertDontSeeHtml('data-test="new-donor-report"');
+});
