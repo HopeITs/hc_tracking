@@ -1,13 +1,20 @@
 <?php
 
 return [
-    'active_cities' => 'Active cities',
+    'active_cities' => 'Open in HR',
     'all_cities' => 'All cities',
     'arabic_name' => 'Arabic name',
-    'beneficiaries_reached' => 'People reached',
+    'beneficiaries_targeted' => 'People targeted',
+    'hr_open' => 'Open in HR',
+    'hr_closed' => 'Closed in HR',
+    'hr_open_short' => 'Open',
+    'hr_closed_short' => 'Closed',
+    'unknown_city' => 'City not in HR',
+    'no_governorate' => 'No governorate: assign an officer to this project',
+    'show_city_name' => 'Show :name',
     'beneficiaries_reached_hint' => 'Headline targets across every city',
     'cities_are_managed_in_the_hr_system_and_shown_here_read_only' => 'Cities are managed in the HR system and shown here read-only.',
-    'cities_covered' => 'Cities with active work',
+    'cities_covered' => 'Cities with projects',
     'cities_covered_hint' => 'Of :total cities on record',
     'city_name' => 'City name',
     'clear_search' => 'Clear search',

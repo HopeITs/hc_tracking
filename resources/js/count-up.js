@@ -12,8 +12,10 @@ document.addEventListener('alpine:init', () => {
         init() {
             const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 
+            const show = (value) => (options.grouped ? Number(value).toLocaleString('en-US') : value);
+
             if (reducedMotion || typeof target !== 'number' || Number.isNaN(target)) {
-                this.display = target;
+                this.display = show(target);
 
                 return;
             }
@@ -27,7 +29,7 @@ document.addEventListener('alpine:init', () => {
                 // Expo-out: fast start, long settle — matches the page's own reveal curve.
                 const eased = elapsed === 1 ? 1 : 1 - Math.pow(2, -10 * elapsed);
 
-                this.display = Math.round(from + (target - from) * eased);
+                this.display = show(Math.round(from + (target - from) * eased));
 
                 if (elapsed < 1) {
                     requestAnimationFrame(tick);

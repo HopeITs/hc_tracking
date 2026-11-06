@@ -32,7 +32,7 @@ use Livewire\Attributes\Computed;
  * @property-read Collection<int, MealCoverageAssignment> $mealCoverages  #[Computed] mealCoverages()
  * @property-read Collection<int, HrEmployee> $mealOfficers  #[Computed] mealOfficers()
  * @property-read array<int, array{name: string, inactive: bool}> $cityOfficers  #[Computed] cityOfficers()
- * @property-read Collection<int, array{id: int, name: string, city: string|null, officer: array{name: string, inactive: bool}|null, inherited: bool}> $projectOfficers  #[Computed] projectOfficers()
+ * @property-read Collection<int, array{id: int, name: string, city: string|null, officer: array{name: string, inactive: bool}|null, inherited: bool, noGovernorate: bool}> $projectOfficers  #[Computed] projectOfficers()
  * @property-read array{name: string, inactiveCity: bool}|null $mealTarget  #[Computed] mealTarget()
  */
 trait ManagesMealCoverage
@@ -118,7 +118,7 @@ trait ManagesMealCoverage
      * The projects matching the project search, each with its own officer or
      * the one it inherits from its governorate (its center's city).
      *
-     * @return Collection<int, array{id: int, name: string, city: string|null, officer: array{name: string, inactive: bool}|null, inherited: bool}>
+     * @return Collection<int, array{id: int, name: string, city: string|null, officer: array{name: string, inactive: bool}|null, inherited: bool, noGovernorate: bool}>
      */
     #[Computed]
     public function projectOfficers(): Collection
@@ -142,13 +142,16 @@ trait ManagesMealCoverage
             ->map(function (Project $project) use ($projectOfficerIds, $cityOfficerIds, $cities): array {
                 $cityId = MealCoverage::cityIdOf($project);
                 $ownOfficerId = $projectOfficerIds->get($project->id);
+                $cityName = $cityId === null ? null : $cities->get($cityId)?->name;
 
                 return [
                     'id' => $project->id,
                     'name' => $project->name,
-                    'city' => $cityId === null ? null : $cities->get($cityId)?->name,
-                    'officer' => $this->officerCard($ownOfficerId ?? ($cityId === null ? null : $cityOfficerIds->get($cityId))),
-                    'inherited' => $ownOfficerId === null,
+                    'city' => $cityName,
+                    'officer' => $this->officerCard($ownOfficerId ?? ($cityName === null ? null : $cityOfficerIds->get($cityId))),
+                    // Nothing to inherit from without a governorate HR knows (page review 6 Nov 2026).
+                    'inherited' => $ownOfficerId === null && $cityName !== null,
+                    'noGovernorate' => $ownOfficerId === null && $cityName === null,
                 ];
             })
             ->values();

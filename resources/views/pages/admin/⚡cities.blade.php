@@ -134,13 +134,13 @@ new #[Layout('layouts::desk'), Title('titles.city_directory')] class extends Com
      * Cities come from the HR database and are read-only here; every city is
      * listed, active or not, exactly as HR holds it.
      *
-     * Sorting by name stays a plain database query. Sorting by delivery
-     * signal (project count, active-first) needs {@see self::projectStatsByCity()}
-     * for every matching city up front — cities live in a different database
-     * connection from projects, so that can never be a single ordered query —
-     * which means those two modes fetch every matching city once and paginate
-     * the sorted collection in PHP instead of in SQL. HR city lists are small
-     * reference tables (dozens, not thousands), so this stays cheap.
+     * Every order is sorted in PHP: by delivery signal (project count,
+     * active-first) because that needs {@see self::projectStatsByCity()} from
+     * another database connection, and by name because HR stores some names
+     * with a leading space that SQL would sort first (see byName()). Every
+     * matching city is fetched once and the sorted collection paginated here.
+     * HR city lists are small reference tables (dozens, not thousands), so
+     * this stays cheap.
      *
      * @return LengthAwarePaginator<int, HrCity>
      */
@@ -156,13 +156,7 @@ new #[Layout('layouts::desk'), Title('titles.city_directory')] class extends Com
                 ->orWhere('name_ar', 'like', Like::contains($search))))
             ->when($this->status !== '', fn ($query) => $query->where('is_active', $this->status === 'active'));
 
-        if ($this->sort === 'name') {
-            return $query
-                ->orderBy(HrCity::nameColumn())
-                ->orderBy('id')
-                ->paginate(self::PerPage);
-        }
-
+        // Every order, A–Z included, is sorted here: HR names carry stray spaces SQL would sort by.
         $stats = $this->projectStatsByCity;
         $page = (int) $this->getPage();
 
@@ -171,7 +165,7 @@ new #[Layout('layouts::desk'), Title('titles.city_directory')] class extends Com
                 'projects' => ($stats->get($b->id)['total'] ?? 0) <=> ($stats->get($a->id)['total'] ?? 0),
                 'active' => (int) $b->is_active <=> (int) $a->is_active,
                 default => 0,
-            } ?: strcmp($a->name, $b->name))
+            } ?: self::byName($a, $b))
             ->values();
 
         return new LengthAwarePaginator(
@@ -181,6 +175,16 @@ new #[Layout('layouts::desk'), Title('titles.city_directory')] class extends Com
             $page,
             ['path' => request()->url(), 'query' => request()->query()],
         );
+    }
+
+    /**
+     * A–Z by the name shown, ignoring the spaces HR stores around some names
+     * (" Al-Hasakah", " Ar-raqqa", " Deir Az-zor" sorted before "Aleppo";
+     * page review 6 Nov 2026). HR is read-only, so the page sorts around it.
+     */
+    private static function byName(HrCity $a, HrCity $b): int
+    {
+        return strcasecmp(trim($a->name), trim($b->name)) ?: $a->id <=> $b->id;
     }
 
     /**
@@ -228,10 +232,34 @@ new #[Layout('layouts::desk'), Title('titles.city_directory')] class extends Com
         return [
             'totalCities' => HrCity::count(),
             'activeCities' => HrCity::where('is_active', true)->count(),
-            'coveredCities' => $stats->count(),
+            // Only cities HR knows: a project pointing at a city HR does not have is shown apart (unknownCityProjects).
+            'coveredCities' => $stats->keys()->intersect($this->allCities->pluck('id'))->count(),
             'openProjects' => (int) $stats->sum('open'),
             'beneficiaries' => (int) $stats->sum('beneficiaries'),
         ];
+    }
+
+    /**
+     * Projects whose city is missing or is not in the HR city list, grouped
+     * by that city id, so they still show (and link) instead of vanishing
+     * from the map (page review 6 Nov 2026: 3 of 34 projects appeared nowhere).
+     *
+     * @return list<array{cityId: int|null, total: int, href: string|null}>
+     */
+    #[Computed]
+    public function unknownCityProjects(): array
+    {
+        $known = $this->allCities->pluck('id')->all();
+
+        return $this->projectStatsByCity
+            ->reject(fn (array $stats, int|string $cityId): bool => in_array((int) $cityId, $known, true) && $cityId !== '')
+            ->map(fn (array $stats, int|string $cityId): array => [
+                'cityId' => $cityId === '' ? null : (int) $cityId,
+                'total' => $stats['total'],
+                'href' => $cityId === '' ? null : route('projects.index', ['city' => (int) $cityId]),
+            ])
+            ->values()
+            ->all();
     }
 
     /**
@@ -246,9 +274,9 @@ new #[Layout('layouts::desk'), Title('titles.city_directory')] class extends Com
     {
         return HrCity::query()
             ->select(['id', 'name_en', 'name_ar', 'is_active'])
-            ->orderBy(HrCity::nameColumn())
-            ->orderBy('id')
-            ->get();
+            ->get()
+            ->sort(fn (HrCity $a, HrCity $b): int => self::byName($a, $b))
+            ->values();
     }
 
     /**
@@ -285,7 +313,8 @@ new #[Layout('layouts::desk'), Title('titles.city_directory')] class extends Com
                     'name' => $city->name,
                     'secondaryName' => $city->secondary_name,
                     'isActive' => $city->is_active,
-                    'statusLabel' => $city->is_active ? __('common.active') : __('cities.inactive'),
+                    'statusLabel' => $city->is_active ? __('cities.hr_open') : __('cities.hr_closed'),
+                    'statusShort' => $city->is_active ? __('cities.hr_open_short') : __('cities.hr_closed_short'),
                     'nationwide' => $name === 'Syria',
                     'x' => $position[0] ?? null,
                     'y' => $position[1] ?? null,
@@ -299,7 +328,7 @@ new #[Layout('layouts::desk'), Title('titles.city_directory')] class extends Com
                         ? trans_choice('cities.count_program', $cityStats['programs'], ['count' => $cityStats['programs']])
                         : null,
                     'beneficiariesLine' => $cityStats['beneficiaries'] > 0
-                        ? Number::format($cityStats['beneficiaries']).' '.__('cities.beneficiaries_reached')
+                        ? Number::format($cityStats['beneficiaries']).' '.__('cities.beneficiaries_targeted')
                         : null,
                     'noProjectsLabel' => __('cities.no_projects_here_yet'),
                     'href' => route('projects.index', ['city' => $city->id]),
@@ -322,7 +351,7 @@ new #[Layout('layouts::desk'), Title('titles.city_directory')] class extends Com
         ['key' => 'covered', 'label' => __('cities.cities_covered'), 'value' => $summary['coveredCities'], 'suffix' => '', 'sub' => __('cities.cities_covered_hint', ['total' => $summary['totalCities']]), 'tone' => 'text-funding'],
         ['key' => 'active', 'label' => __('cities.active_cities'), 'value' => $summary['activeCities'], 'suffix' => '', 'sub' => __('cities.cities_covered_hint', ['total' => $summary['totalCities']]), 'tone' => 'text-status-good'],
         ['key' => 'open', 'label' => __('cities.open_projects'), 'value' => $summary['openProjects'], 'suffix' => '', 'sub' => __('cities.open_projects_hint'), 'tone' => ''],
-        ['key' => 'reached', 'label' => __('cities.beneficiaries_reached'), 'value' => $summary['beneficiaries'], 'suffix' => '', 'sub' => __('cities.beneficiaries_reached_hint'), 'tone' => 'text-primary dark:text-brand-text'],
+        ['key' => 'targeted', 'label' => __('cities.beneficiaries_targeted'), 'value' => $summary['beneficiaries'], 'suffix' => '', 'sub' => __('cities.beneficiaries_reached_hint'), 'tone' => ''],
     ];
 
     // A calm rotation of already-brand-safe soft tones so the grid reads as
@@ -344,8 +373,8 @@ new #[Layout('layouts::desk'), Title('titles.city_directory')] class extends Com
 
     $statusOptions = [
         ['key' => '', 'label' => __('cities.all_cities')],
-        ['key' => 'active', 'label' => __('common.active')],
-        ['key' => 'inactive', 'label' => __('cities.inactive')],
+        ['key' => 'active', 'label' => __('cities.hr_open')],
+        ['key' => 'inactive', 'label' => __('cities.hr_closed')],
     ];
 
     $mapCities = collect($this->mapCities);
@@ -379,6 +408,7 @@ new #[Layout('layouts::desk'), Title('titles.city_directory')] class extends Com
                         ['key' => 'grid', 'label' => __('cities.view_grid'), 'icon' => 'squares-2x2'],
                     ]"
                     :label="__('cities.view_as')"
+                    class="pointer-coarse:h-auto pointer-coarse:[&_button]:min-h-11"
                 />
 
                 <x-ui.view-toggle
@@ -386,13 +416,14 @@ new #[Layout('layouts::desk'), Title('titles.city_directory')] class extends Com
                     :active="$status"
                     :options="$statusOptions"
                     :label="__('cities.status')"
+                    class="pointer-coarse:h-auto pointer-coarse:[&_button]:min-h-11"
                 />
             </div>
         </x-slot:actions>
 
         <x-slot:figures>
             @foreach ($figures as $figure)
-                <span wire:key="figure-{{ $figure['key'] }}"><b class="dk-num {{ $figure['tone'] }}" x-data="countUp({{ (int) $figure['value'] }})" x-text="display + '{{ $figure['suffix'] }}'">{{ $figure['value'] }}{{ $figure['suffix'] }}</b> {{ $figure['label'] }}</span>@unless ($loop->last) · @endunless
+                <span wire:key="figure-{{ $figure['key'] }}"><b class="dk-num {{ $figure['tone'] }}" x-data="countUp({{ (int) $figure['value'] }}, { grouped: true })" x-text="display + '{{ $figure['suffix'] }}'">{{ Number::format($figure['value']) }}{{ $figure['suffix'] }}</b> {{ $figure['label'] }}</span>@unless ($loop->last) · @endunless
             @endforeach
         </x-slot:figures>
     
@@ -477,7 +508,7 @@ new #[Layout('layouts::desk'), Title('titles.city_directory')] class extends Com
                                 <flux:icon.map-pin class="size-5" />
                             </div>
                             <div class="min-w-0">
-                                <p class="truncate text-base font-bold text-secondary-dark dark:text-ink">{{ $city->name }}</p>
+                                <p class="text-base font-bold break-words text-secondary-dark dark:text-ink">{{ $city->name }}</p>
                                 <p class="truncate text-xs text-secondary-medium dark:text-ink-muted" dir="auto">{{ $city->secondary_name }}</p>
                             </div>
                         </div>
@@ -486,8 +517,8 @@ new #[Layout('layouts::desk'), Title('titles.city_directory')] class extends Com
                             'shrink-0 rounded-full px-2 py-0.5 text-[11px] font-semibold whitespace-nowrap',
                             'bg-status-good-soft text-status-good' => $city->is_active,
                             'bg-secondary-soft text-secondary-medium dark:bg-surface-2 dark:text-ink-muted' => ! $city->is_active,
-                        ])>
-                            {{ $city->is_active ? __('common.active') : __('cities.inactive') }}
+                        ]) title="{{ $city->is_active ? __('cities.hr_open') : __('cities.hr_closed') }}">
+                            {{ $city->is_active ? __('cities.hr_open_short') : __('cities.hr_closed_short') }}
                         </span>
                     </div>
 
@@ -506,7 +537,7 @@ new #[Layout('layouts::desk'), Title('titles.city_directory')] class extends Com
                                 </p>
                                 @if ($cityStats['beneficiaries'] > 0)
                                     <p class="type-meta truncate text-secondary-medium dark:text-ink-muted">
-                                        {{ \Illuminate\Support\Number::format($cityStats['beneficiaries']) }} {{ __('cities.beneficiaries_reached') }}
+                                        {{ \Illuminate\Support\Number::format($cityStats['beneficiaries']) }} {{ __('cities.beneficiaries_targeted') }}
                                     </p>
                                 @endif
                             </div>

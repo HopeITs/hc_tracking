@@ -35,7 +35,7 @@ test('the directory lists every hr city in english and arabic, active or not', f
         ->assertSee('Damascus')
         ->assertSee('دمشق')
         ->assertSee('Tartus')
-        ->assertSee('Inactive');
+        ->assertSee(__('cities.hr_closed'));
 });
 
 test('the directory searches english and arabic names and clears the search', function () {
@@ -312,4 +312,77 @@ test('meal coverage adds a flat number of queries however many cities and projec
     }
 
     expect($render())->toBe($few);
+});
+
+/*
+| Page review, 6 Nov 2026: the beneficiary target read "People reached", three
+| projects tied to a city HR does not list counted as a covered city yet showed
+| nowhere, one of them claimed an officer "inherited from the governorate",
+| "Inactive" sat next to running projects, and A–Z put " Al-Hasakah" (a
+| leading space in HR) before Aleppo.
+*/
+
+test('the beneficiary figure is the target, formatted, never "reached"', function () {
+    $aleppo = insertHrCity('Aleppo');
+    Project::factory()->active()->create(['city_id' => $aleppo, 'target_beneficiaries' => 65750]);
+
+    Livewire::actingAs(User::factory()->role('General Manager')->create())
+        ->test('pages::admin.cities')
+        ->assertSeeText(__('cities.beneficiaries_targeted'))
+        ->assertSeeText('65,750')
+        ->assertDontSeeText('People reached');
+});
+
+test('projects whose city HR does not list are counted apart and shown, not lost', function () {
+    $aleppo = insertHrCity('Aleppo');
+    $missingCityId = $aleppo + 100;
+    Project::factory()->active()->create(['city_id' => $aleppo]);
+    Project::factory()->active()->count(2)->create(['city_id' => $missingCityId]);
+
+    $component = Livewire::actingAs(User::factory()->role('General Manager')->create())
+        ->test('pages::admin.cities')
+        ->set('view', 'map');
+
+    expect($component->instance()->summary()['coveredCities'])->toBe(1)
+        ->and($component->instance()->unknownCityProjects())->toBe([
+            ['cityId' => $missingCityId, 'total' => 2, 'href' => route('projects.index', ['city' => $missingCityId])],
+        ]);
+
+    $component->assertSeeHtml('data-unknown-city')
+        ->assertSeeText(__('cities.unknown_city'));
+});
+
+test('a project with no governorate HR knows says so instead of inheriting', function () {
+    $aleppo = insertHrCity('Aleppo');
+    Project::factory()->create(['city_id' => $aleppo + 100, 'name' => 'Orphan Centre']);
+
+    Livewire::actingAs(User::factory()->role('MEAL')->create())
+        ->test('pages::admin.cities')
+        ->assertSeeText('Orphan Centre')
+        ->assertSeeText(__('cities.no_governorate'))
+        ->assertDontSeeText(__('cities.inherited_from_governorate'));
+});
+
+test('A to Z ignores the spaces HR stores around a city name', function () {
+    insertHrCity(' Deir Az-zor', 'دير الزور');
+    insertHrCity('Aleppo');
+    insertHrCity(' Al-Hasakah', 'الحسكة');
+
+    $names = Livewire::actingAs(User::factory()->role('General Manager')->create())
+        ->test('pages::admin.cities')
+        ->set('view', 'grid')
+        ->instance()->cities()->getCollection()->map(fn ($city): string => trim($city->name_en))->all();
+
+    expect($names)->toBe(['Al-Hasakah', 'Aleppo', 'Deir Az-zor']);
+});
+
+test('the card badge is one word with the full HR meaning as its tooltip, so the city name keeps its room', function () {
+    insertHrCity('Al-Hasakah', 'الحسكة', isActive: false);
+
+    Livewire::actingAs(User::factory()->role('General Manager')->create())
+        ->test('pages::admin.cities')
+        ->set('view', 'grid')
+        ->assertSeeHtml('title="'.__('cities.hr_closed').'"')
+        ->assertSeeText(__('cities.hr_closed_short'))
+        ->assertSeeHtml('class="text-base font-bold break-words');
 });

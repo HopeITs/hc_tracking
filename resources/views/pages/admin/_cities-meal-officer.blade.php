@@ -20,7 +20,9 @@
             <p class="truncate text-sm font-semibold text-secondary-dark dark:text-ink">{{ $officer['name'] }}</p>
         @endif
 
-        @if ($inherited)
+        @if ($noGovernorate ?? false)
+            <p class="type-meta truncate text-status-warn" data-no-governorate>{{ __('cities.no_governorate') }}</p>
+        @elseif ($inherited)
             <p class="type-meta truncate text-secondary-medium dark:text-ink-muted">{{ __('cities.inherited_from_governorate') }}</p>
         @endif
 

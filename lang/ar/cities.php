@@ -1,13 +1,20 @@
 <?php
 
 return [
-    'active_cities' => 'المدن النشطة',
+    'active_cities' => 'مفعّلة في الموارد البشرية',
     'all_cities' => 'كل المدن',
     'arabic_name' => 'الاسم بالعربية',
-    'beneficiaries_reached' => 'المستفيدون المستهدفون',
+    'beneficiaries_targeted' => 'المستفيدون المستهدفون',
+    'hr_open' => 'مفعّلة في الموارد البشرية',
+    'hr_closed' => 'موقوفة في الموارد البشرية',
+    'hr_open_short' => 'مفعّلة',
+    'hr_closed_short' => 'موقوفة',
+    'unknown_city' => 'مدينة غير موجودة في الموارد البشرية',
+    'no_governorate' => 'لا محافظة: عيّن مسؤولًا لهذا المشروع',
+    'show_city_name' => 'اعرض :name',
     'beneficiaries_reached_hint' => 'الأهداف الرئيسية في كل المدن',
     'cities_are_managed_in_the_hr_system_and_shown_here_read_only' => 'تُدار المدن في نظام الموارد البشرية وتظهر هنا للقراءة فقط.',
-    'cities_covered' => 'مدن بها نشاط فعلي',
+    'cities_covered' => 'مدن فيها مشاريع',
     'cities_covered_hint' => 'من أصل :total مدينة مسجّلة',
     'city_name' => 'اسم المدينة',
     'clear_search' => 'مسح البحث',

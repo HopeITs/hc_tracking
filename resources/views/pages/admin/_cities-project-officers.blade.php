@@ -38,6 +38,7 @@
                     @include('pages.admin._cities-meal-officer', [
                         'officer' => $row['officer'],
                         'inherited' => $row['inherited'],
+                        'noGovernorate' => $row['noGovernorate'],
                         'canManage' => $canManage,
                         'scope' => 'project',
                         'targetId' => $row['id'],

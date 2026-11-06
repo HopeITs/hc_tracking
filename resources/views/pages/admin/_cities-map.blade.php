@@ -66,8 +66,8 @@
                         wire:key="marker-{{ $city['id'] }}"
                         x-on:click="selected = {{ $city['id'] }}"
                         :aria-pressed="selected === {{ $city['id'] }} ? 'true' : 'false'"
-                        aria-label="{{ __('cities.view_projects_in_name', ['name' => $city['name']]) }}"
-                        class="group absolute flex -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-full p-2 hover:z-30 focus-visible:z-30 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-secondary-medium"
+                        aria-label="{{ __('cities.show_city_name', ['name' => $city['name']]) }}"
+                        class="group absolute flex -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-full p-2 pointer-coarse:min-h-11 pointer-coarse:min-w-11 hover:z-30 focus-visible:z-30 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-secondary-medium"
                         style="left: {{ $leftPct }}%; top: {{ $topPct }}%;"
                         :class="selected === {{ $city['id'] }} ? 'z-10' : 'z-0'"
                     >
@@ -100,11 +100,11 @@
             <div class="flex flex-wrap items-center gap-x-4 gap-y-1.5 text-[11px] text-secondary-medium dark:text-ink-muted">
                 <span class="flex items-center gap-1.5">
                     <span class="size-2.5 rounded-full border-2 border-status-good bg-secondary-soft dark:bg-line-strong"></span>
-                    {{ __('common.active') }}
+                    {{ __('cities.hr_open') }}
                 </span>
                 <span class="flex items-center gap-1.5">
                     <span class="size-2.5 rounded-full border-2 border-secondary-light bg-secondary-soft dark:border-ink-faint dark:bg-line-strong"></span>
-                    {{ __('cities.inactive') }}
+                    {{ __('cities.hr_closed') }}
                 </span>
                 <span class="flex items-center gap-1.5">
                     <flux:icon.building-office variant="micro" class="size-3" />
@@ -136,14 +136,14 @@
             >
                 <div class="flex items-start justify-between gap-3">
                     <div class="min-w-0">
-                        <p class="truncate text-lg font-bold text-secondary-dark dark:text-ink">{{ $city['name'] }}</p>
+                        <p class="text-lg font-bold break-words text-secondary-dark dark:text-ink">{{ $city['name'] }}</p>
                         <p class="truncate text-xs text-secondary-medium dark:text-ink-muted" dir="auto">{{ $city['secondaryName'] }}</p>
                     </div>
                     <span @class([
                         'shrink-0 rounded-full px-2 py-0.5 text-[11px] font-semibold whitespace-nowrap',
                         'bg-status-good-soft text-status-good' => $city['isActive'],
                         'bg-secondary-soft text-secondary-medium dark:bg-surface-2 dark:text-ink-muted' => ! $city['isActive'],
-                    ])>{{ $city['statusLabel'] }}</span>
+                    ]) title="{{ $city['statusLabel'] }}">{{ $city['statusShort'] }}</span>
                 </div>
 
                 <div class="flex items-end justify-between gap-3">
@@ -199,8 +199,8 @@
     </div>
 </div>
 
-@if ($unmappedCities->isNotEmpty())
-    <div class="flex flex-wrap items-center gap-2">
+@if ($unmappedCities->isNotEmpty() || $this->unknownCityProjects !== [])
+    <div class="flex flex-wrap items-center gap-2" data-unmapped>
         <p class="type-label shrink-0 text-secondary-medium dark:text-ink-muted">{{ __('cities.not_shown_on_map') }}</p>
         @foreach ($unmappedCities as $city)
             <a
@@ -212,6 +212,19 @@
                 <flux:icon :name="$city['nationwide'] ? 'globe-alt' : 'map-pin'" variant="micro" class="size-3.5 text-secondary-medium dark:text-ink-muted" />
                 {{ $city['nationwide'] ? __('cities.nationwide') : $city['name'] }}
                 <span class="text-secondary-medium dark:text-ink-muted">· {{ $city['projectsLabel'] }}</span>
+            </a>
+        @endforeach
+        {{-- Projects pointing at a city HR does not list: shown, not lost. --}}
+        @foreach ($this->unknownCityProjects as $unknown)
+            <a
+                @if ($unknown['href'] !== null) href="{{ $unknown['href'] }}" wire:navigate @endif
+                wire:key="unknown-city-{{ $unknown['cityId'] ?? 'none' }}"
+                data-unknown-city
+                class="inline-flex items-center gap-1.5 rounded-full border border-status-warn/40 bg-status-warn-soft px-2.5 py-1 text-xs font-semibold text-secondary-dark transition-colors dark:text-ink"
+            >
+                <flux:icon.question-mark-circle variant="micro" class="size-3.5 text-status-warn" />
+                {{ __('cities.unknown_city') }}
+                <span class="text-secondary-medium dark:text-ink-muted">· {{ trans_choice('common.count_project', $unknown['total'], ['count' => $unknown['total']]) }}</span>
             </a>
         @endforeach
     </div>
