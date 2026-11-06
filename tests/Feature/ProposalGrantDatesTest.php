@@ -37,7 +37,8 @@ test('an editor sets the missing grant dates, starting from the planned ones, an
         ->set('grantDateEnd', '2026-10-31')
         ->call('saveGrantDates')
         ->assertHasNoErrors()
-        ->assertSet('showGrantDatesModal', false);
+        ->assertSet('showGrantDatesModal', false)
+        ->assertRedirect();
 
     $proposal = $this->proposal->fresh();
 

@@ -76,6 +76,28 @@ trait ManagesGrantDates
         $this->forgetReadings();
 
         Flux::toast(variant: 'success', text: __('proposals.grant_dates_saved'));
+
+        // The dates feed more than this block (the project Story around it, the
+        // chronology, the donor report builder), so the whole page reloads, on
+        // the same address minus the link that opened the dialog.
+        $this->redirect($this->pageUrlWithoutGrantDatesLink(), navigate: true);
+    }
+
+    /**
+     * The page the dialog was opened on (the request's referrer), without
+     * `grant_dates`, so the reload does not open the dialog again.
+     */
+    private function pageUrlWithoutGrantDatesLink(): string
+    {
+        $page = url()->previous();
+        $parts = parse_url($page);
+        parse_str($parts['query'] ?? '', $query);
+        unset($query['grant_dates']);
+
+        $base = strtok($page, '?#');
+        $fragment = isset($parts['fragment']) ? '#'.$parts['fragment'] : '';
+
+        return $base.($query === [] ? '' : '?'.http_build_query($query)).$fragment;
     }
 
     /**
