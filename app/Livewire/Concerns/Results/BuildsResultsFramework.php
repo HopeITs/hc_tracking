@@ -196,6 +196,8 @@ trait BuildsResultsFramework
      *     approved: int,
      *     funders: list<array{label: string, type: string}>,
      *     rag: array{green: int, amber: int, red: int},
+     *     old: int,
+     *     status: 'none'|'behind'|'waiting'|'ontrack'|'notarget',
      * }>
      */
     #[Computed]
@@ -203,6 +205,7 @@ trait BuildsResultsFramework
     {
         $windowStart = now()->startOfYear();
         $windowEnd = now()->endOfYear();
+        $today = CarbonImmutable::today();
         $measurements = [];
 
         foreach ($this->allResults as $result) {
@@ -214,6 +217,7 @@ trait BuildsResultsFramework
             $reports = 0;
             $approved = 0;
             $funders = [];
+            $old = 0;
 
             foreach ($result->indicators as $indicator) {
                 $achieved = $indicator->percentAchieved();
@@ -238,8 +242,14 @@ trait BuildsResultsFramework
                     }
                 }
 
+                // Never read, or not read within its own cadence: the figure is old.
+                if ($latestReading === null || $latestReading->date->startOfDay()->diffInDays($today, false) > $indicator->frequency->freshnessDays()) {
+                    $old++;
+                }
+
                 if ($achieved !== null) {
-                    $achievements[] = $achieved;
+                    // Capped so one over-target indicator cannot lift the average.
+                    $achievements[] = min($achieved, 100.0);
                 }
 
                 if ($status !== null) {
@@ -267,6 +277,14 @@ trait BuildsResultsFramework
                 'approved' => $approved,
                 'funders' => array_values($funders),
                 'rag' => $rag,
+                'old' => $old,
+                'status' => match (true) {
+                    $rows === [] => 'none',
+                    $rag['amber'] + $rag['red'] > 0 => 'behind',
+                    $old > 0 => 'waiting',
+                    $rag['green'] > 0 => 'ontrack',
+                    default => 'notarget',
+                },
             ];
         }
 

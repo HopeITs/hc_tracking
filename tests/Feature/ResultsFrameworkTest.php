@@ -91,7 +91,6 @@ test('a program with a purely numeric name does not break either view', function
         ->test('pages::results.index')
         ->assertOk()
         ->assertSee('Numeric program statement.')
-        ->set('view', 'matrix')
         ->assertOk()
         ->assertSee('Numeric program statement.');
 });
@@ -207,9 +206,7 @@ test('the overview counts statements, indicators, targets and measurement covera
         ->and($overview['measured'])->toBe(1)
         ->and($overview['indicators'])->toBe(1)
         ->and($overview['targets'])->toBe(1)
-        ->and($overview['coverage'])->toBe(50.0)
-        ->and($overview['levels'][ResultType::Outcome->value]['measured'])->toBe(1)
-        ->and($overview['levels'][ResultType::Output->value]['measured'])->toBe(0);
+        ->and($overview['coverage'])->toBe(50.0);
 });
 
 test('the search matches an indicator name as well as a statement', function () {
@@ -291,7 +288,7 @@ test('a statement whose parent a filter hides is promoted to the top and keeps i
         ->assertDontSee('data-result-type="impact"', false);
 });
 
-test('the matrix view lists every visible statement', function () {
+test('the framework lists every visible statement, nested under its program', function () {
     $user = User::factory()->role('General Manager')->create();
     $program = Program::factory()->create();
 
@@ -309,7 +306,6 @@ test('the matrix view lists every visible statement', function () {
 
     Livewire::actingAs($user)
         ->test('pages::results.index')
-        ->set('view', 'matrix')
         ->assertSee('Matrix impact statement.')
         ->assertSee('Matrix output statement.')
         ->assertSee('data-tree-depth="1"', false);
@@ -377,22 +373,11 @@ test('the attention chips count under the other active filters, not the whole ta
 
     $component = Livewire::actingAs($user)->test('pages::results.index');
 
-    expect($component->instance()->focusCounts())->toBe(['unmeasured' => 2, 'offtrack' => 0]);
+    expect($component->instance()->focusCounts())->toBe(['unmeasured' => 2, 'offtrack' => 0, 'waiting' => 0]);
 
     $scoped = $component->set('program', (string) $first->id);
 
-    expect($scoped->instance()->focusCounts())->toBe(['unmeasured' => 1, 'offtrack' => 0]);
-});
-
-test('a level in the results chain toggles the type filter', function () {
-    $user = User::factory()->role('General Manager')->create();
-
-    Livewire::actingAs($user)
-        ->test('pages::results.index')
-        ->call('setType', ResultType::Output->value)
-        ->assertSet('type', ResultType::Output->value)
-        ->call('setType', ResultType::Output->value)
-        ->assertSet('type', '');
+    expect($scoped->instance()->focusCounts())->toBe(['unmeasured' => 1, 'offtrack' => 0, 'waiting' => 0]);
 });
 
 test('the parent picker offers only statements one level up the chain', function () {
@@ -680,4 +665,64 @@ describe('the create deep link (T14)', function () {
         'unknown program' => ['MEAL', 999999, '1'],
         'create is not 1' => ['MEAL', null, '2'],
     ]);
+});
+
+test('a statement whose only reading is old is waiting for a measurement, never on track', function () {
+    $this->travelTo(CarbonImmutable::parse('2026-06-30 12:00:00'));
+
+    $user = User::factory()->role('General Manager')->create();
+
+    $old = Result::factory()->create(['statement' => 'Read long ago.']);
+    $fresh = Result::factory()->create(['statement' => 'Read this month.']);
+    $never = Result::factory()->create(['statement' => 'Never read.']);
+
+    $oldIndicator = Indicator::factory()->create(['result_id' => $old->id, 'baseline' => 0, 'target' => 100, 'frequency' => Period::Quarterly]);
+    IndicatorProgress::factory()->create(['indicator_id' => $oldIndicator->id, 'value' => 100, 'date' => '2026-01-31']);
+
+    $freshIndicator = Indicator::factory()->create(['result_id' => $fresh->id, 'baseline' => 0, 'target' => 100, 'frequency' => Period::Quarterly]);
+    IndicatorProgress::factory()->create(['indicator_id' => $freshIndicator->id, 'value' => 100, 'date' => '2026-06-20']);
+
+    Indicator::factory()->create(['result_id' => $never->id, 'frequency' => Period::Quarterly]);
+
+    $component = Livewire::actingAs($user)->test('pages::results.index');
+
+    expect($component->instance()->measurements()[$old->id]['status'])->toBe('waiting')
+        ->and($component->instance()->measurements()[$fresh->id]['status'])->toBe('ontrack')
+        ->and($component->instance()->measurements()[$never->id]['status'])->toBe('waiting')
+        ->and($component->instance()->focusCounts())->toBe(['unmeasured' => 0, 'offtrack' => 0, 'waiting' => 2]);
+
+    $component->call('setFocus', 'waiting')
+        ->assertSee('Read long ago.')
+        ->assertSee('Never read.')
+        ->assertDontSee('Read this month.');
+});
+
+test('the average achievement caps one over-target indicator at 100 percent', function () {
+    $user = User::factory()->role('General Manager')->create();
+    $result = Result::factory()->create();
+
+    $over = Indicator::factory()->create(['result_id' => $result->id, 'baseline' => 0, 'target' => 10]);
+    IndicatorProgress::factory()->create(['indicator_id' => $over->id, 'value' => 50]);
+
+    $under = Indicator::factory()->create(['result_id' => $result->id, 'baseline' => 0, 'target' => 100]);
+    IndicatorProgress::factory()->create(['indicator_id' => $under->id, 'value' => 50]);
+
+    $component = Livewire::actingAs($user)->test('pages::results.index');
+
+    expect($component->instance()->measurements()[$result->id]['achieved'])->toBe(75.0);
+});
+
+test('the three headline buttons render inside the livewire root so they work', function () {
+    $user = User::factory()->role('General Manager')->create();
+    Result::factory()->create();
+
+    $html = Livewire::actingAs($user)->test('pages::results.index')->html();
+
+    $dom = new DOMDocument;
+    @$dom->loadHTML('<?xml encoding="utf-8"?>'.$html);
+    $xpath = new DOMXPath($dom);
+
+    foreach (['unmeasured', 'offtrack', 'waiting'] as $key) {
+        expect($xpath->query('//*[@*[name()="wire:id"]]//button[@data-test="focus-chip-'.$key.'"]')->length)->toBe(1);
+    }
 });

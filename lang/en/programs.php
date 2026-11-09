@@ -34,7 +34,7 @@ return [
     'load_more' => 'Load more',
     'load_more_programs' => 'Load more programs',
     'loading_more_programs' => 'Loading programs…',
-    'logframe_checkout' => ':period check-out',
+    'logframe_checkout' => 'Review: :period',
     'logframe_count_contributing' => '{0} No contributing results|{1} :count contributing result|[2,*] :count contributing results',
     'logframe_count_indicators' => '{0} No indicators yet|{1} :count indicator|[2,*] :count indicators',
     'logframe_count_unmeasured' => '{0} Every statement is measured|{1} :count statement without indicators|[2,*] :count statements without indicators',

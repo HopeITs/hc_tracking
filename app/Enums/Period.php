@@ -35,4 +35,19 @@ enum Period: string
     {
         return array_column(self::cases(), 'value');
     }
+
+    /**
+     * How many days a measurement may go unread before it counts as old.
+     *
+     * The cadence an indicator promises, expressed as a deadline for the next reading.
+     */
+    public function freshnessDays(): int
+    {
+        return match ($this) {
+            self::Monthly => 31,
+            self::Quarterly => 92,
+            self::SemiAnnual => 184,
+            self::Annual => 366,
+        };
+    }
 }

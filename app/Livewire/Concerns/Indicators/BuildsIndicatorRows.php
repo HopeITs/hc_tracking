@@ -187,12 +187,7 @@ trait BuildsIndicatorRows
      */
     protected function freshnessDays(Period $frequency): int
     {
-        return match ($frequency) {
-            Period::Monthly => 31,
-            Period::Quarterly => 92,
-            Period::SemiAnnual => 184,
-            Period::Annual => 366,
-        };
+        return $frequency->freshnessDays();
     }
 
     /**

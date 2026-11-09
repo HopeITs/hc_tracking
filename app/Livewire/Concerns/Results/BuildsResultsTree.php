@@ -69,7 +69,11 @@ trait BuildsResultsTree
             return false;
         }
 
-        if ($focus === 'offtrack' && $measurement['rag']['amber'] + $measurement['rag']['red'] === 0) {
+        if ($focus === 'offtrack' && $measurement['status'] !== 'behind') {
+            return false;
+        }
+
+        if ($focus === 'waiting' && $measurement['status'] !== 'waiting') {
             return false;
         }
 
