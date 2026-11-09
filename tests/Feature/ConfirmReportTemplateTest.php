@@ -273,6 +273,16 @@ test('a MEAL user who is not responsible for the project is refused', function (
         ->and($project->fresh()->status)->toBe(ProjectStatus::Approved);
 });
 
+test('the General Manager cannot confirm a report template', function () {
+    ['project' => $project, 'template' => $template, 'line' => $line] = rtFixture();
+    $this->actingAs(userWithRole('General Manager'));
+
+    expect(fn () => app(ConfirmReportTemplate::class)->handle($template, [$line->id]))->toThrow(AuthorizationException::class);
+
+    expect($line->fresh()->status)->toBe(ReportTemplateLineStatus::Pending)
+        ->and($project->fresh()->status)->toBe(ProjectStatus::Approved);
+});
+
 test('the officer assigned to the project is allowed though based in another governorate', function () {
     holdMealManagerSlot();
     $officer = userWithRole('MEAL', insertHrEmployee(insertHrCity('Homs', 'حمص'), 'Nour', 'Ali'));

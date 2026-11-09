@@ -193,7 +193,8 @@ test('the General Manager never validates, even as the responsible officer', fun
 
     expect($generalManager->can('validate', $submitted))->toBeFalse()
         ->and($generalManager->can('return', $submitted))->toBeFalse()
-        ->and($generalManager->can('fillMealLines', $submitted))->toBeFalse();
+        ->and($generalManager->can('fillMealLines', $submitted))->toBeFalse()
+        ->and($generalManager->can('markSeen', $submitted))->toBeFalse();
 });
 
 test('the preparer side requests a reopen of a validated report only', function () {
