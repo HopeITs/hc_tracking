@@ -85,12 +85,12 @@ class ProposalPolicy
     }
 
     /**
-     * Determine whether the user can record the donor's approval. There is no
-     * proposals.approve permission: approval follows proposals.update.
+     * Determine whether the user can record the donor's approval (D-70): only
+     * the holders of proposals.approve, which is the Public Relations Manager.
      */
     public function approve(User $user, Proposal $proposal): bool
     {
-        return $user->can('proposals.update');
+        return $user->can('proposals.approve');
     }
 
     /**

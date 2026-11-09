@@ -13,7 +13,7 @@ test('the lifecycle modules carry exactly their contract actions', function (str
     expect(config("access-control.groups.{$module}"))->toBe($actions);
 })->with([
     'indicator-library' => ['indicator-library', ['view', 'create', 'update', 'delete']],
-    'proposals' => ['proposals', ['view', 'create', 'update', 'delete', 'manage-reviewers', 'correct-status']],
+    'proposals' => ['proposals', ['view', 'create', 'update', 'delete', 'manage-reviewers', 'correct-status', 'approve']],
     'reports' => ['reports', ['view', 'create', 'update', 'delete', 'approve', 'mark-seen', 'reopen', 'aggregate']],
     'meal-coverage' => ['meal-coverage', ['manage']],
     'supervisions' => ['supervisions', ['manage']],

@@ -103,7 +103,7 @@ function refusedApproval(callable $move): array
 }
 
 test('approving fixes the grant dates, writes one note and funds an acknowledged project without activating it', function () {
-    $actor = userWithRole('Financial');
+    $actor = userWithRole('Public Relations Manager');
     $proposal = submittedProposal();
     $project = linkedProject($proposal);
     Event::fake([ProposalStatusChanged::class]);
@@ -138,14 +138,14 @@ test('an agreement on record removes the no-agreement warning', function () {
     linkedProject($proposal);
     DonorProposal::factory()->create(['proposal_id' => $proposal->id]);
 
-    expect(approve(userWithRole('Financial'), $proposal)->warnings)->not->toContain('no_agreement');
+    expect(approve(userWithRole('Public Relations Manager'), $proposal)->warnings)->not->toContain('no_agreement');
 });
 
 test('a project whose owner has not acknowledged gets the dates and stays a draft until they do', function () {
     $proposal = submittedProposal();
     $project = linkedProject($proposal, ownerAcknowledged: false);
 
-    $result = approve(userWithRole('Financial'), $proposal);
+    $result = approve(userWithRole('Public Relations Manager'), $proposal);
 
     $project->refresh();
 
@@ -166,7 +166,7 @@ test('acknowledging from the notification quick action approves the waiting proj
     $employee = insertHrEmployee();
     $owner = userWithRole('Managers', $employee);
     $project = linkedProject($proposal, ownerAcknowledged: false, attributes: ['user_id' => $employee]);
-    approve(userWithRole('Financial'), $proposal);
+    approve(userWithRole('Public Relations Manager'), $proposal);
 
     $this->actingAs($owner);
     $notification = UserNotification::query()->forUser($owner)->get()
@@ -179,7 +179,7 @@ test('acknowledging from the notification quick action approves the waiting proj
 test('putting yourself in charge of a waiting project approves it', function () {
     $proposal = submittedProposal();
     $project = linkedProject($proposal, ownerAcknowledged: false);
-    approve(userWithRole('Financial'), $proposal);
+    approve(userWithRole('Public Relations Manager'), $proposal);
 
     $employee = insertHrEmployee();
     $self = userWithRole('General Manager', $employee);
@@ -194,7 +194,7 @@ test('a rejected owner keeps the project a draft and the project is skipped', fu
     $project = linkedProject($proposal, ownerAcknowledged: false);
     $project->currentAssignment('user_id')->forceFill(['status' => AssignmentStatus::Rejected])->save();
 
-    $result = approve(userWithRole('Financial'), $proposal);
+    $result = approve(userWithRole('Public Relations Manager'), $proposal);
 
     expect($project->fresh()->status)->toBe(ProjectStatus::Draft)
         ->and($project->fresh()->start_date)->toBeNull()
@@ -225,7 +225,7 @@ test('approved and active projects are extended, never shortened', function () {
     $active = linkedProject($proposal, attributes: ['start_date' => '2026-01-01', 'end_date' => '2028-03-31'], state: ProjectStatus::Active);
     Event::fake([ProjectPeriodChanged::class, ProposalStatusChanged::class]);
 
-    approve(userWithRole('Financial'), $proposal);
+    approve(userWithRole('Public Relations Manager'), $proposal);
 
     expect($approved->fresh()->status)->toBe(ProjectStatus::Approved)
         ->and($approved->fresh()->start_date->toDateString())->toBe('2026-11-01')
@@ -243,7 +243,7 @@ test('an active project whose end moves raises ProjectPeriodChanged once', funct
     $active = linkedProject($proposal, attributes: ['start_date' => '2026-01-01', 'end_date' => '2027-03-31'], state: ProjectStatus::Active);
     Event::fake([ProjectPeriodChanged::class, ProposalStatusChanged::class]);
 
-    approve(userWithRole('Financial'), $proposal);
+    approve(userWithRole('Public Relations Manager'), $proposal);
 
     Event::assertDispatchedTimes(ProjectPeriodChanged::class, 1);
     Event::assertDispatched(ProjectPeriodChanged::class, fn (ProjectPeriodChanged $event): bool => $event->projectId === $active->id
@@ -256,7 +256,7 @@ test('archived and closed projects are skipped and named', function () {
     $archived = linkedProject($proposal, attributes: ['status' => ProjectStatus::Archived]);
     $closed = linkedProject($proposal, state: ProjectStatus::Closed);
 
-    $result = approve(userWithRole('Financial'), $proposal);
+    $result = approve(userWithRole('Public Relations Manager'), $proposal);
 
     expect($result->skippedProjectIds)->toEqualCanonicalizing([$archived->id, $closed->id])
         ->and($archived->fresh()->status)->toBe(ProjectStatus::Archived);
@@ -265,7 +265,7 @@ test('archived and closed projects are skipped and named', function () {
 test('approval is allowed while the proposal is on hold, and clears the hold', function () {
     // A hold keeps the status since W-06 (D-58), so this is a plain
     // submitted → approved move with a flag to clear on the way.
-    $actor = userWithRole('Financial');
+    $actor = userWithRole('Public Relations Manager');
     $proposal = submittedProposal(ProposalStatus::Submitted);
     linkedProject($proposal);
 
@@ -295,7 +295,7 @@ test('approval is refused with no write from the wrong status', function (Propos
     $notes = $proposal->statusNotes()->count();
     Event::fake([ProposalStatusChanged::class]);
 
-    $errors = refusedApproval(fn () => approve(userWithRole('Financial'), $proposal));
+    $errors = refusedApproval(fn () => approve(userWithRole('Public Relations Manager'), $proposal));
 
     expect($errors)->toHaveKey('status')
         ->and($proposal->fresh()->status)->toBe($status)
@@ -313,14 +313,14 @@ test('approving an approved proposal says so and writes nothing', function () {
     $proposal = submittedProposal(ProposalStatus::Approved);
     linkedProject($proposal);
 
-    $errors = refusedApproval(fn () => approve(userWithRole('Financial'), $proposal, expectedFrom: ProposalStatus::Submitted));
+    $errors = refusedApproval(fn () => approve(userWithRole('Public Relations Manager'), $proposal, expectedFrom: ProposalStatus::Submitted));
 
     expect($errors['status'][0])->toBe(__('proposals.already_approved'))
         ->and($proposal->statusNotes()->count())->toBe(0);
 });
 
 test('double approval writes one note and one event', function () {
-    $actor = userWithRole('Financial');
+    $actor = userWithRole('Public Relations Manager');
     $proposal = submittedProposal();
     linkedProject($proposal);
     Event::fake([ProposalStatusChanged::class]);
@@ -337,7 +337,7 @@ test('double approval writes one note and one event', function () {
 test('a proposal with no linked project cannot be approved', function () {
     $proposal = submittedProposal();
 
-    $errors = refusedApproval(fn () => approve(userWithRole('Financial'), $proposal));
+    $errors = refusedApproval(fn () => approve(userWithRole('Public Relations Manager'), $proposal));
 
     expect($errors['linked_project'][0])->toBe(__('proposals.link_project_first'))
         ->and($proposal->fresh()->status)->toBe(ProposalStatus::Submitted);
@@ -349,7 +349,7 @@ test('a location row without a responsible refuses the approval with the incompl
     ProposalLocation::factory()->for($proposal)->create(['program_id' => $project->program_id, 'responsible_employee_id' => null]);
     Event::fake([ProposalStatusChanged::class]);
 
-    $errors = refusedApproval(fn () => approve(userWithRole('Financial'), $proposal));
+    $errors = refusedApproval(fn () => approve(userWithRole('Public Relations Manager'), $proposal));
 
     expect($errors['locations_complete'])->toBe([__('proposals.locations_incomplete')])
         ->and($proposal->fresh()->status)->toBe(ProposalStatus::Submitted)
@@ -364,7 +364,7 @@ test('a proposal whose rows all carry a project approves as before', function ()
     $project = linkedProject($proposal);
     ProposalLocation::factory()->for($proposal)->forProject($project)->create();
 
-    $result = approve(userWithRole('Financial'), $proposal);
+    $result = approve(userWithRole('Public Relations Manager'), $proposal);
 
     expect($proposal->fresh()->status)->toBe(ProposalStatus::Approved)
         ->and($result->approvedProjectIds)->toBe([$project->id])
@@ -376,7 +376,7 @@ test('the donor approval needs a file or a note of at least ten characters', fun
     linkedProject($proposal);
 
     foreach ([null, '', 'too short'] as $note) {
-        $errors = refusedApproval(fn () => approve(userWithRole('Financial'), $proposal, ['approval_note' => $note]));
+        $errors = refusedApproval(fn () => approve(userWithRole('Public Relations Manager'), $proposal, ['approval_note' => $note]));
 
         expect($errors['approval_note'][0])->toBe(__('proposals.approval_evidence_required'));
     }
@@ -389,7 +389,7 @@ test('a donor approval file alone is enough', function () {
     linkedProject($proposal);
     Media::factory()->create(['mediable_type' => 'proposal', 'mediable_id' => $proposal->id, 'collection' => MediaCollection::DonorApproval]);
 
-    approve(userWithRole('Financial'), $proposal, ['approval_note' => null]);
+    approve(userWithRole('Public Relations Manager'), $proposal, ['approval_note' => null]);
 
     expect($proposal->fresh()->status)->toBe(ProposalStatus::Approved)
         ->and($proposal->fresh()->approval_note)->toBeNull();
@@ -400,7 +400,7 @@ test('a file in another category does not count as donor approval evidence', fun
     linkedProject($proposal);
     Media::factory()->create(['mediable_type' => 'proposal', 'mediable_id' => $proposal->id, 'collection' => MediaCollection::Other]);
 
-    $errors = refusedApproval(fn () => approve(userWithRole('Financial'), $proposal, ['approval_note' => null]));
+    $errors = refusedApproval(fn () => approve(userWithRole('Public Relations Manager'), $proposal, ['approval_note' => null]));
 
     expect($errors)->toHaveKey('approval_note');
 });
@@ -409,7 +409,7 @@ test('the dates and the decision date are validated with translated messages', f
     $proposal = submittedProposal();
     linkedProject($proposal);
 
-    $errors = refusedApproval(fn () => approve(userWithRole('Financial'), $proposal, $input));
+    $errors = refusedApproval(fn () => approve(userWithRole('Public Relations Manager'), $proposal, $input));
 
     expect($errors[$key][0])->toBe(__($message));
 })->with([
@@ -423,7 +423,7 @@ test('a start before the decision date is accepted with an explanatory note', fu
     $proposal = submittedProposal();
     linkedProject($proposal);
 
-    approve(userWithRole('Financial'), $proposal, ['actual_date_begin' => '2026-10-01', 'note' => 'Work started on the donor\'s verbal go-ahead.']);
+    approve(userWithRole('Public Relations Manager'), $proposal, ['actual_date_begin' => '2026-10-01', 'note' => 'Work started on the donor\'s verbal go-ahead.']);
 
     expect($proposal->fresh()->actual_date_begin->toDateString())->toBe('2026-10-01')
         ->and($proposal->statusNotes()->sole()->context)->toContain('verbal go-ahead');
@@ -433,26 +433,26 @@ test('the note is capped at 2000 characters', function () {
     $proposal = submittedProposal();
     linkedProject($proposal);
 
-    $errors = refusedApproval(fn () => approve(userWithRole('Financial'), $proposal, ['note' => str_repeat('x', 2001)]));
+    $errors = refusedApproval(fn () => approve(userWithRole('Public Relations Manager'), $proposal, ['note' => str_repeat('x', 2001)]));
 
     expect($errors)->toHaveKey('note');
 });
 
-test('approving without proposals.update is forbidden and writes nothing', function () {
+test('only the Public Relations Manager approves: every other role is forbidden and nothing is written (D-70)', function (string $role) {
     $proposal = submittedProposal();
     $project = linkedProject($proposal);
     Event::fake([ProposalStatusChanged::class]);
 
-    expect(fn () => approve(userWithRole('Team Member'), $proposal))->toThrow(AuthorizationException::class);
+    expect(fn () => approve(userWithRole($role), $proposal))->toThrow(AuthorizationException::class);
 
     expect($proposal->fresh()->status)->toBe(ProposalStatus::Submitted)
         ->and($project->fresh()->start_date)->toBeNull();
 
     Event::assertNotDispatched(ProposalStatusChanged::class);
-});
+})->with(['Team Member', 'Financial', 'General Manager', 'Managers', 'MEAL', 'Public Relations', 'Media Team']);
 
 test('a failure inside approval rolls everything back and dispatches nothing', function () {
-    $actor = userWithRole('Financial');
+    $actor = userWithRole('Public Relations Manager');
     $proposal = submittedProposal();
     $project = linkedProject($proposal);
     Event::fake([ProposalStatusChanged::class, ProjectPeriodChanged::class]);
@@ -478,7 +478,7 @@ test('the activity of the approval carries no amount', function () {
     $proposal->forceFill(['requested_budget' => '120000.00'])->save();
     linkedProject($proposal);
 
-    approve(userWithRole('Financial'), $proposal);
+    approve(userWithRole('Public Relations Manager'), $proposal);
 
     $activity = DB::table('activities')->where('subject_type', 'proposal')->where('subject_id', $proposal->id)->where('event', 'proposal.approved')->first();
 
@@ -491,7 +491,7 @@ test('a project reached through the approval records project.approved with its v
     $proposal = submittedProposal();
     $project = linkedProject($proposal);
 
-    approve(userWithRole('Financial'), $proposal);
+    approve(userWithRole('Public Relations Manager'), $proposal);
 
     $activity = DB::table('activities')->where('subject_type', 'project')->where('subject_id', $project->id)->where('event', 'project.approved')->first();
 
@@ -516,7 +516,7 @@ test('Assignment is unchanged for a project that is not waiting on a donor-appro
 });
 
 test('a failed caller around a payroll approval leaves it submitted and dispatches neither event', function () {
-    $actor = userWithRole('Financial');
+    $actor = userWithRole('Public Relations Manager');
     $proposal = Proposal::factory()->payroll()->create([
         'status' => ProposalStatus::Submitted,
         'planned_date_begin' => '2026-11-01',
@@ -543,7 +543,7 @@ test('a project proposal still needs a linked project and stays approved, not ac
     $proposal = submittedProposal();
     linkedProject($proposal);
 
-    approve(userWithRole('Financial'), $proposal);
+    approve(userWithRole('Public Relations Manager'), $proposal);
 
     expect($proposal->fresh()->status)->toBe(ProposalStatus::Approved)
         ->and($proposal->statusNotes()->pluck('status')->all())->toBe([ProposalStatus::Approved]);

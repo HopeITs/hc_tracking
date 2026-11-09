@@ -41,22 +41,28 @@ function approveModal(string $role, Proposal $proposal): Testable
         ->call('openApproveModal', $proposal->id);
 }
 
-test('the button shows only while the proposal can be approved and only to proposal editors', function () {
+test('the button shows only while the proposal can be approved and only to the Public Relations Manager (D-70)', function () {
     ['proposal' => $proposal] = proposalReadyToApprove();
 
-    Livewire::actingAs(userWithRole('Financial'))->test('pages::proposals.show', ['proposal' => $proposal])->assertSeeHtml('data-test="open-approve-modal"');
+    foreach (['Financial', 'General Manager', 'Managers'] as $role) {
+        Livewire::actingAs(userWithRole($role))->test('pages::proposals.show', ['proposal' => $proposal])->assertDontSeeHtml('data-test="open-approve-modal"');
+    }
+
+    Livewire::actingAs(userWithRole('Financial'))->test('pages::proposals.show', ['proposal' => $proposal])->call('openApproveModal', $proposal->id)->assertForbidden();
+
+    Livewire::actingAs(userWithRole('Public Relations Manager'))->test('pages::proposals.show', ['proposal' => $proposal])->assertSeeHtml('data-test="open-approve-modal"');
     Livewire::actingAs(userWithRole('Team Member'))->test('pages::proposals.show', ['proposal' => $proposal])->assertDontSeeHtml('data-test="open-approve-modal"');
 
     $proposal->forceFill(['status' => ProposalStatus::ProposalDraft])->save();
 
-    Livewire::actingAs(userWithRole('Financial'))->test('pages::proposals.show', ['proposal' => $proposal])->assertDontSeeHtml('data-test="open-approve-modal"');
+    Livewire::actingAs(userWithRole('Public Relations Manager'))->test('pages::proposals.show', ['proposal' => $proposal])->assertDontSeeHtml('data-test="open-approve-modal"');
 });
 
 test('the dialog pre-fills the planned dates and previews each project in English and Arabic', function (string $locale) {
     app()->setLocale($locale);
     ['proposal' => $proposal, 'ready' => $ready, 'waiting' => $waiting] = proposalReadyToApprove();
 
-    $component = approveModal('Financial', $proposal)
+    $component = approveModal('Public Relations Manager', $proposal)
         ->assertSet('showApproveModal', true)
         ->assertSet('approveBegin', '2026-11-01')
         ->assertSet('approveEnd', '2027-10-31')
@@ -75,7 +81,7 @@ test('a planned start in the past moves to the decision date and keeps the plann
     ['proposal' => $proposal] = proposalReadyToApprove();
     $proposal->forceFill(['planned_date_begin' => '2026-09-01', 'planned_date_end' => '2027-08-31'])->save();
 
-    approveModal('Financial', $proposal)
+    approveModal('Public Relations Manager', $proposal)
         ->assertSet('approveBegin', '2026-10-14')
         ->assertSet('approveEnd', '2027-10-13');
 });
@@ -83,7 +89,7 @@ test('a planned start in the past moves to the decision date and keeps the plann
 test('approving with a note funds the ready project, leaves the waiting one a dated draft and closes the dialog', function () {
     ['proposal' => $proposal, 'ready' => $ready, 'waiting' => $waiting] = proposalReadyToApprove();
 
-    approveModal('Financial', $proposal)
+    approveModal('Public Relations Manager', $proposal)
         ->set('approveDecisionDate', '2026-10-13')
         ->set('approveEvidenceMode', 'note')
         ->set('approveEvidenceNote', 'The donor confirmed by email on 12 October.')
@@ -101,7 +107,7 @@ test('a donor approval file is stored in its own category and counts as the evid
     Storage::fake('local');
     ['proposal' => $proposal] = proposalReadyToApprove();
 
-    approveModal('Financial', $proposal)
+    approveModal('Public Relations Manager', $proposal)
         ->set('approveDecisionDate', '2026-10-13')
         ->set('approveFile', validUpload('donor-email.pdf', 100))
         ->call('approveProposal')
@@ -114,7 +120,7 @@ test('a donor approval file is stored in its own category and counts as the evid
 test('missing evidence is explained next to the field and nothing is written', function (string $mode, string $field) {
     ['proposal' => $proposal] = proposalReadyToApprove();
 
-    approveModal('Financial', $proposal)
+    approveModal('Public Relations Manager', $proposal)
         ->set('approveDecisionDate', '2026-10-13')
         ->set('approveEvidenceMode', $mode)
         ->call('approveProposal')
@@ -131,7 +137,7 @@ test('missing evidence is explained next to the field and nothing is written', f
 test('a proposal approved elsewhere meanwhile shows the explanation and a reload button', function () {
     ['proposal' => $proposal] = proposalReadyToApprove();
 
-    $component = approveModal('Financial', $proposal);
+    $component = approveModal('Public Relations Manager', $proposal);
     $proposal->forceFill(['status' => ProposalStatus::Approved])->save();
 
     $component->set('approveDecisionDate', '2026-10-13')
@@ -155,7 +161,7 @@ test('a proposal that cannot be approved does not open the dialog', function () 
     ['proposal' => $proposal] = proposalReadyToApprove();
     $proposal->forceFill(['status' => ProposalStatus::ProposalDraft])->save();
 
-    approveModal('Financial', $proposal)->assertSet('showApproveModal', false);
+    approveModal('Public Relations Manager', $proposal)->assertSet('showApproveModal', false);
 });
 
 test('the preview names extended and skipped projects too', function () {
@@ -164,7 +170,7 @@ test('the preview names extended and skipped projects too', function () {
     $archived = Project::factory()->status(ProjectStatus::Archived)->create(['name' => 'Archived project']);
     $proposal->projects()->attach([$active->id => ['target_beneficiaries' => 10], $archived->id => ['target_beneficiaries' => 10]]);
 
-    $outcomes = collect(approveModal('Financial', $proposal)->instance()->approvalPreview)->pluck('outcome', 'name');
+    $outcomes = collect(approveModal('Public Relations Manager', $proposal)->instance()->approvalPreview)->pluck('outcome', 'name');
 
     expect($outcomes['Running project'])->toBe('extended')
         ->and($outcomes['Archived project'])->toBe('skipped');

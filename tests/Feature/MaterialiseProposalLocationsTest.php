@@ -322,10 +322,10 @@ test('approving without proposals.update is forbidden and creates nothing', func
         ->and($proposal->fresh()->status)->toBe(ProposalStatus::Submitted);
 });
 
-test('Financial may approve rows that create projects: the role holds projects.create since W-34a', function () {
+test('the Public Relations Manager may approve rows that create projects: the role holds projects.create', function () {
     $proposal = proposalWithRows([newRow()]);
 
-    approveWithRows(userWithRole('Financial'), $proposal);
+    approveWithRows(userWithRole('Public Relations Manager'), $proposal);
 
     expect($proposal->fresh()->status)->toBe(ProposalStatus::Approved)
         ->and(DB::table('projects')->count())->toBe(1);
@@ -334,7 +334,7 @@ test('Financial may approve rows that create projects: the role holds projects.c
 test('an approver without projects.create cannot approve rows that would create projects', function () {
     $proposal = proposalWithRows([newRow()]);
     $approver = userWithRole('Team Member');
-    $approver->givePermissionTo('proposals.update');
+    $approver->givePermissionTo(['proposals.update', 'proposals.approve']);
 
     expect(fn () => approveWithRows($approver, $proposal))->toThrow(AuthorizationException::class);
 
@@ -347,7 +347,7 @@ test('an approver without projects.create still approves rows that only reuse op
     $open = Project::factory()->create(['city_id' => $this->aleppo, 'center_id' => $this->aleppoCenter, 'program_id' => $this->program->id]);
     $proposal = proposalWithRows([newRow()]);
     $approver = userWithRole('Team Member');
-    $approver->givePermissionTo('proposals.update');
+    $approver->givePermissionTo(['proposals.update', 'proposals.approve']);
 
     approveWithRows($approver, $proposal);
 

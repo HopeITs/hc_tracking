@@ -74,7 +74,7 @@ function rebaseTestTask(Proposal $proposal, ?string $start, ?string $due, array 
  */
 function rebaseTestApprove(Proposal $proposal, string $grantBegin = '2027-01-01', string $grantEnd = '2027-09-30'): void
 {
-    test()->actingAs(userWithRole('Financial'));
+    test()->actingAs(userWithRole('Public Relations Manager'));
 
     app(ApproveProposal::class)->handle($proposal, ProposalStatus::Submitted, [
         'actual_date_begin' => $grantBegin,

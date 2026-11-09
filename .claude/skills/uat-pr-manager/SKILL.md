@@ -22,4 +22,5 @@ Role name in code: `'Public Relations Manager'` (`userWithRole('Public Relations
 - **PM-04** ⚠ A second agreement on the same proposal is refused; so is one on a proposal the donor hasn't approved.
 - **PM-05** ✅ Accept the final report: the proposal becomes `completed`.
 - **PM-06** ✅ Record an extension: new end date, reason, file.
-- **PM-07** 🚫 Cannot approve a proposal, approve a donor, validate monthly reports, or edit transfers.
+- **PM-07** 🚫 Cannot approve a donor, validate monthly reports, or edit transfers.
+- **PM-08** ✅ Only the PR Manager records the donor's approval of a proposal (`proposals.approve`, D-70): Financial, General Manager and every other role are refused and see no Approve button. The General Manager (CEO) is notified when the PR Manager approves.

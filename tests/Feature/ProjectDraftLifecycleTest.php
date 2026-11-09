@@ -325,7 +325,7 @@ test('the draft invariant holds after an approval: waiting drafts hold dates, ac
     $acknowledged->currentAssignment('user_id')->forceFill(['status' => AssignmentStatus::Acknowledged])->save();
     $proposal->projects()->attach([$waiting->id => ['target_beneficiaries' => 10], $acknowledged->id => ['target_beneficiaries' => 10]]);
 
-    $this->actingAs(userWithRole('Financial'));
+    $this->actingAs(userWithRole('Public Relations Manager'));
     app(ApproveProposal::class)->handle($proposal, ProposalStatus::Submitted, [
         'actual_date_begin' => today()->toDateString(),
         'actual_date_end' => today()->addYear()->toDateString(),

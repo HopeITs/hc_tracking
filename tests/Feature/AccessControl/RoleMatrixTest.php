@@ -60,6 +60,7 @@ test('holders of each lifecycle permission are exactly the contract roles', func
     'indicator-library.delete' => ['indicator-library.delete', ['MEAL', 'General Manager']],
     'proposals.manage-reviewers' => ['proposals.manage-reviewers', ['Financial', 'Public Relations Manager', 'General Manager']],
     'proposals.correct-status' => ['proposals.correct-status', ['General Manager', 'Public Relations Manager']],
+    'proposals.approve' => ['proposals.approve', ['Public Relations Manager']],
     'reports.reopen' => ['reports.reopen', ['MEAL', 'Public Relations Manager']],
     'reports.aggregate' => ['reports.aggregate', ['Public Relations Manager', 'General Manager', 'MEAL']],
     'meal-coverage.manage' => ['meal-coverage.manage', ['MEAL']],
@@ -111,7 +112,7 @@ test('each role holds every view permission plus exactly its approved write perm
         'donors.create', 'donors.update', 'proposals.create', 'proposals.update',
         'projects.create',
         'funding-agreements.view', 'funding-agreements.create', 'funding-agreements.update',
-        'proposals.manage-reviewers', 'proposals.correct-status',
+        'proposals.manage-reviewers', 'proposals.correct-status', 'proposals.approve',
         'reports.reopen', 'reports.aggregate',
         'ai.draft',
     ]],
@@ -157,6 +158,7 @@ test('the General Manager holds everything except role and permission management
             'access-management.manage-roles', 'access-management.manage-permissions', 'reports.mark-seen', 'notification-settings.manage',
             'reports.reopen', 'meal-coverage.manage', 'report-templates.manage', 'evidence-types.manage', 'narrative-questions.manage',
             'targets.create', 'targets.update',
+            'proposals.approve',
             'ai.draft',
         ])
         ->pluck('name')

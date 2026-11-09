@@ -282,7 +282,7 @@ test('the donor can send a payroll proposal back or reject it', function (Propos
 
 test('approving a payroll proposal makes it active at once with two notes and two events', function () {
     Event::fake([ProposalStatusChanged::class]);
-    $actor = userWithRole('Financial');
+    $actor = userWithRole('Public Relations Manager');
     $this->actingAs($actor);
     $proposal = payrollProposal(ProposalStatus::Submitted);
 
@@ -310,7 +310,7 @@ test('approving a payroll proposal makes it active at once with two notes and tw
 });
 
 test('a payroll approval keeps the grant dates it is given', function () {
-    $this->actingAs(userWithRole('Financial'));
+    $this->actingAs(userWithRole('Public Relations Manager'));
     $proposal = payrollProposal(ProposalStatus::Submitted);
 
     app(ApproveProposal::class)->handle($proposal, ProposalStatus::Submitted, [

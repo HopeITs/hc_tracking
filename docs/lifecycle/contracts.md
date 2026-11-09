@@ -263,6 +263,7 @@ Nine roles (fixed): Super Admin, General Manager, Managers, MEAL, Financial, Med
 | `indicator-library.create/update/delete` | MEAL, General Manager | — |
 | `proposals.manage-reviewers` | Financial, Public Relations Manager, General Manager | — |
 | `proposals.correct-status` | **General Manager, Public Relations Manager** | — |
+| `proposals.approve` | **Public Relations Manager only** (D-70; excluded from General Manager; Super Admin by the code rule). `ProposalPolicy::approve()` reads it; the General Manager is told of every approval through oversight | — |
 | `reports.reopen` | MEAL, Public Relations Manager (excluded from GM) | MEAL Manager slot holder; if empty/inactive → active PR Manager holders; never the preparer (D-09a) |
 | `reports.aggregate` | Public Relations Manager, General Manager, MEAL (never in `$viewEverything`) | — |
 | `meal-coverage.manage` | MEAL (excluded from GM) ⚑ | MEAL Manager slot holder |

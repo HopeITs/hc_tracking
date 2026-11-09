@@ -66,7 +66,7 @@ test('project.approved and project.activated reach the owner, the program manage
 })->with(['project.approved', 'project.activated']);
 
 test('approving writes the approved events on the proposal and none carries an amount', function () {
-    $actor = userWithRole('Financial');
+    $actor = userWithRole('Public Relations Manager');
     $watcher = userWithRole('Public Relations Manager');
     $proposal = Proposal::factory()->create([
         'status' => ProposalStatus::Submitted,
@@ -100,8 +100,38 @@ test('approving writes the approved events on the proposal and none carries an a
     expect(DB::table('notifications')->get()->map(fn ($row) => $row->data)->implode(''))->not->toContain('987654');
 });
 
+test('the General Manager is told when the Public Relations Manager approves a proposal', function () {
+    $actor = userWithRole('Public Relations Manager');
+    $ceo = userWithRole('General Manager');
+    $bystander = userWithRole('Media Team');
+    $proposal = Proposal::factory()->create([
+        'status' => ProposalStatus::Submitted,
+        'planned_date_begin' => '2026-11-01',
+        'planned_date_end' => '2027-10-31',
+    ]);
+    $project = Project::factory()->create();
+    $project->currentAssignment('user_id')->forceFill(['status' => AssignmentStatus::Acknowledged])->save();
+    $proposal->projects()->attach($project->id, ['target_beneficiaries' => 10]);
+
+    $this->actingAs($actor);
+    app(ApproveProposal::class)->handle($proposal, ProposalStatus::Submitted, [
+        'actual_date_begin' => '2026-11-01',
+        'actual_date_end' => '2027-10-31',
+        'decision_date' => '2026-10-13',
+        'approval_note' => 'Donor email confirms the grant.',
+    ]);
+
+    $approved = Activity::query()->where('subject_type', 'proposal')->where('subject_id', $proposal->id)->where('event', 'proposal.approved')->sole();
+    $ids = approvalRecipients($approved);
+
+    expect($ids)->toContain($ceo->id)
+        ->not->toContain($bystander->id)
+        ->not->toContain($actor->id)
+        ->and(DB::table('notifications')->where('notifiable_id', $ceo->id)->exists())->toBeTrue();
+});
+
 test('a rolled-back approval leaves no activity and no notification', function () {
-    $actor = userWithRole('Financial');
+    $actor = userWithRole('Public Relations Manager');
     $proposal = Proposal::factory()->create(['status' => ProposalStatus::Submitted, 'planned_date_begin' => '2026-11-01', 'planned_date_end' => '2027-10-31']);
     $project = Project::factory()->create();
     $proposal->projects()->attach($project->id, ['target_beneficiaries' => 10]);
