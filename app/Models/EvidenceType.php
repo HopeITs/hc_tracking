@@ -86,13 +86,14 @@ class EvidenceType extends Model
 
     /**
      * Whether anything refers to this type, so it can only be deactivated:
-     * a report template line requiring it. T17 adds
-     * `monthly_report_files.evidence_type_id` here; until then its
-     * restricting foreign key is the backstop DeleteEvidenceType catches.
+     * a report template line requiring it, or a monthly report file typed
+     * with it. The restricting foreign keys stay the backstop
+     * DeleteEvidenceType catches.
      */
     public function isInUse(): bool
     {
-        return DB::table('report_template_line_evidence_types')->where('evidence_type_id', $this->getKey())->exists();
+        return DB::table('report_template_line_evidence_types')->where('evidence_type_id', $this->getKey())->exists()
+            || DB::table('monthly_report_files')->where('evidence_type_id', $this->getKey())->exists();
     }
 
     /**

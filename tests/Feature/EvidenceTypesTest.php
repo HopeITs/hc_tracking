@@ -6,6 +6,7 @@ use App\Actions\EvidenceTypes\MoveEvidenceType;
 use App\Actions\EvidenceTypes\ReactivateEvidenceType;
 use App\Actions\EvidenceTypes\SaveEvidenceType;
 use App\Models\EvidenceType;
+use App\Models\MonthlyReportFile;
 use App\Models\ReportTemplateLine;
 use App\Support\DefaultEvidenceTypes;
 use Illuminate\Auth\Access\AuthorizationException;
@@ -275,6 +276,17 @@ describe('the actions', function () {
             ->call('deactivateInsteadOfDelete');
 
         expect($evidenceType->fresh()->is_active)->toBeFalse();
+    });
+});
+
+describe('a type only an uploaded file uses', function () {
+    it('counts as in use, so the delete dialog offers to deactivate it', function () {
+        $evidenceType = EvidenceType::factory()->create();
+        MonthlyReportFile::factory()->create(['evidence_type_id' => $evidenceType->id]);
+
+        Livewire::actingAs(userWithRole('MEAL'))->test('pages::admin.evidence-types')
+            ->call('confirmDelete', $evidenceType->id)
+            ->assertSet('deletingEvidenceTypeInUse', true);
     });
 });
 
