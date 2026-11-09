@@ -23,7 +23,7 @@ enum MatrixCellState: string
     /** A started month whose report is a draft or does not exist yet. */
     case NotSubmitted = 'not_submitted';
 
-    /** The month has not started. */
+    /** The month has not ended, so its report is not late yet. */
     case Upcoming = 'upcoming';
 
     /** The report exists but the indicator is not due that month. */

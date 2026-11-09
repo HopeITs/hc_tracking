@@ -898,3 +898,63 @@ test('an unknown view or tab falls back to the rows of the matrix', function () 
 
     expect($page->instance()->resolvedView)->toBe('rows')->and($page->instance()->resolvedTab)->toBe('matrix');
 });
+
+test('the month in progress is not late: a missing or draft report shows as not due yet, an ended month shows as not sent', function () {
+    $project = mmProject();
+    $library = LibraryIndicator::factory()->create();
+    $target = mmTarget(mmProposal($project), $project, $library);
+    mmLine(mmReport($project, '2026-11-01', MonthlyReportStatus::Draft), $library, [$target], 5);
+
+    $cells = mmRows(Livewire::actingAs(mmViewer())->test('pages::reports.monthly-matrix'))[$library->code]['cells'];
+
+    expect($cells['2026-11']['state'])->toBe(MatrixCellState::Upcoming)
+        ->and($cells['2026-10']['state'])->toBe(MatrixCellState::NotSubmitted);
+});
+
+test('the focus buttons are disjoint, add up to every row and filter the list and the count', function () {
+    $rows = [];
+    foreach (['missing', 'waiting', 'current'] as $kind) {
+        $project = mmProject();
+        $library = LibraryIndicator::factory()->create();
+        $target = mmTarget(mmProposal($project), $project, $library);
+        $rows[$kind] = $library->code;
+
+        foreach (range(1, 10) as $month) {
+            if ($kind === 'missing' && $month === 5) {
+                continue;
+            }
+            $status = $kind === 'waiting' && $month === 10 ? MonthlyReportStatus::Submitted : MonthlyReportStatus::Validated;
+            mmLine(mmReport($project, sprintf('2026-%02d-01', $month), $status), $library, [$target], 1);
+        }
+    }
+
+    $page = Livewire::actingAs(mmViewer())->test('pages::reports.monthly-matrix');
+
+    expect($page->instance()->matrix['counts'])->toBe(['missing' => 1, 'waiting' => 1, 'current' => 1]);
+
+    foreach ($rows as $kind => $code) {
+        $page->call('setFocus', $kind)->assertSet('focus', $kind);
+        expect(array_column($page->instance()->matrix['rows'], 'code'))->toBe([$code])
+            ->and($page->instance()->pagedRows->total())->toBe(1);
+    }
+
+    $page->call('setFocus', 'current')->assertSet('focus', '');
+    expect($page->instance()->pagedRows->total())->toBe(3);
+});
+
+test('the focus buttons and More filters sit inside the Livewire component', function () {
+    $project = mmProject();
+    $library = LibraryIndicator::factory()->create();
+    mmTarget(mmProposal($project), $project, $library);
+
+    $html = Livewire::actingAs(mmViewer())->test('pages::reports.monthly-matrix')->html();
+
+    $dom = new DOMDocument;
+    @$dom->loadHTML('<?xml encoding="utf-8"?>'.$html);
+    $xpath = new DOMXPath($dom);
+    $root = '//*[@*[name()="wire:id"]]';
+
+    foreach (['matrix-focus-missing', 'matrix-focus-waiting', 'matrix-focus-current', 'matrix-more-filters'] as $control) {
+        expect($xpath->query($root.'//*[@data-test="'.$control.'"]')->length)->toBeGreaterThan(0, "{$control} sits outside the component");
+    }
+});

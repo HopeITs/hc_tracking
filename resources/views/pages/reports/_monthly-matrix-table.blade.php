@@ -20,11 +20,8 @@
             <thead class="sticky top-0 z-20">
                 <tr>
                     <th scope="col" class="{{ $headCell }} {{ $stickyCode }} z-30">{{ __('reports.matrix.code') }}</th>
-                    <th scope="col" class="{{ $headCell }} {{ $stickyName }} z-30 border-secondary-soft dark:border-line">{{ __('reports.matrix.name_en') }}</th>
-                    <th scope="col" class="{{ $headCell }} w-56">{{ __('reports.matrix.name_ar') }}</th>
-                    <th scope="col" class="{{ $headCell }} w-44">{{ __('reports.matrix.center') }}</th>
-                    <th scope="col" class="{{ $headCell }} w-52">{{ __('reports.matrix.source') }}</th>
-                    <th scope="col" class="{{ $headCell }} w-24">{{ __('reports.matrix.measure') }}</th>
+                    <th scope="col" class="{{ $headCell }} {{ $stickyName }} z-30 border-secondary-soft dark:border-line">{{ __('reports.matrix.indicator') }}</th>
+                    <th scope="col" class="{{ $headCell }} w-52">{{ __('reports.matrix.center_and_source') }}</th>
                     <th scope="col" class="{{ $headCell }} w-24 text-end">{{ __('reports.matrix.target') }}</th>
                     @foreach ($matrix['months'] as $month)
                         <th scope="col" class="{{ $headCell }} w-24 text-end whitespace-nowrap" data-matrix-month="{{ $month->format('Y-m') }}">{{ $month->translatedFormat(__('formats.month_year')) }}</th>
@@ -42,7 +39,15 @@
                     <tr data-matrix-row="{{ $row['key'] }}">
                         <td class="{{ $bodyCell }} {{ $stickyCode }} bg-white font-mono text-xs dark:bg-surface-1" dir="ltr">{{ $row['code'] }}</td>
                         <td class="{{ $bodyCell }} {{ $stickyName }} bg-white dark:bg-surface-1">
-                            <span dir="auto" class="block font-medium">{{ $row['name_en'] }}</span>
+                            @php
+                                $isArabic = app()->getLocale() === 'ar';
+                                $firstName = $isArabic ? $row['name_ar'] : $row['name_en'];
+                                $secondName = $isArabic ? $row['name_en'] : $row['name_ar'];
+                            @endphp
+                            <span dir="auto" class="block font-medium"><bdi>{{ $firstName }}</bdi></span>
+                            @if ($secondName !== $firstName)
+                                <span dir="auto" class="block text-xs text-secondary-medium dark:text-ink-muted"><bdi>{{ $secondName }}</bdi></span>
+                            @endif
                             @if ($row['breakdown'] !== null)
                                 <button type="button" x-on:click="open = ! open" x-bind:aria-expanded="open.toString()" aria-expanded="false" aria-label="{{ __('reports.matrix.toggle_breakdown') }}" data-matrix-expand class="mt-1 inline-flex min-h-8 touch-manipulation items-center gap-1 text-xs text-secondary-medium underline decoration-secondary-light underline-offset-2 dark:text-ink-muted">
                                     <flux:icon.chevron-down variant="micro" class="size-3.5 transition-transform" x-bind:class="open ? 'rotate-180' : ''" aria-hidden="true" />
@@ -53,7 +58,6 @@
                                 <span class="mt-0.5 inline-flex items-center gap-1 text-[11px] text-secondary-medium dark:text-ink-muted"><flux:icon.pause-circle variant="micro" class="size-3.5" aria-hidden="true" />{{ __('reports.matrix.inactive') }}</span>
                             @endunless
                         </td>
-                        <td class="{{ $bodyCell }}"><span dir="auto" class="block">{{ $row['name_ar'] }}</span></td>
                         <td class="{{ $bodyCell }}">
                             @if ($row['is_group'])
                                 <span>{{ __('reports.matrix.centers_count', ['count' => $row['centers_count']]) }}</span>
@@ -67,10 +71,8 @@
                             @if ($row['city'] !== null)
                                 <span dir="auto" class="block text-xs text-secondary-medium dark:text-ink-muted">{{ $row['city'] }}</span>
                             @endif
-                        </td>
-                        <td class="{{ $bodyCell }} text-xs">
                             @foreach ($row['sources'] as $source)
-                                <div class="mb-1 last:mb-0">
+                                <div class="mt-1.5 text-xs">
                                     @if ($source['proposal'] !== null)
                                         @can('proposals.view')
                                             <a href="{{ route('proposals.show', $source['proposal_slug']) }}" wire:navigate dir="auto" class="underline decoration-secondary-light underline-offset-2">{{ $source['proposal'] }}</a>
@@ -92,20 +94,15 @@
                                 </div>
                             @endforeach
                         </td>
-                        <td class="{{ $bodyCell }} text-xs">
-                            {{ $row['measure']->label() }}
-                            @if ($row['is_cumulative'])
-                                <span class="block text-secondary-medium dark:text-ink-muted">{{ __('reports.matrix.cumulative') }}</span>
-                                @if ($row['is_group'])
-                                    <span class="block text-[11px] text-secondary-medium dark:text-ink-muted">{{ __('reports.matrix.cumulative_group_note') }}</span>
-                                @endif
-                            @endif
-                        </td>
                         <td class="{{ $bodyCell }} text-end tabular-nums" dir="ltr">
                             @if ($row['target'] === null)
                                 <span aria-hidden="true">—</span><span class="sr-only">{{ __('reports.matrix.no_target') }}</span>
                             @else
                                 {{ $this->matrixNumber($row['target']) }}{{ $unit === '%' ? '%' : '' }}
+                            @endif
+                            <span class="block text-[11px] font-normal text-secondary-medium dark:text-ink-muted" dir="auto">{{ $row['measure']->label() }}@if ($row['is_cumulative']) · {{ __('reports.matrix.cumulative') }}@endif</span>
+                            @if ($row['is_cumulative'] && $row['is_group'])
+                                <span class="block text-[11px] font-normal text-secondary-medium dark:text-ink-muted">{{ __('reports.matrix.cumulative_group_note') }}</span>
                             @endif
                         </td>
 
@@ -166,6 +163,7 @@
                                 <span aria-hidden="true">—</span><span class="sr-only">{{ __('reports.matrix.no_achieved') }}</span>
                             @else
                                 <span dir="ltr">{{ $this->matrixNumber($row['achieved']) }}%</span>
+                                <span class="block text-[11px] font-normal text-secondary-medium dark:text-ink-muted" dir="ltr">{{ __('reports.matrix.of_target', ['total' => $this->matrixNumber($row['total']).($unit === '%' ? '%' : ''), 'target' => $this->matrixNumber($row['target']).($unit === '%' ? '%' : '')]) }}</span>
                             @endif
                         </td>
                     </tr>

@@ -293,7 +293,7 @@ return [
         'approved' => 'مُتحقَّق منه',
         'pending' => 'بانتظار التحقق',
         'not_submitted' => 'غير مُرسَل',
-        'upcoming' => 'قادم',
-        'not_due' => 'غير مستحق',
+        'upcoming' => 'لم يحن موعده',
+        'not_due' => 'غير مطلوب',
     ],
 ];

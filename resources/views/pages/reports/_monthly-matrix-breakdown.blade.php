@@ -26,7 +26,7 @@
         <td class="{{ $bodyCell }} {{ $stickyName }} bg-white dark:bg-surface-1">
             <span @class(['block text-xs', 'ps-4 text-secondary-medium dark:text-ink-muted' => $sub['pwd'], 'ps-2 font-medium' => ! $sub['pwd']])>{{ $sub['label'] }}</span>
         </td>
-        <td class="{{ $bodyCell }}" colspan="4">
+        <td class="{{ $bodyCell }}" >
             @if ($loop->first && $row['breakdown_kind'] === 'fixed')
                 <span class="text-[11px] text-secondary-medium dark:text-ink-muted">{{ __('reports.matrix.fixed_counts_note') }}</span>
             @endif

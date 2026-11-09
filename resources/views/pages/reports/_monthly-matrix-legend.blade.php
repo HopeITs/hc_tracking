@@ -11,8 +11,4 @@
             <span>{{ $state->label() }}</span>
         </li>
     @endforeach
-    <li class="inline-flex items-center gap-1.5">
-        <span class="font-semibold" aria-hidden="true">—</span>
-        <span>{{ __('reports.matrix.legend_not_due_note') }}</span>
-    </li>
 </ul>

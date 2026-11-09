@@ -51,6 +51,7 @@ use Livewire\Attributes\Computed;
  * @property string $year #[Url] filter on the page
  * @property bool $mine #[Url] filter on the page
  * @property string $view #[Url] mode on the page: rows | grouped
+ * @property string $focus #[Url] focus button: missing | waiting | current
  * @property string $tab #[Url] tab on the page: matrix | activities
  * @property bool $pwd #[Url] show the disability rows of a breakdown
  * @property-read array{proposal: ?int, donor: ?int, center: ?int, city: ?int, indicator: ?int, pillar: ?int} $resolvedFilters
@@ -191,7 +192,7 @@ trait BuildsMonthlyMatrix
      * order. Read once; the page pages it in memory and the export reads it
      * whole.
      *
-     * @return array{months: list<CarbonImmutable>, rows: list<array<string, mixed>>, isDonorView: bool}
+     * @return array{months: list<CarbonImmutable>, rows: list<array<string, mixed>>, isDonorView: bool, counts: array{missing: int, waiting: int, current: int}}
      */
     #[Computed]
     public function matrix(): array
@@ -210,7 +211,44 @@ trait BuildsMonthlyMatrix
             }
         }
 
-        return ['months' => $months, 'rows' => $rows, 'isDonorView' => $isDonorView];
+        $counts = ['missing' => 0, 'waiting' => 0, 'current' => 0];
+        foreach ($rows as $row) {
+            $counts[$this->rowFocus($row)]++;
+        }
+
+        $focus = $this->resolvedFocus;
+        if ($focus !== '') {
+            $rows = array_values(array_filter($rows, fn (array $row): bool => $this->rowFocus($row) === $focus));
+        }
+
+        return ['months' => $months, 'rows' => $rows, 'isDonorView' => $isDonorView, 'counts' => $counts];
+    }
+
+    /**
+     * The focus button a row belongs to; every row belongs to exactly one:
+     * a month that ended without a report, a report awaiting validation, or
+     * neither.
+     *
+     * @param  array<string, mixed>  $row
+     */
+    protected function rowFocus(array $row): string
+    {
+        $states = array_column($row['cells'], 'state');
+
+        return match (true) {
+            in_array(MatrixCellState::NotSubmitted, $states, true) => 'missing',
+            in_array(MatrixCellState::Pending, $states, true) => 'waiting',
+            default => 'current',
+        };
+    }
+
+    /**
+     * The focus button pressed: missing | waiting | current, else none.
+     */
+    #[Computed]
+    public function resolvedFocus(): string
+    {
+        return in_array($this->focus, ['missing', 'waiting', 'current'], true) ? $this->focus : '';
     }
 
     /**
@@ -562,8 +600,12 @@ trait BuildsMonthlyMatrix
                 $status = $reportStatus[$row['project_id']][$ym] ?? null;
                 $figure = $figures[$row['key']][$ym] ?? null;
 
+                // A month is only late once it has ended: until then a missing or draft report is still due.
+                $stillDue = $month->endOfMonth()->greaterThanOrEqualTo($today)
+                    && ($status === null || $status === MonthlyReportStatus::Draft->value);
+
                 $state = match (true) {
-                    $month->greaterThan($today) => MatrixCellState::Upcoming,
+                    $month->greaterThan($today), $stillDue => MatrixCellState::Upcoming,
                     $status === null => MatrixCellState::NotSubmitted,
                     $figure === null => MatrixCellState::NotDue,
                     $status === MonthlyReportStatus::Validated->value => MatrixCellState::Approved,

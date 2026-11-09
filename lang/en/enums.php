@@ -293,7 +293,7 @@ return [
         'approved' => 'Validated',
         'pending' => 'Awaiting validation',
         'not_submitted' => 'Not sent',
-        'upcoming' => 'Upcoming',
-        'not_due' => 'Not due',
+        'upcoming' => 'Not due yet',
+        'not_due' => 'Not expected',
     ],
 ];
