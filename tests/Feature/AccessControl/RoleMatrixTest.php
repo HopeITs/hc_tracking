@@ -34,8 +34,8 @@ test('the money pages are open only to the finance-facing roles', function (stri
     'transfers' => ['transfers.view', ['Super Admin', 'General Manager', 'Financial']],
     'funding agreements' => ['funding-agreements.view', ['Super Admin', 'General Manager', 'Financial', 'Public Relations Manager']],
     'bank accounts' => ['accounts.view', ['Super Admin', 'General Manager', 'Financial']],
-    'donors' => ['donors.view', ['Super Admin', 'General Manager', 'Financial', 'Public Relations Manager']],
-    'proposals' => ['proposals.view', ['Super Admin', 'General Manager', 'Financial', 'Public Relations Manager']],
+    'donors' => ['donors.view', ['Super Admin', 'General Manager', 'Financial', 'Public Relations', 'Public Relations Manager']],
+    'proposals' => ['proposals.view', ['Super Admin', 'General Manager', 'Financial', 'Public Relations', 'Public Relations Manager']],
 ]);
 
 /**
@@ -76,7 +76,8 @@ test('holders of each lifecycle permission are exactly the contract roles', func
     'funding-agreements.view' => ['funding-agreements.view', ['Financial', 'Public Relations Manager', 'General Manager']],
     'funding-agreements.create' => ['funding-agreements.create', ['Financial', 'Public Relations Manager', 'General Manager']],
     'funding-agreements.update' => ['funding-agreements.update', ['Financial', 'Public Relations Manager', 'General Manager']],
-    'proposals.update' => ['proposals.update', ['Financial', 'Public Relations Manager', 'General Manager']],
+    'proposals.update' => ['proposals.update', ['Financial', 'Public Relations', 'Public Relations Manager', 'General Manager']],
+    'proposals.create' => ['proposals.create', ['Financial', 'Public Relations', 'Public Relations Manager', 'General Manager']],
 ]);
 
 test('only Super Admin, General Manager, Public Relations Manager and Financial may add projects by default', function () {
@@ -105,7 +106,7 @@ test('each role holds every view permission plus exactly its approved write perm
 })->with([
     'Team Member' => ['Team Member', []],
     'Media Team' => ['Media Team', ['tasks.create', 'tasks.update', 'reports.create', 'reports.update']],
-    'Public Relations' => ['Public Relations', ['tasks.create', 'tasks.update', 'reports.create', 'reports.update', 'ai.draft']],
+    'Public Relations' => ['Public Relations', [...FUNDRAISING_VIEWS, 'tasks.create', 'tasks.update', 'reports.create', 'reports.update', 'proposals.create', 'proposals.update', 'ai.draft']],
     'Public Relations Manager' => ['Public Relations Manager', [
         ...FUNDRAISING_VIEWS,
         'tasks.create', 'tasks.update', 'reports.create', 'reports.update',

@@ -171,7 +171,14 @@ return [
     'role_baselines' => [
         'Team Member' => $viewEverything,
         'Media Team' => [...$viewEverything, ...$taskWriter, ...$reportWriter],
-        'Public Relations' => [...$viewEverything, ...$taskWriter, ...$reportWriter, ...$aiDrafter],
+        // The fundraising officer works the proposals (user story §1). The donor list
+        // is read-only for them: only the PR Manager records a donor, and the
+        // General Manager approves it.
+        'Public Relations' => [
+            ...$viewEverything, ...$fundraisingViews, ...$taskWriter, ...$reportWriter,
+            'proposals.create', 'proposals.update',
+            ...$aiDrafter,
+        ],
         'Public Relations Manager' => [
             ...$viewEverything, ...$fundraisingViews, ...$taskWriter, ...$reportWriter,
             'donors.create', 'donors.update',

@@ -17,11 +17,11 @@ Role name in code: `'Public Relations'` (`userWithRole('Public Relations')`). So
 
 ## Scenarios
 - **PR-01** ✅ Create a proposal with an existing donor, a location row (city only) and a concept note; move concept note → review → submitted.
-- **PR-02** ✅ New donor on the form: a pending donor request is created and the proposal is not saved until the General Manager approves.
+- **PR-02** 🚫 Cannot record a donor: only the Public Relations Manager records one and the General Manager approves it. The donor picker lists existing approved donors only.
 - **PR-03** ⚠ Location row with `is_new` when program/center is missing; submitting without a city is refused.
 - **PR-04** ✅ Add negotiation notes (text and file) after submission.
 - **PR-05** 🚫 Cannot enter a budget, record an agreement, correct a status, manage reviewers, or see Transfers/Accounts (each as a separate fresh component call).
 - **PR-06** ✅ AI drafting works; the AI usage log is not visible.
 
-## Known open question
-The story says PR starts from "New proposal", but the baseline gives `Public Relations` no `proposals.view`/`proposals.create`. If PR-01 is refused, report it as a **permission/story mismatch** for the owner to decide, not as a code bug.
+## Access (decided 2026-11-09)
+`Public Relations` holds `proposals.view/create/update` and `donors.view` (migration `grant_public_relations_proposal_permissions`), but not `donors.create`, `proposals.approve` or any money view. If PR-01 is refused, that is a defect.

@@ -279,14 +279,15 @@ test('the role\'s favourite is suggested', function (string $role, string $favou
     ['Team Member', 'today'],
 ]);
 
-test('a favourite the viewer is not offered falls back to My day: Public Relations until it may see donors', function () {
+test('a favourite the viewer is not offered falls back to My day: Public Relations while its role lacks the donor list', function () {
     $user = userWithRole('Public Relations', insertHrEmployee());
+    $user->roles->first()->revokePermissionTo('donors.view');
     $panels = app(Panels::class);
     $favourite = fn (User $viewer): ?string => $panels->favouriteReadyLayoutFor($viewer, array_column($panels->readyLayoutsFor($viewer), 'key'));
 
-    expect($favourite($user))->toBe('today');
+    expect($favourite($user->fresh()))->toBe('today');
 
-    $user->givePermissionTo(Permission::findOrCreate('donors.view', 'web'));
+    $user->roles->first()->givePermissionTo(Permission::findOrCreate('donors.view', 'web'));
 
     expect($favourite($user->fresh()))->toBe('donors');
 });
