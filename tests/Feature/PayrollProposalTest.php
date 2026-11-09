@@ -326,7 +326,7 @@ test('a payroll approval keeps the grant dates it is given', function () {
 
 test('a payroll approval without evidence or with a stale status writes nothing', function (array $input, ProposalStatus $expectedFrom, string $field) {
     Event::fake([ProposalStatusChanged::class]);
-    $this->actingAs(userWithRole('Financial'));
+    $this->actingAs(userWithRole('Public Relations Manager'));
     $proposal = payrollProposal(ProposalStatus::Submitted);
 
     $errors = payrollRefusal(fn () => app(ApproveProposal::class)->handle($proposal, $expectedFrom, ['decision_date' => '2026-10-13', ...$input]));
@@ -422,4 +422,22 @@ test('renewing a payroll proposal starts a payroll draft with the narrative and 
         ->and($renewal->projects()->count())->toBe(0)
         ->and($result['copied'])->toBe(['results' => 0, 'indicators' => 0, 'milestones' => 0, 'tasks' => 0])
         ->and(app(CloneProposalForRenewal::class)->handle($previous, ['internalProjectNumber' => 'HC-2026-963'], $actor)['proposal']->id)->toBe($renewal->id);
+});
+
+test('payroll renewals count on their own YY-NNN sequence and leave the HC- numbers alone', function () {
+    $actor = userWithRole('Financial');
+    $this->actingAs($actor);
+    $renew = fn (): Proposal => app(CloneProposalForRenewal::class)->handle(payrollProposal(ProposalStatus::Completed), [], $actor)['proposal'];
+
+    $first = $renew();
+    $second = $renew();
+    $yy = $first->planned_date_begin->format('y');
+
+    expect($first->internal_project_number)->toBe("{$yy}-001")
+        ->and($second->internal_project_number)->toBe("{$yy}-002");
+
+    $year = $first->planned_date_begin->year;
+    $fresh = app(SaveProposal::class)->handle(null, payrollFormData(['plannedDateBegin' => "{$year}-02-01", 'plannedDateEnd' => "{$year}-12-31"]), $actor);
+
+    expect($fresh->internal_project_number)->toBe("HC-{$year}-001");
 });

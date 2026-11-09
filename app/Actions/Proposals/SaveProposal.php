@@ -91,7 +91,10 @@ final class SaveProposal
             $proposal = new Proposal;
             $proposal->kind = $kind;
             $this->fillDetails($proposal, $input, $actor);
-            $proposal->internal_project_number = $this->nextNumber((string) $input['plannedDateBegin']);
+            $proposal->internal_project_number = $this->nextNumber(
+                (string) $input['plannedDateBegin'],
+                shortYear: $kind === ProposalKind::Payroll && isset($input['previousProposalId']),
+            );
             $proposal->previous_proposal_id = isset($input['previousProposalId']) ? (int) $input['previousProposalId'] : null;
             $proposal->save();
 
@@ -553,14 +556,19 @@ final class SaveProposal
         }
     }
 
-    private function nextNumber(string $plannedStart): string
+    /**
+     * The next internal project number of the planned start's year: HC-YYYY-NNN,
+     * or YY-NNN (26-001) for a renewed payroll proposal. The short form counts
+     * on its own, from the numbers already written, under the same year lock.
+     */
+    private function nextNumber(string $plannedStart, bool $shortYear = false): string
     {
         $year = CarbonImmutable::parse($plannedStart)->year;
-        $prefix = sprintf('HC-%04d-', $year);
+        $prefix = $shortYear ? sprintf('%02d-', $year % 100) : sprintf('HC-%04d-', $year);
 
         DB::table('proposal_number_sequences')->insertOrIgnore(['year' => $year, 'last_number' => 0]);
         $sequence = DB::table('proposal_number_sequences')->where('year', $year)->lockForUpdate()->first();
-        $lastNumber = (int) $sequence->last_number;
+        $lastNumber = $shortYear ? 0 : (int) $sequence->last_number;
 
         foreach (Proposal::query()->where('internal_project_number', 'like', $prefix.'%')->pluck('internal_project_number') as $number) {
             if (preg_match('/^'.preg_quote($prefix, '/').'([0-9]{3})$/', $number, $matches)) {
@@ -574,7 +582,9 @@ final class SaveProposal
             ]);
         }
 
-        DB::table('proposal_number_sequences')->where('year', $year)->update(['last_number' => $lastNumber + 1]);
+        if (! $shortYear) {
+            DB::table('proposal_number_sequences')->where('year', $year)->update(['last_number' => $lastNumber + 1]);
+        }
 
         return $prefix.str_pad((string) ($lastNumber + 1), 3, '0', STR_PAD_LEFT);
     }
