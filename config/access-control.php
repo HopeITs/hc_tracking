@@ -204,8 +204,6 @@ return [
             ...$viewEverything, ...$financeViews, ...$fundraisingViews, ...$taskWriter,
             'donors.create', 'donors.update', 'donors.delete',
             'proposals.create', 'proposals.update', 'proposals.delete', 'proposals.manage-reviewers',
-            // W-34a (Dev 1, 2026-11-04): approving a proposal materialises its projects.
-            'projects.create',
             'funding-agreements.create', 'funding-agreements.update', 'funding-agreements.delete',
             'transfers.create', 'transfers.update', 'transfers.delete',
             'accounts.create', 'accounts.update', 'accounts.delete',
