@@ -211,13 +211,13 @@ new #[Layout('layouts::desk'), Title('titles.donor_report')] class extends Compo
     $breadcrumbs = [
         auth()->user()->can('reports.aggregate')
             ? ['label' => __('navigation.donor_report_builder'), 'url' => route('donor-reports.compose')]
-            : ['label' => __('navigation.reporting_duties'), 'url' => route('reporting-duties.index')],
+            : ['label' => __('navigation.donor_reports'), 'url' => route('donor-reports.index')],
         ['label' => $report->title],
     ];
 @endphp
 
 <section class="@container/detail flex w-full flex-1 flex-col gap-8 text-secondary-dark dark:text-ink" data-donor-report-page>
-    <x-ui.detail-header :back="\App\Support\BackUrl::for(route('reporting-duties.index'))" :breadcrumbs="$breadcrumbs" :title="$report->title">
+    <x-ui.detail-header :back="\App\Support\BackUrl::for(route('donor-reports.index'))" :breadcrumbs="$breadcrumbs" :title="$report->title">
         <x-slot:meta>
             <span>{{ $report->type->label() }}</span>
             <span>{{ $report->audience->label() }}</span>

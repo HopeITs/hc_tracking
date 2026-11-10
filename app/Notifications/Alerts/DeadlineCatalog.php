@@ -330,7 +330,7 @@ final class DeadlineCatalog
                 'donor_report', $report->id, 'donor-reports', $report->title, $report->due_on, $direct, self::FinanceWatchers,
                 eventKey: 'donor_report',
                 exemptUserIds: $direct,
-                link: $reachable ? ['route' => 'reporting-duties.index'] : [],
+                link: $reachable ? ['route' => 'donor-reports.index'] : [],
             );
         })->all());
     }

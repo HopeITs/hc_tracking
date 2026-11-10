@@ -56,6 +56,16 @@ test('a running project with last month\'s report still open is off track and as
         ->assertDontSeeHtml('data-test="story-nudge"');
 });
 
+test('the monthly reports card of a running project opens the Monthly Reports page', function () {
+    $owner = userWithRole('Managers', insertHrEmployee(firstNameEn: 'Rana', lastNameEn: 'Darwish'));
+    $project = storyProject(ProposalStatus::Active, $owner->employee_id, ProjectStatus::Active);
+
+    Livewire::actingAs($owner)
+        ->test('pages::projects.show', ['project' => $project])
+        ->assertSeeHtml('data-test="story-reporting"')
+        ->assertSeeHtml('href="'.route('monthly-reports.index').'" wire:navigate>'.__('story.open.monthly_reports'));
+});
+
 test('nudging the holder of the next step reaches them once a day', function () {
     $owner = userWithRole('Managers', insertHrEmployee(firstNameEn: 'Rana', lastNameEn: 'Darwish'));
     $viewer = userWithRole('General Manager', insertHrEmployee(firstNameEn: 'Sami'));

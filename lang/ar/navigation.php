@@ -36,7 +36,6 @@ return [
     'user_directory' => 'دليل المستخدمين',
     'donor_report_builder' => 'التقارير',
     'donor_reports' => 'تقارير المانحين',
-    'reporting_duties' => 'مهام التقارير',
     'monthly_matrix' => 'المصفوفة الشهرية',
     'tools' => 'الأدوات',
     'help' => 'المساعدة',

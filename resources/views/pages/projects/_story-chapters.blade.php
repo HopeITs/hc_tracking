@@ -170,7 +170,7 @@
             <div class="dk-card dk-span-5" data-test="story-reporting">
                 <div class="dk-card-h">
                     <h3>{{ __('story.monthly_reports') }}</h3>
-                    <a class="dk-link" href="{{ route('reporting-duties.index') }}" wire:navigate>{{ __('story.open.duties') }}</a>
+                    <a class="dk-link" href="{{ route('monthly-reports.index') }}" wire:navigate>{{ __('story.open.monthly_reports') }}</a>
                 </div>
                 <div class="dk-card-b">
                     @if ($story['months'] === [] && $this->templateLines === [])

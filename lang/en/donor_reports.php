@@ -30,7 +30,7 @@ return [
     'audience' => 'Audience',
     'due_help' => 'Agreed with the donor. Reminders go to the responsible person.',
     'responsible' => 'Responsible',
-    'responsible_help' => 'Who delivers the report. They see it in My Reporting Duties.',
+    'responsible_help' => 'Who delivers the report. They see it in Donor Reports.',
     'title' => 'Title',
     'title_help' => 'Leave empty for a title built from the type and period.',
     'notes' => 'Notes',

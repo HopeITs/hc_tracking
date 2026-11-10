@@ -99,8 +99,8 @@ test('a donor report reminder reaches its responsible person without the money p
     $due = donorReportNotifications($responsible->id, $report->id);
 
     expect($due)->toHaveCount(1)
-        ->and($due->first()->data['link'])->toBe(['route' => 'reporting-duties.index'])
-        ->and(app(SubjectLinks::class)->urlFor($due->first()))->toBe(route('reporting-duties.index'))
+        ->and($due->first()->data['link'])->toBe(['route' => 'donor-reports.index'])
+        ->and(app(SubjectLinks::class)->urlFor($due->first()))->toBe(route('donor-reports.index'))
         ->and(DB::table('notification_alert_ledger')->where('subject_type', 'donor_report')->where('subject_id', $report->id)->pluck('stage')->all())
         ->each->toEndWith(':2026-11-18');
 

@@ -113,7 +113,6 @@ final class Panels
         'reports' => [['validate', 'L'], ['duties', 'L'], ['matrix', 'XL']],
         'monthly-reports' => [['validate', 'L'], ['templates', 'L'], ['matrix', 'XL']],
         'donor-reports' => [['duties', 'L'], ['deliverables', 'L'], ['donors', 'L']],
-        'reporting-duties' => [['duties', 'L'], ['deliverables', 'L'], ['money', 'L']],
         'donors' => [['donors', 'L'], ['pipeline', 'L'], ['money', 'L']],
         'proposals' => [['pipeline', 'L'], ['reviews', 'L'], ['donors', 'L'], ['needs', 'L']],
         'reviews' => [['reviews', 'L'], ['pipeline', 'L']],
@@ -704,7 +703,7 @@ final class Panels
             'deliverables' => ['icon' => 'board', 'size' => 'M', 'register' => 'department-tasks.index', 'allows' => fn (User $user): bool => $user->can('viewDepartmentQueue', Task::class)],
             'myteam' => ['icon' => 'users', 'size' => 'M', 'register' => null, 'allows' => fn (User $user): bool => $user->employee_id !== null || $user->isAdministrator()],
             'targets' => ['icon' => 'chart', 'size' => 'L', 'register' => 'targets.index', 'allows' => $can('targets.view')],
-            'duties' => ['icon' => 'file', 'size' => 'M', 'register' => 'reporting-duties.index', 'allows' => fn (User $user): bool => $user->can('reports.aggregate') || $user->can('funding-agreements.update') || $user->hasReportingDuties()],
+            'duties' => ['icon' => 'file', 'size' => 'M', 'register' => 'donor-reports.index', 'allows' => fn (User $user): bool => $user->can('reports.aggregate') || $user->can('funding-agreements.update') || $user->hasReportingDuties()],
             'milestones' => ['icon' => 'flag', 'size' => 'M', 'register' => 'milestones.index', 'allows' => $can('milestones.view')],
             'donors' => ['icon' => 'users', 'size' => 'L', 'register' => 'donors.index', 'allows' => $can('donors.view')],
         ];
