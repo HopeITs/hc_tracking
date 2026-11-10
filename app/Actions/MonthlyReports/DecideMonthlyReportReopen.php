@@ -12,6 +12,8 @@ use App\Models\MonthlyReportReopenRequest;
 use App\Support\MonthlyReportActivityStatuses;
 use App\Support\MonthlyReportGuard;
 use App\Support\MonthlyReportMirrors;
+use App\Support\MonthlyReportPeriods;
+use Carbon\CarbonImmutable;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
@@ -20,7 +22,9 @@ use Illuminate\Validation\ValidationException;
  * Grant or deny a pending reopen request (contracts §13 Workflow, D-09a).
  * Grant → the report and its mirrors return to draft, so its figures leave
  * achievement until it is validated again, and the activity statuses it
- * confirmed are restored (slice 4). Deny keeps it validated and needs a
+ * confirmed are restored (slice 4). Granted after the month's deadline, it
+ * is due by the next working day (MonthlyReportPeriods::revisedDueDateWhenSentBack()).
+ * Deny keeps it validated and needs a
  * note. The request loads through the report (BOLA); the requester is told
  * (`monthly_report.reopen_decided`).
  */
@@ -49,7 +53,15 @@ final class DecideMonthlyReportReopen
 
             if ($grant) {
                 $this->activityStatuses->restore($locked);
-                $locked->fill(['status' => MonthlyReportStatus::Draft, 'validated_at' => null, 'validated_by' => null]);
+                $project = $locked->project()->firstOrFail();
+                $locked->fill([
+                    'status' => MonthlyReportStatus::Draft,
+                    'validated_at' => null,
+                    'validated_by' => null,
+                    // Dynamic Deadline rule, as for a return: reopened after its deadline, the report is
+                    // due by the next working day (weekends and holidays skipped); otherwise it keeps its own.
+                    'revised_due_on' => MonthlyReportPeriods::for($project)->revisedDueDateWhenSentBack($locked, CarbonImmutable::now()),
+                ]);
                 Activity::withoutRecording(fn () => $locked->save());
                 $this->mirrors->moveTo($locked, null);
             }

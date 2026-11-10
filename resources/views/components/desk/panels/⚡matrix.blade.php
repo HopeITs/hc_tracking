@@ -79,7 +79,7 @@ new class extends Component {
             ->with([
                 'program:id',
                 'user:id,first_name_en,last_name_en,first_name_ar,last_name_ar',
-                'monthlyReports' => fn ($query) => $query->select(['id', 'slug', 'project_id', 'period', 'status', 'returned_at'])
+                'monthlyReports' => fn ($query) => $query->select(['id', 'slug', 'project_id', 'period', 'status', 'returned_at', 'revised_due_on'])
                     ->withExists(['reopenRequests as has_pending_reopen' => fn ($reopen) => $reopen->where('status', ReopenRequestStatus::Pending)]),
             ])
             ->orderBy('name')
@@ -139,6 +139,10 @@ new class extends Component {
         return match (true) {
             $report->status === MonthlyReportStatus::Validated => 'validated',
             $report->status === MonthlyReportStatus::Submitted => 'submitted',
+            // Overdue rule: a report sent back late (returned or reopened) keeps its state until
+            // its new deadline ends, then it is late; the month having passed does not make it late.
+            $report->revised_due_on?->lessThan(CarbonImmutable::today()) === true => 'late',
+            $report->revised_due_on !== null => $report->returned_at !== null ? 'returned' : 'draft',
             $report->returned_at !== null => 'returned',
             $report->period->lt(CarbonImmutable::today()->startOfMonth()) => 'late',
             default => 'draft',

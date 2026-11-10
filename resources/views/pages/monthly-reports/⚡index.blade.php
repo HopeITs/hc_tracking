@@ -167,14 +167,14 @@ new #[Layout('layouts::desk'), Title('titles.monthly_reports')] class extends Co
         $projects = Project::query()
             ->whereIn('id', $projectIds)
             ->orderBy('name')
-            ->get(['id', 'slug', 'name', 'user_id', 'program_id', 'working_days', 'start_date', 'end_date']);
+            ->get(['id', 'slug', 'name', 'user_id', 'program_id', 'center_id', 'city_id', 'working_days', 'start_date', 'end_date']);
 
         $reports = MonthlyReport::query()
             ->whereIn('project_id', $projectIds)
             ->withCount('lines')
             ->withExists(['reopenRequests as reopen_pending' => fn (Builder $query) => $query->where('status', ReopenRequestStatus::Pending)])
             ->orderBy('period')
-            ->get(['id', 'slug', 'project_id', 'period', 'status', 'returned_at'])
+            ->get(['id', 'slug', 'project_id', 'period', 'status', 'returned_at', 'revised_due_on'])
             ->groupBy('project_id');
 
         $user = auth()->user();
@@ -205,7 +205,7 @@ new #[Layout('layouts::desk'), Title('titles.monthly_reports')] class extends Co
                     default => 'draft',
                 };
                 $editable = in_array($state, ['draft', 'returned'], true);
-                $due = $hasLines ? $periods->dueDate($report->period) : null;
+                $due = $hasLines ? $periods->effectiveDueDate($report) : null;
                 // A month OpenMonthlyReport would refuse (no project period, or outside it) gets its reason, not a Fill that silently fails.
                 $refusal = $editable ? OpenMonthlyReport::refusal($project, $report->period) : null;
 

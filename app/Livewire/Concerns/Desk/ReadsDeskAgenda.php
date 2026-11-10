@@ -82,7 +82,7 @@ trait ReadsDeskAgenda
             ]);
 
         $monthlyReports = $this->visible(MonthlyReport::query(), 'reports')
-            ->select(['id', 'slug', 'project_id', 'period', 'prepared_by'])
+            ->select(['id', 'slug', 'project_id', 'period', 'prepared_by', 'revised_due_on'])
             ->with('project')
             ->where('status', MonthlyReportStatus::Draft)
             ->where(fn (Builder $query) => $query->whereIn('project_id', $projectIds === [] ? [0] : $projectIds)->orWhere('prepared_by', $user->id))
@@ -91,7 +91,7 @@ trait ReadsDeskAgenda
             ->map(fn (MonthlyReport $report): array => [
                 'key' => 'monthly-report-'.$report->id,
                 'kind' => 'monthly-report',
-                'date' => MonthlyReportPeriods::fromLoaded($report->project, new EloquentCollection)->dueDate($report->period->startOfMonth()),
+                'date' => MonthlyReportPeriods::fromLoaded($report->project, new EloquentCollection)->effectiveDueDate($report),
                 'title' => (string) __('desk.agenda_monthly_report', ['month' => $report->period->translatedFormat('F Y')]),
                 'context' => $report->project?->name ?? '—',
                 'project' => $report->project?->name,
