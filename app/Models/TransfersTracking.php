@@ -216,11 +216,20 @@ class TransfersTracking extends Model implements TracksActivity
     }
 
     /**
-     * A settled tranche that landed with less than was sent.
+     * A settled tranche that lost more than its recorded fees explain.
+     *
+     * "Less than was sent" was the old test, and every transfer that paid a
+     * bank fee met it: the flag was true for every settled tranche and so
+     * told a reader nothing. What is worth chasing is the part nobody has
+     * accounted for, so the recorded fees are taken off first — only when
+     * they were recorded in the currency the money was sent in, matching
+     * ReadsTransferLedger's own fee arithmetic.
      */
     public static function landedShortSql(): string
     {
-        return '('.self::settledSql().' and transfers_tracking.net_amount_received < transfers_tracking.payment_amount)';
+        $fees = '(case when transfers_tracking.fees_currency = transfers_tracking.amount_transfered_currency then coalesce(transfers_tracking.fees, 0) else 0 end)';
+
+        return '('.self::settledSql()." and transfers_tracking.net_amount_received < transfers_tracking.payment_amount - {$fees})";
     }
 
     /**

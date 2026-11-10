@@ -1,10 +1,8 @@
 <?php
 
-use App\Enums\NotificationKind;
 use App\Enums\NotificationPriority;
 use App\Livewire\Concerns\ManagesInbox;
 use App\Models\UserNotification;
-use App\Notifications\NotificationPresenter;
 use App\Notifications\UnreadCounts;
 use Illuminate\Support\Collection;
 use Livewire\Attributes\Computed;
@@ -15,23 +13,19 @@ use Livewire\Component;
 new class extends Component {
     use ManagesInbox;
 
-    /** Which slice of the inbox the panel shows: all, unread or alerts. */
+    /** Which slice of the inbox the panel shows: all or unread. */
     public string $tab = 'all';
-
-    /** The module chip the panel is narrowed to, '' for every module. */
-    public string $module = '';
 
     /**
      * Whether the panel has been opened on this page. The bell renders on
-     * every page (twice: mobile and desktop header), so its rows are only
-     * queried once somebody actually opens it; until then only the cached
-     * unread count is read.
+     * every page, so its rows are only queried once somebody actually opens
+     * it; until then only the cached unread count is read.
      */
     public bool $opened = false;
 
     /**
-     * Whether the panel links to the notification rules; the top bar decides,
-     * so the bell itself never loads the viewer's permissions.
+     * Whether the panel's settings menu offers the notification rules; the
+     * top bar decides, so the bell itself never loads the viewer's permissions.
      */
     #[Locked]
     public bool $canManageRules = false;
@@ -63,8 +57,6 @@ new class extends Component {
             ->forUser(auth()->user())
             ->visible()
             ->when($this->tab === 'unread', fn ($query) => $query->whereNull('read_at'))
-            ->when($this->tab === 'alerts', fn ($query) => $query->whereIn('kind', [NotificationKind::Alert->value, NotificationKind::Digest->value]))
-            ->when($this->module !== '', fn ($query) => $query->where('module', $this->module))
             ->with('actor:id,hr_user_id,employee_id')
             ->orderByRaw('case when read_at is null and priority = ? then 0 else 1 end', [NotificationPriority::Critical->value])
             ->latest()
@@ -87,13 +79,7 @@ new class extends Component {
 
     public function showTab(string $tab): void
     {
-        $this->tab = in_array($tab, ['all', 'unread', 'alerts'], true) ? $tab : 'all';
-        unset($this->sections);
-    }
-
-    public function showModule(string $module): void
-    {
-        $this->module = $this->module === $module ? '' : $module;
+        $this->tab = $tab === 'unread' ? 'unread' : 'all';
         unset($this->sections);
     }
 
@@ -106,20 +92,16 @@ new class extends Component {
 }; ?>
 
 @php
-    $presenter = app(NotificationPresenter::class);
     $total = $this->counts['total'];
     $critical = $this->counts['critical'];
-    $chipModules = $this->counts['modules'];
-
-    if ($module !== '' && ! array_key_exists($module, $chipModules)) {
-        $chipModules[$module] = 0;
-    }
+    $panelId = 'notification-panel-'.$this->getId();
 @endphp
 
 <div
     x-data="notificationBell"
     x-on:keydown.escape.window="close(true)"
     x-on:click.outside="close(false)"
+    x-on:resize.window="place()"
     x-on:inbox-undoable.window="showUndo($event.detail)"
     class="relative flex"
     data-notification-bell
@@ -130,6 +112,7 @@ new class extends Component {
         x-on:click="toggle()"
         x-bind:aria-expanded="open.toString()"
         aria-haspopup="dialog"
+        aria-controls="{{ $panelId }}-dialog"
         aria-label="{{ trans_choice('notifications.bell_label', $total, ['count' => $total]) }}"
         x-bind:class="open && 'bg-white text-secondary-dark shadow-sm dark:bg-surface-3 dark:text-ink dark:shadow-raised'"
         class="relative inline-flex size-8 cursor-pointer touch-manipulation items-center justify-center rounded-full text-secondary-medium transition-colors hover:bg-white hover:text-secondary-dark hover:shadow-sm max-lg:size-11 dark:text-ink-muted dark:hover:bg-surface-3 dark:hover:text-ink dark:hover:shadow-raised"
@@ -140,196 +123,142 @@ new class extends Component {
             <flux:icon.bell variant="outline" class="size-4.5!" />
         </span>
 
+        {{-- Only a red dot on the bell, like the sidebar rail (user decision 2026-11-10); the exact number is
+             in the button's label and inside the panel. data-unread-count carries it for the app badge. --}}
         @if ($total > 0)
             <span
-                @class([
-                    'absolute -end-0.5 -top-0.5 inline-flex min-w-[1.125rem] items-center justify-center rounded-full px-1 text-[10px] font-bold leading-[1.125rem] tabular-nums text-white ring-2 ring-white dark:ring-surface-1',
-                    'bg-primary dark:bg-status-critical dark:text-surface-0' => $critical > 0,
-                    'bg-secondary-dark dark:bg-ink dark:text-surface-0' => $critical === 0,
-                ])
-                data-unread-count
+                class="absolute size-2 rounded-full bg-primary ring-2 ring-white dark:bg-status-critical dark:ring-surface-1"
+                aria-hidden="true"
+                data-unread-count="{{ $total }}"
                 @if ($critical > 0) data-critical-unread @endif
-            >{{ $total > 99 ? '99+' : $total }}</span>
+            ></span>
         @endif
     </button>
 
-    {{-- From sm the panel hangs from the bell, its end edge lined up with
-         the bell's so it opens towards the page rather than the window edge.
-         It stays short: the list scrolls inside it. --}}
+    {{-- The panel hangs centred under the bell (desk-bell.css); place() nudges
+         it back inside the window when the bell sits near an edge. Below 640px
+         it is a full-width sheet under the top bar. --}}
     <div
         x-show="open"
         x-cloak
         x-ref="panel"
+        id="{{ $panelId }}-dialog"
         tabindex="-1"
-        x-transition:enter="transition duration-300 ease-[cubic-bezier(0.16,1,0.3,1)] motion-reduce:duration-0"
-        x-transition:enter-start="opacity-0 -translate-y-2 scale-[0.97] blur-[2px]"
-        x-transition:enter-end="opacity-100 translate-y-0 scale-100 blur-0"
-        x-transition:leave="transition duration-150 ease-in motion-reduce:duration-0"
-        x-transition:leave-start="opacity-100 scale-100"
-        x-transition:leave-end="opacity-0 scale-[0.98]"
+        x-transition:enter="dk-menu-in"
+        x-transition:enter-start="dk-menu-from"
+        x-transition:leave="dk-menu-out"
+        x-transition:leave-end="dk-menu-from"
         role="dialog"
         aria-label="{{ __('notifications.inbox') }}"
-        class="fixed inset-x-3 top-16 z-50 flex max-h-[calc(100dvh-5rem)] origin-top-right flex-col overflow-hidden rounded-2xl bg-white text-secondary-dark shadow-[0_24px_48px_-12px_rgba(16,24,40,0.22),0_4px_10px_rgba(16,24,40,0.08)] ring-1 ring-secondary-soft/70 focus:outline-none sm:absolute sm:inset-x-auto sm:end-0 sm:top-full sm:mt-2 sm:w-[26rem] rtl:origin-top-left dark:bg-surface-3 dark:shadow-raised dark:text-ink dark:ring-line"
+        class="dk-nb"
         data-notification-panel
     >
-        <div class="flex items-start justify-between gap-3 px-5 pt-5">
-            <div class="min-w-0">
-                <p class="text-lg leading-tight font-bold">{{ __('notifications.inbox') }}</p>
-                <p class="mt-0.5 text-xs font-semibold text-secondary-medium dark:text-ink-muted">
+        <div class="dk-nb-h">
+            <div class="dk-nb-head">
+                <p class="dk-nb-title">{{ __('notifications.inbox') }}</p>
+                <p class="dk-nb-figure" aria-live="polite">
                     @if ($total > 0)
-                        <span class="tabular-nums">{{ __('notifications.unread_count', ['count' => $total]) }}</span>
+                        <strong>{{ $total > 999 ? '999+' : $total }}</strong>
+                        <span>{{ __('notifications.bell.unread') }}</span>
                         @if ($critical > 0)
-                            <span aria-hidden="true" class="text-secondary-light">·</span>
-                            <span class="text-status-critical tabular-nums">{{ $critical }} {{ __('notifications.brief.critical') }}</span>
+                            <span class="dk-nb-critical" data-bell-critical><i aria-hidden="true"></i>{{ __('notifications.bell.critical_count', ['count' => $critical]) }}</span>
                         @endif
                     @else
-                        {{ __('notifications.brief.caught_up') }}
+                        <span class="dk-nb-calm">{{ __('notifications.brief.caught_up') }}</span>
                     @endif
                 </p>
             </div>
-            <div class="-me-1.5 flex items-center gap-0.5">
-                <a href="{{ route('notifications.index') }}" wire:navigate class="inline-flex size-8 items-center justify-center rounded-lg text-secondary-medium transition-colors hover:bg-secondary-soft hover:text-secondary-dark dark:text-ink-muted dark:hover:bg-white/10 dark:hover:text-ink" aria-label="{{ __('notifications.full_page') }}" title="{{ __('notifications.full_page') }}">
-                    <flux:icon.arrows-pointing-out variant="mini" class="size-4" />
-                </a>
+
+            <div class="dk-nb-acts">
+                @if ($total > 0)
+                    <button type="button" wire:click="markAllRead" x-on:click="$refs.panel.querySelectorAll('.dk-nb-unread').forEach((row) => row.classList.remove('dk-nb-unread', 'dk-nb-crit'))" class="dk-nb-ic dk-tip" aria-label="{{ __('notifications.mark_all_read') }}" data-tip="{{ __('notifications.mark_all_read') }}" data-bell-mark-all>
+                        <flux:icon name="nav-check-check" class="size-4" />
+                    </button>
+                @endif
+
                 @if ($canManageRules)
-                    <a href="{{ route('admin.notification-settings.edit') }}" wire:navigate class="inline-flex size-8 items-center justify-center rounded-lg text-secondary-medium transition-colors hover:bg-secondary-soft hover:text-secondary-dark dark:text-ink-muted dark:hover:bg-white/10 dark:hover:text-ink" aria-label="{{ __('navigation.notification_settings') }}" title="{{ __('navigation.notification_settings') }}" data-bell-rules>
-                        <flux:icon.adjustments-horizontal variant="mini" class="size-4" />
+                    <div class="relative" x-data="{ menu: false }" x-on:click.outside="menu = false" x-on:keydown.escape.stop="menu = false; $refs.gear.focus()">
+                        <button type="button" x-ref="gear" x-on:click="menu = ! menu" x-bind:aria-expanded="menu.toString()" aria-haspopup="menu" class="dk-nb-ic dk-tip" aria-label="{{ __('notifications.bell.settings') }}" data-tip="{{ __('notifications.bell.settings') }}" data-bell-settings>
+                            <flux:icon name="nav-settings" class="size-4" />
+                        </button>
+                        <div x-show="menu" x-cloak role="menu" class="dk-nb-menu" x-transition:enter="dk-menu-in" x-transition:enter-start="dk-menu-from" x-transition:leave="dk-menu-out" x-transition:leave-end="dk-menu-from">
+                            <a role="menuitem" href="{{ route('notification-settings.edit') }}" wire:navigate>
+                                <flux:icon name="nav-bell-ring" class="size-4" />
+                                {{ __('notifications.settings_link') }}
+                            </a>
+                            <a role="menuitem" href="{{ route('admin.notification-settings.edit') }}" wire:navigate data-bell-rules>
+                                <flux:icon name="nav-sliders-horizontal" class="size-4" />
+                                {{ __('navigation.notification_settings') }}
+                            </a>
+                        </div>
+                    </div>
+                @else
+                    <a href="{{ route('notification-settings.edit') }}" wire:navigate class="dk-nb-ic dk-tip" aria-label="{{ __('notifications.settings_link') }}" data-tip="{{ __('notifications.settings_link') }}" data-bell-settings>
+                        <flux:icon name="nav-settings" class="size-4" />
                     </a>
                 @endif
-                <a href="{{ route('notification-settings.edit') }}" wire:navigate class="inline-flex size-8 items-center justify-center rounded-lg text-secondary-medium transition-colors hover:bg-secondary-soft hover:text-secondary-dark dark:text-ink-muted dark:hover:bg-white/10 dark:hover:text-ink" aria-label="{{ __('notifications.settings_link') }}" title="{{ __('notifications.settings_link') }}">
-                    <flux:icon.cog-6-tooth variant="mini" class="size-4" />
-                </a>
             </div>
         </div>
 
-        <div class="px-5 pt-4">
-            <div class="grid grid-cols-3 gap-1 rounded-xl bg-secondary-soft/50 p-1 text-sm dark:bg-white/[0.06]" role="tablist">
-                @foreach (['all', 'unread', 'alerts'] as $key)
-                    <button
-                        type="button"
-                        role="tab"
-                        wire:click="showTab('{{ $key }}')"
-                        aria-selected="{{ $tab === $key ? 'true' : 'false' }}"
-                        aria-controls="notification-panel-{{ $this->getId() }}"
-                        @class([
-                            'inline-flex min-h-8 cursor-pointer items-center justify-center gap-1.5 rounded-lg px-2 font-semibold transition-[background-color,color,box-shadow] duration-200',
-                            'bg-white text-secondary-dark shadow-[0_1px_3px_rgba(16,24,40,0.12)] dark:bg-surface-2 dark:text-ink' => $tab === $key,
-                            'text-secondary-medium hover:text-secondary-dark dark:text-ink-muted dark:hover:text-ink' => $tab !== $key,
-                        ])
-                    >
-                        {{ __("notifications.tabs.{$key}") }}
-                        @if ($key === 'unread' && $total > 0)
-                            <span @class([
-                                'inline-flex min-w-4.5 items-center justify-center rounded-full px-1 text-[0.625rem] leading-4.5 font-bold tabular-nums',
-                                'bg-primary dark:bg-status-critical dark:text-surface-0 text-white' => $critical > 0,
-                                'bg-secondary-dark text-white dark:bg-ink dark:text-surface-0' => $critical === 0,
-                            ])>{{ $total > 99 ? '99+' : $total }}</span>
-                        @endif
-                    </button>
-                @endforeach
-            </div>
+        <div class="dk-nb-tabs" role="tablist" aria-label="{{ __('notifications.inbox') }}" x-on:keydown.arrow-left.prevent="switchTab($event)" x-on:keydown.arrow-right.prevent="switchTab($event)">
+            @foreach (['all', 'unread'] as $key)
+                <button
+                    type="button"
+                    role="tab"
+                    wire:click="showTab('{{ $key }}')"
+                    aria-selected="{{ $tab === $key ? 'true' : 'false' }}"
+                    aria-controls="{{ $panelId }}"
+                    tabindex="{{ $tab === $key ? '0' : '-1' }}"
+                    class="dk-nb-tab"
+                >
+                    {{ __("notifications.tabs.{$key}") }}
+                    @if ($key === 'unread' && $total > 0)
+                        <small>{{ $total > 99 ? '99+' : $total }}</small>
+                    @endif
+                </button>
+            @endforeach
         </div>
 
-        @if (count($chipModules) > 1 || $module !== '')
-            <div class="relative mt-3">
-                <div class="flex gap-1.5 overflow-x-auto px-5 pb-1 [scrollbar-width:none] [mask-image:linear-gradient(to_right,transparent,black_1.25rem,black_calc(100%-1.25rem),transparent)] [&::-webkit-scrollbar]:hidden" data-bell-modules>
-                    @foreach ($chipModules as $chip => $chipCount)
-                        <button
-                            type="button"
-                            wire:click="showModule('{{ $chip }}')"
-                            wire:key="bell-chip-{{ $chip }}"
-                            aria-pressed="{{ $module === $chip ? 'true' : 'false' }}"
-                            @class([
-                                'inline-flex min-h-8 shrink-0 cursor-pointer items-center gap-1.5 rounded-full border ps-2.5 pe-3 text-xs font-semibold whitespace-nowrap transition-colors',
-                                'border-secondary-dark bg-secondary-dark text-white dark:border-ink dark:bg-ink dark:text-surface-0' => $module === $chip,
-                                'border-secondary-soft text-secondary-dark hover:border-secondary-light dark:border-line dark:text-ink dark:hover:border-field-line' => $module !== $chip,
-                            ])
-                            data-bell-module="{{ $chip }}"
-                        >
-                            <flux:icon :name="$presenter->moduleIcon($chip)" variant="micro" class="size-3.5" />
-                            {{ $presenter->moduleLabel($chip) }}
-                            @if ($chipCount > 0)
-                                <span class="tabular-nums opacity-70">{{ $chipCount }}</span>
-                            @endif
-                        </button>
-                    @endforeach
-                </div>
-            </div>
-        @endif
-
-        <div id="notification-panel-{{ $this->getId() }}" role="tabpanel" class="mt-2 max-h-[min(19rem,calc(100dvh-16rem))] min-h-0 overflow-y-auto overscroll-contain px-2.5 pb-3 [scrollbar-width:thin]" wire:loading.class="opacity-60" wire:target="showTab,showModule">
+        <div id="{{ $panelId }}" role="tabpanel" class="dk-nb-list" wire:loading.class="dk-nb-busy" wire:target="showTab">
             @if (! $opened)
-                <div class="space-y-1 px-2 py-2" role="status" data-panel-loading>
+                <div class="dk-nb-skel" role="status" data-panel-loading>
                     <span class="sr-only">{{ __('notifications.loading') }}</span>
-                    @foreach ([0.9, 0.7, 0.8] as $width)
-                        <div class="flex gap-3 py-2.5" aria-hidden="true">
-                            <span class="size-9 shrink-0 animate-pulse rounded-full bg-secondary-soft/70 dark:bg-white/10"></span>
-                            <span class="flex-1 space-y-2 pt-1">
-                                <span class="block h-3 animate-pulse rounded-full bg-secondary-soft/70 dark:bg-white/10" style="width: {{ $width * 100 }}%"></span>
-                                <span class="block h-2.5 w-1/3 animate-pulse rounded-full bg-secondary-soft/50 dark:bg-white/[0.07]"></span>
-                            </span>
-                        </div>
+                    @foreach ([88, 64, 76] as $width)
+                        <span class="dk-nb-skel-row" aria-hidden="true">
+                            <i></i>
+                            <span><b style="width: {{ $width }}%"></b><b></b></span>
+                        </span>
                     @endforeach
                 </div>
             @else
                 @forelse ($this->sections as $section => $rows)
-                    @if ($section === 'pinned')
-                        <div class="mt-2 rounded-xl bg-status-critical-soft/60 p-1 pt-2.5 dark:bg-surface-2/60" data-bell-pinned>
-                            <p class="flex items-center gap-2 px-2.5 pb-0.5 text-xs font-bold text-status-critical">
-                                <span class="notification-beacon relative size-1.5 rounded-full bg-primary dark:bg-status-critical text-primary dark:text-brand-text" aria-hidden="true"></span>
-                                {{ __("notifications.sections.{$section}") }}
-                            </p>
-                            <ol class="notification-thread">
-                                @foreach ($rows as $notification)
-                                    <x-notifications.row :notification="$notification" :compact="true" wire:key="bell-{{ $notification->id }}" style="--row-order: {{ $loop->index }}" />
-                                @endforeach
-                            </ol>
-                        </div>
-                    @else
-                        <p class="type-label px-2.5 pt-4 pb-1 text-secondary-medium dark:text-ink-muted">{{ __("notifications.sections.{$section}") }}</p>
-                        <ol class="notification-thread">
-                            @foreach ($rows as $notification)
-                                <x-notifications.row :notification="$notification" :compact="true" wire:key="bell-{{ $notification->id }}" style="--row-order: {{ $loop->index }}" />
-                            @endforeach
-                        </ol>
-                    @endif
+                    <p class="dk-nb-sec" @if ($section === 'pinned') data-bell-pinned @endif>{{ __("notifications.sections.{$section}") }}</p>
+                    <ol class="dk-nb-thread" x-on:keydown.arrow-down.prevent="moveRow($event, 1)" x-on:keydown.arrow-up.prevent="moveRow($event, -1)">
+                        @foreach ($rows as $notification)
+                            <x-notifications.bell-row :notification="$notification" wire:key="bell-{{ $notification->id }}" />
+                        @endforeach
+                    </ol>
                 @empty
-                    <div class="flex flex-col items-center px-6 py-12 text-center" data-bell-empty>
-                        <svg viewBox="0 0 160 64" class="h-14 w-36 text-secondary-soft dark:text-ink-faint" fill="none" aria-hidden="true">
-                            <path d="M8 32H62M98 32H152" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-dasharray="1 7" />
-                            <circle cx="20" cy="32" r="4" fill="currentColor" />
-                            <circle cx="140" cy="32" r="4" fill="currentColor" />
-                            <circle cx="80" cy="32" r="17" class="fill-status-good-soft stroke-status-good" stroke-width="1.5" />
-                            <path d="M72.5 32.5L77.5 37.5L88 27" class="stroke-status-good" stroke-width="2.25" stroke-linecap="round" stroke-linejoin="round" />
-                        </svg>
-                        <p class="mt-4 text-base font-bold">{{ __('notifications.empty') }}</p>
-                        <p class="mt-1 max-w-60 text-xs text-pretty text-secondary-medium dark:text-ink-muted">{{ __('notifications.empty_body') }}</p>
+                    <div class="dk-nb-empty" data-bell-empty>
+                        <span aria-hidden="true"><flux:icon.check variant="outline" /></span>
+                        <p>{{ __('notifications.empty') }}</p>
+                        <small>{{ __('notifications.empty_body') }}</small>
                     </div>
                 @endforelse
             @endif
         </div>
 
-        <div class="relative flex items-center justify-between gap-3 border-t border-secondary-soft/80 px-5 py-3 text-sm dark:border-line">
-            <button type="button" wire:click="markAllRead" @disabled($total === 0) class="inline-flex cursor-pointer items-center gap-1.5 font-semibold text-secondary-medium transition-colors hover:text-secondary-dark disabled:cursor-default disabled:opacity-40 dark:text-ink-muted dark:hover:text-ink">
-                <flux:icon.check-circle variant="micro" />
-                {{ __('notifications.mark_all_read') }}
-            </button>
-            <a href="{{ route('notifications.index') }}" wire:navigate class="group/all inline-flex items-center gap-1 font-semibold text-status-critical">
+        <div class="dk-nb-foot">
+            <a href="{{ route('notifications.index') }}" wire:navigate class="dk-nb-all">
                 {{ __('notifications.view_all') }}
-                <flux:icon.arrow-right variant="micro" class="size-4 transition-transform group-hover/all:translate-x-0.5 rtl:rotate-180 rtl:group-hover/all:-translate-x-0.5" />
+                <flux:icon.arrow-right variant="micro" class="dk-flip" />
             </a>
 
             <template x-if="undo">
-                <div
-                    x-transition:enter="transition duration-200 ease-out"
-                    x-transition:enter-start="opacity-0 translate-y-1"
-                    class="absolute inset-0 flex items-center justify-between gap-3 bg-secondary-dark px-5 text-white dark:bg-surface-3 dark:text-ink"
-                    aria-live="polite"
-                    data-bell-undo
-                >
-                    <span x-text="undo.message" class="truncate font-semibold"></span>
-                    <button type="button" x-on:click="undoNow()" class="inline-flex min-h-8 shrink-0 cursor-pointer items-center gap-1.5 rounded-full bg-white/15 px-3 font-bold hover:bg-white/25 dark:bg-white/10 dark:hover:bg-white/15">
-                        <flux:icon.arrow-uturn-left variant="micro" class="size-3.5" />
+                <div class="dk-nb-undo" aria-live="polite" data-bell-undo>
+                    <span x-text="undo.message"></span>
+                    <button type="button" x-on:click="undoNow()">
+                        <flux:icon.arrow-uturn-left variant="micro" />
                         {{ __('notifications.undo.action') }}
                     </button>
                 </div>

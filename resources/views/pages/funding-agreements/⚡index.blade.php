@@ -8,6 +8,7 @@ use App\Livewire\Concerns\FundingAgreements\ExportsAgreementRegister;
 use App\Livewire\Concerns\FundingAgreements\ReadsAgreementRegister;
 use App\Livewire\Concerns\ManagesAgreementForm;
 use App\Models\DonorProposal;
+use App\Support\AgreementHealth;
 use Livewire\Attributes\Layout;
 use Livewire\Attributes\Title;
 use Livewire\Attributes\Url;
@@ -43,7 +44,7 @@ new #[Layout('layouts::desk'), Title('titles.funding_agreements')] class extends
      *
      * @var list<string>
      */
-    private const FILTERS = ['search', 'donor', 'currency', 'stage', 'flag', 'min', 'max'];
+    private const FILTERS = ['search', 'donor', 'currency', 'health', 'stage', 'flag', 'min', 'max'];
 
     #[Url(except: '')]
     public string $search = '';
@@ -53,6 +54,10 @@ new #[Layout('layouts::desk'), Title('titles.funding_agreements')] class extends
 
     #[Url(except: '')]
     public string $currency = '';
+
+    /** Which of the three headline states the list is narrowed to. */
+    #[Url(except: '')]
+    public string $health = '';
 
     #[Url(except: '')]
     public string $stage = '';
@@ -87,6 +92,10 @@ new #[Layout('layouts::desk'), Title('titles.funding_agreements')] class extends
 
     protected function normaliseFilters(): void
     {
+        if (! in_array($this->health, AgreementHealth::CASES, true)) {
+            $this->health = '';
+        }
+
         if (! in_array($this->stage, self::STAGES, true)) {
             $this->stage = '';
         }
@@ -111,9 +120,30 @@ new #[Layout('layouts::desk'), Title('titles.funding_agreements')] class extends
 
     public function clearFilters(): void
     {
-        $this->reset(['search', 'donor', 'currency', 'stage', 'flag', 'min', 'max']);
+        $this->reset(['search', 'donor', 'currency', 'health', 'stage', 'flag', 'min', 'max']);
         $this->resetRegisterFilters();
         $this->clearStrategyFilter();
+    }
+
+    /**
+     * Narrow to one headline state from its figure, or clear it by pressing
+     * the same figure again.
+     */
+    public function toggleHealth(string $health): void
+    {
+        $this->health = $this->health === $health || ! in_array($health, AgreementHealth::CASES, true) ? '' : $health;
+        $this->resetPage();
+    }
+
+    /**
+     * A register of agreements is read a page at a time, not five rows at a
+     * time: most of them are one line of reading each.
+     *
+     * @return list<string>
+     */
+    protected function registerPageSizes(): array
+    {
+        return ['25', '50', '100'];
     }
 
     /**
@@ -151,7 +181,7 @@ new #[Layout('layouts::desk'), Title('titles.funding_agreements')] class extends
 
 @php
     $showsOverview = $this->view === 'overview';
-    $activeFilterCount = collect([$this->search, $this->donor, $this->currency, $this->stage, $this->flag, $this->min, $this->max, $this->year])
+    $activeFilterCount = collect([$this->search, $this->donor, $this->currency, $this->health, $this->stage, $this->flag, $this->min, $this->max, $this->year])
         ->filter(fn (string $value): bool => $value !== '')
         ->count();
     $total = $showsOverview ? $this->agreements->total() : $this->rows->total();
@@ -173,24 +203,29 @@ new #[Layout('layouts::desk'), Title('titles.funding_agreements')] class extends
     $sortKey = $this->activeSort();
     $sortDirection = $this->activeSortDir();
     $counts = $this->hasAnyAgreement && ! $showsOverview ? $this->stageCounts : [];
+    $flagCounts = $this->hasAnyAgreement ? $this->flagCounts : [];
 
     $setPill = fn (string $property, string $value, string $label): array => [
         'label' => $label,
         'model' => $property, 'value' => $value, 'toggle' => true,
         'active' => $chosen[$property] === $value,
     ];
+    /* A choice that would return nothing stays in the row, but greyed and unpressable. */
     $stagePill = fn (string $value, string $label, ?string $tone = null): array => [
         'label' => $label,
         'model' => 'stage', 'value' => $value, 'toggle' => true,
         'active' => $chosen['stage'] === $value,
         'count' => $counts[$value] ?? 0,
         'tone' => ($counts[$value] ?? 0) > 0 ? $tone : null,
+        'disabled' => $counts !== [] && ($counts[$value] ?? 0) === 0,
         'test' => 'stage-'.$value,
     ];
     $flagPill = fn (string $value, string $label): array => [
         'label' => $label,
         'model' => 'flag', 'value' => $value, 'toggle' => true,
         'active' => $chosen['flag'] === $value,
+        'count' => $flagCounts[$value] ?? 0,
+        'disabled' => $flagCounts !== [] && ($flagCounts[$value] ?? 0) === 0,
         'test' => 'flag-'.$value,
     ];
 
@@ -231,22 +266,33 @@ new #[Layout('layouts::desk'), Title('titles.funding_agreements')] class extends
     :view="$view"
     :views="[ 'table' => ['icon' => 'table', 'label' => __('finance_tables.view_table')], 'overview' => ['icon' => 'chart', 'label' => __('finance_tables.view_overview')] ]"
 >
+    @if ($this->hasAnyAgreement)
+        {{-- The two controls reached for most often: they filter as they are used, no dialog in the way. --}}
+        <x-slot:search>
+            <x-desk.register-search
+                :label="__('funding_agreements.search_agreements')"
+                :placeholder="__('common.reference_donor_or_proposal')"
+                wire:model.live.debounce.300ms="search"
+                data-test="register-search"
+            />
+        </x-slot:search>
+
+        <x-slot:filters>
+            <x-ui.header-filter-select :label="__('funding_agreements.donor')" wire:model.live="donor" :value="$this->donor" data-test="register-donor">
+                <flux:select.option value="">{{ __('funding_agreements.all_donors') }}</flux:select.option>
+                @foreach ($this->donorOptions as $donorOption)
+                    <flux:select.option :value="$donorOption->id" :wire:key="'agr-donor-'.$donorOption->id">{{ $donorOption->name }}</flux:select.option>
+                @endforeach
+            </x-ui.header-filter-select>
+        </x-slot:filters>
+    @endif
+
     <x-slot:actions>
             <div class="flex flex-wrap items-center justify-end gap-2">
                 <x-desk.strategy-chip :strategy="$this->strategyFilter" />
                 @if ($this->hasAnyAgreement)
                     <x-funding.filters :active="$activeFilterCount" :results="$total">
-                        <div class="directory-filters grid gap-3 sm:grid-cols-2">
-                            <x-ui.input type="search" icon="magnifying-glass" :label="__('funding_agreements.search_agreements')" :placeholder="__('common.reference_donor_or_proposal')" wire:model="search" clearable />
-
-                            <x-ui.header-filter-select deferred :label="__('funding_agreements.donor')" wire:model="donor" :value="$this->donor">
-                                <flux:select.option value="">{{ __('funding_agreements.all_donors') }}</flux:select.option>
-                                @foreach ($this->donorOptions as $donorOption)
-                                    <flux:select.option :value="$donorOption->id" :wire:key="'agr-donor-'.$donorOption->id">{{ $donorOption->name }}</flux:select.option>
-                                @endforeach
-                            </x-ui.header-filter-select>
-                        </div>
-
+                        {{-- Search and donor stay out here in the bar, where they are always reachable. --}}
                         <x-funding.pills :label="__('finance_tables.year')" :pills="$yearPills" />
 
                         @if ($selectedYear !== null)
@@ -286,12 +332,20 @@ new #[Layout('layouts::desk'), Title('titles.funding_agreements')] class extends
 
     @if (! $this->hasAnyAgreement)
         <x-ui.empty-state icon="banknotes" :heading="__('common.no_agreements_yet')" :body="__('funding_agreements.record_the_first_funding_agreement')" />
-    @elseif ($showsOverview)
-        @include('pages.funding-agreements._overview')
-    @elseif ($this->rows->isEmpty())
-        <x-ui.empty-state icon="banknotes" :heading="__('funding_agreements.no_matching_agreements')" :body="__('common.change_the_search_or_filters_and_try_again')" />
     @else
-        @include('pages.funding-agreements._index-register')
+        @include('pages.funding-agreements._index-headline')
+
+        @if ($showsOverview)
+            @include('pages.funding-agreements._overview')
+        @elseif ($this->rows->isEmpty())
+            <x-ui.empty-state icon="banknotes" :heading="__('funding_agreements.no_matching_agreements')" :body="__('common.change_the_search_or_filters_and_try_again')">
+                <x-slot:action>
+                    <x-ui.button tone="action" size="sm" wire:click="clearFilters" data-test="reset-filters">{{ __('finance_tables.filters_clear_all') }}</x-ui.button>
+                </x-slot:action>
+            </x-ui.empty-state>
+        @else
+            @include('pages.funding-agreements._index-register')
+        @endif
     @endif
 
     <x-funding.agreement-modal

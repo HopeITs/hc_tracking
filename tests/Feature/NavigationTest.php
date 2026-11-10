@@ -3,6 +3,8 @@
 use App\Models\DonorReport;
 use App\Models\User;
 use App\Support\Desk\Destinations;
+use App\Support\Desk\PageCards;
+use Illuminate\Support\Facades\Blade;
 use Illuminate\Support\Facades\Route;
 
 /**
@@ -176,6 +178,16 @@ test('the risk register is no longer in the sidebar, and the risk library is onl
         ->and(deskPageRoutes(mealManager()))->toContain('admin.risk-library.index');
 });
 
+test('a super admin outside the MEAL Manager slot is not offered the risk library its route refuses', function () {
+    $admin = User::factory()->role('Super Admin')->create();
+
+    $this->actingAs($admin)->get(route('admin.risk-library.index'))->assertForbidden();
+
+    expect(deskPageRoutes($admin))->not->toContain('admin.risk-library.index')
+        ->and(app(PageCards::class)->allows($admin, 'admin.risk-library.index'))->toBeFalse()
+        ->and(deskPageRoutes($admin))->toContain('admin.users.index');
+});
+
 test('the sidebar folds each group into one row and opens the group of the current page', function () {
     $this->actingAs(User::factory()->role('Super Admin')->create())
         ->get(route('projects.index'))
@@ -186,4 +198,12 @@ test('the sidebar folds each group into one row and opens the group of the curre
         ->assertSee('x-data="{ open: false ||', false)
         ->assertSee('data-side-link="projects.index"', false)
         ->assertSee('data-side-fly="projects_delivery"', false);
+});
+
+test('every wire:navigate link prefetches on hover unless it already names a modifier', function () {
+    $html = Blade::render('<a href="/a" wire:navigate>A</a><a href="/b" wire:navigate.preserve-scroll>B</a>');
+
+    expect($html)->toContain('href="/a" wire:navigate.hover>')
+        ->toContain('href="/b" wire:navigate.preserve-scroll>')
+        ->not->toContain('wire:navigate.preserve-scroll.hover');
 });

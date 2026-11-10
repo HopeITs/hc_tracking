@@ -5,26 +5,28 @@
     $sortKey and $sortDirection.
 --}}
 @use('App\Models\DonorProposal')
+@use('App\Support\AgreementHealth')
 @use('App\Support\AgreementMoney')
         @php
             $totals = $this->totals;
-            // A column nobody has money in is noise: failed money earns its column only when there is some.
-            $showFailed = $totals->sum('failed') > 0 || $chosen['stage'] === 'failed';
-            $columns = AgreementMoney::columns(year: $selectedYear, yearOnly: $yearOnly, withFailed: $showFailed);
+            $columns = AgreementMoney::registerColumns(year: $selectedYear, yearOnly: $yearOnly);
 
+            /*
+             * One quiet line per currency: what was promised, what landed, and
+             * what is still owed. A figure that is only ever an alarm — money
+             * past its date, money that failed — earns its place only when
+             * there is some, so a healthy currency reads as three numbers.
+             */
             $totalLines = $totals->map(fn (array $line): array => [
                 'currency' => $line['currency'],
                 'caption' => trans_choice('common.count_agreement', $line['agreements'], ['count' => $line['agreements']]),
                 'figures' => array_values(array_filter([
                     ['key' => 'budget', 'label' => $yearOnly ? __('finance_tables.budget_whole_agreement') : __('finance_tables.budget'), 'value' => $line['budget']],
-                    ['key' => 'scheduled', 'label' => __('finance_tables.scheduled'), 'value' => $line['scheduled']],
                     ['key' => 'received', 'label' => __('finance_tables.received'), 'value' => $line['received'], 'tone' => 'good', 'note' => DonorProposal::percentLabel($line['received'], $yearOnly ? $line['scheduled'] : $line['budget']).'%'],
                     $selectedYear !== null && ! $yearOnly ? ['key' => 'due_in_year', 'label' => __('finance_tables.due_in_year', ['year' => $selectedYear]), 'value' => $line['due_in_year']] : null,
                     $selectedYear !== null && ! $yearOnly ? ['key' => 'received_in_year', 'label' => __('finance_tables.received_in_year', ['year' => $selectedYear]), 'value' => $line['received_in_year'], 'tone' => 'good'] : null,
-                    ['key' => 'in_transit', 'label' => __('finance_tables.in_transit'), 'value' => $line['in_transit'], 'tone' => $line['in_transit'] > 0 ? 'warn' : null],
-                    ['key' => 'overdue', 'label' => __('finance_tables.overdue'), 'value' => $line['overdue'], 'tone' => $line['overdue'] > 0 ? 'critical' : null],
+                    $line['overdue'] > 0 ? ['key' => 'overdue', 'label' => __('finance_tables.overdue'), 'value' => $line['overdue'], 'tone' => 'critical'] : null,
                     $line['failed'] > 0 ? ['key' => 'failed', 'label' => __('finance_tables.failed'), 'value' => $line['failed'], 'tone' => 'critical'] : null,
-                    $yearOnly ? null : ['key' => 'unscheduled', 'label' => __('finance_tables.not_scheduled'), 'value' => $line['unscheduled'], 'tone' => 'muted'],
                     $yearOnly ? null : ['key' => 'outstanding', 'label' => __('finance_tables.outstanding'), 'value' => $line['outstanding']],
                 ])),
             ])->all();
@@ -32,9 +34,13 @@
 
         <x-funding.totals :lines="$totalLines" />
 
-        <x-funding.register size="2xl" :caption="__('finance_tables.agreements_caption')">
+        {{-- 2xl (104rem) was the min-width fourteen money columns needed. Six fit in
+             sm (56rem), so the table stops forcing a sideways scroll and its heading
+             row sticks again; the agreement name takes whatever slack is left. --}}
+        <x-funding.register size="sm" :caption="__('finance_tables.agreements_caption')">
             <x-slot:head>
                 <x-funding.register.th sort="agreement" :active="$sortKey" :dir="$sortDirection">{{ __('finance_tables.agreement') }}</x-funding.register.th>
+                <x-funding.register.th>{{ __('common.status') }}</x-funding.register.th>
                 <x-funding.agreement-head :columns="$columns" sortable :active="$sortKey" :dir="$sortDirection" />
             </x-slot:head>
 
@@ -58,7 +64,32 @@
                                 @endcan
                                 · {{ $agreement->proposal->status->label() }}
                             </span>
-                            <span class="sub">{{ $agreement->external_project_number ?? __('common.no_external_project_number') }}</span>
+                            {{-- An agreement with no external number says nothing about it: a whole
+                             line of "no external project number" on most rows is not information. --}}
+                        @if (filled($agreement->external_project_number))
+                            <span class="sub">{{ $agreement->external_project_number }}</span>
+                        @endif
+                        </td>
+
+                        @php
+                            $health = AgreementHealth::of($agreement);
+                        @endphp
+                        <td data-label="{{ __('common.status') }}" data-cell="health" data-health="{{ $health }}">
+                            <span @class([
+                                'inline-flex items-center gap-1.5 font-semibold whitespace-nowrap',
+                                {{-- The text token, not the surface one: this is 14px type. --}}
+                                'text-status-critical-text' => $health === AgreementHealth::ATTENTION,
+                                'text-funding' => $health === AgreementHealth::MOVING,
+                                'text-secondary-medium dark:text-ink-muted' => $health === AgreementHealth::NOT_STARTED,
+                            ])>
+                                <span @class([
+                                    'size-2 shrink-0 rounded-full',
+                                    'bg-primary dark:bg-status-critical' => $health === AgreementHealth::ATTENTION,
+                                    'bg-funding' => $health === AgreementHealth::MOVING,
+                                    'border border-dashed border-secondary-medium dark:border-ink-faint' => $health === AgreementHealth::NOT_STARTED,
+                                ]) aria-hidden="true"></span>
+                                {{ AgreementHealth::label($health) }}
+                            </span>
                         </td>
                     </x-slot:lead>
 
@@ -66,9 +97,9 @@
                         {{-- No delete here: an agreement is deleted from its edit form, and only while nothing is filed under it. --}}
                         <td>
                             <span class="flex items-center justify-end">
-                                <x-ui.button tone="ghost" size="sm" icon="eye" icon:variant="outline" class="size-8!" :href="route('funding-agreements.show', $agreement)" wire:navigate :aria-label="__('common.view_name', ['name' => $agreementName])" />
+                                <x-ui.button tone="ghost" size="sm" icon="eye" icon:variant="outline" class="size-8! max-sm:size-11! touch-manipulation" :href="route('funding-agreements.show', $agreement)" wire:navigate :aria-label="__('common.view_name', ['name' => $agreementName])" />
                                 @can('funding-agreements.update')
-                                    <x-ui.button tone="ghost" size="sm" icon="pencil-square" icon:variant="outline" class="size-8!" wire:click="openEditModal({{ $agreement->id }})" :aria-label="__('common.edit_name', ['name' => $agreementName])" data-test="edit-agreement-{{ $agreement->id }}" />
+                                    <x-ui.button tone="ghost" size="sm" icon="pencil-square" icon:variant="outline" class="size-8! max-sm:size-11! touch-manipulation" wire:click="openEditModal({{ $agreement->id }})" :aria-label="__('common.edit_name', ['name' => $agreementName])" data-test="edit-agreement-{{ $agreement->id }}" />
                                 @endcan
                             </span>
                         </td>

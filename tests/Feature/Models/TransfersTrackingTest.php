@@ -87,8 +87,21 @@ test('settled, landed short, missing net and converted tranches are told apart',
     $converted = TransfersTracking::factory()->create(['ar_status' => ArStatus::Received, 'net_amount_received' => '80.00', 'amount_transfered_currency' => Currency::Usd, 'amount_received_currency' => Currency::Eur]);
     $pending = TransfersTracking::factory()->create(['ar_status' => ArStatus::Pending, 'net_amount_received' => '5.00']);
 
-    expect(TransfersTracking::query()->settled()->pluck('id')->all())->toBe([$settled->id])
-        ->and(TransfersTracking::query()->whereRaw(TransfersTracking::landedShortSql())->pluck('id')->all())->toBe([$settled->id])
+    // Loses 10 with 10 of fees recorded: the whole loss is accounted for, so
+    // it is not short. Every transfer pays a fee, so testing net < payment
+    // alone flagged all of them and told a reader nothing.
+    $explained = TransfersTracking::factory()->create(['ar_status' => ArStatus::Received, 'payment_amount' => '100.00', 'net_amount_received' => '90.00', 'fees' => '10.00', 'fees_currency' => Currency::Usd, 'amount_transfered_currency' => Currency::Usd, 'amount_received_currency' => Currency::Usd]);
+
+    // Loses 10 with only 4 of fees: 6 is unexplained, so it is short.
+    $unexplained = TransfersTracking::factory()->create(['ar_status' => ArStatus::Received, 'payment_amount' => '100.00', 'net_amount_received' => '90.00', 'fees' => '4.00', 'fees_currency' => Currency::Usd, 'amount_transfered_currency' => Currency::Usd, 'amount_received_currency' => Currency::Usd]);
+
+    // Fees recorded in another currency cannot be set against the loss.
+    $feesElsewhere = TransfersTracking::factory()->create(['ar_status' => ArStatus::Received, 'payment_amount' => '100.00', 'net_amount_received' => '90.00', 'fees' => '10.00', 'fees_currency' => Currency::Eur, 'amount_transfered_currency' => Currency::Usd, 'amount_received_currency' => Currency::Usd]);
+
+    expect(TransfersTracking::query()->settled()->pluck('id')->all())
+        ->toBe([$settled->id, $explained->id, $unexplained->id, $feesElsewhere->id])
+        ->and(TransfersTracking::query()->whereRaw(TransfersTracking::landedShortSql())->pluck('id')->all())
+        ->toBe([$settled->id, $unexplained->id, $feesElsewhere->id])
         ->and(TransfersTracking::query()->missingNet()->pluck('id')->all())->toBe([$missing->id])
         ->and(TransfersTracking::query()->converted()->pluck('id')->all())->toBe([$converted->id])
         ->and($settled->fresh()->isSettled())->toBeTrue()

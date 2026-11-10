@@ -628,6 +628,33 @@
         cursor: pointer;
     }
 
+    /*
+     * A register's row action. The Flux button carried ~1,100 bytes of utility
+     * classes on every row — 27KB of class attribute alone over a 25-row page,
+     * and a component render per row. One class here does the same job.
+     */
+    .register-action {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        inline-size: 2rem;
+        block-size: 2rem;
+        border-radius: 0.5rem;
+        color: var(--register-muted);
+        cursor: pointer;
+        touch-action: manipulation;
+        transition: background-color 150ms, color 150ms;
+    }
+
+    .register-action:hover { background: var(--color-board-head); color: var(--register-ink); }
+    .register-action:focus-visible { outline: 2px solid var(--color-secondary-medium); outline-offset: 2px; }
+    .register-action svg { inline-size: 1rem; block-size: 1rem; }
+
+    /* A phone needs a 44px target. */
+    @media (max-width: 40rem) {
+        .register-action { inline-size: 2.75rem; block-size: 2.75rem; }
+    }
+
     .register td > .flex.justify-end { justify-content: center; }
     .register th[aria-sort] { color: var(--register-ink); }
 

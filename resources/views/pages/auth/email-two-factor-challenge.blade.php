@@ -23,7 +23,7 @@
             </div>
 
             @error('code')
-                <flux:text color="red">{{ $message }}</flux:text>
+                <flux:text class="text-primary! dark:text-brand-text!">{{ $message }}</flux:text>
             @enderror
 
             <div class="flex justify-center">

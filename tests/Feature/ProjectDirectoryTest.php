@@ -624,7 +624,7 @@ test('every view opens a project through the same eye action instead of a clicka
             ->assertSeeHtml('aria-label="Open Wells Of Hope"')
             ->assertSeeHtml('href="'.$showUrl.'"')
             // The name is plain text in every view; only the eye navigates.
-            ->assertDontSeeHtml('href="'.$showUrl.'" wire:navigate title="Wells Of Hope"');
+            ->assertDontSeeHtml('href="'.$showUrl.'" wire:navigate.hover title="Wells Of Hope"');
     }
 });
 

@@ -29,6 +29,7 @@ return [
         'empty_body' => 'When a proposal is approved, the templates of the projects you cover appear here for you to confirm.',
     ],
     'tab' => [
+        'preparing_monthly_reports' => 'Preparing monthly reports. They will appear once generation finishes.',
         'title' => 'Monthly report template',
         'subtitle' => 'What the center manager reports each month, per proposal.',
         'read_only' => 'Read only: only the project\'s MEAL officer or the MEAL Manager can change this template.',

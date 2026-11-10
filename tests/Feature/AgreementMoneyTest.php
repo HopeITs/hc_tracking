@@ -127,3 +127,13 @@ test('the column list follows the permission, the year and the mode', function (
         ->and($keys(AgreementMoney::columns(withTransfers: false)))->toBe(['currency', 'budget', 'reports'])
         ->and(AgreementMoney::columns(year: 2026, yearOnly: true)[1]['label'])->toBe('Budget (whole agreement)');
 });
+
+test('the register keeps three columns, and a chosen year adds its two', function () {
+    $keys = fn (array $columns): array => array_column($columns, 'key');
+
+    expect($keys(AgreementMoney::registerColumns()))->toBe(['amount', 'received_share', 'next_due'])
+        ->and($keys(AgreementMoney::registerColumns(year: 2026)))->toBe(['amount', 'received_share', 'due_in_year', 'received_in_year', 'next_due'])
+        // Year-only figures are the year's own, so the year columns would repeat them.
+        ->and($keys(AgreementMoney::registerColumns(year: 2026, yearOnly: true)))->toBe(['amount', 'received_share', 'next_due'])
+        ->and(AgreementMoney::registerColumns(year: 2026, yearOnly: true)[0]['label'])->toBe('Budget (whole agreement)');
+});

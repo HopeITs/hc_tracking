@@ -61,7 +61,7 @@ test('the strategy page is its own full page with a back link and a breadcrumb t
         ->assertSee('class="dk-story dk-strat"', false)
         ->assertSee('class="dk-back" href="'.route('strategies.index').'" wire:navigate', false)
         ->assertSee('<nav class="dk-crumb" aria-label="'.__('ui.breadcrumb').'">', false)
-        ->assertSee('<a href="'.route('strategies.index').'" wire:navigate>'.__('common.strategies').'</a>', false)
+        ->assertSee('<a href="'.route('strategies.index').'" wire:navigate.hover>'.__('common.strategies').'</a>', false)
         ->assertSee('<span aria-current="page">Country Strategy</span>', false);
 });
 
@@ -288,8 +288,8 @@ test('the programs and projects figures link to their own registers narrowed to 
 
     $this->actingAs(User::factory()->role('General Manager')->create())
         ->get(route('strategies.show', $strategy))
-        ->assertSee('href="'.e(route('programs.index', ['strategy' => $strategy->id])).'" wire:navigate data-test="strategy-programs-link"', false)
-        ->assertSee('href="'.e(route('projects.index', ['strategy' => $strategy->id])).'" wire:navigate data-test="strategy-projects-link"', false);
+        ->assertSee('href="'.e(route('programs.index', ['strategy' => $strategy->id])).'" wire:navigate.hover data-test="strategy-programs-link"', false)
+        ->assertSee('href="'.e(route('projects.index', ['strategy' => $strategy->id])).'" wire:navigate.hover data-test="strategy-projects-link"', false);
 });
 
 test('programs under no pillar get a notice that jumps to their group', function () {

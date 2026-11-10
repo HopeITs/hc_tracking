@@ -19,8 +19,16 @@ class RescheduleTask
      */
     public function handle(int $taskId, string $date): ?bool
     {
-        if ($date !== '' && preg_match('/^\d{4}-\d{2}-\d{2}$/', $date) !== 1) {
-            return null;
+        $dueDate = null;
+
+        if ($date !== '') {
+            // Carbon rolls an impossible day over (2026-02-31 becomes March 3)
+            // instead of failing, so the parsed day must format back to the input.
+            $dueDate = preg_match('/^\d{4}-\d{2}-\d{2}$/', $date) === 1 ? CarbonImmutable::createFromFormat('!Y-m-d', $date) : null;
+
+            if (! $dueDate instanceof CarbonImmutable || $dueDate->format('Y-m-d') !== $date) {
+                return null;
+            }
         }
 
         $task = Task::query()->find($taskId);
@@ -35,7 +43,7 @@ class RescheduleTask
             return false;
         }
 
-        $task->due_date = $date === '' ? null : CarbonImmutable::parse($date);
+        $task->due_date = $dueDate;
         $task->save();
 
         return true;

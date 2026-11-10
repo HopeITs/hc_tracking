@@ -16,7 +16,7 @@
                         <rect width="2" height="5" class="fill-status-warn" />
                     </pattern>
                     <pattern id="dial-stripes-critical" patternUnits="userSpaceOnUse" width="5" height="5" patternTransform="rotate(45)">
-                        <rect width="5" height="5" class="fill-primary/20" />
+                        <rect width="5" height="5" class="fill-secondary-soft dark:fill-surface-3" />
                         <rect width="2" height="5" class="fill-primary" />
                     </pattern>
                     <pattern id="dial-stripes-funding" patternUnits="userSpaceOnUse" width="5" height="5" patternTransform="rotate(45)">

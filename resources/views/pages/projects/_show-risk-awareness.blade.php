@@ -38,7 +38,7 @@
                                 <li class="flex flex-wrap items-center gap-x-2 gap-y-1 px-3 py-2" wire:key="project-risk-{{ $risk->id }}" data-risk="{{ $risk->id }}">
                                     <span class="min-w-0 flex-1 basis-36 text-sm font-semibold text-secondary-dark dark:text-ink" dir="auto">{{ $risk->localizedName() }}</span>
                                     @if ($risk->happened)
-                                        <span class="inline-flex items-center gap-1 rounded-md border border-status-critical/30 bg-status-critical-soft px-2 py-0.5 text-xs font-semibold text-status-critical">
+                                        <span class="inline-flex items-center gap-1 rounded-md border border-status-critical bg-status-critical-soft px-2 py-0.5 text-xs font-semibold text-status-critical">
                                             <flux:icon.exclamation-triangle variant="micro" class="size-3.5" aria-hidden="true" />{{ __('common.materialised') }}
                                         </span>
                                     @endif

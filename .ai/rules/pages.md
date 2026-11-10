@@ -49,3 +49,6 @@ User decision 2026-10-20 (Desk stage 2, option A): every list/index page renders
 
 ## Records are full pages, never side sheets (user decision 2026-11-04)
 Every record (strategy, program, annual plan, donor, agreement, milestone, task, report, monthly report, donor report…) opens as its own full page in layouts::desk, nested like a page inside a page: `.dk-back` (or x-ui.detail-header :back) via App\Support\BackUrl, a "A › B › C" breadcrumb, h1.page-title, no bg-white frame. Never wrap a record over its register or in a side sheet/drawer; x-desk.record-sheet was removed. Modals only for small forms (create/edit, assign) and confirmations (delete). Reverses the 2026-10-22 Tracking Desk stage 6 decision.
+
+## A funding register's size must cover its table's natural width
+`x-funding.register :size` sets the container width at which the table stops scrolling inside itself (sm 56rem … 2xl 104rem). The Desk register frame is `overflow: clip` (a hidden box would trap the sticky heading row), so a size smaller than the table's real width cuts its last column off instead of scrolling. Pick the size from the column count: the donors register needs `lg` with transfers and `xl` with the year columns.

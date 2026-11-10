@@ -103,7 +103,7 @@ test('the named team roles were granted tasks permissions', function () {
 | and the task queries did not select it.
 */
 
-test('a scoped viewer opens the board, the list, the drawer and the page of a colleague\'s task', function () {
+test('a scoped viewer opens the board, the list and the page of a colleague, but not its edit drawer\'s task', function () {
     $colleagueEmployeeId = insertHrEmployee(firstNameEn: 'Media', lastNameEn: 'Colleague');
     insertHrContract($colleagueEmployeeId, $this->mediaPositionId);
 
@@ -120,7 +120,7 @@ test('a scoped viewer opens the board, the list, the drawer and the page of a co
         ->set('view', 'list')
         ->assertSee('Colleague task')
         ->call('openEditDrawer', $task->id)
-        ->assertSet('editingTaskId', $task->id);
+        ->assertSet('editingTaskId', null);
 
     $this->actingAs($this->mediaUser)
         ->get(route('tasks.show', $task))

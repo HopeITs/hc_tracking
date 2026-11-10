@@ -30,9 +30,32 @@
     $moveEarlier = \Illuminate\Support\Js::from(__('desk.customize_sheet.move_panel_earlier', ['panel' => '__P__']));
     $moveLater = \Illuminate\Support\Js::from(__('desk.customize_sheet.move_panel_later', ['panel' => '__P__']));
     $removePanel = \Illuminate\Support\Js::from(__('desk.customize_sheet.remove_panel', ['panel' => '__P__']));
-    $addGroups = collect(['money', 'work', 'results', 'people'])->mapWithKeys(fn (string $kind): array => [
-        $kind => collect($library)->filter(fn (array $panel, string $id): bool => $deskPanels->readyKindOf($id) === $kind),
-    ])->filter->isNotEmpty();
+    /*
+     * What can be added, in three tabs of folding groups: hand-made panels by what they hold; every page
+     * as a card, by its sidebar section; and buttons: the "New ..." actions, then pages by sidebar section.
+     */
+    $destinations = app(\App\Support\Desk\Destinations::class);
+    $sectionLabels = collect($destinations->sidebarFor(auth()->user()))->pluck('label', 'group')->all();
+    $sectionOf = [];
+    foreach ($destinations->for(auth()->user()) as $page) {
+        $slug = \App\Support\Desk\Destinations::slugOf($page['route']);
+        $section = (string) ($sectionLabels[$page['group']] ?? __('desk.customize_sheet.other_pages'));
+        $sectionOf[\App\Support\Desk\PageCards::Prefix.$slug] = $section;
+        $sectionOf[\App\Support\Desk\Shortcuts::PagePrefix.$slug] = $section;
+    }
+    $ofKind = fn (string $kind) => collect($library)->filter(fn (array $panel, string $id): bool => $deskPanels->readyKindOf($id) === $kind);
+    $bySection = fn (string $kind, string $prefix) => $ofKind($kind)
+        ->groupBy(fn (array $panel, string $id): string => $sectionOf[$id] ?? __('desk.customize_sheet.other_pages'), preserveKeys: true)
+        ->map(fn ($items, string $title): array => ['key' => $prefix.'-'.\Illuminate\Support\Str::slug($title), 'title' => $title, 'items' => $items])
+        ->values();
+    $addTabs = collect([
+        'panels' => collect(['money', 'work', 'results', 'people'])->map(fn (string $kind): array => ['key' => $kind, 'title' => __('desk.ready.kind.'.$kind), 'items' => $ofKind($kind)]),
+        'cards' => $bySection('pages', 'pages'),
+        'buttons' => collect([['key' => 'actions', 'title' => __('desk.ready.kind.actions'), 'items' => $ofKind('actions')]])->concat($bySection('buttons', 'buttons')),
+    ])->map(fn ($groups) => $groups->filter(fn (array $group): bool => $group['items']->isNotEmpty())->values())->filter->isNotEmpty();
+    $firstGroups = $addTabs->map(fn ($groups): string => $groups->first()['key'])->all();
+    /* What the Desk itself can hold (panels and page cards): buttons go to Quick access. */
+    $deskItemCount = collect($library)->filter(fn (array $item): bool => in_array($item['kind'], ['panel', 'card'], true))->count();
 @endphp
 
 {{--
@@ -45,7 +68,7 @@
     way drops it. Colours: the site's red and neutrals only, guarded by a test on
     this file and desk-customize.css.
 --}}
-<div x-data="deskCustomize(@js($starting), @js($readyChoices), @js($favourite), @js($panelChoices), @js($sheetTexts))" data-layout="{{ json_encode($layout) }}" data-layout-saved="{{ is_array(auth()->user()->desk_layout) ? 'true' : 'false' }}" x-on:dk-customize-open.window="openSheet($event.detail?.pane)" x-on:keydown.escape.window="if (open) { discard() }" data-desk-customize>
+<div x-data="deskCustomize(@js($starting), @js($readyChoices), @js($favourite), @js($panelChoices), @js($sheetTexts))" data-layout="{{ json_encode($layout) }}" data-layout-saved="{{ is_array(auth()->user()->desk_layout) ? 'true' : 'false' }}" data-quick-items="{{ json_encode(app(\App\Support\Desk\QuickAccess::class)->itemIds(auth()->user())) }}" x-on:dk-customize-open.window="openSheet($event.detail?.pane, $event.detail?.layout)" x-on:keydown.escape.window="if (open) { discard() }" data-desk-customize>
     <template x-teleport="body">
         <div x-show="open" x-cloak class="dk-scope">
             <div class="dk-sh-scrim" x-on:click="discard()"></div>
@@ -137,33 +160,60 @@
                             </div>
                         </div>
 
-                        <div class="dk-cz-add" data-customize-add-panels>
+                        {{-- Three tabs of folding groups, each with what is left to add; a search looks through all three at once. --}}
+                        <div class="dk-cz-add" data-customize-add-panels x-data="{ tab: @js($addTabs->keys()->first()), open: @js(array_fill_keys(array_values($firstGroups), true)), left(ids) { return ids.filter((id) => isAddable(id)).length } }">
                             <label class="dk-cz-search">
                                 <x-desk.icon name="search" />
                                 <input type="search" x-ref="search" x-model.trim="search" placeholder="{{ __('desk.customize_sheet.search_placeholder') }}" aria-label="{{ __('desk.customize_sheet.search_placeholder') }}" x-on:keydown.escape="if (search !== '') { search = ''; $event.stopPropagation() }" data-customize-search>
                             </label>
 
-                            @foreach ($addGroups as $kind => $panels)
-                                <section class="dk-cz-group" x-show="groupHasMatches('{{ $kind }}')" data-customize-group="{{ $kind }}">
-                                    <h4>{{ __('desk.ready.kind.'.$kind) }}</h4>
-                                    <ul>
-                                        @foreach ($panels as $panel)
-                                            <li wire:key="cz-add-{{ $panel['id'] }}" x-show="isAddable('{{ $panel['id'] }}')" data-customize-add="{{ $panel['id'] }}">
-                                                <button type="button" class="dk-cz-pick" title="{{ $panel['description'] }}" x-on:click="add('{{ $panel['id'] }}')" aria-label="{{ __('desk.customize_sheet.add_panel', ['panel' => $panel['title']]) }}"><span>{{ $panel['title'] }}</span><x-desk.icon name="plus" /></button>
-                                            </li>
-                                        @endforeach
-                                    </ul>
-                                </section>
+                            <div class="dk-cz-tabs" role="tablist" aria-label="{{ __('desk.customize_sheet.add_tabs') }}" x-show="search === ''" data-customize-tabs>
+                                @foreach ($addTabs as $tabKey => $groups)
+                                    @php
+                                        $tabIds = $groups->flatMap(fn (array $group) => $group['items']->keys())->values()->all();
+                                    @endphp
+                                    <button type="button" role="tab" x-on:click="tab = '{{ $tabKey }}'" x-bind:aria-selected="(tab === '{{ $tabKey }}').toString()" data-customize-tab="{{ $tabKey }}">
+                                        <span>{{ __('desk.customize_sheet.tab_'.$tabKey) }}</span>
+                                        <span class="dk-cz-n dk-num" x-text="left(@js($tabIds))"></span>
+                                    </button>
+                                @endforeach
+                            </div>
+
+                            @if ($addTabs->has('buttons'))
+                                <p class="dk-cz-note" x-show="search === '' && tab === 'buttons'" x-cloak data-customize-buttons-note>{{ __('desk.customize_sheet.buttons_note') }}</p>
+                            @endif
+
+                            @foreach ($addTabs as $tabKey => $groups)
+                                @foreach ($groups as $group)
+                                    @php
+                                        $groupIds = $group['items']->keys()->values()->all();
+                                    @endphp
+                                    <section class="dk-cz-group" x-show="(search !== '' || tab === '{{ $tabKey }}') && left(@js($groupIds)) > 0" data-customize-group="{{ $group['key'] }}">
+                                        <button type="button" class="dk-cz-group-h" x-on:click="open['{{ $group['key'] }}'] = ! open['{{ $group['key'] }}']" x-bind:aria-expanded="(search !== '' || Boolean(open['{{ $group['key'] }}'])).toString()" aria-controls="dk-cz-g-{{ $group['key'] }}">
+                                            <x-desk.icon name="chev" class="dk-cz-chev" />
+                                            <h4>{{ $group['title'] }}</h4>
+                                            <span class="dk-cz-n dk-num" x-text="left(@js($groupIds))"></span>
+                                        </button>
+                                        <ul id="dk-cz-g-{{ $group['key'] }}" x-show="search !== '' || open['{{ $group['key'] }}']" x-collapse>
+                                            @foreach ($group['items'] as $panel)
+                                                <li wire:key="cz-add-{{ $panel['id'] }}" x-show="isAddable('{{ $panel['id'] }}')" data-customize-add="{{ $panel['id'] }}">
+                                                    <button type="button" class="dk-cz-pick" title="{{ $panel['description'] }}" x-on:click="pick('{{ $panel['id'] }}')" aria-label="{{ __($tabKey === 'buttons' ? 'desk.customize_sheet.add_quick' : 'desk.customize_sheet.add_panel', ['panel' => $panel['title']]) }}"><span>{{ $panel['title'] }}</span><x-desk.icon name="{{ $tabKey === 'buttons' ? 'bolt' : 'plus' }}" /></button>
+                                                </li>
+                                            @endforeach
+                                        </ul>
+                                    </section>
+                                @endforeach
                             @endforeach
 
-                            <p class="dk-cz-none" x-show="draft.length === {{ count($library) }}" data-nothing-to-add x-cloak>{{ __('desk.nothing_to_add') }}</p>
-                            <p class="dk-cz-none" x-show="draft.length !== {{ count($library) }} && search !== '' && ! anyMatches()" x-cloak>{{ __('desk.customize_sheet.no_match') }}</p>
+                            <p class="dk-cz-none" x-show="search === '' && ! anyMatches()" data-nothing-to-add x-cloak>{{ __('desk.nothing_to_add') }}</p>
+                            <p class="dk-cz-none" x-show="search !== '' && ! anyMatches()" x-cloak>{{ __('desk.customize_sheet.no_match') }}</p>
                         </div>
                     </section>
                 </div>
 
                 <div class="dk-sh-f dk-cz-f">
                     <button type="button" class="dk-btn dk-cz-reset" x-show="pane === 'desk'" x-on:click="reset()"><x-desk.icon name="undo" />{{ __('desk.reset_layout') }}</button>
+                    <button type="button" class="dk-btn dk-ghost dk-cz-clear" x-show="pane === 'desk' && draft.length > 0" x-on:click="clear()" data-customize-clear><x-desk.icon name="x" />{{ __('desk.customize_sheet.remove_all') }}</button>
                     <span class="dk-is dk-num dk-cz-sum" role="status" x-show="pane === 'desk'" x-text="changeSummary()" data-customize-summary></span>
                     <span class="dk-is dk-cz-sum" x-show="pane === 'layouts'">{{ __('desk.customize_lede') }}</span>
                     <span class="dk-pspace"></span>

@@ -13,6 +13,7 @@ use App\Models\EvidenceType;
 use App\Models\Indicator;
 use App\Models\LibraryIndicator;
 use App\Models\MealCoverageAssignment;
+use App\Models\MonthlyReport;
 use App\Models\PlanIndicator;
 use App\Models\Project;
 use App\Models\Proposal;
@@ -375,4 +376,16 @@ test('the tab renders in Arabic', function () {
         ->assertSee('عدد الأسر الواصلة')
         ->assertSee('اربطه بالمكتبة أولًا')
         ->assertSee(__('enums.report_template_line_status.pending'));
+});
+
+test('a confirmed active template shows when its monthly reports are still being prepared', function () {
+    ['project' => $project, 'template' => $template] = rtpProject(ProjectStatus::Active);
+    $template->forceFill(['status' => ReportTemplateStatus::Confirmed])->save();
+    $manager = mealManager();
+
+    rtpPage($manager, $project)->assertSeeHtml('data-monthly-reports-preparing');
+
+    MonthlyReport::factory()->for($project)->create(['period' => '2026-11-01']);
+
+    rtpPage($manager, $project)->assertDontSeeHtml('data-monthly-reports-preparing');
 });

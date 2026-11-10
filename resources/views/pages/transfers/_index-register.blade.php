@@ -6,8 +6,14 @@
                     ['key' => 'expected', 'label' => __('transfers.expected'), 'value' => $line['expected']],
                     ['key' => 'sent', 'label' => __('transfers.sent'), 'value' => $line['sent']],
                     ['key' => 'received', 'label' => __('finance_tables.received_net'), 'value' => $line['landed'], 'tone' => 'good'],
-                    ['key' => 'fees', 'label' => __('transfers.fees'), 'value' => $line['recordedFees']],
-                    ['key' => 'shortfall', 'label' => __('transfers.shortfall'), 'value' => $line['shrink'], 'prefix' => $line['shrink'] > 0 ? '−' : '', 'tone' => $line['shrink'] > 0 ? 'critical' : null],
+                    /*
+                     * One figure, not two. Fees and shortfall were printed side
+                     * by side at the same size, so a reader added them: 13,202
+                     * of fees and 13,202 "lost" reads as 26,404 gone, when the
+                     * fees ARE the shortfall. The note names the parts instead,
+                     * and they sum to the figure exactly.
+                     */
+                    $line['shrink'] > 0 ? ['key' => 'shortfall', 'label' => __('transfers.shortfall'), 'value' => $line['shrink'], 'prefix' => '−', 'tone' => $line['exchangeGap'] > 0 ? 'critical' : null, 'note' => __('transfers.shortfall_parts', ['fees' => number_format($line['fees'], 2), 'gap' => number_format($line['exchangeGap'], 2)])] : null,
                     $line['overage'] > 0 ? ['key' => 'overage', 'label' => __('transfers.arrived_over'), 'value' => $line['overage'], 'prefix' => '+', 'tone' => 'good'] : null,
                     ['key' => 'outstanding', 'label' => __('finance_tables.outstanding'), 'value' => $line['inFlight']],
                 ])),
@@ -25,10 +31,12 @@
 
         <x-funding.totals :lines="$totalLines" />
 
-        <x-funding.register size="xl" :caption="__('finance_tables.transfers_caption')">
+        {{-- Five columns fit in sm; xl (92rem) was the width thirteen needed, and it
+             forced a sideways scroll that put the edit button past the edge. --}}
+        <x-funding.register size="sm" :caption="__('finance_tables.transfers_caption')">
             <x-slot:head>
                 <x-funding.register.th sort="donor" :active="$sortKey" :dir="$sortDirection">{{ __('finance_tables.donor_agreement') }}</x-funding.register.th>
-                <x-funding.tranche-head sortable :active="$sortKey" :dir="$sortDirection" />
+                <x-funding.tranche-head compact :conversions="$this->hasConversions" sortable :active="$sortKey" :dir="$sortDirection" />
             </x-slot:head>
 
             @foreach ($this->rows as $transfer)
@@ -43,13 +51,15 @@
                         :group="$groupKey"
                         :lines="$this->groupTotals->get($groupKey, [])"
                         :lead="1"
+                        compact
+                        :conversions="$this->hasConversions"
                     />
                     @php
                         $previousGroup = $groupKey;
                     @endphp
                 @endif
 
-                <x-funding.tranche-row :transfer="$transfer">
+                <x-funding.tranche-row :transfer="$transfer" compact :conversions="$this->hasConversions">
                     <x-slot:lead>
                         <td data-label="{{ __('finance_tables.donor_agreement') }}" data-wide>
                             @can('donors.view')
@@ -78,7 +88,22 @@
                             @can('transfers.update')
                                 {{-- Deleting a tranche happens inside its edit form. --}}
                                 <span class="flex items-center justify-end">
-                                    <x-ui.button tone="ghost" size="sm" icon="pencil-square" icon:variant="outline" class="size-8!" wire:click="openEditModal({{ $transfer->id }})" :aria-label="__('transfers.edit_transfer')" data-test="edit-transfer-{{ $transfer->id }}" />
+                                    {{--
+                                        A plain button, not x-ui.button: the Flux one carried ~1,100
+                                        bytes of utility classes and a component render on every row.
+                                        .register-action does the same job, 44px on a phone included.
+                                        The label names the tranche, so a screen reader does not hear
+                                        the same "Edit transfer" on every row.
+                                    --}}
+                                    <button
+                                        type="button"
+                                        class="register-action"
+                                        wire:click="openEditModal({{ $transfer->id }})"
+                                        aria-label="{{ __('common.edit_name', ['name' => $rowAgreement->donor->name.' · '.$transfer->scheduled_date?->translatedFormat(__('formats.date'))]) }}"
+                                        data-test="edit-transfer-{{ $transfer->id }}"
+                                    >
+                                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="m16.862 4.487 1.687-1.688a1.875 1.875 0 1 1 2.652 2.652L10.582 16.07a4.5 4.5 0 0 1-1.897 1.13L6 18l.8-2.685a4.5 4.5 0 0 1 1.13-1.897l8.932-8.931Zm0 0L19.5 7.125"/></svg>
+                                    </button>
                                 </span>
                             @endcan
                         </td>

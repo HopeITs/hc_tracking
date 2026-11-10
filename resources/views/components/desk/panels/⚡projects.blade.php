@@ -171,7 +171,7 @@ new class extends Component
     $stages = __('desk.stages');
 @endphp
 
-<x-desk.panel :facets="$pg['facets']" :filtered="$active !== 'all' || ($hasOthers && $scope !== 'all')" id="projects" :register="'projects.index'" :size="$size" :cols="$gridCols" :height="$gridRows" :index="$index" :total="$total" :count="$list->count()">
+<x-desk.panel :empty="$base->isEmpty()" :facets="$pg['facets']" :filtered="$active !== 'all' || ($hasOthers && $scope !== 'all')" id="projects" :register="'projects.index'" :size="$size" :cols="$gridCols" :height="$gridRows" :index="$index" :total="$total" :count="$list->count()">
     <x-slot:filters>
         @if ($hasOthers)
             <div class="contents" data-filter-defaults='{"scope":"all"}'>
@@ -193,7 +193,7 @@ new class extends Component
     <x-slot:tools>
         <div class="dk-seg" role="group">
             @foreach ($lenses as $key)
-                <button type="button" wire:click="setLens('{{ $key }}')" aria-pressed="{{ $shownLens === $key ? 'true' : 'false' }}">{{ __('desk.lens.'.$key) }}</button>
+                <button type="button" wire:click="setLens('{{ $key }}')" aria-pressed="{{ $shownLens === $key ? 'true' : 'false' }}" title="{{ __('desk.lens.'.$key) }}">{{ __('desk.lens.'.$key) }}</button>
             @endforeach
         </div>
     </x-slot:tools>

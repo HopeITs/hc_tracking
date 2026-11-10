@@ -42,6 +42,14 @@ test('MEAL approves another author\'s reviewed report but never their own', func
     expect($own->fresh()->status)->toBe(ReportStatus::Reviewed);
 });
 
+test('Financial cannot approve a reviewed report', function () {
+    $this->draft->update(['status' => ReportStatus::Reviewed, 'submit_date' => today()]);
+
+    ($this->show)(userWithRole('Financial'))->call('approve')->assertForbidden();
+
+    expect($this->draft->fresh()->status)->toBe(ReportStatus::Reviewed);
+});
+
 test('the author pulls back a report still under review; a Team Member cannot', function () {
     $this->draft->update(['status' => ReportStatus::Reviewed, 'submit_date' => today()]);
 

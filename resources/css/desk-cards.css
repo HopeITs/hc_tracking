@@ -143,7 +143,7 @@
     [dir="rtl"] .dk-focus-card[data-state="gone"] { transform: translateX(32px) scale(.98); }
     .dk-focus-card[data-state="hidden"] { z-index: 0; transform: translateY(16px) scale(.9); opacity: 0; pointer-events: none; }
     .dk-focus-card:not([data-state="top"]) > * { visibility: hidden; }
-    .dk-focus-card.dk-focus-late[data-state="top"] { border-color: color-mix(in srgb, var(--bad) 35%, var(--line)); }
+    .dk-focus-card.dk-focus-late[data-state="top"] { border-color: var(--brand); }
     .dk-focus-eyebrow { display: flex; align-items: center; gap: 8px; margin: 0; font-size: 11.5px; font-weight: 800; letter-spacing: .08em; text-transform: uppercase; color: var(--ink-3); }
     [lang="ar"] .dk-focus-eyebrow { letter-spacing: 0; text-transform: none; font-size: 12.5px; }
     .dk-focus-eyebrow .dk-sev { margin-top: 0; }
@@ -245,7 +245,9 @@
     /* ── Hero: briefing, command strip ──────────────────── */
     /* The greeting on one side, the day's two figures across from it; on a narrow screen they sit under it. */
     .dk-hello { grid-template-columns: minmax(0, 1fr) auto; grid-template-areas: "main figs"; padding-bottom: 12px; }
-    .dk-hello-figs, .dk-hello-clear { grid-area: figs; align-self: end; margin: 0; }
+    /* The figures and the Quick access button share the end of the row (pages/desk/_quick-access). */
+    .dk-hello-end { grid-area: figs; align-self: end; display: flex; flex-wrap: wrap; align-items: center; justify-content: flex-end; gap: 14px 28px; min-width: 0; }
+    .dk-hello-figs, .dk-hello-clear { margin: 0; }
     .dk-hello-figs { display: flex; color: inherit; text-decoration: none; border-radius: 10px; }
     .dk-hello-figs:focus-visible { outline: 2px solid var(--ink-2); outline-offset: 4px; }
     .dk-hello-clear { font-size: 15px; font-weight: 600; color: var(--ink-2); }
@@ -258,6 +260,7 @@
     .dk-hello-fig.dk-late > span, a.dk-hello-figs:hover .dk-hello-fig.dk-late > span { color: var(--brand-ink); }
     @media (max-width: 760px) {
         .dk-hello { grid-template-columns: minmax(0, 1fr); grid-template-areas: "main" "figs"; }
+        .dk-hello-end { justify-content: space-between; }
     }
 
 

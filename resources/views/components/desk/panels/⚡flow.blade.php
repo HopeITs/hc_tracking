@@ -24,7 +24,7 @@ new class extends Component {
     $lastStage = count($flow['stages']) - 1;
 @endphp
 
-<x-desk.panel id="flow" class="dk-flow-panel" :filterable="false" register="projects.index" :size="$size" :cols="$gridCols" :height="$gridRows" :index="$index" :total="$total" :count="$flow['total']" :health="$flow['late'] > 0 ? 'warn' : null">
+<x-desk.panel :empty="$flow['total'] === 0" id="flow" class="dk-flow-panel" :filterable="false" register="projects.index" :size="$size" :cols="$gridCols" :height="$gridRows" :index="$index" :total="$total" :count="$flow['total']" :health="$flow['late'] > 0 ? 'warn' : null">
     @if ($flow['total'] > 0)
         <p class="dk-flow-head">
             <strong>{{ trans_choice('desk-cards.flow.headline', $flow['total'], ['count' => $flow['total']]) }}</strong>

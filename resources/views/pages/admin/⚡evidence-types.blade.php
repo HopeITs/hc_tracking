@@ -242,7 +242,7 @@ new #[Layout('layouts::desk'), Title('titles.evidence_types')] class extends Com
 
 <x-desk.register class="@container/directory" heading-id="evidence-types-heading" :title="__('titles.evidence_types')" :count="$evidenceTypes->count()" data-tour="evidence-types-page">
         <x-slot:actions>
-            <x-ui.button tone="primary" icon="plus" class="min-h-11 self-end touch-manipulation @sm/directory:min-h-10" wire:click="openCreateModal" data-test="create-evidence-type" data-tour="evidence-types-create">
+            <x-ui.button tone="primary" icon="plus" class="min-h-11 self-end touch-manipulation @sm/directory:min-h-10" wire:click="openCreateModal" data-test="create-evidence-type" data-tour="evidence-types-create" data-quick-create>
                 {{ __('evidence_types.add_evidence_type') }}
             </x-ui.button>
         </x-slot:actions>

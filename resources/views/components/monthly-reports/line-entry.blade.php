@@ -20,7 +20,7 @@
      * proposal's beneficiaries; an entered ratio's numerator and denominator
      * with Not measured; by sex with persons with disabilities when the
      * library entry is disaggregated (D-50). Computed values are the
-     * server's, shown read-only. Inputs bind wire:model.blur under $prefix.
+     * server's, shown read-only. Inputs bind wire:model.live.blur under $prefix.
      */
     $kind = $row['kind'];
     $fields = match ($kind) {
@@ -65,7 +65,7 @@
                                     inputmode="decimal"
                                     dir="ltr"
                                     data-nav
-                                    wire:model.blur="{{ $model }}"
+                                    wire:model.live.blur="{{ $model }}"
                                     aria-label="{{ $row['name'] }} — {{ $columnLabel }}"
                                     @error($model) aria-invalid="true" @enderror
                                     @disabled($notMeasured)
@@ -96,7 +96,7 @@
                         inputmode="decimal"
                         dir="ltr"
                         data-nav
-                        wire:model.blur="{{ $model }}"
+                        wire:model.live.blur="{{ $model }}"
                         aria-label="{{ $row['name'] }} — {{ $fieldLabels[$field] }}"
                         @error($model) aria-invalid="true" @enderror
                         @disabled($notMeasured)

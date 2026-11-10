@@ -102,4 +102,5 @@ return [
     'plan_period_help' => 'Inside the proposal period.',
     'final_report_template_help' => 'Adds the proposal\'s one final report milestone and the task that prepares the report.',
     'final_report_due_help' => 'Defaults to the milestone\'s end.',
+    'show_more_projects' => '{1} Show 1 more project|[2,*] Show :count more projects',
 ];

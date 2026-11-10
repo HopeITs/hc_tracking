@@ -14,7 +14,7 @@
      * Keyboard (same idea as x-ui.targets-grid): arrows move between visible
      * inputs (left/right flip in RTL), up/down and Enter move to the next
      * group of inputs, Escape leaves the input, which saves it
-     * (wire:model.blur).
+     * (wire:model.live.blur).
      */
     $mealRows = array_values(array_filter($rows, fn (array $row): bool => $row['meal']));
     $foldsMeal = $mealRows !== [] && ! collect($mealRows)->contains(fn (array $row): bool => $row['editable']);

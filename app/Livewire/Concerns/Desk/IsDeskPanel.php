@@ -10,6 +10,7 @@ use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Lang;
 use Illuminate\Support\HtmlString;
 use Illuminate\Support\Str;
+use Livewire\Attributes\On;
 use Livewire\Attributes\Reactive;
 
 /**
@@ -69,6 +70,17 @@ trait IsDeskPanel
     public function updatedFacets(): void
     {
         $this->page = 0;
+    }
+
+    /**
+     * The Desk is shown again after a while in Desk tabs (resources/js/
+     * desk-tabs.js): read again, so what was done in a tab shows here. Every
+     * panel answers the same event, so they all come back in one round trip.
+     */
+    #[On('dk-desk-refresh')]
+    public function refreshPanel(): void
+    {
+        // Answering the event is enough: Livewire renders the panel again with fresh reads.
     }
 
     /**

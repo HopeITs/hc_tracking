@@ -157,7 +157,7 @@ test('the attention list links a late report to the late reports register, and s
 
     expect($late)
         ->toContain(trans_choice('strategies.attention_late_reports', 1, ['count' => '<bdi>1</bdi>']))
-        ->toContain('href="'.e(route('reports.index', ['strategy' => $this->strategy->id, 'overdue' => 1])).'" wire:navigate class="dk-attn-a">'.__('strategies.see_late_reports'))
+        ->toContain('href="'.e(route('reports.index', ['strategy' => $this->strategy->id, 'overdue' => 1])).'" wire:navigate.hover class="dk-attn-a">'.__('strategies.see_late_reports'))
         ->not->toContain(__('strategies.nothing_needs_attention'));
 });
 

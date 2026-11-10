@@ -66,7 +66,18 @@ class TaskPolicy
         }
 
         return $user->can('tasks.update')
+            && ! $this->isStatusAndFilesOnly($user)
             && (! $user->isTaskDepartmentScoped() || $this->isOwnOrDepartmentWork($user, $task));
+    }
+
+    /**
+     * Determine whether the user can add, replace or remove the task's
+     * files: everyone who may edit it, plus status-and-files-only roles on
+     * their own and department work.
+     */
+    public function manageFiles(User $user, Task $task): bool
+    {
+        return $this->update($user, $task) || $this->isStatusAndFilesWork($user, $task);
     }
 
     /**
@@ -75,7 +86,7 @@ class TaskPolicy
      */
     public function updateStatus(User $user, Task $task): bool
     {
-        return $this->update($user, $task) || $this->isAssignee($user, $task);
+        return $this->update($user, $task) || $this->isAssignee($user, $task) || $this->isStatusAndFilesWork($user, $task);
     }
 
     /**
@@ -155,6 +166,26 @@ class TaskPolicy
     public function forceDelete(User $user, Task $task): bool
     {
         return false;
+    }
+
+    /**
+     * Whether the user holds a status-and-files-only role (config
+     * access-control.task_status_and_files_only_roles).
+     */
+    private function isStatusAndFilesOnly(User $user): bool
+    {
+        return $user->hasAnyRole(config('access-control.task_status_and_files_only_roles', []));
+    }
+
+    /**
+     * Whether a status-and-files-only user may work this task's status and
+     * files: they hold tasks.update and it is their own or department work.
+     */
+    private function isStatusAndFilesWork(User $user, Task $task): bool
+    {
+        return $this->isStatusAndFilesOnly($user)
+            && $user->can('tasks.update')
+            && $this->isOwnOrDepartmentWork($user, $task);
     }
 
     /**

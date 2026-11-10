@@ -10,10 +10,14 @@
         {{-- The save state only means something to someone who can change the page: the preparer, or a validator with MEAL lines to fill. A validator reading a locked report saw "Saved" for work they never did. --}}
         @if ($abilities['submit'] || $isEditable)
             <p class="flex items-center gap-1.5 text-sm text-secondary-medium dark:text-ink-muted" aria-live="polite" data-save-state>
-                <span wire:loading.delay wire:target="{{ $saveTargets }}">{{ __('monthly_reports.saving') }}</span>
-                <span wire:loading.remove wire:target="{{ $saveTargets }}" class="inline-flex items-center gap-1.5">
-                    <flux:icon.check variant="micro" class="size-4" aria-hidden="true" />
-                    {{ __('monthly_reports.saved') }}
+                <span wire:loading wire:target="{{ $saveTargets }}">{{ __('monthly_reports.saving') }}</span>
+                <span wire:dirty wire:target="figures,activityEntries,answers">
+                    <span wire:loading.remove wire:target="{{ $saveTargets }}">{{ __('monthly_reports.unsaved_changes') }}</span>
+                </span>
+                <span wire:dirty.remove wire:target="figures,activityEntries,answers">
+                    <span wire:loading.remove wire:target="{{ $saveTargets }}">
+                        {{ $errors->any() ? __('monthly_reports.save_needs_attention') : __('monthly_reports.saved') }}
+                    </span>
                 </span>
             </p>
         @else

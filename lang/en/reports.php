@@ -164,6 +164,8 @@ return [
         'indicator' => 'Indicator',
         'pillar' => 'Pillar',
         'year' => 'Year',
+        'calendar_basis' => 'Calendar year · January to December',
+        'grant_basis' => 'Grant year · starts in the grant’s first month',
         'grant_year_label' => 'Grant year',
         'grant_year' => 'Year :year',
         'all_proposals' => 'All proposals',

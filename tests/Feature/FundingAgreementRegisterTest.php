@@ -7,6 +7,7 @@ use App\Models\DonorReport;
 use App\Models\Proposal;
 use App\Models\TransfersTracking;
 use App\Models\User;
+use App\Support\AgreementHealth;
 use Database\Seeders\RolesAndPermissionsSeeder;
 use Livewire\Features\SupportTesting\Testable;
 use Livewire\Livewire;
@@ -64,7 +65,7 @@ function registerMixedAgreement(string $proposalName = 'Mixed Proposal'): DonorP
     return $agreement;
 }
 
-test('the page opens on the table with every money figure of an agreement in its own column', function () {
+test('a register row carries the budget, what landed and what is next, and leaves the rest to the agreement page', function () {
     $agreement = registerMixedAgreement();
 
     $page = agreementRegister()
@@ -72,13 +73,25 @@ test('the page opens on the table with every money figure of an agreement in its
         ->assertSeeHtml('data-register')
         ->assertDontSeeHtml('data-calendar')
         ->assertSeeHtml('data-agreement-row="'.$agreement->id.'"')
+        // The budget with its currency, what landed with its share, and the next date.
+        ->assertSeeHtml('data-cell="amount"')
+        ->assertSeeHtml('data-cell="received_share"')
+        ->assertSeeHtml('data-cell="next_due"')
         ->assertSee('1,000.00')
-        ->assertSee('750.00')
         ->assertSee('390.00')
         ->assertSee('39%')
-        ->assertSee('600.00');
+        // Every other figure moved to the agreement's own page.
+        ->assertDontSeeHtml('data-cell="scheduled"')
+        ->assertDontSeeHtml('data-cell="in_transit"')
+        ->assertDontSeeHtml('data-cell="overdue"')
+        ->assertDontSeeHtml('data-cell="unscheduled"')
+        ->assertDontSeeHtml('data-cell="outstanding"')
+        ->assertDontSeeHtml('data-cell="tranches"')
+        ->assertDontSeeHtml('data-cell="reports"');
 
     $row = $page->instance()->rows->first();
+
+    // They are still read and still right; they are simply not printed here.
 
     expect((float) $row->money_scheduled)->toBe(750.0)
         ->and((float) $row->money_received)->toBe(390.0)
@@ -266,7 +279,9 @@ test('a row opens its agreement from the eye button and links its donor and prop
         ->assertSeeHtml('href="'.route('funding-agreements.show', $agreement).'"')
         ->assertSeeHtml('href="'.route('donors.show', $agreement->donor).'"')
         ->assertSeeHtml('href="'.route('proposals.show', $agreement->proposal).'"')
-        ->assertSeeHtml('href="'.route('transfers.index', ['agreement' => $agreement->id]).'"');
+        // The tranche count column went: the agreement's own page carries the
+        // link into the transfers ledger, beside the tranches themselves.
+        ->assertDontSeeHtml('href="'.route('transfers.index', ['agreement' => $agreement->id]).'"');
 });
 
 test('a viewer without the update permission gets the table with no edit buttons', function () {
@@ -323,4 +338,115 @@ test('the agreement form is rendered only while its modal is open', function () 
         ->assertDontSeeHtml('wire:model="budget"')
         ->call('openAgreementCreate')
         ->assertSeeHtml('wire:model="budget"');
+});
+
+test('every agreement falls into exactly one of the three headline states', function () {
+    // Needs attention: a tranche past its date and unsent.
+    $late = DonorProposal::factory()->create(['budget' => '100.00', 'currency' => Currency::Usd]);
+    registerTranche($late, ['payment_amount' => '100.00', 'scheduled_date' => '2026-05-01']);
+
+    // Needs attention: a tranche that failed.
+    $failed = DonorProposal::factory()->create(['budget' => '200.00', 'currency' => Currency::Usd]);
+    registerTranche($failed, ['payment_amount' => '200.00', 'scheduled_date' => '2026-07-01', 'ar_status' => ArStatus::Failed]);
+
+    // Needs attention: an unsubmitted donor report past its due date.
+    $reporting = DonorProposal::factory()->create(['budget' => '300.00', 'currency' => Currency::Usd]);
+    registerTranche($reporting, ['payment_amount' => '300.00', 'scheduled_date' => '2026-09-01']);
+    DonorReport::factory()->create(['donor_proposal_id' => $reporting->id, 'due_on' => '2026-06-01', 'submitted_on' => null]);
+
+    // On track: scheduled ahead, nothing late.
+    $moving = DonorProposal::factory()->create(['budget' => '400.00', 'currency' => Currency::Usd]);
+    registerTranche($moving, ['payment_amount' => '400.00', 'scheduled_date' => '2026-08-01']);
+
+    // Not started: signed, no tranche under it.
+    $idle = DonorProposal::factory()->create(['budget' => '500.00', 'currency' => Currency::Usd]);
+
+    $page = agreementRegister();
+    $ids = fn (Testable $page): array => $page->instance()->rows->pluck('id')->sort()->values()->all();
+
+    expect($page->instance()->healthCounts)->toBe(['attention' => 3, 'moving' => 1, 'not_started' => 1])
+        ->and($ids(agreementRegister()->call('toggleHealth', 'attention')))->toBe(collect([$late, $failed, $reporting])->pluck('id')->sort()->values()->all())
+        ->and($ids(agreementRegister()->call('toggleHealth', 'moving')))->toBe([$moving->id])
+        ->and($ids(agreementRegister()->call('toggleHealth', 'not_started')))->toBe([$idle->id]);
+
+    // The three counts add up to every agreement, so none is counted twice or left out.
+    expect(array_sum($page->instance()->healthCounts))->toBe(DonorProposal::count());
+
+    // The badge a row renders agrees with the filter that selects it.
+    foreach ($page->instance()->rows as $row) {
+        expect(AgreementHealth::of($row))->toBe(match ($row->id) {
+            $moving->id => 'moving',
+            $idle->id => 'not_started',
+            default => 'attention',
+        });
+    }
+
+    // Pressing the same figure again clears it.
+    agreementRegister()->call('toggleHealth', 'attention')->call('toggleHealth', 'attention')->assertSet('health', '');
+
+    // A state typed into the address bar that is not one of the three is dropped.
+    agreementRegister(['health' => 'whatever'])->assertSet('health', '')->assertOk();
+});
+
+test('the table opens with what needs a person first, then what is running, then what has not started', function () {
+    $idle = DonorProposal::factory()->create(['budget' => '500.00', 'currency' => Currency::Usd]);
+    $moving = DonorProposal::factory()->create(['budget' => '400.00', 'currency' => Currency::Usd]);
+    registerTranche($moving, ['payment_amount' => '400.00', 'scheduled_date' => '2026-08-01']);
+    // Failed money leaves no next due date, so only the urgency rank can lift it.
+    $failed = DonorProposal::factory()->create(['budget' => '200.00', 'currency' => Currency::Usd]);
+    registerTranche($failed, ['payment_amount' => '200.00', 'scheduled_date' => '2026-07-01', 'ar_status' => ArStatus::Failed]);
+
+    expect(agreementRegister()->instance()->rows->pluck('id')->all())
+        ->toBe([$failed->id, $moving->id, $idle->id]);
+});
+
+test('a register page holds twenty-five agreements, not five', function () {
+    DonorProposal::factory()->count(30)->create(['currency' => Currency::Usd, 'budget' => '10.00']);
+
+    $page = agreementRegister();
+
+    expect($page->instance()->rows->perPage())->toBe(25)
+        ->and($page->instance()->rows->count())->toBe(25);
+
+    $page->set('perPage', '50');
+
+    expect($page->instance()->rows->count())->toBe(30);
+});
+
+test('a currency line prints three figures while nothing is wrong, and its alarms only when there are some', function () {
+    // Healthy: a tranche due ahead, nothing late, nothing failed.
+    $healthy = DonorProposal::factory()->create(['budget' => '1000.00', 'currency' => Currency::Usd]);
+    registerTranche($healthy, ['payment_amount' => '400.00', 'net_amount_received' => '400.00', 'ar_status' => ArStatus::Received, 'scheduled_date' => '2026-05-01', 'transfer_date' => '2026-05-01', 'receive_date' => '2026-05-02']);
+    registerTranche($healthy, ['payment_amount' => '600.00', 'scheduled_date' => '2026-08-01']);
+
+    agreementRegister()
+        ->assertSeeHtml('data-total="budget"')
+        ->assertSeeHtml('data-total="received"')
+        ->assertSeeHtml('data-total="outstanding"')
+        // Scheduled, in transit and not scheduled left the line: they are on the agreement page.
+        ->assertDontSeeHtml('data-total="scheduled"')
+        ->assertDontSeeHtml('data-total="in_transit"')
+        ->assertDontSeeHtml('data-total="unscheduled"')
+        // Nothing is late or failed, so neither alarm is printed.
+        ->assertDontSeeHtml('data-total="overdue"')
+        ->assertDontSeeHtml('data-total="failed"');
+
+    // Once money is late and money has failed, both alarms appear.
+    registerTranche($healthy, ['payment_amount' => '50.00', 'scheduled_date' => '2026-05-20']);
+    registerTranche($healthy, ['payment_amount' => '70.00', 'scheduled_date' => '2026-05-25', 'ar_status' => ArStatus::Failed]);
+
+    agreementRegister()
+        ->assertSeeHtml('data-total="overdue"')
+        ->assertSeeHtml('data-total="failed"');
+});
+
+test('the register is sized for the columns it actually has, so it does not scroll sideways', function () {
+    registerMixedAgreement();
+
+    // register-2xl forces min-width:104rem — the width fourteen money columns
+    // needed. Six columns fit in register-sm (56rem), which also lets the
+    // heading row stick: sticky cannot work inside an overflow box.
+    agreementRegister()
+        ->assertSeeHtml('register-sm')
+        ->assertDontSeeHtml('register-2xl');
 });

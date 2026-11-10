@@ -16,7 +16,7 @@ class DeleteTaskAttachment
 {
     public function handle(Task $task, TaskAttachment $file): void
     {
-        Gate::authorize('update', $task);
+        Gate::authorize('manageFiles', $task);
 
         if ($file->original_name !== null) {
             StoredFiles::forget($file->disk, $file->path, 'task attachment', ['task_attachment_id' => $file->id]);

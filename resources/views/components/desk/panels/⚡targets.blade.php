@@ -68,7 +68,7 @@ new class extends Component
     $number = fn (?float $value): string => $value === null ? '—' : rtrim(rtrim(number_format($value, 2, '.', ','), '0'), '.');
 @endphp
 
-<x-desk.panel :facets="$pg['facets']" id="targets" register="targets.index" :size="$size" :cols="$gridCols" :height="$gridRows" :index="$index" :total="$total" :count="$rows->count()">
+<x-desk.panel :empty="$rows->isEmpty()" :facets="$pg['facets']" id="targets" register="targets.index" :size="$size" :cols="$gridCols" :height="$gridRows" :index="$index" :total="$total" :count="$rows->count()">
     @if ($pg['total'] > 0)
         <ul class="dk-tg" {{ $this->fitAttributes($pg) }}>
             @foreach ($pg['slice'] as $row)

@@ -38,6 +38,13 @@ use Livewire\Component;
  *
  * config('desk.ask_ai') reserves an "Ask AI" fallback row for later; it is
  * off, and nothing here calls an AI service.
+ *
+ * In front of these server answers sits the instant layer (resources/js/
+ * ask-index.js over App\Support\Desk\AskCommands, shipped once with the
+ * page): pages, "New …" actions, putting things on or off the Desk, Desk
+ * tabs and commands, found on every key with no round trip. While it has
+ * rows, the server's own "Go to" and "Do" groups stand back, so nothing
+ * shows twice; the answers and records still come from here.
  */
 new class extends Component {
     use ChartsDashboard;
@@ -126,7 +133,7 @@ new class extends Component {
         $wantsCreate = in_array('create', $intents, true);
 
         if ($wantsCreate && $actions !== []) {
-            $groups[] = ['name' => __('desk.ask_group_do'), 'items' => $actions];
+            $groups[] = ['name' => __('desk.ask_group_do'), 'kind' => 'do', 'items' => $actions];
         }
 
         if (in_array('late', $intents, true)) {
@@ -187,13 +194,13 @@ new class extends Component {
         }
 
         if (! $wantsCreate && $actions !== []) {
-            $groups[] = ['name' => __('desk.ask_group_do'), 'items' => $actions];
+            $groups[] = ['name' => __('desk.ask_group_do'), 'kind' => 'do', 'items' => $actions];
         }
 
         $pages = array_map(fn (array $page): array => ['icon' => $page['icon'], 'label' => $page['label'], 'sub' => '', 'href' => route($page['route'])], $ask->pages($user, $meaning));
 
         if ($pages !== []) {
-            $groups[] = ['name' => __('desk.ask_group_go'), 'items' => $pages];
+            $groups[] = ['name' => __('desk.ask_group_go'), 'kind' => 'go', 'items' => $pages];
         }
 
         $groups = array_values(array_filter($groups, fn (array $group): bool => $group['items'] !== []));
@@ -371,6 +378,7 @@ new class extends Component {
 <div
     x-data="hcDeskAsk"
     x-on:dk-ask-open.window="show()"
+    x-on:dk-ask-close.window="hide()"
     x-on:keydown.window="onGlobalKey($event)"
     data-desk-ask-palette
 >
@@ -389,7 +397,8 @@ new class extends Component {
                         placeholder="{{ __('desk.ask_hint') }}"
                         x-on:keydown.arrow-down.prevent="move(1)"
                         x-on:keydown.arrow-up.prevent="move(-1)"
-                        x-on:keydown.enter.prevent="choose()"
+                        x-on:keydown.enter.prevent="choose($event)"
+                        x-on:input="type($event.target.value)"
                     >
                     {{-- While Livewire answers, a red line scans along the input row's bottom edge. --}}
                     <span class="dk-pal-busy" wire:loading.delay wire:target="query" aria-hidden="true"></span>
@@ -397,6 +406,24 @@ new class extends Component {
                 </div>
 
                 <div class="dk-pal-list" x-ref="list">
+                    {{-- Instant rows: no round trip (resources/js/ask-index.js). wire:ignore keeps Livewire's morph away from them. --}}
+                    <div wire:ignore data-ask-instant>
+                        <template x-if="instant.length > 0">
+                            <div class="dk-pal-instant">
+                                <p class="dk-pal-g" x-text="instantRecent ? texts.recent : texts.instant"></p>
+                                <p class="dk-pal-g dk-pal-fix" x-show="instantCorrected" x-text="texts.corrected.replace('__Q__', instantCorrected)"></p>
+                                <template x-for="row in instant" x-bind:key="row.key">
+                                    <a x-bind:href="row.href ?? '#'" class="dk-pal-i" x-bind:class="{ 'dk-pal-act': row.kind === 'action' || row.kind === 'add', 'dk-pal-done': row.done }" data-pi data-desk-native x-on:click="runRow(row, $event)" x-bind:data-ask-row="row.key" x-bind:draggable="carry(row) ? 'true' : 'false'" x-bind:data-ask-carry="carry(row)">
+                                        <span class="dk-ic"><svg class="dk-i"><use x-bind:href="'#dk-sym-' + row.icon"></use></svg></span>
+                                        <span class="dk-pal-t"><span x-html="row.html"></span><small x-show="row.sub" x-text="row.sub"></small></span>
+                                        <span class="dk-pal-kind" x-bind:data-kind="row.kind" x-text="row.done ? texts.badge_done : row.badge"></span>
+                                        <span class="dk-pal-ret" aria-hidden="true"><x-desk.icon name="enter" /></span>
+                                    </a>
+                                </template>
+                            </div>
+                        </template>
+                    </div>
+
                     @if ($results['corrected'] !== null)
                         <p class="dk-pal-g dk-pal-fix" data-ask-corrected>{{ __('desk.ask_corrected', ['query' => $results['corrected']]) }}</p>
                     @endif
@@ -405,7 +432,7 @@ new class extends Component {
                         {{-- Example questions on the Desk's dot-thread; the highlighted one takes the brand ring. --}}
                         <div class="dk-pal-try" data-ask-suggestions>
                             @if (trim($query) !== '')
-                                <div class="dk-pal-none">
+                                <div class="dk-pal-none" x-show="instant.length === 0">
                                     <strong>{{ __('desk.ask_nothing_title') }}</strong>
                                     <span>{{ __('desk.ask_nothing_body') }}</span>
                                 </div>
@@ -413,7 +440,7 @@ new class extends Component {
                             <p class="dk-pal-g">{{ __('desk.ask_try') }}</p>
                             <div class="dk-pal-thread">
                                 @foreach ($results['suggestions'] as $suggestion)
-                                    <button type="button" class="dk-pal-q" data-pi="{{ $index }}" x-bind:class="{ 'dk-sel': selected === {{ $index }} }" x-on:click="ask(@js($suggestion))">
+                                    <button type="button" class="dk-pal-q" data-pi="{{ $index }}" x-on:click="ask(@js($suggestion))">
                                         <i aria-hidden="true"></i>
                                         <span class="dk-pal-t">{{ $suggestion }}</span>
                                         <span class="dk-pal-ret" aria-hidden="true"><x-desk.icon name="enter" /></span>
@@ -439,9 +466,11 @@ new class extends Component {
                     @endforeach
 
                     @foreach ($results['groups'] as $group)
+                        {{-- Pages and actions stand back while the instant rows above show them. --}}
+                        <div class="dk-pal-grp" @if (in_array($group['kind'] ?? null, ['go', 'do'], true)) x-show="instant.length === 0" @endif data-ask-group="{{ $group['kind'] ?? 'answer' }}">
                         <div class="dk-pal-g">{{ $group['name'] }}</div>
                         @foreach ($group['items'] as $item)
-                            <a href="{{ $item['href'] }}" wire:navigate @class(['dk-pal-i', 'dk-pal-act' => $item['action'] ?? false]) data-pi="{{ $index }}" x-bind:class="{ 'dk-sel': selected === {{ $index }} }" x-on:click="hide()" @if ($item['action'] ?? false) data-ask-action @endif>
+                            <a href="{{ $item['href'] }}" wire:navigate @class(['dk-pal-i', 'dk-pal-act' => $item['action'] ?? false]) data-pi="{{ $index }}" x-on:click="hide()" @if ($item['action'] ?? false) data-ask-action @endif>
                                 <span class="dk-ic"><x-desk.icon :name="$item['icon']" /></span>
                                 <span class="dk-pal-t">{{ $item['label'] }}@if ($item['sub'] !== '')<small>{{ $item['sub'] }}</small>@endif</span>
                                 <span class="dk-pal-ret" aria-hidden="true"><x-desk.icon name="enter" /></span>
@@ -450,6 +479,7 @@ new class extends Component {
                                 $index++;
                             @endphp
                         @endforeach
+                        </div>
                     @endforeach
 
                     @if ($results['ai'] && trim($query) !== '')
@@ -459,9 +489,13 @@ new class extends Component {
                     @endif
                 </div>
 
+                <p class="dk-pal-flash" role="status" aria-live="polite" x-show="flash" x-cloak x-transition.opacity x-text="flash"></p>
+
                 <div class="dk-pal-foot">
                     <span><kbd>↑</kbd> <kbd>↓</kbd> {{ __('desk.ask_move') }}</span>
                     <span><kbd><x-desk.icon name="enter" /></kbd> {{ __('desk.ask_open') }}</span>
+                    <span class="dk-pal-foot-more"><kbd>Alt</kbd> <kbd><x-desk.icon name="enter" /></kbd> {{ __('desk-workspace.ask.alt_enter') }}</span>
+                    <span class="dk-pal-foot-more"><kbd>&gt;</kbd> {{ __('desk-workspace.ask.commands_only') }}</span>
                     <span><kbd>{{ __('desk.key_esc') }}</kbd> {{ __('desk.ask_close') }}</span>
                 </div>
             </div>

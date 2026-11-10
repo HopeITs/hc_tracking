@@ -22,7 +22,11 @@
  * with a "6 × 4" badge; releasing asks the host page to arrangePanels(). Esc
  * cancels. RTL-aware throughout.
  *
- * Delegated from document so panels Livewire re-renders keep working.
+ * A button tile (x-desk.tile) is all face: its link carries data-drag-through,
+ * so a press that moves carries the tile and a press that does not opens it.
+ *
+ * Delegated from document so panels Livewire re-renders keep working. The
+ * helpers the sidebar's drag-and-drop needs (desk-drop.js) are exported.
  */
 
 import { inserted, resized, rowsIn, sameLayout, swapped } from './desk-rows';
@@ -45,12 +49,12 @@ function panelOf(target) {
     return target instanceof Element ? target.closest('[data-desk-grid] > .dk-panel') : null;
 }
 
-function panelsIn(grid) {
+export function panelsIn(grid) {
     return [...grid.querySelectorAll(':scope > .dk-panel')];
 }
 
 /** The grid's layout as desk-rows.js reads it: its cards in order, at their current cells. */
-function layoutOf(grid) {
+export function layoutOf(grid) {
     return panelsIn(grid).map((panel) => ({ panel: panel.dataset.panel, cols: Number(panel.dataset.cols) || 4, rows: Number(panel.dataset.rows) || 4 }));
 }
 
@@ -66,7 +70,7 @@ function setCells(panel, cols, rows) {
  * re-inserted before whatever follows the last card, so Livewire's loop
  * markers around them stay where they were.
  */
-function lay(grid, layout) {
+export function lay(grid, layout) {
     const cards = panelsIn(grid);
     const byId = new Map(cards.map((panel) => [panel.dataset.panel, panel]));
     const anchor = cards.at(-1)?.nextSibling ?? null;
@@ -108,7 +112,7 @@ function nextCard(card) {
  * '[wire\:id]' would collapse to the invalid selector '[wire:id]' and closest()
  * would throw.
  */
-function hostOf(panel) {
+export function hostOf(panel) {
     const host = panel.closest('[data-desk-grid]')?.closest('[wire\\:id]');
 
     return host ? window.Livewire?.find(host.getAttribute('wire:id')) : null;
@@ -139,7 +143,7 @@ let move = null;
 let swallowClick = false;
 
 /** Slide every panel but the carried one from where it was to where it now sits. */
-function flip(grid, mutate, carried = move?.panel) {
+export function flip(grid, mutate, carried = move?.panel) {
     const others = panelsIn(grid).filter((panel) => panel !== carried);
     const before = new Map(others.map((panel) => [panel, panel.getBoundingClientRect()]));
 
@@ -355,7 +359,10 @@ document.addEventListener('pointerdown', (event) => {
     const handle = event.target instanceof Element ? event.target.closest('[data-drag]') : null;
     const panel = handle ? panelOf(handle) : null;
 
-    if (! panel || event.button !== 0 || move || resize || event.target.closest(interactive)) {
+    const blocker = event.target.closest(interactive);
+
+    // A folded tile (desk-fold.js) sits outside the rows, so it is not carried; it opens from its own button.
+    if (! panel || panel.hasAttribute('data-folded') || event.button !== 0 || move || resize || (blocker && ! blocker.hasAttribute('data-drag-through'))) {
         return;
     }
 
@@ -383,6 +390,11 @@ document.addEventListener('pointerdown', (event) => {
 });
 
 document.addEventListener('pointermove', (event) => {
+    // The button was let go where no pointerup reached the page (outside the window): the card is put down, not left stuck to the pointer.
+    if (move && event.pointerType === 'mouse' && event.buttons === 0) {
+        endMove(false);
+    }
+
     if (move) {
         move.x = event.clientX;
         move.y = event.clientY;
@@ -433,7 +445,7 @@ let resize = null;
  * that round trip would re-render it at its saved size mid-pull. Lift it once
  * the new size is saved (or dropped) and let the panel fit again.
  */
-function fitAgain(panel) {
+export function fitAgain(panel) {
     delete panel.dataset.resizing;
     panel.dispatchEvent(new CustomEvent('dk-panel-resized'));
 }
@@ -477,7 +489,7 @@ document.addEventListener('pointerdown', (event) => {
     const handle = event.target instanceof Element ? event.target.closest('[data-resize]') : null;
     const panel = handle ? panelOf(handle) : null;
 
-    if (! panel || event.button !== 0 || isPhone()) {
+    if (! panel || panel.hasAttribute('data-folded') || event.button !== 0 || isPhone()) {
         return;
     }
 
@@ -708,6 +720,12 @@ document.addEventListener('pointerup', () => {
 });
 
 document.addEventListener('pointercancel', () => {
+    endResize(false);
+    endMove(false);
+});
+
+// Another window or app took over mid-drag: nothing is left carried or half-pulled.
+window.addEventListener('blur', () => {
     endResize(false);
     endMove(false);
 });

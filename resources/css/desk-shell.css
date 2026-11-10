@@ -105,6 +105,8 @@
     .dk-side-pin:hover { background: var(--sunk); color: var(--ink); }
     .dk-side-pin.dk-pinned { color: var(--brand); }
     .dk-side-pin.dk-pinned svg { fill: currentColor; }
+    .dk-side-pin svg.dk-pin-ic { width: 14px; height: 14px; stroke-width: 2; }
+    .dk-side-pin.dk-pinned svg.dk-pin-ic { fill: color-mix(in srgb, currentColor 30%, transparent); }
 
     /* Personal zone: Pinned + Recent */
     .dk-side-me ul { display: grid; gap: 1px; }
@@ -112,8 +114,10 @@
     .dk-side-star { display: none; }
     .dk-side-empty { margin: 0; padding: 6px 10px; font-size: 12.5px; color: var(--faint); }
     .dk-side-rec { height: 42px; }
-    .dk-side-rec .dk-side-l { display: grid; line-height: 1.2; }
-    .dk-side-rec small { font-size: 11px; font-weight: 600; color: var(--faint); overflow: hidden; text-overflow: ellipsis; }
+    .dk-side-rec .dk-side-l { display: grid; min-width: 0; line-height: 1.2; }
+    /* A long record name ends in an ellipsis inside the list (and the rail's fly-out), never past its edge. */
+    .dk-side-rec :is(.dk-side-rt, small) { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .dk-side-rec small { font-size: 11px; font-weight: 600; color: var(--faint); }
 
     /* Project context mode */
     .dk-side-ctx { display: flex; flex-direction: column; gap: 2px; }
@@ -157,8 +161,9 @@
         html:not(.dk-nav-open) .dk-side-all > .dk-side-g .dk-side-a.dk-on::before,
         html:not(.dk-nav-open) .dk-side-gb.dk-has-on::before,
         html:not(.dk-nav-open) .dk-side-ctx .dk-side-a.dk-on::before { content: ""; display: block; position: absolute; inset-block: 9px; inset-inline-start: -14px; width: 3px; border-radius: 3px; background: var(--brand); }
-        /* On the rail a count is a small numbered tag tucked into the icon's top corner, inside its circle */
-        html:not(.dk-nav-open) .dk-side-all > .dk-side-g .dk-side-badge { position: absolute; top: -3px; inset-inline-end: -3px; width: auto; min-width: 16px; height: 16px; padding: 0 4px; border-radius: 999px; font-size: 10px; font-weight: 800; line-height: 16px; background: var(--brand); color: var(--on-brand); box-shadow: 0 0 0 2px var(--paper); }
+        /* On the rail a count is only a small red dot hugging the icon's top corner (user decision 2026-11-10); the
+           number stays in the markup for screen readers, and the fly-out on hover still shows each page's count */
+        html:not(.dk-nav-open) .dk-side-all > .dk-side-g .dk-side-badge { position: absolute; top: 4px; inset-inline-end: 4px; width: 8px; min-width: 8px; height: 8px; padding: 0; overflow: hidden; border-radius: 999px; font-size: 0; line-height: 0; color: transparent; background: var(--brand); box-shadow: 0 0 0 2px var(--paper); pointer-events: none; }
         html:not(.dk-nav-open) .dk-side-ctx { align-items: center; }
         html:not(.dk-nav-open) .dk-side-back { width: 34px; height: 34px; padding: 0; justify-content: center; }
     }
@@ -167,7 +172,7 @@
     .dk-side-fly .dk-side-a { width: 100% !important; height: 38px !important; gap: 10px !important; padding-inline: 10px 34px !important; justify-content: flex-start !important; margin: 0 !important; border-radius: 9px !important; }
     .dk-side-fly .dk-side-rec { height: 42px !important; }
     .dk-side-fly .dk-side-l { display: block !important; }
-    .dk-side-fly .dk-side-rec .dk-side-l { display: grid !important; }
+    .dk-side-fly .dk-side-rec .dk-side-l { display: grid !important; flex: 1 1 auto !important; min-width: 0 !important; }
     .dk-side-fly .dk-side-a.dk-on::before { display: none !important; }
     /* In the fly-out a count reads as a quiet numbered pill right after the label, never a blank blob */
     .dk-side-fly .dk-side-l { flex: 0 1 auto !important; }
@@ -257,11 +262,12 @@
     /* Every tool is a flex box, so no button sits on a text baseline (the help menu's wrapper was a block and dropped its button). */
     .dk-tools > .dk-pmenu { display: flex; }
     /* The unread count rides the bell's top corner, cut out of the dock by a paper ring. */
-    .dk-tools [data-unread-count] { top: -3px !important; inset-inline-end: -5px !important; min-width: 17px !important; height: 17px !important; padding-inline: 4px !important; font-size: 10px !important; font-weight: 700 !important; line-height: 17px !important; letter-spacing: -.01em; box-shadow: 0 0 0 2px var(--paper) !important; --tw-ring-shadow: 0 0 #0000 !important; pointer-events: none; }
+    /* The bell's unread mark is a small red dot on the icon's top corner, like the sidebar rail's; the number is inside the panel. */
+    .dk-tools [data-unread-count] { top: 6px !important; inset-inline-end: 6px !important; width: 8px; height: 8px; box-shadow: 0 0 0 2px var(--paper) !important; --tw-ring-shadow: 0 0 #0000 !important; pointer-events: none; }
     .dk-top .dk-tools .dk-iconbtn:active, .dk-tools [data-notification-bell] > button:active { transform: scale(.92); }
 
-    .dk-fresh { position: absolute; top: 8px; inset-inline-end: 8px; width: 8px; height: 8px; border-radius: 50%; background: var(--brand); box-shadow: 0 0 0 2px var(--paper); animation: dk-fresh 2.4s ease-out infinite; }
-    @keyframes dk-fresh { 0% { box-shadow: 0 0 0 2px var(--paper), 0 0 0 2px var(--brand); } 70%, 100% { box-shadow: 0 0 0 2px var(--paper), 0 0 0 9px transparent; } }
+    /* The Help button's "new" dot: a still dot on the button's top corner, clear of the question mark's ring. */
+    .dk-fresh { position: absolute; top: 3px; inset-inline-end: 3px; width: 9px; height: 9px; border-radius: 50%; background: var(--brand); box-shadow: 0 0 0 2px var(--paper); pointer-events: none; }
 
     .dk-seg { display: contents; }
     .dk-seg-lang { font-size: 15px !important; font-weight: 600 !important; line-height: 1 !important; }
@@ -360,7 +366,7 @@
 
     @media (prefers-reduced-motion: reduce) {
         .dk-side { transition: none; }
-        .dk-where, .dk-where-p::before, .dk-seg-theme svg, .dk-fresh { animation: none; }
+        .dk-where, .dk-where-p::before, .dk-seg-theme svg { animation: none; }
         .dk-menu-in, .dk-menu-out { transition: opacity .1s linear; }
         .dk-menu-from { transform: none; }
         .dk-top :active { transform: none !important; }
@@ -413,6 +419,10 @@
     /* One section per step; the stepper names it, so the section's own rail heading steps aside. */
     .modal-shell-frame[data-wizard] .form-section-rail { display: none; }
     .modal-shell-frame[data-wizard] .form-section { padding-block: 0; border-top: 0 !important; grid-template-columns: minmax(0, 1fr); }
+    .report-form-modal .modal-shell-steps { padding-block: 0; }
+    .report-form-modal .modal-shell-steps li { padding-block: 0.75rem; }
+    .report-form-modal .modal-shell-steps li + li::before { top: calc(0.75rem + 13px); }
+    .report-form-modal .modal-shell-body { padding-block: 1.25rem 1.5rem; }
     .modal-shell-body[data-step="1"] section.form-section:not(:nth-of-type(1)) { display: none; }
     .modal-shell-body[data-step="2"] section.form-section:not(:nth-of-type(2)) { display: none; }
     .modal-shell-body[data-step="3"] section.form-section:not(:nth-of-type(3)) { display: none; }
@@ -451,6 +461,9 @@
     [data-flux-modal] > dialog.modal-shell-xl:not([data-flux-flyout]):not([data-flux-modal-overflow]):not(:has(.modal-shell-frame[data-wizard])):not(:has(section.form-section)) { width: min(1020px, calc(100vw - 32px)); }
 }
 [data-flux-modal] > dialog.modal-shell:has(.modal-shell-frame[data-wizard]) { height: var(--pop-h); }
+@media (width >= 40rem) {
+    [data-flux-modal] > dialog.modal-shell.report-form-modal:has(.modal-shell-frame[data-wizard]) { height: 32rem; }
+}
 [data-flux-modal] > dialog.filter-dialog { height: var(--pop-h); }
 
 /* ---------- Desk panels: one fixed height (desk.css --panel-h), paginate, never scroll, never spill ---------- */
@@ -547,8 +560,7 @@
 
     /* Answers: the figure is the headline, with a live brand dot (they are read from the same data as the panels). */
     .dk-answer { display: flex; align-items: flex-start; gap: 14px; margin: 10px 2px 2px; padding: 16px 18px; border: 1px solid var(--line); border-radius: 16px; background: linear-gradient(135deg, var(--sunk), var(--paper) 70%); font-size: 13.5px; color: var(--ink-3); }
-    .dk-answer > i { flex: none; width: 10px; height: 10px; margin-top: 9px; border-radius: 50%; background: var(--brand); animation: dk-pal-live 2.2s ease-out infinite; }
-    @keyframes dk-pal-live { 0% { box-shadow: 0 0 0 0 color-mix(in srgb, var(--brand) 45%, transparent); } 70%, 100% { box-shadow: 0 0 0 9px transparent; } }
+    .dk-answer > i { flex: none; width: 10px; height: 10px; margin-top: 9px; border-radius: 50%; background: var(--brand); }
     .dk-answer > div { display: grid; gap: 3px; min-width: 0; }
     .dk-answer strong { display: block; margin: 0; font-size: 20px; font-weight: 800; line-height: 1.25; letter-spacing: -.015em; color: var(--ink); }
 
@@ -713,6 +725,24 @@
         .dk-glance:is([data-figs="2"], [data-figs="4"]) > li:nth-child(2n + 1) { border-inline-start: 0; padding-inline-start: 0; }
         .dk-glance:is([data-figs="2"], [data-figs="4"]) > li:nth-child(2n) { border-inline-start: 1px solid var(--line); padding-inline-start: 16px; }
     }
+    /* Narrow (a 3- or 4-column card): two to a line left each label ~90px wide and cut most of them, so each figure
+       takes its own line with its words beside it. A 2-row card has no height for six lines and keeps the pairs. */
+    @container pb (max-width: 419px) {
+        .dk-panel:not([data-rows="2"]) .dk-pb > .dk-glance { grid-template-columns: minmax(0, 1fr); row-gap: 0; align-content: space-evenly; }
+        .dk-panel:not([data-rows="2"]) .dk-glance > li { padding-inline: 0; border-inline-start: 0; border-block-start: 1px solid var(--line); }
+        .dk-panel:not([data-rows="2"]) .dk-glance > li:first-child { border-block-start: 0; }
+        .dk-panel:not([data-rows="2"]) .dk-gl-a { display: grid; grid-template-columns: minmax(3.5rem, auto) minmax(0, 1fr); grid-template-areas: "n l" "n d"; align-items: center; align-content: center; column-gap: 12px; row-gap: 1px; padding-block: 5px; }
+        .dk-panel:not([data-rows="2"]) .dk-gl-a strong { grid-area: n; font-size: 24px; }
+        .dk-panel:not([data-rows="2"]) .dk-gl-l { grid-area: l; }
+        .dk-panel:not([data-rows="2"]) .dk-gl-d { grid-area: d; -webkit-line-clamp: 1; }
+        /* Three row units hold six lines only when each is tight. */
+        .dk-panel[data-rows="3"] .dk-gl-a { padding-block: 2px; }
+        .dk-panel[data-rows="3"] .dk-gl-a strong { font-size: 21px; }
+        .dk-panel[data-rows="3"] .dk-gl-l { font-size: 12px; line-height: 1.3; }
+    }
+    /* With height to spare, a long label ("October reports validated of those due") takes a third line instead of being cut. */
+    .dk-panel:not([data-rows="2"], [data-rows="3"]) .dk-gl-l { -webkit-line-clamp: 3; }
+    @container pb (min-width: 420px) { .dk-panel[data-rows="3"] .dk-gl-l { -webkit-line-clamp: 3; } }
     /* One row on wide cards. */
     @container pb (min-width: 860px) {
         .dk-pb > .dk-glance, .dk-pb > .dk-glance:is([data-figs]) { grid-template-columns: repeat(var(--figs), minmax(0, 1fr)); }

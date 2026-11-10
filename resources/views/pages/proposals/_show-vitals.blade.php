@@ -31,7 +31,7 @@
                 ])>
                     <span class="truncate">{{ $reading['figure'] }}</span>
                     @if ($reading['suffix'] !== null)
-                        <span @class(['text-2xl font-bold tracking-normal @xl/detail:text-3xl', 'text-status-critical/70' => $reading['alarm'], $mutedText => ! $reading['alarm']])>{{ $reading['suffix'] }}</span>
+                        <span @class(['text-2xl font-bold tracking-normal @xl/detail:text-3xl', 'text-status-critical' => $reading['alarm'], $mutedText => ! $reading['alarm']])>{{ $reading['suffix'] }}</span>
                     @endif
                 </span>
 

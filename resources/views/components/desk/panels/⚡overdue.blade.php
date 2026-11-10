@@ -32,7 +32,7 @@ new class extends Component {
     $pg = $this->paginate($all, self::PerPage);
 @endphp
 
-<x-desk.panel :facets="$pg['facets']" id="overdue" class="dk-overdue" :size="$size" :cols="$gridCols" :height="$gridRows" :index="$index" :total="$total" :count="$all->count()" :health="$all->isNotEmpty() ? 'critical' : null">
+<x-desk.panel :empty="$all->isEmpty()" :facets="$pg['facets']" id="overdue" class="dk-overdue" :size="$size" :cols="$gridCols" :height="$gridRows" :index="$index" :total="$total" :count="$all->count()" :health="$all->isNotEmpty() ? 'critical' : null">
     @if ($pg['total'] > 0)
         <ol class="dk-od" {{ $this->fitAttributes($pg) }}>
             @foreach ($pg['slice'] as $item)

@@ -17,8 +17,8 @@ Role name in code: `'General Manager'` (`userWithRole('General Manager')`). Sour
 
 ## Scenarios
 - **GM-01** ✅ Approve a pending donor; the PR user's proposal can then be saved.
-- **GM-02** ✅ Approve a proposal (`approved`): location rows are completed and missing projects (program, center, owner) are created.
-- **GM-03** ⚠ Approve a proposal with a location row that has no program or center.
+- **GM-02** 🚫 Cannot approve a proposal (`approved`): only the Public Relations Manager does (D-70). The approval itself (locations completed, missing projects created) is tested as the PR Manager.
+- **GM-03** ⚠ Approval of a proposal with a location row that has no program or center is refused and writes nothing (tested as the PR Manager; the GM cannot approve).
 - **GM-04** ✅ Open the activity log (only this role and Super Admin can).
 - **GM-05** 🚫 Cannot confirm report templates, set targets, reopen reports or mark them seen, or use AI drafting.
 - **GM-06** ✅ See the AI usage log.

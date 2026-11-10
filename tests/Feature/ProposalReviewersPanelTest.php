@@ -207,6 +207,20 @@ test('a manager adds a reviewer to the stage derived from the status', function 
     'proposal review' => [ProposalStatus::ProposalReview, ReviewStage::Proposal],
 ]);
 
+test('Financial holds proposals.manage-reviewers and adds a reviewer', function () {
+    $proposal = panelProposal();
+    $employeeId = insertHrEmployee(firstNameEn: 'Extra');
+    $financial = userWithRole('Financial');
+
+    reviewersPanel($financial, $proposal)->set('reviewerEmployeeId', (string) $employeeId)->call('addReviewer')->assertHasNoErrors();
+
+    $row = DB::table('proposal_reviewers')->sole();
+
+    expect($row->slot)->toBe('additional')
+        ->and($row->employee_id)->toBe($employeeId)
+        ->and($row->added_by)->toBe($financial->id);
+});
+
 test('no reviewer can be added outside the review stages', function () {
     $proposal = panelProposal(ProposalStatus::Submitted);
 

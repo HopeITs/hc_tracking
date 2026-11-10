@@ -49,7 +49,7 @@
                     <div class="flex items-center gap-2">
                         <span
                             class="size-2 shrink-0 rounded-full"
-                            x-bind:class="item.sticky ? 'bg-primary dark:bg-status-critical motion-safe:animate-pulse' : 'bg-status-warn'"
+                            x-bind:class="item.sticky ? 'bg-primary dark:bg-status-critical' : 'bg-status-warn'"
                             aria-hidden="true"
                         ></span>
                         <p class="min-w-0 truncate text-[11px] font-semibold uppercase tracking-[0.1em] text-secondary-medium dark:text-ink-muted" x-text="item.module_label"></p>

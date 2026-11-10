@@ -61,6 +61,7 @@ test('author and MEAL review sit behind More filters and the controls stay insid
         expect($xpath->query($root.'//*[@data-test="'.$control.'"]')->length)->toBeGreaterThan(0, "{$control} sits outside the component");
     }
     expect($xpath->query($root.'//*[@data-test="report-list"]//article')->length)->toBe(4);
+    expect($xpath->query($root.'//*[@data-test="report-list"]//article/div[@data-report-row-actions and contains(@class, "md:grid-cols-[max-content_2.25rem]")]')->length)->toBe(4);
 });
 
 test('only a draft offers edit and delete in the row menu; an approved report shows why not', function () {

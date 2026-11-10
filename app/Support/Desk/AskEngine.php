@@ -298,6 +298,77 @@ final class AskEngine
     }
 
     /**
+     * The words that find a page, normalised: its own name, its module's
+     * names and the page's extra words. AskCommands ships them to the
+     * browser, so the Ask bar's instant results read the same vocabulary
+     * as the answers worked out here.
+     *
+     * @param  array{route: string, label: string, module: string|null}  $page
+     * @return list<string>
+     */
+    public function wordsForPage(array $page): array
+    {
+        return self::normalizedWords([
+            $page['label'],
+            ...(self::Entities[$page['module'] ?? ''] ?? []),
+            ...(self::Entities[Str::before(Str::after($page['route'], 'admin.'), '.')] ?? []),
+            ...(self::PageWords[$page['route']] ?? []),
+        ]);
+    }
+
+    /**
+     * The names of a part of the system (a module), normalised, for the
+     * "New …" actions that create there.
+     *
+     * @return list<string>
+     */
+    public function wordsForModule(string $module): array
+    {
+        return self::normalizedWords(self::Entities[$module] ?? []);
+    }
+
+    /**
+     * An intent's question words, normalised ("create" => new, add, جديد…).
+     *
+     * @return list<string>
+     */
+    public function wordsForIntent(string $intent): array
+    {
+        return self::normalizedWords(self::Intents[$intent] ?? []);
+    }
+
+    /**
+     * Words carrying no meaning for matching, normalised.
+     *
+     * @return list<string>
+     */
+    public function stopWords(): array
+    {
+        return self::normalizedWords(self::StopWords);
+    }
+
+    /**
+     * Phrases split into words, normalised, each once.
+     *
+     * @param  list<string>  $phrases
+     * @return list<string>
+     */
+    public static function normalizedWords(array $phrases): array
+    {
+        $words = [];
+
+        foreach ($phrases as $phrase) {
+            foreach (explode(' ', self::normalize($phrase)) as $word) {
+                if ($word !== '') {
+                    $words[$word] = true;
+                }
+            }
+        }
+
+        return array_keys($words);
+    }
+
+    /**
      * Lower case, without Arabic diacritics, tatweel or letter variants
      * (أ إ آ → ا, ة → ه, ى → ي), the definite article "ال" dropped from long
      * words, punctuation turned to spaces.

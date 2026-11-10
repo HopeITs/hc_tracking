@@ -24,6 +24,7 @@
 <x-ui.modal
     wire:model="showReportModal"
     size="xl"
+    class="report-form-modal"
     :title="$editing ? __('reports.edit_report') : __('reports.record_report')"
     :description="__('reports.status_and_meal_review_are_recorded_on_the_report_page_not_h')"
     submit="saveReport"
@@ -32,8 +33,8 @@
 >
     @if ($open)
         <x-ui.form-section :title="__('common.section_details')" :fields="['reportTargetId', 'plannedDate', 'value', 'numerator', 'denominator']">
-            <div class="grid gap-x-4 gap-y-3 @2xl/modal:grid-cols-2">
-                <x-ui.form-select wire:model.live="reportTargetId" :label="__('reports.target')" :placeholder="__('reports.select_a_target')" :help="$targetHelp" required autofocus class="@2xl/modal:col-span-2">
+            <div class="grid gap-4 @2xl/modal:grid-cols-2">
+                <x-ui.form-select wire:model.live="reportTargetId" :label="__('reports.target')" :placeholder="__('reports.select_a_target')" :help="$targetHelp" required autofocus wrap-labels class="@2xl/modal:col-span-2">
                     @foreach ($targetOptions as $targetOption)
                         <option value="{{ $targetOption['id'] }}">{{ $targetOption['label'] }}</option>
                     @endforeach
@@ -72,7 +73,7 @@
         </x-ui.form-section>
 
         <x-ui.form-section :title="__('reports.section_narrative')" :fields="['periodStart', 'periodEnd', 'narrativeNotes']">
-            <div class="grid grid-cols-2 gap-x-4 gap-y-3">
+            <div class="grid grid-cols-2 gap-4">
                 <x-ui.form-input wire:model="periodStart" :label="__('reports.narrative_window_start')" type="date" />
                 <x-ui.form-input wire:model="periodEnd" :label="__('reports.narrative_window_end')" type="date" />
                 <x-ui.form-textarea wire:model="narrativeNotes" :label="__('reports.narrative_notes')" rows="2" class="col-span-2" />
@@ -80,7 +81,7 @@
         </x-ui.form-section>
 
         <x-ui.form-section :title="__('reports.section_summary')" :fields="['keyAchievements', 'challenges', 'lessonsLearned', 'nextPeriodPlans']">
-            <div class="grid gap-x-4 gap-y-3 @2xl/modal:grid-cols-2">
+            <div class="grid gap-4 @2xl/modal:grid-cols-2">
                 <x-ui.form-textarea wire:model="keyAchievements" :label="__('reports.key_achievements')" rows="2" />
                 <x-ui.form-textarea wire:model="challenges" :label="__('reports.challenges')" rows="2" />
                 <x-ui.form-textarea wire:model="lessonsLearned" :label="__('reports.lessons_learned')" rows="2" />

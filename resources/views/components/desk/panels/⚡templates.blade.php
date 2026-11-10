@@ -120,7 +120,7 @@ new class extends Component {
     $pg = $this->paginate($rows, self::PerPage);
 @endphp
 
-<x-desk.panel :facets="$pg['facets']" id="templates" register="report-templates.index" :size="$size" :cols="$gridCols" :height="$gridRows" :index="$index" :total="$total" :count="($counts['missing'] ?? 0) + ($counts['pending'] ?? 0) ?: null">
+<x-desk.panel :empty="$rows->isEmpty()" :facets="$pg['facets']" id="templates" register="report-templates.index" :size="$size" :cols="$gridCols" :height="$gridRows" :index="$index" :total="$total" :count="($counts['missing'] ?? 0) + ($counts['pending'] ?? 0) ?: null">
     @if ($rows->isNotEmpty())
         <p class="dk-pl-sum">{{ __('desk.templates_summary', ['missing' => $counts['missing'] ?? 0, 'pending' => $counts['pending'] ?? 0, 'approved' => $counts['approved'] ?? 0]) }}</p>
     @endif

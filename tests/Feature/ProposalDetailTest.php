@@ -718,7 +718,7 @@ test('proposal detail shows a back link to the register when nothing referred th
     $this->actingAs($user)
         ->get(route('proposals.show', $proposal))
         ->assertOk()
-        ->assertSeeHtml('href="'.route('proposals.index').'" wire:navigate data-detail-back');
+        ->assertSeeHtml('href="'.route('proposals.index').'" wire:navigate.hover data-detail-back');
 });
 
 test('proposal detail sends the back link to the in-app page the visitor came from', function () {
@@ -730,7 +730,7 @@ test('proposal detail sends the back link to the in-app page the visitor came fr
         ->withHeader('referer', $from)
         ->get(route('proposals.show', $proposal))
         ->assertOk()
-        ->assertSeeHtml('href="'.$from.'" wire:navigate data-detail-back');
+        ->assertSeeHtml('href="'.$from.'" wire:navigate.hover data-detail-back');
 });
 
 /*

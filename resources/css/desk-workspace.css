@@ -1,0 +1,617 @@
+/* Desk workspace: page cards, buttons, Desk tabs, dragging pages in and "Add to desk".
+ * Page cards (components/desk/panels/⚡page) read their own size: width through
+ * the body's `pb` container, height through the panel's data-rows, so every
+ * card says the most it can in the cell it is given. Buttons (x-desk.tile) are
+ * a size container of their own. Tabs: resources/js/desk-tabs.js. Own classes
+ * only, dk- prefixed, tokens from desk.css :root, in @layer components. */
+
+@layer components {
+    :root { --tabs-h: 60px; }
+
+    /* ── Tones, shared by figures, splits and legends ─────────────── */
+    .dk-card [data-tone], .dk-tile { --tone: var(--ink-3); }
+    .dk-card [data-tone="good"] { --tone: var(--good); }
+    .dk-card [data-tone="warn"] { --tone: var(--warn); }
+    .dk-card [data-tone="critical"] { --tone: var(--bad); }
+    .dk-card [data-tone="active"] { --tone: var(--active); }
+    .dk-card [data-tone="neutral"] { --tone: var(--line-2); }
+
+    /* ── Page cards ───────────────────────────────────────────────────
+     * Three parts, each shown only where it reads well, never squeezed:
+     *  - figures: one line of plain numbers. A figure that does not fit whole
+     *    is left out (the strip wraps and hides what wrapped), so a number or
+     *    its label is never cut;
+     *  - the split by state (bar and legend): from four row units up;
+     *  - the records: from three row units up, and beside the figures on a
+     *    wide card whatever its height.
+     * Width is the body's `pb` container (the list is a container too, `rows`,
+     * so a record becomes one line by the room the list itself has), height
+     * the card's data-rows. */
+    .dk-pagecard .dk-pb { display: flex; flex-direction: column; padding-block-start: 6px; }
+    .dk-card { --fig-h: 46px; flex: 1 1 auto; min-height: 0; min-width: 0; display: flex; flex-direction: column; gap: 12px; }
+
+    .dk-card-figs { flex: none; margin: 0; height: var(--fig-h); display: flex; flex-wrap: wrap; column-gap: 16px; overflow: hidden; }
+    .dk-card-fig { flex: 0 1 auto; min-width: max-content; height: var(--fig-h); display: flex; flex-direction: column-reverse; justify-content: flex-end; gap: 1px; }
+    /* The rule between two figures belongs to the later one, so a figure left out takes its rule with it. */
+    .dk-card-fig:not(:first-child) { padding-inline-start: 16px; border-inline-start: 1px solid var(--line); }
+    .dk-card-fig dt { font-size: 12px; font-weight: 600; line-height: 16px; color: var(--ink-3); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .dk-card-fig dd { margin: 0; font-size: 24px; font-weight: 800; letter-spacing: -.02em; line-height: 28px; color: var(--ink); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .dk-card-fig:is([data-tone="critical"], [data-tone="warn"]) dd { color: var(--tone); }
+
+    .dk-card-split { flex: none; display: grid; gap: 8px; min-width: 0; }
+    .dk-card-bar { display: flex; gap: 2px; height: 8px; border-radius: 99px; overflow: hidden; background: var(--sunk); }
+    .dk-card-bar > span { flex-basis: 0; min-width: 6px; background: var(--tone); }
+    .dk-card-legend { display: flex; flex-wrap: wrap; gap: 4px 14px; max-height: 44px; overflow: hidden; font-size: 12px; color: var(--ink-2); line-height: 20px; }
+    .dk-card-legend li { display: inline-flex; align-items: center; gap: 6px; min-width: 0; max-width: 100%; }
+    .dk-card-legend i { flex: none; width: 8px; height: 8px; border-radius: 2px; background: var(--tone); }
+    .dk-card-legend span { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .dk-card-legend b { font-weight: 800; color: var(--ink); font-variant-numeric: tabular-nums; }
+
+    /* The records. The list is a column in both states, so a full page only shares the room left between its rows
+       (.dk-fit-fill, desk-filters.js); a row always spans the card's width and keeps its text at the start. */
+    .dk-card-rows { container: rows / inline-size; flex: 0 1 auto; min-height: 0; min-width: 0; display: flex; flex-direction: column; }
+    .dk-card-rows.dk-fit-fill { flex: 1 1 auto; }
+    .dk-card-rows > li { flex: none; display: grid; align-items: stretch; align-content: stretch; min-width: 0; border-top: 1px solid var(--line); }
+    .dk-card-rows.dk-fit-fill > li { flex: 1 1 auto; align-items: stretch; align-content: stretch; }
+    /* One grid for every layout: what leads the record, its name over its detail (and its bar), the figure at its end, its state.
+       Empty tracks take no room: the gaps are the parts' own margins, not column-gap. */
+    .dk-card-row { min-width: 0; min-height: 50px; display: grid; grid-template-columns: auto minmax(0, 1fr) auto auto; grid-template-areas: "l t e b" "l m e b" "l r e b"; align-content: center; align-items: center; padding: 6px; margin-inline: -6px; border-radius: 9px; color: inherit; text-decoration: none; transition: background .12s; }
+    .dk-card-row:hover { background: var(--sunk); }
+    .dk-card-row:focus-visible { outline: 2px solid var(--line-2); outline-offset: -2px; }
+    .dk-card-t { grid-area: t; min-width: 0; font-size: 14px; font-weight: 700; line-height: 20px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .dk-card-m { grid-area: m; min-width: 0; font-size: 12.5px; color: var(--ink-3); line-height: 18px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .dk-card-row:not(:has(.dk-card-m)) > .dk-card-t { grid-row: 1 / -1; }
+    .dk-card-b { grid-area: b; justify-self: end; max-width: 132px; margin-inline-start: 10px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+    /* ── Record shapes (PageCard::layout) ─────────────────────────────
+     * lead (.dk-card-l, data-kind): date · year · avatar · coin · code · rank · number · dot
+     * end (.dk-card-e): an amount, a count or a time, right-aligned in figures
+     * bar (.dk-card-r): a meter (0 → to) or a span (from → to) with today (--now) */
+    .dk-card-l { grid-area: l; flex: none; margin-inline-end: 12px; display: grid; place-items: center; align-content: center; color: var(--ink-2); font-variant-numeric: tabular-nums; }
+    .dk-card-l b { font-weight: 800; line-height: 1; }
+    .dk-card-l small { font-size: 10px; font-weight: 700; line-height: 1; letter-spacing: .04em; text-transform: uppercase; color: var(--ink-3); }
+    .dk-card-e { grid-area: e; margin-inline-start: 12px; display: grid; justify-items: end; gap: 1px; text-align: end; white-space: nowrap; }
+    .dk-card-e b { font-size: 15px; font-weight: 800; letter-spacing: -.01em; line-height: 20px; color: var(--ink); }
+    .dk-card-e small { font-size: 11px; font-weight: 700; line-height: 14px; color: var(--ink-3); }
+    .dk-card-r { grid-area: r; position: relative; display: block; height: 6px; margin-block-start: 6px; border-radius: 99px; background: var(--sunk); }
+    .dk-card-r > i { position: absolute; inset-block: 0; inset-inline-start: var(--from, 0%); width: calc(var(--to) - var(--from, 0%)); min-width: 3px; border-radius: inherit; background: var(--tone); }
+    .dk-card-r > em { position: absolute; inset-block: -3px; inset-inline-start: var(--now); width: 2px; border-radius: 2px; background: var(--ink); }
+    .dk-card .dk-card-r[data-tone="neutral"] { --tone: var(--ink-3); }
+
+    /* Agenda: a calendar leaf, its colour the record's state (late reads red at a glance). */
+    .dk-card-l:is([data-kind="date"], [data-kind="year"]) { width: 42px; height: 42px; gap: 3px; border-radius: 10px; background: color-mix(in srgb, var(--tone) 14%, var(--paper)); box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--tone) 35%, transparent); }
+    .dk-card-l[data-kind="date"] b { font-size: 17px; }
+    .dk-card-l[data-kind="year"] b { font-size: 12.5px; }
+    .dk-card-l:is([data-kind="date"], [data-kind="year"])[data-tone="neutral"] { background: var(--sunk); box-shadow: none; }
+    .dk-card-l:is([data-kind="date"], [data-kind="year"]):is([data-tone="critical"], [data-tone="warn"]) b { color: var(--tone); }
+
+    /* People: initials on one of six calm grounds, by person. */
+    .dk-card-l[data-kind="avatar"] { width: 34px; height: 34px; border-radius: 50%; font-size: 12px; color: var(--paper); background: var(--av, var(--ink-3)); }
+    .dk-card-l[data-tone="tone-0"] { --av: #5b6cd9; } .dk-card-l[data-tone="tone-1"] { --av: #2f9e8f; } .dk-card-l[data-tone="tone-2"] { --av: #c2703d; }
+    .dk-card-l[data-tone="tone-3"] { --av: #a2559b; } .dk-card-l[data-tone="tone-4"] { --av: #3f88c5; } .dk-card-l[data-tone="tone-5"] { --av: #7a8a3a; }
+
+    /* Accounts: the currency as a coin. */
+    .dk-card-l[data-kind="coin"] { width: 38px; height: 38px; border-radius: 50%; font-size: 10.5px; letter-spacing: .03em; color: var(--tone); background: color-mix(in srgb, var(--tone) 14%, var(--paper)); box-shadow: inset 0 0 0 1.5px color-mix(in srgb, var(--tone) 45%, transparent); }
+    [data-layout="bank"] .dk-card-e b { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 13px; font-weight: 700; letter-spacing: .06em; color: var(--ink-2); }
+
+    /* The library: the indicator's code as a key. */
+    .dk-card-l[data-kind="code"] { min-width: 54px; height: 26px; padding-inline: 7px; border-radius: 7px; background: var(--sunk); font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 11.5px; color: var(--ink); box-shadow: inset 0 0 0 1px var(--line); }
+
+    /* Cities: the leaders' places stand out. */
+    .dk-card-l[data-kind="rank"] { width: 22px; font-size: 15px; color: var(--ink-3); }
+    .dk-card-l[data-kind="rank"][data-tone="active"] { color: var(--brand-ink); }
+
+    /* Questions, in their order. */
+    .dk-card-l[data-kind="number"] { width: 26px; height: 26px; border-radius: 50%; font-size: 12px; color: var(--tone); box-shadow: inset 0 0 0 1.5px var(--tone); }
+    .dk-card-l[data-kind="number"][data-tone="neutral"] { color: var(--ink-3); box-shadow: inset 0 0 0 1.5px var(--line-2); }
+
+    /* Activity: a line of events through dots, the newest on top. */
+    .dk-card-l[data-kind="dot"] { position: relative; width: 12px; align-self: stretch; }
+    .dk-card-l[data-kind="dot"]::before { content: ""; position: absolute; inset-block: -12px; inset-inline-start: 5px; width: 2px; background: var(--line); }
+    .dk-card-l[data-kind="dot"]::after { content: ""; position: relative; width: 10px; height: 10px; border-radius: 50%; background: var(--paper); box-shadow: inset 0 0 0 2px var(--brand); }
+    [data-layout="feed"] > li { border-top: 0; }
+    [data-layout="feed"] > li:first-child .dk-card-l[data-kind="dot"]::before { inset-block-start: 50%; }
+    [data-layout="feed"] > li:last-child .dk-card-l[data-kind="dot"]::before { inset-block-end: 50%; }
+    [data-layout="feed"] .dk-card-t { font-weight: 600; }
+    [data-layout="feed"] .dk-card-e b { font-size: 13px; color: var(--ink-2); }
+
+    /* Results and indicators: their kind as a coloured edge, so levels read down the list. */
+    [data-layout="tagged"] .dk-card-row { padding-inline-start: 14px; }
+    [data-layout="tagged"] .dk-card-row::before { content: ""; grid-area: 1 / 1 / -1 / 2; justify-self: start; width: 3px; height: 70%; margin-inline-start: -8px; border-radius: 3px; background: var(--tone); }
+    [data-layout="tagged"] .dk-card-row[data-tone="neutral"]::before { background: var(--line-2); }
+
+    /* Agreements: the amount is the record. */
+    [data-layout="ledger"] .dk-card-e b { font-size: 16px; }
+
+    /* Strategies: each one's years on one shared ruler, today marked. */
+    [data-layout="timeline"] .dk-card-r { height: 10px; background: color-mix(in srgb, var(--sunk) 70%, transparent); }
+    .dk-card-empty { flex: 1 1 auto; min-height: 0; display: grid; place-items: center; padding: 8px 12px; text-align: center; color: var(--ink-3); font-size: 13.5px; line-height: 1.45; border: 1px dashed var(--line-2); border-radius: 12px; overflow: hidden; }
+
+    /* The footer: the pager at the start, the page's "New …" at the end. On a narrow card the button is its plus alone. */
+    .dk-pagecard .dk-pf .dk-card-pager { display: inline-flex; align-items: center; gap: 8px; min-width: 0; white-space: nowrap; }
+    .dk-card-new { flex: none; margin-inline-start: auto; max-width: 60%; }
+    .dk-card-new span { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    @container panel (max-width: 419px) {
+        .dk-card-new { width: 32px; padding-inline: 0; justify-content: center; }
+        .dk-card-new span { display: none; }
+    }
+    /* Where the records are not shown (two row units, not wide) their count is not either. */
+    @container panel (max-width: 513px) { .dk-pagecard[data-rows="2"] .dk-card-pager { display: none; } }
+
+    /* Narrow: the badge gives way before the record's name does */
+    @container pb (max-width: 279px) { .dk-card-b { max-width: 88px; } }
+    @container pb (max-width: 219px) { .dk-card-b { display: none; } }
+    /* A narrow record with a bar: the bar's colour already says its state, so the pill gives its room to the name. */
+    @container pb (max-width: 339px) {
+        /* Where colour already says the state (a bar, an edge, a date leaf), the pill gives its room to the name. */
+        .dk-card-row:has(> .dk-card-r) > .dk-card-b, :is([data-layout="tagged"], [data-layout="agenda"]) .dk-card-b { display: none; }
+        .dk-card-e small { display: none; }
+        /* An amount keeps its currency. */
+        [data-layout="ledger"] .dk-card-e small { display: block; }
+        .dk-card-l { margin-inline-end: 10px; }
+    }
+
+    /* Two row units, not wide: the figures alone, larger, in the middle of the card */
+    @container pb (max-width: 479px) {
+        .dk-pagecard[data-rows="2"] .dk-card:has(> .dk-card-figs) { --fig-h: 54px; justify-content: center; }
+        .dk-pagecard[data-rows="2"] .dk-card:has(> .dk-card-figs) > :is(.dk-card-rows, .dk-card-empty) { display: none; }
+        .dk-pagecard[data-rows="2"] .dk-card-fig dd { font-size: 30px; line-height: 36px; }
+    }
+    .dk-pagecard:is([data-rows="2"], [data-rows="3"]) .dk-card-split { display: none; }
+
+    /* A list with room for it puts a record on one line: name, detail, state, each in its own column down the list */
+    @container rows (min-width: 440px) {
+        .dk-card-row { min-height: 40px; grid-template-columns: auto minmax(0, 1.35fr) minmax(0, 1fr) auto 134px; grid-template-areas: "l t m e b"; }
+        .dk-card-rows:not(:has(.dk-card-b)) .dk-card-row { grid-template-columns: auto minmax(0, 1.35fr) minmax(0, 1fr) auto; grid-template-areas: "l t m e"; }
+        .dk-card-row:not(:has(.dk-card-m)) > .dk-card-t { grid-row: auto; }
+        .dk-card-m { margin-inline-start: 12px; }
+        /* A record with a bar: name over detail, the bar in the middle column. */
+        .dk-card-row:has(> .dk-card-r) { grid-template-areas: "l t r e b" "l m r e b"; }
+        .dk-card-rows:not(:has(.dk-card-b)) .dk-card-row:has(> .dk-card-r) { grid-template-areas: "l t r e" "l m r e"; }
+        .dk-card-row:has(> .dk-card-r) > .dk-card-m { margin-inline-start: 0; }
+        .dk-card-row > .dk-card-r { margin-block-start: 0; margin-inline-start: 16px; }
+        [data-layout="tagged"] .dk-card-row::before { grid-area: 1 / 1 / -1 / 2; }
+    }
+
+    /* From 480px the summary stands beside the records, so a wide card reads like its page, not a stretched list */
+    @container pb (min-width: 480px) {
+        .dk-card { display: grid; grid-template-columns: minmax(200px, 30%) minmax(0, 1fr); grid-template-rows: auto minmax(0, 1fr); grid-template-areas: "figs rows" "split rows"; column-gap: 24px; row-gap: 14px; }
+        .dk-card-figs { grid-area: figs; height: auto; max-height: calc(4 * var(--fig-h) + 3 * 12px); gap: 12px 16px; align-content: flex-start; }
+        .dk-card-fig { flex: 1 1 30%; }
+        .dk-card-fig:nth-child(n) { padding-inline-start: 0; border-inline-start: 0; }
+        .dk-card-split { grid-area: split; align-self: start; }
+        .dk-card > :is(.dk-card-rows, .dk-card-empty) { grid-area: rows; }
+        .dk-card > .dk-card-rows > li:first-child { border-top: 0; }
+        /* Two row units hold one line of figures beside the first records */
+        .dk-pagecard[data-rows="2"] .dk-card-figs { height: var(--fig-h); align-self: center; grid-row: 1 / -1; }
+        .dk-pagecard[data-rows="2"] .dk-card-fig { flex: 0 1 auto; }
+        .dk-pagecard[data-rows="2"] .dk-card-fig:not(:first-child) { padding-inline-start: 16px; border-inline-start: 1px solid var(--line); }
+    }
+    @container pb (min-width: 900px) {
+        .dk-card { grid-template-columns: minmax(240px, 26%) minmax(0, 1fr); column-gap: 32px; }
+    }
+
+    /* ── A card's own picture (x-desk.card-hero, PageCard::hero) ──────
+     * One headline figure, then the visual that fits the page. On a narrow
+     * card it is a fixed band over the records; from 480px it is the card's
+     * first column, as tall as the card. */
+    .dk-hero { --hero-h: 108px; flex: none; min-width: 0; height: var(--hero-h); display: flex; flex-direction: column; gap: 8px; overflow: hidden; }
+    .dk-hero [data-tone], .dk-hero[data-tone] { --tone: var(--ink-3); }
+    .dk-hero [data-tone="good"], .dk-hero[data-tone="good"] { --tone: var(--good); }
+    .dk-hero [data-tone="warn"], .dk-hero[data-tone="warn"] { --tone: var(--warn); }
+    .dk-hero [data-tone="critical"], .dk-hero[data-tone="critical"] { --tone: var(--bad); }
+    .dk-hero [data-tone="active"], .dk-hero[data-tone="active"] { --tone: var(--active); }
+    .dk-hero [data-tone="neutral"] { --tone: var(--ink-3); }
+    .dk-hero-head { flex: none; margin: 0; display: flex; align-items: baseline; gap: 8px; min-width: 0; }
+    .dk-hero-head strong { flex: none; font-size: 26px; font-weight: 800; letter-spacing: -.02em; line-height: 30px; color: var(--ink); }
+    .dk-hero[data-tone="critical"] .dk-hero-head strong:not(:is([data-hero="flow"] *)) { color: var(--bad); }
+    [data-hero="flow"][data-tone="critical"] .dk-hero-head strong { color: var(--bad); }
+    .dk-hero-head span { min-width: 0; font-size: 12.5px; font-weight: 600; color: var(--ink-3); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .dk-hero > :not(.dk-hero-head) { flex: 1 1 auto; min-height: 0; min-width: 0; margin: 0; padding: 0; list-style: none; }
+
+    /* Strategies: every strategy's years on one ruler, today marked. */
+    .dk-hero-ruler { position: relative; display: flex; flex-direction: column; justify-content: flex-end; gap: 5px; padding-block-end: 16px !important; }
+    .dk-hero-span { position: relative; display: block; height: 16px; margin-inline-start: var(--from); width: calc(var(--to) - var(--from)); border-radius: 5px; background: color-mix(in srgb, var(--tone) 22%, transparent); box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--tone) 45%, transparent); }
+    .dk-hero-span b { position: absolute; inset-inline-start: 6px; inset-block: 0; display: flex; align-items: center; font-size: 10.5px; font-weight: 800; color: var(--ink-2); white-space: nowrap; }
+    .dk-hero-ticks { position: absolute; inset-inline: 0; inset-block-end: 0; height: 14px; border-top: 1px solid var(--line); }
+    .dk-hero-ticks i { position: absolute; inset-inline-start: var(--at); translate: -50% 0; font-style: normal; font-size: 9.5px; font-weight: 700; color: var(--ink-3); line-height: 14px; }
+    [dir="rtl"] .dk-hero-ticks i { translate: 50% 0; }
+    .dk-hero-ticks i:first-child { translate: 0; }
+    .dk-hero-now { position: absolute; inset-inline-start: var(--now); inset-block: 0 12px; width: 2px; border-radius: 2px; background: var(--brand); }
+
+    /* Programs (a ring) and indicators (a gauge): one share at a glance, its parts beside it. */
+    .dk-hero-meter { display: flex; align-items: center; gap: 14px; }
+    .dk-hero-dial { flex: none; position: relative; width: 62px; aspect-ratio: 1; border-radius: 50%; background: conic-gradient(var(--tone) calc(var(--share) * 1%), var(--sunk) 0); }
+    .dk-hero-dial::after { content: ""; position: absolute; inset: 9px; border-radius: 50%; background: var(--paper); }
+    [data-hero="gauge"] .dk-hero-dial { width: 76px; aspect-ratio: 2 / 1; border-radius: 76px 76px 0 0; background: conic-gradient(from 270deg at 50% 100%, var(--tone) calc(var(--share) * 1.8deg), var(--sunk) 0 180deg, transparent 0); }
+    [data-hero="gauge"] .dk-hero-dial::after { inset: 11px 11px 0; border-radius: 60px 60px 0 0; }
+    [data-hero="ring"] .dk-hero-dial { --tone: var(--good); }
+    .dk-hero-legend { min-width: 0; display: grid; gap: 4px; margin: 0; padding: 0; list-style: none; }
+    .dk-hero-legend li { display: flex; align-items: center; gap: 7px; min-width: 0; font-size: 12px; color: var(--ink-2); }
+    .dk-hero-legend i { flex: none; width: 8px; height: 8px; border-radius: 2px; background: var(--tone); }
+    .dk-hero-legend span { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .dk-hero-legend b { margin-inline-start: auto; font-weight: 800; color: var(--ink); }
+
+    /* Annual plans by year, activity by day: columns. */
+    .dk-hero-cols { display: flex; align-items: stretch; gap: 6px; }
+    .dk-hero-cols li { flex: 1 1 0; min-width: 0; display: flex; flex-direction: column; justify-content: flex-end; align-items: center; gap: 3px; }
+    .dk-hero-cols i { width: 100%; max-width: 34px; height: max(3px, calc(var(--share) * .44px)); border-radius: 4px 4px 1px 1px; background: color-mix(in srgb, var(--tone) 40%, var(--sunk)); }
+    .dk-hero-cols li.dk-on i { background: var(--tone); }
+    .dk-hero-cols b { font-size: 11.5px; font-weight: 800; color: var(--ink-2); }
+    .dk-hero-cols span { font-size: 10.5px; font-weight: 700; color: var(--ink-3); }
+    .dk-hero-cols li.dk-on :is(b, span) { color: var(--ink); }
+    [data-hero="pulse"] .dk-hero-cols { gap: 3px; }
+    [data-hero="pulse"] .dk-hero-cols i { max-width: none; height: max(2px, calc(var(--share) * .52px)); border-radius: 3px; }
+
+    /* Results: impact over outcomes over outputs, as a pyramid. */
+    .dk-hero-pyramid { display: flex; flex-direction: column; justify-content: center; align-items: center; gap: 3px; }
+    .dk-hero-pyramid li { width: var(--share); min-width: 0; flex: 0 1 22px; min-height: 13px; display: flex; align-items: center; justify-content: space-between; gap: 6px; padding-inline: 9px; border-radius: 6px; background: color-mix(in srgb, var(--tone) 26%, var(--paper)); box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--tone) 50%, transparent); font-size: 11px; font-weight: 700; color: var(--ink); }
+    .dk-hero-pyramid span { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+    /* Measures, currencies, categories: counted chips. */
+    .dk-hero-chips { display: flex; flex-wrap: wrap; align-content: flex-start; gap: 6px; overflow: hidden; }
+    .dk-hero-chips li { display: inline-flex; align-items: baseline; gap: 6px; min-width: 0; max-width: 100%; padding: 6px 10px; border-radius: 10px; background: color-mix(in srgb, var(--tone) 12%, var(--paper)); box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--tone) 32%, transparent); }
+    .dk-hero-chips b { font-size: 16px; font-weight: 800; color: var(--ink); }
+    .dk-hero-chips span { min-width: 0; font-size: 11.5px; font-weight: 700; color: var(--ink-2); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    /* Accounts: a coin per currency, its accounts counted on it. */
+    [data-hero="coins"] .dk-hero-chips li { flex-direction: column; align-items: center; justify-content: center; gap: 0; width: 52px; height: 52px; padding: 0; border-radius: 50%; box-shadow: inset 0 0 0 2px color-mix(in srgb, var(--tone) 45%, transparent); }
+    [data-hero="coins"] .dk-hero-chips b { order: 2; font-size: 11px; color: var(--ink-3); }
+    [data-hero="coins"] .dk-hero-chips span { order: 1; font-size: 12px; font-weight: 800; color: var(--tone); }
+    /* Risk categories: quiet tags. */
+    [data-hero="tags"] .dk-hero-chips li { padding: 4px 9px; border-radius: 99px; }
+    [data-hero="tags"] .dk-hero-chips b { font-size: 12.5px; }
+
+    /* Reports: where they stand along the way. */
+    .dk-hero-flow { display: flex; align-items: stretch; gap: 4px; }
+    .dk-hero-flow li { position: relative; flex: 1 1 0; min-width: 0; display: flex; flex-direction: column; justify-content: center; gap: 2px; padding-inline: 8px 12px; border-radius: 8px; background: color-mix(in srgb, var(--tone) 12%, var(--paper)); clip-path: polygon(0 0, calc(100% - 8px) 0, 100% 50%, calc(100% - 8px) 100%, 0 100%, 8px 50%); }
+    .dk-hero-flow li:first-child { clip-path: polygon(0 0, calc(100% - 8px) 0, 100% 50%, calc(100% - 8px) 100%, 0 100%); }
+    [dir="rtl"] .dk-hero-flow li { clip-path: polygon(8px 0, 100% 0, calc(100% - 8px) 50%, 100% 100%, 8px 100%, 0 50%); }
+    [dir="rtl"] .dk-hero-flow li:first-child { clip-path: polygon(8px 0, 100% 0, 100% 100%, 8px 100%, 0 50%); }
+    .dk-hero-flow li:not(:first-child) { padding-inline-start: 14px; }
+    .dk-hero-flow b { font-size: 17px; font-weight: 800; color: var(--ink); }
+    .dk-hero-flow span { font-size: 10.5px; font-weight: 700; color: var(--ink-3); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+    /* Donor reports: the next eight weeks, a pip per report due. */
+    .dk-hero-weeks { display: flex; align-items: stretch; gap: 4px; }
+    .dk-hero-weeks li { flex: 1 1 0; min-width: 0; display: flex; flex-direction: column; justify-content: flex-end; align-items: center; gap: 4px; padding-block-end: 2px; border-radius: 6px; background: var(--sunk); }
+    .dk-hero-weeks li > span:last-child { font-size: 9.5px; font-weight: 700; color: var(--ink-3); white-space: nowrap; }
+    .dk-hero-pips { display: flex; flex-wrap: wrap; justify-content: center; gap: 3px; }
+    .dk-hero-pips i { width: 7px; height: 7px; border-radius: 50%; background: var(--tone); }
+
+    /* Agreements: the money, per currency, with its weight. */
+    .dk-hero-money { display: grid; align-content: center; gap: 6px; }
+    .dk-hero-money li { display: grid; grid-template-columns: auto auto 1fr; align-items: baseline; column-gap: 6px; row-gap: 3px; min-width: 0; }
+    .dk-hero-money b { font-size: 16px; font-weight: 800; color: var(--ink); }
+    .dk-hero-money span { font-size: 11px; font-weight: 800; color: var(--good); }
+    .dk-hero-money small { justify-self: end; font-size: 11px; color: var(--ink-3); white-space: nowrap; }
+    .dk-hero-money i { grid-column: 1 / -1; grid-row: 2; height: 4px; border-radius: 4px; background: linear-gradient(to right, var(--good) var(--share), var(--sunk) 0); }
+    [dir="rtl"] .dk-hero-money i { background: linear-gradient(to left, var(--good) var(--share), var(--sunk) 0); }
+
+    /* Users: who is here, and their roles. */
+    .dk-hero-faces { display: flex; flex-direction: column; justify-content: center; gap: 8px; }
+    .dk-hero-stack { display: flex; }
+    .dk-hero-stack i { width: 30px; height: 30px; margin-inline-end: -4px; border-radius: 50%; display: grid; place-items: center; font-style: normal; font-size: 11px; font-weight: 800; color: #fff; background: var(--av, var(--ink-3)); box-shadow: 0 0 0 2px var(--paper); }
+    .dk-hero-stack [data-tone="tone-0"] { --av: #5b6cd9; } .dk-hero-stack [data-tone="tone-1"] { --av: #2f9e8f; } .dk-hero-stack [data-tone="tone-2"] { --av: #c2703d; }
+    .dk-hero-stack [data-tone="tone-3"] { --av: #a2559b; } .dk-hero-stack [data-tone="tone-4"] { --av: #3f88c5; } .dk-hero-stack [data-tone="tone-5"] { --av: #7a8a3a; }
+    [data-hero="faces"] .dk-hero-chips li { padding: 3px 8px; border-radius: 99px; }
+    [data-hero="faces"] .dk-hero-chips b { font-size: 12.5px; }
+
+    /* Cities: the three with most work, on a podium. */
+    .dk-hero-podium { display: flex; align-items: flex-end; justify-content: center; gap: 6px; }
+    .dk-hero-podium li { flex: 1 1 0; max-width: 96px; min-width: 0; display: flex; flex-direction: column; align-items: center; gap: 3px; height: 100%; justify-content: flex-end; }
+    .dk-hero-podium span { max-width: 100%; font-size: 11px; font-weight: 700; color: var(--ink-2); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .dk-hero-podium i { width: 100%; height: max(18px, calc(var(--share) * .42px)); display: grid; place-items: start center; padding-block-start: 3px; border-radius: 7px 7px 2px 2px; background: color-mix(in srgb, var(--tone) 30%, var(--paper)); box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--tone) 50%, transparent); font-style: normal; }
+    .dk-hero-podium li:nth-child(2) i { background: color-mix(in srgb, var(--tone) 55%, var(--paper)); }
+    .dk-hero-podium b { font-size: 13px; font-weight: 800; color: var(--ink); }
+
+    /* Sectors: a bubble each, sized by its projects. */
+    .dk-hero-bubbles { display: flex; flex-wrap: wrap; align-items: center; align-content: center; gap: 6px; overflow: hidden; }
+    .dk-hero-bubbles li { --d: calc(26px + var(--share) * .3px); width: var(--d); height: var(--d); border-radius: 50%; display: grid; place-items: center; background: color-mix(in srgb, var(--tone) 22%, var(--paper)); box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--tone) 50%, transparent); }
+    .dk-hero-bubbles b { font-size: 12px; font-weight: 800; color: var(--ink); }
+    .dk-hero-bubbles span { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); }
+
+    /* Evidence types: a square each, filled where it is in use. */
+    .dk-hero-waffle { display: flex; flex-wrap: wrap; align-content: center; gap: 5px; overflow: hidden; }
+    .dk-hero-waffle li { width: 22px; height: 22px; border-radius: 6px; background: var(--sunk); box-shadow: inset 0 0 0 1px var(--line-2); }
+    .dk-hero-waffle li.dk-on { background: var(--active); box-shadow: none; }
+    .dk-hero-waffle span { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); }
+
+    /* Narrative questions: how often each is asked, a dot per question. */
+    .dk-hero-dots { display: grid; align-content: center; gap: 8px; }
+    .dk-hero-dots li { display: grid; grid-template-columns: minmax(0, 1fr) auto auto; align-items: center; gap: 8px; font-size: 12px; font-weight: 700; color: var(--ink-2); }
+    .dk-hero-dots li > span:first-child { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .dk-hero-dots .dk-hero-pips i { width: 9px; height: 9px; }
+    .dk-hero-dots b { min-width: 16px; text-align: end; font-weight: 800; color: var(--ink); }
+
+    /* Narrow: every other year and week is labelled, so labels never collide; chips are compact. */
+    @container pb (max-width: 479px) {
+        .dk-hero-ticks i:nth-child(even) { display: none; }
+        .dk-hero-weeks li:nth-child(even) > span:last-child { visibility: hidden; }
+        [data-hero="tally"] .dk-hero-chips { gap: 4px; }
+        [data-hero="tally"] .dk-hero-chips li { padding: 3px 8px; border-radius: 8px; }
+        [data-hero="tally"] .dk-hero-chips b { font-size: 13.5px; }
+    }
+    .dk-hero-weeks li { background: color-mix(in srgb, var(--sunk) 55%, transparent); box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--line) 60%, transparent); }
+
+    /* Two row units, narrow: the picture alone. */
+    .dk-pagecard[data-rows="2"] .dk-hero { --hero-h: 100%; }
+    /* Two row units are about 120px: the tallest pictures tighten to fit whole. */
+    .dk-pagecard[data-rows="2"] .dk-hero { gap: 6px; }
+    .dk-pagecard[data-rows="2"] .dk-hero-pyramid { gap: 2px; }
+    .dk-pagecard[data-rows="2"] .dk-hero-pyramid li { font-size: 10px; }
+    .dk-pagecard[data-rows="2"] [data-hero="faces"] .dk-hero-chips { display: none; }
+    .dk-pagecard[data-rows="2"] .dk-hero-podium i { height: max(20px, calc(var(--share) * .26px)); padding-block-start: 2px; }
+    .dk-pagecard[data-rows="2"] .dk-hero-podium b { line-height: 16px; }
+    .dk-pagecard[data-rows="2"] .dk-hero-bubbles li { --d: calc(24px + var(--share) * .18px); }
+    .dk-pagecard[data-rows="2"] .dk-hero-bubbles { flex-wrap: nowrap; }
+    .dk-pagecard[data-rows="2"] .dk-hero-bubbles li:nth-child(n + 6) { display: none; }
+    @container pb (max-width: 479px) {
+        .dk-pagecard[data-rows="2"] .dk-card:has(> .dk-hero) > :is(.dk-card-rows, .dk-card-empty) { display: none; }
+    }
+    /* Wide: the picture is the first column, as tall as the card gives. */
+    @container pb (min-width: 480px) {
+        .dk-card > .dk-hero { grid-area: figs; grid-row: 1 / -1; height: auto; max-height: 100%; --hero-h: auto; }
+        .dk-card:has(> .dk-hero) > .dk-hero > :not(.dk-hero-head) { max-height: 170px; }
+        .dk-pagecard[data-rows="2"] .dk-card > .dk-hero > :not(.dk-hero-head) { max-height: none; }
+    }
+
+    /* ── Buttons on the Desk ──────────────────────────────────────── */
+    .dk-tile { container: tile / size; padding: 0; overflow: visible; }
+    .dk-tile-a { position: relative; flex: 1 1 auto; min-height: 0; display: grid; grid-template-columns: auto minmax(0, 1fr) auto; align-items: center; gap: 12px; padding-block: 0; padding-inline: 16px 44px; border-radius: inherit; color: inherit; text-decoration: none; cursor: pointer; -webkit-touch-callout: none; -webkit-user-select: none; user-select: none; -webkit-user-drag: none; touch-action: pan-y; }
+    .dk-tile-a:focus-visible { outline: 2px solid var(--line-2); outline-offset: 2px; }
+    .dk-tile-ic { position: relative; flex: none; width: 40px; height: 40px; border-radius: 11px; display: grid; place-items: center; background: var(--sunk); color: var(--ink-2); transition: background .15s, color .15s, transform .15s; }
+    .dk-tile-ic > svg { width: 21px; height: 21px; }
+    .dk-tile-plus { position: absolute; inset-block-end: -4px; inset-inline-end: -4px; width: 17px; height: 17px; border-radius: 50%; display: grid; place-items: center; background: var(--brand); color: var(--on-brand); box-shadow: 0 0 0 2px var(--paper); }
+    .dk-tile-plus svg.dk-i { width: 11px; height: 11px; stroke-width: 3; }
+    .dk-tile-action .dk-tile-ic { background: var(--brand-soft); color: var(--brand-ink); }
+    .dk-tile-t { min-width: 0; display: grid; gap: 1px; }
+    .dk-tile-t strong { font-size: 15px; font-weight: 800; line-height: 1.3; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .dk-tile-t small { font-size: 12.5px; color: var(--ink-3); line-height: 1.35; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .dk-tile-go { color: var(--ink-3); display: grid; place-items: center; transition: transform .18s cubic-bezier(.2, .8, .2, 1), color .15s; }
+    .dk-tile-go svg.dk-i { width: 18px; height: 18px; }
+    .dk-tile:hover { box-shadow: 0 1px 2px color-mix(in srgb, var(--ink) 6%, transparent), 0 14px 30px -16px color-mix(in srgb, var(--ink) 30%, transparent); }
+    .dk-tile:hover .dk-tile-go { color: var(--ink); transform: translateX(3px); }
+    [dir="rtl"] .dk-tile:hover .dk-tile-go { transform: translateX(-3px); }
+    .dk-tile-action:hover .dk-tile-ic { background: var(--brand); color: var(--on-brand); }
+    .dk-tile-a:active .dk-tile-ic { transform: scale(.94); }
+    .dk-tile-menu { position: absolute; z-index: 2; inset-block-start: 50%; inset-inline-end: 8px; translate: 0 -50%; opacity: 0; transition: opacity .15s; }
+    .dk-tile:hover .dk-tile-menu, .dk-tile:focus-within .dk-tile-menu, .dk-tile-menu:has([aria-expanded="true"]) { opacity: 1; }
+    .dk-tile-menu .dk-pop { top: calc(100% + 4px); }
+    @media (hover: none) { .dk-tile-menu { opacity: 1; } }
+
+    /* A narrow button: the name alone beside its icon */
+    @container tile (max-width: 239px) {
+        .dk-tile-a { padding-inline: 12px 40px; gap: 10px; }
+        .dk-tile-t small, .dk-tile-go { display: none; }
+        .dk-tile-a { grid-template-columns: auto minmax(0, 1fr); }
+        .dk-tile-ic { width: 34px; height: 34px; }
+    }
+    /* A tall button stands up: icon at the top, the name and what it does under it, the arrow at the end */
+    @container tile (min-height: 150px) {
+        .dk-tile-a { grid-template-columns: minmax(0, 1fr) auto; grid-template-rows: 1fr auto; grid-template-areas: "ic ic" "t go"; align-items: end; padding: 18px; gap: 10px; }
+        .dk-tile-ic { grid-area: ic; align-self: start; width: 48px; height: 48px; border-radius: 14px; }
+        .dk-tile-ic > svg { width: 25px; height: 25px; }
+        .dk-tile-t { grid-area: t; }
+        .dk-tile-t strong { font-size: 17px; white-space: normal; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; }
+        .dk-tile-t small { white-space: normal; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; }
+        .dk-tile-go { grid-area: go; display: grid; }
+        .dk-tile-menu { inset-block-start: 12px; translate: none; }
+    }
+    @container tile (min-height: 300px) and (min-width: 300px) {
+        .dk-tile-a { padding: 26px; }
+        .dk-tile-ic { width: 64px; height: 64px; border-radius: 18px; }
+        .dk-tile-ic > svg { width: 32px; height: 32px; }
+        .dk-tile-t strong { font-size: 22px; }
+        .dk-tile-t small { font-size: 14px; }
+    }
+
+    /* ── Desk tabs ────────────────────────────────────────────────── */
+    /* A pill track (user decision 2026-11-10): the open tabs sit in one soft rounded rail and the tab in
+       front is a raised paper pill with its icon in the brand colour. The row is pulled up over main's 28px
+       top padding (desk-shell.css `.dk-scope main`) so it always sits flush under the top bar, on the Desk
+       and over a tab alike, and the frames below start exactly where it ends: nothing slides under it. */
+    .dk-tabs { position: relative; }
+    .dk-tabs.dk-tabs-on { margin-block-start: -28px; }
+    .dk-tabs-bar { position: sticky; z-index: 26; top: var(--top-h); display: flex; align-items: center; gap: 12px; height: var(--tabs-h); margin-block-end: 8px; background: var(--ground); }
+    /* Once the Desk scrolls under the row, a hairline separates them. */
+    @supports (animation-timeline: scroll()) {
+        .dk-tabs-bar { animation: dk-tabs-edge linear both; animation-timeline: scroll(root block); animation-range: 0 24px; }
+        @keyframes dk-tabs-edge { from { box-shadow: 0 1px 0 transparent; } to { box-shadow: 0 1px 0 var(--line); } }
+    }
+    .dk-tabs-strip { flex: 0 1 auto; min-width: 0; display: flex; align-items: center; gap: 2px; padding: 4px; border-radius: 13px; background: var(--sunk); overflow-x: auto; overflow-y: hidden; scrollbar-width: none; overscroll-behavior-x: contain; }
+    .dk-tabs-strip::-webkit-scrollbar { display: none; }
+    .dk-tab { position: relative; flex: 0 1 210px; min-width: 112px; height: 38px; display: flex; align-items: center; border-radius: 9px; color: var(--ink-3); transition: color .15s, background-color .15s, box-shadow .15s; }
+    .dk-tab-desk { flex: none; min-width: 0; }
+    .dk-tab:hover { color: var(--ink); background: color-mix(in srgb, var(--paper) 55%, transparent); }
+    .dk-tab.dk-on { color: var(--ink); background: var(--paper); box-shadow: 0 1px 2px rgb(0 0 0 / .08), 0 0 0 1px var(--line); }
+    .dark .dk-tab.dk-on { box-shadow: 0 1px 2px rgb(0 0 0 / .4), 0 0 0 1px var(--line); }
+    .dk-tab-b { position: relative; flex: 1 1 auto; min-width: 0; height: 100%; display: flex; align-items: center; gap: 8px; padding-inline: 13px 4px; border: 0; border-radius: inherit; background: none; color: inherit; font: inherit; font-size: 14px; font-weight: 600; text-align: start; cursor: pointer; }
+    .dk-tab.dk-on .dk-tab-b { font-weight: 700; }
+    .dk-tab-desk .dk-tab-b { padding-inline: 13px; }
+    .dk-tab-b:focus-visible { outline: 2px solid var(--brand); outline-offset: -2px; }
+    .dk-tab-t { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .dk-tab-ic { flex: none; width: 16px; height: 16px; display: grid; place-items: center; color: inherit; opacity: .8; }
+    .dk-tab.dk-on .dk-tab-ic { color: var(--brand-ink); opacity: 1; }
+    .dk-tab-ic svg.dk-i, svg.dk-tab-ic { width: 16px; height: 16px; }
+    .dk-tab-spin { width: 14px; height: 14px; border-radius: 50%; border: 2px solid var(--line-2); border-top-color: var(--brand); }
+    @media (prefers-reduced-motion: no-preference) { .dk-tab-spin { animation: dk-tab-spin .7s linear infinite; } }
+    @keyframes dk-tab-spin { to { rotate: 360deg; } }
+    .dk-tab-x { position: relative; flex: none; width: 24px; height: 24px; margin-inline-end: 7px; border: 0; border-radius: 7px; background: none; color: var(--ink-3); display: grid; place-items: center; cursor: pointer; opacity: 0; transition: opacity .12s, background-color .12s, color .12s; }
+    .dk-tab-x svg.dk-i { width: 13px; height: 13px; }
+    .dk-tab:hover .dk-tab-x, .dk-tab.dk-on .dk-tab-x, .dk-tab-x:focus-visible { opacity: 1; }
+    .dk-tab-x:hover { background: var(--sunk); color: var(--brand); }
+    .dk-tab.dk-asleep .dk-tab-t { opacity: .75; }
+    .dk-tab.dk-dragging { opacity: .55; cursor: grabbing; }
+    .dk-tab:not(.dk-tab-desk) { animation: dk-tab-in .18s cubic-bezier(.2, .8, .2, 1); }
+    @keyframes dk-tab-in { from { opacity: 0; } }
+    @media (prefers-reduced-motion: reduce) { .dk-tab:not(.dk-tab-desk) { animation: none; } }
+    /* Reload, open on its own and close all: quiet icons at the row's end. */
+    .dk-tabs-tools { flex: none; display: flex; align-items: center; gap: 2px; margin-inline-start: auto; }
+    .dk-tabs-tools .dk-iconbtn { width: 36px; height: 36px; border-radius: 10px; color: var(--ink-3); }
+    .dk-tabs-tools .dk-iconbtn:hover { background: var(--sunk); color: var(--ink); }
+    /* A narrow window: tabs keep their icon and as much title as fits. */
+    @media (max-width: 640px) {
+        .dk-tabs-bar { gap: 6px; }
+        .dk-tab { min-width: 84px; }
+        .dk-tab-desk .dk-tab-t { display: none; }
+        .dk-tab-desk .dk-tab-b { padding-inline: 12px; }
+        .dk-tabs-tools .dk-iconbtn { width: 32px; height: 32px; }
+    }
+    .dk-tab-menu { position: fixed; z-index: 90; top: auto; inset-inline-end: auto; width: 260px; }
+
+    /* Carrying a page from the sidebar or the Ask bar (desk-drop.js): the tab bar shows even with no tab
+       open, ending in a dashed "drop here" pill. With no tab open it floats over the top of the Desk rather
+       than pushing it down mid-drag; its sides follow the page column (desk-shell.css --page-edge). */
+    .dk-tab-drop { display: none; }
+    .dk-tabs-droppable .dk-tabs-bar { display: flex !important; }
+    .dk-tabs-droppable:not(.dk-tabs-on) .dk-tabs-bar { position: fixed; inset-inline: var(--side-w) 0; top: var(--top-h); padding-inline: max(var(--page-gutter), calc((100vw - var(--side-w) - var(--page-w)) / 2)); box-shadow: 0 1px 0 var(--line); animation: none; }
+    @media (max-width: 899px) { .dk-tabs-droppable:not(.dk-tabs-on) .dk-tabs-bar { inset-inline-start: 0; } }
+    .dk-tabs-droppable .dk-tab-drop { flex: none; display: flex; align-items: center; gap: 8px; height: 38px; padding-inline: 14px; border: 1.5px dashed var(--brand); border-radius: 9px; color: var(--brand-ink); font-size: 13.5px; font-weight: 700; white-space: nowrap; transition: background-color .12s; }
+    .dk-tabs-droppable:not(.dk-tabs-on) :is(.dk-tab-desk, .dk-tabs-tools) { display: none; }
+    .dk-tabs-over .dk-tab-drop { border-style: solid; background: var(--sunk); }
+    /* The page in front is a frame: while something is carried it lets the drag through to the Desk around it. */
+    html.dk-carrying .dk-tabframe { pointer-events: none; }
+    /* Carried out of the Ask bar: the palette steps aside so the tab bar and Quick access can be seen. */
+    html.dk-carry-ask :is(.dk-pal-scrim, .dk-pal) { opacity: 0; pointer-events: none; transition: opacity .15s; }
+
+    /* ── Quick access (pages/desk/_quick-access, desk-quick.js) ───────
+     * A quiet paper button and, under it, a card of the same width that fades in as it drops 4px
+     * (140ms; reduced motion: it just appears). Two shared lines hold it together:
+     *  - start: the bolt tile and every row's icon tile are one 30px grey square 7px in from the edge
+     *    (button: border 1 + padding 6; list: border 1 + padding 4 + row 2), so the names line up;
+     *  - end: the button's count and every row's number are one 24px badge 7px in from the edge
+     *    (button: border 1 + padding 6; list: border 1 + padding 4 + 2), so the numbers line up.
+     * A row's × takes its number's place on hover. Colours: the site red and greys only. */
+    .dk-quick { --qa-w: 216px; --qa-r: 12px; position: relative; z-index: 30; flex: none; width: var(--qa-w); }
+    .dk-quick-none { display: none; }
+    html:is(.dk-carry-ask, .dk-carry-quick) .dk-quick-none { display: block; }
+
+    .dk-quick-b { display: flex; align-items: center; gap: 10px; width: 100%; height: 42px; padding-inline: 6px; border: 1px solid var(--line-2); border-radius: var(--qa-r); background: var(--paper); color: var(--ink); font: inherit; text-align: start; cursor: pointer; box-shadow: 0 1px 2px rgb(16 24 40 / .05); transition: background-color .15s; }
+    .dk-quick-b:hover, .dk-quick-open .dk-quick-b { background: var(--tint); }
+    .dk-quick-b:focus { outline: none; }
+    .dk-quick-b:focus-visible { background: var(--sunk); }
+    .dk-quick-ic, .dk-quick-rI { flex: none; width: 30px; height: 30px; display: grid; place-items: center; border-radius: 9px; background: var(--sunk); }
+    .dk-quick-ic { color: var(--brand); }
+    .dk-quick-ic svg.dk-i { width: 16px; height: 16px; fill: currentColor; stroke-width: 1.5; }
+    .dk-quick-l, .dk-quick-rT { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 14px; font-weight: 700; }
+    .dk-quick-n, .dk-quick-key { flex: none; width: 24px; height: 22px; display: grid; place-items: center; border-radius: 7px; font-family: inherit; font-size: 12px; font-weight: 800; }
+    .dk-quick-n { background: var(--ink); color: var(--paper); }
+
+    /* The list: its own card 6px under the button, the button's width. */
+    .dk-quick-pop { position: absolute; inset-inline: 0; inset-block-start: calc(100% + 6px); padding: 4px; border: 1px solid var(--line-2); border-radius: var(--qa-r); background: var(--paper); box-shadow: 0 16px 32px -16px rgb(16 24 40 / .3), 0 2px 6px rgb(16 24 40 / .05); visibility: hidden; opacity: 0; transform: translateY(-4px); transition: opacity .14s ease, transform .14s ease, visibility 0s .14s; }
+    .dk-quick-open .dk-quick-pop { visibility: visible; opacity: 1; transform: none; transition: opacity .14s ease, transform .14s ease; }
+    .dark .dk-quick-pop { box-shadow: 0 16px 32px -14px rgb(0 0 0 / .7); }
+    @media (prefers-reduced-motion: reduce) { .dk-quick-pop, .dk-quick-open .dk-quick-pop { transform: none; transition: none; } }
+
+    .dk-quick-list { display: grid; gap: 2px; list-style: none; }
+    .dk-quick-row { position: relative; display: flex; align-items: center; gap: 0; border-radius: 9px; transition: background-color .12s; }
+    .dk-quick-row:hover, .dk-quick-row:focus-within { background: var(--sunk); }
+    .dk-quick-row > a { flex: 1 1 auto; min-width: 0; display: flex; align-items: center; gap: 10px; height: 40px; padding-inline: 2px 8px; border-radius: 9px; color: var(--ink); text-decoration: none; outline: none; }
+    .dk-quick-row > a:focus-visible { box-shadow: inset 0 0 0 2px var(--ink-2); }
+    .dk-quick-rI { color: var(--ink-2); transition: background-color .12s, color .12s; }
+    .dk-quick-rI svg.dk-i { width: 14px; height: 14px; }
+    .dk-quick-row:is(:hover, :focus-within) .dk-quick-rI { background: var(--paper); color: var(--ink); }
+
+    /* The number at rest; on hover or focus the × takes its place in a badge of the same shape (always on touch).
+       A row is dragged by itself to reorder (no grip outside the card); the link inside keeps the pointer. */
+    .dk-quick-key { margin-inline-end: 2px; border: 1px solid var(--line-2); background: var(--paper); color: var(--ink-3); }
+    .dk-quick-x { flex: none; width: 24px; height: 22px; margin-inline-end: 2px; padding: 0; border: 1px solid var(--line-2); border-radius: 7px; background: var(--paper); color: var(--ink-3); display: none; place-items: center; cursor: pointer; transition: color .12s, border-color .12s; }
+    .dk-quick-x svg.dk-i { width: 10px; height: 10px; stroke-width: 2.4; }
+    .dk-quick-row:is(:hover, :focus-within) .dk-quick-key { display: none; }
+    .dk-quick-row:is(:hover, :focus-within) .dk-quick-x { display: grid; }
+    .dk-quick-x:hover, .dk-quick-x:focus-visible { border-color: var(--brand); color: var(--brand); outline: none; }
+    .dk-quick-row { cursor: grab; }
+    .dk-quick-row:active { cursor: grabbing; }
+    @media (hover: none) { .dk-quick-key { display: none; } .dk-quick-x { display: grid; } }
+    .dk-quick-row.dk-quick-moving { opacity: .4; }
+
+    /* Carrying a row from the Ask bar, or a sidebar page that is only a button (dk-carry-quick): a dashed target of the button's own size stands in for it. */
+    .dk-quick-drop { display: none; }
+    html:is(.dk-carry-ask, .dk-carry-quick) .dk-quick-b { display: none; }
+    html:is(.dk-carry-ask, .dk-carry-quick) .dk-quick-drop { display: flex; align-items: center; justify-content: center; gap: 8px; height: 42px; padding-inline: 12px; border: 1.5px dashed var(--brand); border-radius: var(--qa-r); background: var(--paper); color: var(--brand-ink); font-size: 12.5px; font-weight: 700; white-space: nowrap; transition: background-color .12s; }
+    .dk-quick-drop svg.dk-i { width: 17px; height: 17px; pointer-events: none; }
+    .dk-quick-drop span { pointer-events: none; overflow: hidden; text-overflow: ellipsis; }
+    .dk-quick-over .dk-quick-drop { border-style: solid; background: var(--sunk); }
+
+    /* The tab in front: the real page in its frame, filling the main column under the strip */
+    .dk-tabframes { position: fixed; z-index: 20; inset-block: calc(var(--top-h) + var(--tabs-h)) 0; inset-inline-start: var(--side-w); inset-inline-end: 0; background: var(--ground); }
+    @media (max-width: 899px) { .dk-tabframes { inset-inline-start: 0; } }
+    .dk-tabframe { position: absolute; inset: 0; width: 100%; height: 100%; border: 0; display: block; visibility: hidden; background: transparent; color-scheme: normal; }
+    .dk-tabframe.dk-on.dk-ready { visibility: visible; }
+    @media (prefers-reduced-motion: no-preference) { .dk-tabframe.dk-on.dk-ready { animation: dk-frame-in .16s ease-out; } }
+    @keyframes dk-frame-in { from { opacity: .4; } }
+    .dk-tabframe-warm { visibility: hidden !important; pointer-events: none; }
+    /* While the page in front draws for the first time: a quiet outline of a page, never a white flash */
+    .dk-tabframes::before { content: ""; position: absolute; inset: 28px var(--page-gutter) auto; height: 220px; border-radius: 18px; opacity: 0; transition: opacity .2s .12s; background:
+        linear-gradient(var(--sunk), var(--sunk)) 0 0 / 38% 26px no-repeat,
+        linear-gradient(var(--sunk), var(--sunk)) 0 54px / 22% 14px no-repeat,
+        linear-gradient(var(--sunk), var(--sunk)) 0 100px / 100% 110px no-repeat; }
+    .dk-tabframes.dk-loading::before { opacity: 1; }
+
+    /* While a tab is in front, the Desk under it rests: hidden, never re-rendered or re-scrolled */
+    html.dk-tab-active { overflow: hidden; }
+    html.dk-tab-active [data-desk] > :not(.dk-tabs), html.dk-tab-active .dk-foot { display: none !important; }
+
+    /* ── A page inside a tab: its own frame is gone (DeskTab, desk-tab-child.js) ── */
+    html.dk-in-tab :is(.dk-side, .dk-side-scrim, .dk-top, .dk-foot, [data-desk-ask-palette]) { display: none !important; }
+    html.dk-in-tab .dk-app { grid-template-columns: minmax(0, 1fr); }
+    html.dk-in-tab .dk-wrap { padding-block-start: 6px; }
+    /* No top bar above a page in a tab: whatever sticks under it sticks to the top of the tab instead. */
+    html.dk-in-tab { --top-h: 0px; }
+    html.dk-in-tab .register { --register-sticky-top: 0px; }
+    html.dk-in-tab :is(.dk-rail, .dk-story .dk-pjtabs) { top: env(safe-area-inset-top, 0px); }
+    html.dk-in-tab .dk-ptk-rail { top: 8px; }
+    html.dk-in-tab .dk-story-side { top: 76px; }
+
+    /* ── Dragging a page in from the sidebar ──────────────────────── */
+    .dk-grid > .dk-drop-slot { display: grid; place-items: center; border: 2px dashed var(--brand); background: var(--paper); box-shadow: none; animation: none; -webkit-backdrop-filter: none; backdrop-filter: none; }
+    .dk-drop-slot-t { padding: 8px 14px; text-align: center; font-size: 14px; font-weight: 800; color: var(--brand-ink); overflow-wrap: anywhere; }
+    @media (prefers-reduced-motion: no-preference) { .dk-drop-slot.dk-drop-landing { animation: dk-landing 1s ease-in-out infinite alternate; } }
+    @keyframes dk-landing { to { background: var(--sunk); } }
+    .dk-grid > .dk-panel.dk-drop-ring { box-shadow: 0 0 0 3px var(--brand); }
+    @media (prefers-reduced-motion: no-preference) { .dk-grid > .dk-panel.dk-drop-found { animation: dk-found 1.2s ease; } }
+    @keyframes dk-found { 20%, 60% { box-shadow: 0 0 0 4px var(--brand); } }
+    html.dk-dropping .dk-grid { outline: 2px dashed var(--line-2); outline-offset: 10px; border-radius: 24px; }
+    .dk-drag-chip { position: fixed; inset-block-start: -400px; inset-inline-start: -400px; padding: 9px 14px; border-radius: 11px; background: var(--ink); color: var(--paper); font-family: var(--font); font-size: 13.5px; font-weight: 800; white-space: nowrap; box-shadow: var(--dk-shadow); }
+
+    /* The sidebar's "+" on My desk, beside the pin star */
+    .dk-side-ondesk .dk-side-li > .dk-side-a { padding-inline-end: 60px; }
+    .dk-side-ondesk .dk-side-flat .dk-side-li > .dk-side-a { padding-inline-end: 34px; }
+    .dk-side-add { position: absolute; top: 50%; inset-inline-end: 32px; transform: translateY(-50%); width: 24px; height: 24px; border: 0; border-radius: 6px; background: none; color: var(--faint); display: grid; place-items: center; cursor: pointer; opacity: 0; }
+    .dk-side-add:last-child { inset-inline-end: 6px; }
+    .dk-side-li:hover .dk-side-add, .dk-side-add:focus-visible { opacity: 1; }
+    .dk-side-add:hover { background: var(--brand-soft); color: var(--brand-ink); }
+    .dk-side-ondesk [data-desk-route] { -webkit-user-drag: element; }
+    .dk-side-ondesk .dk-side-fly .dk-side-a { padding-inline-end: 60px !important; }
+    @media (min-width: 900px) {
+        html:not(.dk-nav-open) .dk-side-all > .dk-side-g .dk-side-add { display: none !important; }
+        /* The icon rail has no room for the "+": its links stay centred squares (the room above pushed
+           Your desk, My reviews and Security off their highlight). A group's flyout keeps it. */
+        html:not(.dk-nav-open) .dk-side-ondesk .dk-side-a:not(.dk-side-fly .dk-side-a) { padding-inline: 0 !important; }
+        html:not(.dk-nav-open) .dk-side-ondesk .dk-side-add:not(.dk-side-fly .dk-side-add) { display: none !important; }
+    }
+
+    /* ── "Add to desk" in a page's header ─────────────────────────── */
+    .dk-addesk { position: relative; display: inline-flex; align-items: stretch; }
+    .dk-addesk-main svg.dk-i { width: 16px; height: 16px; }
+    .dk-addesk-main.dk-on { background: var(--sunk); border-color: var(--line); }
+    .dk-addesk-main.dk-on svg.dk-i { color: var(--brand-ink); fill: none; }
+    .dk-addesk-main:has(+ .dk-addesk-more) { border-start-end-radius: 0; border-end-end-radius: 0; }
+    .dk-addesk-more { padding-inline: 8px; margin-inline-start: -1px; border-start-start-radius: 0; border-end-start-radius: 0; }
+    .dk-addesk-pop { width: 310px; }
+    .dk-addesk-pop [role="menuitemcheckbox"] { display: flex; align-items: center; gap: 12px; width: 100%; min-height: 44px; padding: 8px 10px; border: 0; border-radius: 10px; background: none; color: var(--ink); font: inherit; text-align: start; cursor: pointer; }
+    .dk-addesk-pop [role="menuitemcheckbox"]:hover, .dk-addesk-pop [role="menuitemcheckbox"]:focus-visible { background: var(--sunk); outline: none; }
+    .dk-addesk-check { flex: none; width: 18px; height: 18px; border-radius: 5px; border: 1.5px solid var(--line-2); display: grid; place-items: center; color: transparent; }
+    .dk-addesk-check svg.dk-i { width: 12px; height: 12px; stroke-width: 3; }
+    [aria-checked="true"] > .dk-addesk-check { background: var(--ink); border-color: var(--ink); color: var(--paper); }
+
+    /* ── The Ask bar's instant rows (resources/js/ask-index.js) ───── */
+    .dk-pal-kind { flex: none; height: 22px; padding-inline: 8px; border-radius: 6px; display: inline-flex; align-items: center; font-size: 11.5px; font-weight: 800; background: var(--sunk); color: var(--ink-3); }
+    .dk-pal-kind:is([data-kind="add"], [data-kind="action"]) { background: var(--brand-soft); color: var(--brand-ink); }
+    .dk-pal-kind[data-kind="remove"] { background: var(--bad-soft); color: var(--bad); }
+    .dk-pal-done .dk-pal-kind { background: var(--good-soft); color: var(--good); }
+    .dk-pal-i mark { background: none; color: inherit; font-weight: 800; text-decoration: underline; text-decoration-color: var(--brand); text-decoration-thickness: 2px; text-underline-offset: 3px; }
+    .dk-pal-instant { display: grid; gap: 2px; }
+    .dk-pal-flash { margin: 0 10px 8px; padding: 9px 12px; border-radius: 10px; background: var(--ink); color: var(--paper); font-size: 13.5px; font-weight: 700; }
+    @media (max-width: 640px) { .dk-pal-foot-more { display: none; } }
+}

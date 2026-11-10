@@ -362,7 +362,7 @@ new #[Layout('layouts::desk'), Title('titles.narrative_questions')] class extend
 
 <x-desk.register class="@container/directory" heading-id="narrative-questions-heading" :title="__('titles.narrative_questions')" :count="$this->questions->count()" data-tour="narrative-questions-page">
     <x-slot:actions>
-        <x-ui.button tone="primary" icon="plus" class="min-h-11 self-end touch-manipulation @sm/directory:min-h-10" wire:click="openCreateModal" data-test="create-narrative-question" data-tour="narrative-questions-create">
+        <x-ui.button tone="primary" icon="plus" class="min-h-11 self-end touch-manipulation @sm/directory:min-h-10" wire:click="openCreateModal" data-test="create-narrative-question" data-tour="narrative-questions-create" data-quick-create>
             {{ __('narrative_questions.add_question') }}
         </x-ui.button>
     </x-slot:actions>

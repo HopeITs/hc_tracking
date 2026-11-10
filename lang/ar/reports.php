@@ -164,6 +164,8 @@ return [
         'indicator' => 'المؤشر',
         'pillar' => 'الركيزة',
         'year' => 'السنة',
+        'calendar_basis' => 'السنة التقويمية · من كانون الثاني إلى كانون الأول',
+        'grant_basis' => 'سنة المنحة · تبدأ في الشهر الأول للمنحة',
         'grant_year_label' => 'سنة المنحة',
         'grant_year' => 'السنة :year',
         'all_proposals' => 'كل المقترحات',

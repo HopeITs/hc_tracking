@@ -17,8 +17,16 @@
  * The draft keeps the Desk's rows flush (desk-rows.js): adding, removing,
  * moving and pulling an edge on the map never leave a hole, and the map shows
  * exactly the rows the Desk will have.
+ *
+ * Buttons ("New …" actions a-…, page buttons g-…) are never part of the
+ * draft: the Desk holds only panels and page cards. A click in the Buttons
+ * tab puts the button in Quick access at once ($wire.addQuickItem), and the
+ * tab hides what Quick access already holds (data-quick-items).
  */
 import { flush, resized, sameLayout } from './desk-rows';
+
+/** A Desk button: kept in Quick access, never on the Desk itself. */
+const isButton = (id) => /^[ag]-/.test(id);
 
 document.addEventListener('alpine:init', () => {
     window.Alpine.data('deskCustomize', (starting, ready = [], favourite = null, panels = {}, texts = {}) => ({
@@ -32,6 +40,7 @@ document.addEventListener('alpine:init', () => {
         browsed: false,
         resizing: null,
         search: '',
+        quick: [],
         signals: {},
         signalsAt: 0,
         signalsRead: false,
@@ -39,14 +48,17 @@ document.addEventListener('alpine:init', () => {
         suggested: favourite,
         suggestionReason: null,
 
-        openSheet(requestedPane = 'desk') {
+        openSheet(requestedPane = 'desk', layout = null) {
             this.saved = JSON.parse(this.$root.dataset.layout || '[]');
             this.draft = this.saved.map((entry) => ({ ...entry }));
+            this.quick = JSON.parse(this.$root.dataset.quickItems || '[]');
             this.resetting = false;
             this.selected = null;
             this.search = '';
             this.browsed = false;
-            this.viewing = this.suggested ?? ready[0]?.key ?? null;
+            // The Ask bar can ask for one layout ("layout money"): it opens looked at, one click from use.
+            this.viewing = ready.some((entry) => entry.key === layout) ? layout : this.suggested ?? ready[0]?.key ?? null;
+            this.browsed = this.viewing === layout;
             this.pane = requestedPane === 'layouts' && ready.length > 0 ? 'layouts' : 'desk';
             this.open = true;
             window.hcLockPageScroll?.();
@@ -223,8 +235,32 @@ document.addEventListener('alpine:init', () => {
             this.selected = null;
         },
 
+        /** A button goes straight to Quick access (no draft, no Done); anything else into the draft. */
+        pick(panel) {
+            if (! isButton(panel)) {
+                this.add(panel);
+
+                return;
+            }
+
+            if (this.quick.includes(panel)) {
+                return;
+            }
+
+            const offered = this.visibleControls('[data-customize-add] button');
+            const next = offered[offered.findIndex((button) => button.closest('[data-customize-add]').dataset.customizeAdd === panel) + 1];
+
+            this.quick = [...this.quick, panel];
+            this.$nextTick(() => (next ?? this.$refs.search).focus());
+            this.$wire.addQuickItem(panel).then((kept) => {
+                if (kept !== true) {
+                    this.quick = this.quick.filter((each) => each !== panel);
+                }
+            });
+        },
+
         add(panel) {
-            if (this.has(panel)) {
+            if (this.has(panel) || isButton(panel)) {
                 return;
             }
 
@@ -340,7 +376,9 @@ document.addEventListener('alpine:init', () => {
         },
 
         isAddable(panel) {
-            return ! this.has(panel) && this.matchesSearch(panels[panel]?.search ?? '');
+            const taken = isButton(panel) ? this.quick.includes(panel) : this.has(panel);
+
+            return ! taken && this.matchesSearch(panels[panel]?.search ?? '');
         },
 
         groupHasMatches(kind) {
@@ -349,6 +387,11 @@ document.addEventListener('alpine:init', () => {
 
         anyMatches() {
             return Object.keys(panels).some((panel) => this.isAddable(panel));
+        },
+
+        /** Remove all panels: an empty draft, kept only once Done saves it. */
+        clear() {
+            this.edit([]);
         },
 
         reset() {

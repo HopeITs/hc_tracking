@@ -372,7 +372,7 @@ new #[Layout('layouts::desk'), Title('titles.task')] class extends Component
         $canEditTask = auth()->user()->can('update', $this->task);
         $canUpdateTaskStatus = $canEditTask || auth()->user()->can('updateStatus', $this->task);
         $canRescheduleTask = $canEditTask && $this->task->created_by === auth()->id();
-        $canEditAttachments = $canEditTask;
+        $canEditAttachments = auth()->user()->can('manageFiles', $this->task);
     @endphp
 
     <x-ui.detail-header

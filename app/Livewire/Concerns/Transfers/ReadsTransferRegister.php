@@ -70,6 +70,28 @@ trait ReadsTransferRegister
     }
 
     /**
+     * The three states a person reads the ledger in, as SQL over the stage
+     * conditions. They are disjoint and together cover every tranche, so the
+     * headline counts always add up to the page's own count.
+     *
+     * @return array<string, string>
+     */
+    protected function focusSql(): array
+    {
+        $stages = $this->stageSql();
+
+        return [
+            // Money that misbehaved: late, failed, lost more than its fees, or
+            // arrived with nobody recording what arrived.
+            'attention' => '('.$stages['overdue'].' or '.$stages['failed'].' or '.$stages['short'].' or '.$stages['unrecorded'].')',
+            // Money still on its way, and nothing wrong with it yet.
+            'travelling' => '('.$stages['upcoming'].' or '.$stages['transit'].')',
+            // Arrived, fully accounted for.
+            'landed' => '('.$stages['received'].' and not '.$stages['short'].' and not '.$stages['unrecorded'].')',
+        ];
+    }
+
+    /**
      * Tranches matching every active filter, with no ordering and no eager
      * loads, so the table, its totals, the Overview ledger and the export all
      * build on it.
@@ -79,10 +101,11 @@ trait ReadsTransferRegister
      *
      * @return Builder<TransfersTracking>
      */
-    protected function filteredQuery(bool $withStage = true): Builder
+    protected function filteredQuery(bool $withStage = true, bool $withFocus = true): Builder
     {
         $search = trim($this->search);
         $stages = $this->stageSql();
+        $focuses = $this->focusSql();
 
         return TransfersTracking::query()
             ->when($search !== '', function (Builder $query) use ($search): void {
@@ -102,6 +125,10 @@ trait ReadsTransferRegister
             ->when($this->max !== '', fn (Builder $query) => $query->where('transfers_tracking.payment_amount', '<=', (float) $this->max))
             ->when($this->flag === 'converted', fn (Builder $query) => $query->converted())
             ->when($this->flag === 'no_account', fn (Builder $query) => $query->whereNull('transfers_tracking.account_id'))
+            ->when(
+                $withFocus && array_key_exists($this->focus, $focuses),
+                fn (Builder $query) => $query->whereRaw($focuses[$this->focus]),
+            )
             ->when(
                 $withStage && array_key_exists($this->stage, $stages),
                 fn (Builder $query) => $query->whereRaw($stages[$this->stage]),

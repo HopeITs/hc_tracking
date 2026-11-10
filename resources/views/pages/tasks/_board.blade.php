@@ -39,8 +39,11 @@
 <div class="flex flex-col gap-4 @2xl/directory:flex-row @2xl/directory:flex-wrap @6xl/directory:flex-nowrap" x-data="taskSubtaskScope">
     @foreach (TaskStatus::cases() as $case)
         @php
-            $columnTasks = $allTasks->where('status', $case)->values();
-            $isColumnEmpty = $columnTasks->isEmpty();
+            $columnAll = $allTasks->where('status', $case)->values();
+            $columnTotal = $columnAll->count();
+            $columnTasks = $columnAll->take($this->boardCardLimit($case));
+            $columnHidden = $columnTotal - $columnTasks->count();
+            $isColumnEmpty = $columnAll->isEmpty();
         @endphp
 
         <div
@@ -58,6 +61,9 @@
                 dragOver = false;
                 const dragged = JSON.parse($event.dataTransfer.getData('text/plain') || '{}');
                 if (dragged.id && dragged.status !== '{{ $case->value }}') {
+                    {{-- Move the card at once; the server's answer then confirms it, or puts it back if refused. --}}
+                    const card = document.querySelector(`[data-task-id='${dragged.id}']`);
+                    $el.querySelector('[data-test=task-board-cards-{{ $case->value }}]')?.prepend(card);
                     $wire.quickSetStatus(dragged.id, '{{ $case->value }}');
                 }
             "
@@ -72,7 +78,7 @@
                 {{-- Wide layout only: the empty column as a narrow vertical strip. --}}
                 <div class="hidden flex-1 flex-col items-center gap-2 px-1" :class="adding ? '' : '@6xl/directory:flex'" data-test="task-board-strip-{{ $case->value }}">
                     {{ FluxMarkup::icon($columnIcon($case), 'micro', 'size-4 shrink-0 '.$columnAccent($case).' rounded-full text-white') }}
-                    <span class="inline-flex min-w-6 items-center justify-center rounded-full bg-white px-1.5 py-0.5 text-[11px] font-bold tabular-nums text-secondary-medium shadow-sm dark:bg-surface-1 dark:text-ink-muted">{{ $columnTasks->count() }}</span>
+                    <span class="inline-flex min-w-6 items-center justify-center rounded-full bg-white px-1.5 py-0.5 text-[11px] font-bold tabular-nums text-secondary-medium shadow-sm dark:bg-surface-1 dark:text-ink-muted">{{ $columnTotal }}</span>
                     @if ($canCreateTask)
                         {{ FluxMarkup::ghostIconButton('plus', __('tasks.add_task_to_status', ['status' => $case->label()]), 'x-on:click="adding = true; $nextTick(() => $refs.boardQuickAdd?.focus())" data-test="task-board-strip-add-'.$case->value.'"', 'size-7!') }}
                     @endif
@@ -84,7 +90,7 @@
                 <div class="flex min-w-0 items-center gap-1.5">
                     {{ FluxMarkup::icon($columnIcon($case), 'micro', 'size-4 shrink-0 '.$columnAccent($case).' rounded-full text-white') }}
                     <span class="truncate text-xs font-bold tracking-wide text-secondary-dark uppercase dark:text-ink">{{ $case->label() }}</span>
-                    <span class="inline-flex min-w-6 shrink-0 items-center justify-center rounded-full bg-white px-1.5 py-0.5 text-[11px] font-bold tabular-nums text-secondary-medium shadow-sm dark:bg-surface-1 dark:text-ink-muted" data-test="task-board-count-{{ $case->value }}">{{ $columnTasks->count() }}</span>
+                    <span class="inline-flex min-w-6 shrink-0 items-center justify-center rounded-full bg-white px-1.5 py-0.5 text-[11px] font-bold tabular-nums text-secondary-medium shadow-sm dark:bg-surface-1 dark:text-ink-muted" data-test="task-board-count-{{ $case->value }}">{{ $columnTotal }}</span>
                 </div>
                 @if ($canCreateTask)
                     {{ FluxMarkup::ghostIconButton('plus', __('tasks.add_task_to_status', ['status' => $case->label()]), 'x-on:click="adding = true; $nextTick(() => $refs.boardQuickAdd?.focus())" data-test="task-board-header-add-'.$case->value.'"', 'size-7!') }}
@@ -95,6 +101,10 @@
                 {{-- Side by side, a long column scrolls on its own (thin scrollbar) so the header and "+ Add task" stay in view; stacked on a phone it grows with the page. --}}
                 <div class="flex flex-col gap-2 px-3 @2xl/directory:max-h-[calc(100dvh-18rem)] @2xl/directory:min-h-0 @2xl/directory:overflow-y-auto @2xl/directory:overscroll-contain [scrollbar-width:thin] [scrollbar-color:var(--color-secondary-light)_transparent] dark:[scrollbar-color:var(--color-line-strong)_transparent]" data-test="task-board-cards-{{ $case->value }}">
 @include('pages.tasks._board-card')
+                    @if ($columnHidden > 0)
+                        {{-- The next cards load as this comes into view; the button is there for keyboards and a slow scroll. --}}
+                        <button type="button" x-intersect.margin.300px="$wire.showMoreBoard('{{ $case->value }}')" wire:click="showMoreBoard('{{ $case->value }}')" wire:loading.attr="disabled" wire:target="showMoreBoard('{{ $case->value }}')" class="min-h-9 cursor-pointer rounded-xl border border-dashed border-secondary-soft text-xs font-bold text-secondary-medium hover:border-secondary-light hover:text-secondary-dark disabled:opacity-60 dark:border-line dark:text-ink-muted dark:hover:text-ink" data-test="task-board-more-{{ $case->value }}">{{ trans_choice('tasks.show_more_cards', $columnHidden, ['count' => $columnHidden]) }}</button>
+                    @endif
                 </div>
             @endunless
 

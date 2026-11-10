@@ -28,11 +28,14 @@ test('the bell shows the unread count and the sentences', function () {
     bellNotify($user, subject: 'Water trucking');
     bellNotify($user, subject: 'Hygiene kits');
 
-    Livewire::actingAs($user)->test('notifications.bell')
+    $bell = Livewire::actingAs($user)->test('notifications.bell')
         ->call('loadPanel')
-        ->assertSeeHtml('data-unread-count')
+        ->assertSeeHtml('aria-label="'.trans_choice('notifications.bell_label', 2, ['count' => 2]).'"')
         ->assertSeeText('Sami created the task “Water trucking”')
         ->assertSeeText('Hygiene kits');
+
+    // The bell itself shows only a dot; the number rides along as data for the app badge.
+    expect($bell->html())->toMatch('/data-unread-count="2"\s*><\/span>/');
 });
 
 test('the panel reads no rows until it is opened', function () {
@@ -67,7 +70,7 @@ test('an unread critical notification is pinned first and turns the counter red'
         ->assertSeeHtml('data-critical-unread');
 });
 
-test('the unread and alerts tabs narrow the list', function () {
+test('the unread tab narrows the list and any other tab shows everything', function () {
     $user = Activity::withoutRecording(fn () => User::factory()->create());
     UserNotification::query()->find(bellNotify($user, subject: 'Already read'))->markAsRead();
     bellNotify($user, kind: NotificationKind::Alert, subject: 'Due tomorrow');
@@ -79,8 +82,10 @@ test('the unread and alerts tabs narrow the list', function () {
         ->assertDontSeeText('Already read')
         ->assertSeeText('Fresh action')
         ->call('showTab', 'alerts')
+        ->assertSet('tab', 'all')
+        ->assertSeeText('Already read')
         ->assertSeeText('Due tomorrow')
-        ->assertDontSeeText('Fresh action');
+        ->assertSeeText('Fresh action');
 });
 
 test('marking read, unread, all read and snoozing from the bell', function () {
@@ -136,7 +141,7 @@ test('the bell renders in arabic for arabic readers', function () {
     Livewire::actingAs($user)->test('notifications.bell')->call('loadPanel')->assertSeeText('أنشأ Sami المهمة «خطة»');
 });
 
-test('a module chip narrows the panel and a second click clears it', function () {
+test('the panel lists every module together, with no module filter', function () {
     $user = Activity::withoutRecording(fn () => User::factory()->create());
     bellNotify($user, subject: 'Task side');
     $user->notify(new AppNotification(new NotificationPayload(
@@ -147,10 +152,19 @@ test('a module chip narrows the panel and a second click clears it', function ()
 
     Livewire::actingAs($user)->test('notifications.bell')
         ->call('loadPanel')
-        ->assertSeeHtml('data-bell-module="risks"')
-        ->call('showModule', 'risks')
         ->assertSeeText('Risk side')
-        ->assertDontSeeText('Task side')
-        ->call('showModule', 'risks')
-        ->assertSeeText('Task side');
+        ->assertSeeText('Task side')
+        ->assertDontSeeHtml('data-bell-module');
+});
+
+test('only rule managers find the notification rules in the settings menu', function () {
+    $user = Activity::withoutRecording(fn () => User::factory()->create());
+
+    Livewire::actingAs($user)->test('notifications.bell', ['canManageRules' => true])
+        ->assertSeeHtml(route('notification-settings.edit'))
+        ->assertSeeHtml(route('admin.notification-settings.edit'));
+
+    Livewire::actingAs($user)->test('notifications.bell')
+        ->assertSeeHtml(route('notification-settings.edit'))
+        ->assertDontSeeHtml(route('admin.notification-settings.edit'));
 });

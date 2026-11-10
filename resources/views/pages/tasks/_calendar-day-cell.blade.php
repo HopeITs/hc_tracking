@@ -3,22 +3,31 @@
     use Illuminate\Support\Js;
 
     /**
+     * One day's tasks on the tasks calendar: the chips (the first $chipLimit
+     * of them, the rest behind a "+N more" popover), then the quick-add
+     * composer. Included by _calendar.blade.php for month cells and for the
+     * day / 4-days / week columns.
+     *
      * @var \Carbon\CarbonImmutable $day
-     * @var array{month: \Carbon\CarbonImmutable, weeks: ?array<int, array<int, \Carbon\CarbonImmutable>>, days: ?array<int, \Carbon\CarbonImmutable>, tasksByDay: \Illuminate\Support\Collection<string, \Illuminate\Database\Eloquent\Collection<int, \App\Models\Task>>, unscheduled: \Illuminate\Database\Eloquent\Collection<int, \App\Models\Task>} $calendar
-     * @var \Closure $markerTone
-     * @var \Closure $markerDot
+     * @var array{tasksByDay: \Illuminate\Support\Collection<string, \Illuminate\Database\Eloquent\Collection<int, \App\Models\Task>>} $calendar
+     * @var ?int $chipLimit null shows every chip
+     * @var bool $alignEnd open the "+N more" popover from the cell's end edge
+     * @var \Closure $chipState
      * @var \Closure $markerLabel
      * @var \Closure $priorityIconClasses
      */
     $dayTasks = $calendar['tasksByDay']->get($day->toDateString(), new \Illuminate\Database\Eloquent\Collection);
-    $dayRowKey = 'calendar|'.$day->toDateString();
+    $visibleTasks = $chipLimit === null || $dayTasks->count() <= $chipLimit ? $dayTasks : $dayTasks->take($chipLimit - 1);
+    $hiddenCount = $dayTasks->count() - $visibleTasks->count();
+    $dayKey = $day->toDateString();
+    $dayRowKey = 'calendar|'.$dayKey;
     $dayTaskDraft = $this->taskDraft($dayRowKey);
     $dayDraftPriority = TaskPriority::from($dayTaskDraft['priority']);
     $dayDraftAssignees = collect($this->userOptions)->whereIn('id', collect($dayTaskDraft['assignees'])->map(fn ($id) => (int) $id));
 @endphp
 
-<div class="flex min-h-4 flex-1 flex-col gap-1" x-data="taskDropList('task-calendar', (wire, id) => wire.rescheduleTask(id, '{{ $day->toDateString() }}'))">
-    @foreach ($dayTasks as $task)
+<div class="dk-tc-chips" x-data="taskDropList('task-calendar', (wire, id) => wire.rescheduleTask(id, '{{ $dayKey }}'))">
+    @foreach ($visibleTasks as $task)
         @php
             $chipLabel = $markerLabel($task);
             $canReschedule = $task->created_by === auth()->id();
@@ -26,31 +35,69 @@
         <div
             data-task-chip
             @if ($canReschedule) data-task-id="{{ $task->id }}" @endif
-            wire:key="task-calendar-chip-{{ $day->toDateString() }}-{{ $task->id }}"
-            title="{{ $chipLabel }}"
-            @class([
-                'group flex items-center gap-1.5 rounded-md px-1.5 py-1 text-[10px] transition-transform hover:-translate-y-px',
-                'cursor-grab' => $canReschedule,
-                $markerTone($task),
-            ])
+            wire:key="task-calendar-chip-{{ $dayKey }}-{{ $task->id }}"
+            title="{{ $task->title }}{{ $chipLabel !== null ? ' · '.$chipLabel : '' }}"
+            class="dk-tc-chip"
+            data-state="{{ $chipState($task) }}"
         >
-            <span class="size-1.5 shrink-0 rounded-full {{ $markerDot($task) }}"></span>
-            <a href="{{ route('tasks.show', $task) }}" wire:navigate class="min-w-0 flex-1 truncate text-start font-semibold hover:underline" data-test="task-calendar-chip-{{ $task->id }}">
-                {{ $task->title }}
-            </a>
+            <span class="dk-tc-dot" data-priority="{{ $task->priority->value }}" aria-hidden="true"></span>
+            <a href="{{ route('tasks.show', $task) }}" wire:navigate class="dk-tc-chip-title" data-test="task-calendar-chip-{{ $task->id }}">{{ $task->title }}</a>
             @if ($chipLabel !== null)
-                <span class="shrink-0 text-[9px] font-bold uppercase opacity-80" data-test="task-calendar-chip-badge-{{ $task->id }}">{{ $chipLabel }}</span>
+                <span class="dk-tc-flag" data-test="task-calendar-chip-badge-{{ $task->id }}">{{ $chipLabel }}</span>
             @endif
         </div>
     @endforeach
 </div>
 
+@if ($hiddenCount > 0)
+    <div class="dk-tc-more" x-on:keydown.escape.window="moreOpen === {{ Js::from($dayKey) }} && (moreOpen = null)">
+        <button
+            type="button"
+            class="dk-tc-more-btn"
+            x-on:click="moreOpen = moreOpen === {{ Js::from($dayKey) }} ? null : {{ Js::from($dayKey) }}"
+            x-bind:aria-expanded="moreOpen === {{ Js::from($dayKey) }} ? 'true' : 'false'"
+            aria-controls="task-calendar-more-{{ $dayKey }}"
+            data-test="task-calendar-more-{{ $dayKey }}"
+        >{{ trans_choice('calendar.more_items', $hiddenCount, ['count' => $hiddenCount]) }}</button>
+
+        <div
+            id="task-calendar-more-{{ $dayKey }}"
+            x-show="moreOpen === {{ Js::from($dayKey) }}"
+            x-cloak
+            x-transition.opacity.duration.100ms
+            x-on:click.outside="moreOpen = null"
+            role="dialog"
+            aria-label="{{ __('tasks.calendar_tasks_on_day', ['date' => $day->translatedFormat('l, j F')]) }}"
+            @class(['dk-tc-more-pop', 'is-end' => $alignEnd])
+        >
+            <div class="dk-tc-more-head">
+                <span>{{ $day->translatedFormat('l, j F') }}</span>
+                <button type="button" class="dk-tc-icon-btn" x-on:click="moreOpen = null" aria-label="{{ __('common.close') }}">
+                    <flux:icon.x-mark variant="micro" class="size-4" />
+                </button>
+            </div>
+            <ul class="dk-tc-more-list">
+                @foreach ($dayTasks as $task)
+                    @php $chipLabel = $markerLabel($task); @endphp
+                    <li class="dk-tc-chip" data-state="{{ $chipState($task) }}" wire:key="task-calendar-more-{{ $dayKey }}-{{ $task->id }}">
+                        <span class="dk-tc-dot" data-priority="{{ $task->priority->value }}" aria-hidden="true"></span>
+                        <a href="{{ route('tasks.show', $task) }}" wire:navigate class="dk-tc-chip-title" data-test="task-calendar-more-item-{{ $task->id }}">{{ $task->title }}</a>
+                        @if ($chipLabel !== null)
+                            <span class="dk-tc-flag">{{ $chipLabel }}</span>
+                        @endif
+                    </li>
+                @endforeach
+            </ul>
+        </div>
+    </div>
+@endif
+
 @can('create', App\Models\Task::class)
 <button
     type="button"
-    x-show="!addOpen[{{ Js::from($day->toDateString()) }}]"
-    x-on:click="addOpen[{{ Js::from($day->toDateString()) }}] = true; $nextTick(() => $refs['calendarAddInput{{ $day->toDateString() }}']?.focus())"
-    class="inline-flex shrink-0 items-center gap-0.5 self-start rounded px-1 py-0.5 text-[10px] text-secondary-medium opacity-0 hover:bg-secondary-soft group-hover/day:opacity-100 dark:text-ink-muted dark:hover:bg-surface-2"
+    x-show="!addOpen[{{ Js::from($dayKey) }}]"
+    x-on:click="addOpen[{{ Js::from($dayKey) }}] = true; $nextTick(() => $refs['calendarAddInput{{ $day->toDateString() }}']?.focus())"
+    class="dk-tc-add"
     :aria-label="{{ Js::from(__('tasks.add_task')) }}"
     data-test="task-calendar-add-toggle-{{ $day->toDateString() }}"
 >
@@ -58,12 +105,13 @@
     {{ __('tasks.add_task') }}
 </button>
 
-<div x-show="addOpen[{{ Js::from($day->toDateString()) }}]" x-cloak class="flex flex-col gap-1" data-test="task-calendar-add-row-{{ $day->toDateString() }}">
+<div x-show="addOpen[{{ Js::from($dayKey) }}]" x-cloak class="dk-tc-add-row" data-test="task-calendar-add-row-{{ $day->toDateString() }}">
     <input
         type="text"
         x-ref="calendarAddInput{{ $day->toDateString() }}"
         placeholder="{{ __('tasks.add_task') }}"
-        class="w-full min-w-0 border-0 bg-transparent p-0.5 text-[11px] text-secondary-dark placeholder:text-secondary-light focus:ring-0 focus:outline-none dark:text-ink"
+        class="dk-tc-add-input"
+        x-on:keydown.escape="addOpen[{{ Js::from($dayKey) }}] = false"
         wire:keydown.enter="quickCreateTask($event.target.value, null, null, {{ Js::from($dayRowKey) }}, {{ Js::from($day->toDateString()) }}); $event.target.value = ''"
         data-test="task-calendar-quick-add-{{ $day->toDateString() }}"
     />

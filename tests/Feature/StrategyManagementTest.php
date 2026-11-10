@@ -239,7 +239,7 @@ test('every role can open a strategy through a labelled Open link, not the name'
 
     // The Open link carries a visible label and names the strategy for screen readers...
     expect($html)
-        ->toContain('href="'.route('strategies.show', $strategy).'" wire:navigate class="dk-slink" aria-label="'.__('strategies.open_named', ['name' => 'Country Strategy']).'">'.__('strategies.open'))
+        ->toContain('href="'.route('strategies.show', $strategy).'" wire:navigate.hover class="dk-slink" aria-label="'.__('strategies.open_named', ['name' => 'Country Strategy']).'">'.__('strategies.open'))
         // ...while the name itself is plain text, not a link.
         ->toContain('<strong>Country Strategy</strong>');
 })->with([

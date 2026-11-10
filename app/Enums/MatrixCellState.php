@@ -26,6 +26,9 @@ enum MatrixCellState: string
     /** The month has not started. */
     case Upcoming = 'upcoming';
 
+    /** The month lies outside the reporting window. */
+    case OutsidePeriod = 'outside_period';
+
     /** The report exists but the indicator is not due that month. */
     case NotDue = 'not_due';
 
@@ -40,6 +43,7 @@ enum MatrixCellState: string
             self::Pending => 'clock',
             self::NotSubmitted => 'pencil-square',
             self::Upcoming => 'calendar',
+            self::OutsidePeriod => 'minus-circle',
             self::NotDue => 'minus',
         };
     }

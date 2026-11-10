@@ -97,7 +97,7 @@
                         @if (in_array($chosen, $reasonStatuses, true))
                             <label class="flex max-w-2xl flex-col gap-1 text-xs font-semibold">
                                 {{ __('monthly_reports.activity_reason') }}
-                                <textarea rows="2" dir="auto" wire:model.blur="{{ $key }}.reason" class="{{ $field }}"></textarea>
+                                <textarea rows="2" dir="auto" wire:model.live.blur="{{ $key }}.reason" class="{{ $field }}"></textarea>
                                 @error($key.'.reason')
                                     <span class="font-normal text-status-critical">{{ $message }}</span>
                                 @enderror
@@ -107,7 +107,7 @@
                         @foreach (isset($dateFields[$chosen]) ? [$dateFields[$chosen]] : [] as $dateField)
                             <label class="flex w-48 flex-col gap-1 text-xs font-semibold">
                                 {{ __('monthly_reports.'.$dateField) }}
-                                <input type="date" dir="ltr" wire:model.blur="{{ $key }}.{{ $dateField }}" class="{{ $field }} tabular-nums" />
+                                <input type="date" dir="ltr" wire:model.live.blur="{{ $key }}.{{ $dateField }}" class="{{ $field }} tabular-nums" />
                                 @error($key.'.'.$dateField)
                                     <span class="font-normal text-status-critical">{{ $message }}</span>
                                 @enderror
@@ -121,7 +121,7 @@
                             </button>
                             <label x-show="note" @unless ($noteOpen) style="display: none" @endunless class="flex w-full max-w-2xl flex-col gap-1 text-xs font-semibold">
                                 {{ __('monthly_reports.activity_note') }}
-                                <textarea x-ref="note" rows="2" dir="auto" wire:model.blur="{{ $key }}.note" class="{{ $field }}"></textarea>
+                                <textarea x-ref="note" rows="2" dir="auto" wire:model.live.blur="{{ $key }}.note" class="{{ $field }}"></textarea>
                             </label>
                             @if ($activity['entry_id'] !== null)
                                 <x-monthly-reports.files-cell :files="$activity['files']" :editable="true" :entry-id="$activity['entry_id']" :label="$activity['statement']" />

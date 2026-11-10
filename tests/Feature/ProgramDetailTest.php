@@ -63,8 +63,8 @@ test('the program breadcrumb leads back through the strategies list and the prog
 
     $this->actingAs(User::factory()->role('General Manager')->create())
         ->get(route('programs.show', $program))
-        ->assertSee('<a href="'.route('strategies.index').'" wire:navigate>'.__('common.strategies').'</a>', false)
-        ->assertSee('<a href="'.route('strategies.show', $strategy).'" wire:navigate>Country Strategy</a>', false)
+        ->assertSee('<a href="'.route('strategies.index').'" wire:navigate.hover>'.__('common.strategies').'</a>', false)
+        ->assertSee('<a href="'.route('strategies.show', $strategy).'" wire:navigate.hover>Country Strategy</a>', false)
         ->assertSee('<span aria-current="page">Water Security</span>', false);
 });
 

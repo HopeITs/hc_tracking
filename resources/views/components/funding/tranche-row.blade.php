@@ -1,4 +1,4 @@
-@props(['transfer'])
+@props(['transfer', 'compact' => false, 'conversions' => false])
 
 @php
     /** @var \App\Models\TransfersTracking $transfer */
@@ -24,6 +24,7 @@
         @endif
     </td>
 
+    @unless ($compact)
     <td data-label="{{ __('transfers.account') }}">
         @if ($transfer->account === null)
             <span class="italic text-secondary-medium dark:text-ink-muted">{{ __('transfers.no_account') }}</span>
@@ -31,17 +32,24 @@
             {{ $transfer->account->account_name }}
         @endif
     </td>
+    @endunless
 
     <td class="date" data-label="{{ __('transfers.scheduled') }}">{{ $date($transfer->scheduled_date) }}</td>
-    <td class="date" data-label="{{ __('transfers.sent_on') }}">{{ $date($transfer->transfer_date) }}</td>
-    <td class="date" data-label="{{ __('transfers.received_on') }}">{{ $date($transfer->receive_date) }}</td>
-
-    <td data-label="{{ __('common.currency') }}">{{ $sentCurrency->value }}</td>
+    @unless ($compact)
+        <td class="date" data-label="{{ __('transfers.sent_on') }}">{{ $date($transfer->transfer_date) }}</td>
+        <td class="date" data-label="{{ __('transfers.received_on') }}">{{ $date($transfer->receive_date) }}</td>
+        <td data-label="{{ __('common.currency') }}">{{ $sentCurrency->value }}</td>
+    @endunless
 
     <td class="num" data-label="{{ __('finance_tables.amount_sent') }}" data-cell="sent">
         <span class="fig font-semibold">{{ $money($transfer->payment_amount) }}</span>
+        {{-- Compact drops the currency column, so the amount carries it. --}}
+        @if ($compact)
+            <span class="sub">{{ $sentCurrency->value }}</span>
+        @endif
     </td>
 
+    @unless ($compact)
     <td class="num" data-label="{{ __('transfers.fees') }}" data-cell="fees">
         @if ((float) $transfer->fees > 0)
             <span class="fig">{{ $money($transfer->fees) }}</span>
@@ -52,12 +60,16 @@
             —
         @endif
     </td>
+    @endunless
 
+    @unless ($compact && ! $conversions)
     <td class="num" data-label="{{ __('transfers.exchange_rate') }}" data-cell="rate">
         <span class="fig">{{ $rate }}</span>
     </td>
+    @endunless
 
     {{-- A pending tranche may carry amounts filled in ahead of time. They have not landed, so they are not shown. --}}
+    @unless ($compact && ! $conversions)
     <td class="num" data-label="{{ __('finance_tables.gross_received') }}" data-cell="gross">
         @if ($isReceived && $transfer->amount_received !== null)
             <span class="fig">{{ $money($transfer->amount_received) }}</span>
@@ -65,6 +77,7 @@
             —
         @endif
     </td>
+    @endunless
 
     <td class="num" data-label="{{ __('common.net_received') }}" data-cell="net">
         @if ($transfer->isMissingNetAmount())

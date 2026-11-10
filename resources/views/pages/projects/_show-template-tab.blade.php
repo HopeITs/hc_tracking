@@ -20,6 +20,12 @@
                 </div>
             </x-slot:toolbar>
 
+            @if ($this->awaitingMonthlyReports)
+                <p role="status" class="px-4 py-2.5 text-sm text-secondary-medium dark:text-ink-muted" data-monthly-reports-preparing>
+                    {{ __('report_templates.tab.preparing_monthly_reports') }}
+                </p>
+            @endif
+
             @unless ($canManageTemplate)
                 <p class="flex items-start gap-2 border-b border-secondary-soft px-4 py-2.5 text-sm text-secondary-medium dark:border-line dark:text-ink-muted" data-test="template-read-only">
                     <flux:icon name="lock-closed" variant="micro" class="mt-0.5 size-3.5 shrink-0" aria-hidden="true" />

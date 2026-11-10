@@ -37,6 +37,8 @@
             @isset($actions)
                 <div class="dk-reg-actions" data-desk-register-actions>{{ $actions }}</div>
             @endisset
+            {{-- Put this page (its panel or card, a button for it, or its "New …" button) on My desk. --}}
+            <x-desk.add-to-desk />
         </div>
     </div>
 

@@ -343,7 +343,7 @@ new #[Layout('layouts::desk'), Title('titles.risk_library')] class extends Compo
 
 <x-desk.register class="@container/directory" heading-id="risk-library-heading" :title="__('titles.risk_library')" :count="$entries->count()" data-tour="risk-library-page">
     <x-slot:actions>
-        <x-ui.button tone="primary" icon="plus" class="min-h-11 self-end touch-manipulation @sm/directory:min-h-10" wire:click="openCreateModal" data-test="create-risk-library-entry" data-tour="risk-library-create">
+        <x-ui.button tone="primary" icon="plus" class="min-h-11 self-end touch-manipulation @sm/directory:min-h-10" wire:click="openCreateModal" data-test="create-risk-library-entry" data-tour="risk-library-create" data-quick-create>
             {{ __('risk_library.add_entry') }}
         </x-ui.button>
     </x-slot:actions>

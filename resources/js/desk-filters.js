@@ -20,6 +20,8 @@
  * rows (.dk-fit-fill), so a full page fills the card top to bottom. It holds
  * off while the card is being resized and measures again on dk-panel-resized.
  */
+import { hostOf } from './desk-grid';
+
 document.addEventListener('alpine:init', () => {
     window.Alpine.data('deskPanel', (panelId) => ({
         menu: false,
@@ -31,6 +33,54 @@ document.addEventListener('alpine:init', () => {
         fitBox: '',
         fitBusy: false,
         scheduleFit: () => {},
+
+        /* Pin to top and Collapse (desk-fold.js keeps the store and lays the folds); only on My desk. */
+        onDesk() {
+            return Boolean(this.$root.closest('[data-desk-grid]'));
+        },
+
+        pinned() {
+            return this.$store.deskFlags?.pinned.includes(panelId) ?? false;
+        },
+
+        folded() {
+            return this.$store.deskFlags?.folded.includes(panelId) ?? false;
+        },
+
+        /** Read when the menu opens: a panel that folded itself because it is empty has nothing to collapse. */
+        foldsItself() {
+            return this.menu && this.$root.dataset.folded === 'empty';
+        },
+
+        pin(on) {
+            const store = this.$store.deskFlags;
+            const others = store.pinned.filter((id) => id !== panelId);
+
+            store.pinned = on ? [...others, panelId] : others;
+
+            // A collapsed panel that is pinned opens: it goes to the top as a full panel.
+            if (on) {
+                store.folded = store.folded.filter((id) => id !== panelId);
+            }
+
+            hostOf(this.$root)?.pinPanel(panelId, on);
+        },
+
+        /** An empty tile opened for this visit (to add the first to-do, say); it folds again on the next load if still empty. */
+        peek() {
+            const store = this.$store.deskFlags;
+
+            store.peeked = [...store.peeked.filter((id) => id !== panelId), panelId];
+        },
+
+        fold(on) {
+            const store = this.$store.deskFlags;
+            const others = store.folded.filter((id) => id !== panelId);
+
+            this.menu = false;
+            store.folded = on ? [...others, panelId] : others;
+            hostOf(this.$root)?.foldPanel(panelId, on);
+        },
 
         init() {
             const body = this.$root.querySelector(':scope > .dk-pb');
@@ -144,7 +194,8 @@ document.addEventListener('alpine:init', () => {
             const list = body.querySelector('[data-fit]');
 
             // Not while the card is being resized (desk-grid.js): fitRows re-renders it at its saved size and the card would snap back mid-pull. It fits again once the new size is saved.
-            if (! list || this.fitBusy || 'resizing' in this.$root.dataset) {
+            // Nor while the list is not drawn (a card too short for rows hides it, desk-cards.css): there is nothing to measure.
+            if (! list || this.fitBusy || 'resizing' in this.$root.dataset || list.getClientRects().length === 0) {
                 return;
             }
 

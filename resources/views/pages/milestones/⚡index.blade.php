@@ -46,6 +46,17 @@ new #[Layout('layouts::desk'), Title('titles.milestones')] class extends Compone
     #[Url(as: 'period', except: 'month')]
     public string $viewMode = 'month';
 
+    /** Project panels the timeline draws before "Show more": each panel is a whole drawn timeline. */
+    public const int TimelineProjectsPerStep = 6;
+
+    /** How many project panels the timeline draws now; scrolling to its end draws the next step. */
+    public int $timelineShown = self::TimelineProjectsPerStep;
+
+    public function showMoreTimeline(): void
+    {
+        $this->timelineShown += self::TimelineProjectsPerStep;
+    }
+
     public function clearFilters(): void
     {
         $this->project = '';
@@ -376,7 +387,15 @@ new #[Layout('layouts::desk'), Title('titles.milestones')] class extends Compone
     @else
         @switch ($view)
             @case ('timeline')
-                @include('pages.milestones._timeline', ['projects' => $this->projectsWithMilestones])
+                @include('pages.milestones._timeline', ['projects' => $this->projectsWithMilestones->take($timelineShown)])
+
+                @if ($this->projectsWithMilestones->count() > $timelineShown)
+                    @php
+                        $timelineHidden = $this->projectsWithMilestones->count() - $timelineShown;
+                    @endphp
+                    {{-- The next project panels load as this comes into view; the button is there for keyboards and a slow scroll. --}}
+                    <button type="button" x-intersect.margin.400px="$wire.showMoreTimeline()" wire:click="showMoreTimeline" wire:loading.attr="disabled" wire:target="showMoreTimeline" class="min-h-11 w-full cursor-pointer rounded-2xl border border-dashed border-secondary-soft text-sm font-bold text-secondary-medium hover:border-secondary-light hover:text-secondary-dark disabled:opacity-60 dark:border-line dark:text-ink-muted dark:hover:text-ink" data-test="milestone-timeline-more">{{ trans_choice('milestones.show_more_projects', $timelineHidden, ['count' => $timelineHidden]) }}</button>
+                @endif
                 @break
 
             @case ('board')

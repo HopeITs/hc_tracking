@@ -1,4 +1,4 @@
-@props(['label', 'lines' => [], 'lead' => 0, 'actions' => true, 'group' => ''])
+@props(['label', 'lines' => [], 'lead' => 0, 'actions' => true, 'group' => '', 'compact' => false, 'conversions' => false])
 
 @php
     /**
@@ -13,31 +13,37 @@
 @endphp
 
 <tr class="register-group" wire:key="group-{{ $group }}" data-group="{{ $group }}">
-    <td colspan="{{ $lead + 5 }}" data-wide>
+    <td colspan="{{ $lead + ($compact ? 2 : 5) }}" data-wide>
         {{ $label }}
         <span class="sub">{{ trans_choice('transfers.count_tranches', $count, ['count' => $count]) }}</span>
     </td>
-    <td data-label="{{ __('common.currency') }}">
-        @foreach ($lines as $line)
-            <span class="block">{{ $line['currency'] }}</span>
-        @endforeach
-    </td>
+    @unless ($compact)
+        <td data-label="{{ __('common.currency') }}">
+            @foreach ($lines as $line)
+                <span class="block">{{ $line['currency'] }}</span>
+            @endforeach
+        </td>
+    @endunless
     <td class="num" data-label="{{ __('finance_tables.amount_sent') }}">
         @foreach ($lines as $line)
-            <span class="fig block">{{ $money($line['sent']) }}</span>
+            <span class="fig block">{{ $money($line['sent']) }}@if ($compact) <span class="sub">{{ $line['currency'] }}</span>@endif</span>
         @endforeach
     </td>
-    <td class="num" data-label="{{ __('transfers.fees') }}">
-        @foreach ($lines as $line)
-            <span class="fig block">{{ $money($line['fees']) }}</span>
-        @endforeach
-    </td>
-    <td></td>
-    <td class="num" data-label="{{ __('finance_tables.gross_received') }}">
-        @foreach ($lines as $line)
-            <span class="fig block">{{ $money($line['gross']) }}</span>
-        @endforeach
-    </td>
+    @unless ($compact)
+        <td class="num" data-label="{{ __('transfers.fees') }}">
+            @foreach ($lines as $line)
+                <span class="fig block">{{ $money($line['fees']) }}</span>
+            @endforeach
+        </td>
+    @endunless
+    @unless ($compact && ! $conversions)
+        <td></td>
+        <td class="num" data-label="{{ __('finance_tables.gross_received') }}">
+            @foreach ($lines as $line)
+                <span class="fig block">{{ $money($line['gross']) }}</span>
+            @endforeach
+        </td>
+    @endunless
     <td class="num" data-label="{{ __('common.net_received') }}">
         @foreach ($lines as $line)
             <span class="fig block text-funding">{{ $money($line['net']) }}</span>

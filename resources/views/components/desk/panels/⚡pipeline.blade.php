@@ -139,7 +139,7 @@ new class extends Component {
     $summary = collect($counts)->filter()->sortDesc()->take(4)->map(fn (int $count, string $status): string => $count.' '.mb_strtolower(ProposalStatus::from($status)->label()))->implode(' · ');
 @endphp
 
-<x-desk.panel :facets="$pg['facets']" :filtered="$status !== ''" id="pipeline" register="proposals.index" :size="$size" :cols="$gridCols" :height="$gridRows" :index="$index" :total="$total" :count="array_sum($counts)">
+<x-desk.panel :empty="$this->rows->isEmpty()" :facets="$pg['facets']" :filtered="$status !== ''" id="pipeline" register="proposals.index" :size="$size" :cols="$gridCols" :height="$gridRows" :index="$index" :total="$total" :count="array_sum($counts)">
     <x-slot:filters>
         <div class="contents" data-filter-defaults='{"status":""}'>
             <x-ui.header-filter-select :label="__('desk.facet.status')" wire:model="status" :value="$status" deferred>

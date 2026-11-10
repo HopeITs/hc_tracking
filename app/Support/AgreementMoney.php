@@ -167,6 +167,34 @@ final class AgreementMoney
     }
 
     /**
+     * The columns of the funding agreements register: what a person reading
+     * the list needs, and nothing more.
+     *
+     * Every other figure — scheduled, in transit, overdue, failed, not
+     * scheduled, outstanding, the tranche count, the reports — lives on the
+     * agreement's own page, where there is room to explain it. A chosen year
+     * adds its two columns, since that is the whole point of choosing one.
+     *
+     * The wider columns() below stays as it is: donors/show and proposals/show
+     * show an agreement inside a bigger record and read every figure there.
+     *
+     * @return list<array{key: string, label: string, numeric: bool}>
+     */
+    public static function registerColumns(?int $year = null, bool $yearOnly = false): array
+    {
+        $yearOnly = $yearOnly && $year !== null;
+        $column = fn (string $key, string $label, bool $numeric = true): array => ['key' => $key, 'label' => $label, 'numeric' => $numeric];
+
+        return array_values(array_filter([
+            $column('amount', $yearOnly ? __('finance_tables.budget_whole_agreement') : __('finance_tables.budget')),
+            $column('received_share', __('finance_tables.received')),
+            $year !== null && ! $yearOnly ? $column('due_in_year', __('finance_tables.due_in_year', ['year' => $year])) : null,
+            $year !== null && ! $yearOnly ? $column('received_in_year', __('finance_tables.received_in_year', ['year' => $year])) : null,
+            $column('next_due', __('finance_tables.next_due'), false),
+        ]));
+    }
+
+    /**
      * The money columns of an agreement table, in order.
      *
      * @return list<array{key: string, label: string, numeric: bool}>

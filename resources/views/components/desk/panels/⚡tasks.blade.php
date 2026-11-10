@@ -228,7 +228,7 @@ new class extends Component {
     $user = auth()->user();
 @endphp
 
-<x-desk.panel :facets="$pg['facets']" :filtered="$this->activeScope !== 'mine'" id="tasks" register="tasks.index" :size="$size" :cols="$gridCols" :height="$gridRows" :index="$index" :total="$total" :count="$open->count()">
+<x-desk.panel :empty="$rows->isEmpty()" :facets="$pg['facets']" :filtered="$this->activeScope !== 'mine'" id="tasks" register="tasks.index" :size="$size" :cols="$gridCols" :height="$gridRows" :index="$index" :total="$total" :count="$open->count()">
     <x-slot:filters>
         <div class="contents" data-filter-defaults='{"scope":"mine"}'>
             <x-ui.header-filter-select :label="__('desk.whose')" wire:model="scope" :value="$this->activeScope" deferred>

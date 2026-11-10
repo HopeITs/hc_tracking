@@ -4,6 +4,7 @@ use App\Enums\MilestoneStatus;
 use App\Enums\TaskStatus;
 use App\Models\Milestone;
 use App\Models\Project;
+use App\Models\Proposal;
 use App\Models\Task;
 use App\Models\User;
 use Livewire\Livewire;
@@ -176,6 +177,24 @@ test('a task can be added from the milestone show page pre-filled with this mile
         ->and($task->source_id)->toBe($milestone->id)
         ->and($task->parent_task_id)->toBeNull()
         ->and($task->taskAssignees->pluck('employee_id')->all())->toBe([$assignee]);
+});
+
+test('a task added from a milestone outside any program keeps its description and names the milestone as related', function () {
+    $user = User::factory()->role('General Manager')->create();
+    $milestone = Milestone::factory()->forProposal(Proposal::factory()->create())->create(['name' => 'Works handover']);
+
+    Livewire::actingAs($user)
+        ->test('pages::milestones.show', ['milestone' => $milestone])
+        ->call('openAddTaskModal')
+        ->assertSeeHtml('data-test="new-milestone-task-related-to"')
+        ->assertSee('Works handover')
+        ->set('newTaskTitle', 'Household survey')
+        ->set('newTaskDescription', '  Cover the north district first.  ')
+        ->call('addTask')
+        ->assertHasNoErrors();
+
+    expect(Task::query()->where('title', 'Household survey')->sole()->description)
+        ->toBe('Cover the north district first.');
 });
 
 test('adding a task from the milestone show page requires a title but no assignee', function () {

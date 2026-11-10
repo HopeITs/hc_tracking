@@ -10,6 +10,7 @@ use App\Models\User;
 use App\Support\DonorReportAggregator;
 use App\Support\DonorReportPeriods;
 use Carbon\CarbonImmutable;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Validation\ValidationException;
 
@@ -17,7 +18,7 @@ use Illuminate\Validation\ValidationException;
  * Preview a donor report: one proposal's validated monthly figures for a
  * period, without saving anything (contracts §14.3).
  *
- * - Who: `reports.aggregate` and `view` on the proposal.
+ * - Who: `reports.aggregate` and proposal visibility or a donor-report assignment.
  * - Which proposals: approved by the donor and not self-funded (D-27a); the
  *   id is re-loaded here, never trusted.
  * - Finance is included only for holders of funding-agreements.view.
@@ -41,6 +42,24 @@ final class ComposeDonorReport
         return $this->snapshot($proposal, $period, $window['start'], $window['end'], $actor);
     }
 
+    /** @return Builder<Proposal> */
+    public function visibleProposals(User $actor): Builder
+    {
+        $query = Proposal::query();
+
+        if ($actor->can('proposals.view')) {
+            return $query;
+        }
+
+        if (! $actor->employee_id) {
+            return $query->whereRaw('1 = 0');
+        }
+
+        return $query->where(fn (Builder $visible) => $visible
+            ->whereHas('reviewers', fn (Builder $reviewers) => $reviewers->where('employee_id', $actor->employee_id))
+            ->orWhereHas('donorProposals.reports', fn (Builder $reports) => $reports->where('responsible_employee_id', $actor->employee_id)));
+    }
+
     /**
      * The proposal a donor report may be built on, re-loaded from its id:
      * donor-approved, visible to the actor, not self-funded and not payroll
@@ -50,9 +69,9 @@ final class ComposeDonorReport
      */
     public function eligibleProposal(int $proposalId, User $actor): Proposal
     {
-        $proposal = Proposal::query()->with('donor')->find($proposalId);
+        $proposal = $this->visibleProposals($actor)->with('donor')->find($proposalId);
 
-        if ($proposal === null || ! $proposal->status->isApprovedByDonor() || Gate::forUser($actor)->denies('view', $proposal)) {
+        if ($proposal === null || ! $proposal->status->isApprovedByDonor()) {
             throw ValidationException::withMessages(['proposalId' => __('donor_reports.proposal_required')]);
         }
 

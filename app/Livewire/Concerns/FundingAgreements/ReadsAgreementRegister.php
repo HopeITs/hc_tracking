@@ -9,6 +9,7 @@ use App\Enums\Currency;
 use App\Models\DonorProposal;
 use App\Models\Strategy;
 use App\Models\TransfersTracking;
+use App\Support\AgreementHealth;
 use App\Support\AgreementMoney;
 use App\Support\Like;
 use Carbon\CarbonImmutable;
@@ -33,6 +34,7 @@ use Livewire\Attributes\Computed;
  * @property string $donor
  * @property string $currency
  * @property string $stage
+ * @property string $health
  * @property string $flag
  * @property string $min
  * @property string $max
@@ -42,9 +44,16 @@ use Livewire\Attributes\Computed;
  * @property-read Collection<int, array{currency: string, agreements: int, tranches: int, budget: float, scheduled: float, received: float, in_transit: float, overdue: float, failed: float, unscheduled: float, outstanding: float, due_in_year: float, received_in_year: float}> $totals  #[Computed] totals()
  * @property-read bool $hasAnyAgreement  #[Computed] hasAnyAgreement()
  * @property-read array<string, int> $stageCounts  #[Computed] stageCounts()
+ * @property-read array<string, int> $healthCounts  #[Computed] healthCounts()
  */
 trait ReadsAgreementRegister
 {
+    /**
+     * The three states as a sortable rank, reading the counts registerQuery()
+     * selects: 0 wants a person, 1 is running, 2 has not started.
+     */
+    private const URGENCY_RANK_SQL = '(case when late_transfers_count > 0 or failed_transfers_count > 0 or overdue_reports_count > 0 then 0 when coalesce(money.m_tranches, 0) > 0 then 1 else 2 end)';
+
     /**
      * Agreements matching every active filter.
      *
@@ -53,7 +62,7 @@ trait ReadsAgreementRegister
      *
      * @return Builder<DonorProposal>
      */
-    protected function filteredQuery(bool $withStage = true): Builder
+    protected function filteredQuery(bool $withStage = true, bool $withHealth = true, bool $withFlag = true): Builder
     {
         $search = trim($this->search);
 
@@ -70,9 +79,91 @@ trait ReadsAgreementRegister
             ->when(Currency::tryFrom($this->currency), fn (Builder $query, Currency $currency) => $query->where('currency', $currency))
             ->when($this->min !== '', fn (Builder $query) => $query->where('donor_proposal.budget', '>=', (float) $this->min))
             ->when($this->max !== '', fn (Builder $query) => $query->where('donor_proposal.budget', '<=', (float) $this->max))
-            ->when($this->flag !== '', fn (Builder $query) => $this->applyFlag($query, $this->flag))
+            ->when($withFlag && $this->flag !== '', fn (Builder $query) => $this->applyFlag($query, $this->flag))
             ->when($this->selectedYear() !== null, fn (Builder $query) => $this->applyYear($query))
+            ->when($withHealth && in_array($this->health, AgreementHealth::CASES, true), fn (Builder $query) => $this->applyHealth($query, $this->health))
             ->when($withStage && in_array($this->stage, self::STAGES, true), fn (Builder $query) => $this->applyStage($query, $this->stage));
+    }
+
+    /**
+     * Narrow a query to one of the three states a person reads an agreement
+     * in. The three are disjoint and cover every agreement.
+     *
+     * @param  Builder<DonorProposal>  $query
+     * @return Builder<DonorProposal>
+     */
+    protected function applyHealth(Builder $query, string $health): Builder
+    {
+        return match ($health) {
+            AgreementHealth::ATTENTION => $query->where(fn (Builder $query) => $this->whereNeedsAttention($query)),
+            AgreementHealth::MOVING => $query
+                ->has('transfers')
+                ->whereNot(fn (Builder $query) => $this->whereNeedsAttention($query)),
+            AgreementHealth::NOT_STARTED => $query->doesntHave('transfers'),
+            default => $query,
+        };
+    }
+
+    /**
+     * The one definition of "wants a person today": a tranche past its date
+     * and unsent, a tranche that failed, or an unsubmitted donor report past
+     * its due date. AgreementHealth::needsAttention() reads the same three
+     * facts off the selected counts.
+     *
+     * @param  Builder<DonorProposal>  $query
+     * @return Builder<DonorProposal>
+     */
+    protected function whereNeedsAttention(Builder $query): Builder
+    {
+        $today = CarbonImmutable::today()->toDateString();
+
+        return $query
+            ->whereHas('transfers', fn (Builder $query) => $query->where(fn (Builder $query) => $query
+                ->where('ar_status', ArStatus::Failed)
+                ->orWhere(fn (Builder $query) => $query
+                    ->where('ar_status', ArStatus::Pending)
+                    ->whereNull('transfer_date')
+                    ->whereDate('scheduled_date', '<', $today))))
+            ->orWhereHas('reports', fn (Builder $query) => $query
+                ->whereNull('submitted_on')
+                ->whereDate('due_on', '<', $today));
+    }
+
+    /**
+     * The counts behind the three headline figures, each ignoring the health
+     * filter itself so pressing one never empties the other two.
+     *
+     * @return array<string, int>
+     */
+    #[Computed]
+    public function healthCounts(): array
+    {
+        return collect(AgreementHealth::CASES)
+            ->mapWithKeys(fn (string $health): array => [
+                $health => $this->applyHealth($this->filteredQuery(withHealth: false), $health)->count(),
+            ])
+            ->all();
+    }
+
+    /**
+     * The two counts a row's status word is read from, alongside the
+     * overdue_reports_count every register query already selects.
+     *
+     * @param  Builder<DonorProposal>  $query
+     * @return Builder<DonorProposal>
+     */
+    protected function withHealthCounts(Builder $query): Builder
+    {
+        $today = CarbonImmutable::today()->toDateString();
+
+        return $query->withCount([
+            'transfers as late_transfers_count' => fn (Builder $query) => $query
+                ->where('ar_status', ArStatus::Pending)
+                ->whereNull('transfer_date')
+                ->whereDate('scheduled_date', '<', $today),
+            'transfers as failed_transfers_count' => fn (Builder $query) => $query
+                ->where('ar_status', ArStatus::Failed),
+        ]);
     }
 
     /**
@@ -158,7 +249,7 @@ trait ReadsAgreementRegister
     {
         $today = CarbonImmutable::today()->toDateString();
 
-        return $this->filteredQuery()
+        $query = $this->filteredQuery()
             ->select(['id', 'donor_id', 'proposal_id', 'budget', 'currency', 'external_project_number', 'updated_at'])
             ->addSelect(['next_due' => TransfersTracking::query()
                 ->select('scheduled_date')
@@ -184,7 +275,9 @@ trait ReadsAgreementRegister
                 ->whereDate('due_on', '<', $today)])
             ->withMin(['reports as next_report_due' => fn (Builder $query) => $query
                 ->whereNull('submitted_on')
-                ->whereDate('due_on', '>=', $today)], 'due_on')
+                ->whereDate('due_on', '>=', $today)], 'due_on');
+
+        return $this->withHealthCounts($query)
             ->orderByRaw('next_due is null')
             ->orderBy('next_due')
             ->orderByDesc('id')
@@ -205,6 +298,23 @@ trait ReadsAgreementRegister
     }
 
     /**
+     * How many matching agreements carry each flag, ignoring the flag filter
+     * itself, so a flag that would return nothing can say so before it is
+     * pressed.
+     *
+     * @return array<string, int>
+     */
+    #[Computed]
+    public function flagCounts(): array
+    {
+        return collect(self::FLAGS)
+            ->mapWithKeys(fn (string $flag): array => [
+                $flag => $this->applyFlag($this->filteredQuery(withFlag: false), $flag)->count(),
+            ])
+            ->all();
+    }
+
+    /**
      * The filtered agreements joined to the records their rows name and to
      * their money, which is one grouped join rather than a loaded relation:
      * that is what lets a money column be sorted, totalled and exported.
@@ -215,7 +325,7 @@ trait ReadsAgreementRegister
     {
         $today = CarbonImmutable::today()->toDateString();
 
-        return $this->filteredQuery()
+        $query = $this->filteredQuery()
             ->join('donors', 'donors.id', '=', 'donor_proposal.donor_id')
             ->join('proposals', 'proposals.id', '=', 'donor_proposal.proposal_id')
             ->select('donor_proposal.*')
@@ -226,6 +336,8 @@ trait ReadsAgreementRegister
             ->withMin(['reports as next_report_due' => fn (Builder $query) => $query
                 ->whereNull('submitted_on')
                 ->whereDate('due_on', '>=', $today)], 'due_on');
+
+        return $this->withHealthCounts($query);
     }
 
     /**
@@ -240,8 +352,20 @@ trait ReadsAgreementRegister
         $sum = fn (string $column): string => "coalesce(money.{$column}, 0)";
 
         return [
+            // Not a column heading: the opening order, what needs a person first.
+            'urgency' => ['dir' => 'asc', 'order' => [
+                self::URGENCY_RANK_SQL.' {dir}',
+                'money.m_next_due is null',
+                'money.m_next_due asc',
+                'donors.name asc',
+                $lastById,
+            ]],
             'agreement' => ['dir' => 'asc', 'order' => ['donors.name {dir}', 'proposals.name {dir}', $lastById]],
             'budget' => $money('donor_proposal.budget'),
+            // The register's own two columns carry the budget and the received
+            // share, so each sorts by the figure it prints.
+            'amount' => $money('donor_proposal.budget'),
+            'received_share' => $money($sum('m_received')),
             'scheduled' => $money($sum('m_scheduled')),
             'received' => $money($sum('m_received')),
             'percent' => ['dir' => 'desc', 'order' => ["(case when donor_proposal.budget > 0 then {$sum('m_received')} / donor_proposal.budget else 0 end) {dir}", $lastById]],
@@ -260,7 +384,7 @@ trait ReadsAgreementRegister
 
     protected function registerDefaultSort(): string
     {
-        return 'next_due';
+        return 'urgency';
     }
 
     /**

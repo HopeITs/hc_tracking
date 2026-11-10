@@ -159,7 +159,7 @@ test('the cash-flow calendar pads an empty schedule around today', function () {
     $calendar = Livewire::actingAs($user)
         ->test('pages::funding-agreements.index')
         ->set('view', 'overview')
-        ->assertSeeText('No tranches scheduled yet')
+        ->assertSeeText('No tranches scheduled')
         ->instance()
         ->calendar;
 
@@ -791,10 +791,18 @@ test('the index flags agreements with an overdue donor report', function () {
     $agreement = DonorProposal::factory()->create();
     DonorReport::factory()->create(['donor_proposal_id' => $agreement->id, 'due_on' => now()->subDays(2)->toDateString()]);
 
-    Livewire::actingAs($user)
+    // The donor-reports column went; an overdue report now shows where it is
+    // harder to miss — the row's status word, and the headline figure above it.
+    $page = Livewire::actingAs($user)
         ->test('pages::funding-agreements.index')
-        ->assertSeeHtml('data-report-overdue')
-        ->assertSeeText('1 donor report overdue');
+        ->assertSeeHtml('data-health="attention"')
+        ->assertSeeText('Needs attention');
+
+    expect($page->instance()->healthCounts['attention'])->toBe(1);
+
+    // And pressing that figure finds it.
+    expect($page->call('toggleHealth', 'attention')->instance()->rows->pluck('id')->all())
+        ->toBe([$agreement->id]);
 });
 
 test('agreement detail shows when the donor was last contacted and flags a donor gone quiet', function () {

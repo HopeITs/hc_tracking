@@ -64,7 +64,7 @@ trait ManagesTaskAttachments
 
     public function openCreateFileModal(): void
     {
-        Gate::authorize('update', $this->task);
+        Gate::authorize('manageFiles', $this->task);
 
         $this->resetFileForm();
         $this->fileDate = now()->toDateString();
@@ -73,7 +73,7 @@ trait ManagesTaskAttachments
 
     public function openEditFileModal(int $fileId): void
     {
-        Gate::authorize('update', $this->task);
+        Gate::authorize('manageFiles', $this->task);
 
         $file = $this->taskAttachment($fileId);
 
@@ -90,7 +90,7 @@ trait ManagesTaskAttachments
      */
     public function saveFile(): void
     {
-        Gate::authorize('update', $this->task);
+        Gate::authorize('manageFiles', $this->task);
 
         $isCreate = $this->editingFileId === null;
         $allowedTypes = implode(',', FileType::values());
@@ -135,7 +135,7 @@ trait ManagesTaskAttachments
 
     public function confirmDeleteFile(int $fileId): void
     {
-        Gate::authorize('update', $this->task);
+        Gate::authorize('manageFiles', $this->task);
 
         $this->deletingFileId = $this->taskAttachment($fileId)->id;
         $this->showDeleteFileModal = true;
@@ -146,7 +146,7 @@ trait ManagesTaskAttachments
      */
     public function deleteFile(): void
     {
-        Gate::authorize('update', $this->task);
+        Gate::authorize('manageFiles', $this->task);
 
         if ($this->deletingFileId === null) {
             $this->closeDeleteFileModal();

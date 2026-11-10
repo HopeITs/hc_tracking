@@ -135,8 +135,13 @@ return [
     | department, plus their own tasks and tasks on projects they answer for
     | (App\Models\Scopes\TaskVisibilityScope). A bypass role sees every
     | department and wins when a user holds both kinds.
+    |
+    | task_status_and_files_only_roles (Media Team, UAT 2026-11-09) edit only
+    | the tasks they created. On a colleague's own or department task they
+    | may move the status and add or remove files, nothing else.
     */
     'task_department_scope_bypass_roles' => ['Super Admin', 'General Manager', 'Managers'],
+    'task_status_and_files_only_roles' => ['Media Team'],
     'task_department_scoped_roles' => ['MEAL', 'Financial', 'Media Team', 'Public Relations', 'Public Relations Manager', 'Team Member'],
 
     /*

@@ -48,6 +48,10 @@ trait FiltersTransferRegister
             $this->sort = 'attention';
         }
 
+        if (! in_array($this->focus, self::FOCUSES, true)) {
+            $this->focus = '';
+        }
+
         if (! in_array($this->stage, self::STAGES, true)) {
             $this->stage = '';
         }
@@ -134,7 +138,7 @@ trait FiltersTransferRegister
 
     public function clearFilters(): void
     {
-        $this->reset(['search', 'donor', 'account', 'currency', 'stage', 'flag', 'dateBasis', 'from', 'to', 'min', 'max', 'agreement']);
+        $this->reset(['focus', 'search', 'donor', 'account', 'currency', 'stage', 'flag', 'dateBasis', 'from', 'to', 'min', 'max', 'agreement']);
         $this->resetRegisterFilters();
         $this->resetPage();
     }

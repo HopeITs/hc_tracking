@@ -64,6 +64,8 @@ new #[Layout('layouts::desk'), Title('titles.monthly_report')] class extends Com
                 <p class="type-meta text-secondary-medium dark:text-ink-muted">
                     @if ($isEditable)
                         {{ __('monthly_reports.grid_help') }}
+                    @elseif ($report->status === \App\Enums\MonthlyReportStatus::Validated)
+                        {{ __('monthly_reports.read_only_validated') }}
                     @elseif ($report->status !== \App\Enums\MonthlyReportStatus::Draft)
                         {{ __('monthly_reports.read_only_submitted') }}
                     @else

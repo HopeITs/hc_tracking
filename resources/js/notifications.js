@@ -152,7 +152,7 @@ window.addEventListener('notification-counts', (event) => setAppBadge(event.deta
 document.addEventListener('livewire:navigated', () => {
     const counter = document.querySelector('[data-unread-count]');
 
-    setAppBadge(counter ? Number.parseInt(counter.textContent, 10) || 0 : 0);
+    setAppBadge(counter ? Number.parseInt(counter.dataset.unreadCount, 10) || 0 : 0);
 });
 
 /* ------------------------------------------------------------------ */
@@ -465,8 +465,8 @@ document.addEventListener('alpine:init', () => {
 
     /**
      * The bell's panel. Its rows are fetched the first time it opens
-     * (loadPanel), focus moves into it on open and back to the bell when
-     * Escape closes it.
+     * (loadPanel), it is centred under the bell (place), focus moves into it
+     * on open and back to the bell when Escape closes it.
      */
     window.Alpine.data('notificationBell', () => ({
         open: false,
@@ -521,7 +521,63 @@ document.addEventListener('alpine:init', () => {
                 this.$wire.loadPanel();
             }
 
-            this.$nextTick(() => this.$refs.panel?.focus({ preventScroll: true }));
+            this.$nextTick(() => {
+                this.place();
+                this.$refs.panel?.focus({ preventScroll: true });
+            });
+        },
+
+        /**
+         * The panel hangs centred under the bell (desk-bell.css). Near a window
+         * edge it slides sideways just enough to keep a 16px margin; below
+         * 640px it is a full-width sheet and needs no nudge.
+         */
+        place() {
+            const panel = this.$refs.panel;
+
+            if (!this.open || !panel) {
+                return;
+            }
+
+            if (window.innerWidth < 640) {
+                panel.style.removeProperty('--nb-shift');
+
+                return;
+            }
+
+            const margin = 16;
+            const bell = this.$refs.button.getBoundingClientRect();
+            const centre = bell.left + bell.width / 2;
+            const half = panel.offsetWidth / 2;
+            const left = centre - half;
+            const right = centre + half;
+            let shift = 0;
+
+            if (left < margin) {
+                shift = margin - left;
+            } else if (right > window.innerWidth - margin) {
+                shift = window.innerWidth - margin - right;
+            }
+
+            panel.style.setProperty('--nb-shift', `${Math.round(shift)}px`);
+        },
+
+        /** ↑ / ↓ move focus from one notification to the next, across sections. */
+        moveRow(event, step) {
+            const links = [...this.$refs.panel.querySelectorAll('[data-notification-link]')];
+            const current = links.indexOf(event.target.closest('[data-bell-row]')?.querySelector('[data-notification-link]'));
+
+            links[Math.min(links.length - 1, Math.max(0, current + step))]?.focus();
+        },
+
+        /** Arrow keys move between the All and Unread tabs and select them. */
+        switchTab(event) {
+            const tabs = [...event.currentTarget.querySelectorAll('[role="tab"]')];
+            const current = tabs.indexOf(document.activeElement);
+            const next = tabs[(current + 1) % tabs.length];
+
+            next?.focus();
+            next?.click();
         },
 
         close(returnFocus) {

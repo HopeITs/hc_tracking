@@ -28,7 +28,8 @@
         @endif
 
         {{-- A slim register: who, when to follow up, and the money at a glance. Contact details, the next step and the rest of the rhythm wait on the donor's own page. --}}
-        <x-funding.register :size="! $canTransfers ? 'sm' : ($showsYearColumns ? 'lg' : 'md')" :caption="__('finance_tables.donors_caption')">
+        {{-- Nine columns need ~75rem and eleven ~89rem: a smaller size stopped scrolling before the table fit, and the Desk register's clipped frame cut the actions column off. --}}
+        <x-funding.register :size="! $canTransfers ? 'sm' : ($showsYearColumns ? 'xl' : 'lg')" :caption="__('finance_tables.donors_caption')">
             <x-slot:head>
                 <x-funding.register.th sort="donor" :active="$sortKey" :dir="$sortDirection">{{ __('donors.donor') }}</x-funding.register.th>
                 <x-funding.register.th>{{ __('donors.section_contact') }}</x-funding.register.th>

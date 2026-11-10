@@ -235,6 +235,17 @@ new #[Layout('layouts::desk'), Title('titles.donor_report')] class extends Compo
         </x-slot:meta>
 
         <x-slot:actions>
+            @if (! $report->isSubmitted()
+                && $report->type === \App\Enums\DonorReportType::Narrative
+                && $report->isResponsible(auth()->user())
+                && auth()->user()->can('reports.aggregate')
+                && ($proposal = $report->donorProposal?->proposal)?->status->isApprovedByDonor()
+                && ! $proposal->isPayroll()
+                && $proposal->donor?->is_internal === false)
+                <x-ui.button icon="document-plus" :href="route('donor-reports.compose', ['proposal' => $proposal->id])" wire:navigate data-test="compose-assigned-donor-report">
+                    {{ __('navigation.donor_report_builder') }}
+                </x-ui.button>
+            @endif
             @if ($report->isSubmitted())
                 <span class="inline-flex items-center gap-1.5 rounded-full bg-status-good-soft px-3 py-1 text-sm font-semibold text-status-good" data-report-submitted>
                     <flux:icon.check-circle variant="mini" class="size-4" />

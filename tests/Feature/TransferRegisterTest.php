@@ -8,6 +8,7 @@ use App\Models\DonorProposal;
 use App\Models\TransfersTracking;
 use App\Models\User;
 use Database\Seeders\RolesAndPermissionsSeeder;
+use Illuminate\Support\Facades\Blade;
 use Livewire\Features\SupportTesting\Testable;
 use Livewire\Livewire;
 
@@ -90,17 +91,64 @@ test('the overview view shows the ledger and the ladder instead of the table', f
         ->assertDontSeeHtml('data-register');
 });
 
-test('a table row shows fees, rate, gross, net and the difference without expanding anything', function () {
-    registerSettledTranche(['exchange_rate' => '0.925000']);
+test('a table row shows what was sent, what landed and the gap, and leaves the journey to the Overview', function () {
+    // Everything in one currency at a rate of 1: nothing to explain.
+    registerSettledTranche();
 
     transferRegister()
         ->assertSee('1,000.00')
-        ->assertSee('10.00')
-        ->assertSee('0.925')
-        ->assertSee('995.00')
         ->assertSee('985.00')
         ->assertSee('−15.00')
+        // Fees, the account and the sent and received dates moved to the
+        // Overview ladder and the edit form: thirteen columns forced a
+        // sideways scroll that hid the edit button.
+        ->assertDontSeeHtml('data-cell="fees"')
+        ->assertDontSeeHtml('data-cell="rate"')
+        ->assertDontSeeHtml('data-cell="gross"')
         ->assertDontSeeHtml('aria-controls="transfer-detail-');
+});
+
+test('the exchange rate and the gross amount come back as soon as a tranche crosses currencies', function () {
+    registerSettledTranche();
+
+    // A rate of 1 on every row explains nothing, so the two columns stay out.
+    expect(transferRegister()->instance()->hasConversions)->toBeFalse();
+
+    // One tranche at another rate, and they are the columns that explain the
+    // figures — so the register shows them again rather than losing them.
+    registerSettledTranche(['exchange_rate' => '0.925000']);
+
+    $page = transferRegister();
+
+    expect($page->instance()->hasConversions)->toBeTrue();
+
+    $page->assertSeeHtml('data-cell="rate"')
+        ->assertSeeHtml('data-cell="gross"')
+        ->assertSee('0.925')
+        // Fees and the dates stay out: they are not what a conversion needs.
+        ->assertDontSeeHtml('data-cell="fees"');
+});
+
+test('a tranche that landed in another currency also brings the columns back', function () {
+    registerSettledTranche(['amount_received_currency' => Currency::Eur]);
+
+    expect(transferRegister()->instance()->hasConversions)->toBeTrue();
+});
+
+test('the full tranche table keeps every column, so the agreement page is unchanged', function () {
+    $tranche = registerSettledTranche(['exchange_rate' => '0.925000']);
+
+    // x-funding.tranche-row is shared; only the transfers register asks for
+    // the compact set, so the agreement, donor and proposal pages keep theirs.
+    $html = Blade::render(
+        '<table><tbody><x-funding.tranche-row :transfer="$transfer" /></tbody></table>',
+        ['transfer' => $tranche->fresh()],
+    );
+
+    expect($html)->toContain('data-cell="fees"')
+        ->and($html)->toContain('data-cell="rate"')
+        ->and($html)->toContain('data-cell="gross"')
+        ->and($html)->toContain('0.925');
 });
 
 test('the donor, currency, account and agreement filters each narrow the rows', function () {
@@ -325,7 +373,9 @@ test('a group subtotal covers the whole group even when the group runs onto the 
 
     $page = transferRegister()->set('group', 'donor');
 
-    expect($page->instance()->rows)->toHaveCount(5)
+    // A page now holds 25, so 26 tranches still split across two pages and the
+    // subtotal must cover both.
+    expect($page->instance()->rows)->toHaveCount(25)
         ->and((float) $page->instance()->groupTotals->get((string) $donor->id)->first()->sent)->toBe(2600.0);
 
     $page->assertSeeHtml('data-group="'.$donor->id.'"')
@@ -349,10 +399,11 @@ test('the page size can be changed and an unknown size is ignored', function () 
 
     $page = transferRegister();
 
-    expect($page->instance()->rows)->toHaveCount(5);
-
-    $page->set('perPage', '25');
+    // A ledger opens 25 rows deep, not 5.
     expect($page->instance()->rows)->toHaveCount(25);
+
+    $page->set('perPage', '50');
+    expect($page->instance()->rows)->toHaveCount(30);
 
     $page->set('perPage', '5000')->assertSet('perPage', '');
 });
@@ -474,4 +525,110 @@ test('the tranche form is rendered only while its modal is open', function () {
         ->assertDontSeeHtml('wire:model="paymentAmount"')
         ->call('openTransferCreate')
         ->assertSeeHtml('wire:model="paymentAmount"');
+});
+
+test('the shortfall names its parts instead of printing the fees twice', function () {
+    // 1,000 sent, 985 net: 15 lost, 10 of it recorded fees, 5 unexplained.
+    registerSettledTranche();
+
+    $line = transferRegister()->instance()->totals->sole();
+
+    expect($line['shrink'])->toBe(15.0)
+        ->and($line['fees'])->toBe(10.0)
+        ->and($line['exchangeGap'])->toBe(5.0);
+
+    // One figure for what was lost; fees are no longer a sibling of it, so a
+    // reader cannot add the two and conclude 25 is gone.
+    transferRegister()
+        ->assertSeeHtml('data-total="shortfall"')
+        ->assertDontSeeHtml('data-total="fees"')
+        ->assertSeeText('fees 10.00 · unexplained 5.00');
+});
+
+test('a tranche whose whole loss is its recorded fees is not counted as short', function () {
+    // 1,000 sent, 990 net, 10 of fees: nothing unexplained.
+    registerSettledTranche(['net_amount_received' => '990.00', 'amount_received' => '1000.00']);
+
+    $page = transferRegister();
+
+    expect($page->instance()->totals->sole()['exchangeGap'])->toBe(0.0)
+        ->and($page->instance()->stageCounts['short'])->toBe(0);
+
+    // And the status that selects them finds none.
+    expect($page->call('toggleStage', 'short')->instance()->rows->total())->toBe(0);
+});
+
+test('landed short and net not recorded sit with the statuses they belong to', function () {
+    registerSettledTranche();
+
+    // They write the stage property, so choosing one replaces the status
+    // rather than combining with it: they are statuses, and are shown as such.
+    $page = transferRegister()->call('toggleStage', 'received');
+
+    expect($page->instance()->stage)->toBe('received');
+
+    $page->call('toggleStage', 'short');
+
+    expect($page->instance()->stage)->toBe('short')
+        ->and($page->instance()->flag)->toBe('');
+});
+
+test('every tranche falls into exactly one of the three headline states', function () {
+    // Pinned, because "late" and "upcoming" are read against today.
+    $this->travelTo('2026-06-15 09:00:00');
+
+    // Needs attention: unsent and past its date.
+    $late = registerPendingTranche(['scheduled_date' => '2026-05-01']);
+    // Needs attention: failed.
+    $failed = registerPendingTranche(['ar_status' => ArStatus::Failed]);
+    // Needs attention: received but nobody recorded what arrived.
+    $unrecorded = registerSettledTranche(['net_amount_received' => null, 'amount_received' => null]);
+    // On its way: scheduled ahead.
+    $upcoming = registerPendingTranche(['scheduled_date' => '2026-08-01']);
+    // Landed: arrived and the whole loss is its recorded fees.
+    $landed = registerSettledTranche(['net_amount_received' => '990.00', 'amount_received' => '1000.00']);
+
+    $page = transferRegister();
+
+    expect($page->instance()->focusCounts)->toBe(['attention' => 3, 'travelling' => 1, 'landed' => 1]);
+
+    // The three cover every tranche, so none is counted twice or left out.
+    expect(array_sum($page->instance()->focusCounts))->toBe(TransfersTracking::count());
+
+    $ids = fn (Testable $page): array => $page->instance()->rows->pluck('id')->sort()->values()->all();
+
+    expect($ids(transferRegister()->call('toggleFocus', 'attention')))
+        ->toBe(collect([$late, $failed, $unrecorded])->pluck('id')->sort()->values()->all())
+        ->and($ids(transferRegister()->call('toggleFocus', 'travelling')))->toBe([$upcoming->id])
+        ->and($ids(transferRegister()->call('toggleFocus', 'landed')))->toBe([$landed->id]);
+
+    // Pressing the same figure again clears it.
+    transferRegister()->call('toggleFocus', 'landed')->call('toggleFocus', 'landed')->assertSet('focus', '');
+
+    // A state typed into the address bar that is not one of the three is dropped.
+    transferRegister(['focus' => 'whatever'])->assertSet('focus', '')->assertOk();
+});
+
+test('the net figure is called the same thing everywhere on the transfers page, in both languages', function (string $locale) {
+    // The ledger's figure and the totals row above it print the same number.
+    expect((string) trans('transfers.landed', [], $locale))
+        ->toBe((string) trans('finance_tables.received', [], $locale));
+
+    // The cell and the status that select the same tranches say the same thing.
+    expect((string) trans('transfers.not_recorded_yet', [], $locale))
+        ->toBe((string) trans('finance_tables.flag_unrecorded', [], $locale));
+
+    // "Fully received" is the headline state; "Received" is the raw status.
+    // They select different tranches, so they must not share a word.
+    expect((string) trans('transfers.focus_landed', [], $locale))
+        ->not->toBe((string) trans('finance_tables.state_received', [], $locale));
+})->with(['en', 'ar']);
+
+test('every row names the tranche its edit button edits', function () {
+    $donor = Donor::factory()->create(['name' => 'Alpha Fund']);
+    $agreement = DonorProposal::factory()->create(['donor_id' => $donor->id, 'currency' => Currency::Usd]);
+    registerPendingTranche(['donor_proposal_id' => $agreement->id, 'scheduled_date' => '2026-02-01']);
+
+    // Six identical "Edit transfer" buttons are six identical announcements.
+    transferRegister()->assertSeeHtml('aria-label="Edit Alpha Fund · Feb 1, 2026"');
 });

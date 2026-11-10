@@ -32,7 +32,7 @@
                             id="answer-{{ $question->id }}"
                             rows="2"
                             dir="auto"
-                            wire:model.blur="answers.{{ $question->id }}"
+                            wire:model.live.blur="answers.{{ $question->id }}"
                             class="field-sizing-content min-h-16 w-full max-w-3xl rounded-md border border-secondary-light bg-white px-2 py-1.5 text-sm text-secondary-dark outline-none focus:border-secondary-medium focus:ring-2 focus:ring-secondary-light dark:border-field-line dark:bg-surface-2 dark:text-ink dark:focus:border-ink-muted"
                         ></textarea>
                         @error('answers.'.$question->id)

@@ -8,6 +8,7 @@ use App\Models\ProposalReviewer;
 use App\Models\Task;
 use App\Models\User;
 use Closure;
+use Illuminate\Support\Facades\Lang;
 use Illuminate\Support\Facades\Route;
 use Illuminate\Support\Str;
 
@@ -27,6 +28,13 @@ use Illuminate\Support\Str;
  * exactly twelve columns and each row shares one height, so the Desk never
  * shows a hole between cards. resources/js/desk-rows.js mirrors these rules
  * for the live preview while a card is dragged or resized.
+ *
+ * Besides its hand-made panels the Desk holds every page and every action:
+ * a page with no panel of its own as a page card ("p-…", PageCards), and any
+ * page or "New …" action as a button ("g-…" / "a-…", Shortcuts). A button may
+ * be one row unit tall (MinTileRows); everything else is at least MinRows.
+ * itemForRoute() names what stands for a page when it is dragged in from the
+ * sidebar or added from its own header.
  */
 final class Panels
 {
@@ -47,6 +55,33 @@ final class Panels
     public const int MinRows = 2;
 
     public const int MaxRows = 8;
+
+    /**
+     * A button (Shortcuts) may be one row unit tall; a row of buttons reads as a strip.
+     */
+    public const int MinTileRows = 1;
+
+    /**
+     * The hand-made panel that stands for a page, by the page's route.
+     *
+     * @var array<string, string>
+     */
+    private const array RoutePanels = [
+        'reviews.index' => 'reviews',
+        'projects.index' => 'projects',
+        'milestones.index' => 'milestones',
+        'targets.index' => 'targets',
+        'reports.monthly-matrix' => 'matrix',
+        'monthly-reports.index' => 'validate',
+        'report-templates.index' => 'templates',
+        'donor-reports.index' => 'duties',
+        'donors.index' => 'donors',
+        'proposals.index' => 'pipeline',
+        'transfers.index' => 'transfers',
+        'tasks.index' => 'tasks',
+        'department-tasks.index' => 'deliverables',
+        'calendar.index' => 'coming',
+    ];
 
     /**
      * The starting layout per role, in the order the panels appear.
@@ -136,54 +171,55 @@ final class Panels
      * The ready layouts of the Customize sheet: each names the panel without
      * which it is not offered (core) and its rows, every row an ordered list
      * of [panel, cols, rows] that totals twelve columns and shares one height.
+     * Only panels and page cards: buttons live in Quick access, never on the Desk.
      *
      * @var array<string, array{core: string, rows: list<list<array{0: string, 1: int, 2: int}>>}>
      */
     private const array ReadyLayouts = [
         'today' => ['core' => 'needs', 'rows' => [
             [['needs', 7, 4], ['coming', 5, 4]],
-            [['overdue', 6, 4], ['tasks', 6, 4]],
-            [['waiting', 12, 3]],
+            [['tasks', 8, 4], ['milestones', 4, 4]],
+            [['overdue', 6, 3], ['waiting', 6, 3]],
         ]],
         'money' => ['core' => 'money', 'rows' => [
             [['money', 8, 5], ['transfers', 4, 5]],
-            [['overdue', 5, 4], ['duties', 7, 4]],
-            [['pipeline', 12, 4]],
+            [['p-funding-agreements', 6, 4], ['duties', 6, 4]],
+            [['p-admin-accounts', 6, 3], ['overdue', 6, 3]],
         ]],
         'donors' => ['core' => 'donors', 'rows' => [
-            [['donors', 7, 5], ['pipeline', 5, 5]],
-            [['duties', 6, 4], ['money', 6, 4]],
-            [['coming', 12, 3]],
+            [['donors', 7, 5], ['duties', 5, 5]],
+            [['pipeline', 8, 4], ['coming', 4, 4]],
+            [['p-donor-reports', 6, 3], ['p-funding-agreements', 6, 3]],
         ]],
         'tasks' => ['core' => 'tasks', 'rows' => [
-            [['tasks', 8, 6], ['waiting', 4, 6]],
-            [['deliverables', 4, 4], ['overdue', 4, 4], ['coming', 4, 4]],
-            [['myteam', 12, 4]],
+            [['tasks', 8, 6], ['coming', 4, 6]],
+            [['deliverables', 6, 4], ['waiting', 6, 4]],
         ]],
         'delivery' => ['core' => 'projects', 'rows' => [
             [['flow', 12, 2]],
             [['projects', 8, 5], ['milestones', 4, 5]],
-            [['targets', 6, 4], ['tasks', 6, 4]],
+            [['tasks', 6, 4], ['targets', 6, 4]],
+            [['p-annual-plans', 6, 3], ['p-programs', 6, 3]],
         ]],
         'impact' => ['core' => 'targets', 'rows' => [
             [['targets', 7, 5], ['validate', 5, 5]],
             [['matrix', 12, 4]],
-            [['templates', 6, 3], ['duties', 6, 3]],
+            [['templates', 4, 3], ['p-indicators', 4, 3], ['p-results', 4, 3]],
         ]],
         'fundraising' => ['core' => 'pipeline', 'rows' => [
             [['pipeline', 8, 5], ['reviews', 4, 5]],
-            [['donors', 6, 4], ['coming', 6, 4]],
+            [['donors', 6, 4], ['needs', 6, 4]],
         ]],
         'team' => ['core' => 'myteam', 'rows' => [
             [['myteam', 7, 5], ['waiting', 5, 5]],
             [['tasks', 8, 4], ['needs', 4, 4]],
-            [['milestones', 12, 3]],
+            [['milestones', 6, 3], ['deliverables', 6, 3]],
         ]],
         'overview' => ['core' => 'glance', 'rows' => [
             [['glance', 12, 2]],
-            [['flow', 12, 2]],
-            [['needs', 6, 4], ['money', 6, 4]],
-            [['matrix', 12, 4]],
+            [['needs', 4, 4], ['flow', 8, 4]],
+            [['money', 6, 4], ['projects', 6, 4]],
+            [['matrix', 8, 4], ['targets', 4, 4]],
         ]],
     ];
 
@@ -339,15 +375,49 @@ final class Panels
      */
     public function readyKindOf(string $panel): string
     {
-        return self::ReadyKinds[$panel] ?? 'work';
+        return match (true) {
+            PageCards::isCard($panel) => 'pages',
+            str_starts_with($panel, Shortcuts::ActionPrefix) => 'actions',
+            Shortcuts::isShortcut($panel) => 'buttons',
+            default => self::ReadyKinds[$panel] ?? 'work',
+        };
     }
 
     /**
-     * Every panel the given user may see, keyed by id, in library order.
+     * Everything the given user may put on the Desk, keyed by id: the
+     * hand-made panels in library order, then the page cards, then the
+     * buttons (actions first, then pages). kind says which.
      *
-     * @return array<string, array{id: string, title: string, description: string, icon: string, size: string, register: string|null}>
+     * @return array<string, array{id: string, title: string, description: string, icon: string, size: string, register: string|null, kind: 'panel'|'card'|'action'|'page'}>
      */
     public function availableTo(User $user): array
+    {
+        return $this->available[$this->memoKey($user)] ??= $this->buildAvailable($user);
+    }
+
+    /**
+     * @var array<string, array<string, array{id: string, title: string, description: string, icon: string, size: string, register: string|null, kind: 'panel'|'card'|'action'|'page'}>>
+     */
+    private array $available = [];
+
+    /**
+     * @var array<string, array<string, string>>
+     */
+    private array $routeItems = [];
+
+    /**
+     * Who is asking, as their access stands now: a role given or taken a permission in the
+     * same request reads afresh.
+     */
+    private function memoKey(User $user): string
+    {
+        return $user->id.':'.md5($user->getAllPermissions()->pluck('name')->sort()->implode(',').'|'.$user->getRoleNames()->implode(','));
+    }
+
+    /**
+     * @return array<string, array{id: string, title: string, description: string, icon: string, size: string, register: string|null, kind: 'panel'|'card'|'action'|'page'}>
+     */
+    private function buildAvailable(User $user): array
     {
         $panels = [];
 
@@ -363,10 +433,125 @@ final class Panels
                 'icon' => $panel['icon'],
                 'size' => $panel['size'],
                 'register' => $panel['register'],
+                'kind' => 'panel',
+            ];
+        }
+
+        $cards = app(PageCards::class);
+        $destinations = app(Destinations::class);
+
+        foreach ($cards->routes() as $route) {
+            $page = $destinations->find($route);
+
+            if ($page === null || ! Route::has($route) || ! $cards->allows($user, $route)) {
+                continue;
+            }
+
+            $id = PageCards::idFor($route);
+            $describes = 'desk-workspace.card.about.'.Destinations::slugOf($route);
+            $panels[$id] = [
+                'id' => $id,
+                'title' => $page['label'],
+                'description' => Lang::has($describes) ? (string) __($describes) : (string) __('desk-workspace.card.about_any', ['page' => $page['label']]),
+                'icon' => $cards->iconOf($route),
+                'size' => 'L',
+                'register' => $route,
+                'kind' => 'card',
+            ];
+        }
+
+        foreach (app(Shortcuts::class)->for($user) as $id => $button) {
+            $panels[$id] = [
+                'id' => $id,
+                'title' => $button['label'],
+                'description' => (string) __('desk-workspace.tile.about_'.$button['kind'], ['page' => $button['label']]),
+                'icon' => $button['icon'],
+                'size' => 'S',
+                'register' => $button['route'],
+                'kind' => $button['kind'],
             ];
         }
 
         return $panels;
+    }
+
+    /**
+     * What stands for a page on this user's Desk: its hand-made panel, else
+     * its page card, else a button that opens it; null when they may not
+     * open the page. The sidebar's drag-and-drop and every page's "Add to
+     * desk" read this, so a page always lands as the same thing.
+     */
+    public function itemForRoute(User $user, string $route): ?string
+    {
+        return $this->itemAmong($this->availableTo($user), $route);
+    }
+
+    /**
+     * What stands for each page the user may open (itemForRoute), read in
+     * one pass: route => item id, pages with nothing left out.
+     *
+     * @return array<string, string>
+     */
+    public function itemsForRoutes(User $user): array
+    {
+        return $this->routeItems[$this->memoKey($user)] ??= $this->buildItemsForRoutes($user);
+    }
+
+    /**
+     * @return array<string, string>
+     */
+    private function buildItemsForRoutes(User $user): array
+    {
+        $available = $this->availableTo($user);
+        $items = [];
+
+        foreach (app(Destinations::class)->for($user) as $page) {
+            $id = $this->itemAmong($available, $page['route']);
+
+            if ($id !== null) {
+                $items[$page['route']] = $id;
+            }
+        }
+
+        return $items;
+    }
+
+    /**
+     * @param  array<string, mixed>  $available
+     */
+    private function itemAmong(array $available, string $route): ?string
+    {
+        $candidates = [self::RoutePanels[$route] ?? null, PageCards::idFor($route), Shortcuts::PagePrefix.Destinations::slugOf($route)];
+
+        foreach ($candidates as $id) {
+            if ($id !== null && isset($available[$id])) {
+                return $id;
+            }
+        }
+
+        return null;
+    }
+
+    /**
+     * The layout with one more item: at $position in the order (the end
+     * when null), at the item's own size, read flush. Unchanged when the
+     * item is already placed or not available to the user.
+     *
+     * @param  list<array{panel: string, size: string, cols: int, rows: int}>  $layout
+     * @return list<array{panel: string, size: string, cols: int, rows: int}>
+     */
+    public function withItem(User $user, array $layout, string $id, ?int $position = null): array
+    {
+        $available = $this->availableTo($user);
+
+        if (! isset($available[$id]) || in_array($id, array_column($layout, 'panel'), true)) {
+            return $layout;
+        }
+
+        $entry = $this->sized($id, $available[$id]['size']);
+        array_splice($layout, $position === null ? count($layout) : max(0, min($position, count($layout))), 0, [$entry]);
+
+        return $this->flush(array_values($layout));
     }
 
     /**
@@ -396,13 +581,46 @@ final class Panels
 
     /**
      * The user's Desk: their own arrangement, or their role's default, with
-     * every panel they may not see (and every unknown entry) left out.
+     * every panel they may not see (and every unknown entry) left out. Buttons
+     * are never on it: they live in Quick access (QuickAccess::addItem).
      *
      * @return list<array{panel: string, size: string, cols: int, rows: int}>
      */
     public function layoutFor(User $user): array
     {
-        return is_array($user->desk_layout) ? $this->clean($user->desk_layout, $user) : $this->startingLayoutFor($user);
+        return is_array($user->desk_layout) ? $this->clean($this->withoutButtons($user->desk_layout), $user) : $this->startingLayoutFor($user);
+    }
+
+    /**
+     * The button ids (Shortcuts, `a-…` / `g-…`) a stored Desk layout still
+     * holds, in its order. The Desk keeps only panels and page cards; buttons
+     * live in Quick access, and a Desk saved before that moves them there.
+     *
+     * @param  array<mixed>  $stored
+     * @return list<string>
+     */
+    public function buttonsIn(array $stored): array
+    {
+        $buttons = [];
+
+        foreach ($stored as $entry) {
+            $panel = is_array($entry) ? ($entry['panel'] ?? null) : null;
+
+            if (is_string($panel) && Shortcuts::isShortcut($panel) && ! in_array($panel, $buttons, true)) {
+                $buttons[] = $panel;
+            }
+        }
+
+        return $buttons;
+    }
+
+    /**
+     * @param  array<mixed>  $stored
+     * @return array<mixed>
+     */
+    private function withoutButtons(array $stored): array
+    {
+        return array_values(array_filter($stored, fn (mixed $entry): bool => ! (is_array($entry) && is_string($entry['panel'] ?? null) && Shortcuts::isShortcut($entry['panel']))));
     }
 
     /**
@@ -521,6 +739,45 @@ final class Panels
     }
 
     /**
+     * Which Desk panels the person pinned to the top (in the order they
+     * pinned them) and which they folded into a small tile, as saved on
+     * users.desk_panel_flags. Anything malformed is dropped; panels no
+     * longer on the Desk are left for the caller to filter.
+     *
+     * @return array{pinned: list<string>, folded: list<string>}
+     */
+    public function flagsFor(User $user): array
+    {
+        $stored = is_array($user->desk_panel_flags) ? $user->desk_panel_flags : [];
+        $list = fn (string $key): array => array_values(array_unique(array_filter(is_array($stored[$key] ?? null) ? $stored[$key] : [], is_string(...))));
+
+        return ['pinned' => $list('pinned'), 'folded' => $list('folded')];
+    }
+
+    /**
+     * The layout with its pinned panels first, in the order they were
+     * pinned, and every other panel after them in its own order. The cards
+     * trade places, never shapes (as Move did): every slot keeps its size,
+     * so pinning can never open a hole in the Desk.
+     *
+     * @param  list<array{panel: string, size: string, cols: int, rows: int}>  $layout
+     * @param  list<string>  $pinned
+     * @return list<array{panel: string, size: string, cols: int, rows: int}>
+     */
+    public function pinnedFirst(array $layout, array $pinned): array
+    {
+        $order = array_column($layout, 'panel');
+        $first = array_values(array_intersect($pinned, $order));
+        $wanted = [...$first, ...array_values(array_diff($order, $first))];
+
+        if ($wanted === $order) {
+            return $layout;
+        }
+
+        return array_map(fn (array $slot, string $panel): array => $this->sized($panel, $slot['size'], $slot['cols'], $slot['rows']), $layout, $wanted);
+    }
+
+    /**
      * The layout cut into rows, in order: a card that would pass the
      * twelfth column starts the next row.
      *
@@ -592,7 +849,8 @@ final class Panels
     public function sized(string $panel, string $size, mixed $cols = null, mixed $rows = null): array
     {
         $cols = is_numeric($cols) ? max(self::MinCols, min(self::MaxCols, (int) $cols)) : (self::Sizes[$size] ?? 4);
-        $rows = is_numeric($rows) ? max(self::MinRows, min(self::MaxRows, (int) $rows)) : max(self::MinRows, min(self::MaxRows, $this->rowsOf($panel)));
+        $least = $this->minRowsOf($panel);
+        $rows = is_numeric($rows) ? max($least, min(self::MaxRows, (int) $rows)) : max($least, min(self::MaxRows, $this->rowsOf($panel)));
 
         return ['panel' => $panel, 'size' => $this->nearestSize($cols), 'cols' => $cols, 'rows' => $rows];
     }
@@ -638,7 +896,15 @@ final class Panels
      */
     public function rowsOf(string $id): int
     {
-        return $this->definitions()[$id]['rows'] ?? self::DefaultRows;
+        return Shortcuts::isShortcut($id) ? self::MinTileRows : ($this->definitions()[$id]['rows'] ?? self::DefaultRows);
+    }
+
+    /**
+     * The fewest row units an item may be: a button one, anything else MinRows.
+     */
+    public function minRowsOf(string $id): int
+    {
+        return Shortcuts::isShortcut($id) ? self::MinTileRows : self::MinRows;
     }
 
     /**
@@ -646,7 +912,9 @@ final class Panels
      */
     public function iconOf(string $id): string
     {
-        return $this->definitions()[$id]['icon'] ?? 'grid';
+        $card = PageCards::isCard($id) ? app(PageCards::class)->routeOf($id) : null;
+
+        return $card !== null ? app(PageCards::class)->iconOf($card) : ($this->definitions()[$id]['icon'] ?? 'grid');
     }
 
     /**

@@ -175,6 +175,13 @@
                                                 <span class="text-2xl @xl/ledger:text-3xl">{{ __('transfers.settled_money_landed_in_full') }}</span>
                                             @endif
                                         </span>
+                                        @if ($line['shrink'] > 0)
+                                            {{-- The fees figure beside this one is PART of it, not a second
+                                                 loss. Say so here, where the total is read. --}}
+                                            <span class="mt-1.5 block text-[11px] tabular-nums {{ $mutedText }}" data-ledger-shortfall-parts>
+                                                {{ __('transfers.shortfall_parts', ['fees' => $this->amountAtLeast($line['fees']), 'gap' => $this->amountAtLeast($line['exchangeGap'])]) }}
+                                            </span>
+                                        @endif
                                     </button>
                                 </div>
                             @endif

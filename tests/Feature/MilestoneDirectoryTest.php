@@ -747,3 +747,21 @@ test('the milestone form is rendered only while its modal is open', function () 
         ->call('openCreateModal')
         ->assertSeeHtml('wire:model="plannedStartDate"');
 });
+
+test('the timeline draws the first project panels and the rest on request', function () {
+    $user = User::factory()->role('General Manager')->create();
+
+    foreach (range(1, 7) as $number) {
+        Milestone::factory()->create(['project_id' => Project::factory()->create(['name' => "Timeline project {$number}"])->id]);
+    }
+
+    $timeline = Livewire::actingAs($user)->test('pages::milestones.index')
+        ->assertSeeHtml('data-test="milestone-timeline-more"');
+
+    expect(substr_count($timeline->html(), 'wire:key="milestone-timeline-project-'))->toBe(6);
+
+    $timeline->call('showMoreTimeline')
+        ->assertDontSeeHtml('data-test="milestone-timeline-more"');
+
+    expect(substr_count($timeline->html(), 'wire:key="milestone-timeline-project-'))->toBe(7);
+});

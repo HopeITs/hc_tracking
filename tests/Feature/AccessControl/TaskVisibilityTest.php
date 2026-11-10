@@ -106,7 +106,7 @@ test('a milestone whose only task is hidden still cannot be deleted', function (
     expect($page->canDelete($this->milestone->id))->toBeFalse();
 });
 
-test('a department-limited editor edits own and department tasks, and only views owned-project tasks', function () {
+test('a Media Team editor moves status on department tasks but cannot edit them, and only views owned-project tasks', function () {
     $editor = userWithRole('Media Team', $this->mediaEmployee);
     $this->project->update(['user_id' => $this->mediaEmployee]);
     $colleague = insertHrEmployee(firstNameEn: 'Media', lastNameEn: 'Colleague');
@@ -116,7 +116,8 @@ test('a department-limited editor edits own and department tasks, and only views
     $departmentTask->taskAssignees()->create(['employee_id' => $colleague]);
     $gate = Gate::forUser($editor->fresh());
 
-    expect($gate->allows('update', $departmentTask))->toBeTrue()
+    expect($gate->allows('update', $departmentTask))->toBeFalse()
+        ->and($gate->allows('updateStatus', $departmentTask))->toBeTrue()
         ->and($gate->allows('view', $this->financeTask))->toBeTrue()
         ->and($gate->allows('update', $this->financeTask))->toBeFalse()
         ->and($gate->allows('updateStatus', $this->financeTask))->toBeFalse();

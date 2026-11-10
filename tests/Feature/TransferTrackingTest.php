@@ -448,12 +448,14 @@ test('a tranche marked received with no net amount is not reported as landed', f
     ]);
 
     // The measure's own label is the assertion: it described this tranche as
-    // "Sent 100,000.00 USD · Landed" while nothing had been recorded.
+    // arrived while nothing had been recorded. ("Landed" became "Received" and
+    // "Not recorded yet" became "Net not recorded" when the page settled on one
+    // word per idea; the behaviour under test is unchanged.)
     Livewire::actingAs($user)
         ->test('pages::transfers.index')
         ->set('view', 'overview')
-        ->assertSeeHtml('aria-label="Sent 100,000.00 USD · Not recorded yet"')
-        ->assertDontSeeHtml('aria-label="Sent 100,000.00 USD · Landed"');
+        ->assertSeeHtml('aria-label="Sent 100,000.00 USD · Net not recorded"')
+        ->assertDontSeeHtml('aria-label="Sent 100,000.00 USD · Received"');
 });
 
 test('an exchange rate of zero is shown as zero rather than an empty cell', function () {

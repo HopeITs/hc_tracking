@@ -71,16 +71,12 @@ new #[Layout('layouts::desk'), Title('titles.donor_report_builder')] class exten
     #[Computed]
     public function proposals(): Collection
     {
-        if (! auth()->user()->can('proposals.view')) {
-            return new Collection;
-        }
-
         $approved = array_values(array_map(
             fn (ProposalStatus $status): string => $status->value,
             array_filter(ProposalStatus::cases(), fn (ProposalStatus $status): bool => $status->isApprovedByDonor()),
         ));
 
-        return Proposal::query()
+        return app(ComposeDonorReport::class)->visibleProposals(auth()->user())
             ->whereIn('status', $approved)
             ->whereHas('donor', fn (Builder $query) => $query->where('is_internal', false))
             ->where('kind', ProposalKind::Project)
@@ -220,6 +216,7 @@ new #[Layout('layouts::desk'), Title('titles.donor_report_builder')] class exten
     $panel = 'rounded-panel border border-panel-border p-4 sm:p-5 dark:bg-surface-1 dark:shadow-raised';
     $preview = $this->preview;
     $proposal = $this->selectedProposal;
+    $assignmentOnly = $this->selectedProposal !== null && auth()->user()->cannot('view', $this->selectedProposal);
     $slotHint = DonorReportResponsibles::slotFor(DonorReportType::tryFrom($type) ?? DonorReportType::Narrative);
 @endphp
 
@@ -287,13 +284,17 @@ new #[Layout('layouts::desk'), Title('titles.donor_report_builder')] class exten
             @endunless
 
             <div class="grid gap-4 md:grid-cols-2">
+                @unless ($assignmentOnly)
                 <x-ui.form-segmented wire:model.live="type" :label="__('common.type')" required
                     :options="collect(DonorReportType::cases())->map(fn (DonorReportType $case): array => ['value' => $case->value, 'label' => $case->label()])->all()" />
+                @endunless
                 <x-ui.form-segmented wire:model="audience" :label="__('donor_reports.audience')" required
                     :options="collect(ReportAudience::cases())->map(fn (ReportAudience $case): array => ['value' => $case->value, 'label' => $case->label()])->all()" />
                 <x-ui.form-input wire:model="dueOn" type="date" :label="__('funding_agreements.due')" required :help="__('donor_reports.due_help')" />
+                @unless ($assignmentOnly)
                 <x-ui.form-select wire:model="responsibleEmployeeId" :label="__('donor_reports.responsible')" :placeholder="__('donor_reports.default_responsible.'.$slotHint)" employees
                     :help="__('donor_reports.responsible_help')" />
+                @endunless
                 <x-ui.form-input wire:model="title" :label="__('donor_reports.title')" maxlength="255" :help="__('donor_reports.title_help')" class="md:col-span-2" />
                 <x-ui.form-textarea wire:model="notes" :label="__('donor_reports.notes')" maxlength="2000" rows="3" class="md:col-span-2" />
             </div>

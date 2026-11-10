@@ -38,6 +38,12 @@ test('only a role with the manage-users permission can list view and create user
     'super admin' => ['Super Admin', true],
 ]);
 
+test('a super admin whose role lost the manage-users permission can still list users', function () {
+    Role::findByName('Super Admin', 'web')->revokePermissionTo('access-management.manage-users');
+
+    expect((new UserPolicy)->viewAny(userForPolicy(1, 'Super Admin')))->toBeTrue();
+});
+
 test('a manager-of-users can update and delete other users but not themselves', function () {
     $admin = userForPolicy(1, 'Super Admin');
     $otherUser = userForPolicy(2, null);

@@ -303,3 +303,15 @@ test('the Public Relations Manager is refused a second agreement and an agreemen
 
     expect(DonorProposal::query()->count())->toBe(1);
 });
+
+test('Financial is refused a second agreement on a proposal that already has one', function () {
+    $financial = userWithRole('Financial');
+    $proposal = donorApprovedProposal();
+    DonorProposal::factory()->create(['proposal_id' => $proposal->id]);
+
+    recordAgreementOn($financial, $proposal)
+        ->assertHasErrors(['agreementProposalId'])
+        ->assertSee(__('funding_agreements.agreement_exists'));
+
+    expect(DonorProposal::query()->count())->toBe(1);
+});

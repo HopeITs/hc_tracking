@@ -146,7 +146,7 @@ new class extends Component {
     $pg = $this->paginate($found, self::PerPage);
 @endphp
 
-<x-desk.panel :facets="$pg['facets']" search="search" :search-value="$search" id="myteam" :size="$size" :cols="$gridCols" :height="$gridRows" :index="$index" :total="$total" :count="count($people)">
+<x-desk.panel :empty="count($people) === 0" :facets="$pg['facets']" search="search" :search-value="$search" id="myteam" :size="$size" :cols="$gridCols" :height="$gridRows" :index="$index" :total="$total" :count="count($people)">
     @if ($people !== [])
         @php
             $loads = array_count_values(array_column($people, 'load'));

@@ -12,11 +12,14 @@ use Spatie\Permission\Models\Permission as SpatiePermission;
 class UserPolicy
 {
     /**
-     * Determine whether the user can view any models.
+     * Determine whether the user can view any models. Administrators always
+     * get in, even when their role has lost the manage-users permission in
+     * the database (an unsynced or edited install), so nobody is locked out
+     * of the user directory.
      */
     public function viewAny(User $user): bool
     {
-        return $user->can('access-management.manage-users');
+        return $this->isAdministrator($user) || $user->can('access-management.manage-users');
     }
 
     /**

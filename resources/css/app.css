@@ -9,7 +9,6 @@
 @import './tokens.css';
 @import './base.css';
 @import './typography.css';
-@import './preloader.css';
 @import './flux-overrides.css';
 @import './forms.css';
 @import './gantt.css';
@@ -21,7 +20,9 @@
 @import './desk-register.css';
 @import './desk-story.css';
 @import './desk-shell.css';
+@import './desk-bell.css';
 @import './desk-customize.css';
+@import './desk-workspace.css';
 
 /* flux.css already scans Flux's own stubs; these are the app's views and Laravel's pagination views. */
 @source '../views';

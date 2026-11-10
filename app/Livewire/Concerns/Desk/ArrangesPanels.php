@@ -46,23 +46,94 @@ trait ArrangesPanels
      */
     public function arrangePanels(array $entries): void
     {
+        $arranged = $this->arranged($entries, array_column($this->layout, 'size', 'panel'));
+
+        if ($arranged !== null) {
+            $this->storeLayout($arranged);
+        }
+    }
+
+    /**
+     * Something new dropped on the Desk (a sidebar page dragged in): the
+     * whole arrangement the drop previewed (desk-rows.js placedNew), in
+     * order, as [panel, cols, rows]. Saved only when it holds the panels
+     * already placed plus exactly this one, which must be available and not
+     * placed yet; it is read back flush like any arrangement.
+     *
+     * @param  array<mixed>  $entries
+     */
+    public function dropItem(string $panel, array $entries): void
+    {
+        $library = $this->library;
         $placed = array_column($this->layout, 'size', 'panel');
+
+        if (! isset($library[$panel]) || isset($placed[$panel])) {
+            return;
+        }
+
+        $arranged = $this->arranged($entries, [...$placed, $panel => $library[$panel]['size']]);
+
+        if ($arranged !== null) {
+            $this->storeLayout(app(Panels::class)->flush($arranged));
+            $this->dispatch('dk-item-placed', panel: $panel, title: $library[$panel]['title']);
+        }
+    }
+
+    /**
+     * Put a page on the Desk by its route (the Ask bar's "add … to desk", a
+     * keyboard drop): whatever stands for it (Panels::itemForRoute) lands at
+     * $position, the end when null. Returns the item id, or null when the
+     * page cannot be added or is already there.
+     */
+    public function addRoute(string $route, ?int $position = null): ?string
+    {
+        $id = app(Panels::class)->itemForRoute(auth()->user(), $route);
+
+        return $id !== null && $this->addItem($id, $position) ? $id : null;
+    }
+
+    /**
+     * Put one item (panel, page card or button) on the Desk at $position,
+     * the end when null. False when it is not available or already placed.
+     */
+    public function addItem(string $panel, ?int $position = null): bool
+    {
+        $library = $this->library;
+
+        if (! isset($library[$panel]) || in_array($panel, array_column($this->layout, 'panel'), true)) {
+            return false;
+        }
+
+        $this->storeLayout(app(Panels::class)->withItem(auth()->user(), $this->layout, $panel, $position));
+        $this->dispatch('dk-item-placed', panel: $panel, title: $library[$panel]['title']);
+
+        return true;
+    }
+
+    /**
+     * The entries as a layout, or null unless they hold exactly the given
+     * panels (panel => size), each once.
+     *
+     * @param  array<mixed>  $entries
+     * @param  array<string, string>  $expected
+     * @return list<array{panel: string, size: string, cols: int, rows: int}>|null
+     */
+    private function arranged(array $entries, array $expected): ?array
+    {
         $panels = app(Panels::class);
         $arranged = [];
 
         foreach ($entries as $entry) {
             $panel = is_array($entry) ? ($entry['panel'] ?? null) : null;
 
-            if (! is_string($panel) || ! isset($placed[$panel]) || isset($arranged[$panel])) {
-                return;
+            if (! is_string($panel) || ! isset($expected[$panel]) || isset($arranged[$panel])) {
+                return null;
             }
 
-            $arranged[$panel] = $panels->sized($panel, $placed[$panel], $entry['cols'] ?? null, $entry['rows'] ?? null);
+            $arranged[$panel] = $panels->sized($panel, $expected[$panel], $entry['cols'] ?? null, $entry['rows'] ?? null);
         }
 
-        if (count($arranged) === count($placed)) {
-            $this->storeLayout(array_values($arranged));
-        }
+        return count($arranged) === count($expected) ? array_values($arranged) : null;
     }
 
     /**

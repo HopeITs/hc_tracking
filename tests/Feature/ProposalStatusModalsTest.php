@@ -62,14 +62,14 @@ test('a target outside the table is refused on the status field and writes nothi
 
 test('a requirement the proposal does not meet shows in the gate alert and writes nothing', function () {
     $proposal = Proposal::factory()->create(['status' => ProposalStatus::ConceptNote]);
-    $proposal->projects()->detach();
+    $proposal->locations()->delete();
 
     statusModal('Financial', $proposal)
         ->set('newStatus', ProposalStatus::ConceptNoteReview->value)
         ->call('changeStatus')
         ->assertHasErrors(['statusGate'])
         ->assertSeeHtml('data-test="status-gate-alert"')
-        ->assertSee(__('proposals.link_project_first'));
+        ->assertSee(__('proposals.locations_required'));
 
     expect($proposal->fresh()->status)->toBe(ProposalStatus::ConceptNote);
 });

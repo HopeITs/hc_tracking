@@ -19,6 +19,7 @@ use App\Models\TransfersTracking;
 use App\Models\User;
 use App\Support\Desk\Panels;
 use App\Support\Desk\ReadyLayoutSignals;
+use App\Support\Desk\Shortcuts;
 use Illuminate\Support\Arr;
 use Livewire\Livewire;
 use Spatie\Permission\Models\Permission;
@@ -80,13 +81,21 @@ test('every panel in the catalogue exists, every row totals twelve columns and o
     }
 });
 
+test('no ready layout puts a button on the desk', function () {
+    foreach (app(Panels::class)->readyCatalogue() as $layout) {
+        foreach ($layout['rows'] as $row) {
+            expect(array_filter(array_column($row, 0), Shortcuts::isShortcut(...)))->toBe([]);
+        }
+    }
+});
+
 test('an administrator gets the whole money layout, cell for cell', function () {
     $entries = readyLayout(userWithRole('Super Admin', insertHrEmployee()), 'money')['entries'];
 
     expect(array_map(fn (array $entry): array => [$entry['panel'], $entry['cols'], $entry['rows']], $entries))->toBe([
         ['money', 8, 5], ['transfers', 4, 5],
-        ['overdue', 5, 4], ['duties', 7, 4],
-        ['pipeline', 12, 4],
+        ['p-funding-agreements', 6, 4], ['duties', 6, 4],
+        ['p-admin-accounts', 6, 3], ['overdue', 6, 3],
     ]);
 });
 
@@ -100,10 +109,10 @@ test('a viewer lacking a panel gets its row widened, with no panel moving to ano
 
     $entries = readyLayout($roleless->fresh(), 'donors')['entries'];
 
-    // The pipeline leaves row one, duties and money leave row two (so it disappears), coming keeps its own row.
+    // The page cards' row disappears, duties leaves donors' row and the pipeline leaves coming's.
     expect(array_map(fn (array $entry): array => [$entry['panel'], $entry['cols'], $entry['rows']], $entries))->toBe([
         ['donors', 12, 5],
-        ['coming', 12, 3],
+        ['coming', 12, 4],
     ]);
 });
 

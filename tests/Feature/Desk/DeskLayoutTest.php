@@ -206,18 +206,22 @@ test('the customize sheet offers the To-do panel under Add, with the work panels
         ->assertSee(__('desk.customize_sheet.add_panel', ['panel' => __('desk.panel.todo.title')]));
 });
 
-test('the customize sheet says there is nothing to add once every allowed panel is placed', function () {
+test('the customize sheet says there is nothing to add once every allowed panel is placed and every button kept', function () {
     $user = User::factory()->create();
-    $allowed = array_keys(app(Panels::class)->availableTo($user));
-    $user->desk_layout = array_map(fn (string $panel): array => ['panel' => $panel, 'size' => 'M'], $allowed);
+    $library = app(Panels::class)->availableTo($user);
+    $user->desk_layout = array_map(fn (string $panel): array => ['panel' => $panel, 'size' => 'M'], array_keys($library));
     $user->save();
 
-    expect(deskPanelIds($user))->toBe($allowed);
+    $onDesk = array_keys(array_filter($library, fn (array $item): bool => in_array($item['kind'], ['panel', 'card'], true)));
+    $buttons = array_keys(array_diff_key($library, array_flip($onDesk)));
 
     Livewire::actingAs($user)
         ->test('pages::desk.index')
-        ->assertSeeHtml('x-show="draft.length === '.count($allowed).'" data-nothing-to-add')
+        ->assertSeeHtml('x-show="search === \'\' && ! anyMatches()" data-nothing-to-add')
+        ->assertSeeHtml('data-quick-items="'.e(json_encode($buttons)).'"')
         ->assertSee(__('desk.nothing_to_add'));
+
+    expect(deskPanelIds($user->fresh()))->toBe($onDesk);
 });
 
 test('the customize sheet saves its whole draft only on Done, dropping what the viewer may not place', function () {

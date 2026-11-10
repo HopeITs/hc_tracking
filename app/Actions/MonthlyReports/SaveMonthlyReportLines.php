@@ -366,7 +366,14 @@ final class SaveMonthlyReportLines
         $rules['lines.*.breakdowns.*.gender'][] = 'distinct';
         $rules['lines.*.shares.*.breakdowns.*.gender'][] = 'distinct';
 
-        Validator::make(['lines' => $lines], $rules)->validate();
+        $messages = [];
+        foreach (array_keys($rules) as $field) {
+            if (in_array('min:0', $rules[$field], true)) {
+                $messages[$field.'.min'] = __('monthly_reports.nonnegative_value');
+            }
+        }
+
+        Validator::make(['lines' => $lines], $rules, $messages)->validate();
     }
 
     /**

@@ -64,11 +64,11 @@ new class extends Component {
     $today = \Carbon\CarbonImmutable::today();
 @endphp
 
-<x-desk.panel :facets="$pg['facets']" id="needs" class="dk-needs" :size="$size" :cols="$gridCols" :height="$gridRows" :index="$index" :total="$total" :count="$all->count()" :health="$all->isNotEmpty() ? 'brand' : null">
+<x-desk.panel :empty="$all->isEmpty()" :facets="$pg['facets']" id="needs" class="dk-needs" :size="$size" :cols="$gridCols" :height="$gridRows" :index="$index" :total="$total" :count="$all->count()" :health="$all->isNotEmpty() ? 'brand' : null">
     <x-slot:tools>
         <div class="dk-seg" role="group">
             @foreach (['week' => __('desk.filter_week'), 'late' => __('desk.filter_late'), 'all' => __('desk.filter_all')] as $key => $label)
-                <button type="button" wire:click="setFilter('{{ $key }}')" aria-pressed="{{ $filter === $key ? 'true' : 'false' }}">{{ $label }}</button>
+                <button type="button" wire:click="setFilter('{{ $key }}')" aria-pressed="{{ $filter === $key ? 'true' : 'false' }}" title="{{ $label }}">{{ $label }}</button>
             @endforeach
         </div>
         <div class="dk-seg dk-needs-view" role="group" aria-label="{{ __('desk-cards.needs.view') }}"
@@ -76,8 +76,9 @@ new class extends Component {
                 pick(view) { try { localStorage.setItem('dk-needs-view', view) } catch (e) {} $wire.setView(view) },
                 init() { let saved = null; try { saved = localStorage.getItem('dk-needs-view') } catch (e) {} if (saved && saved !== @js($view)) { $wire.setView(saved) } },
             }">
-            <button type="button" x-on:click="pick('focus')" aria-pressed="{{ $focus ? 'true' : 'false' }}">{{ __('desk-cards.needs.focus') }}</button>
-            <button type="button" x-on:click="pick('list')" aria-pressed="{{ $focus ? 'false' : 'true' }}">{{ __('desk-cards.needs.list') }}</button>
+            {{-- On a narrow card the two views are their icons alone (desk-grid.css), so the filters keep their words. --}}
+            <button type="button" x-on:click="pick('focus')" aria-pressed="{{ $focus ? 'true' : 'false' }}" title="{{ __('desk-cards.needs.focus') }}"><x-desk.icon name="deck" /><span class="dk-seg-word">{{ __('desk-cards.needs.focus') }}</span></button>
+            <button type="button" x-on:click="pick('list')" aria-pressed="{{ $focus ? 'false' : 'true' }}" title="{{ __('desk-cards.needs.list') }}"><x-desk.icon name="list" /><span class="dk-seg-word">{{ __('desk-cards.needs.list') }}</span></button>
         </div>
     </x-slot:tools>
 

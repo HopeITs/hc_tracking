@@ -20,7 +20,7 @@ class SaveTaskAttachment
      */
     public function handle(Task $task, ?TaskAttachment $existing, ?UploadedFile $upload, array $validated): TaskAttachment
     {
-        Gate::authorize('update', $task);
+        Gate::authorize('manageFiles', $task);
 
         $file = $existing ?? new TaskAttachment(['task_id' => $task->id]);
 

@@ -11,6 +11,7 @@ use App\Enums\TaskStatus;
 use App\Models\HrEmployee;
 use App\Models\Task;
 use Flux\Flux;
+use Illuminate\Database\Eloquent\Relations\Relation;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\Rules\Enum;
@@ -33,6 +34,8 @@ trait AddsQuickTask
     public bool $showAddTaskModal = false;
 
     public string $newTaskTitle = '';
+
+    public string $newTaskDescription = '';
 
     public string $newTaskStatus = 'todo';
 
@@ -84,12 +87,31 @@ trait AddsQuickTask
         return $programId === null ? null : app(MoveTask::class)->placesInProgram($programId);
     }
 
+    /**
+     * The page's own record as the dialog's "Related to" row shows it when
+     * there is no "Goes to" choice: its type label and its name.
+     *
+     * @return array{type: string, name: string}
+     */
+    #[Computed]
+    public function quickTaskSourceLabel(): array
+    {
+        $source = $this->quickTaskSource();
+        $modelClass = Relation::getMorphedModel($source['type']);
+
+        return [
+            'type' => __('tasks.source_type_'.$source['type']),
+            'name' => $modelClass === null ? '' : (string) $modelClass::query()->whereKey($source['id'])->value('name'),
+        ];
+    }
+
     public function openAddTaskModal(): void
     {
         Gate::authorize('create', Task::class);
 
         $this->resetValidation();
         $this->newTaskTitle = '';
+        $this->newTaskDescription = '';
         $this->newTaskStatus = TaskStatus::Todo->value;
         $this->newTaskPriority = TaskPriority::Medium->value;
         $this->newTaskDueDate = '';
@@ -111,6 +133,7 @@ trait AddsQuickTask
 
         $validated = $this->validate([
             'newTaskTitle' => ['required', 'string', 'max:255'],
+            'newTaskDescription' => ['nullable', 'string', 'max:5000'],
             'newTaskStatus' => ['required', new Enum(TaskStatus::class)],
             'newTaskPriority' => ['required', new Enum(TaskPriority::class)],
             'newTaskDueDate' => ['nullable', 'date'],

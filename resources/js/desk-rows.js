@@ -17,12 +17,27 @@
  *  - the top edge trades height with the row above (the card's bottom stays
  *    put); on the first row it makes the row taller or shorter from the top;
  *  - the bottom edge makes the whole row taller or shorter.
+ *
+ * A button (an "a-…" action or a "g-…" page, App\Support\Desk\Shortcuts) may
+ * be one row unit tall; anything else at least MinRows. A row is never
+ * shorter than the tallest minimum among its cards (Panels::minRowsOf).
  */
 
 export const MaxCols = 12;
 export const MinCols = 3;
 export const MinRows = 2;
 export const MaxRows = 8;
+export const MinTileRows = 1;
+
+/** The fewest row units a card may be: a button one, anything else MinRows. */
+export function minRowsOf(entry) {
+    return /^[ag]-/.test(entry?.panel ?? '') ? MinTileRows : MinRows;
+}
+
+/** The fewest row units a row may be: its tallest minimum. */
+function rowMin(entries, row) {
+    return Math.max(MinTileRows, ...row.map((i) => minRowsOf(entries[i])));
+}
 
 const clamp = (value, min, max) => Math.max(min, Math.min(max, value));
 
@@ -79,7 +94,7 @@ export function flush(entries) {
     const flushed = entries.map((entry) => ({ ...entry }));
 
     rowsIn(entries).forEach((row) => {
-        const height = Math.max(...row.map((i) => entries[i].rows));
+        const height = Math.max(rowMin(entries, row), ...row.map((i) => entries[i].rows));
         const widths = fitRow(row.map((i) => entries[i].cols));
 
         row.forEach((i, k) => {
@@ -134,18 +149,18 @@ export function resized(entries, index, edge, stepsX, stepsY) {
     };
 
     if (edge === 'bottom' || edge === 'corner') {
-        const height = clamp(entries[index].rows + stepsY, MinRows, MaxRows);
+        const height = clamp(entries[index].rows + stepsY, rowMin(entries, row), MaxRows);
 
         row.forEach((i) => (next[i].rows = height));
     } else if (edge === 'top' && r === 0) {
-        const height = clamp(entries[index].rows - stepsY, MinRows, MaxRows);
+        const height = clamp(entries[index].rows - stepsY, rowMin(entries, row), MaxRows);
 
         row.forEach((i) => (next[i].rows = height));
     } else if (edge === 'top') {
         const above = rows[r - 1];
         const own = entries[index].rows;
         const over = entries[above[0]].rows;
-        const grown = clamp(-stepsY, Math.max(MinRows - own, over - MaxRows), Math.min(MaxRows - own, over - MinRows));
+        const grown = clamp(-stepsY, Math.max(rowMin(entries, row) - own, over - MaxRows), Math.min(MaxRows - own, over - rowMin(entries, above)));
 
         row.forEach((i) => (next[i].rows = own + grown));
         above.forEach((i) => (next[i].rows = over - grown));
@@ -265,6 +280,22 @@ export function inserted(entries, panel, target, place) {
     wrap(rows, at, panel);
 
     return rows.flat();
+}
+
+/**
+ * The layout with a new card (not placed yet) dropped beside another
+ * ('before' or 'after' it), as inserted() places a carried one; with no
+ * target it goes last. The new card keeps its own width and takes its
+ * row's height, never under its own minimum.
+ */
+export function placedNew(entries, entry, target = null, place = 'after') {
+    const withNew = [...entries.map((each) => ({ ...each })), { ...entry }];
+
+    if (! target || ! entries.some((each) => each.panel === target)) {
+        return flush(withNew);
+    }
+
+    return flush(inserted(withNew, entry.panel, target, place));
 }
 
 /** Put a card first in the row after rows[r], at that row's height; past the last row it opens a new one. */

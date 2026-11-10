@@ -133,7 +133,7 @@ new class extends Component {
     $empty = $this->todos->isEmpty();
 @endphp
 
-<x-desk.panel id="todo" class="dk-todo-panel" :filterable="false" :count="$open->count()" :size="$size" :cols="$gridCols" :height="$gridRows" :index="$index" :total="$total">
+<x-desk.panel :empty="$empty" id="todo" class="dk-todo-panel" :filterable="false" :count="$open->count()" :size="$size" :cols="$gridCols" :height="$gridRows" :index="$index" :total="$total">
     <div class="dk-todo" x-data="{
         draft: '',
         save() { $wire.add(this.draft).then((saved) => { if (saved === true) { this.draft = '' } }) },

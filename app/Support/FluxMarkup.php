@@ -77,7 +77,7 @@ final class FluxMarkup
      * The task status chip (what x-ui.status-pill renders): the shared
      * StatusTone badge colours (W-28) with a status icon in front.
      */
-    public static function statusPill(TaskStatus $case, string $extraClass = ''): HtmlString
+    public static function statusPill(TaskStatus $case, string $extraClass = '', bool $quiet = false): HtmlString
     {
         $icon = match ($case) {
             TaskStatus::Todo => 'stop',
@@ -86,8 +86,14 @@ final class FluxMarkup
             TaskStatus::Done => 'check',
         };
 
+        // The quiet variant (task list rows and cards): sentence case and a
+        // smaller chip, so a column of statuses reads calmly when scanned.
+        $shape = $quiet
+            ? 'gap-1 px-2 py-0.5 text-xs font-medium'
+            : 'gap-1.5 px-2.5 py-1 text-[11px] font-bold tracking-wide uppercase';
+
         return new HtmlString(
-            '<span class="inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-[11px] font-bold tracking-wide uppercase whitespace-nowrap '.$case->tone()->badgeClasses().($extraClass === '' ? '' : ' '.e($extraClass)).'" data-tone="'.$case->tone()->value.'">'
+            '<span class="inline-flex max-w-full items-center rounded-full border whitespace-nowrap '.$shape.' '.$case->tone()->badgeClasses().($extraClass === '' ? '' : ' '.e($extraClass)).'" data-tone="'.$case->tone()->value.'">'
             .self::icon($icon, 'micro', 'size-3 shrink-0')
             .'<span class="truncate">'.e($case->label()).'</span></span>'
         );

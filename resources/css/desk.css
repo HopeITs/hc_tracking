@@ -167,11 +167,6 @@
 .dk-thread li.dk-now.dk-good i{ border-color:var(--good) }
 .dk-thread li.dk-now.dk-warn i{ border-color:var(--warn) }
 .dk-thread li.dk-now.dk-bad i{ border-color:var(--bad) }
-.dk-thread li.dk-now.dk-bad i{ animation:dk-pulse 2.4s ease-out infinite }
-@keyframes dk-pulse{ 0%{ box-shadow:0 0 0 0 var(--bad-soft) }
-60%{ box-shadow:0 0 0 8px transparent }
-100%{ box-shadow:0 0 0 0 transparent }
- }
 .dk-stage-name{ font-size:12px;font-weight:700;color:var(--ink-3);margin-top:5px;display:block }
 /* Lens values */
 .dk-meter{ display:block;position:relative;height:6px;border-radius:6px;background:var(--sunk);overflow:hidden;margin-top:6px }
@@ -535,8 +530,8 @@
 .dk-ph>.dk-pc{ margin-top:4px }
 /* Header tools fade in on hover / keyboard focus where a pointer can hover; always shown on touch */
 @media (hover: hover){
-.dk-ph>.dk-psearch-btn,.dk-ph>.dk-pfilter,.dk-ph>[data-panel-register],.dk-ph>.dk-pmenu{ opacity:0;transition:opacity .15s }
-.dk-panel:hover .dk-ph>*,.dk-panel:focus-within .dk-ph>*,.dk-ph>.dk-on,.dk-ph>.dk-pmenu:has([aria-expanded="true"]){ opacity:1 }
+.dk-ph-tools>*{ opacity:0;transition:opacity .15s }
+.dk-panel:hover .dk-ph-tools>*,.dk-panel:focus-within .dk-ph-tools>*,.dk-ph-tools>.dk-on,.dk-ph-tools>.dk-pmenu:has([aria-expanded="true"]){ opacity:1 }
 }
 .dk-pc{ font-size:11.5px;font-weight:800;min-width:22px;height:20px;padding-inline:6px;border-radius:999px;background:var(--brand);color:var(--on-brand);display:inline-grid;place-items:center }
 .dk-pspace{ flex:1 }
@@ -567,7 +562,7 @@
 /* items inside panels */
 .dk-panel .dk-items>li{ grid-template-columns:12px minmax(0,1fr);padding-block:11px;gap:4px 10px }
 /* Needs you: the primary card, a quiet brand accent on its leading edge */
-.dk-panel.dk-needs{ border-color:color-mix(in srgb,var(--brand) 22%,var(--line)) }
+.dk-panel.dk-needs{ border-color:var(--line-2) }
 .dk-panel.dk-needs::before{ content:"";position:absolute;inset-block-start:0;inset-inline:18px;height:3px;border-radius:0 0 3px 3px;background:var(--brand) }
 .dk-needs .dk-it{ overflow:hidden;text-overflow:ellipsis;white-space:nowrap }
 .dk-needs .dk-who{ color:var(--ink-2);font-weight:700 }

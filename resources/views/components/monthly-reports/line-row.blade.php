@@ -149,7 +149,7 @@
                     <textarea
                         rows="2"
                         dir="auto"
-                        wire:model.blur="{{ $noteModel }}"
+                        wire:model.live.blur="{{ $noteModel }}"
                         aria-label="{{ $row['name'] }} — {{ __('monthly_reports.grid_note') }}"
                         class="w-full rounded-md border border-secondary-light bg-white px-2 py-1 text-sm text-secondary-dark outline-none focus:border-secondary-medium focus:ring-2 focus:ring-secondary-light dark:border-field-line dark:bg-surface-2 dark:text-ink dark:focus:border-ink-muted"
                     ></textarea>

@@ -132,7 +132,7 @@ test('guests are redirected, reports.view holders read the page and others are r
     $report = mrsReport(mrsProject());
 
     $this->get(route('monthly-reports.show', $report))->assertRedirect(route('login'));
-    $this->actingAs(userWithRole('Team Member'))->get(route('monthly-reports.show', $report))->assertOk()->assertDontSee('wire:model.blur', false);
+    $this->actingAs(userWithRole('Team Member'))->get(route('monthly-reports.show', $report))->assertOk()->assertDontSee('wire:model.live.blur', false);
     $this->actingAs(User::factory()->create())->get(route('monthly-reports.show', $report))->assertForbidden();
 });
 
@@ -147,13 +147,25 @@ test('the grid shows the code, both names, the frequency note, the target and th
         ->assertSeeText('عدد الأطفال الملقحين')
         ->assertSeeText('Counted at each session')
         ->assertSeeHtml('data-target="'.$line->id.'"')
-        ->assertSeeHtml('wire:model.blur="figures.'.$line->id.'.value"')
+        ->assertSeeHtml('wire:model.live.blur="figures.'.$line->id.'.value"')
         ->set('figures.'.$line->id.'.value', '12')
         ->assertHasNoErrors();
 
     expect((float) $line->fresh()->value)->toBe(12.0)
         ->and($other->fresh()->value)->toBeNull()
         ->and($report->fresh()->prepared_by)->toBe($this->owner->id);
+});
+
+test('an invalid autosaved number leaves the saved value intact and explains the correction', function () {
+    $report = mrsReport(mrsProject());
+    $line = mrsLine($report);
+    $field = 'figures.'.$line->id.'.value';
+
+    mrsPage($report)->set($field, '12')->assertHasNoErrors()
+        ->set($field, '-1')->assertHasErrors([$field => __('monthly_reports.nonnegative_value')])
+        ->assertSee(__('monthly_reports.save_needs_attention'));
+
+    expect((float) $line->fresh()->value)->toBe(12.0);
 });
 
 test('figures sent as one whole array save the line', function () {
@@ -198,7 +210,7 @@ test('a fixed percentage takes the count, shows the proposal denominator and the
     mrsPage($report)
         ->assertSeeText('Trained teachers')
         ->assertSeeText(__('monthly_reports.out_of_beneficiaries', ['count' => '180']))
-        ->assertDontSeeHtml('wire:model.blur="figures.'.$line->id.'.denominator"')
+        ->assertDontSeeHtml('wire:model.live.blur="figures.'.$line->id.'.denominator"')
         ->set('figures.'.$line->id.'.numerator', '36')
         ->assertSeeHtml('data-computed="'.$line->id.'">20%');
 });
@@ -210,8 +222,8 @@ test('a ratio takes numerator and denominator, and Not measured saves no value',
     $page = mrsPage($report)
         ->assertSeeText('Passed')
         ->assertSeeText('Tested')
-        ->assertSeeHtml('wire:model.blur="figures.'.$line->id.'.numerator"')
-        ->assertSeeHtml('wire:model.blur="figures.'.$line->id.'.denominator"')
+        ->assertSeeHtml('wire:model.live.blur="figures.'.$line->id.'.numerator"')
+        ->assertSeeHtml('wire:model.live.blur="figures.'.$line->id.'.denominator"')
         ->set('figures.'.$line->id.'.numerator', '30')
         ->set('figures.'.$line->id.'.denominator', '40')
         ->assertSeeHtml('data-computed="'.$line->id.'">75%');
@@ -246,9 +258,9 @@ test('a disaggregated line takes males and females with persons with disabilitie
     $line = mrsLine($report, ['is_disaggregated' => true]);
 
     mrsPage($report)
-        ->assertSeeHtml('wire:model.blur="figures.'.$line->id.'.breakdowns.male.value"')
-        ->assertSeeHtml('wire:model.blur="figures.'.$line->id.'.breakdowns.female.disabled_value"')
-        ->assertDontSeeHtml('wire:model.blur="figures.'.$line->id.'.value"')
+        ->assertSeeHtml('wire:model.live.blur="figures.'.$line->id.'.breakdowns.male.value"')
+        ->assertSeeHtml('wire:model.live.blur="figures.'.$line->id.'.breakdowns.female.disabled_value"')
+        ->assertDontSeeHtml('wire:model.live.blur="figures.'.$line->id.'.value"')
         ->set('figures.'.$line->id.'.breakdowns.male.value', '10')
         ->set('figures.'.$line->id.'.breakdowns.female.value', '17')
         ->set('figures.'.$line->id.'.breakdowns.female.disabled_value', '2')
@@ -264,15 +276,15 @@ test('a MEAL line is read-only for the manager; the validator fills it while sub
 
     mrsPage($draft)
         ->assertSeeText(__('monthly_reports.filled_by_meal'))
-        ->assertDontSeeHtml('wire:model.blur="figures.'.$draftMeal->id.'.value"');
+        ->assertDontSeeHtml('wire:model.live.blur="figures.'.$draftMeal->id.'.value"');
 
     $submitted = mrsReport(mrsProject(), status: MonthlyReportStatus::Submitted);
     $manager = mrsLine($submitted);
     $meal = mrsLine($submitted, enteredBy: IndicatorCollector::Meal);
 
     mrsPage($submitted, $this->officer)
-        ->assertDontSeeHtml('wire:model.blur="figures.'.$manager->id.'.value"')
-        ->assertSeeHtml('wire:model.blur="figures.'.$meal->id.'.value"')
+        ->assertDontSeeHtml('wire:model.live.blur="figures.'.$manager->id.'.value"')
+        ->assertSeeHtml('wire:model.live.blur="figures.'.$meal->id.'.value"')
         ->assertSeeHtml('data-validate-blocked')
         ->assertSeeText(__('monthly_reports.meal_lines_pending'))
         ->set('figures.'.$meal->id.'.value', '8')
@@ -298,7 +310,7 @@ test('Submit lists the incomplete lines, then locks the report: no inputs and a 
         ->assertDontSeeHtml('data-incomplete-line="'.$line->id.'"')
         ->call('submitReport')
         ->assertSet('showSubmitModal', false)
-        ->assertDontSeeHtml('wire:model.blur="figures.'.$line->id.'.value"')
+        ->assertDontSeeHtml('wire:model.live.blur="figures.'.$line->id.'.value"')
         ->set('figures.'.$line->id.'.value', '9')
         ->assertDispatched('toast-show', mrsToast(__('monthly_reports.locked')));
 
@@ -335,7 +347,7 @@ test('MEAL sees Validate and Return without manager inputs; Return needs a reaso
     mrsPage($report, $this->officer)
         ->assertSeeHtml('data-test="validate-button"')
         ->assertSeeHtml('data-test="return-button"')
-        ->assertDontSeeHtml('wire:model.blur="figures.'.$line->id.'.value"')
+        ->assertDontSeeHtml('wire:model.live.blur="figures.'.$line->id.'.value"')
         ->call('openReturnModal')
         ->assertSet('showReturnModal', true)
         ->set('returnReason', 'Too short')
@@ -499,7 +511,7 @@ test('the header warns when the owner works at another center, without blocking'
 
     mrsPage($report)
         ->assertSeeText(__('monthly_reports.owner_center_mismatch'))
-        ->assertSeeHtml('wire:model.blur="figures.'.$line->id.'.value"');
+        ->assertSeeHtml('wire:model.live.blur="figures.'.$line->id.'.value"');
 });
 
 test('the preparer deletes a never-submitted draft and lands on the list', function () {
@@ -523,7 +535,7 @@ test('a stale page turns a blur into a toast and reloads the report', function (
 
     $page->set('figures.'.$line->id.'.value', '4')
         ->assertDispatched('toast-show', mrsToast(__('monthly_reports.stale')))
-        ->assertDontSeeHtml('wire:model.blur="figures.'.$line->id.'.value"');
+        ->assertDontSeeHtml('wire:model.live.blur="figures.'.$line->id.'.value"');
 
     expect($line->fresh()->value)->toBeNull();
 });
@@ -636,8 +648,8 @@ test('each status asks for its own inputs and saves the activity row', function 
     $page = mrsPage($report)
         ->set($key.'.status', 'started')
         ->assertHasErrors([$key.'.started_on' => __('monthly_reports.activity_date_required')])
-        ->assertSeeHtml('wire:model.blur="'.$key.'.started_on"')
-        ->assertDontSeeHtml('wire:model.blur="'.$key.'.reason"')
+        ->assertSeeHtml('wire:model.live.blur="'.$key.'.started_on"')
+        ->assertDontSeeHtml('wire:model.live.blur="'.$key.'.reason"')
         ->set($key.'.started_on', '2026-10-12')
         ->assertHasNoErrors();
 
@@ -646,7 +658,7 @@ test('each status asks for its own inputs and saves the activity row', function 
         ->and(CarbonImmutable::parse($entry->started_on)->toDateString())->toBe('2026-10-12');
 
     $page->set($key.'.status', 'not_started')
-        ->assertSeeHtml('wire:model.blur="'.$key.'.reason"')
+        ->assertSeeHtml('wire:model.live.blur="'.$key.'.reason"')
         ->set($key.'.reason', 'Too short')
         ->assertHasErrors([$key.'.reason' => __('monthly_reports.activity_reason_min')]);
 

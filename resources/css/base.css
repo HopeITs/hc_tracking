@@ -60,3 +60,21 @@
         animation: none;
     }
 }
+
+/*
+ * Instant press feedback (user decision 2026-11-10, "every click like thunder"):
+ * Livewire 4 marks the element that started a request with data-loading while
+ * the request runs. It shows a busy cursor at once and, only if the answer takes
+ * longer than 150 ms, eases to a pending look, so fast answers never flicker.
+ * In the base layer so any component's own loading style still wins.
+ */
+@layer base {
+    [data-loading] {
+        cursor: progress;
+    }
+
+    :is(button, a, [role='button'], [role='menuitem'], [role='tab'])[data-loading] {
+        opacity: 0.6;
+        transition: opacity 120ms ease 150ms;
+    }
+}

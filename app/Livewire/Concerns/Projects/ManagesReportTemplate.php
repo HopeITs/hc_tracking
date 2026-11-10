@@ -202,6 +202,18 @@ trait ManagesReportTemplate
         Flux::toast(variant: 'success', text: $wasApproved ? __('report_templates.tab.activated') : __('report_templates.tab.confirmed'));
     }
 
+    #[Computed]
+    public function awaitingMonthlyReports(): bool
+    {
+        $project = $this->project;
+
+        return $project->status === ProjectStatus::Active
+            && $this->reportTemplate?->status === ReportTemplateStatus::Confirmed
+            && $project->start_date !== null
+            && $project->end_date !== null
+            && ! $project->monthlyReports()->exists();
+    }
+
     public function openTemplateLineModal(int $lineId): void
     {
         $template = $this->authorizeTemplate('manage');

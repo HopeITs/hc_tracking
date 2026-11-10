@@ -212,7 +212,7 @@ test('a current strategy links to its page and to its programs, with their count
         ->assertOk()
         ->assertSee(route('strategies.show', $strategy), false)
         ->assertSeeText(__('strategies.open_strategy'))
-        ->assertSee('href="'.e(route('programs.index', ['strategy' => $strategy->id])).'" wire:navigate aria-label="'.trans_choice('strategies.programs_link_label', 2, ['count' => 2]).'" data-test="strategy-programs-link">2</a>', false);
+        ->assertSee('href="'.e(route('programs.index', ['strategy' => $strategy->id])).'" wire:navigate.hover aria-label="'.trans_choice('strategies.programs_link_label', 2, ['count' => 2]).'" data-test="strategy-programs-link">2</a>', false);
 });
 
 test('several active strategies each get their own block with their year', function () {

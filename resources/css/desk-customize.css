@@ -108,14 +108,32 @@
     .dk-cz-search input { flex: 1; min-width: 0; height: 100%; border: 0; background: none; outline: none; font-size: 13.5px; color: var(--ink); }
     .dk-cz-search input::placeholder { color: var(--ink-3); }
 
-    .dk-cz-group { margin-block-start: 18px; }
-    .dk-cz-group h4 { margin: 0 0 4px; font-size: 12px; font-weight: 700; color: var(--ink-3); }
+    /* What to add: three tabs, then folding groups with what is left in each. */
+    .dk-cz-tabs { display: flex; gap: 2px; margin-block-start: 14px; padding: 3px; border-radius: 11px; background: var(--sunk); }
+    .dk-cz-tabs [role="tab"] { flex: 1 1 auto; min-width: 0; display: inline-flex; align-items: center; justify-content: center; gap: 5px; height: 34px; padding-inline: 6px; border: 0; border-radius: 8px; background: none; color: var(--ink-3); font: inherit; font-size: 13px; font-weight: 700; white-space: nowrap; cursor: pointer; }
+    .dk-cz-tabs [role="tab"]:hover { color: var(--ink); }
+    .dk-cz-tabs [role="tab"][aria-selected="true"] { background: var(--paper); color: var(--ink); box-shadow: 0 1px 2px rgb(16 24 40 / .08), 0 0 0 1px var(--line); }
+    .dk-cz-tabs [role="tab"] > span:first-child { overflow: hidden; text-overflow: ellipsis; }
+    .dk-cz-n { flex: none; min-width: 20px; height: 18px; padding-inline: 5px; border-radius: 99px; background: var(--line); color: var(--ink-2); font-size: 11px; font-weight: 800; display: inline-grid; place-items: center; }
+    .dk-cz-group { margin-block-start: 8px; border-block-end: 1px solid var(--line); }
+    .dk-cz-group:first-of-type { margin-block-start: 12px; }
+    .dk-cz-group-h { display: flex; align-items: center; gap: 8px; width: 100%; min-height: 40px; padding-inline: 6px; border: 0; border-radius: 8px; background: none; color: var(--ink); font: inherit; text-align: start; cursor: pointer; }
+    .dk-cz-group-h:hover { background: var(--tint); }
+    .dk-cz-group-h:focus-visible { outline: 2px solid var(--ink-2); outline-offset: -2px; }
+    .dk-cz-group-h h4 { flex: 1; min-width: 0; margin: 0; font-size: 13.5px; font-weight: 800; color: var(--ink); }
+    .dk-cz-chev { flex: none; width: 14px; height: 14px; color: var(--ink-3); transition: rotate .15s; }
+    .dk-cz-group-h[aria-expanded="true"] .dk-cz-chev { rotate: 90deg; }
+    [dir="rtl"] .dk-cz-group-h[aria-expanded="false"] .dk-cz-chev { rotate: 180deg; }
+    .dk-cz-group li { padding-inline-start: 14px; }
+    .dk-cz-group li:last-child { padding-block-end: 6px; }
     .dk-cz-pick { display: flex; align-items: center; gap: 10px; width: 100%; min-height: 40px; padding-inline: 8px; border: 0; border-radius: 8px; background: none; color: var(--ink); font-size: 13.5px; font-weight: 600; text-align: start; cursor: pointer; }
     .dk-cz-pick:hover { background: var(--tint); }
     .dk-cz-pick:focus-visible { outline: 2px solid var(--ink-2); outline-offset: -2px; }
     .dk-cz-pick > span { flex: 1; min-width: 0; }
     .dk-cz-pick svg.dk-i { flex: none; width: 16px; height: 16px; color: var(--ink-3); }
     .dk-cz-none { margin-block-start: 16px; font-size: 13px; color: var(--ink-3); }
+    /* The Buttons tab's one line: a button goes to Quick access, not the draft (padding, since desk.css zeroes a p's margin). */
+    .dk-cz-note { padding-block: 2px 8px; font-size: 12.5px; line-height: 1.45; color: var(--ink-3); }
 
     .dk-cz-f { flex: none; }
     .dk-cz-sum { margin: 0; }
@@ -151,7 +169,7 @@
         .dk-cz-placed { display: block; }
         .dk-cz-f { gap: 8px; }
         .dk-cz-f .dk-btn { height: auto; flex: 1 1 40%; white-space: normal; }
-        .dk-cz-f .dk-cz-reset { flex-basis: 100%; }
+        .dk-cz-f :is(.dk-cz-reset, .dk-cz-clear) { flex-basis: 100%; }
         .dk-cz-f .dk-pspace { display: none; }
         .dk-cz-sum { flex-basis: 100%; order: -1; text-align: center; }
     }

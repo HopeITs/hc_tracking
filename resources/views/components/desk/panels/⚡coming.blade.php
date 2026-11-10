@@ -128,7 +128,7 @@ new class extends Component {
     $tones = ['milestone' => 'dk-k-ms', 'task' => 'dk-k-task', 'monthly-report' => 'dk-k-rep', 'report' => 'dk-k-rep', 'transfer' => 'dk-k-money', 'donor-report' => 'dk-k-donor'];
 @endphp
 
-<x-desk.panel :facets="$pg['facets']" id="coming" register="calendar.index" :size="$size" :cols="$gridCols" :height="$gridRows" :index="$index" :total="$total" :count="$events->count()">
+<x-desk.panel :empty="$events->isEmpty()" :facets="$pg['facets']" id="coming" register="calendar.index" :size="$size" :cols="$gridCols" :height="$gridRows" :index="$index" :total="$total" :count="$events->count()">
     <x-slot:tools>
         <div class="dk-seg" role="group">
             @foreach (['list' => __('desk.view_list'), 'month' => __('desk.view_month')] as $key => $label)

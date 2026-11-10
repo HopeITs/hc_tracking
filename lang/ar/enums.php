@@ -85,6 +85,7 @@ return [
         'report_submission' => 'التقرير المُسلَّم',
     ],
     'reporting_period' => [
+        'monthly' => 'شهري',
         'quarterly' => 'ربع سنوي',
         'semi_annual' => 'نصف سنوي',
         'annual' => 'سنوي',
@@ -290,6 +291,7 @@ return [
         'none' => 'بلا رقابة',
     ],
     'matrix_cell_state' => [
+        'outside_period' => 'خارج فترة التقرير',
         'approved' => 'مُتحقَّق منه',
         'pending' => 'بانتظار التحقق',
         'not_submitted' => 'غير مُرسَل',

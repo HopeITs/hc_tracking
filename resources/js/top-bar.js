@@ -10,7 +10,7 @@
  * lifts off the page with a shadow only when there is something under it.
  */
 
-const items = (menu) => [...menu.querySelectorAll('[role="menuitem"]')].filter((item) => item.offsetParent !== null);
+const items = (menu) => [...menu.querySelectorAll('[role="menuitem"], [role="menuitemcheckbox"]')].filter((item) => item.offsetParent !== null);
 
 function syncScrolled() {
     document.documentElement.classList.toggle('dk-scrolled', window.scrollY > 2);

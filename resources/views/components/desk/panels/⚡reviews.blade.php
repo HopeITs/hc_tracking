@@ -44,7 +44,7 @@ new class extends Component {
     $pg = $this->paginate($rows, self::PerPage);
 @endphp
 
-<x-desk.panel :facets="$pg['facets']" id="reviews" register="reviews.index" :size="$size" :cols="$gridCols" :height="$gridRows" :index="$index" :total="$total" :count="$rows->isNotEmpty() ? $rows->count() : null">
+<x-desk.panel :empty="$rows->isEmpty()" :facets="$pg['facets']" id="reviews" register="reviews.index" :size="$size" :cols="$gridCols" :height="$gridRows" :index="$index" :total="$total" :count="$rows->isNotEmpty() ? $rows->count() : null">
     @if ($pg['total'] > 0)
         <ul class="dk-rv" {{ $this->fitAttributes($pg) }}>
             @foreach ($pg['slice'] as $review)

@@ -49,6 +49,14 @@ new #[Layout('layouts::desk'), Title('titles.transfers')] class extends Componen
     /** @var list<string> */
     public const FLAGS = ['converted', 'no_account'];
 
+    /**
+     * The three states the headline figures read the ledger in. Disjoint and
+     * exhaustive, so their counts always add up to the page count.
+     *
+     * @var list<string>
+     */
+    public const FOCUSES = ['attention', 'travelling', 'landed'];
+
     /** @var list<string> */
     public const GROUPS = ['agreement', 'donor', 'account', 'month'];
 
@@ -61,7 +69,7 @@ new #[Layout('layouts::desk'), Title('titles.transfers')] class extends Componen
      *
      * @var list<string>
      */
-    private const FILTERS = ['search', 'donor', 'account', 'currency', 'stage', 'flag', 'dateBasis', 'from', 'to', 'min', 'max', 'group', 'agreement', 'year'];
+    private const FILTERS = ['focus', 'search', 'donor', 'account', 'currency', 'stage', 'flag', 'dateBasis', 'from', 'to', 'min', 'max', 'group', 'agreement', 'year'];
 
     #[Url(except: '')]
     public string $search = '';
@@ -74,6 +82,10 @@ new #[Layout('layouts::desk'), Title('titles.transfers')] class extends Componen
 
     #[Url(except: '')]
     public string $currency = '';
+
+    /** Which of the three headline states the ledger is narrowed to. */
+    #[Url(except: '')]
+    public string $focus = '';
 
     #[Url(except: '')]
     public string $stage = '';
@@ -178,9 +190,28 @@ new #[Layout('layouts::desk'), Title('titles.transfers')] class extends Componen
         $this->openTransferCreate($agreementId > 0 && DonorProposal::query()->whereKey($agreementId)->exists() ? $agreementId : null);
     }
 
+    /**
+     * Narrow to one headline state, or clear it by pressing it again.
+     */
+    public function toggleFocus(string $focus): void
+    {
+        $this->focus = $this->focus === $focus || ! in_array($focus, self::FOCUSES, true) ? '' : $focus;
+        $this->resetPage();
+    }
+
     public function openEditModal(int $transferId): void
     {
         $this->openTransferEdit($transferId);
+    }
+
+    /**
+     * A ledger is read a page at a time, not five rows at a time.
+     *
+     * @return list<string>
+     */
+    protected function registerPageSizes(): array
+    {
+        return ['25', '50', '100'];
     }
 
     protected function transferSaved(TransfersTracking $transfer, bool $isCreate): void
@@ -197,7 +228,7 @@ new #[Layout('layouts::desk'), Title('titles.transfers')] class extends Componen
 
 @php
     $showsOverview = $this->view === 'overview';
-    $activeFilterCount = collect([$this->search, $this->donor, $this->account, $this->currency, $this->stage, $this->flag, $this->from, $this->to, $this->min, $this->max, $this->agreement])
+    $activeFilterCount = collect([$this->focus, $this->search, $this->donor, $this->account, $this->currency, $this->stage, $this->flag, $this->from, $this->to, $this->min, $this->max, $this->agreement])
         ->filter(fn (string $value): bool => $value !== '')
         ->count();
     $total = $showsOverview ? $this->transfers->total() : $this->rows->total();
@@ -256,15 +287,21 @@ new #[Layout('layouts::desk'), Title('titles.transfers')] class extends Componen
         $stagePill('transit', __('finance_tables.state_transit'), 'warn'),
         $stagePill('received', __('finance_tables.state_received')),
         $stagePill('failed', __('finance_tables.state_failed'), 'critical'),
+        /*
+         * These two are states a received tranche can be in, and they write
+         * the same `stage` property as the five above. Sitting in the Flags
+         * row they looked like a second, combinable dimension, so choosing one
+         * silently cleared whatever status was picked. They belong here.
+         */
+        $stagePill('short', __('finance_tables.flag_short'), 'critical'),
+        $stagePill('unrecorded', __('finance_tables.flag_unrecorded'), 'warn'),
     ];
     $currencyPills = [
         ['default' => true, 'label' => __('finance_tables.all'), 'model' => 'currency', 'value' => '', 'active' => $chosen['currency'] === ''],
         ...array_map(fn (Currency $case): array => $setPill('currency', $case->value, $case->value), Currency::cases()),
     ];
-    /* Landed short and net-not-recorded are stages of a received tranche, so they share the status property. */
+    /* Only real flags here now: they write `flag`, so they combine with any status. */
     $flagPills = [
-        $stagePill('short', __('finance_tables.flag_short'), 'critical'),
-        $stagePill('unrecorded', __('finance_tables.flag_unrecorded'), 'warn'),
         ['label' => __('finance_tables.flag_converted'), 'model' => 'flag', 'value' => 'converted', 'toggle' => true, 'active' => $chosen['flag'] === 'converted', 'test' => 'flag-converted'],
         ['label' => __('finance_tables.flag_no_account'), 'model' => 'flag', 'value' => 'no_account', 'toggle' => true, 'active' => $chosen['flag'] === 'no_account', 'test' => 'flag-no-account'],
     ];
@@ -293,20 +330,32 @@ new #[Layout('layouts::desk'), Title('titles.transfers')] class extends Componen
         'overview' => ['icon' => 'chart', 'label' => __('finance_tables.view_overview')],
     ]"
 >
+    @if ($this->hasAnyTransfer)
+        {{-- The two reached for most often filter as they are used, no dialog in the way. --}}
+        <x-slot:search>
+            <x-desk.register-search
+                :label="__('transfers.search_transfers')"
+                :placeholder="__('common.reference_donor_or_proposal')"
+                wire:model.live.debounce.300ms="search"
+                data-test="register-search"
+            />
+        </x-slot:search>
+
+        <x-slot:filters>
+            <x-ui.header-filter-select :label="__('funding_agreements.donor')" wire:model.live="donor" :value="$this->donor" data-test="register-donor">
+                <flux:select.option value="">{{ __('funding_agreements.all_donors') }}</flux:select.option>
+                @foreach ($this->filterDonors as $donorOption)
+                    <flux:select.option :value="$donorOption->id" :wire:key="'tr-donor-'.$donorOption->id">{{ $donorOption->name }}</flux:select.option>
+                @endforeach
+            </x-ui.header-filter-select>
+        </x-slot:filters>
+    @endif
+
     <x-slot:actions>
             <div class="flex flex-wrap items-center justify-end gap-2">
                 @if ($this->hasAnyTransfer)
                     <x-funding.filters :active="$activeFilterCount" :results="$total">
                         <div class="directory-filters grid gap-3 sm:grid-cols-2">
-                            <x-ui.input type="search" icon="magnifying-glass" :label="__('transfers.search_transfers')" :placeholder="__('common.reference_donor_or_proposal')" wire:model="search" clearable />
-
-                            <x-ui.header-filter-select deferred :label="__('funding_agreements.donor')" wire:model="donor" :value="$this->donor">
-                                <flux:select.option value="">{{ __('funding_agreements.all_donors') }}</flux:select.option>
-                                @foreach ($this->filterDonors as $donorOption)
-                                    <flux:select.option :value="$donorOption->id" :wire:key="'tr-donor-'.$donorOption->id">{{ $donorOption->name }}</flux:select.option>
-                                @endforeach
-                            </x-ui.header-filter-select>
-
                             <x-ui.header-filter-select deferred :label="__('transfers.account')" wire:model="account" :value="$this->account">
                                 <flux:select.option value="">{{ __('common.all_accounts') }}</flux:select.option>
                                 @foreach ($this->filterAccounts as $accountOption)
@@ -374,21 +423,29 @@ new #[Layout('layouts::desk'), Title('titles.transfers')] class extends Componen
             :heading="__('transfers.no_transfers_recorded')"
             :body="__('transfers.record_the_first_tranche_against_a_funding_agreement')"
         />
-    @elseif ($showsOverview)
-        @include('pages.transfers._overview')
-    @elseif ($view === 'board')
-        @include('pages.transfers._index-board')
-    @elseif ($view === 'calendar')
-        <x-desk.month-calendar :month="$this->calendarMonthStart()->toDateString()" :items="$this->calendarItems" />
-    @elseif ($this->rows->isEmpty())
-        <x-ui.empty-state
-            class="rtl:[&_svg]:-scale-x-100"
-            icon="arrow-right-circle"
-            :heading="__('transfers.no_matching_transfers')"
-            :body="__('common.change_the_search_or_filters_and_try_again')"
-        />
     @else
-        @include('pages.transfers._index-register')
+        @include('pages.transfers._index-headline')
+
+        @if ($showsOverview)
+            @include('pages.transfers._overview')
+        @elseif ($view === 'board')
+            @include('pages.transfers._index-board')
+        @elseif ($view === 'calendar')
+            <x-desk.month-calendar :month="$this->calendarMonthStart()->toDateString()" :items="$this->calendarItems" />
+        @elseif ($this->rows->isEmpty())
+            <x-ui.empty-state
+                class="rtl:[&_svg]:-scale-x-100"
+                icon="arrow-right-circle"
+                :heading="__('transfers.no_matching_transfers')"
+                :body="__('common.change_the_search_or_filters_and_try_again')"
+            >
+                <x-slot:action>
+                    <x-ui.button tone="action" size="sm" wire:click="clearFilters" data-test="reset-filters">{{ __('finance_tables.filters_clear_all') }}</x-ui.button>
+                </x-slot:action>
+            </x-ui.empty-state>
+        @else
+            @include('pages.transfers._index-register')
+        @endif
     @endif
 
     <x-funding.transfer-modal

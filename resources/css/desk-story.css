@@ -490,7 +490,7 @@
     .dk-prog-stat-n.dk-muted { color: var(--faint); }
     .dk-prog-stat-m { font-size: 20px; font-weight: 800; color: var(--ink); }
     .dk-prog-stat-s { font-size: 12.5px; line-height: 1.4; color: var(--ink-3); }
-    .dk-prog-stat.dk-bad { border-color: color-mix(in srgb, var(--bad) 35%, var(--line)); background: color-mix(in srgb, var(--bad-soft) 55%, var(--paper)); }
+    .dk-prog-stat.dk-bad { border-color: var(--brand); background: var(--paper); }
     .dk-prog-stat.dk-bad :is(.dk-prog-stat-n, .dk-prog-stat-k) { color: var(--bad); }
 
     .dk-story .dk-pjtabs .dk-prog-alert { width: 7px; height: 7px; border-radius: 50%; background: var(--bad); }

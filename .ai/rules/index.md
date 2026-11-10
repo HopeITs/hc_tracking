@@ -5,8 +5,8 @@ Before planning or editing, find the row whose globs match the file's path and r
 | Applies to | Rule file |
 | --- | --- |
 | app/Actions/Fortify/AuthenticateWithHrAccount.php | .ai/rules/actions-fortify.md |
-| {resources/views/pages/transfers/**,resources/views/pages/funding-agreements/**,resources/views/pages/donors/**,resources/views/pages/proposals/**,resources/views/pages/admin/⚡accounts.blade.php} | .ai/rules/admin.md |
 | resources/views/pages/activity/** | .ai/rules/activity.md |
+| {resources/views/pages/transfers/**,resources/views/pages/funding-agreements/**,resources/views/pages/donors/**,resources/views/pages/proposals/**,resources/views/pages/admin/⚡accounts.blade.php} | .ai/rules/admin.md |
 | app/Notifications/Alerts/** | .ai/rules/alerts.md |
 | resources/views/pages/annual-plans/** | .ai/rules/annual-plans.md |
 | app/** | .ai/rules/app-2.md |
@@ -28,7 +28,7 @@ Before planning or editing, find the row whose globs match the file's path and r
 | resources/css/*.css, resources/css/desk*.css | .ai/rules/css.md |
 | database/migrations/** | .ai/rules/database-migrations.md |
 | database/seeders/** | .ai/rules/database-seeders.md |
-| resources/views/components/desk/** | .ai/rules/desk.md |
+| resources/views/components/desk/**, resources/views/pages/desk/**, app/Support/Desk/**, resources/js/desk-*.js, resources/js/ask-index.js | .ai/rules/desk.md |
 | {database/migrations/**,app/Models/DonorReport.php,resources/views/pages/funding-agreements/**,resources/views/pages/donor-reports/**} | .ai/rules/donor-reports.md |
 | {app/Livewire/Concerns/ManagesDonorForm.php,resources/views/components/donors/**,resources/views/pages/donors/**} | .ai/rules/donors.md |
 | {config/fortify.php,app/Console/Commands/**,app/Enums/**} | .ai/rules/enums.md |
@@ -39,8 +39,8 @@ Before planning or editing, find the row whose globs match the file's path and r
 | {app/Providers/FortifyServiceProvider.php,app/Actions/Fortify/**,config/fortify.php} | .ai/rules/fortify.md |
 | resources/views/pages/funding-agreements/** | .ai/rules/funding-agreements.md |
 | {app/Livewire/Concerns/**,resources/views/components/funding/**} | .ai/rules/funding.md |
+| resources/views/pages/indicator-library/**, app/Livewire/Concerns/IndicatorLibrary/** | .ai/rules/indicator-library.md |
 | resources/views/pages/indicators/** | .ai/rules/indicators.md |
-| {resources/views/pages/indicator-library/**,app/Livewire/Concerns/IndicatorLibrary/**} | .ai/rules/indicator-library.md |
 | resources/js/** | .ai/rules/js.md |
 | {resources/views/components/ui/gantt.blade.php,resources/js/gantt/**,app/Livewire/Concerns/*Gantt.php} | .ai/rules/livewire-concerns.md |
 | {app/Models/User.php,app/Console/Commands/**,app/Http/Middleware/**,app/Actions/Fortify/**} | .ai/rules/middleware-actions-fortify.md |
@@ -49,6 +49,7 @@ Before planning or editing, find the row whose globs match the file's path and r
 | resources/views/pages/{milestones,tasks}/** | .ai/rules/milestonestasks.md |
 | {app/Models/Hr*.php,app/Support/EmployeeProfile.php,app/Models/Concerns/RemembersHrLookup.php} | .ai/rules/models-concerns.md |
 | app/Models/**, app/Models/Account.php, app/Models/Hr*.php, app/Models/Program.php, app/Models/User.php, app/Models/Task.php | .ai/rules/models.md |
+| resources/views/pages/admin/*narrative-questions* | .ai/rules/narrative-questions.md |
 | {app/Http/Middleware/SetLocale.php,app/Http/Controllers/SwitchLocaleController.php,resources/views/components/navigation/sidebar.blade.php,resources/css/*.css} | .ai/rules/navigation-css.md |
 | resources/views/components/{navigation/sidebar.blade.php,ui/panel.blade.php,ui/stat-tile.blade.php,ui/data-table.blade.php} | .ai/rules/navigation.md |
 | resources/views/pages/notifications/** | .ai/rules/notifications.md |
@@ -57,6 +58,7 @@ Before planning or editing, find the row whose globs match the file's path and r
 | {database/migrations/**,app/Models/DonorReport.php,resources/views/pages/funding-agreements/**} | .ai/rules/pages-funding-agreements.md |
 | resources/views/pages/** | .ai/rules/pages.md |
 | {config/access-control.php,app/Policies/UserPolicy.php} | .ai/rules/policies.md |
+| resources/views/pages/programs/** | .ai/rules/programs.md |
 | {app/Actions/Proposals/**,resources/views/pages/proposals/**,resources/views/pages/projects/**} | .ai/rules/projects.md |
 | resources/views/pages/proposals/** | .ai/rules/proposals.md |
 | {app/Models/Proposal.php,app/Models/DonorProposal.php,resources/views/pages/{proposals,funding-agreements,transfers,donors}/**} | .ai/rules/proposalsfunding-agreementstransfersdonors.md |
@@ -66,16 +68,14 @@ Before planning or editing, find the row whose globs match the file's path and r
 | resources/views/pages/results/** | .ai/rules/results.md |
 | {app/Models/PlanIndicator.php,resources/views/pages/{results,indicators,targets,reports}/**} | .ai/rules/resultsindicatorstargetsreports.md |
 | resources/views/pages/reviews/** | .ai/rules/reviews.md |
-| resources/views/pages/risks/** | .ai/rules/risks.md |
 | resources/views/pages/admin/*risk-library* | .ai/rules/risk-library.md |
-| resources/views/pages/admin/*narrative-questions* | .ai/rules/narrative-questions.md |
+| resources/views/pages/risks/** | .ai/rules/risks.md |
 | routes/web.php | .ai/rules/routes.md |
 | {database/factories/**,database/seeders/**,tests/Pest.php} | .ai/rules/seeders.md |
 | resources/views/pages/strategies/⚡show.blade.php, resources/views/pages/strategies/⚡index.blade.php | .ai/rules/strategies.md |
 | {app/Support/AgreementMoney.php,app/Support/Tranches.php,app/Models/TransfersTracking.php} | .ai/rules/support-models.md |
+| resources/views/pages/targets/**, app/Livewire/Concerns/Targets/** | .ai/rules/targets.md |
 | resources/views/pages/tasks/**, resources/views/pages/tasks/_list-group.blade.php | .ai/rules/tasks.md |
-| {resources/views/pages/targets/**,app/Livewire/Concerns/Targets/**} | .ai/rules/targets.md |
-| resources/views/pages/programs/** | .ai/rules/programs.md |
 | tests/** | .ai/rules/tests.md |
 | resources/views/pages/transfers/** | .ai/rules/transfers.md |
 | resources/views/{components/ui/page-header.blade.php,pages/**}, resources/views/{components/ui/header-filter-select.blade.php,pages/**}, resources/views/components/ui/detail-header.blade.php | .ai/rules/ui.md |

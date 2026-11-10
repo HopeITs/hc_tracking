@@ -5,15 +5,15 @@
 <div class="@container" x-data="taskSubtaskScope">
     @if ($this->listLayout !== 'narrow')
     <table class="hidden w-full table-fixed border-collapse text-start text-sm @3xl:table">
-        <thead class="bg-secondary-soft/40 dark:bg-surface-2">
-            <tr class="[&>th]:px-3.5 [&>th]:py-2.5 [&>th]:text-start [&>th]:text-[11px] [&>th]:font-bold [&>th]:tracking-wider [&>th]:text-secondary-medium [&>th]:uppercase [&>th]:dark:text-ink-faint">
-                <th class="w-9"></th>
+        <thead class="border-b border-secondary-soft dark:border-line">
+            <tr class="[&>th]:px-2 [&>th]:py-2.5 [&>th]:text-start [&>th]:text-xs [&>th]:font-semibold [&>th]:text-secondary-medium [&>th]:dark:text-ink-muted">
+                <th class="w-11"><span class="sr-only">{{ __('tasks.mark_complete') }}</span></th>
                 @include('pages.tasks._sortable-th', ['field' => 'title', 'label' => __('common.name')])
-                @include('pages.tasks._sortable-th', ['field' => 'assignee', 'label' => __('tasks.assignee'), 'class' => 'w-28'])
-                @include('pages.tasks._sortable-th', ['field' => 'due', 'label' => __('tasks.due_date_2'), 'class' => 'w-32'])
-                @include('pages.tasks._sortable-th', ['field' => 'priority', 'label' => __('tasks.priority'), 'class' => 'w-24'])
-                @include('pages.tasks._sortable-th', ['field' => 'status', 'label' => __('common.status'), 'class' => 'w-40'])
-                <th class="w-20"></th>
+                @include('pages.tasks._sortable-th', ['field' => 'assignee', 'label' => __('tasks.assignee'), 'class' => 'w-32'])
+                @include('pages.tasks._sortable-th', ['field' => 'due', 'label' => __('tasks.due_date_2'), 'class' => 'w-40'])
+                @include('pages.tasks._sortable-th', ['field' => 'priority', 'label' => __('tasks.priority'), 'class' => 'w-28'])
+                @include('pages.tasks._sortable-th', ['field' => 'status', 'label' => __('common.status'), 'class' => 'w-36'])
+                <th class="w-20"><span class="sr-only">{{ __('common.actions') }}</span></th>
             </tr>
         </thead>
         <tbody class="divide-y divide-secondary-soft dark:divide-line">

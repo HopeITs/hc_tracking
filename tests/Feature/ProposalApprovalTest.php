@@ -359,6 +359,21 @@ test('a location row without a responsible refuses the approval with the incompl
     Event::assertNotDispatched(ProposalStatusChanged::class);
 });
 
+test('a location row with no program or center refuses the approval and writes nothing', function () {
+    $proposal = submittedProposal();
+    $project = linkedProject($proposal);
+    ProposalLocation::factory()->for($proposal)->create();
+    Event::fake([ProposalStatusChanged::class]);
+
+    $errors = refusedApproval(fn () => approve(userWithRole('Public Relations Manager'), $proposal));
+
+    expect($errors['locations_complete'])->toBe([__('proposals.locations_incomplete')])
+        ->and($proposal->fresh()->status)->toBe(ProposalStatus::Submitted)
+        ->and($project->fresh()->start_date)->toBeNull();
+
+    Event::assertNotDispatched(ProposalStatusChanged::class);
+});
+
 test('a proposal whose rows all carry a project approves as before', function () {
     $proposal = submittedProposal();
     $project = linkedProject($proposal);

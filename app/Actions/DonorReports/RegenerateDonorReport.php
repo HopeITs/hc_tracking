@@ -15,7 +15,7 @@ use Illuminate\Validation\ValidationException;
  * as it was; a submitted report is never regenerated (contracts §14.3).
  *
  * - Who: `regenerate` on the report (`reports.aggregate`, not submitted) and
- *   `view` on its proposal.
+ *   proposal visibility or responsibility for this narrative report.
  * - The period is kept as saved, even if the grant dates changed since.
  */
 final class RegenerateDonorReport

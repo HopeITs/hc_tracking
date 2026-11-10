@@ -145,7 +145,10 @@
                                                     <span class="sr-only">{{ __('transfers.not_yet_assigned') }}</span>
                                                     <span aria-hidden="true">—</span>
                                                 @else
-                                                    {{ $node['date']->translatedFormat(__('formats.date_short')) }}
+                                                    {{-- The short format drops the year, and a ledger spans
+                                                         several: "30 December" beside a 2027 row is a guess.
+                                                         Keep the year off only for dates in this one. --}}
+                                                    {{ $node['date']->translatedFormat(__($node['date']->year === now()->year ? 'formats.date_short' : 'formats.date')) }}
                                                 @endif
                                             </span>
                                         </li>

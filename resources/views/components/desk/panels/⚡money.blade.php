@@ -103,7 +103,7 @@ new class extends Component {
     $format = __('desk.date_short');
 @endphp
 
-<x-desk.panel :facets="$pg['facets']" id="money" register="funding-agreements.index" :size="$size" :cols="$gridCols" :height="$gridRows" :index="$index" :total="$total" :count="$rows->count()">
+<x-desk.panel :empty="$rows->isEmpty()" :facets="$pg['facets']" id="money" register="funding-agreements.index" :size="$size" :cols="$gridCols" :height="$gridRows" :index="$index" :total="$total" :count="$rows->count()">
     @if ($this->fundingPosition->isNotEmpty())
         <p class="dk-fp-tot dk-num">
             @foreach ($this->fundingPosition as $total)

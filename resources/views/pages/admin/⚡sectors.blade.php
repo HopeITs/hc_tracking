@@ -254,7 +254,7 @@ new #[Layout('layouts::desk'), Title('titles.sectors')] class extends Component 
 <x-desk.register class="@container/directory" heading-id="sectors-heading" :title="__('titles.sectors')" :count="$sectors->count()" data-tour="sectors-page">
         @if ($canManage)
             <x-slot:actions>
-                <x-ui.button tone="primary" icon="plus" class="min-h-11 self-end touch-manipulation @sm/directory:min-h-10" wire:click="openCreateModal" data-test="create-sector" data-tour="sectors-create">
+                <x-ui.button tone="primary" icon="plus" class="min-h-11 self-end touch-manipulation @sm/directory:min-h-10" wire:click="openCreateModal" data-test="create-sector" data-tour="sectors-create" data-quick-create>
                     {{ __('sectors.add_sector') }}
                 </x-ui.button>
             </x-slot:actions>

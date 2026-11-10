@@ -5,8 +5,10 @@
             {{ $slot }}
         </main>
 
-        <footer class="dk-foot" data-desk-footer>
-            <p>{{ __('authentication.copyright_notice', ['year' => now()->year]) }}</p>
-        </footer>
+        @unless (\App\Support\Desk\DeskTab::current())
+            <footer class="dk-foot" data-desk-footer>
+                <p>{{ __('authentication.copyright_notice', ['year' => now()->year]) }}</p>
+            </footer>
+        @endunless
     </div>
 </x-layouts::app.sidebar>

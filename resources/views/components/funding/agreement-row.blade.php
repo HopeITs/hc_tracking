@@ -28,6 +28,25 @@
                 </td>
                 @break
 
+            @case('amount')
+                {{-- The budget with its currency, so a register needs no currency column of its own. --}}
+                <td class="num" data-label="{{ $column['label'] }}" data-cell="amount">
+                    <span class="fig font-semibold">{{ $money($budget) }}</span>
+                    <span class="sub">{{ $agreement->currency->value }}</span>
+                </td>
+                @break
+
+            @case('received_share')
+                {{-- What landed and what share of the budget that is: the figure and its denominator together. --}}
+                @php
+                    $receivedBase = $yearOnly ? (float) $agreement->money_scheduled : $budget;
+                @endphp
+                <td class="num" data-label="{{ $column['label'] }}" data-cell="received_share">
+                    <span class="fig font-semibold text-funding">{{ $money($agreement->money_received) }}</span>
+                    <span class="sub" dir="ltr">{{ \App\Models\DonorProposal::percentLabel((float) $agreement->money_received, $receivedBase) }}%</span>
+                </td>
+                @break
+
             @case('received')
             @case('received_in_year')
                 <td class="num" data-label="{{ $column['label'] }}" data-cell="{{ $column['key'] }}">

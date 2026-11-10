@@ -50,9 +50,11 @@ use Spatie\Permission\Traits\HasRoles;
  * @property int|null $active_role_id
  * @property string|null $locale
  * @property list<string>|null $nav_pins the sidebar pages this person pinned, as route names
- * @property list<array{route: string, key: string, label: string, kind: string}>|null $nav_recent the records this person opened last, newest first
+ * @property list<array{route: string, key: string, label: string, kind: string, n?: int, t?: int}>|null $nav_recent the records this person works in, with how often (n) and when last (t) each was opened; read through RemembersRecentRecord::mostUsed()
  * @property array<mixed>|null $desk_layout the saved Desk arrangement, list<array{panel: string, size: string}> as written; read through Panels::layoutFor(), which drops anything malformed
  * @property array<mixed>|null $page_panels the Panels popup's sets per route name, array<string, list<array{panel: string, size: string}>> as written; read through Panels::pageLayoutFor()
+ * @property array<mixed>|null $desk_panel_flags the Desk panels pinned to the top and folded into tiles, array{pinned?: list<string>, folded?: list<string>} as written; read through Panels::flagsFor()
+ * @property array<mixed>|null $desk_quick_access the Desk's Quick access list, Ask row keys in order (list<string>) as written; read through QuickAccess::for(), which drops what is no longer offered
  * @property bool $notification_popups
  * @property CarbonImmutable|null $tour_seen_at
  * @property CarbonImmutable|null $email_verified_at
@@ -83,6 +85,8 @@ class User extends Authenticatable implements HasLocalePreference, PasskeyUser, 
         'locale' => null,
         'desk_layout' => null,
         'page_panels' => null,
+        'desk_quick_access' => null,
+        'desk_panel_flags' => null,
         'nav_pins' => null,
         'nav_recent' => null,
         'notification_popups' => false,
@@ -692,6 +696,8 @@ class User extends Authenticatable implements HasLocalePreference, PasskeyUser, 
             'tour_seen_at' => 'datetime',
             'desk_layout' => 'array',
             'page_panels' => 'array',
+            'desk_quick_access' => 'array',
+            'desk_panel_flags' => 'array',
             'nav_pins' => 'array',
             'nav_recent' => 'array',
         ];

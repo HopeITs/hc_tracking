@@ -1,0 +1,152 @@
+/*
+ * The bell's notifications panel (components/notifications/⚡bell and
+ * bell-row), drawn in the Ask bar's language (desk-shell.css .dk-pal-*): a
+ * big unread figure, tracked group labels ending in a hairline, and rows on a
+ * thread whose nodes are the modules' sidebar icons in rings. Classes are
+ * dk-nb- prefixed and read the Desk tokens from desk.css :root, so the
+ * Graphite .dark values apply without a second block. notifications.js
+ * place() sets --nb-shift to keep the card inside the window.
+ */
+@layer components {
+    .dk-nb { --nb-shift: 0px; --nb-glyph: 28px; --nb-pad: 10px; position: absolute; z-index: 50; top: calc(100% + 10px); left: 50%; translate: calc(-50% + var(--nb-shift)) 0; width: 380px; display: flex; flex-direction: column; max-height: min(580px, calc(100dvh - var(--top-h) - 24px)); background: var(--paper); color: var(--ink); border: 1px solid var(--line); border-radius: 22px; box-shadow: 0 30px 70px -24px rgb(16 24 40 / .45), 0 2px 6px rgb(16 24 40 / .06); transform-origin: top center; text-align: start; }
+    .dark .dk-nb { box-shadow: 0 30px 70px -20px rgb(0 0 0 / .7); }
+    .dk-nb:focus { outline: none; }
+
+    /* Header: a tracked label over the big unread figure; the two actions share one small pill, centred on it.
+       Icon sizes are set on the icons (size-*): Flux's own size utility outranks any size set here. */
+    .dk-nb-h { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 16px 16px 12px 20px; }
+    [dir="rtl"] .dk-nb-h { padding: 16px 20px 12px 16px; }
+    .dk-nb-head { display: grid; gap: 4px; min-width: 0; }
+    .dk-nb-title { font-size: 11px; font-weight: 800; letter-spacing: .08em; text-transform: uppercase; color: var(--ink-3); }
+    [lang="ar"] .dk-nb-title { font-size: 12px; letter-spacing: 0; }
+    .dk-nb-figure { display: flex; align-items: baseline; flex-wrap: wrap; gap: 0 6px; min-width: 0; }
+    .dk-nb-figure strong { font-size: 30px; font-weight: 800; line-height: 1; letter-spacing: -.02em; font-variant-numeric: tabular-nums; }
+    .dk-nb-figure > span { font-size: 13px; font-weight: 600; color: var(--ink-3); }
+    .dk-nb-figure .dk-nb-critical { display: inline-flex; align-items: center; gap: 6px; margin-inline-start: 6px; font-size: 12px; font-weight: 700; color: var(--bad); font-variant-numeric: tabular-nums; }
+    .dk-nb-critical > i { width: 10px; height: 10px; flex: none; border-radius: 999px; border: 3px solid var(--brand); }
+    .dk-nb-figure .dk-nb-calm { font-size: 17px; font-weight: 800; letter-spacing: -.01em; color: var(--ink); }
+    .dk-nb-acts { display: flex; align-items: center; gap: 2px; flex: none; padding: 3px; border: 1px solid var(--line); border-radius: 999px; background: var(--paper); box-shadow: 0 1px 2px rgb(16 24 40 / .04); }
+    .dark .dk-nb-acts { box-shadow: none; }
+    .dk-nb-acts > .relative { display: flex; }
+    .dk-nb-ic { position: relative; display: inline-grid; place-items: center; width: 30px; height: 30px; border: 0; border-radius: 999px; background: none; color: var(--ink-3); cursor: pointer; transition: background .15s, color .15s; }
+    .dk-nb-ic svg { stroke-width: 1.75; }
+    .dk-nb-ic:hover, .dk-nb-ic[aria-expanded="true"] { background: var(--sunk); color: var(--ink); }
+    .dk-nb-ic:focus-visible { outline: none; box-shadow: 0 0 0 2px var(--line-2); color: var(--ink); }
+    .dk-nb-ic.dk-tip::after { left: auto; inset-inline-end: 0; transform: translateY(-3px); }
+    @media (hover: hover) { .dk-nb-ic.dk-tip:hover::after { transform: none; } }
+    .dk-nb-ic.dk-tip:focus-visible::after { transform: none; }
+
+    /* The settings menu under the gear (administrators: preferences and rules). */
+    .dk-nb-menu { position: absolute; z-index: 2; top: calc(100% + 10px); inset-inline-end: -4px; width: 230px; padding: 6px; display: grid; gap: 1px; background: var(--paper); border: 1px solid var(--line); border-radius: 14px; box-shadow: var(--dk-shadow); transform-origin: top right; }
+    [dir="rtl"] .dk-nb-menu { transform-origin: top left; }
+    .dk-nb-menu a { display: flex; align-items: center; gap: 10px; min-height: 38px; padding: 6px 10px; border-radius: 10px; color: var(--ink); font-size: 13px; font-weight: 700; text-decoration: none; }
+    .dk-nb-menu a svg { flex: none; stroke-width: 1.75; color: var(--ink-3); }
+    .dk-nb-menu a:hover, .dk-nb-menu a:focus-visible { background: var(--sunk); outline: none; }
+
+    /* All / Unread: the Desk's pill track; Unread carries its count. */
+    .dk-nb-tabs { display: inline-flex; align-self: flex-start; gap: 2px; margin: 0 20px 4px; padding: 3px; border-radius: 999px; background: var(--sunk); }
+    .dk-nb-tab { display: inline-flex; align-items: center; gap: 6px; min-height: 28px; padding: 0 14px; border: 0; border-radius: 999px; background: none; color: var(--ink-3); font: inherit; font-size: 13px; font-weight: 700; cursor: pointer; transition: background .15s, color .15s, box-shadow .15s; }
+    .dk-nb-tab small { font-size: 11px; font-weight: 700; color: var(--faint); font-variant-numeric: tabular-nums; }
+    .dk-nb-tab:hover { color: var(--ink); }
+    .dk-nb-tab[aria-selected="true"] { background: var(--paper); color: var(--ink); box-shadow: 0 1px 2px rgb(16 24 40 / .08), 0 0 0 1px var(--line); }
+    .dk-nb-tab[aria-selected="true"] small { color: var(--ink-3); }
+    .dk-nb-tab:focus-visible { outline: none; box-shadow: 0 0 0 2px var(--line-2); }
+
+    /* The list scrolls inside the card; group labels are tracked and end in a hairline. */
+    .dk-nb-list { flex: 1 1 auto; min-height: 0; overflow-y: auto; overscroll-behavior: contain; padding: 0 6px 8px; scrollbar-width: thin; transition: opacity .15s; }
+    .dk-nb-busy { opacity: .55; }
+    .dk-nb-sec { display: flex; align-items: center; gap: 10px; padding: 16px 12px 6px; font-size: 11px; font-weight: 800; letter-spacing: .08em; text-transform: uppercase; color: var(--ink-3); }
+    [lang="ar"] .dk-nb-sec { font-size: 12px; letter-spacing: 0; }
+    .dk-nb-sec::after { content: ""; flex: 1; height: 1px; background: var(--line); }
+    .dk-nb-sec[data-bell-pinned] { color: var(--bad); }
+
+    /* The thread joins one row's icon ring to the next, as in the Ask bar's suggestions. */
+    .dk-nb-thread { position: relative; display: grid; gap: 2px; }
+    .dk-nb-thread::before { content: ""; position: absolute; inset-block: 24px; inset-inline-start: calc(var(--nb-pad) + var(--nb-glyph) / 2 - 1px); width: 2px; border-radius: 2px; background: var(--line); }
+
+    /* A row: icon ring with its unread dot, one clamped line, a muted meta line. */
+    .dk-nb-row { position: relative; border-radius: 14px; transition: background .12s; }
+    .dk-nb-row:hover, .dk-nb-row:focus-within { background: var(--sunk); }
+    .dk-nb-link { display: flex; align-items: center; gap: 10px; min-width: 0; min-height: 48px; padding: 6px var(--nb-pad); border-radius: 14px; color: inherit; text-decoration: none; }
+    .dk-nb-link:focus-visible { outline: none; }
+    .dk-nb-glyph { position: relative; display: grid; place-items: center; width: var(--nb-glyph); height: var(--nb-glyph); flex: none; border-radius: 999px; border: 1px solid var(--line); background: var(--paper); color: var(--faint); transition: border-color .12s, color .12s; }
+    .dk-nb-glyph svg { stroke-width: 2; }
+    .dk-nb-unread .dk-nb-glyph { border-color: var(--line-2); color: var(--ink-2); }
+    .dk-nb-row:hover .dk-nb-glyph, .dk-nb-row:focus-within .dk-nb-glyph { border-color: var(--line-2); color: var(--ink); }
+    .dk-nb-dot { position: absolute; top: -2px; inset-inline-end: -2px; width: 9px; height: 9px; border-radius: 999px; border: 2px solid var(--paper); background: var(--ink); display: none; }
+    .dk-nb-unread .dk-nb-dot { display: block; }
+    .dk-nb-crit .dk-nb-dot { background: var(--brand); }
+    .dk-nb-row:hover .dk-nb-dot, .dk-nb-row:focus-within .dk-nb-dot { border-color: var(--sunk); }
+    .dk-nb-text { display: grid; gap: 2px; min-width: 0; flex: 1; }
+    .dk-nb-line { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 13.5px; font-weight: 500; line-height: 1.35; color: var(--ink-3); }
+    .dk-nb-unread .dk-nb-line { font-weight: 600; color: var(--ink); }
+    .dk-nb-meta { display: flex; align-items: center; gap: 5px; min-width: 0; overflow: hidden; white-space: nowrap; font-size: 12px; font-weight: 500; line-height: 1.35; color: var(--faint); }
+
+    /* The keyboard-selected row shows the Ask bar's return chip. */
+    .dk-nb-ret { flex: none; display: none; place-items: center; width: 26px; height: 22px; padding: 0; border: 0; border-radius: 7px; background: var(--paper); box-shadow: 0 0 0 1px var(--line); color: var(--ink-3); }
+    .dk-nb-ret svg { width: 13px; height: 13px; }
+    [dir="rtl"] .dk-nb-ret { transform: scaleX(-1); }
+    .dk-nb-link:focus-visible .dk-nb-ret { display: grid; }
+    .dk-nb-row:hover .dk-nb-ret { display: none; }
+
+    /* Mark as read: a round tick on hover or when it has focus (always shown on touch). */
+    .dk-nb-tick { position: absolute; inset-inline-end: 10px; top: 50%; margin-top: -15px; display: grid; place-items: center; width: 30px; height: 30px; border: 0; border-radius: 999px; background: var(--paper); box-shadow: 0 0 0 1px var(--line); color: var(--ink-3); cursor: pointer; opacity: 0; transition: opacity .12s, color .12s, box-shadow .12s; }
+    .dk-nb-tick svg { width: 16px; height: 16px; }
+    .dk-nb-tick:hover { color: var(--ink); box-shadow: 0 0 0 1px var(--line-2); }
+    .dk-nb-tick:focus-visible { outline: none; opacity: 1; box-shadow: 0 0 0 2px var(--line-2); color: var(--ink); }
+    .dk-nb-row:hover .dk-nb-tick { opacity: 1; }
+    .dk-nb-unread:hover .dk-nb-link, .dk-nb-unread:has(.dk-nb-tick:focus-visible) .dk-nb-link { padding-inline-end: 48px; }
+    @media (hover: none) {
+        .dk-nb-tick { opacity: 1; }
+        .dk-nb-unread .dk-nb-link { padding-inline-end: 48px; }
+    }
+
+    /* Loading and empty states. */
+    .dk-nb-skel { display: grid; gap: 2px; padding: 12px 0 4px; }
+    .dk-nb-skel-row { display: flex; align-items: center; gap: 10px; min-height: 48px; padding: 6px var(--nb-pad); }
+    .dk-nb-skel-row > i { width: var(--nb-glyph); height: var(--nb-glyph); flex: none; border-radius: 999px; border: 1px solid var(--line); }
+    .dk-nb-skel-row > span { display: grid; gap: 8px; flex: 1; }
+    .dk-nb-skel-row b { display: block; height: 10px; border-radius: 999px; background: var(--sunk); animation: dk-nb-breathe 1.4s ease-in-out infinite; }
+    .dk-nb-skel-row b + b { width: 34%; height: 8px; }
+    @keyframes dk-nb-breathe { 50% { opacity: .45; } }
+    .dk-nb-empty { display: grid; justify-items: center; gap: 4px; padding: 40px 24px 44px; text-align: center; }
+    .dk-nb-empty > span { display: grid; place-items: center; width: 48px; height: 48px; margin-bottom: 10px; border-radius: 999px; border: 1px solid var(--line-2); color: var(--ink); }
+    .dk-nb-empty > span svg { width: 22px; height: 22px; }
+    .dk-nb-empty p { font-size: 17px; font-weight: 800; letter-spacing: -.01em; }
+    .dk-nb-empty small { max-width: 240px; font-size: 12.5px; font-weight: 500; color: var(--ink-3); }
+
+    /* Footer: one link to the full inbox; the undo bar covers it for a few seconds. */
+    .dk-nb-foot { position: relative; display: flex; justify-content: flex-end; padding: 10px 14px 10px 20px; border-top: 1px solid var(--line); border-radius: 0 0 22px 22px; }
+    [dir="rtl"] .dk-nb-foot { padding: 10px 20px 10px 14px; }
+    .dk-nb-all { display: inline-flex; align-items: center; gap: 6px; min-height: 30px; padding-inline: 12px 10px; border-radius: 999px; color: var(--ink); font-size: 13px; font-weight: 700; text-decoration: none; transition: background .15s; }
+    .dk-nb-all svg { width: 16px; height: 16px; color: var(--ink-3); transition: translate .15s; }
+    .dk-nb-all:hover { background: var(--sunk); }
+    .dk-nb-all:hover svg { translate: 2px 0; }
+    [dir="rtl"] .dk-nb-all:hover svg { translate: -2px 0; }
+    .dk-nb-all:focus-visible { outline: none; box-shadow: 0 0 0 2px var(--line-2); }
+    .dk-nb-undo { position: absolute; inset: 0; display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 0 12px 0 20px; border-radius: inherit; background: var(--ink); color: var(--paper); font-size: 13px; font-weight: 700; }
+    .dk-nb-undo > span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .dk-nb-undo button { display: inline-flex; align-items: center; gap: 6px; flex: none; min-height: 28px; padding: 0 12px; border: 0; border-radius: 999px; background: rgb(255 255 255 / .16); color: inherit; font: inherit; cursor: pointer; }
+    .dark .dk-nb-undo button { background: rgb(0 0 0 / .12); }
+    .dk-nb-undo button svg { width: 14px; height: 14px; }
+
+    /* Rows settle in once when the panel first fills; morphed rows keep their node and never replay. */
+    @media (prefers-reduced-motion: no-preference) {
+        .dk-nb-row { animation: dk-nb-in .32s cubic-bezier(.2, .8, .2, 1) both; }
+        .dk-nb-row:nth-child(2) { animation-delay: 30ms; }
+        .dk-nb-row:nth-child(3) { animation-delay: 60ms; }
+        .dk-nb-row:nth-child(4) { animation-delay: 90ms; }
+        .dk-nb-row:nth-child(n+5) { animation-delay: 120ms; }
+    }
+    @keyframes dk-nb-in { from { opacity: 0; transform: translateY(4px); } }
+
+    /* Phones: a full-width sheet under the top bar. */
+    @media (max-width: 639px) {
+        .dk-nb { position: fixed; top: calc(var(--top-h) + 8px); left: 12px; right: 12px; width: auto; translate: none; max-height: calc(100dvh - var(--top-h) - 20px); }
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+        .dk-nb-all svg, .dk-nb-tick, .dk-nb-row { transition: none; }
+        .dk-nb-skel-row b { animation: none; }
+    }
+}

@@ -11,6 +11,8 @@
     $countOf = fn (array $item): int => $item['module'] !== null ? (int) ($moduleCounts[$item['module']] ?? 0) : 0;
     $badge = fn (int $count): string => $count > 99 ? '99+' : (string) $count;
     $dueModules = app(\App\Support\Desk\NavDeadlines::class)->modulesFor($user);
+    /* On My desk every page can be dragged onto the Desk, or added with its "+" (resources/js/desk-drop.js). */
+    $onDesk = $routeName === 'dashboard';
 
     /* Every page the sidebar offers, by route, for the Pinned zone. */
     $pages = collect($groups)->flatMap(fn (array $group): array => $group['items'])->keyBy('route');
@@ -21,8 +23,9 @@
     ])->all();
     $pins = collect($user->nav_pins ?? [])->filter(fn (mixed $pin): bool => is_string($pin) && $pages->has($pin))->values()->all();
 
-    $recent = collect($user->nav_recent ?? [])
-        ->filter(fn (mixed $entry): bool => is_array($entry) && isset($entry['route'], $entry['key'], $entry['label'], $entry['kind']) && Route::has($entry['route']))
+    /* The records this person works in most, by use (RemembersRecentRecord::mostUsed). */
+    $recent = collect(\App\Http\Middleware\RemembersRecentRecord::mostUsed($user->nav_recent))
+        ->filter(fn (array $entry): bool => Route::has($entry['route']))
         ->map(fn (array $entry): array => [
             'href' => route($entry['route'], $entry['key']),
             'label' => $entry['label'],
@@ -37,12 +40,12 @@
     if ($project !== null) {
         $tab = (string) request()->query('tab', '');
         $sections = collect([
-            ['tab' => '', 'label' => __('navigation.section_story'), 'icon' => 'book-open'],
-            ['tab' => 'tasks', 'label' => __('navigation.section_tasks'), 'icon' => 'check-circle'],
-            ['tab' => 'risks', 'label' => __('navigation.section_risks'), 'icon' => 'exclamation-triangle'],
-            ['tab' => 'targets', 'label' => __('navigation.section_targets'), 'icon' => 'viewfinder-circle'],
-            ['tab' => 'proposals', 'label' => __('navigation.section_funding'), 'icon' => 'banknotes'],
-            ['tab' => 'files', 'label' => __('navigation.section_files'), 'icon' => 'paper-clip'],
+            ['tab' => '', 'label' => __('navigation.section_story'), 'icon' => 'nav-book-open'],
+            ['tab' => 'tasks', 'label' => __('navigation.section_tasks'), 'icon' => 'nav-square-check-big'],
+            ['tab' => 'risks', 'label' => __('navigation.section_risks'), 'icon' => 'nav-siren'],
+            ['tab' => 'targets', 'label' => __('navigation.section_targets'), 'icon' => 'nav-crosshair'],
+            ['tab' => 'proposals', 'label' => __('navigation.section_funding'), 'icon' => 'nav-wallet'],
+            ['tab' => 'files', 'label' => __('navigation.section_files'), 'icon' => 'nav-paperclip'],
         ])->map(fn (array $section): array => $section + [
             'href' => route('projects.show', $section['tab'] === '' ? [$project] : [$project, 'tab' => $section['tab']]),
             'current' => $section['tab'] === $tab || ($section['tab'] === '' && in_array($tab, ['', 'milestones'], true)),
@@ -59,7 +62,7 @@
     Below 900px the top bar's menu button lays the expanded sidebar over the page.
 --}}
 <nav
-    class="dk-side dk-scope"
+    @class(['dk-side dk-scope', 'dk-side-ondesk' => $onDesk])
     aria-label="{{ __('navigation.application_navigation') }}"
     x-data="hcSideNav({ pins: @js($pins), pages: @js($pinnable), pinUrl: @js(route('nav.pins.toggle')), context: @js($project !== null) })"
     data-side-nav
@@ -145,6 +148,7 @@
                                     @if ($current) aria-current="page" @endif
                                     data-label="{{ $item['label'] }}"
                                     data-side-link="{{ $item['route'] }}"
+                                    data-desk-route="{{ $item['route'] }}"
                                 >
                                     @if ($flat)
                                         <flux:icon :name="$item['hero']" variant="outline" class="dk-side-ic" />
@@ -154,6 +158,9 @@
                                         <span class="dk-side-badge dk-num" data-side-badge>{{ $badge($count) }}</span>
                                     @endif
                                 </a>
+                                @if ($onDesk && $item['route'] !== 'dashboard')
+                                    <x-desk.side-add :route="$item['route']" :label="$item['label']" />
+                                @endif
                                 @unless ($flat)
                                     <x-desk.side-pin :route="$item['route']" :label="$item['label']" />
                                 @endunless
@@ -169,13 +176,16 @@
                         @foreach ($group['items'] as $item)
                             @php $count = $countOf($item); @endphp
                             <div class="dk-side-li">
-                            <a href="{{ route($item['route']) }}" wire:navigate role="menuitem" @class(['dk-side-a', 'dk-side-sub', 'dk-on' => $isCurrent($item['route'])]) @if ($isCurrent($item['route'])) aria-current="page" @endif>
+                            <a href="{{ route($item['route']) }}" wire:navigate role="menuitem" @class(['dk-side-a', 'dk-side-sub', 'dk-on' => $isCurrent($item['route'])]) @if ($isCurrent($item['route'])) aria-current="page" @endif data-desk-route="{{ $item['route'] }}">
                                 <flux:icon :name="$item['hero']" variant="outline" class="dk-side-fly-ic" />
                                 <span class="dk-side-l">{{ $item['label'] }}</span>
                                 @if ($count > 0)
                                     <span class="dk-side-badge dk-num">{{ $badge($count) }}</span>
                                 @endif
                             </a>
+                            @if ($onDesk)
+                                <x-desk.side-add :route="$item['route']" :label="$item['label']" />
+                            @endif
                             <x-desk.side-pin :route="$item['route']" :label="$item['label']" />
                             </div>
                         @endforeach
@@ -186,7 +196,7 @@
                 @if ($group['group'] === 'overview')
                     <section class="dk-side-g dk-side-me" data-side-personal>
                         <button type="button" class="dk-side-a dk-side-gb dk-side-star" data-fly="personal" x-on:click="toggle()" data-label="{{ __('navigation.pinned_and_recent') }}" aria-label="{{ __('navigation.pinned_and_recent') }}">
-                            <span class="dk-side-icw"><flux:icon.star variant="outline" class="dk-side-ic" /></span>
+                            <span class="dk-side-icw"><flux:icon name="nav-pin" variant="outline" class="dk-side-ic" /></span>
                         </button>
                         <div class="dk-side-me-list">
                             <p class="dk-side-gh">{{ __('navigation.pinned') }}</p>

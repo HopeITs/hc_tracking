@@ -29,7 +29,8 @@ use Illuminate\Validation\ValidationException;
  * (contracts §14.3). Saving the same agreement, type and period again adds
  * the next version; nothing saved changes when monthly data changes later.
  *
- * - Who: `reports.aggregate` and `view` on the proposal.
+ * - Who: `reports.aggregate` and proposal visibility, or a report assignment
+ *   for saving a narrative report with the same responsible person.
  * - The proposal needs a funding agreement (`donor_reports.donor_proposal_id`
  *   is NOT NULL); without one the builder can preview but not save.
  * - Default responsible: narrative → the Fundraising Manager slot holder,
@@ -54,7 +55,16 @@ final class SaveDonorReportSnapshot
         $period = ReportingPeriod::from($data['periodType']);
         $type = DonorReportType::from($data['type']);
         $window = DonorReportPeriods::window($proposal, $period, $data['startMonth'], $data['endMonth'] ?? null);
-        $agreementId = DonorProposal::query()->where('proposal_id', $proposal->id)->value('id');
+        $assignmentOnly = $actor->cannot('view', $proposal);
+
+        if ($assignmentOnly) {
+            Gate::forUser($actor)->allowIf($type === DonorReportType::Narrative
+                && (int) ($data['responsibleEmployeeId'] ?? $actor->employee_id) === (int) $actor->employee_id);
+        }
+
+        $agreementId = $proposal->donorProposals()
+            ->when($assignmentOnly, fn ($agreements) => $agreements->whereHas('reports', fn ($reports) => $reports->where('responsible_employee_id', $actor->employee_id)))
+            ->value('id');
 
         if ($agreementId === null) {
             throw ValidationException::withMessages(['proposalId' => __('donor_reports.agreement_required')]);
@@ -75,7 +85,7 @@ final class SaveDonorReportSnapshot
             'period_end' => $window['end']->toDateString(),
             'due_on' => $data['dueOn'],
             'snapshot' => $snapshot,
-            'responsible_employee_id' => $data['responsibleEmployeeId'] ?? Slots::holderOf(DonorReportResponsibles::slotFor($type)),
+            'responsible_employee_id' => $assignmentOnly ? $actor->employee_id : ($data['responsibleEmployeeId'] ?? Slots::holderOf(DonorReportResponsibles::slotFor($type))),
             'notes' => filled($data['notes'] ?? null) ? $data['notes'] : null,
         ]);
     }

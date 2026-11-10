@@ -78,29 +78,35 @@ final class NotificationPresenter
     }
 
     /**
-     * The Heroicon a module is drawn with, matching the sidebar.
+     * The icon a module is drawn with: the same Lucide nav- icon its page has
+     * in the Desk sidebar (App\Support\Desk\Destinations).
      */
     public function moduleIcon(string $module): string
     {
         return match ($module) {
-            'strategies' => 'chart-bar-square',
-            'programs' => 'briefcase',
-            'annual-plans' => 'calendar-days',
-            'projects' => 'rectangle-stack',
-            'milestones' => 'flag',
-            'tasks' => 'clipboard-document-check',
-            'risks' => 'exclamation-triangle',
-            'results' => 'chart-bar',
-            'indicators' => 'variable',
-            'targets' => 'viewfinder-circle',
-            'reports' => 'document-chart-bar',
-            'proposals' => 'document-text',
-            'donors' => 'building-library',
-            'funding-agreements' => 'banknotes',
-            'transfers' => 'arrow-right-circle',
-            'accounts' => 'credit-card',
-            'access-management' => 'users',
-            default => 'bell',
+            'strategies' => 'nav-lightbulb',
+            'programs' => 'nav-layers',
+            'annual-plans' => 'nav-calendar-range',
+            'projects' => 'nav-folder-open',
+            'milestones' => 'nav-flag',
+            'tasks' => 'nav-square-check-big',
+            'risks' => 'nav-siren',
+            'results' => 'nav-network',
+            'indicator-library' => 'nav-library-big',
+            'indicators' => 'nav-gauge',
+            'targets' => 'nav-crosshair',
+            'reports' => 'nav-file-chart-column',
+            'monthly-reports' => 'nav-calendar-check',
+            'report-templates' => 'nav-clipboard-list',
+            'donor-reports' => 'nav-file-text',
+            'proposals' => 'nav-file-pen',
+            'donors' => 'nav-hand-heart',
+            'funding-agreements' => 'nav-handshake',
+            'transfers' => 'nav-arrow-left-right',
+            'accounts' => 'nav-landmark',
+            'access-management' => 'nav-users',
+            'cities' => 'nav-map-pin',
+            default => 'nav-bell',
         };
     }
 

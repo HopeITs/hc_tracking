@@ -85,7 +85,7 @@ document.addEventListener('alpine:init', () => {
                 return;
             }
 
-            // Wait for the preloader and first paint so the spotlight lands on settled layout.
+            // Wait for first paint so the spotlight lands on settled layout.
             setTimeout(() => {
                 this.start();
 

@@ -406,7 +406,7 @@
                     <flux:icon.arrow-right variant="micro" />
                 </button>
                 <span x-show="busy" x-cloak class="ms-1.5 inline-flex items-center gap-1.5 text-xs text-secondary-medium dark:text-ink-muted">
-                    <span class="size-1.5 animate-pulse rounded-full bg-primary dark:bg-ink"></span>{{ __('gantt.saving') }}
+                    <span class="size-1.5 rounded-full bg-primary dark:bg-ink"></span>{{ __('gantt.saving') }}
                 </span>
             </div>
         @endif

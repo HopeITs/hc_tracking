@@ -62,8 +62,7 @@ test('the monthly reports card of a running project opens the Monthly Reports pa
 
     Livewire::actingAs($owner)
         ->test('pages::projects.show', ['project' => $project])
-        ->assertSeeHtml('data-test="story-reporting"')
-        ->assertSeeHtml('href="'.route('monthly-reports.index').'" wire:navigate>'.__('story.open.monthly_reports'));
+        ->assertSeeHtmlInOrder(['data-test="story-reporting"', 'href="'.route('monthly-reports.index').'"', __('story.open.monthly_reports').'</a>']);
 });
 
 test('nudging the holder of the next step reaches them once a day', function () {

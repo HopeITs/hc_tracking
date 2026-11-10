@@ -48,7 +48,8 @@ new class extends Component {
     #[Computed]
     public function library(): array
     {
-        return app(Panels::class)->availableTo(auth()->user());
+        /* Page cards and buttons live on My desk only: this popup holds hand-made panels. */
+        return array_filter(app(Panels::class)->availableTo(auth()->user()), fn (array $panel): bool => $panel['kind'] === 'panel');
     }
 
     /**

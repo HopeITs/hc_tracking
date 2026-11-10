@@ -1,8 +1,7 @@
-/* Desk free cell grid + "glass desk" surface (resources/js/desk-grid.js).
+/* Desk free cell grid (resources/js/desk-grid.js).
  * Panels sit on a 12-column cell grid: --span = the entry's cols, --rows its
  * row units. Below 1280px the spans collapse through --span-r (data-cols
- * ranges), never [style*="--span"]. Glass and the
- * ambient field are tokens + color-mix only; reduced motion = static.
+ * ranges), never [style*="--span"]. Nothing on the Desk repaints while it rests.
  * Own classes only, all prefixed dk-, in @layer components like desk.css. */
 
 @layer components {
@@ -20,66 +19,82 @@
         .dk-panel:is([data-cols="1"], [data-cols="2"], [data-cols="3"]) { --span-r: 6; }
     }
 
-    /* ── Ambient field: a slow, faint mesh behind the desk ─────────── */
+    /* ── The Desk sits on the plain ground ────────────────────────────
+     * No red, green or grey glow behind the cards, in light or dark (user
+     * decision 2026-11-10). */
     [data-desk] { position: relative; isolation: isolate; }
-    [data-desk]::before {
-        content: ""; position: fixed; inset: -10vmax; z-index: -1; pointer-events: none;
-        background:
-            radial-gradient(40vmax 30vmax at 12% 8%, color-mix(in srgb, var(--brand) 7%, transparent), transparent 70%),
-            radial-gradient(36vmax 28vmax at 88% 18%, color-mix(in srgb, var(--good) 6%, transparent), transparent 70%),
-            radial-gradient(44vmax 34vmax at 60% 96%, color-mix(in srgb, var(--ink) 6%, transparent), transparent 70%);
-    }
-    .dark [data-desk]::before {
-        background:
-            radial-gradient(40vmax 30vmax at 12% 8%, color-mix(in srgb, var(--brand) 14%, transparent), transparent 70%),
-            radial-gradient(36vmax 28vmax at 88% 18%, color-mix(in srgb, var(--good) 9%, transparent), transparent 70%),
-            radial-gradient(44vmax 34vmax at 60% 96%, color-mix(in srgb, var(--ink) 7%, transparent), transparent 70%);
-    }
-    @media (prefers-reduced-motion: no-preference) {
-        [data-desk]::before { animation: dk-ambient 48s ease-in-out infinite alternate; }
-    }
-    @keyframes dk-ambient {
-        to { translate: 3vmax -2vmax; scale: 1.06; }
-    }
 
-    /* ── Glass panels ────────────────────── */
-    .dk-grid > .dk-panel {
-        background: color-mix(in srgb, var(--paper) 82%, transparent);
-        border-color: color-mix(in srgb, var(--line) 75%, transparent);
-    }
-    @supports ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
-        .dk-grid > .dk-panel { -webkit-backdrop-filter: blur(16px) saturate(1.25); backdrop-filter: blur(16px) saturate(1.25); }
-        .dark .dk-grid > .dk-panel { background: color-mix(in srgb, var(--paper) 72%, transparent); }
-    }
-    /* Glass makes each panel a stacking context: lift the one whose menu is open. */
+    /* ── Cards: solid paper, each a container of its own ──────────────
+     * `panel` is the card's own width (its header and footer read it); `pb`
+     * stays the body's. A button (x-desk.tile) is a size container instead. */
+    .dk-grid > .dk-panel { background: var(--paper); }
+    .dk-panel:not(.dk-tile) { container: panel / inline-size; }
+    /* A container is a stacking context: lift the card whose menu is open. */
     .dk-grid > .dk-panel:has([aria-expanded="true"]), .dk-grid > .dk-panel:focus-within { z-index: 8; }
 
     /* ── Header: the drag handle, title and its plain sentence ────── */
     .dk-ph[data-drag] { cursor: grab; touch-action: pan-y; -webkit-user-select: none; user-select: none; -webkit-touch-callout: none; }
     .dk-ph[data-drag] :is(button, a, input) { cursor: pointer; }
     .dk-moving-doc, .dk-moving-doc * { cursor: grabbing !important; user-select: none !important; }
-    .dk-ph-t { min-width: 0; display: grid; gap: 2px; }
-    .dk-tagline { margin: 0; font-size: 13px; line-height: 1.35; color: var(--ink-2); display: -webkit-box; -webkit-line-clamp: 1; -webkit-box-orient: vertical; overflow: hidden; }
+    .dk-ph-t { flex: 1 1 auto; min-width: 0; display: grid; gap: 2px; }
+    /* The title is one line at every width: it gives way with an ellipsis, never by wrapping into the body's room. */
+    .dk-ph .dk-ph-t h2 { display: block; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; overflow-wrap: normal; }
+    .dk-tagline { margin: 0; font-size: 13px; line-height: 1.35; color: var(--ink-2); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    /* The header, tools, search and footer keep their height: only the body gives way in a short card. */
+    .dk-panel > :is(.dk-ph, .dk-ptools, .dk-psearch, .dk-pf) { flex: none; }
+    /* A short or narrow card has no room for the sentence under its title: the title alone says what it is. */
+    .dk-panel[data-rows="2"] .dk-tagline { display: none; }
+    @container panel (max-width: 339px) { .dk-tagline { display: none; } }
+
+    /* Header tools (search, filter, open in full, options). On a wide card they keep their place and fade in; on a
+       narrow one they would squeeze the title, so they lie over the header's end and show on hover or focus. */
+    .dk-ph-tools { flex: none; display: flex; align-items: center; gap: 2px; }
+    @container panel (max-width: 419px) {
+        @media (hover: hover) {
+            .dk-ph-tools { position: absolute; z-index: 3; inset-block-start: 8px; inset-inline-end: calc(var(--panel-pad) - 6px); padding-inline-start: 22px; border-radius: 8px; background: linear-gradient(to right, transparent, var(--paper) 18px); opacity: 0; pointer-events: none; transition: opacity .15s; }
+            [dir="rtl"] .dk-ph-tools { background: linear-gradient(to left, transparent, var(--paper) 18px); }
+            .dk-panel:hover .dk-ph-tools, .dk-panel:focus-within .dk-ph-tools, .dk-ph-tools:has([aria-expanded="true"]) { opacity: 1; pointer-events: auto; }
+            /* A search or filter that is on stays in sight, in the header's own line. */
+            .dk-panel:not(:hover):not(:focus-within) .dk-ph-tools:has(> .dk-on):not(:has([aria-expanded="true"])) { position: static; padding: 0; background: none; opacity: 1; pointer-events: auto; }
+            .dk-panel:not(:hover):not(:focus-within) .dk-ph-tools:has(> .dk-on):not(:has([aria-expanded="true"])) > :not(.dk-on) { display: none; }
+        }
+    }
     .dk-ph .dk-grip { position: absolute; inset-block-start: 14px; inset-inline-start: 3px; width: 14px; height: 22px; background: none; color: var(--ink-3); opacity: 0; transition: opacity .15s ease; display: grid; place-items: center; pointer-events: none; }
     .dk-ph .dk-grip svg.dk-grip-dots { width: 14px; height: 14px; opacity: 1; }
     .dk-panel:hover .dk-ph .dk-grip { opacity: 1; }
 
-    /* A live pulse on the cards that need action. */
-    .dk-panel:is([data-health="brand"], [data-health="critical"]) .dk-ph-t h2 { display: flex; align-items: center; gap: 8px; }
+    /* A short card keeps its "all caught up" whole: a smaller tick and its headline, without the line under it. */
+    .dk-panel[data-rows="2"] .dk-celebrate { gap: 6px; padding: 0 8px 4px; }
+    .dk-panel[data-rows="2"] .dk-celebrate svg { width: 40px; height: 40px; }
+    .dk-panel[data-rows="2"] .dk-celebrate strong { font-size: 17px; }
+    .dk-panel[data-rows="2"] .dk-celebrate .dk-is { display: none; }
+    /* A card's row of lenses is one line and never runs past the card. `.dk-seg` is `display: contents`
+       (desk-shell.css), so its buttons are the row's own flex items: on a narrow card they get tighter, then
+       the longest labels give way with an ellipsis (a 3-column card beside the open sidebar is ~220px, where
+       Every project's four lenses still fit whole). */
+    .dk-panel > .dk-ptools { flex-wrap: nowrap; min-width: 0; }
+    /* Needs you has two groups (which decisions, how to show them): the second keeps to the row's end, so they never read as one. */
+    .dk-panel > .dk-ptools .dk-needs-view > button:first-child { margin-inline-start: auto; }
+    .dk-needs-view svg.dk-i { display: none; }
+    @container panel (max-width: 339px) {
+        .dk-panel > .dk-ptools { gap: 2px; padding-inline: 12px; }
+        .dk-panel > .dk-ptools .dk-seg:not(.dk-seg-fill, .dk-needs-view) button { flex: 0 1 auto; min-width: 2.25em; display: block; padding-inline: 3px; line-height: 26px; overflow: hidden; text-overflow: ellipsis; }
+        @media (pointer: coarse) { .dk-panel > .dk-ptools .dk-seg:not(.dk-seg-fill, .dk-needs-view) button { line-height: 44px; } }
+        .dk-needs-view button { flex: none; padding-inline: 3px; }
+        .dk-needs-view svg.dk-i { display: block; }
+        .dk-needs-view .dk-seg-word { display: none; }
+    }
+
+    /* A still red dot on the cards that need action: no halo, no pulse (user decision 2026-11-10). */
     .dk-panel:is([data-health="brand"], [data-health="critical"]) .dk-ph-t h2::before, .dk-live {
-        content: ""; flex: none; width: 8px; height: 8px; border-radius: 50%; background: var(--dk-pulse, var(--brand));
-        box-shadow: 0 0 0 0 color-mix(in srgb, var(--dk-pulse, var(--brand)) 55%, transparent);
+        content: ""; flex: none; display: inline-block; width: 8px; height: 8px; border-radius: 50%; background: var(--brand);
     }
-    .dk-panel[data-health="critical"] { --dk-pulse: var(--bad); }
-    @media (prefers-reduced-motion: no-preference) {
-        .dk-panel:is([data-health="brand"], [data-health="critical"]) .dk-ph-t h2::before, .dk-live { animation: dk-pulse 2.2s cubic-bezier(.2, .7, .2, 1) infinite; }
-    }
-    @keyframes dk-pulse { 70% { box-shadow: 0 0 0 7px transparent; } 100% { box-shadow: 0 0 0 0 transparent; } }
+    .dk-panel:is([data-health="brand"], [data-health="critical"]) .dk-ph-t h2::before { margin-inline-end: 8px; vertical-align: 1px; }
 
     /* ── Move: the carried card floats; the rest spring aside ─────── */
     .dk-grid > .dk-panel.dk-dragging {
         z-index: 30; opacity: 1; transition: none !important; filter: none !important;
-        box-shadow: 0 0 0 1.5px color-mix(in srgb, var(--brand) 70%, transparent), 0 30px 60px -24px color-mix(in srgb, var(--ink) 45%, transparent);
+        box-shadow: 0 0 0 1.5px var(--brand), 0 30px 60px -24px color-mix(in srgb, var(--ink) 45%, transparent);
     }
 
     /* Dropping beside a card: a bar in the gap on the side it will land (desk-grid.js). */
@@ -136,11 +151,10 @@
     }
     @media (prefers-reduced-motion: reduce) { .dk-resize-ghost.dk-landing { transition: none; } }
 
-    /* While a card is pulled or carried: cards gliding past the Desk's side never widen the page (no horizontal scrollbar), and the ambient field holds still so the glass cards are not re-blurred every frame. */
+    /* While a card is pulled or carried: cards gliding past the Desk's side never widen the page (no horizontal scrollbar). */
     .dk-resizing-doc, .dk-moving-doc { overflow-x: clip; }
     /* A row that grows past the window's height must not bring the page's scrollbar in and narrow the whole Desk mid-pull. */
     html:has([data-desk-grid]) { scrollbar-gutter: stable; }
-    :is(.dk-resizing-doc, .dk-moving-doc) [data-desk]::before { animation-play-state: paused; }
 
     .dk-resize-badge { position: absolute; z-index: 10; inset-block-start: 50%; inset-inline-start: 50%; translate: -50% -50%; pointer-events: none; padding: 6px 14px; border-radius: 999px; background: var(--ink); color: var(--paper); font-size: 18px; font-weight: 800; font-variant-numeric: tabular-nums; letter-spacing: .02em; white-space: nowrap; }
     [dir="rtl"] .dk-resize-badge { translate: 50% -50%; }
@@ -167,11 +181,10 @@
     .dk-hint {
         display: flex; align-items: center; gap: 12px; margin: 0 0 var(--grid-gap); padding: 10px 12px 10px 16px; width: fit-content; max-width: 100%;
         border-radius: 14px; font-size: 14px; color: var(--ink);
-        background: color-mix(in srgb, var(--paper) 80%, transparent); border: 1px solid color-mix(in srgb, var(--line) 80%, transparent);
-        box-shadow: var(--panel-shadow); -webkit-backdrop-filter: blur(12px); backdrop-filter: blur(12px);
+        background: var(--paper); border: 1px solid var(--line);
+        box-shadow: var(--panel-shadow);
     }
     .dk-hint p { margin: 0; font-weight: 600; }
-    .dk-hint .dk-live { --dk-pulse: var(--brand); }
 
     /* ── Friendly empty states with the dot motif ─────────────────── */
     .dk-pempty { display: grid; justify-items: center; gap: 10px; text-align: center; padding: 22px 8px; color: var(--ink-2); }
@@ -192,4 +205,73 @@
         .dk-hint .dk-btn { min-height: 44px; }
         .dk-panel .dk-load { grid-template-columns: repeat(14, 44px); overflow-x: auto; scrollbar-width: none; }
     }
+}
+
+/* ── Pinned and folded panels (resources/js/desk-fold.js) ─────────────
+ * A pinned card shows a small pushpin before its name. A folded card is a
+ * 2×2 tile drawn after every open card: its name in the middle, and either
+ * "Nothing to show" on a grey dashed ground (it folded itself, empty) or its
+ * count and an Open button on paper (its owner folded it, it has data). */
+@layer components {
+    svg.dk-i.dk-pin-mark { display: inline-block; flex: none; width: 13px; height: 13px; margin-inline-end: 6px; vertical-align: -2px; color: var(--ink-3); }
+    svg.dk-i.dk-tile-pin { position: absolute; z-index: 2; inset-block-start: 8px; inset-inline-start: 8px; margin: 0; }
+
+    /* The panel menu: its name on top, then Pin and Collapse, then Remove apart. */
+    .dk-pop.dk-pmenu-pop { width: 232px; padding: 6px; gap: 1px; border-radius: 14px; }
+    .dk-pmenu-pop > .dk-pop-h { padding: 6px 10px 6px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; text-transform: none; letter-spacing: 0; font-size: 12px; font-weight: 700; color: var(--ink-3); }
+    .dk-pmenu-group { display: grid; gap: 1px; padding-block-end: 4px; margin-block-end: 4px; border-block-end: 1px solid var(--line); }
+    .dk-pmenu-pop :is(.dk-pmenu-group > button, > button) { display: flex; align-items: center; gap: 10px; width: 100%; height: 38px; padding-inline: 10px; border: 0; border-radius: 9px; background: none; color: var(--ink); font: inherit; font-size: 13.5px; font-weight: 600; text-align: start; cursor: pointer; }
+    .dk-pmenu-pop :is(.dk-pmenu-group > button, > button):hover, .dk-pmenu-pop :is(.dk-pmenu-group > button, > button):focus-visible { background: var(--sunk); outline: none; }
+    .dk-pmenu-pop button svg.dk-i { flex: none; width: 16px; height: 16px; color: var(--ink-3); }
+    .dk-pmenu-pop > button.dk-danger, .dk-pmenu-pop > button.dk-danger svg.dk-i { color: var(--brand); }
+    .dk-tile .dk-pmenu-pop > button[data-panel-pin] { margin-block-end: 4px; }
+
+    /* Hidden until the card folds. */
+    .dk-fold-ic, .dk-fold-note, .dk-unfold { display: none; }
+
+    /* A folded card: a 2×2 tile after every open card. Its header becomes the whole tile: the panel's
+       icon at the top, then its name, then its count with a round Open button (folded by its owner),
+       or "Nothing to show" (folded by itself, empty). Only the menu stays, in the top corner. */
+    .dk-grid > .dk-panel[data-folded] { order: 1; grid-column: span 2 !important; grid-row: span 2 !important; height: calc(2 * var(--row-unit) + var(--grid-gap)) !important; min-height: 0; }
+    @media (max-width: 1279px) { .dk-grid > .dk-panel[data-folded] { grid-column: span 3 !important; } }
+    @media (max-width: 1023px) { .dk-grid > .dk-panel[data-folded] { grid-column: span 4 !important; } }
+    @media (max-width: 640px) { .dk-grid > .dk-panel[data-folded] { grid-column: span 6 !important; } }
+    .dk-panel[data-folded] > :not(.dk-ph) { display: none !important; }
+    .dk-panel[data-folded] > .dk-ph {
+        flex: 1; display: grid; grid-template-columns: minmax(0, 1fr) auto; grid-template-rows: auto 1fr auto auto;
+        grid-template-areas: "ic ic" ". ." "t t" "n go"; align-items: end; gap: 0 8px; padding: 14px 14px 13px; border: 0; cursor: default;
+    }
+    .dk-panel[data-folded] .dk-grip, .dk-panel[data-folded] .dk-tagline { display: none; }
+    .dk-panel[data-folded] .dk-fold-ic { grid-area: ic; align-self: start; display: grid; place-items: center; width: 32px; height: 32px; border-radius: 10px; background: var(--sunk); color: var(--ink-2); }
+    .dk-panel[data-folded] .dk-fold-ic svg.dk-i { width: 17px; height: 17px; }
+    .dk-panel[data-folded] .dk-ph-t { grid-area: t; min-width: 0; }
+    .dk-panel[data-folded] .dk-ph-t h2 { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .dk-panel[data-folded] .dk-ph-t h2::before { display: none; }
+    /* Only the menu stays, in the tile's top corner, shown on hover. */
+    .dk-panel[data-folded] .dk-ph-tools { position: absolute; inset-block-start: 10px; inset-inline-end: 10px; }
+    .dk-panel[data-folded] .dk-ph-tools > :not(.dk-pmenu) { display: none; }
+    .dk-panel[data-folded] .dk-ph-tools > * { opacity: 0; }
+    .dk-panel[data-folded]:is(:hover, :focus-within) .dk-ph-tools > *, .dk-panel[data-folded] .dk-ph-tools > .dk-pmenu:has([aria-expanded="true"]) { opacity: 1; }
+    .dk-panel[data-folded] .dk-rz { display: none; }
+
+    /* Folded by its owner: it has data. Two paper edges under it say there is more inside; the whole
+       tile opens it, and so does its round button. */
+    .dk-panel[data-folded="user"] { cursor: pointer; box-shadow: 0 4px 0 -1px var(--paper), 0 4px 0 0 var(--line), 0 8px 0 -2px var(--paper), 0 8px 0 -1px var(--line); transition: transform .18s, box-shadow .18s; }
+    .dk-panel[data-folded="user"] > .dk-ph { cursor: pointer; }
+    .dk-panel[data-folded="user"]:hover { transform: translateY(-2px); }
+    .dk-panel[data-folded="user"] .dk-pc { grid-area: n; justify-self: start; display: block; min-width: 0; height: auto; margin: 6px 0 0; padding: 0; border-radius: 0; background: none; color: var(--ink); font-size: 32px; font-weight: 800; line-height: 1; }
+    .dk-panel[data-folded="user"] .dk-unfold { grid-area: go; display: grid; place-items: center; width: 32px; height: 32px; padding: 0; border: 1px solid var(--line-2); border-radius: 50%; background: var(--paper); color: var(--ink-2); cursor: pointer; transition: border-color .15s, color .15s, background-color .15s; }
+    .dk-panel[data-folded="user"]:hover .dk-unfold, .dk-panel[data-folded="user"] .dk-unfold:focus-visible { border-color: var(--ink); background: var(--ink); color: var(--paper); outline: none; }
+    .dk-panel[data-folded="user"] .dk-unfold svg.dk-i { width: 14px; height: 14px; }
+    @media (prefers-reduced-motion: reduce) { .dk-panel[data-folded="user"]:hover { transform: none; } }
+
+    /* Folded by itself: nothing to show. Grey and dashed, no count, no Open. */
+    .dk-panel[data-folded="empty"] { background: var(--sunk); border: 1.5px dashed var(--line-2); box-shadow: none; cursor: pointer; transition: background-color .15s, border-color .15s; }
+    .dk-panel[data-folded="empty"] > .dk-ph { cursor: pointer; }
+    /* A click opens it for this visit (to add the first to-do, say): it folds again on the next load if still empty. */
+    .dk-panel[data-folded="empty"]:hover { background: var(--paper); border-color: var(--ink-3); }
+    .dk-panel[data-folded="empty"] .dk-fold-ic { background: var(--paper); color: var(--ink-3); }
+    .dk-panel[data-folded="empty"] .dk-ph-t h2 { color: var(--ink-2); }
+    .dk-panel[data-folded="empty"] .dk-pc { display: none; }
+    .dk-panel[data-folded="empty"] .dk-fold-note { grid-area: n; display: block; margin: 4px 0 0; font-size: 12.5px; font-weight: 600; color: var(--ink-3); }
 }

@@ -30,13 +30,28 @@
             $model = Illuminate\Support\Js::from($pill['model']);
             $value = Illuminate\Support\Js::from((string) $pill['value']);
         @endphp
+        @php
+            /*
+             * A pill that would return nothing stays in place, so the row still
+             * reads as the whole list of choices, but it cannot be pressed: a
+             * click on it would only cost an empty page and a trip back. The
+             * one already chosen stays pressable, so it can be cleared.
+             */
+            $isUnavailable = ($pill['disabled'] ?? false) && ! $isActive;
+        @endphp
         <button
             type="button"
-            x-on:click="pick({{ $model }}, {{ $value }}, {{ ($pill['toggle'] ?? false) ? 'true' : 'false' }}, {{ Illuminate\Support\Js::from((object) ($pill['also'] ?? [])) }})"
+            @unless ($isUnavailable)
+                x-on:click="pick({{ $model }}, {{ $value }}, {{ ($pill['toggle'] ?? false) ? 'true' : 'false' }}, {{ Illuminate\Support\Js::from((object) ($pill['also'] ?? [])) }})"
+            @else
+                {{-- Still a tab stop, and still says why, but it does nothing. --}}
+                aria-disabled="true"
+                title="{{ __('finance_tables.nothing_matches_this_here') }}"
+            @endunless
             aria-pressed="{{ $isActive ? 'true' : 'false' }}"
             x-bind:aria-pressed="is({{ $model }}, {{ $value }}) ? 'true' : 'false'"
             @isset($pill['test']) data-test="{{ $pill['test'] }}" @endisset
-            class="filter-pill group/pill"
+            @class(['filter-pill group/pill', 'cursor-default opacity-50' => $isUnavailable])
         >
             @if ($tone !== null)
                 <span @class(['size-1.5 rounded-full group-aria-pressed/pill:hidden', 'bg-primary dark:bg-status-critical' => $tone === 'critical', 'bg-status-warn' => $tone === 'warn']) aria-hidden="true"></span>

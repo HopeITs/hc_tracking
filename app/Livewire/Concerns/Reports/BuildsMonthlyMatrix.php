@@ -380,6 +380,12 @@ trait BuildsMonthlyMatrix
                 'project_id' => (int) $first->project_id,
                 'project_name' => $first->project_name,
                 'project_slug' => $first->project_slug,
+                'project_start' => $first->project_start,
+                'project_end' => $first->project_end,
+                'source_windows' => $group->map(fn (object $target): array => [
+                    'start' => $target->plan_year === null ? $target->proposal_start : $target->plan_year.'-01-01',
+                    'end' => $target->plan_year === null ? $target->proposal_end : $target->plan_year.'-12-31',
+                ]),
                 'library_id' => (int) $first->library_id,
                 'code' => $first->code,
                 'name_en' => $first->name_en ?? $first->name_ar,
@@ -464,6 +470,9 @@ trait BuildsMonthlyMatrix
     {
         $filters = $this->resolvedFilters;
 
+        $proposalStart = 'case when pp.actual_date_begin is not null and pp.actual_date_end is not null then pp.actual_date_begin else pp.planned_date_begin end';
+        $proposalEnd = 'case when pp.actual_date_begin is not null and pp.actual_date_end is not null then coalesce(pp.extended_date_end, pp.actual_date_end) else pp.planned_date_end end';
+
         $query = DB::table('plan_indicators as p')
             ->join('indicators as ind', 'ind.id', '=', 'p.indicator_id')
             ->join('library_indicators as li', 'li.id', '=', 'ind.library_indicator_id')
@@ -472,11 +481,11 @@ trait BuildsMonthlyMatrix
             ->leftJoin('proposals as pp', fn ($join) => $join->on('pp.id', '=', 'p.source_id')->where('p.source_type', '=', 'proposal'))
             ->leftJoin('donors as d', 'd.id', '=', 'pp.donor_id')
             ->leftJoin('annual_plans as ap', fn ($join) => $join->on('ap.id', '=', 'p.source_id')->where('p.source_type', '=', 'annual_plan'))
-            ->where(function (Builder $covers) use ($from, $to): void {
-                $covers->where(function (Builder $proposalTargets) use ($from, $to): void {
+            ->where(function (Builder $covers) use ($from, $to, $proposalStart, $proposalEnd): void {
+                $covers->where(function (Builder $proposalTargets) use ($from, $to, $proposalStart, $proposalEnd): void {
                     $proposalTargets->whereNotNull('pp.id')
-                        ->whereRaw('(case when pp.actual_date_begin is not null and pp.actual_date_end is not null then pp.actual_date_begin else pp.planned_date_begin end) <= ?', [$to->toDateString()])
-                        ->whereRaw('(case when pp.actual_date_begin is not null and pp.actual_date_end is not null then coalesce(pp.extended_date_end, pp.actual_date_end) else pp.planned_date_end end) >= ?', [$from->toDateString()]);
+                        ->whereRaw("($proposalStart) <= ?", [$to->toDateString()])
+                        ->whereRaw("($proposalEnd) >= ?", [$from->toDateString()]);
                 })->orWhere(function (Builder $planTargets) use ($from, $to): void {
                     $planTargets->whereNotNull('ap.id')->whereBetween('ap.year', [$from->year, $to->year]);
                 });
@@ -496,7 +505,9 @@ trait BuildsMonthlyMatrix
                 'pg.donor_attribution',
                 'pp.name as proposal_name', 'pp.slug as proposal_slug',
                 'd.name as donor_name', 'd.slug as donor_slug',
-            ]);
+                'pr.start_date as project_start', 'pr.end_date as project_end', 'ap.year as plan_year',
+            ])
+            ->selectRaw("($proposalStart) as proposal_start, ($proposalEnd) as proposal_end");
     }
 
     /**
@@ -562,7 +573,15 @@ trait BuildsMonthlyMatrix
                 $status = $reportStatus[$row['project_id']][$ym] ?? null;
                 $figure = $figures[$row['key']][$ym] ?? null;
 
+                $monthStart = $month->toDateString();
+                $monthEnd = $month->endOfMonth()->toDateString();
+                $outsidePeriod = ($row['project_start'] !== null && $row['project_start'] > $monthEnd)
+                    || ($row['project_end'] !== null && $row['project_end'] < $monthStart)
+                    || ! $row['source_windows']->contains(fn (array $window): bool => ($window['start'] === null || $window['start'] <= $monthEnd)
+                        && ($window['end'] === null || $window['end'] >= $monthStart));
+
                 $state = match (true) {
+                    $figure === null && $outsidePeriod => MatrixCellState::OutsidePeriod,
                     $month->greaterThan($today) => MatrixCellState::Upcoming,
                     $status === null => MatrixCellState::NotSubmitted,
                     $figure === null => MatrixCellState::NotDue,
