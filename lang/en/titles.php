@@ -49,6 +49,5 @@ return [
     'donor_report' => 'Donor Report',
     'donor_report_builder' => 'Donor report builder',
     'donor_reports' => 'Donor reports',
-    'reporting_duties' => 'My Reporting Duties',
     'monthly_matrix' => 'Monthly Matrix',
 ];

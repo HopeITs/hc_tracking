@@ -592,7 +592,7 @@ class User extends Authenticatable implements HasLocalePreference, PasskeyUser, 
 
     /**
      * Whether this user is named responsible on any donor report (contracts
-     * §14.3), for the My Reporting Duties sidebar item. One exists query,
+     * §14.3), for the Donor Reports page and the Desk duties card. One exists query,
      * memoized per user instance.
      */
     public function hasReportingDuties(): bool

@@ -69,15 +69,22 @@ test('the rendered sidebar links only what the role may open', function () {
         ->assertDontSee('data-side-link="admin.accounts.index"', false);
 });
 
-test('the donor report builder goes only to reports.aggregate holders, reporting duties to responsibles and agreement editors', function () {
+test('the donor report builder goes only to reports.aggregate holders, donor reports also to their responsibles', function () {
     $employeeId = insertHrEmployee();
     $responsible = User::factory()->role('Team Member')->create(['employee_id' => $employeeId]);
     DonorReport::factory()->create(['responsible_employee_id' => $employeeId]);
 
-    expect(deskPageRoutes(User::factory()->role('Team Member')->create()))->not->toContain('donor-reports.compose')->not->toContain('reporting-duties.index')->not->toContain('donor-reports.index')
-        ->and(deskPageRoutes($responsible))->toContain('reporting-duties.index', 'donor-reports.index')->not->toContain('donor-reports.compose')
-        ->and(deskPageRoutes(User::factory()->role('Financial')->create()))->toContain('reporting-duties.index', 'donor-reports.index')->not->toContain('donor-reports.compose')
-        ->and(deskPageRoutes(User::factory()->role('MEAL')->create()))->toContain('donor-reports.compose', 'donor-reports.index');
+    expect(deskPageRoutes(User::factory()->role('Team Member')->create()))->not->toContain('donor-reports.compose')->not->toContain('donor-reports.index')
+        ->and(deskPageRoutes($responsible))->toContain('donor-reports.index')->not->toContain('donor-reports.compose')
+        ->and(deskPageRoutes(User::factory()->role('Financial')->create()))->toContain('donor-reports.index')->not->toContain('donor-reports.compose')
+        ->and(deskPageRoutes(User::factory()->role('MEAL')->create()))->toContain('donor-reports.compose', 'donor-reports.index')
+        ->and(deskPageRoutes(User::factory()->role('Financial')->create()))->not->toContain('reporting-duties.index');
+});
+
+test('the old My Reporting Duties address leads to Donor Reports', function () {
+    $this->actingAs(User::factory()->role('Team Member')->create())
+        ->get('/reporting-duties')
+        ->assertRedirect(route('donor-reports.index'));
 });
 
 test('the donor reports register sits under monitoring and evaluation, labelled Donor reports, the builder labelled Reports', function () {

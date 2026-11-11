@@ -222,10 +222,10 @@ new #[Layout('layouts::desk'), Title('titles.donor_report_builder')] class exten
 
 <section class="@container flex w-full flex-1 flex-col gap-8 text-secondary-dark dark:text-ink" data-donor-report-builder>
     <x-ui.detail-header
-        :back="\App\Support\BackUrl::for(route('reporting-duties.index'))"
+        :back="\App\Support\BackUrl::for(route('donor-reports.index'))"
         id="donor-report-builder-heading"
         :breadcrumbs="[
-            ['label' => __('navigation.reporting_duties'), 'url' => route('reporting-duties.index')],
+            ['label' => __('navigation.donor_reports'), 'url' => route('donor-reports.index')],
             ['label' => __('navigation.donor_report_builder')],
         ]"
         :title="__('titles.donor_report_builder')"

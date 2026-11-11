@@ -36,7 +36,6 @@ return [
     'user_directory' => 'User Directory',
     'donor_report_builder' => 'Donor report builder',
     'donor_reports' => 'Donor reports',
-    'reporting_duties' => 'My Reporting Duties',
     'monthly_matrix' => 'Monthly Matrix',
     'tools' => 'Tools',
     'help' => 'Help',

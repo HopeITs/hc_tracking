@@ -276,7 +276,6 @@ final class Destinations
             $page('report-templates.index', 'navigation.report_templates', 'file', 'nav-clipboard-list', 'monitoring_evaluation', $can('report-templates.manage'), 'report-templates'),
             $page('donor-reports.index', 'navigation.donor_reports', 'file', 'nav-file-text', 'monitoring_evaluation', fn (User $user): bool => $user->can('viewAny', DonorReport::class)),
             $page('donor-reports.compose', 'navigation.donor_report_builder', 'file', 'nav-file-plus', 'monitoring_evaluation', $can('reports.aggregate')),
-            $page('reporting-duties.index', 'navigation.reporting_duties', 'file', 'nav-inbox', 'monitoring_evaluation', fn (User $user): bool => $user->can('funding-agreements.update') || $user->hasReportingDuties(), 'donor-reports'),
 
             $page('donors.index', 'common.donors', 'users', 'nav-hand-heart', 'funding_finance', $can('donors.view'), 'donors'),
             $page('proposals.index', 'common.proposals', 'file', 'nav-file-pen', 'funding_finance', $can('proposals.view'), 'proposals'),

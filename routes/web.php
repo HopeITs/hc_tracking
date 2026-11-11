@@ -208,8 +208,10 @@ Route::middleware(['auth', EnsureTwoFactorIsEnabled::class])->group(function () 
         ->middleware('throttle:files')
         ->name('donor-reports.files.download');
 
-    // Open to everyone: the page lists only the reports the viewer is responsible for.
-    Route::livewire('reporting-duties', 'pages::reporting-duties.index')
+    // The My Reporting Duties page is gone (Managers UAT, 2026-11-10): Donor
+    // Reports already shows each person the reports they are responsible for.
+    // The name stays only so links stored in old notifications still open.
+    Route::permanentRedirect('reporting-duties', '/donor-reports')
         ->name('reporting-duties.index');
 
     Route::livewire('transfers', 'pages::transfers.index')
