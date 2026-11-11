@@ -90,7 +90,7 @@ new class extends Component {
     $pg = $this->paginate($rows, self::PerPage);
 @endphp
 
-<x-desk.panel :empty="$rows->isEmpty()" :facets="$pg['facets']" id="duties" register="reporting-duties.index" :size="$size" :cols="$gridCols" :height="$gridRows" :index="$index" :total="$total" :count="$late > 0 ? $late : ($rows->count() ?: null)">
+<x-desk.panel :empty="$rows->isEmpty()" :facets="$pg['facets']" id="duties" register="donor-reports.index" :size="$size" :cols="$gridCols" :height="$gridRows" :index="$index" :total="$total" :count="$late > 0 ? $late : ($rows->count() ?: null)">
     @if ($rows->isNotEmpty())
         <p class="dk-pl-sum">{{ trans_choice('desk.duties_summary', $late, ['late' => $late, 'open' => $rows->count()]) }}</p>
     @endif

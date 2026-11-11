@@ -36,7 +36,7 @@ return [
         'deadlines' => 'Deadlines',
         'funding' => 'Funding',
         'reports' => 'Donor reports',
-        'duties' => 'Reporting duties',
+        'monthly_reports' => 'Monthly reports',
     ],
     'side' => [
         'proposals' => 'Proposals on this project',

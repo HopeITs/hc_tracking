@@ -14,7 +14,7 @@ test('every register opens in the desk frame with a way back to the desk', funct
 })->with([
     'tasks.index', 'projects.index', 'proposals.index', 'transfers.index', 'donors.index',
     'funding-agreements.index', 'milestones.index', 'annual-plans.index', 'risks.index',
-    'reports.index', 'monthly-reports.index', 'reporting-duties.index', 'reviews.index',
+    'reports.index', 'monthly-reports.index', 'reviews.index',
     'activity.index', 'calendar.index', 'department-tasks.index', 'targets.index', 'notifications.index',
     'results.index', 'reports.monthly-matrix', 'indicator-library.index',
 ]);

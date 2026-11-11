@@ -211,13 +211,13 @@ new #[Layout('layouts::desk'), Title('titles.donor_report')] class extends Compo
     $breadcrumbs = [
         auth()->user()->can('reports.aggregate')
             ? ['label' => __('navigation.donor_report_builder'), 'url' => route('donor-reports.compose')]
-            : ['label' => __('navigation.reporting_duties'), 'url' => route('reporting-duties.index')],
+            : ['label' => __('navigation.donor_reports'), 'url' => route('donor-reports.index')],
         ['label' => $report->title],
     ];
 @endphp
 
 <section class="@container/detail flex w-full flex-1 flex-col gap-8 text-secondary-dark dark:text-ink" data-donor-report-page>
-    <x-ui.detail-header :back="\App\Support\BackUrl::for(route('reporting-duties.index'))" :breadcrumbs="$breadcrumbs" :title="$report->title">
+    <x-ui.detail-header :back="\App\Support\BackUrl::for(route('donor-reports.index'))" :breadcrumbs="$breadcrumbs" :title="$report->title">
         <x-slot:meta>
             <span>{{ $report->type->label() }}</span>
             <span>{{ $report->audience->label() }}</span>
@@ -235,6 +235,17 @@ new #[Layout('layouts::desk'), Title('titles.donor_report')] class extends Compo
         </x-slot:meta>
 
         <x-slot:actions>
+            @if (! $report->isSubmitted()
+                && $report->type === \App\Enums\DonorReportType::Narrative
+                && $report->isResponsible(auth()->user())
+                && auth()->user()->can('reports.aggregate')
+                && ($proposal = $report->donorProposal?->proposal)?->status->isApprovedByDonor()
+                && ! $proposal->isPayroll()
+                && $proposal->donor?->is_internal === false)
+                <x-ui.button icon="document-plus" :href="route('donor-reports.compose', ['proposal' => $proposal->id])" wire:navigate data-test="compose-assigned-donor-report">
+                    {{ __('navigation.donor_report_builder') }}
+                </x-ui.button>
+            @endif
             @if ($report->isSubmitted())
                 <span class="inline-flex items-center gap-1.5 rounded-full bg-status-good-soft px-3 py-1 text-sm font-semibold text-status-good" data-report-submitted>
                     <flux:icon.check-circle variant="mini" class="size-4" />

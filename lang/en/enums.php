@@ -85,6 +85,7 @@ return [
         'report_submission' => 'Delivered report',
     ],
     'reporting_period' => [
+        'monthly' => 'Monthly',
         'quarterly' => 'Quarterly',
         'semi_annual' => 'Semi-annual',
         'annual' => 'Annual',
@@ -290,6 +291,7 @@ return [
         'none' => 'No oversight',
     ],
     'matrix_cell_state' => [
+        'outside_period' => 'Outside reporting period',
         'approved' => 'Validated',
         'pending' => 'Awaiting validation',
         'not_submitted' => 'Not sent',

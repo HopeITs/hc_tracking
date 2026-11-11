@@ -9,7 +9,6 @@ use App\Models\Task;
 use App\Notifications\UnreadSubjects;
 use Carbon\CarbonImmutable;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
-use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Collection as EloquentCollection;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
@@ -17,14 +16,15 @@ use Livewire\Attributes\Computed;
 
 /**
  * What the tasks page reads to draw its views: the paginated list, the
- * capped board/calendar set, the stat-tile aggregate, the "My Tasks" rail
- * and the calendar grid.
+ * capped board/calendar/cards set, the stat-tile aggregate and the calendar
+ * grid.
  *
  * Used by tasks/index only. filteredTasksQuery() and applySort() come from
  * FiltersTaskDirectory; activeMonth() and periodDays() from
  * NavigatesCalendarPeriods.
  *
  * @property string $viewMode
+ * @property string $dueFilter
  * @property ?string $listLayout
  * @property string $group
  * @property-read EloquentCollection<int, Task> $boardTasks  #[Computed] boardTasks() below
@@ -56,6 +56,9 @@ trait ReadsTaskViews
             $this->boardShown[$case->value] = $this->boardCardLimit($case) + self::BoardCardsPerStep;
         }
     }
+
+    /** How many undated tasks the calendar's Unscheduled panel lists at most. */
+    protected const int UNSCHEDULED_LIMIT = 200;
 
     public function setListLayout(string $layout): void
     {
@@ -141,7 +144,11 @@ trait ReadsTaskViews
      * ran on every list-view page load via boardTasks() before, which is a
      * full board/calendar-sized query the list view never otherwise needs.
      *
-     * @return array{total: int, done: int, overdue: int, missed: int, due_soon: int}
+     * The figures are counted without the Due filter (see
+     * filteredTasksQuery()), so they stay steady while one is pressed;
+     * `total` alone honours it, since it is the count of what is listed.
+     *
+     * @return array{total: int, all: int, done: int, overdue: int, missed: int, due_soon: int}
      */
     #[Computed]
     public function taskStats(): array
@@ -156,7 +163,7 @@ trait ReadsTaskViews
         $today = CarbonImmutable::today()->toDateString();
         $dueSoonEnd = CarbonImmutable::today()->addDays(7)->toDateString();
 
-        $row = $this->filteredTasksQuery()->toBase()->select(DB::raw(
+        $row = $this->filteredTasksQuery(applyDueFilter: false)->toBase()->select(DB::raw(
             "count(*) as total,
             sum(case when status = 'done' then 1 else 0 end) as done,
             sum(case when status not in ('todo', 'done') and due_date is not null and due_date < '{$today}' then 1 else 0 end) as overdue,
@@ -164,45 +171,16 @@ trait ReadsTaskViews
             sum(case when status <> 'done' and due_date is not null and due_date between '{$today}' and '{$dueSoonEnd}' then 1 else 0 end) as due_soon",
         ))->first();
 
+        $all = (int) ($row->total ?? 0);
+
         return [
-            'total' => (int) ($row->total ?? 0),
+            'total' => $this->dueFilter === '' ? $all : $this->filteredTasksQuery()->count(),
+            'all' => $all,
             'done' => (int) ($row->done ?? 0),
             'overdue' => (int) ($row->overdue ?? 0),
             'missed' => (int) ($row->missed ?? 0),
             'due_soon' => (int) ($row->due_soon ?? 0),
         ];
-    }
-
-    /**
-     * A capped preview of the viewer's own tasks (assigned to or created by
-     * them) for the "My Tasks" rail — independent of every other filter
-     * (status, priority, department, …) so it always reflects "what's mine"
-     * regardless of what the rest of the page is currently narrowed to.
-     * Bypasses the base filteredTasksQuery() entirely rather than layering
-     * myTasksOnly on top of it, for exactly that reason.
-     *
-     * @return EloquentCollection<int, Task>
-     */
-    #[Computed]
-    public function myTasksPreview(): EloquentCollection
-    {
-        $user = auth()->user();
-        $employeeId = $user->employee_id;
-
-        return Task::query()
-            ->select(['id', 'title', 'status', 'priority', 'due_date', 'created_by'])
-            ->whereNull('parent_task_id')
-            ->where(fn (Builder $query) => $query
-                ->when($employeeId !== null, fn (Builder $query) => $query->orWhereHas(
-                    'taskAssignees',
-                    fn (Builder $query) => $query->where('employee_id', $employeeId),
-                ))
-                ->orWhere('created_by', $user->id))
-            ->where('status', '!=', TaskStatus::Done->value)
-            ->with('taskAssignees.employee:id,first_name_en,last_name_en,first_name_ar,last_name_ar')
-            ->orderByRaw('due_date is null, due_date asc')
-            ->limit(8)
-            ->get();
     }
 
     /**
@@ -214,7 +192,7 @@ trait ReadsTaskViews
      * `weeks` is null then and `days` is populated, and vice versa in month
      * view.
      *
-     * @return array{month: CarbonImmutable, weeks: ?array<int, array<int, CarbonImmutable>>, days: ?array<int, CarbonImmutable>, tasksByDay: Collection<string, EloquentCollection<int, Task>>, unscheduled: EloquentCollection<int, Task>}
+     * @return array{month: CarbonImmutable, weeks: ?array<int, array<int, CarbonImmutable>>, days: ?array<int, CarbonImmutable>, tasksByDay: Collection<string, EloquentCollection<int, Task>>, unscheduled: EloquentCollection<int, Task>, unscheduledTotal: int}
      */
     #[Computed]
     public function calendarGrid(): array
@@ -244,13 +222,26 @@ trait ReadsTaskViews
             $weeks = null;
         }
 
-        $tasks = $this->boardTasks;
-
-        $tasksByDay = $tasks
-            ->filter(fn (Task $task): bool => $task->due_date !== null && $task->due_date->between($gridStart, $gridEnd))
+        // Queried for the visible range itself rather than sliced out of
+        // boardTasks(): that set is capped at 500 rows ordered by due date, so
+        // on a large backlog the later months (and every undated task) fell
+        // off the end and the calendar silently showed empty days.
+        $tasksByDay = $this->filteredTasksQuery()
+            ->whereBetween('due_date', [$gridStart->toDateString(), $gridEnd->toDateString()])
+            ->orderBy('due_date')
+            ->orderByRaw("status = 'done'")
+            ->orderByRaw("case priority when 'high' then 0 when 'medium' then 1 else 2 end")
+            ->orderBy('id')
+            ->get()
             ->groupBy(fn (Task $task): string => $task->due_date->toDateString());
 
-        $unscheduled = $tasks->filter(fn (Task $task): bool => $task->due_date === null)->values();
+        $unscheduledQuery = $this->filteredTasksQuery()->whereNull('due_date');
+        $unscheduledTotal = (clone $unscheduledQuery)->count();
+        $unscheduled = $unscheduledQuery
+            ->orderByRaw("status = 'done'")
+            ->orderByDesc('id')
+            ->limit(self::UNSCHEDULED_LIMIT)
+            ->get();
 
         return [
             'month' => $month,
@@ -258,6 +249,7 @@ trait ReadsTaskViews
             'days' => $days,
             'tasksByDay' => $tasksByDay,
             'unscheduled' => $unscheduled,
+            'unscheduledTotal' => $unscheduledTotal,
         ];
     }
 }

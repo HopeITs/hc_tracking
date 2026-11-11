@@ -498,6 +498,32 @@ function createHrSchema(): void
         $table->string('disk');
         $table->timestamps();
     });
+
+    $schema->create('holidays', function (Blueprint $table): void {
+        $table->id();
+        $table->string('name')->nullable();
+        $table->date('start_date');
+        $table->date('end_date');
+        $table->string('holidayable_type');
+        $table->unsignedBigInteger('holidayable_id');
+        $table->boolean('is_recurring')->default(false);
+        $table->timestamps();
+    });
+}
+
+/**
+ * Insert an HR holiday attached to one HR record (a center, city or program)
+ * and return its id.
+ */
+function insertHrHoliday(string $holidayableType, int $holidayableId, string $startDate, ?string $endDate = null, bool $isRecurring = false): int
+{
+    return DB::connection('hr')->table('holidays')->insertGetId([
+        'start_date' => $startDate,
+        'end_date' => $endDate ?? $startDate,
+        'holidayable_type' => $holidayableType,
+        'holidayable_id' => $holidayableId,
+        'is_recurring' => $isRecurring,
+    ]);
 }
 
 /**

@@ -898,3 +898,19 @@ test('an unknown view or tab falls back to the rows of the matrix', function () 
 
     expect($page->instance()->resolvedView)->toBe('rows')->and($page->instance()->resolvedTab)->toBe('matrix');
 });
+
+test('months outside a project or its indicator source do not count as missing reports', function () {
+    $project = mmProject(attributes: ['start_date' => '2026-03-15', 'end_date' => '2026-11-30']);
+    $proposal = mmProposal($project, '2026-02-01', '2026-09-18');
+    $library = LibraryIndicator::factory()->create();
+    mmTarget($proposal, $project, $library);
+
+    $page = Livewire::actingAs(mmViewer())->test('pages::reports.monthly-matrix')
+        ->assertSee(__('reports.matrix.calendar_basis'));
+    $cells = mmRows($page)[$library->code]['cells'];
+
+    expect($cells['2026-02']['state'])->toBe(MatrixCellState::OutsidePeriod)
+        ->and($cells['2026-03']['state'])->toBe(MatrixCellState::NotSubmitted)
+        ->and($cells['2026-09']['state'])->toBe(MatrixCellState::NotSubmitted)
+        ->and($cells['2026-10']['state'])->toBe(MatrixCellState::OutsidePeriod);
+});

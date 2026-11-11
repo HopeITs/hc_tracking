@@ -16,10 +16,10 @@ Role name in code: `'Managers'` (`userWithRole('Managers')`). Source: ClickUp su
 6. Report a table: ID, scenario, result (PASS / FAIL / NOT COVERED), evidence. Do not post to ClickUp unless asked.
 
 ## Scenarios
-- **MG-01** ✅ "Add center": city, program, real or host center, owner, sectors; a missing sector is refused.
+- **MG-01** 🚫 Cannot add a center: no "Add center" button, and `projects.create` is refused. Only Super Admin, General Manager (CEO) and Public Relations Manager add centers (decision 2026-11-10).
 - **MG-02** ✅ Acknowledge project ownership after donor approval: the project becomes `approved`.
 - **MG-03** ✅ Fill and submit a monthly report: counts (0 allowed), notes, typed evidence.
 - **MG-04** ⚠ Submit before the last working day, or while the previous month is unsubmitted: refused. After submit: locked. A not-yet-started month shows "upcoming", never overdue.
-- **MG-05** ✅ Request a reopen; the decision shows in My Reporting Duties.
+- **MG-05** ✅ Request a reopen; the decision shows on the Monthly Reports page and in the notifications. (The My Reporting Duties page was removed 2026-11-10; its old address redirects to Donor Reports.)
 - **MG-06** ✅ A Grade 5 department manager sees the whole department's tasks; a non-manager does not.
 - **MG-07** 🚫 Cannot validate their own report.

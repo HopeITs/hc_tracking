@@ -409,7 +409,7 @@ test('no tasks view renders the employee option list', function (string $view) {
         ->and(substr_count($html, 'assignee-popover-option-'.$alice))->toBe(0)
         // A few mentions per task (row label, avatar hover title), never one per employee.
         ->and(substr_count($html, 'Alice Nadir'))->toBeLessThanOrEqual(15);
-})->with(['list', 'board', 'calendar']);
+})->with(['list', 'board', 'calendar', 'cards']);
 
 test('a task can be deleted and takes only its own attachments with it', function () {
     $user = User::factory()->role('General Manager')->create();
@@ -496,23 +496,42 @@ test('the task directory renders with no tasks', function () {
     Livewire::actingAs($user)->test('pages::tasks.index')->assertSee('No tasks yet');
 });
 
-test('the my tasks rail stays visible and shows an empty state when the viewer has no tasks', function () {
+test('the cards view says nothing is open for the viewer when none of the tasks are theirs', function () {
     $user = User::factory()->role('General Manager')->create();
+    Task::factory()->create();
 
     Livewire::actingAs($user)->test('pages::tasks.index')
-        ->assertSeeHtml('data-test="my-tasks-rail"')
-        ->assertSeeHtml('data-test="my-tasks-empty"')
-        ->assertSee('Tasks Related to Me');
+        ->set('view', 'cards')
+        ->assertSee('Nothing open is assigned to you.')
+        ->assertDontSeeHtml('data-test="task-cards-grid"');
 });
 
-test('the my tasks rail card title links to the task detail page', function () {
+test('a cards view card title links to the task detail page', function () {
     $user = User::factory()->role('General Manager')->create();
     $task = Task::factory()->create(['title' => 'Reconcile the ledger', 'created_by' => $user->id]);
 
     Livewire::actingAs($user)
         ->test('pages::tasks.index')
+        ->set('view', 'cards')
         ->assertSeeHtml('href="'.route('tasks.show', $task).'"')
-        ->assertSeeHtml('data-test="my-task-title-'.$task->id.'"');
+        ->assertSeeHtml('data-test="cards-task-title-'.$task->id.'"');
+});
+
+test('the cards view shows only the viewers own tasks that match the filters', function () {
+    $user = User::factory()->role('General Manager')->create();
+    $myTask = Task::factory()->create(['status' => TaskStatus::Todo, 'created_by' => $user->id]);
+    $myFilteredOutTask = Task::factory()->create(['status' => TaskStatus::Done, 'created_by' => $user->id]);
+    $someoneElsesTask = Task::factory()->create(['status' => TaskStatus::Todo]);
+
+    Livewire::actingAs($user)
+        ->test('pages::tasks.index')
+        ->set('view', 'cards')
+        ->set('status', TaskStatus::Todo->value)
+        ->assertSeeHtml('data-test="task-cards-grid"')
+        ->assertSeeHtml('data-test="cards-task-card-'.$myTask->id.'"')
+        ->assertDontSeeHtml('data-test="cards-task-card-'.$myFilteredOutTask->id.'"')
+        ->assertDontSeeHtml('data-test="cards-task-card-'.$someoneElsesTask->id.'"')
+        ->assertDontSeeHtml('data-test="my-tasks-rail"');
 });
 
 test('toggling completion marks a task done, and a completed task cannot be un-completed', function () {
@@ -644,14 +663,13 @@ test('the list view computes stat tiles with one aggregate query instead of load
     // paginate() itself issues a count query plus the page's select query;
     // the stat tiles add one aggregate select on top of that, the eager
     // load of each row's own subtasks (for the inline expand panel) adds a
-    // fourth, the "My Tasks" rail's own capped preview query a fifth, and
-    // the "To review" tab badge's count a sixth — six total, not a second
-    // full (board-sized) fetch of every task with its relations just to
-    // count a handful of numbers.
-    expect($taskTableQueries)->toHaveCount(6);
+    // fourth, and the "To review" tab badge's count a fifth — five total, not a second full
+    // (board-sized) fetch of every task with its relations just to count a
+    // handful of numbers.
+    expect($taskTableQueries)->toHaveCount(5);
 });
 
-test('the My Tasks rail visually distinguishes tasks assigned to the viewer from tasks the viewer only delegated', function () {
+test('cards view cards visually distinguish tasks assigned to the viewer from tasks the viewer only delegated', function () {
     $employeeId = insertHrEmployee();
     $user = User::factory()->role('General Manager')->create(['employee_id' => $employeeId]);
 
@@ -665,10 +683,11 @@ test('the My Tasks rail visually distinguishes tasks assigned to the viewer from
 
     Livewire::actingAs($user)
         ->test('pages::tasks.index')
-        ->assertSee('data-test="my-task-role-assigned-'.$assignedToMe->id.'"', false)
-        ->assertSee('data-test="my-task-role-delegated-'.$delegatedByMe->id.'"', false)
-        ->assertDontSee('data-test="my-task-role-delegated-'.$assignedToMe->id.'"', false)
-        ->assertDontSee('data-test="my-task-role-assigned-'.$delegatedByMe->id.'"', false)
+        ->set('view', 'cards')
+        ->assertSee('data-test="cards-task-role-assigned-'.$assignedToMe->id.'"', false)
+        ->assertSee('data-test="cards-task-role-delegated-'.$delegatedByMe->id.'"', false)
+        ->assertDontSee('data-test="cards-task-role-delegated-'.$assignedToMe->id.'"', false)
+        ->assertDontSee('data-test="cards-task-role-assigned-'.$delegatedByMe->id.'"', false)
         ->assertSee('Assigned to Someone Else');
 });
 
@@ -1391,6 +1410,51 @@ test('the stats section counts overdue and missed tasks separately and filters b
         ->assertSet('dueFilter', 'missed');
 });
 
+test('pressing a headline figure filters the list but keeps every figure steady', function () {
+    $user = User::factory()->role('General Manager')->create();
+    Task::factory()->create(['status' => TaskStatus::Todo, 'due_date' => now()->subDay()->toDateString()]);
+    Task::factory()->create(['status' => TaskStatus::InProgress, 'due_date' => now()->subDay()->toDateString()]);
+    Task::factory()->create(['status' => TaskStatus::Todo, 'due_date' => now()->addDays(2)->toDateString()]);
+
+    $component = Livewire::actingAs($user)
+        ->test('pages::tasks.index')
+        ->call('toggleDueFilter', 'overdue')
+        ->assertSeeHtml('data-test="task-stat-overdue"')
+        ->assertSeeHtml('aria-pressed="true"');
+
+    expect($component->get('taskStats'))->toMatchArray(['total' => 1, 'all' => 3, 'overdue' => 1, 'missed' => 1, 'due_soon' => 1]);
+
+    $component->call('toggleDueFilter', 'overdue')->assertSet('dueFilter', '');
+});
+
+test('choosing a due filter in the bar returns the list to page one', function () {
+    $user = User::factory()->role('General Manager')->create();
+    Task::factory()->count(25)->create(['status' => TaskStatus::InProgress, 'due_date' => now()->subDay()->toDateString()]);
+
+    Livewire::actingAs($user)
+        ->withQueryParams(['view' => 'list', 'page' => 2])
+        ->test('pages::tasks.index')
+        ->assertSet('paginators.page', 2)
+        ->set('dueFilter', 'overdue')
+        ->assertSet('paginators.page', 1);
+});
+
+test('filters kept behind the Filters button show as chips that remove them', function () {
+    $user = User::factory()->role('General Manager')->create();
+    Task::factory()->create(['title' => 'Urgent one', 'priority' => TaskPriority::High]);
+    Task::factory()->create(['title' => 'Calm one', 'priority' => TaskPriority::Low]);
+
+    Livewire::actingAs($user)
+        ->test('pages::tasks.index')
+        ->assertDontSeeHtml('data-test="task-active-filter-chips"')
+        ->set('priority', TaskPriority::High->value)
+        ->assertSeeHtml('data-test="task-active-filter-priority"')
+        ->assertSee('Urgent one')->assertDontSee('Calm one')
+        ->set('priority', '')
+        ->assertDontSeeHtml('data-test="task-active-filter-chips"')
+        ->assertSee('Calm one');
+});
+
 test('quickSetStatus refuses to change the status of a completed task', function () {
     $user = User::factory()->role('General Manager')->create();
     $task = Task::factory()->completed()->create();
@@ -1504,6 +1568,12 @@ test('rescheduleTask sets or clears a due date from calendar drag and drop', fun
         ->call('rescheduleTask', $task->id, 'not-a-date');
 
     expect($task->refresh()->due_date)->toBeNull();
+
+    Livewire::actingAs($user)
+        ->test('pages::tasks.index')
+        ->call('rescheduleTask', $task->id, '2026-02-31');
+
+    expect($task->refresh()->due_date)->toBeNull();
 });
 
 test('rescheduleTask refuses to change the due date for anyone but the task creator', function () {
@@ -1529,6 +1599,7 @@ test('a view-only user gets no calendar drag handles or drag hint, and a resched
         ->set('view', 'calendar')
         ->assertSee('Someone else task')
         ->assertDontSee('data-task-id="'.$task->id.'"', false)
+        ->assertDontSeeHtml('data-test="task-calendar-schedule-'.$task->id.'"')
         ->assertDontSee('Drag one onto a day to schedule it.')
         ->assertSee('Unscheduled tasks have no due date.')
         ->call('rescheduleTask', $task->id, '2026-05-10')
@@ -1545,7 +1616,44 @@ test('the task creator can drag their unscheduled tasks onto the calendar', func
         ->test('pages::tasks.index')
         ->set('view', 'calendar')
         ->assertSee('data-task-id="'.$task->id.'"', false)
+        ->assertSeeHtml('data-test="task-calendar-schedule-'.$task->id.'"')
+        ->assertSeeHtml('data-test="task-calendar-schedule-date-'.$task->id.'"')
         ->assertSee('Drag one onto a day to schedule it.');
+});
+
+test('a busy calendar day shows its first chips and puts the rest behind a "+N more" list', function () {
+    $user = User::factory()->role('General Manager')->create();
+    $day = now()->startOfMonth()->addDays(9)->toDateString();
+    $tasks = Task::factory()->count(5)->create(['due_date' => $day, 'priority' => TaskPriority::Low]);
+    $urgent = Task::factory()->create(['due_date' => $day, 'priority' => TaskPriority::High]);
+
+    $page = Livewire::actingAs($user)
+        ->test('pages::tasks.index')
+        ->set('view', 'calendar')
+        ->assertSeeHtml('data-test="task-calendar-more-'.$day.'"')
+        ->assertSee('+4 more')
+        // High priority leads the day, so it is never hidden behind "+N more".
+        ->assertSeeHtml('data-test="task-calendar-chip-'.$urgent->id.'"');
+
+    foreach ($tasks->push($urgent) as $task) {
+        $page->assertSeeHtml('data-test="task-calendar-more-item-'.$task->id.'"');
+    }
+});
+
+test('the calendar shows the visible month and every unscheduled task however large the backlog', function () {
+    $user = User::factory()->role('General Manager')->create();
+    Task::factory()->count(500)->create(['due_date' => now()->subYear()->toDateString()]);
+    $later = Task::factory()->create(['title' => 'Next month task', 'due_date' => now()->addMonthNoOverflow()->startOfMonth()->addDays(14)->toDateString()]);
+    Task::factory()->create(['title' => 'Undated backlog task', 'due_date' => null]);
+
+    $page = Livewire::actingAs($user)
+        ->test('pages::tasks.index')
+        ->set('view', 'calendar')
+        ->assertSee('Undated backlog task')
+        ->call('nextMonth')
+        ->assertSeeHtml('data-test="task-calendar-chip-'.$later->id.'"');
+
+    expect($page->instance()->calendarGrid['tasksByDay']->flatten()->pluck('id')->all())->toBe([$later->id]);
 });
 
 test('the default due-date sort lists unfinished tasks before done ones', function () {
@@ -1596,8 +1704,7 @@ test('the task register explains overdue and missed, and labels the related-to f
         ->assertSee('Started, past its due date')
         ->assertSee('Not started, past its due date')
         ->assertSee('Anything')
-        ->assertSee('Any date')
-        ->assertSee('Nothing open is assigned to you.');
+        ->assertSee('Any date');
 });
 
 test('list cards show the year on a due date outside the current year', function () {
@@ -1633,6 +1740,55 @@ test('list cards offer the subtask toggle only when a task has subtasks', functi
         ->set('listLayout', 'narrow')
         ->assertSeeHtml('data-test="task-subtasks-toggle-mobile-'.$parent->id.'"')
         ->assertDontSeeHtml('data-test="task-subtasks-toggle-mobile-'.$loneTask->id.'"');
+});
+
+test('list rows spell out how late a task is, not only by colour', function (string $layout, string $hookSuffix) {
+    $user = User::factory()->role('General Manager')->create();
+    $missed = Task::factory()->create(['status' => TaskStatus::Todo, 'due_date' => today()->subDays(3)]);
+    $overdue = Task::factory()->create(['status' => TaskStatus::InProgress, 'due_date' => today()->subDays(5)]);
+    $finished = Task::factory()->create(['status' => TaskStatus::Done, 'due_date' => today()->subDays(4)]);
+
+    Livewire::actingAs($user)
+        ->test('pages::tasks.index')
+        ->set('view', 'list')
+        ->set('listLayout', $layout)
+        ->assertSeeHtml('data-test="task-missed'.$hookSuffix.'-'.$missed->id.'"')
+        ->assertSee('Missed · 3 days late')
+        ->assertSeeHtml('data-test="task-overdue'.$hookSuffix.'-'.$overdue->id.'"')
+        ->assertSee('5 days late')
+        ->assertDontSee('4 days late');
+})->with([
+    'table' => ['wide', ''],
+    'cards' => ['narrow', '-mobile'],
+]);
+
+test('list rows name the priority in words beside its flag', function () {
+    $user = User::factory()->role('General Manager')->create();
+    $task = Task::factory()->create(['priority' => TaskPriority::High, 'created_by' => $user->id]);
+
+    $html = Livewire::actingAs($user)
+        ->test('pages::tasks.index')
+        ->set('view', 'list')
+        ->set('listLayout', 'wide')
+        ->html();
+
+    expect($html)->toMatch('/data-test="task-priority-trigger-'.$task->id.'"[\s\S]*?<span class="truncate">High<\/span>/');
+});
+
+test('the table offers the subtask toggle with done-of-total only when a task has subtasks', function () {
+    $user = User::factory()->role('General Manager')->create();
+    $parent = Task::factory()->create();
+    $loneTask = Task::factory()->create();
+    Task::factory()->subtaskOf($parent)->create(['status' => TaskStatus::Done]);
+    Task::factory()->subtaskOf($parent)->create(['status' => TaskStatus::Todo]);
+
+    Livewire::actingAs($user)
+        ->test('pages::tasks.index')
+        ->set('view', 'list')
+        ->set('listLayout', 'wide')
+        ->assertSeeHtml('data-test="task-subtasks-toggle-'.$parent->id.'"')
+        ->assertSee('1 of 2 subtasks done')
+        ->assertDontSeeHtml('data-test="task-subtasks-toggle-'.$loneTask->id.'"');
 });
 
 test('the scope tabs show my tasks, tasks I assigned and tasks waiting for my review', function () {
@@ -1884,4 +2040,129 @@ test('a long board column draws its first cards and the rest on request', functi
         ->assertDontSeeHtml('data-test="task-board-more-todo"');
 
     expect(substr_count($board->html(), 'wire:key="task-board-card-'))->toBe(27);
+});
+
+test('the due today filter lists only unfinished tasks due today', function () {
+    $user = User::factory()->role('General Manager')->create();
+    Task::factory()->create(['title' => 'Due today open', 'status' => TaskStatus::InProgress, 'due_date' => now()->toDateString()]);
+    Task::factory()->create(['title' => 'Due today finished', 'status' => TaskStatus::Done, 'due_date' => now()->toDateString()]);
+    Task::factory()->create(['title' => 'Due tomorrow', 'status' => TaskStatus::Todo, 'due_date' => now()->addDay()->toDateString()]);
+
+    $titles = fn ($component) => $component->instance()->tasks->getCollection()->pluck('title')->all();
+
+    $component = Livewire::actingAs($user)->test('pages::tasks.index')->set('view', 'list')->set('dueFilter', 'due_today');
+
+    expect($titles($component))->toBe(['Due today open'])
+        ->and($component->get('taskStats'))->toMatchArray(['total' => 1, 'all' => 3]);
+
+    expect($titles($component->set('dueFilter', 'not-a-filter')))->toHaveCount(3);
+});
+
+test('search status due filter and scope narrow the list together', function () {
+    $user = User::factory()->role('General Manager')->create();
+    $overdue = ['status' => TaskStatus::InProgress, 'due_date' => now()->subDay()->toDateString()];
+
+    Task::factory()->create(['title' => 'Budget review mine', 'created_by' => $user->id, ...$overdue]);
+    Task::factory()->create(['title' => 'Budget review other', ...$overdue]);
+    Task::factory()->create(['title' => 'Budget review on time', 'created_by' => $user->id, 'status' => TaskStatus::InProgress, 'due_date' => now()->addDays(3)->toDateString()]);
+    Task::factory()->create(['title' => 'Budget review todo', 'created_by' => $user->id, 'status' => TaskStatus::Todo, 'due_date' => now()->subDay()->toDateString()]);
+    Task::factory()->create(['title' => 'Venue booking mine', 'created_by' => $user->id, ...$overdue]);
+
+    $component = Livewire::actingAs($user)
+        ->test('pages::tasks.index')
+        ->set('view', 'list')
+        ->set('search', '  budget  ')
+        ->set('status', TaskStatus::InProgress->value)
+        ->set('dueFilter', 'overdue')
+        ->call('setScope', 'assigned');
+
+    expect($component->instance()->tasks->getCollection()->pluck('title')->all())->toBe(['Budget review mine']);
+});
+
+test('the Filters badge counts only the popover filters that apply', function () {
+    $user = User::factory()->role('General Manager')->create();
+    $milestone = Milestone::factory()->create();
+
+    $component = Livewire::actingAs($user)->test('pages::tasks.index');
+    $count = fn () => $component->instance()->activeAdvancedFilterCount();
+
+    expect($count())->toBe(0);
+
+    $component->set('priority', TaskPriority::High->value)
+        ->set('assignee', '7')
+        ->set('departmentId', '3')
+        ->set('sourceType', 'milestone')
+        ->set('sourceId', (string) $milestone->id)
+        ->set('myTasksOnly', true);
+
+    expect($count())->toBe(6);
+
+    $component->set('view', 'cards');
+
+    expect($count())->toBe(5);
+
+    $scopedUser = User::factory()->role('Team Member')->create();
+    $scoped = Livewire::actingAs($scopedUser)->test('pages::tasks.index')->set('departmentId', '3');
+
+    expect($scoped->instance()->activeAdvancedFilterCount())->toBe(0);
+});
+
+test('the scope tab and a blank search are not active filters', function () {
+    $user = User::factory()->role('General Manager')->create();
+
+    $component = Livewire::actingAs($user)->test('pages::tasks.index')->call('setScope', 'mine')->set('search', '   ');
+
+    expect($component->instance()->hasActiveFilters())->toBeFalse();
+
+    $component->set('dueFilter', 'due_today');
+
+    expect($component->instance()->hasActiveFilters())->toBeTrue();
+});
+
+test('clearing the filters keeps the scope tab and the calendar period', function () {
+    $user = User::factory()->role('General Manager')->create();
+
+    $component = Livewire::actingAs($user)
+        ->test('pages::tasks.index')
+        ->set('view', 'calendar')
+        ->call('setScope', 'assigned')
+        ->set('viewMode', 'week')
+        ->set('anchorDate', '2026-03-04')
+        ->set('priority', TaskPriority::High->value)
+        ->set('dueFilter', 'overdue')
+        ->call('clearFilters')
+        ->assertSet('priority', '')
+        ->assertSet('dueFilter', '')
+        ->assertSet('scope', 'assigned')
+        ->assertSet('view', 'calendar')
+        ->assertSet('viewMode', 'week')
+        ->assertSet('anchorDate', '2026-03-04');
+
+    expect($component->instance()->hasActiveFilters())->toBeFalse();
+});
+
+test('the popover Clear resets only the Filters popover filters', function () {
+    $user = User::factory()->role('General Manager')->create();
+
+    Livewire::actingAs($user)
+        ->test('pages::tasks.index')
+        ->set('search', 'report')
+        ->set('dueFilter', 'overdue')
+        ->set('priority', TaskPriority::High->value)
+        ->call('toggleMyTasksOnly')
+        ->call('clearAdvancedFilters')
+        ->assertSet('priority', '')
+        ->assertSet('myTasksOnly', false)
+        ->assertSet('search', 'report')
+        ->assertSet('dueFilter', 'overdue');
+});
+
+test('an empty scope tab offers to show all tasks instead of adding the first one', function () {
+    $user = User::factory()->role('General Manager')->create();
+
+    Livewire::actingAs($user)
+        ->test('pages::tasks.index')
+        ->call('setScope', 'review')
+        ->assertSee(__('tasks.empty_scope_heading'))
+        ->assertSeeHtml('data-test="task-empty-show-all"');
 });

@@ -19,8 +19,16 @@ class RescheduleTask
      */
     public function handle(int $taskId, string $date): ?bool
     {
-        if ($date !== '' && preg_match('/^\d{4}-\d{2}-\d{2}$/', $date) !== 1) {
-            return null;
+        $dueDate = null;
+
+        if ($date !== '') {
+            // Carbon rolls an impossible day over (2026-02-31 becomes March 3)
+            // instead of failing, so the parsed day must format back to the input.
+            $dueDate = preg_match('/^\d{4}-\d{2}-\d{2}$/', $date) === 1 ? CarbonImmutable::createFromFormat('!Y-m-d', $date) : null;
+
+            if (! $dueDate instanceof CarbonImmutable || $dueDate->format('Y-m-d') !== $date) {
+                return null;
+            }
         }
 
         $task = Task::query()->find($taskId);
@@ -29,15 +37,13 @@ class RescheduleTask
             return null;
         }
 
-        // Someone else's task is refused with false (a message): a calendar drop
-        // is a casual gesture, and the card simply returns to its day.
-        if ($task->created_by !== auth()->id()) {
+        // Refused with false (a message), never a 403 page: a calendar drop is
+        // a casual gesture, and the card simply returns to its day on refusal.
+        if ($task->created_by !== auth()->id() || Gate::denies('update', $task)) {
             return false;
         }
 
-        Gate::authorize('update', $task);
-
-        $task->due_date = $date === '' ? null : CarbonImmutable::parse($date);
+        $task->due_date = $dueDate;
         $task->save();
 
         return true;

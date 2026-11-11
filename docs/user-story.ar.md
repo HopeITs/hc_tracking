@@ -49,6 +49,7 @@ Project (Draft) → Concept note → Proposal → Donor approval → Report temp
 - يسجّل الـ **Funding agreement** والأقساط، وتتولد الـ Transfers المتوقعة تلقائياً.
 - يقبل الـ **Final report** (التاريخ، من قبِله، ملف) لإغلاق الـ Proposal على `completed`.
 - يسجّل **Extension** للـ Proposal النشط: تاريخ نهاية جديد وسبب وملف تعديل.
+- يضيف المركز من «Add center»: المدينة، والـ Program، والمركز الفعلي أو المضيف، والمسؤول، والقطاعات.
 
 ### 3) General Manager (المدير العام)
 **يبدأ من:** Desk → طلبات الـ Donors المعلّقة والملخصات.
@@ -56,6 +57,7 @@ Project (Draft) → Concept note → Proposal → Donor approval → Report temp
 - يوافق على الـ Donors الجدد في صفحة Donors.
 - يرى كل شيء، ويصحّح الحالات النهائية، ويعتمد الـ Proposal (`approved`).
 - عند الاعتماد يُكمل النظام صفوف المواقع وينشئ الـ Projects الناقصة تلقائياً (Program + مركز + مسؤول).
+- يضيف المركز من «Add center» مثل الـ Public Relations Manager. لا يملك هذا غيرهما (قد يُضاف Logistics لاحقاً مع الـ HUB).
 
 ### 4) Financial (المالية)
 **يبدأ من:** Proposals في مرحلة `proposal draft`.
@@ -74,11 +76,12 @@ Project (Draft) → Concept note → Proposal → Donor approval → Report temp
 - يجمّع **Donor reports** (شهري أو نصف سنوي) من الأرقام المعتمدة.
 
 ### 6) Managers (مدير مركز / برنامج)
-**يبدأ من:** Desk → لوحة Reporting duties و Tasks.
+**يبدأ من:** Desk → Monthly Reports و Tasks.
 
-- يضيف المركز من «Add center»: المدينة، والـ Program، والمركز الفعلي أو المضيف، والمسؤول، والقطاعات.
+- لا يضيف مراكز: يطلبها من الـ Public Relations Manager أو الـ General Manager.
 - يقرّ (acknowledge) بملكية الـ Project بعد اعتماد الـ Donor، وهذا شرط ليصبح `approved`.
 - يعبّئ ويرسل الـ **Monthly report** لكل شهر (الأرقام والسرد والأدلة).
+- يطلب إعادة فتح تقرير معتمد، ويرى القرار في صفحة Monthly Reports وفي الإشعارات.
 - يرى مهام قسمه إذا كان مدير قسم (Grade 5).
 
 ### 7) Media Team (الإعلام)

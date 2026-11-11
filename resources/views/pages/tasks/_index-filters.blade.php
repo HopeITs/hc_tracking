@@ -1,179 +1,200 @@
 {{--
-    What sits between the register bar and the task views: the "My Tasks" rail,
-    then the list's group/sort controls and the "my tasks only" toggle. (The
-    view switch, filters and Clear live in the x-desk.register frame.) Included by
-    ⚡index.blade.php, whose top PHP block defines $filtersAreActive.
+    Everything between the register header and the task views, in reading
+    order: the scope tabs (whose tasks), one toolbar (search, Status, Due,
+    Filters, Clear, then Display at the end), the chips for any filter set
+    behind the Filters button, and the view-only notice. The view switch and
+    Add task stay in the x-desk.register header. Included by ⚡index.blade.php,
+    whose top PHP block defines $filtersAreActive, $advancedFilterCount,
+    $canPickDepartment, $hiddenFilterChips and $hiddenFilterLabels.
 --}}
-    {{-- Whose tasks: one click to the viewer's own work, or what waits for their review. --}}
-    <nav class="-mb-1 flex gap-1 overflow-x-auto border-b border-secondary-soft dark:border-line" aria-label="{{ __('tasks.tabs_label') }}" data-test="task-scope-tabs">
-        @foreach (['' => __('tasks.tab_all'), 'mine' => __('tasks.tab_mine'), 'assigned' => __('tasks.tab_assigned'), 'review' => __('tasks.tab_review')] as $scopeKey => $scopeLabel)
-            <button
-                type="button"
-                wire:click="setScope('{{ $scopeKey }}')"
-                aria-current="{{ $scope === $scopeKey ? 'page' : 'false' }}"
-                data-test="task-scope-{{ $scopeKey === '' ? 'all' : $scopeKey }}"
-                @class([
-                    '-mb-px inline-flex shrink-0 items-center gap-1.5 border-b-2 px-3 py-2 text-sm font-semibold transition-colors focus-visible:outline-2 focus-visible:outline-secondary-medium',
-                    'border-primary text-secondary-dark dark:border-brand-text dark:text-ink' => $scope === $scopeKey,
-                    'border-transparent text-secondary-medium hover:text-secondary-dark dark:text-ink-muted dark:hover:text-ink' => $scope !== $scopeKey,
-                ])
-            >
-                {{ $scopeLabel }}
-                @if ($scopeKey === 'review' && $this->tasksAwaitingMyReview > 0)
-                    <span class="rounded-full bg-primary px-1.5 text-[11px] font-bold text-white tabular-nums dark:bg-status-critical dark:text-surface-0" data-test="task-scope-review-count">{{ $this->tasksAwaitingMyReview }}</span>
-                @endif
-            </button>
-        @endforeach
-    </nav>
+<nav class="dk-tk-tabs" aria-label="{{ __('tasks.tabs_label') }}" data-test="task-scope-tabs">
+    @foreach (['' => __('tasks.tab_all'), 'mine' => __('tasks.tab_mine'), 'assigned' => __('tasks.tab_assigned'), 'review' => __('tasks.tab_review')] as $scopeKey => $scopeLabel)
+        <button
+            type="button"
+            wire:click="setScope('{{ $scopeKey }}')"
+            aria-current="{{ $scope === $scopeKey ? 'page' : 'false' }}"
+            data-test="task-scope-{{ $scopeKey === '' ? 'all' : $scopeKey }}"
+        >
+            {{ $scopeLabel }}
+            @if ($scopeKey === 'review' && $this->tasksAwaitingMyReview > 0)
+                <span class="dk-num dk-tk-tab-count" data-test="task-scope-review-count">{{ $this->tasksAwaitingMyReview }}</span>
+            @endif
+        </button>
+    @endforeach
+</nav>
 
-    @if (! auth()->user()->can('tasks.update') && ! auth()->user()->can('create', App\Models\Task::class))
-        <p class="flex items-start gap-2 rounded-xl bg-secondary-soft/40 px-3 py-2 text-xs text-secondary-dark dark:bg-white/[0.04] dark:text-ink-muted" data-test="task-view-only-notice">
-            <flux:icon.eye variant="micro" class="mt-0.5 size-3.5 shrink-0" aria-hidden="true" />
-            {{ __('tasks.view_only_notice') }}
-        </p>
+<div class="dk-reg-bar dk-tk-bar" data-desk-register-bar>
+    <x-desk.register-search :label="__('tasks.search_tasks')" :placeholder="__('tasks.title_description_or_assignee')" wire:model.live.debounce.300ms="search" />
+
+    <x-ui.header-filter-select :label="__('common.status')" wire:model.live="status" :value="$status">
+        <option value="">{{ __('common.all_statuses') }}</option>
+        @foreach (App\Enums\TaskStatus::cases() as $statusCase)
+            <option value="{{ $statusCase->value }}">{{ $statusCase->label() }}</option>
+        @endforeach
+    </x-ui.header-filter-select>
+    <x-ui.header-filter-select :label="__('desk.register.due')" wire:model.live="dueFilter" :value="$dueFilter" data-test="task-due-filter">
+        <option value="">{{ __('desk.register.due_any') }}</option>
+        <option value="due_today">{{ __('tasks.due_today') }}</option>
+        <option value="due_soon">{{ __('tasks.due_within_7_days') }}</option>
+        <option value="overdue">{{ __('tasks.overdue') }}</option>
+        <option value="missed">{{ __('tasks.missed_not_started') }}</option>
+    </x-ui.header-filter-select>
+
+    {{-- Less frequent filters sit behind one button; what is set shows as chips under the bar. --}}
+    <div class="dk-pmenu dk-tkf" x-data="{ open: false }" x-on:click.outside="open = false" x-on:keydown.escape.window="open = false">
+        <button type="button" @class(['dk-btn', 'dk-tkf-btn', 'dk-tkf-on' => $advancedFilterCount > 0]) x-on:click="open = ! open" x-bind:aria-expanded="open" aria-haspopup="dialog" aria-label="{{ __('tasks.filters') }}" data-test="task-filters-button">
+            <flux:icon.adjustments-horizontal variant="micro" class="size-4" aria-hidden="true" /><span class="dk-tk-btn-text">{{ __('tasks.filters') }}</span>
+            @if ($advancedFilterCount > 0)
+                <span class="dk-pc dk-num" data-test="task-filters-count">{{ $advancedFilterCount }}</span>
+            @endif
+        </button>
+
+        <div class="dk-tkf-scrim" x-show="open" x-cloak x-on:click="open = false" aria-hidden="true"></div>
+        <div class="dk-pop dk-pjf-pop dk-tkf-pop" role="dialog" aria-label="{{ __('tasks.filters') }}" x-show="open" x-cloak x-transition.opacity.duration.120ms>
+            <div class="dk-tkf-sec" role="group" aria-labelledby="task-filters-work">
+                <p class="dk-tkf-h" id="task-filters-work">{{ __('tasks.filters_work') }}</p>
+                <x-ui.header-filter-select :label="__('tasks.priority')" wire:model.live="priority" :value="$priority">
+                    <option value="">{{ __('tasks.all_priorities') }}</option>
+                    @foreach (App\Enums\TaskPriority::cases() as $priorityCase)
+                        <option value="{{ $priorityCase->value }}">{{ $priorityCase->label() }}</option>
+                    @endforeach
+                </x-ui.header-filter-select>
+            </div>
+            <div class="dk-tkf-sec" role="group" aria-labelledby="task-filters-people">
+                <p class="dk-tkf-h" id="task-filters-people">{{ __('tasks.filters_people') }}</p>
+                <x-ui.header-filter-select :label="__('tasks.assignee')" wire:model.live="assignee" :value="$assignee" employees>
+                    <option value="">{{ __('common.anyone') }}</option>
+                </x-ui.header-filter-select>
+                @if ($canPickDepartment)
+                    <x-ui.header-filter-select :label="__('tasks.department')" wire:model.live="departmentId" :value="$departmentId" data-test="task-department-filter">
+                        <option value="">{{ __('tasks.every_department') }}</option>
+                        @foreach ($this->departmentOptions as $departmentOption)
+                            <option value="{{ $departmentOption['id'] }}">{{ $departmentOption['name'] }}</option>
+                        @endforeach
+                    </x-ui.header-filter-select>
+                @endif
+                @if ($view !== 'cards')
+                    {{-- Cards always shows only the viewer's own tasks, so the switch would do nothing there. --}}
+                    <label class="dk-tkf-check">
+                        <input type="checkbox" wire:click="toggleMyTasksOnly" @checked($myTasksOnly) data-test="task-filter-my-tasks-only" />
+                        <span><b>{{ __('tasks.my_tasks_only') }}</b><small>{{ __('tasks.my_tasks_only_hint') }}</small></span>
+                    </label>
+                @endif
+            </div>
+            <div class="dk-tkf-sec dk-tkf-sec-related" role="group" aria-labelledby="task-filters-related">
+                <p class="dk-tkf-h" id="task-filters-related">{{ __('tasks.filters_related_to') }}</p>
+                <x-ui.header-filter-select :label="__('tasks.source_type')" wire:model.live="sourceType" :value="$sourceType">
+                    <option value="">{{ __('tasks.related_to_any') }}</option>
+                    @foreach ($this->sourceTypeOptions as $sourceTypeOption)
+                        <option value="{{ $sourceTypeOption['value'] }}">{{ $sourceTypeOption['label'] }}</option>
+                    @endforeach
+                </x-ui.header-filter-select>
+                @if ($sourceType !== '')
+                    <x-ui.header-filter-select :label="__('tasks.source')" wire:model.live="sourceId" :value="$sourceId">
+                        <option value="">{{ __('tasks.any_record') }}</option>
+                        @foreach ($this->filterSourceOptions as $sourceOption)
+                            <option value="{{ $sourceOption['id'] }}">{{ $sourceOption['name'] }}</option>
+                        @endforeach
+                    </x-ui.header-filter-select>
+                @endif
+            </div>
+            {{-- Wrapped: desk.css styles every direct `.dk-pop > button` as a menu row. --}}
+            <div class="dk-tkf-foot">
+                @if ($advancedFilterCount > 0)
+                    <button type="button" class="dk-btn dk-ghost" wire:click="clearAdvancedFilters" data-test="task-filters-clear">{{ __('desk.register.clear') }}</button>
+                @endif
+                <button type="button" class="dk-btn" x-on:click="open = false">{{ __('desk.filter_done') }}</button>
+            </div>
+        </div>
+    </div>
+
+    @if ($filtersAreActive)
+        <button type="button" class="dk-btn dk-ghost dk-tk-clear" wire:click="clearFilters" data-test="task-clear-filters">{{ __('tasks.clear_filters') }}</button>
     @endif
 
-    {{-- Nothing open for the viewer: one quiet line instead of a big empty box. --}}
-    <div @class([
-        'flex rounded-2xl border border-secondary-soft bg-secondary-soft/20 dark:border-line dark:bg-white/[0.03]',
-        'flex-col gap-3 p-4' => $this->myTasksPreview->isNotEmpty(),
-        'flex-wrap items-center gap-x-3 gap-y-1 px-4 py-2.5' => $this->myTasksPreview->isEmpty(),
-    ]) data-test="my-tasks-rail">
-        <div class="flex items-center justify-between gap-3">
-            <div class="flex items-center gap-2">
-                <flux:icon name="user-circle" variant="micro" class="size-5 text-primary dark:text-brand-text" aria-hidden="true" />
-                <h2 class="text-sm font-bold text-secondary-dark dark:text-ink">{{ __('tasks.my_tasks') }}</h2>
-            </div>
-            @if ($this->myTasksPreview->isNotEmpty())
-                <button type="button" wire:click="toggleMyTasksOnly" class="text-xs font-semibold text-primary dark:text-brand-text hover:underline" data-test="my-tasks-view-all">
-                    {{ $myTasksOnly ? __('tasks.showing_my_tasks_only') : __('tasks.view_all') }}
-                </button>
-            @endif
-        </div>
-        @if ($this->myTasksPreview->isNotEmpty())
-            @php $viewerEmployeeId = auth()->user()->employee_id; @endphp
-            <div class="flex gap-3 overflow-x-auto pb-1">
-                @foreach ($this->myTasksPreview as $myTask)
-                    @php $isAssignedToMe = $viewerEmployeeId !== null && $myTask->taskAssignees->pluck('employee_id')->contains($viewerEmployeeId); @endphp
-                    <div
-                        role="button"
-                        tabindex="0"
-                        @can('update', $myTask)
-                            wire:click="openEditDrawer({{ $myTask->id }})"
-                            x-on:keydown="if (! $event.target.closest('a') && ($event.key === 'Enter' || $event.key === ' ')) { $event.preventDefault(); $wire.openEditDrawer({{ $myTask->id }}) }"
-                        @else
-                            {{-- Only the status is theirs to change: open the task's own page. --}}
-                            x-on:click="if (! $event.target.closest('a')) { Livewire.navigate({{ Illuminate\Support\Js::from(route('tasks.show', $myTask)) }}) }"
-                            x-on:keydown="if (! $event.target.closest('a') && ($event.key === 'Enter' || $event.key === ' ')) { $event.preventDefault(); Livewire.navigate({{ Illuminate\Support\Js::from(route('tasks.show', $myTask)) }}) }"
-                        @endcan
-                        wire:key="my-task-{{ $myTask->id }}"
-                        data-test="my-task-card-{{ $myTask->id }}"
-                        @class([
-                            'flex w-64 shrink-0 flex-col gap-2 rounded-xl border p-3 text-start shadow-sm transition-shadow hover:shadow-md dark:bg-surface-1',
-                            'border-primary bg-white dark:border-status-critical' => $isAssignedToMe,
-                            'border-dashed border-secondary-light bg-secondary-soft/30 dark:border-line dark:bg-white/[0.03]' => ! $isAssignedToMe,
-                        ])
-                    >
-                        <div class="flex items-center justify-between gap-2">
-                            <x-ui.status-pill :case="$myTask->status" />
-                            @if ($isAssignedToMe)
-                                <span class="inline-flex shrink-0 items-center gap-1 text-[10px] font-bold text-primary dark:text-status-critical" data-test="my-task-role-assigned-{{ $myTask->id }}">
-                                    <flux:icon.user variant="micro" class="size-3" aria-hidden="true" />
-                                    {{ __('tasks.assigned_to_you') }}
-                                </span>
-                            @endif
+    @if ($view === 'list' || $view === 'board')
+        <div class="dk-tk-end">
+            @if ($view === 'list')
+                {{-- How the list is laid out (group, sort): one Display button, not filters. --}}
+                <div class="dk-pmenu dk-tkf dk-tkd" x-data="{ open: false }" x-on:click.outside="open = false" x-on:keydown.escape.window="open = false">
+                    <button type="button" class="dk-btn dk-tkf-btn" x-on:click="open = ! open" x-bind:aria-expanded="open" aria-haspopup="dialog" aria-label="{{ __('tasks.display_options') }}" data-test="task-display-button">
+                        <flux:icon.bars-3-bottom-left variant="micro" class="size-4" aria-hidden="true" /><span class="dk-tk-btn-text">{{ __('tasks.display_options') }}</span>
+                    </button>
+
+                    <div class="dk-tkf-scrim" x-show="open" x-cloak x-on:click="open = false" aria-hidden="true"></div>
+                    <div class="dk-pop dk-pjf-pop dk-tkf-pop" role="dialog" aria-label="{{ __('tasks.display_options') }}" x-show="open" x-cloak x-transition.opacity.duration.120ms>
+                        <div class="dk-tkf-sec" role="group" aria-label="{{ __('tasks.task_toolbar') }}">
+                            <x-ui.header-filter-select :label="__('tasks.group_by')" wire:model.live="group" :value="$group" data-test="task-group-select">
+                                <option value="none">{{ __('tasks.no_grouping') }}</option>
+                                <option value="status">{{ __('common.status') }}</option>
+                                <option value="priority">{{ __('tasks.priority') }}</option>
+                                <option value="assignee">{{ __('tasks.assignee') }}</option>
+                                <option value="milestone">{{ __('tasks.milestone') }}</option>
+                            </x-ui.header-filter-select>
+                            <div class="dk-tk-sort">
+                                <x-ui.header-filter-select :label="__('tasks.sort_by')" wire:model.live="sortField" :value="$sortField" data-test="task-sort-select">
+                                    <option value="due">{{ __('tasks.due_date_2') }}</option>
+                                    <option value="title">{{ __('common.name') }}</option>
+                                    <option value="status">{{ __('common.status') }}</option>
+                                    <option value="priority">{{ __('tasks.priority') }}</option>
+                                    <option value="assignee">{{ __('tasks.assignee') }}</option>
+                                    <option value="created">{{ __('tasks.created_date') }}</option>
+                                </x-ui.header-filter-select>
+                                <button
+                                    type="button"
+                                    class="dk-btn dk-tk-icon-btn"
+                                    wire:click="$set('sortDirection', '{{ $sortDirection === 'asc' ? 'desc' : 'asc' }}')"
+                                    aria-label="{{ $sortDirection === 'asc' ? __('tasks.sort_ascending') : __('tasks.sort_descending') }}"
+                                    title="{{ $sortDirection === 'asc' ? __('tasks.sort_ascending') : __('tasks.sort_descending') }}"
+                                    data-test="task-sort-direction-toggle"
+                                >
+                                    <flux:icon :name="$sortDirection === 'asc' ? 'bars-arrow-up' : 'bars-arrow-down'" variant="micro" class="size-4" aria-hidden="true" />
+                                </button>
+                            </div>
                         </div>
-                        @unless ($isAssignedToMe)
-                            @php $assigneeName = $myTask->taskAssignees->first()?->employee?->name; @endphp
-                            @if ($assigneeName !== null)
-                                <span class="inline-flex items-start gap-1 text-[10px] font-semibold text-secondary-medium dark:text-ink-muted" data-test="my-task-role-delegated-{{ $myTask->id }}">
-                                    <flux:icon.paper-airplane variant="micro" class="mt-0.5 size-3 shrink-0" aria-hidden="true" />
-                                    <span class="break-words">{{ __('tasks.assigned_to_name', ['name' => $assigneeName]) }}</span>
-                                </span>
-                            @endif
-                        @endunless
-                        <a
-                            href="{{ route('tasks.show', $myTask) }}"
-                            wire:navigate
-                            title="{{ $myTask->title }}"
-                            dir="auto"
-                            x-on:click.stop
-                            class="truncate text-sm font-semibold text-secondary-dark hover:text-primary hover:underline dark:text-ink dark:hover:text-status-critical"
-                            data-test="my-task-title-{{ $myTask->id }}"
-                        >{{ $myTask->title }}</a>
-                        <div class="flex items-center justify-between text-xs text-secondary-medium dark:text-ink-muted">
-                            <span @class(['font-semibold text-status-critical' => $myTask->isOverdue() || $myTask->isMissed()])>
-                                {{ $myTask->due_date?->translatedFormat(__($myTask->due_date->isCurrentYear() ? 'formats.date_short' : 'formats.date')) ?? __('tasks.no_due_date') }}
-                            </span>
-                            <x-ui.enum-badge :case="$myTask->priority" />
+                        <div class="dk-tkf-foot">
+                            <button type="button" class="dk-btn" x-on:click="open = false">{{ __('desk.filter_done') }}</button>
                         </div>
                     </div>
-                @endforeach
-            </div>
-        @else
-            <p class="text-sm text-secondary-medium dark:text-ink-muted" data-test="my-tasks-empty">{{ __('tasks.nothing_open_for_you') }}</p>
-        @endif
-    </div>
-
-    <div class="dk-reg-sub">
-        <span></span>
-
-        <div class="flex min-w-0 flex-wrap items-center gap-2">
-            @if ($view === 'list')
-                <x-ui.header-filter-select :label="__('tasks.group_by')" wire:model.live="group" :value="$group" class="w-40!">
-                    <option value="none">{{ __('tasks.no_grouping') }}</option>
-                    <option value="status">{{ __('common.status') }}</option>
-                    <option value="priority">{{ __('tasks.priority') }}</option>
-                    <option value="assignee">{{ __('tasks.assignee') }}</option>
-                    <option value="milestone">{{ __('tasks.milestone') }}</option>
-                </x-ui.header-filter-select>
-                <x-ui.header-filter-select :label="__('tasks.sort_by')" wire:model.live="sortField" :value="$sortField" class="w-40!">
-                    <option value="due">{{ __('tasks.due_date_2') }}</option>
-                    <option value="title">{{ __('common.name') }}</option>
-                    <option value="status">{{ __('common.status') }}</option>
-                    <option value="priority">{{ __('tasks.priority') }}</option>
-                    <option value="assignee">{{ __('tasks.assignee') }}</option>
-                    <option value="created">{{ __('tasks.created_date') }}</option>
-                </x-ui.header-filter-select>
-                <x-ui.button
-                    size="sm"
-                    wire:click="$set('sortDirection', '{{ $sortDirection === 'asc' ? 'desc' : 'asc' }}')"
-                    :aria-label="$sortDirection === 'asc' ? __('tasks.sort_ascending') : __('tasks.sort_descending')"
-                    data-test="task-sort-direction-toggle"
-                >
-                    <flux:icon :name="$sortDirection === 'asc' ? 'bars-arrow-up' : 'bars-arrow-down'" variant="micro" class="size-4" aria-hidden="true" />
-                </x-ui.button>
+                </div>
             @endif
 
+            {{-- Opens or closes every task's subtasks at once; remembered per browser (task-subtasks.js). --}}
             <button
                 type="button"
-                wire:click="toggleMyTasksOnly"
-                aria-pressed="{{ $myTasksOnly ? 'true' : 'false' }}"
-                data-test="task-filter-my-tasks-only"
-                @class([
-                    'inline-flex shrink-0 items-center gap-1.5 rounded-md border px-2.5 py-1.5 text-xs font-semibold transition-colors focus-visible:outline-2 focus-visible:outline-secondary-medium',
-                    'border-primary bg-primary dark:bg-ink dark:text-surface-0 dark:border-ink text-white' => $myTasksOnly,
-                    'border-secondary-light text-secondary-medium hover:bg-secondary-soft dark:text-ink-muted dark:hover:bg-surface-2' => ! $myTasksOnly,
-                ])
+                x-data
+                x-on:click="$store.taskSubtasks.toggleAll()"
+                x-bind:aria-pressed="$store.taskSubtasks.allOpen ? 'true' : 'false'"
+                class="dk-btn dk-tk-subtasks"
+                data-test="task-subtasks-toggle-all"
             >
-                <flux:icon.user variant="micro" class="size-3.5" />
-                {{ __('tasks.my_tasks_only') }}
+                <flux:icon.rectangle-stack variant="micro" class="size-4" aria-hidden="true" />
+                <span class="dk-tk-btn-text" x-text="$store.taskSubtasks.allOpen ? {{ Illuminate\Support\Js::from(__('tasks.hide_subtasks')) }} : {{ Illuminate\Support\Js::from(__('tasks.show_subtasks')) }}">{{ __('tasks.show_subtasks') }}</span>
             </button>
-
-            @if ($view !== 'calendar')
-                {{-- Opens or closes every task's subtasks at once; remembered per browser (task-subtasks.js). --}}
-                <button
-                    type="button"
-                    x-data
-                    x-on:click="$store.taskSubtasks.toggleAll()"
-                    x-bind:aria-pressed="$store.taskSubtasks.allOpen ? 'true' : 'false'"
-                    x-bind:class="$store.taskSubtasks.allOpen ? 'border-primary bg-primary text-white dark:border-ink dark:bg-ink dark:text-surface-0' : 'border-secondary-light text-secondary-medium hover:bg-secondary-soft dark:text-ink-muted dark:hover:bg-surface-2'"
-                    class="inline-flex shrink-0 items-center gap-1.5 rounded-md border px-2.5 py-1.5 text-xs font-semibold transition-colors focus-visible:outline-2 focus-visible:outline-secondary-medium"
-                    data-test="task-subtasks-toggle-all"
-                >
-                    <flux:icon.rectangle-stack variant="micro" class="size-3.5" />
-                    <span x-text="$store.taskSubtasks.allOpen ? {{ Illuminate\Support\Js::from(__('tasks.hide_subtasks')) }} : {{ Illuminate\Support\Js::from(__('tasks.show_subtasks')) }}">{{ __('tasks.show_subtasks') }}</span>
-                </button>
-            @endif
         </div>
+    @endif
+</div>
+
+@if ($hiddenFilterChips !== [])
+    <div class="dk-pjq-row dk-tk-chips" data-test="task-active-filter-chips">
+        @foreach ($hiddenFilterChips as $filterKey => $filterValue)
+            <button
+                type="button"
+                class="dk-chip dk-pjq-set"
+                @if ($filterKey === 'myTasksOnly') wire:click="toggleMyTasksOnly" @else wire:click="$set('{{ $filterKey }}', '')" @endif
+                wire:key="task-active-filter-{{ $filterKey }}"
+                aria-label="{{ __('tasks.remove_filter', ['filter' => $hiddenFilterLabels[$filterKey].': '.$filterValue]) }}"
+                data-test="task-active-filter-{{ $filterKey }}"
+            >
+                <span class="dk-pjq-k">{{ $hiddenFilterLabels[$filterKey] }}</span> <bdi>{{ $filterValue }}</bdi> <x-desk.icon name="x" />
+            </button>
+        @endforeach
     </div>
+@endif
+
+@if (! auth()->user()->can('tasks.update') && ! auth()->user()->can('create', App\Models\Task::class))
+    <p class="dk-tk-notice" data-test="task-view-only-notice">
+        <flux:icon.eye variant="micro" class="size-3.5 shrink-0" aria-hidden="true" />
+        {{ __('tasks.view_only_notice') }}
+    </p>
+@endif

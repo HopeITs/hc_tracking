@@ -160,7 +160,7 @@ test('save validates its input', function (array $input, string $field) {
 
     expect(DonorReport::query()->count())->toBe(0);
 })->with([
-    'unknown period type' => [['period_type' => 'monthly'], 'periodType'],
+    'unknown period type' => [['period_type' => 'weekly'], 'periodType'],
     'unknown type' => [['type' => 'annual'], 'type'],
     'unknown audience' => [['audience' => 'public'], 'audience'],
     'missing due date' => [['due_on' => ''], 'dueOn'],

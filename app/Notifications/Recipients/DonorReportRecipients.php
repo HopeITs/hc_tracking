@@ -15,7 +15,7 @@ use App\Models\User;
  * - Direct: the responsible employee named on the report.
  * - Watchers: Financial and the Public Relations Manager (as the agreement).
  * - The responsible person hears about their own report without
- *   funding-agreements.view (they are routed to My Reporting Duties).
+ *   funding-agreements.view (they are routed to Donor Reports).
  */
 final class DonorReportRecipients extends WatcherRecipients
 {

@@ -67,7 +67,7 @@
  * more specific than .dark .filter-picker so both themes follow the Desk.
  */
 @layer utilities {
-    .dk-scope .dk-reg-bar .filter-picker [data-flux-button] {
+    .dk-scope :is(.dk-reg-bar, .dk-tk-opts) .filter-picker [data-flux-button] {
         min-height: 36px;
         height: 36px;
         border-radius: 10px;
@@ -79,14 +79,14 @@
         padding-inline: 10px;
     }
 
-    .dk-scope .dk-reg-bar .filter-picker [data-flux-button]:hover {
+    .dk-scope :is(.dk-reg-bar, .dk-tk-opts) .filter-picker [data-flux-button]:hover {
         border-color: var(--ink-3);
         background-color: var(--paper);
     }
 
     /* A phone finger needs 44px, not the desktop 36px. */
     @media (max-width: 720px) {
-        .dk-scope .dk-reg-bar .filter-picker [data-flux-button] {
+        .dk-scope :is(.dk-reg-bar, .dk-tk-opts) .filter-picker [data-flux-button] {
             min-height: 44px;
             height: 44px;
         }
@@ -333,4 +333,307 @@
     .dk-gapchip { background: var(--ink); border-color: var(--ink); color: var(--paper); cursor: default; }
     .dk-gapchip button { display: inline-flex; align-items: center; gap: 4px; margin-inline-start: 2px; padding: 0; border: 0; background: none; color: inherit; font: inherit; font-weight: 800; text-decoration: underline; text-underline-offset: 3px; cursor: pointer; }
     .dk-gapchip button svg.dk-i { width: 14px; height: 14px; }
+}
+
+/*
+ * Tasks register (pages/tasks/⚡index, frame class .dk-tasks-reg): headline
+ * figures that filter the list, one Filters popover (a bottom sheet on
+ * phones), and one toolbar row with the scope tabs on the start side and the
+ * list options on the end. Scoped to task classes so the shared register
+ * frame other pages use is left alone.
+ */
+@layer components {
+    /* Figures: quiet text under the title. Only a number above zero takes its tone; a zero stays muted. */
+    .dk-tasks-reg .dk-reg-figs { align-items: center; gap: 4px; margin-top: 8px; font-size: 13px; }
+    .dk-tasks-reg .dk-reg-figs b { font-weight: 700; }
+    .dk-tasks-reg .dk-reg-figs .dk-bad b { color: var(--color-status-critical-text); }
+    .dk-tk-fig-done { display: inline-flex; align-items: baseline; padding-inline-end: 12px; margin-inline-end: 4px; border-inline-end: 1px solid var(--line); line-height: 20px; }
+    .dk-reg-figs .dk-fig-btn { display: inline-flex; align-items: center; height: 28px; padding-inline: 10px; border: 1px solid transparent; border-radius: 999px; background: none; font: inherit; color: inherit; cursor: pointer; white-space: nowrap; transition: color .15s, background-color .15s, border-color .15s; }
+    .dk-reg-figs .dk-fig-btn:hover { background: var(--sunk); color: var(--ink); }
+    .dk-reg-figs .dk-fig-btn[aria-pressed="true"] { background: var(--sunk); border-color: var(--line-2); color: var(--ink); }
+    .dk-reg-figs .dk-fig-btn:focus-visible { outline: 2px solid var(--ink-3); outline-offset: 2px; }
+    .dk-reg-figs .dk-tk-fig-zero b { color: var(--ink-3); font-weight: 600; }
+
+    /* Toolbar (.dk-tk-bar, rendered in the body under the tabs): search grows, pickers at a set width, Display pushed to the end. */
+    .dk-tk-bar { gap: 8px; margin: 0; padding: 0; border: 0; }
+    .dk-tk-bar .dk-reg-q { flex: 1 1 240px; min-width: 0; max-width: 420px; }
+    .dk-tk-bar .dk-reg-q input { min-width: 0; width: 100%; }
+    .dk-tk-bar > [data-header-filter-select] { flex: 0 1 168px; min-width: 132px; }
+    .dk-tk-end { display: flex; align-items: center; gap: 8px; margin-inline-start: auto; }
+    .dk-tk-subtasks { gap: 6px; font-weight: 600; }
+    /* Display sits at the bar's end, so its panel opens back toward the start. */
+    @media (min-width: 721px) { .dk-tk-bar .dk-tkd .dk-tkf-pop { inset-inline-start: auto; inset-inline-end: 0; } }
+    /* Tablets: Display shrinks to its icon so the whole toolbar keeps to one row. */
+    @media (min-width: 721px) and (max-width: 1024px) {
+        .dk-tk-bar .dk-reg-q { flex-basis: 150px; }
+        .dk-tk-bar > [data-header-filter-select] { flex-basis: 150px; min-width: 120px; }
+        .dk-tkf-btn { position: relative; width: 40px; padding-inline: 0; justify-content: center; }
+        .dk-tkf-btn .dk-pc { position: absolute; top: -6px; inset-inline-end: -6px; }
+        .dk-tk-subtasks { width: 40px; padding-inline: 0; justify-content: center; }
+        :is(.dk-tkf-btn, .dk-tk-subtasks) .dk-tk-btn-text { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+    }
+    .dk-tkf-btn { gap: 6px; font-weight: 600; }
+    .dk-tkf-btn.dk-tkf-on { border-color: var(--ink); background: var(--sunk); }
+    .dk-tkf-btn .dk-pc { min-width: 18px; height: 18px; padding-inline: 5px; font-size: 11px; background: var(--ink); color: var(--paper); }
+    .dk-tk-clear { padding-inline: 8px; font-size: 13px; color: var(--ink-2); font-weight: 600; }
+    .dk-tk-clear:hover { background: none; color: var(--ink); text-decoration: underline; text-underline-offset: 3px; }
+    .dk-tk-chips { margin-top: -6px; }
+    .dk-tk-notice { display: flex; align-items: center; gap: 6px; margin-top: -6px; font-size: 12.5px; color: var(--ink-3); }
+
+    /* Filters popover: three small sections, then Clear / Done. */
+    .dk-tkf-pop { width: min(340px, calc(100vw - 32px)); padding: 14px; gap: 14px; }
+    .dk-tkf-sec { display: grid; gap: 8px; }
+    .dk-tkf-sec + .dk-tkf-sec { padding-top: 14px; border-top: 1px solid var(--line); }
+    .dk-tkf-h { font-size: 11px; font-weight: 800; letter-spacing: .08em; text-transform: uppercase; color: var(--ink-3); }
+    [dir="rtl"] .dk-tkf-h { letter-spacing: 0; font-size: 12px; }
+    /* The section heading already says "Related to": the type picker's own label stays for screen readers only. */
+    .dk-reg-bar .dk-tkf-sec-related > [data-header-filter-select]:first-of-type > label { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+    .dk-tkf-check { display: flex; align-items: flex-start; gap: 10px; padding: 10px; border: 1px solid var(--line); border-radius: 10px; cursor: pointer; }
+    .dk-tkf-check input { margin-top: 3px; width: 16px; height: 16px; accent-color: var(--ink); }
+    .dk-tkf-check b { display: block; font-size: 13px; color: var(--ink); }
+    .dk-tkf-check small { display: block; font-size: 12px; color: var(--ink-3); }
+    .dk-tkf-foot { display: flex; align-items: center; justify-content: flex-end; gap: 8px; padding-top: 12px; border-top: 1px solid var(--line); }
+    .dk-tkf-foot .dk-btn { height: 32px; padding-inline: 12px; font-size: 13px; }
+    .dk-tkf-scrim { display: none; }
+
+    /* Scope tabs: their own row under the header, underline on the rule. */
+    .dk-tk-tabs { display: flex; align-items: stretch; gap: 24px; min-width: 0; overflow-x: auto; scrollbar-width: none; border-bottom: 1px solid var(--line); }
+    .dk-tk-tabs::-webkit-scrollbar { display: none; }
+    .dk-tk-tabs button { position: relative; display: inline-flex; flex: none; align-items: center; gap: 6px; min-height: 40px; padding-inline: 2px; border: 0; background: none; font: inherit; font-size: 14px; font-weight: 600; color: var(--ink-3); cursor: pointer; white-space: nowrap; transition: color .15s; }
+    .dk-tk-tabs button::after { content: ""; position: absolute; inset-inline: 2px; bottom: 0; height: 2px; border-radius: 2px 2px 0 0; background: transparent; transition: background-color .15s; }
+    .dk-tk-tabs button:hover { color: var(--ink-2); }
+    .dk-tk-tabs button:hover::after { background: var(--line-2); }
+    .dk-tk-tabs button[aria-current="page"] { color: var(--ink); }
+    .dk-tk-tabs button[aria-current="page"]::after { background: var(--brand); }
+    .dk-tk-tabs button:focus-visible { outline: 2px solid var(--ink-3); outline-offset: -2px; border-radius: 6px; }
+    .dk-tk-tab-count { min-width: 18px; height: 18px; padding-inline: 5px; border-radius: 999px; background: var(--sunk); color: var(--ink-2); font-size: 11px; font-weight: 700; line-height: 18px; text-align: center; }
+
+    .dk-tk-sort { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: end; gap: 6px; min-width: 0; }
+    .dk-tk-sort [data-header-filter-select] { min-width: 0; }
+    .dk-tk-icon-btn { width: 40px; height: 40px; padding-inline: 0; justify-content: center; }
+
+    @media (max-width: 720px) {
+        /* Phones: search on its own row, then Status / Due and the two icon buttons on one row. */
+        .dk-tk-bar .dk-reg-q { flex: 1 1 100%; max-width: none; height: 44px; }
+        .dk-tk-bar > [data-header-filter-select] { flex: 1 1 0; min-width: 0; }
+        .dk-tk-bar > .dk-tkf { flex: none; }
+        .dk-tk-end { margin-inline-start: 0; }
+        .dk-tk-subtasks { width: 44px; height: 44px; padding-inline: 0; justify-content: center; }
+        .dk-tk-subtasks .dk-tk-btn-text { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+        .dk-tkf-btn { position: relative; width: 44px; height: 44px; padding-inline: 0; justify-content: center; }
+        .dk-tkf-btn .dk-tk-btn-text { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+        .dk-tkf-btn .dk-pc { position: absolute; top: -6px; inset-inline-end: -6px; }
+        .dk-tk-clear { order: 1; flex: 1 1 100%; justify-content: flex-end; height: 32px; margin-top: -4px; }
+        .dk-tasks-reg .dk-reg-figs { gap: 2px; }
+        .dk-reg-figs .dk-fig-btn { height: 32px; padding-inline: 8px; }
+
+        /* The Filters popover becomes a bottom sheet. */
+        .dk-tkf-pop { position: fixed; z-index: 60; inset: auto 0 0 0; top: auto; width: auto; max-height: 80vh; overflow-y: auto; padding: 16px 16px calc(16px + env(safe-area-inset-bottom)); border-radius: 16px 16px 0 0; gap: 14px; }
+        .dk-tkf-scrim { display: block; position: fixed; inset: 0; z-index: 59; background: rgb(0 0 0 / .4); }
+        .dk-tkf-foot .dk-btn { flex: 1 1 0; height: 44px; }
+        .dk-tkf-check { min-height: 44px; }
+
+        .dk-tk-tabs { gap: 18px; padding-inline-end: 24px; mask-image: linear-gradient(to right, black calc(100% - 24px), transparent); }
+        [dir="rtl"] .dk-tk-tabs { mask-image: linear-gradient(to left, black calc(100% - 24px), transparent); }
+        .dk-tk-tabs button { min-height: 44px; }
+    }
+}
+
+/*
+ * The picker's label is coloured and cased by Tailwind utilities (caps, 11px),
+ * which a components-layer rule cannot beat. Inside the Tasks Filters popover
+ * the section headings are the caps line, so the labels read in sentence case.
+ */
+@layer utilities {
+    .dk-reg-bar .dk-tkf-pop [data-header-filter-select] > label { color: var(--ink-2); font-size: 12.5px; font-weight: 600; letter-spacing: 0; text-transform: none; }
+}
+
+/*
+ * Tasks calendar (pages/tasks/_calendar): the period toolbar, the grid and
+ * the Unscheduled panel read as one surface. Two columns from a 1080px-wide
+ * register; below that the panel sits under the grid. Under 640px the
+ * seven-column chip grid gives way to a month of dots plus the picked day's
+ * list (.dk-tc-agenda), and day/week columns stack as rows.
+ */
+@layer components {
+    .dk-tc-wrap { container: tc / inline-size; }
+    .dk-tc { display: grid; gap: 16px; align-items: start; }
+    .dk-tc-main { container: tcmain / inline-size; min-width: 0; border: 1px solid var(--line); border-radius: 14px; background: var(--paper); }
+
+    /* Toolbar */
+    .dk-tc-bar { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px 12px; padding: 10px 12px; border-bottom: 1px solid var(--line); }
+    .dk-tc-nav { display: flex; align-items: center; gap: 8px; min-width: 0; }
+    .dk-tc-arrows { display: inline-flex; }
+    .dk-tc-btn { display: inline-flex; align-items: center; gap: 6px; height: 32px; padding-inline: 12px; border: 1px solid var(--line-2); border-radius: 8px; background: var(--paper); color: var(--ink); font: inherit; font-size: 13px; font-weight: 700; cursor: pointer; white-space: nowrap; }
+    .dk-tc-btn:hover { border-color: var(--ink-3); }
+    .dk-tc-icon-btn { display: inline-flex; align-items: center; justify-content: center; width: 32px; height: 32px; border: 0; border-radius: 8px; background: none; color: var(--ink-2); cursor: pointer; }
+    .dk-tc-icon-btn:hover { background: var(--sunk); color: var(--ink); }
+    .dk-tc-period { margin: 0; font-size: 16px; font-weight: 800; color: var(--ink); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .dk-tc-loading { width: 14px; height: 14px; border: 2px solid var(--line-2); border-top-color: var(--ink-3); border-radius: 999px; animation: dk-tc-spin .7s linear infinite; }
+    @keyframes dk-tc-spin { to { transform: rotate(360deg); } }
+    .dk-tc-modes { display: inline-flex; padding: 3px; border-radius: 9px; background: var(--sunk); }
+    .dk-tc-modes button { height: 28px; padding-inline: 12px; border: 0; border-radius: 7px; background: none; color: var(--ink-3); font: inherit; font-size: 12.5px; font-weight: 700; cursor: pointer; white-space: nowrap; }
+    .dk-tc-modes button:hover { color: var(--ink); }
+    .dk-tc-modes button[aria-pressed="true"] { background: var(--paper); color: var(--ink); box-shadow: 0 1px 2px rgb(0 0 0 / .08); }
+    .dk-tc :is(button, a, input, select):focus-visible { outline: 2px solid var(--ink-3); outline-offset: 1px; }
+
+    /* Month grid */
+    .dk-tc-weekdays, .dk-tc-days { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); }
+    .dk-tc-weekdays div { padding: 8px 10px; border-bottom: 1px solid var(--line); font-size: 11.5px; font-weight: 700; color: var(--ink-3); text-transform: uppercase; letter-spacing: .04em; }
+    .dk-tc-cell { position: relative; display: flex; flex-direction: column; gap: 4px; min-height: 124px; min-width: 0; padding: 6px; border-bottom: 1px solid var(--line); border-inline-end: 1px solid var(--line); }
+    .dk-tc-cell:nth-child(7n) { border-inline-end: 0; }
+    .dk-tc-cell:nth-last-child(-n + 7) { border-bottom: 0; }
+    .dk-tc-cell.is-out { background: var(--ground); }
+    .dk-tc-cell.is-out .dk-tc-date { color: var(--faint); }
+    .dk-tc-cell-head { display: flex; align-items: center; justify-content: space-between; min-height: 24px; }
+    .dk-tc-date { display: inline-flex; align-items: center; justify-content: center; min-width: 24px; height: 24px; padding-inline: 6px; border-radius: 6px; font-size: 12.5px; font-weight: 700; color: var(--ink-2); font-variant-numeric: tabular-nums; }
+    .dk-tc-date[aria-current="date"] { background: var(--brand-soft); color: var(--brand-ink); }
+
+    /* Chips */
+    .dk-tc-chips { display: flex; flex: 1; flex-direction: column; gap: 4px; min-height: 8px; }
+    .dk-tc-chip { display: flex; align-items: flex-start; gap: 6px; min-width: 0; padding: 4px 6px; border: 1px solid var(--line); border-radius: 6px; background: var(--paper); font-size: 12px; line-height: 1.35; color: var(--ink); }
+    .dk-tc-chip[data-task-id] { cursor: grab; }
+    .dk-tc-chip:hover { border-color: var(--line-2); background: var(--tint); }
+    .dk-tc-chip[data-state="late"] { border-color: transparent; background: var(--bad-soft); }
+    .dk-tc-chip[data-state="done"] { color: var(--ink-3); }
+    .dk-tc-chip[data-state="done"] .dk-tc-chip-title { text-decoration: line-through; text-decoration-color: var(--faint); }
+    .dk-tc-chip-title { display: -webkit-box; flex: 1; min-width: 0; overflow: hidden; -webkit-box-orient: vertical; -webkit-line-clamp: 2; color: inherit; font-weight: 600; text-decoration: none; overflow-wrap: anywhere; }
+    .dk-tc-chip-title:hover { text-decoration: underline; }
+    .dk-tc-dot { flex: none; width: 7px; height: 7px; margin-top: 5px; border-radius: 999px; background: var(--faint); }
+    .dk-tc-dot[data-priority="high"] { background: var(--brand); }
+    .dk-tc-dot[data-priority="medium"] { background: var(--warn); }
+    [data-state="done"] > .dk-tc-dot { background: var(--good); }
+    .dk-tc-flag { flex: none; font-size: 10.5px; font-weight: 800; line-height: 1.6; color: var(--bad); text-transform: uppercase; letter-spacing: .03em; }
+
+    /* "+N more" */
+    .dk-tc-more-btn { align-self: flex-start; padding: 2px 6px; border: 0; border-radius: 6px; background: none; color: var(--ink-2); font: inherit; font-size: 12px; font-weight: 700; cursor: pointer; }
+    .dk-tc-more-btn:hover { background: var(--sunk); color: var(--ink); }
+    .dk-tc-more-pop { position: absolute; z-index: 30; top: -1px; inset-inline-start: -1px; width: max(calc(100% + 2px), 260px); max-height: 340px; overflow-y: auto; padding: 8px; border: 1px solid var(--line-2); border-radius: 10px; background: var(--paper); box-shadow: var(--dk-shadow); }
+    .dk-tc-more-pop.is-end { inset-inline-start: auto; inset-inline-end: -1px; }
+    .dk-tc-more-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 0 2px 6px; font-size: 13px; font-weight: 800; color: var(--ink); }
+    .dk-tc-more-head .dk-tc-icon-btn { width: 28px; height: 28px; }
+    .dk-tc-more-list { display: flex; flex-direction: column; gap: 4px; list-style: none; }
+
+    /* Quick add */
+    .dk-tc-add { display: inline-flex; align-items: center; gap: 4px; align-self: flex-start; padding: 2px 6px; border: 0; border-radius: 6px; background: none; color: var(--ink-3); font: inherit; font-size: 12px; cursor: pointer; opacity: 0; }
+    .dk-tc-cell:hover .dk-tc-add, .dk-tc-col:hover .dk-tc-add, .dk-tc-add:focus-visible { opacity: 1; }
+    .dk-tc-add:hover { background: var(--sunk); color: var(--ink); }
+    .dk-tc-add-row { display: flex; flex-direction: column; gap: 4px; padding: 4px; border: 1px solid var(--line-2); border-radius: 6px; background: var(--paper); }
+    .dk-tc-add-input { width: 100%; min-width: 0; padding: 2px; border: 0; background: transparent; color: var(--ink); font: inherit; font-size: 12px; }
+    .dk-tc-add-input:focus { outline: none; }
+
+    /* Day / 4 days / week columns */
+    .dk-tc-cols { display: grid; grid-template-columns: repeat(var(--tc-cols), minmax(0, 1fr)); }
+    .dk-tc-col { display: flex; flex-direction: column; min-width: 0; border-inline-end: 1px solid var(--line); }
+    .dk-tc-col:last-child { border-inline-end: 0; }
+    .dk-tc-col-head { display: flex; flex-direction: column; align-items: flex-start; gap: 2px; padding: 10px; border-bottom: 1px solid var(--line); }
+    .dk-tc-col-weekday { font-size: 11.5px; font-weight: 700; color: var(--ink-3); text-transform: uppercase; letter-spacing: .04em; }
+    .dk-tc-col .dk-tc-date { padding-inline: 0; }
+    .dk-tc-col .dk-tc-date[aria-current="date"] { padding-inline: 6px; margin-inline-start: -6px; }
+    .dk-tc-col-body { position: relative; display: flex; flex-direction: column; gap: 6px; min-height: 320px; padding: 8px; }
+    .dk-tc-col-body .dk-tc-chip { padding: 6px 8px; font-size: 13px; }
+    .dk-tc-col-body .dk-tc-chip-title { -webkit-line-clamp: 3; }
+
+    /* Phone agenda (hidden until the grid gets narrow) */
+    .dk-tc-agenda { display: none; }
+    .dk-tc-mini-weekdays, .dk-tc-mini { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 2px; padding-inline: 8px; }
+    .dk-tc-mini-weekdays { padding-top: 8px; }
+    .dk-tc-mini-weekdays div { font-size: 11px; font-weight: 700; color: var(--ink-3); text-align: center; }
+    .dk-tc-mini { padding-bottom: 8px; border-bottom: 1px solid var(--line); }
+    .dk-tc-mini-day { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 3px; height: 46px; border: 0; border-radius: 10px; background: none; color: var(--ink); font: inherit; font-size: 14px; font-weight: 600; font-variant-numeric: tabular-nums; cursor: pointer; }
+    .dk-tc-mini-day.is-out { color: var(--faint); }
+    .dk-tc-mini-day.is-today { color: var(--brand-ink); font-weight: 800; }
+    .dk-tc-mini-day[aria-pressed="true"] { background: var(--ink); color: var(--paper); }
+    .dk-tc-mini-dots { display: flex; gap: 2px; height: 5px; }
+    .dk-tc-mini-dots i { width: 5px; height: 5px; border-radius: 999px; background: var(--ink-3); }
+    .dk-tc-mini-dots i[data-state="late"] { background: var(--bad); }
+    .dk-tc-mini-dots i[data-state="done"] { background: var(--good); }
+    .dk-tc-mini-day[aria-pressed="true"] .dk-tc-mini-dots i { background: var(--paper); }
+    .dk-tc-agenda-list { padding: 12px; }
+    .dk-tc-agenda-day { margin: 0 0 8px; font-size: 14px; font-weight: 800; color: var(--ink); }
+    .dk-tc-agenda-items { display: flex; flex-direction: column; gap: 6px; list-style: none; }
+    .dk-tc-agenda-item { display: flex; align-items: flex-start; gap: 10px; min-height: 44px; padding: 10px 12px; border: 1px solid var(--line); border-radius: 10px; }
+    .dk-tc-agenda-item[data-state="late"] { border-color: transparent; background: var(--bad-soft); }
+    .dk-tc-agenda-text { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+    .dk-tc-agenda-empty { display: flex; flex-direction: column; align-items: center; gap: 10px; padding: 20px 0; font-size: 13px; color: var(--ink-3); }
+
+    /* Shared text */
+    .dk-tc-task-title { color: var(--ink); font-size: 13.5px; font-weight: 700; line-height: 1.35; text-decoration: none; overflow-wrap: anywhere; }
+    .dk-tc-task-title:hover { text-decoration: underline; }
+    [data-state="done"] .dk-tc-task-title { color: var(--ink-3); text-decoration: line-through; }
+    .dk-tc-meta { display: inline-flex; flex-wrap: wrap; align-items: center; gap: 6px; font-size: 12px; color: var(--ink-3); }
+
+    /* Unscheduled panel */
+    .dk-tc-side { display: flex; flex-direction: column; min-width: 0; border: 1px solid var(--line); border-radius: 14px; background: var(--paper); }
+    .dk-tc-side-head { padding: 6px; }
+    .dk-tc-side-toggle { display: flex; align-items: center; gap: 8px; width: 100%; min-height: 40px; padding: 4px 8px; border: 0; border-radius: 8px; background: none; color: var(--ink); font: inherit; text-align: start; cursor: pointer; }
+    .dk-tc-side-toggle:hover { background: var(--sunk); }
+    .dk-tc-side-icon { flex: none; color: var(--ink-3); }
+    .dk-tc-side-title { flex: 1; font-size: 14px; font-weight: 800; }
+    .dk-tc-count { min-width: 22px; height: 22px; padding-inline: 7px; border-radius: 999px; background: var(--sunk); font-size: 12px; font-weight: 800; line-height: 22px; text-align: center; }
+    .dk-tc-side-chevron { flex: none; color: var(--ink-3); transition: transform .15s; }
+    .dk-tc-side-toggle[aria-expanded="false"] .dk-tc-side-chevron { transform: rotate(-90deg); }
+    .dk-tc-side-body { display: flex; flex-direction: column; gap: 10px; min-height: 0; padding: 0 12px 12px; }
+    .dk-tc-side-hint { font-size: 12.5px; line-height: 1.45; color: var(--ink-3); }
+    .dk-tc-side-tools { display: flex; gap: 6px; }
+    .dk-tc-search { display: flex; flex: 1; align-items: center; gap: 6px; min-width: 0; height: 34px; padding-inline: 8px; border: 1px solid var(--line-2); border-radius: 8px; color: var(--ink-3); }
+    .dk-tc-search:focus-within { border-color: var(--ink-3); }
+    .dk-tc-search input { flex: 1; min-width: 0; border: 0; background: none; color: var(--ink); font: inherit; font-size: 13px; }
+    .dk-tc-search input:focus { outline: none; }
+    .dk-tc-sort select { max-width: 128px; height: 34px; padding-inline: 8px; border: 1px solid var(--line-2); border-radius: 8px; background: var(--paper); color: var(--ink); font: inherit; font-size: 12.5px; }
+    .dk-tc-side-list { display: flex; flex-direction: column; gap: 6px; min-height: 64px; }
+    .dk-tc-side-empty { padding: 20px 4px; border: 1px dashed var(--line-2); border-radius: 10px; font-size: 12.5px; color: var(--ink-3); text-align: center; }
+    .dk-tc-task { display: flex; flex-direction: column; gap: 6px; padding: 10px 12px; border: 1px solid var(--line); border-radius: 10px; background: var(--paper); }
+    .dk-tc-task[data-task-id] { cursor: grab; }
+    .dk-tc-task:hover { border-color: var(--line-2); }
+    .dk-tc-task-top { display: flex; align-items: flex-start; gap: 8px; }
+    .dk-tc-task-meta { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding-inline-start: 15px; }
+    .dk-tc-avatars { display: inline-flex; flex: none; }
+    .dk-tc-avatars span { display: inline-flex; align-items: center; justify-content: center; width: 22px; height: 22px; margin-inline-start: -4px; border: 2px solid var(--paper); border-radius: 999px; background: var(--ink-2); color: var(--paper); font-size: 9px; font-weight: 800; }
+    .dk-tc-avatars span:first-of-type { margin-inline-start: 0; }
+    .dk-tc-task-actions { padding-inline-start: 15px; }
+    .dk-tc-link { display: inline-flex; align-items: center; gap: 4px; padding: 2px 0; border: 0; background: none; color: var(--ink-2); font: inherit; font-size: 12.5px; font-weight: 700; cursor: pointer; }
+    .dk-tc-link:hover { color: var(--ink); text-decoration: underline; }
+    .dk-tc-due input { height: 32px; padding-inline: 8px; border: 1px solid var(--line-2); border-radius: 8px; background: var(--paper); color: var(--ink); font: inherit; font-size: 13px; }
+
+    /* Wide register: grid and panel side by side; the panel scrolls on its own. */
+    @container tc (min-width: 1080px) {
+        .dk-tc { grid-template-columns: minmax(0, 1fr) minmax(18rem, 26%); }
+        .dk-tc.is-side-closed { grid-template-columns: minmax(0, 1fr) 3.25rem; }
+        .dk-tc-side { position: sticky; top: 16px; max-height: calc(100vh - 32px); }
+        .dk-tc-side-body { overflow: hidden; }
+        .dk-tc-side-list { margin-inline: -4px; padding: 2px 4px; overflow-y: auto; }
+        .is-side-closed .dk-tc-side-toggle { flex-direction: column; justify-content: center; padding: 8px 0; }
+        .is-side-closed :is(.dk-tc-side-title, .dk-tc-side-chevron) { display: none; }
+    }
+
+    /* Narrow calendar: the phone agenda replaces the chip grid; period columns stack. */
+    @container tcmain (max-width: 639px) {
+        .dk-tc-month { display: none; }
+        .dk-tc-agenda { display: block; }
+        .dk-tc-bar { padding: 8px; }
+        .dk-tc-nav { width: 100%; }
+        .dk-tc-period { flex: 1; font-size: 15px; }
+        .dk-tc-modes { width: 100%; }
+        .dk-tc-modes button { flex: 1; height: 34px; padding-inline: 4px; }
+        .dk-tc-btn, .dk-tc-icon-btn { height: 40px; }
+        .dk-tc-icon-btn { width: 40px; }
+        .dk-tc-cols { grid-template-columns: minmax(0, 1fr); }
+        .dk-tc-col { flex-direction: row; border-inline-end: 0; border-bottom: 1px solid var(--line); }
+        .dk-tc-col:last-child { border-bottom: 0; }
+        .dk-tc-col-head { flex: none; width: 84px; border-bottom: 0; border-inline-end: 1px solid var(--line); }
+        .dk-tc-col-body { flex: 1; min-height: 64px; }
+        .dk-tc-add { opacity: 1; }
+    }
+
+    @container tc (max-width: 639px) {
+        .dk-tc-task { padding: 12px; }
+        .dk-tc-link { min-height: 40px; }
+    }
+}
+
+/* The month grid's corner cells follow the calendar card's rounded corners. */
+@layer components {
+    .dk-tc-cell:nth-last-child(7) { border-end-start-radius: 13px; }
+    .dk-tc-cell:last-child { border-end-end-radius: 13px; }
 }

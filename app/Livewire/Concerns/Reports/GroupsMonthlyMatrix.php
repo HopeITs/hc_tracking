@@ -120,7 +120,7 @@ trait GroupsMonthlyMatrix
      */
     private function groupCell(array $cells, IndicatorMeasure $measure): array
     {
-        $order = [MatrixCellState::Approved, MatrixCellState::Pending, MatrixCellState::NotSubmitted, MatrixCellState::Upcoming, MatrixCellState::NotDue];
+        $order = [MatrixCellState::Approved, MatrixCellState::Pending, MatrixCellState::NotSubmitted, MatrixCellState::Upcoming, MatrixCellState::NotDue, MatrixCellState::OutsidePeriod];
         $state = $order[min(array_map(fn (array $cell): int => (int) array_search($cell['state'], $order, true), $cells))];
         $used = array_values(array_filter($cells, fn (array $cell): bool => $cell['state'] === $state));
         $shown = in_array($state, [MatrixCellState::Approved, MatrixCellState::Pending], true);

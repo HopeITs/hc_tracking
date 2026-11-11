@@ -19,7 +19,7 @@ use Livewire\Features\SupportFileUploads\TemporaryUploadedFile;
 /**
  * The one "Mark as submitted" dialog (contracts §14.3, D-21): the submission
  * date and the delivered file, sent through MarkDonorReportSubmitted. Used by
- * funding-agreements/show, donor-reports/show and reporting-duties/index.
+ * funding-agreements/show and donor-reports/show.
  *
  * The page uses WithFileUploads, scopes the report id (submittableReport())
  * and refreshes its readings after a submission (donorReportSubmitted()).

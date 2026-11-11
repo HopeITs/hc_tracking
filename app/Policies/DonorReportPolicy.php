@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Policies;
 
+use App\Enums\DonorReportType;
 use App\Models\DonorReport;
 use App\Models\User;
 
@@ -70,7 +71,14 @@ class DonorReportPolicy
      */
     public function regenerate(User $user, DonorReport $donorReport): bool
     {
-        return $user->can('reports.aggregate') && $donorReport->isComposed() && ! $donorReport->isSubmitted();
+        if ($user->cannot('reports.aggregate') || ! $donorReport->isComposed() || $donorReport->isSubmitted()) {
+            return false;
+        }
+
+        $proposal = $donorReport->donorProposal?->proposal;
+
+        return ($proposal !== null && $user->can('view', $proposal))
+            || ($donorReport->type === DonorReportType::Narrative && $donorReport->isResponsible($user));
     }
 
     /**

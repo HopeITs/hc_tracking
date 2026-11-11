@@ -96,7 +96,7 @@ trait ExportsMonthlyMatrix
         return match ($cell['state']) {
             MatrixCellState::Approved => $cell['value'] === null ? $cell['state']->label() : $this->matrixNumber($cell['value']),
             MatrixCellState::Pending => $cell['value'] === null ? $cell['state']->label() : $this->matrixNumber($cell['value']).' ('.$cell['state']->label().')',
-            MatrixCellState::NotSubmitted, MatrixCellState::Upcoming, MatrixCellState::NotDue => $cell['state']->label(),
+            MatrixCellState::NotSubmitted, MatrixCellState::Upcoming, MatrixCellState::OutsidePeriod, MatrixCellState::NotDue => $cell['state']->label(),
         };
     }
 

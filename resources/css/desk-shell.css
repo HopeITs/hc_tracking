@@ -419,6 +419,10 @@
     /* One section per step; the stepper names it, so the section's own rail heading steps aside. */
     .modal-shell-frame[data-wizard] .form-section-rail { display: none; }
     .modal-shell-frame[data-wizard] .form-section { padding-block: 0; border-top: 0 !important; grid-template-columns: minmax(0, 1fr); }
+    .report-form-modal .modal-shell-steps { padding-block: 0; }
+    .report-form-modal .modal-shell-steps li { padding-block: 0.75rem; }
+    .report-form-modal .modal-shell-steps li + li::before { top: calc(0.75rem + 13px); }
+    .report-form-modal .modal-shell-body { padding-block: 1.25rem 1.5rem; }
     .modal-shell-body[data-step="1"] section.form-section:not(:nth-of-type(1)) { display: none; }
     .modal-shell-body[data-step="2"] section.form-section:not(:nth-of-type(2)) { display: none; }
     .modal-shell-body[data-step="3"] section.form-section:not(:nth-of-type(3)) { display: none; }
@@ -457,6 +461,9 @@
     [data-flux-modal] > dialog.modal-shell-xl:not([data-flux-flyout]):not([data-flux-modal-overflow]):not(:has(.modal-shell-frame[data-wizard])):not(:has(section.form-section)) { width: min(1020px, calc(100vw - 32px)); }
 }
 [data-flux-modal] > dialog.modal-shell:has(.modal-shell-frame[data-wizard]) { height: var(--pop-h); }
+@media (width >= 40rem) {
+    [data-flux-modal] > dialog.modal-shell.report-form-modal:has(.modal-shell-frame[data-wizard]) { height: 32rem; }
+}
 [data-flux-modal] > dialog.filter-dialog { height: var(--pop-h); }
 
 /* ---------- Desk panels: one fixed height (desk.css --panel-h), paginate, never scroll, never spill ---------- */

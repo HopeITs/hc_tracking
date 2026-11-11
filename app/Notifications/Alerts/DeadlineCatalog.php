@@ -249,13 +249,13 @@ final class DeadlineCatalog
             ->has('lines')
             ->withCount('lines')
             ->orderBy('period')
-            ->get(['id', 'project_id', 'period', 'status', 'prepared_by']);
+            ->get(['id', 'project_id', 'period', 'status', 'prepared_by', 'revised_due_on']);
 
         if ($reports->isEmpty()) {
             return [];
         }
 
-        $projects = Project::query()->whereKey($reports->pluck('project_id')->unique()->values())->get(['id', 'name', 'user_id', 'working_days'])->keyBy('id');
+        $projects = Project::query()->whereKey($reports->pluck('project_id')->unique()->values())->get(['id', 'name', 'user_id', 'program_id', 'center_id', 'city_id', 'working_days'])->keyBy('id');
         $owners = $this->employees->usersFor($projects->pluck('user_id')->filter()->map(fn ($id): int => (int) $id)->unique()->values()->all());
         $items = [];
 
@@ -269,7 +269,7 @@ final class DeadlineCatalog
             $periods = MonthlyReportPeriods::fromLoaded($project, $projectReports);
 
             foreach ($periods->openRequiredReports() as $report) {
-                $due = $periods->dueDate($report->period);
+                $due = $periods->effectiveDueDate($report);
 
                 if ($due->greaterThan($dueOnOrBefore)) {
                     continue;
@@ -330,7 +330,7 @@ final class DeadlineCatalog
                 'donor_report', $report->id, 'donor-reports', $report->title, $report->due_on, $direct, self::FinanceWatchers,
                 eventKey: 'donor_report',
                 exemptUserIds: $direct,
-                link: $reachable ? ['route' => 'reporting-duties.index'] : [],
+                link: $reachable ? ['route' => 'donor-reports.index'] : [],
             );
         })->all());
     }

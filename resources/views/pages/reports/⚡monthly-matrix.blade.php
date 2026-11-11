@@ -187,6 +187,10 @@ new #[Layout('layouts::desk'), Title('titles.monthly_matrix')] class extends Com
         @endunless
     </div>
 
+    <p class="text-sm text-secondary-medium dark:text-ink-muted" data-matrix-period-basis>
+        {{ $filters['proposal'] === null ? __('reports.matrix.calendar_basis') : __('reports.matrix.grant_basis') }}
+    </p>
+
     @if ($onActivities)
         @include('pages.reports._monthly-matrix-activities')
     @elseif ($paged->isEmpty())

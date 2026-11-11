@@ -267,7 +267,8 @@ test('the report directory renders with no reports', function () {
 
 test('the targets page can open the form already tied to a target, and a draft can be opened for editing', function () {
     $user = User::factory()->role('Media Team')->create();
-    $target = PlanIndicator::factory()->create();
+    $longName = 'Number of structured psychosocial support sessions, creative arts workshops, and recreational events conducted for children';
+    $target = PlanIndicator::factory()->for(Indicator::factory()->create(['name' => $longName]))->create();
     $draft = Report::factory()->create(['user_id' => $user->id]);
 
     Livewire::actingAs($user)
@@ -275,6 +276,9 @@ test('the targets page can open the form already tied to a target, and a draft c
         ->test('pages::reports.index')
         ->assertSet('showReportModal', true)
         ->assertSet('reportTargetId', (string) $target->id)
+        ->assertSeeHtml('report-form-modal')
+        ->assertSeeHtml('class="min-w-0 whitespace-normal wrap-anywhere text-start"')
+        ->assertSee($longName)
         ->assertSeeHtml('data-test="target-scope-chip"');
 
     Livewire::actingAs($user)

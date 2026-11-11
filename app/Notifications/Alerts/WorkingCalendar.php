@@ -7,6 +7,7 @@ namespace App\Notifications\Alerts;
 use App\Models\Project;
 use Carbon\CarbonImmutable;
 use Carbon\CarbonInterface;
+use Closure;
 
 /**
  * Counts in the admin-configured working days. Every deadline, overdue,
@@ -16,8 +17,30 @@ final class WorkingCalendar
 {
     /**
      * @param  list<int>|null  $days  a project's own ISO working days; null = the global setting
+     * @param  (Closure(CarbonInterface): bool)|null  $isHoliday  official holidays, skipped like weekends; null = none
      */
-    public function __construct(private NotificationSettings $settings, private ?array $days = null) {}
+    public function __construct(private NotificationSettings $settings, private ?array $days = null, private ?Closure $isHoliday = null) {}
+
+    /**
+     * The same calendar that also skips official holidays (see
+     * App\Support\HrHolidays::forProject()). Opt-in: the month deadlines and
+     * the alert scanners still count weekdays only.
+     *
+     * @param  Closure(CarbonInterface): bool  $isHoliday
+     */
+    public function withHolidays(Closure $isHoliday): self
+    {
+        return new self($this->settings, $this->days, $isHoliday);
+    }
+
+    /**
+     * The working day right after the given day: a return made today is due
+     * by the end of the next working day (weekends and holidays skipped).
+     */
+    public function nextWorkingDayAfter(CarbonInterface $day): CarbonImmutable
+    {
+        return $this->addWorkingDays($day, 1);
+    }
 
     /**
      * The same calendar over the project's own working days (D-22), or the
@@ -45,7 +68,8 @@ final class WorkingCalendar
 
     public function isWorkingDay(CarbonInterface $day): bool
     {
-        return in_array($day->dayOfWeekIso, $this->workingDays(), true);
+        return in_array($day->dayOfWeekIso, $this->workingDays(), true)
+            && ($this->isHoliday === null || ! ($this->isHoliday)($day));
     }
 
     /**

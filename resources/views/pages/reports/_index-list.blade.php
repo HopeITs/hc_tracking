@@ -83,17 +83,21 @@
                                     <span class="font-bold">{{ $formatFigure((float) $report->value) }}{{ $rowUnit }}</span>
                                     <span class="text-secondary-medium dark:text-ink-muted">{{ __('reports.of_target', ['target' => $formatFigure((float) $rowTarget->target).$rowUnit]) }}</span>
                                 </p>
-                                @if ($rowAchievement !== null)
-                                    <p class="type-meta font-semibold {{ $achievementTextClass($rowAchievement) }}" title="{{ __('reports.target_achieved_approved_only') }}">{{ __('reports.percent_achieved', ['percent' => $rowAchievement]) }}</p>
-                                @endif
-                                @if ($report->is_seen_by_meal)
-                                    <p class="type-meta text-secondary-medium dark:text-ink-muted">{{ __('reports.seen_by_meal') }}</p>
-                                @elseif ($rowStatus === 'waiting')
-                                    <p class="type-meta font-semibold text-status-warn">{{ __('targets.not_yet_seen_by_meal') }}</p>
-                                @endif
+                                <div class="md:min-h-4">
+                                    @if ($rowAchievement !== null)
+                                        <p class="type-meta font-semibold {{ $achievementTextClass($rowAchievement) }}" title="{{ __('reports.target_achieved_approved_only') }}">{{ __('reports.percent_achieved', ['percent' => $rowAchievement]) }}</p>
+                                    @endif
+                                </div>
+                                <div class="md:min-h-4">
+                                    @if ($report->is_seen_by_meal)
+                                        <p class="type-meta text-secondary-medium dark:text-ink-muted">{{ __('reports.seen_by_meal') }}</p>
+                                    @elseif ($rowStatus === 'waiting')
+                                        <p class="type-meta font-semibold text-status-warn">{{ __('targets.not_yet_seen_by_meal') }}</p>
+                                    @endif
+                                </div>
                             </div>
 
-                            <div class="flex items-center gap-1 md:justify-end">
+                            <div class="flex items-center gap-1 md:grid md:grid-cols-[max-content_2.25rem]" data-report-row-actions>
                                 <x-ui.button size="sm" icon="arrows-pointing-out" class="min-h-11 md:min-h-9" :href="route('reports.show', $report)" wire:navigate :aria-label="__('common.view_name', ['name' => $rowTarget->indicator->name])" data-test="open-report-{{ $report->id }}">
                                     {{ __('reports.open_report') }}
                                 </x-ui.button>

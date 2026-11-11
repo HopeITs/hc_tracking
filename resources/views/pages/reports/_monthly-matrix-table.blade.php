@@ -144,6 +144,7 @@
                                             <span class="sr-only">{{ $cell['state']->label() }}</span>
                                         </span>
                                         @break
+                                    @case(MatrixCellState::OutsidePeriod)
                                     @case(MatrixCellState::NotDue)
                                         <span class="text-secondary-medium dark:text-ink-muted" title="{{ $cell['state']->label() }}"><span aria-hidden="true">—</span><span class="sr-only">{{ $cell['state']->label() }}</span></span>
                                         @break

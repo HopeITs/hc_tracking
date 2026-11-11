@@ -227,7 +227,7 @@ trait ReadsProjectStory
                 $text = (string) __('story.next.confirm_template');
                 $owner = null;
                 $meal = true;
-                $href = route('reporting-duties.index');
+                $href = route('monthly-reports.index');
                 break;
             case 5:
                 [$text, $owner, $href, $meal] = $this->runningStep($project);

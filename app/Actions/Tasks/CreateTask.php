@@ -18,7 +18,7 @@ class CreateTask
 {
     /**
      * @param  string  $sourceType  the morph map key: 'program', 'project', 'proposal' or 'milestone'
-     * @param  array{newTaskTitle: string, newTaskStatus: string, newTaskPriority: string, newTaskDueDate: string, newTaskAssignedTo: array<int, int|string>}  $validated  keyed by the add-task form's property names
+     * @param  array{newTaskTitle: string, newTaskDescription?: string|null, newTaskStatus: string, newTaskPriority: string, newTaskDueDate: string, newTaskAssignedTo: array<int, int|string>}  $validated  keyed by the add-task form's property names
      */
     public function handle(string $sourceType, int $sourceId, array $validated, int $createdBy): Task
     {
@@ -32,6 +32,7 @@ class CreateTask
                 'source_type' => $sourceType,
                 'source_id' => $sourceId,
                 'title' => $validated['newTaskTitle'],
+                'description' => trim((string) ($validated['newTaskDescription'] ?? '')) === '' ? null : trim((string) $validated['newTaskDescription']),
                 'status' => $statusCase,
                 'priority' => $validated['newTaskPriority'],
                 'due_date' => $validated['newTaskDueDate'] === '' ? null : $validated['newTaskDueDate'],

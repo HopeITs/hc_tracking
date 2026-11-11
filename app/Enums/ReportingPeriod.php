@@ -16,6 +16,7 @@ enum ReportingPeriod: string
 {
     use HasTranslatedLabel;
 
+    case Monthly = 'monthly';
     case Quarterly = 'quarterly';
     case SemiAnnual = 'semi-annual';
     case Annual = 'annual';
@@ -27,6 +28,7 @@ enum ReportingPeriod: string
     public function months(): ?int
     {
         return match ($this) {
+            self::Monthly => 1,
             self::Quarterly => 3,
             self::SemiAnnual => 6,
             self::Annual => 12,

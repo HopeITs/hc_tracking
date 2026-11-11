@@ -14,6 +14,7 @@
     'chip' => false,
     'chipIcon' => null,
     'chipTones' => [],
+    'wrapLabels' => false,
 ])
 
 @php
@@ -101,6 +102,7 @@
     /* flux:menu.item's own default-variant classes (vendor/livewire/flux/stubs/resources/views/flux/menu/item.blade.php). */
     $menuItemClasses = 'flex items-center px-2 py-1.5 w-full focus:outline-hidden select-none rounded-md text-start text-sm font-medium [&[disabled]]:opacity-50 text-zinc-800 data-active:bg-zinc-50 dark:text-white dark:data-active:bg-white/6 **:data-flux-menu-item-icon:text-zinc-400 dark:**:data-flux-menu-item-icon:text-white/60 [&[data-active]_[data-flux-menu-item-icon]]:text-current';
     $checkClasses = 'shrink-0 [:where(&)]:size-6 ms-auto size-4 shrink-0 '.($multiple ? 'text-primary dark:text-brand-text' : 'text-secondary-medium');
+    $labelClasses = $wrapLabels ? 'min-w-0 whitespace-normal wrap-anywhere text-start' : 'min-w-0 truncate';
 @endphp
 
 <x-ui.form-field
@@ -166,7 +168,7 @@
                 :id="$id"
                 variant="outline"
                 icon:trailing="chevron-up-down"
-                class="w-full! justify-between!"
+                @class(['w-full! justify-between!', 'h-auto! py-2.5! [&>span]:min-w-0 [&>svg]:shrink-0' => $wrapLabels])
                 :disabled="$disabled"
                 :autofocus="$attributes->has('autofocus')"
                 :aria-invalid="$error !== '' ? 'true' : null"
@@ -182,7 +184,7 @@
                     @endif
 
                     <span
-                        class="{{ $selectedLabel === null ? 'form-select-placeholder ' : '' }}truncate"
+                        @class([$labelClasses, 'form-select-placeholder' => $selectedLabel === null])
                         data-trigger-label
                         x-bind:class="{ 'form-select-placeholder': triggerLabel === null }"
                         x-text="triggerLabel ?? placeholder"
@@ -223,7 +225,7 @@
                         wire:key="{{ $id.'-'.md5($option['value']) }}"
                     >
                         <div class="w-7 hidden [[data-flux-menu]:has(>[data-flux-menu-item-has-icon])_&]:block"></div>
-                        <span class="min-w-0 truncate">{{ $option['label'] }}</span>
+                        <span class="{{ $labelClasses }}">{{ $option['label'] }}</span>
 
                         <svg class="{{ $checkClasses }}" @unless (in_array($option['value'], $currentValues, true)) style="display: none" @endunless x-show="isSelected({{ Illuminate\Support\Js::from($option['value']) }})" data-flux-icon xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" aria-hidden="true" data-slot="icon"><path stroke-linecap="round" stroke-linejoin="round" d="m4.5 12.75 6 6 9-13.5" /></svg>
                     </button>

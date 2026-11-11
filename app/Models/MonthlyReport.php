@@ -38,6 +38,7 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
  * @property CarbonImmutable|null $returned_at
  * @property int|null $returned_by
  * @property string|null $return_reason
+ * @property CarbonImmutable|null $revised_due_on the deadline set when the report was returned after its own one passed
  * @property CarbonImmutable|null $seen_by_meal_at
  * @property CarbonImmutable|null $created_at
  * @property CarbonImmutable|null $updated_at
@@ -54,6 +55,7 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
     'returned_at',
     'returned_by',
     'return_reason',
+    'revised_due_on',
     'seen_by_meal_at',
 ])]
 class MonthlyReport extends Model implements TracksActivity
@@ -241,6 +243,7 @@ class MonthlyReport extends Model implements TracksActivity
             'validated_by' => 'integer',
             'returned_at' => 'datetime',
             'returned_by' => 'integer',
+            'revised_due_on' => 'date',
             'seen_by_meal_at' => 'datetime',
         ];
     }
