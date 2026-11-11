@@ -61,8 +61,8 @@
                         required
                     />
                 @else
-                    <x-ui.form-input wire:model.blur="numerator" :label="$ratio['numerator_label']" type="number" step="0.01" min="0" required />
-                    <x-ui.form-input wire:model.blur="denominator" :label="$ratio['denominator_label']" type="number" step="0.01" min="0" required />
+                    <x-ui.form-input wire:model.live.blur="numerator" :label="$ratio['numerator_label']" type="number" step="0.01" min="0" required />
+                    <x-ui.form-input wire:model.live.blur="denominator" :label="$ratio['denominator_label']" type="number" step="0.01" min="0" required />
                     <div class="flex flex-col gap-1 @2xl/modal:col-span-2" data-ratio-preview>
                         <span class="text-sm font-medium">{{ __('reports.computed_value') }}</span>
                         <bdi dir="ltr" class="text-base font-bold tabular-nums">{{ $ratioPreview ?? '—' }}</bdi>
