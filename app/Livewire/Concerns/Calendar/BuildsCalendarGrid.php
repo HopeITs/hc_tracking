@@ -278,7 +278,7 @@ trait BuildsCalendarGrid
     protected function scopedMonthlyReports(array $employeeIds, array $preparerUserIds): Builder
     {
         return MonthlyReport::query()
-            ->select(['id', 'slug', 'project_id', 'period', 'status', 'prepared_by'])
+            ->select(['id', 'slug', 'project_id', 'period', 'status', 'prepared_by', 'revised_due_on'])
             ->with('project')
             ->whereHas('lines')
             ->where(fn (Builder $query) => $query
@@ -287,11 +287,12 @@ trait BuildsCalendarGrid
     }
 
     /**
-     * The day a monthly report is due: the configured number of working days
+     * The day a monthly report is due: its revised deadline when it was
+     * returned late, else the configured number of working days
      * after its month ends, on its project's working calendar.
      */
     protected function monthlyReportDueOn(MonthlyReport $report): CarbonImmutable
     {
-        return MonthlyReportPeriods::fromLoaded($report->project, new Collection)->dueDate($report->period->startOfMonth());
+        return MonthlyReportPeriods::fromLoaded($report->project, new Collection)->effectiveDueDate($report);
     }
 }

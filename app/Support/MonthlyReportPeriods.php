@@ -21,7 +21,9 @@ use Illuminate\Database\Eloquent\Collection;
  *
  * for() loads the project's months once (one query); everything else
  * answers from memory. Days are counted on the project's own working days
- * (WorkingCalendar::forProject()).
+ * (WorkingCalendar::forProject()), skipping the HR holidays of its center,
+ * city and program (HrHolidays::forProject()). The project must be loaded
+ * with center_id, city_id and program_id.
  */
 final class MonthlyReportPeriods
 {
@@ -40,7 +42,7 @@ final class MonthlyReportPeriods
             ->where('project_id', $project->id)
             ->withCount('lines')
             ->orderBy('period')
-            ->get(['id', 'project_id', 'period', 'status']);
+            ->get(['id', 'project_id', 'period', 'status', 'revised_due_on']);
 
         return self::fromLoaded($project, $reports);
     }
@@ -54,7 +56,11 @@ final class MonthlyReportPeriods
      */
     public static function fromLoaded(Project $project, Collection $reports): self
     {
-        return new self($reports, app(WorkingCalendar::class)->forProject($project), app(NotificationSettings::class));
+        // The project's working days, with the HR holidays of its center, city and program skipped too:
+        // a holiday never counts as a day to report in, nor as the last working day of a month.
+        $calendar = app(WorkingCalendar::class)->forProject($project)->withHolidays(HrHolidays::forProject($project));
+
+        return new self($reports, $calendar, app(NotificationSettings::class));
     }
 
     /**
@@ -112,6 +118,36 @@ final class MonthlyReportPeriods
     public function dueDate(CarbonImmutable $month): CarbonImmutable
     {
         return $this->calendar->addWorkingDays($month->endOfMonth(), (int) $this->settings->get('monthly_report_due_working_days'));
+    }
+
+    /**
+     * The deadline the report is held to now: the one set when it was
+     * returned after its own deadline (`revised_due_on`), or else the
+     * month's own deadline. Everything that says "overdue" reads this, so a
+     * returned report is late only once its new deadline has passed.
+     */
+    public function effectiveDueDate(MonthlyReport $report): CarbonImmutable
+    {
+        return $report->revised_due_on ?? $this->dueDate($report->period);
+    }
+
+    /**
+     * The deadline for a report sent back to the preparer on the given day:
+     * returned by its validator, or reopened by a granted reopen request
+     * (Dynamic Deadline and 1-Business-Day rules, Managers UAT 2026-11-10).
+     *
+     * Sent back on or before its own deadline, the report keeps that deadline
+     * (null: nothing to store). Sent back after it, the preparer gets until
+     * the end of the next working day, on the project's working days with
+     * official holidays skipped too.
+     */
+    public function revisedDueDateWhenSentBack(MonthlyReport $report, CarbonImmutable $sentBackOn): ?CarbonImmutable
+    {
+        if (! $sentBackOn->startOfDay()->greaterThan($this->dueDate($report->period))) {
+            return null;
+        }
+
+        return $this->calendar->nextWorkingDayAfter($sentBackOn);
     }
 
     /**
