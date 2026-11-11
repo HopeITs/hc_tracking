@@ -235,7 +235,8 @@ export function search(query, context, limit = 8) {
         }
     }
 
-    return rows.slice(0, limit);
+    // A bare "new" shows all its actions, however many there are.
+    return rows.slice(0, Math.max(limit, rows.filter((row) => row.kind === 'action').length));
 }
 
 function rowsFor(typed, context, commandsOnly) {
@@ -305,7 +306,8 @@ function rowsFor(typed, context, commandsOnly) {
 
     // "New …" actions: the form that creates it, or with "pin" a button for it on the desk.
     index.actions.forEach((action) => {
-        const score = terms.length ? entryScore(terms, action) : 0;
+        // "new" on its own lists every "New …" action, so each can be opened or carried to Quick access.
+        const score = terms.length ? entryScore(terms, action) : (wantsCreate ? 1 : 0);
 
         if (score <= 0) {
             return;

@@ -430,7 +430,8 @@ new class extends Component {
 
                     @if ($results['suggestions'] !== [])
                         {{-- Example questions on the Desk's dot-thread; the highlighted one takes the brand ring. --}}
-                        <div class="dk-pal-try" data-ask-suggestions>
+                        {{-- Hidden as soon as a key is typed, not a round trip later, so the list never jumps under the instant rows. --}}
+                        <div class="dk-pal-try" @if (trim($query) === '') x-show="typed.trim() === ''" @endif data-ask-suggestions>
                             @if (trim($query) !== '')
                                 <div class="dk-pal-none" x-show="instant.length === 0">
                                     <strong>{{ __('desk.ask_nothing_title') }}</strong>
