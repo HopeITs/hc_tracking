@@ -39,6 +39,18 @@ new #[Layout('layouts::desk'), Title('titles.department_tasks')] class extends C
     /** How many files one delivery takes (DeliverDepartmentTask::MaxFiles). */
     private const MaxDeliveryFiles = 10;
 
+    /** The headline figures each filter the list to one of these. */
+    private const Focuses = ['overdue', 'deliver', 'review'];
+
+    /** The properties that narrow the list; changing one re-reads it. */
+    private const FilterProperties = ['search', 'focus', 'department', 'kind', 'state', 'due', 'person'];
+
+    #[Url(except: '')]
+    public string $search = '';
+
+    #[Url(except: '')]
+    public string $focus = '';
+
     #[Url(except: '')]
     public string $department = '';
 
@@ -50,6 +62,12 @@ new #[Layout('layouts::desk'), Title('titles.department_tasks')] class extends C
 
     #[Url(except: '')]
     public string $due = '';
+
+    #[Url(except: '')]
+    public string $person = '';
+
+    #[Url(except: false)]
+    public bool $showDone = false;
 
     public bool $showDeliveryModal = false;
 
@@ -95,14 +113,15 @@ new #[Layout('layouts::desk'), Title('titles.department_tasks')] class extends C
     }
 
     /**
-     * Every department task the viewer may see, filtered in memory.
+     * Every department task the viewer may see, before any filter: soonest
+     * due first, undated last, then by title.
      *
      * @return Collection<int, Task>
      */
     #[Computed]
-    public function departmentTasks(): Collection
+    public function allDepartmentTasks(): Collection
     {
-        $tasks = Task::query()
+        return Task::query()
             ->select(['id', 'slug', 'source_type', 'source_id', 'department_id', 'kind', 'media_kinds', 'delivery_state', 'title', 'status', 'start_date', 'due_date', 'progress_percentage', 'created_by', 'returned_reason'])
             ->whereNotNull('department_id')
             ->whereNull('parent_task_id')
@@ -116,10 +135,77 @@ new #[Layout('layouts::desk'), Title('titles.department_tasks')] class extends C
                     ->morphWith([Milestone::class => ['proposal:id,slug,name,status']]),
             ])
             ->orderByRaw('due_date is null, due_date')
+            ->orderBy('title')
             ->orderBy('id')
             ->get();
+    }
 
-        return $tasks->filter(fn (Task $task): bool => $this->passesFilters($task))->values();
+    /**
+     * The tasks that pass the search and every filter except the headline
+     * focus, so pressing one figure never changes the others.
+     *
+     * @return Collection<int, Task>
+     */
+    #[Computed]
+    public function matchingTasks(): Collection
+    {
+        return $this->allDepartmentTasks->filter(fn (Task $task): bool => $this->passesFilters($task))->values();
+    }
+
+    /**
+     * The tasks on the list: the matching ones, narrowed to the pressed figure.
+     *
+     * @return Collection<int, Task>
+     */
+    #[Computed]
+    public function departmentTasks(): Collection
+    {
+        if ($this->focus === '') {
+            return $this->matchingTasks;
+        }
+
+        return $this->matchingTasks->filter(fn (Task $task): bool => $this->isInFocus($task, $this->focus))->values();
+    }
+
+    /**
+     * The ids of the deliverables the viewer can hand over or review now,
+     * checked once per page so the rows and the figures agree.
+     *
+     * @return array{deliver: list<int>, review: list<int>}
+     */
+    #[Computed]
+    public function actionableTaskIds(): array
+    {
+        $user = auth()->user();
+        $deliverable = $this->allDepartmentTasks->where('kind', TaskKind::MediaDeliverable);
+
+        return [
+            'deliver' => $deliverable
+                ->filter(fn (Task $task): bool => in_array($task->delivery_state, [DeliveryState::Requested, DeliveryState::Returned], true) && $user?->can('deliver', $task) === true)
+                ->pluck('id')->map(fn ($id): int => (int) $id)->values()->all(),
+            'review' => $deliverable
+                ->filter(fn (Task $task): bool => $task->delivery_state === DeliveryState::Delivered && $user?->can('review', $task) === true)
+                ->pluck('id')->map(fn ($id): int => (int) $id)->values()->all(),
+        ];
+    }
+
+    /**
+     * How many matching tasks each headline figure would show, and how many
+     * matching tasks are still open (the figures' denominator).
+     *
+     * @return array{overdue: int, deliver: int, review: int, open: int}
+     */
+    #[Computed]
+    public function focusCounts(): array
+    {
+        $tasks = $this->matchingTasks;
+
+        return [
+            'overdue' => $tasks->filter(fn (Task $task): bool => $this->isInFocus($task, 'overdue'))->count(),
+            'deliver' => $tasks->filter(fn (Task $task): bool => $this->isInFocus($task, 'deliver'))->count(),
+            'review' => $tasks->filter(fn (Task $task): bool => $this->isInFocus($task, 'review'))->count(),
+            'open' => $tasks->where('status', '!==', TaskStatus::Done)->count(),
+        ];
     }
 
     /**
@@ -139,7 +225,8 @@ new #[Layout('layouts::desk'), Title('titles.department_tasks')] class extends C
     }
 
     /**
-     * The departments the visible tasks belong to, for the filter.
+     * The departments the visible tasks belong to, for the filter. Subtasks
+     * are left out, as they are from the list.
      *
      * @return array<int, string>
      */
@@ -148,6 +235,7 @@ new #[Layout('layouts::desk'), Title('titles.department_tasks')] class extends C
     {
         return Task::query()
             ->whereNotNull('department_id')
+            ->whereNull('parent_task_id')
             ->distinct()
             ->pluck('department_id')
             ->mapWithKeys(fn ($id): array => [(int) $id => HrDepartment::nameOf((int) $id) ?: __('department_tasks.department_unavailable')])
@@ -187,15 +275,45 @@ new #[Layout('layouts::desk'), Title('titles.department_tasks')] class extends C
 
     public function updated(string $property): void
     {
-        if (in_array($property, ['department', 'kind', 'state', 'due'], true)) {
-            unset($this->departmentTasks, $this->groups, $this->openableProposals);
+        if (in_array($property, self::FilterProperties, true)) {
+            $this->forgetFilteredTasks();
         }
+    }
+
+    /**
+     * Press a headline figure: show only its tasks, or every task again when
+     * it is already pressed.
+     */
+    public function toggleFocus(string $focus): void
+    {
+        if (! in_array($focus, self::Focuses, true)) {
+            return;
+        }
+
+        $this->focus = $this->focus === $focus ? '' : $focus;
+        $this->forgetFilteredTasks();
     }
 
     public function clearFilters(): void
     {
-        $this->reset('department', 'kind', 'state', 'due');
-        unset($this->departmentTasks, $this->groups, $this->openableProposals);
+        $this->reset(...self::FilterProperties);
+        $this->forgetFilteredTasks();
+    }
+
+    /**
+     * Whether any search, figure or filter narrows the list.
+     */
+    public function hasActiveFilters(): bool
+    {
+        return collect(self::FilterProperties)->contains(fn (string $property): bool => $this->{$property} !== '');
+    }
+
+    /**
+     * Whether a filter kept behind "More filters" is set, so it opens itself.
+     */
+    public function hasActiveMoreFilters(): bool
+    {
+        return $this->kind !== '' || $this->state !== '' || $this->due !== '' || $this->person !== '';
     }
 
     public function openDelivery(int $taskId): void
@@ -346,14 +464,55 @@ new #[Layout('layouts::desk'), Title('titles.department_tasks')] class extends C
             return false;
         }
 
-        $isOpen = $task->status !== TaskStatus::Done;
+        if ($this->person === 'none' && ($task->status === TaskStatus::Done || $task->taskAssignees->isNotEmpty())) {
+            return false;
+        }
+
+        if ($this->search !== '' && ! $this->matchesSearch($task)) {
+            return false;
+        }
 
         return match ($this->due) {
-            'overdue' => $isOpen && $task->due_date !== null && $task->due_date->lt(today()),
-            'week' => $isOpen && $task->due_date !== null && $task->due_date->betweenIncluded(today(), today()->addDays(7)),
-            'unassigned' => $isOpen && $task->taskAssignees->isEmpty(),
+            'week' => $task->status !== TaskStatus::Done && $task->due_date !== null && $task->due_date->betweenIncluded(today(), today()->addDays(7)),
+            'none' => $task->due_date === null,
             default => true,
         };
+    }
+
+    /**
+     * Whether a task belongs to a headline figure: overdue and still open,
+     * waiting for the viewer to hand it over, or waiting for their review.
+     */
+    private function isInFocus(Task $task, string $focus): bool
+    {
+        return match ($focus) {
+            'overdue' => $task->status !== TaskStatus::Done && $task->due_date !== null && $task->due_date->lt(today()),
+            'deliver' => in_array($task->id, $this->actionableTaskIds['deliver'], true),
+            'review' => in_array($task->id, $this->actionableTaskIds['review'], true),
+            default => true,
+        };
+    }
+
+    /**
+     * The search looks at the task's title, its proposal, its department and
+     * the people on it, in either language.
+     */
+    private function matchesSearch(Task $task): bool
+    {
+        $needle = mb_strtolower(trim($this->search));
+
+        if ($needle === '') {
+            return true;
+        }
+
+        $haystack = collect([
+            $task->title,
+            $this->proposalOf($task)?->name,
+            HrDepartment::nameOf((int) $task->department_id),
+            ...$task->taskAssignees->pluck('employee')->filter()->map->name->all(),
+        ])->filter()->implode(' ');
+
+        return str_contains(mb_strtolower($haystack), $needle);
     }
 
     /**
@@ -382,9 +541,21 @@ new #[Layout('layouts::desk'), Title('titles.department_tasks')] class extends C
         $this->deliveryFileSlots = 1;
     }
 
+    /**
+     * Forget the list after a filter changed; the tasks themselves stay read.
+     */
+    private function forgetFilteredTasks(): void
+    {
+        unset($this->matchingTasks, $this->departmentTasks, $this->focusCounts, $this->groups, $this->openableProposals);
+    }
+
+    /**
+     * Forget everything after a task was written.
+     */
     private function forgetTasks(): void
     {
-        unset($this->departmentTasks, $this->groups, $this->openableProposals);
+        unset($this->allDepartmentTasks, $this->actionableTaskIds);
+        $this->forgetFilteredTasks();
     }
 };
 ?>
@@ -393,7 +564,7 @@ new #[Layout('layouts::desk'), Title('titles.department_tasks')] class extends C
     $mutedText = 'text-secondary-medium dark:text-ink-muted';
     $inkText = 'text-secondary-dark dark:text-ink';
     $hairline = 'border-secondary-soft dark:border-line';
-    $filtersAreActive = $department !== '' || $kind !== '' || $state !== '' || $due !== '';
+    $filtersAreActive = $this->hasActiveFilters();
     $groups = $this->groups;
 @endphp
 
@@ -404,38 +575,56 @@ new #[Layout('layouts::desk'), Title('titles.department_tasks')] class extends C
     :count="$this->departmentTasks->count()"
     data-tour="department-tasks"
 >
+    <x-slot:search>
+        <x-desk.register-search :label="__('department_tasks.search_label')" :placeholder="__('department_tasks.search_placeholder')" wire:model.live.debounce.300ms="search" />
+    </x-slot:search>
+
     <x-slot:filters>
-            <x-ui.header-filter-select :label="__('department_tasks.department')" wire:model.live="department" :value="$department">
-                <option value="">{{ __('department_tasks.all_departments') }}</option>
-                @foreach ($this->departmentOptions as $departmentId => $departmentName)
-                    <option value="{{ $departmentId }}">{{ $departmentName }}</option>
-                @endforeach
-            </x-ui.header-filter-select>
+        <x-ui.header-filter-select :label="__('department_tasks.department')" wire:model.live="department" :value="$department">
+            <option value="">{{ __('department_tasks.all_departments') }}</option>
+            @foreach ($this->departmentOptions as $departmentId => $departmentName)
+                <option value="{{ $departmentId }}">{{ $departmentName }}</option>
+            @endforeach
+        </x-ui.header-filter-select>
 
-            <x-ui.header-filter-select :label="__('department_tasks.kind')" wire:model.live="kind" :value="$kind">
-                <option value="">{{ __('department_tasks.all_kinds') }}</option>
-                @foreach (TaskKind::department() as $kindCase)
-                    <option value="{{ $kindCase->value }}">{{ $kindCase->label() }}</option>
-                @endforeach
-            </x-ui.header-filter-select>
+        <div class="contents" x-data="{ open: @js($this->hasActiveMoreFilters()) }">
+            <button type="button" class="dk-btn" x-on:click="open = ! open" x-bind:aria-expanded="open.toString()" aria-controls="department-tasks-more-filters" data-test="more-filters-button">
+                <flux:icon.adjustments-horizontal variant="micro" class="size-4" aria-hidden="true" />
+                {{ __('department_tasks.more_filters') }}
+            </button>
 
-            <x-ui.header-filter-select :label="__('department_tasks.delivery')" wire:model.live="state" :value="$state">
-                <option value="">{{ __('department_tasks.any_delivery_state') }}</option>
-                @foreach (DeliveryState::cases() as $stateCase)
-                    <option value="{{ $stateCase->value }}">{{ $stateCase->label() }}</option>
-                @endforeach
-            </x-ui.header-filter-select>
+            <div class="contents" id="department-tasks-more-filters" x-show="open" x-cloak>
+                <x-ui.header-filter-select :label="__('department_tasks.kind')" wire:model.live="kind" :value="$kind">
+                    <option value="">{{ __('department_tasks.all_kinds') }}</option>
+                    @foreach (TaskKind::department() as $kindCase)
+                        <option value="{{ $kindCase->value }}">{{ $kindCase->label() }}</option>
+                    @endforeach
+                </x-ui.header-filter-select>
 
-            <x-ui.header-filter-select :label="__('department_tasks.due_filter')" wire:model.live="due" :value="$due">
-                <option value="">{{ __('department_tasks.any_due_date') }}</option>
-                <option value="overdue">{{ __('department_tasks.due_overdue') }}</option>
-                <option value="week">{{ __('department_tasks.due_this_week') }}</option>
-                <option value="unassigned">{{ __('department_tasks.no_person_yet') }}</option>
-            </x-ui.header-filter-select>
-        </x-slot:filters>
+                <x-ui.header-filter-select :label="__('department_tasks.delivery')" wire:model.live="state" :value="$state">
+                    <option value="">{{ __('department_tasks.any_delivery_state') }}</option>
+                    @foreach (DeliveryState::cases() as $stateCase)
+                        <option value="{{ $stateCase->value }}">{{ $stateCase->label() }}</option>
+                    @endforeach
+                </x-ui.header-filter-select>
 
+                <x-ui.header-filter-select :label="__('department_tasks.due_filter')" wire:model.live="due" :value="$due">
+                    <option value="">{{ __('department_tasks.any_due_date') }}</option>
+                    <option value="week">{{ __('department_tasks.due_this_week') }}</option>
+                    <option value="none">{{ __('department_tasks.no_due_date') }}</option>
+                </x-ui.header-filter-select>
 
-    <div class="flex flex-col gap-8" wire:loading.class="opacity-60" wire:target="department, kind, state, due, clearFilters" data-tour="department-tasks-list">
+                <x-ui.header-filter-select :label="__('department_tasks.person')" wire:model.live="person" :value="$person">
+                    <option value="">{{ __('department_tasks.anyone') }}</option>
+                    <option value="none">{{ __('department_tasks.no_person_yet') }}</option>
+                </x-ui.header-filter-select>
+            </div>
+        </div>
+    </x-slot:filters>
+
+    @include('pages.department-tasks._index-headline')
+
+    <div class="flex flex-col gap-8" wire:loading.class="opacity-60" wire:target="search, focus, toggleFocus, department, kind, state, due, person, clearFilters" data-tour="department-tasks-list">
         @if ($groups === [])
             <x-ui.empty-state
                 icon="clipboard-document-list"
@@ -444,24 +633,35 @@ new #[Layout('layouts::desk'), Title('titles.department_tasks')] class extends C
             >
                 @if ($filtersAreActive)
                     <x-slot:action>
-                        <x-ui.button size="sm" wire:click="clearFilters">{{ __('department_tasks.clear_filters') }}</x-ui.button>
+                        <x-ui.button size="sm" wire:click="clearFilters" data-test="clear-filters">{{ __('department_tasks.clear_filters') }}</x-ui.button>
                     </x-slot:action>
                 @endif
             </x-ui.empty-state>
         @endif
 
         @foreach ($groups as $group)
+            @php
+                $isDoneGroup = $group['status'] === TaskStatus::Done;
+                $rowsAreShown = ! $isDoneGroup || $showDone;
+            @endphp
             <section class="min-w-0" wire:key="department-task-group-{{ $group['status']->value }}" data-status-group="{{ $group['status']->value }}">
-                <header class="flex items-center gap-2 border-b pb-3 {{ $hairline }}">
+                <header @class(['flex items-center gap-2', 'border-b pb-3 '.$hairline => $rowsAreShown])>
                     <x-ui.enum-badge :case="$group['status']" />
                     <span class="text-xs font-semibold tabular-nums {{ $mutedText }}">{{ $group['tasks']->count() }}</span>
+                    @if ($isDoneGroup)
+                        <x-ui.button size="sm" tone="ghost" class="ms-auto min-h-11 touch-manipulation sm:min-h-0" wire:click="$toggle('showDone')" :aria-expanded="$showDone ? 'true' : 'false'" data-test="toggle-done">
+                            {{ $showDone ? __('department_tasks.hide_done') : __('department_tasks.show_done') }}
+                        </x-ui.button>
+                    @endif
                 </header>
 
-                <ul class="divide-y {{ $hairline }}">
-                    @foreach ($group['tasks'] as $task)
-                        @include('pages.department-tasks._task-row', ['task' => $task, 'proposal' => $this->proposalOf($task)])
-                    @endforeach
-                </ul>
+                @if ($rowsAreShown)
+                    <ul class="divide-y {{ $hairline }}">
+                        @foreach ($group['tasks'] as $task)
+                            @include('pages.department-tasks._task-row', ['task' => $task, 'proposal' => $this->proposalOf($task)])
+                        @endforeach
+                    </ul>
+                @endif
             </section>
         @endforeach
     </div>

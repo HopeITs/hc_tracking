@@ -4,7 +4,9 @@
     ⚡index.blade.php.
 --}}
 @php
-    $deliveringTask = $deliveringTaskId === null ? null : $this->departmentTasks->firstWhere('id', $deliveringTaskId);
+    $deliveringTask = $deliveringTaskId === null ? null : $this->allDepartmentTasks->firstWhere('id', $deliveringTaskId);
+    $reviewingTask = $reviewingTaskId === null ? null : $this->allDepartmentTasks->firstWhere('id', $reviewingTaskId);
+    $reviewingName = (string) $reviewingTask?->title;
     $deliveryKinds = $deliveringTask?->media_kinds?->all() ?? [];
     $wantsLink = collect($deliveryKinds)->contains(fn ($kind): bool => in_array($kind, [\App\Enums\DeliverableKind::Video, \App\Enums\DeliverableKind::Photos, \App\Enums\DeliverableKind::File], true));
     $wantsFiles = collect($deliveryKinds)->contains(fn ($kind): bool => in_array($kind, [\App\Enums\DeliverableKind::Photos, \App\Enums\DeliverableKind::File], true));
@@ -16,8 +18,8 @@
     <x-ui.modal
         wire:model="showDeliveryModal"
         size="md"
-        :title="__('department_tasks.deliver_title')"
-        :description="$deliveringTask !== null ? __('department_tasks.deliver_description', ['kinds' => collect($deliveryKinds)->map->label()->implode('، ')]) : null"
+        :title="__('department_tasks.deliver_title', ['name' => (string) $deliveringTask?->title])"
+        :description="$deliveringTask !== null ? __('department_tasks.deliver_description', ['kinds' => collect($deliveryKinds)->map->label()->implode(__('common.list_separator'))]) : null"
         submit="deliver"
         close="closeDeliveryModal"
         required-note
@@ -69,7 +71,7 @@
     <x-ui.confirm-modal
         wire:model="showAcceptModal"
         tone="neutral"
-        :title="__('department_tasks.accept_title')"
+        :title="__('department_tasks.accept_title', ['name' => $reviewingName])"
         :message="__('department_tasks.accept_message')"
         confirm="accept"
         :confirm-label="__('department_tasks.accept')"
@@ -80,7 +82,7 @@
     <x-ui.modal
         wire:model="showReturnModal"
         size="sm"
-        :title="__('department_tasks.return_title')"
+        :title="__('department_tasks.return_title', ['name' => $reviewingName])"
         :description="__('department_tasks.return_message')"
         submit="returnDelivery"
         close="closeReview"

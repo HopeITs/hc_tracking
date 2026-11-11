@@ -145,4 +145,5 @@ return [
     'discard_changes_question' => 'Discard your changes?',
     'discard' => 'Discard',
     'keep_editing' => 'Keep editing',
+    'list_separator' => ', ',
 ];

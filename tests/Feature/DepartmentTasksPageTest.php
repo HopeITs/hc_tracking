@@ -252,3 +252,78 @@ test('a department task on a milestone of a paused project wears the Paused chip
 
     expect(substr_count($page->html(), 'data-test="task-paused-chip"'))->toBe(1);
 });
+
+test('the headline figures count what needs a hand and each one filters the list until pressed again', function () {
+    departmentPageDeliverable(attributes: ['title' => 'Film the late visit', 'due_date' => '2026-10-10']);
+    departmentPageDeliverable(attributes: ['title' => 'Film the next visit', 'due_date' => '2026-10-20']);
+    departmentPageDeliverable(attributes: ['title' => 'Film the handed over visit', 'due_date' => '2026-10-25', 'delivery_state' => DeliveryState::Delivered, 'status' => TaskStatus::UnderReview, 'delivered_on' => '2026-10-14', 'delivered_link' => 'https://video.example/a']);
+    Task::factory()->forProposal($this->proposal, $this->media)->completed()->create(['title' => 'Book the old hall', 'due_date' => '2026-09-01', 'created_by' => $this->requester->id]);
+
+    $page = Livewire::actingAs($this->mediaUser)->test('pages::department-tasks.index');
+
+    expect($page->instance()->focusCounts)->toBe(['overdue' => 1, 'deliver' => 2, 'review' => 0, 'open' => 3]);
+
+    $page->call('toggleFocus', 'overdue')
+        ->assertSet('focus', 'overdue')
+        ->assertSeeText('Film the late visit')
+        ->assertDontSeeText('Film the next visit')
+        ->assertDontSeeText('Book the old hall');
+
+    expect($page->instance()->focusCounts)->toBe(['overdue' => 1, 'deliver' => 2, 'review' => 0, 'open' => 3]);
+
+    $page->call('toggleFocus', 'overdue')
+        ->assertSet('focus', '')
+        ->assertSeeText('Film the next visit');
+
+    Livewire::actingAs($this->requester)
+        ->test('pages::department-tasks.index')
+        ->call('toggleFocus', 'review')
+        ->assertSeeText('Film the handed over visit')
+        ->assertDontSeeText('Film the late visit');
+});
+
+test('the search finds a task by its title, proposal or department', function () {
+    departmentPageDeliverable();
+    Task::factory()->forProposal(Proposal::factory()->create(['name' => 'Summer Camp']), $this->media)->create(['title' => 'Book the hall', 'created_by' => $this->requester->id]);
+
+    Livewire::actingAs($this->mediaUser)
+        ->test('pages::department-tasks.index')
+        ->set('search', 'film')
+        ->assertSeeText('Film the distribution')
+        ->assertDontSeeText('Book the hall')
+        ->set('search', 'summer')
+        ->assertSeeText('Book the hall')
+        ->assertDontSeeText('Film the distribution')
+        ->set('search', 'media')
+        ->assertSeeText('Film the distribution')
+        ->assertSeeText('Book the hall')
+        ->set('search', 'nothing like this')
+        ->assertSeeText(__('department_tasks.no_match'))
+        ->call('clearFilters')
+        ->assertSet('search', '')
+        ->assertSeeText('Book the hall');
+});
+
+test('done tasks stay folded under their count until shown', function () {
+    departmentPageDeliverable();
+    Task::factory()->forProposal($this->proposal, $this->media)->completed()->create(['title' => 'Book the old hall', 'created_by' => $this->requester->id]);
+
+    Livewire::actingAs($this->mediaUser)
+        ->test('pages::department-tasks.index')
+        ->assertSeeHtml('data-status-group="done"')
+        ->assertDontSeeText('Book the old hall')
+        ->set('showDone', true)
+        ->assertSeeText('Book the old hall');
+});
+
+test('the review dialogs name the deliverable', function () {
+    $task = departmentPageDeliverable(attributes: ['delivery_state' => DeliveryState::Delivered, 'status' => TaskStatus::UnderReview, 'delivered_on' => '2026-10-14', 'delivered_link' => 'https://video.example/a']);
+
+    Livewire::actingAs($this->requester)
+        ->test('pages::department-tasks.index')
+        ->call('confirmAccept', $task->id)
+        ->assertSeeText(__('department_tasks.accept_title', ['name' => 'Film the distribution']))
+        ->call('closeReview')
+        ->call('confirmReturn', $task->id)
+        ->assertSeeText(__('department_tasks.return_title', ['name' => 'Film the distribution']));
+});

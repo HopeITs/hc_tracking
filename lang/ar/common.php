@@ -145,4 +145,5 @@ return [
     'discard_changes_question' => 'تجاهل تغييراتك؟',
     'discard' => 'تجاهل',
     'keep_editing' => 'متابعة التعديل',
+    'list_separator' => '، ',
 ];
