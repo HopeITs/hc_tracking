@@ -105,6 +105,7 @@ final class AskEngine
         'admin.cities.index' => ['cities', 'city', 'locations', 'places', 'مدن', 'مدينه', 'مواقع'],
         'admin.sectors.index' => ['sectors', 'sector', 'قطاعات', 'قطاع'],
         'admin.evidence-types.index' => ['evidence', 'proof', 'شواهد', 'دليل'],
+        'admin.program-requests.index' => ['requests', 'request', 'طلبات', 'طلب'],
         'admin.narrative-questions.index' => ['narrative', 'questions', 'اسئله', 'سرديه'],
         'security.edit' => ['security', 'password', '2fa', 'twofactor', 'passkey', 'devices', 'امان', 'كلمه', 'مرور'],
         'notification-settings.edit' => ['preferences', 'notifications', 'settings', 'تفضيلات', 'اعدادات'],

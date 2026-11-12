@@ -11,12 +11,14 @@ use App\Models\Proposal;
 use App\Models\ProposalLocation;
 use App\Models\User;
 use Illuminate\Database\Eloquent\Collection;
+use Illuminate\Validation\ValidationException;
 
 /**
  * The one writer of `proposal_locations` rows (contracts.md §7, W-34a).
  *
  * Every entry point expects the proposal row already locked by its caller
- * (SaveProposal, LinkProposalProject, UnlinkProposalProject, the backfill)
+ * (SaveProposal, LinkProposalProject, UnlinkProposalProject, LinkProgramRequest,
+ * the backfill)
  * and runs inside that caller's transaction. It writes rows and centers,
  * keeps the program request of a "needs a program" row in step, and returns
  * the counts the caller records and dispatches; it records nothing itself.
@@ -168,6 +170,38 @@ final class ProposalLocationRows
         $counts['changed']++;
 
         return $counts;
+    }
+
+    /**
+     * Give a row waiting on a program request the HR program the admin
+     * linked: the row takes the program, the request is marked created.
+     * Refused when the proposal already has a row for that city and program
+     * (the unique index would reject it). Returns the counts of what changed.
+     *
+     * @return array{added: int, removed: int, changed: int}
+     *
+     * @throws ValidationException under `programId`
+     */
+    public function linkRequestedProgram(Proposal $locked, ProgramRequest $request, int $programId): array
+    {
+        /** @var ProposalLocation $row */
+        $row = $locked->locations()->whereKey($request->proposal_location_id)->firstOrFail();
+
+        $isTaken = $locked->locations()
+            ->where('city_id', $row->city_id)
+            ->where('program_id', $programId)
+            ->whereKeyNot($row->id)
+            ->exists();
+
+        if ($isTaken) {
+            throw ValidationException::withMessages(['programId' => __('program_requests.program_already_on_proposal')]);
+        }
+
+        $row->forceFill(['program_id' => $programId])->save();
+        $request->forceFill(['status' => ProgramRequestStatus::Created, 'hr_program_id' => $programId])->save();
+        $row->unsetRelation('programRequest');
+
+        return ['added' => 0, 'removed' => 0, 'changed' => 1];
     }
 
     /**

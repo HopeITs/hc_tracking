@@ -17,6 +17,7 @@ return [
     'risk_library' => 'مكتبة المخاطر',
     'evidence_types' => 'أنواع الشواهد',
     'narrative_questions' => 'بنك الأسئلة السردية',
+    'program_requests' => 'طلبات البرامج',
     'milestone' => 'المرحلة الرئيسية',
     'milestones' => 'المراحل الرئيسية',
     'program' => 'البرنامج',

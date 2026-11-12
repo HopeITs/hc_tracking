@@ -26,6 +26,7 @@ return [
     'monthly_reports' => 'Monthly Reports',
     'report_templates' => 'Templates to confirm',
     'narrative_questions' => 'Narrative questions',
+    'program_requests' => 'Program requests',
     'platform' => 'Platform',
     'primary_navigation' => 'Primary navigation',
     'repository' => 'Repository',

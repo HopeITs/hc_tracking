@@ -550,6 +550,10 @@ return [
                 'title' => 'ربط برنامج',
                 'body' => 'ربط :actor برنامج HR «:name» الذي طلبه المقترح «:subject»',
             ],
+            'declined' => [
+                'title' => 'رُفض طلب برنامج',
+                'body' => 'رفض :actor البرنامج «:name» الذي طلبه المقترح «:subject»',
+            ],
         ],
         'proposal' => [
             'created' => [

@@ -188,6 +188,7 @@ final class EventCatalog
                 'proposal.locations_changed' => self::entry('proposals', $digest, 'module_map', $all, activity: 'proposal.locations_changed', event: ProposalLocationsChanged::class),
                 'program_request.opened' => self::entry('proposals', $now, 'module_map', $all, activity: 'program_request.opened'),
                 'program_request.linked' => self::entry('proposals', $now, 'module_map', $all, activity: 'program_request.linked'),
+                'program_request.declined' => self::entry('proposals', $now, 'module_map', $all, activity: 'program_request.declined'),
                 // T31: the approval moved the plan to the grant period; the project owners hear of it only when a date was cut at the grant end.
                 'proposal.plan_rebased' => self::entry('proposals', $now, 'module_map', OversightMode::None, activity: 'proposal.plan_rebased'),
             ],

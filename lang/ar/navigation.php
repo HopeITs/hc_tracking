@@ -26,6 +26,7 @@ return [
     'monthly_reports' => 'التقارير الشهرية',
     'report_templates' => 'قوالب بانتظار التأكيد',
     'narrative_questions' => 'بنك الأسئلة السردية',
+    'program_requests' => 'طلبات البرامج',
     'platform' => 'المنصة',
     'primary_navigation' => 'التنقل الرئيسي',
     'repository' => 'المستودع',
