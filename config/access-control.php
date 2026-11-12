@@ -28,7 +28,7 @@ $groups = [
     'funding-agreements' => ['view', 'create', 'update', 'delete'],
     'transfers' => ['view', 'create', 'update', 'delete'],
     'strategies' => ['view', 'create', 'update', 'delete'],
-    'annual-plans' => ['view', 'create', 'update', 'delete'],
+    'annual-plans' => ['view', 'create', 'update', 'delete', 'review'],
     'reports' => ['view', 'create', 'update', 'delete', 'approve', 'mark-seen', 'reopen', 'aggregate'],
     'meal-coverage' => ['manage'],
     'supervisions' => ['manage'],
@@ -229,6 +229,8 @@ return [
             'access-management.manage-roles',
             'access-management.manage-permissions',
             'reports.mark-seen',
+            // The MEAL manager reviews annual plans; the CEO only reads them.
+            'annual-plans.review',
             'notification-settings.manage',
             'reports.reopen',
             'proposals.approve',

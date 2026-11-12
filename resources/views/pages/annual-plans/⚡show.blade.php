@@ -191,9 +191,9 @@ new #[Layout('layouts::desk'), Title('titles.annual_plan')] class extends Compon
 
 <section class="@container/detail flex w-full flex-1 flex-col gap-8 text-secondary-dark dark:text-ink">
     <x-ui.detail-header
-        :back="\App\Support\BackUrl::for(route('annual-plans.index'))"
+        :back="\App\Support\BackUrl::for(route('annual-plans.targets'))"
         :breadcrumbs="[
-            ['label' => __('common.annual_plans'), 'url' => route('annual-plans.index')],
+            ['label' => __('common.annual_plans'), 'url' => route('annual-plans.targets')],
             ['label' => __('common.fy_year', ['year' => $plan->year])],
         ]"
         :title="__('common.fy_year_program', ['year' => $plan->year, 'program' => $plan->program->name])"

@@ -192,4 +192,6 @@ return [
     'copy_framework_confirm_message' => 'The results and indicators of this track are added to the proposal framework. Targets are set per proposal afterwards.',
     'copy_framework_confirm' => 'Copy framework',
     'framework_copied' => 'Framework copied into the proposal.',
+    'calendar_from_annual_plan' => "The weeks come from this proposal's annual plan.",
+    'calendar_edit_in_plan' => 'Edit in the annual plan',
 ];

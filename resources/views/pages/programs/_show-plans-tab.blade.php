@@ -18,7 +18,7 @@
     $elapsed = $this->planYearElapsed($shownYear);
     $canCreatePlan = $user?->can('create', AnnualPlan::class) === true;
     $canReport = $user?->can('create', Report::class) === true;
-    $createUrl = fn (?int $year): string => route('annual-plans.index', array_filter(['create' => 1, 'program' => $program->id, 'year' => $year]));
+    $createUrl = fn (?int $year): string => route('annual-plans.targets', array_filter(['create' => 1, 'program' => $program->id, 'year' => $year]));
 
     // The shared result-level marks (.ai/rules/components-ui.md).
     $levelMarks = [

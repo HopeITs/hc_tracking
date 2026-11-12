@@ -2,6 +2,10 @@
 
 use App\Models\Account;
 use App\Models\Activity;
+use App\Models\ActivityPlanBatch;
+use App\Models\ActivityPlanFollowUp;
+use App\Models\ActivityPlanItem;
+use App\Models\ActivityPlanItemCity;
 use App\Models\AiRequest;
 use App\Models\DonorProposal;
 use App\Models\FundingAgreementInstallment;
@@ -65,6 +69,10 @@ use Illuminate\Support\Facades\Gate;
 function modelsGuardedWithoutPolicy(): array
 {
     return [
+        ActivityPlanBatch::class => ['annual-plans', 'Part of its annual plan (ActivityPlanPolicy::update); written only by SaveActivityPlanItem and CopyActivityPlanItemSettings.'],
+        ActivityPlanFollowUp::class => ['annual-plans', 'Part of its annual plan (ActivityPlanPolicy::review); written only by ManageActivityPlanFollowUps.'],
+        ActivityPlanItem::class => ['annual-plans', 'Part of its annual plan (ActivityPlanPolicy::update); written only by the App\Actions\AnnualPlans actions.'],
+        ActivityPlanItemCity::class => ['annual-plans', 'Part of its annual plan item (ActivityPlanPolicy::update); written only by SaveActivityPlanItem.'],
         AiRequest::class => ['ai', 'The AI usage ledger: written only by App\Support\Ai\AiGateway, read only under ai.view-usage.'],
         Account::class => ['accounts', 'accounts.* permissions on the admin accounts page and the transfer forms.'],
         Activity::class => ['activity-log', 'The global log needs activity-log.view; a record\'s own Activity tab follows that record\'s page.'],

@@ -192,4 +192,6 @@ return [
     'copy_framework_confirm_message' => 'ستُضاف نتائج هذا المسار ومؤشراته إلى إطار المقترح. تُحدَّد المستهدفات لكل مقترح لاحقًا.',
     'copy_framework_confirm' => 'نسخ الإطار',
     'framework_copied' => 'نُسخ الإطار إلى المقترح.',
+    'calendar_from_annual_plan' => 'تأتي الأسابيع من الخطة السنوية لهذا المقترح.',
+    'calendar_edit_in_plan' => 'التعديل في الخطة السنوية',
 ];

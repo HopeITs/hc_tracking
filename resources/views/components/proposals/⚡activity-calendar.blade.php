@@ -72,7 +72,18 @@ new class extends Component {
     #[Computed]
     public function canEdit(): bool
     {
-        return Gate::allows('update', [ActivitySchedule::class, $this->proposal]);
+        return $this->activityPlan === null && Gate::allows('update', [ActivitySchedule::class, $this->proposal]);
+    }
+
+    /**
+     * The proposal's annual activity plan, once one exists: from then on the
+     * plan's batches are the only dates and this calendar is read only
+     * (user decision 2026-11-12).
+     */
+    #[Computed]
+    public function activityPlan(): ?\App\Models\ActivityPlan
+    {
+        return \App\Models\ActivityPlan::query()->where('proposal_id', $this->proposalId)->orderBy('id')->first(['id', 'slug', 'proposal_id']);
     }
 
     /**
@@ -276,6 +287,10 @@ new class extends Component {
      */
     private function save(int $activityId, array $months, array $weeks, string $version): void
     {
+        if ($this->activityPlan !== null) {
+            return;
+        }
+
         $this->justSaved = false;
 
         try {
@@ -393,7 +408,13 @@ new class extends Component {
         @endif
     </div>
 
-    @if (! $canEdit)
+    @if ($this->activityPlan !== null)
+        <p class="flex flex-wrap items-start gap-2 type-meta text-secondary-dark dark:text-ink" data-test="calendar-from-plan">
+            <flux:icon.lock-closed variant="micro" class="mt-0.5 size-3.5 shrink-0" aria-hidden="true" />
+            <span>{{ __('results_framework.calendar_from_annual_plan') }}</span>
+            <a href="{{ route('activity-plans.show', $this->activityPlan) }}" wire:navigate class="font-semibold underline underline-offset-4">{{ __('results_framework.calendar_edit_in_plan') }}</a>
+        </p>
+    @elseif (! $canEdit)
         <p class="flex items-start gap-2 type-meta text-secondary-dark dark:text-ink" data-test="calendar-read-only">
             <flux:icon.lock-closed variant="micro" class="mt-0.5 size-3.5 shrink-0" aria-hidden="true" />
             <span>{{ $isApproved ? __('results_framework.calendar_read_only_approved') : __('results_framework.calendar_read_only') }}</span>
