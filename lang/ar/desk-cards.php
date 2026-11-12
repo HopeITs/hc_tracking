@@ -30,6 +30,7 @@ return [
         'clear_hint' => 'كل ما أنت مسؤول عنه في موعده.',
         'empty_view' => 'لا متأخرات تطابق هذا التصفية.',
         'kind' => [
+            'proposal' => 'مقترحك',
             'task' => 'مهمة',
             'milestone' => 'مرحلة',
             'monthly-report' => 'تقرير شهري',

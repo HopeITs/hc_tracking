@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Support;
 
+use App\Enums\ActivityPlanStatus;
 use App\Enums\NotificationKind;
 use App\Enums\NotificationPriority;
 use App\Models\ActivityPlan;
@@ -108,6 +109,38 @@ final class PlanNotifier
         }
 
         return array_values($users->unique('id')->all());
+    }
+
+    /**
+     * Tell every MEAL reviewer that the plan waits for them, once per user
+     * and submission. Run on submit and daily: whoever becomes MEAL manager
+     * after the plan was sent still hears of it (Rami, 2026-11-12).
+     */
+    public static function notifyReviewers(ActivityPlan $plan, ?User $actor = null): int
+    {
+        $sent = 0;
+        $actor ??= $plan->submitted_by === null ? null : User::query()->find($plan->submitted_by);
+        $stamp = $plan->submitted_at?->timestamp ?? 0;
+
+        foreach (self::recipients($plan, null, ['meal']) as $user) {
+            if ($user->id === $actor?->id || ! Cache::add("plan-review-waiting:{$plan->id}:{$stamp}:{$user->id}", true, now()->addDays(120))) {
+                continue;
+            }
+
+            self::send([$user], 'annual_plan.plan_submitted', ['plan' => (string) $plan->proposal()->value('name')], ['route' => 'activity-plans.show', 'parameters' => [$plan->slug]], $actor, false);
+            $sent++;
+        }
+
+        return $sent;
+    }
+
+    /**
+     * notifyReviewers for every plan with MEAL.
+     */
+    public static function notifyAllReviewers(): int
+    {
+        return ActivityPlan::query()->where('status', ActivityPlanStatus::InReview->value)->get()
+            ->sum(fn (ActivityPlan $plan): int => self::notifyReviewers($plan));
     }
 
     /**

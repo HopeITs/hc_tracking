@@ -616,6 +616,24 @@ return [
             ],
         ],
         'proposal' => [
+            'waiting_on_you' => [
+                'finish_concept_note' => [
+                    'title' => 'A proposal is waiting on you',
+                    'body' => 'Your project · finish the concept note of “:proposal”.',
+                ],
+                'collect_concept_reviews' => [
+                    'title' => 'A proposal is waiting on you',
+                    'body' => 'Your project · collect the reviews of “:proposal” and move it on.',
+                ],
+                'finish_proposal' => [
+                    'title' => 'A proposal is waiting on you',
+                    'body' => 'Your project · finish the proposal “:proposal”.',
+                ],
+                'send_proposal' => [
+                    'title' => 'A proposal is waiting on you',
+                    'body' => 'Your project · send “:proposal” to the donor.',
+                ],
+            ],
             'created' => [
                 'title' => 'Proposal created',
                 'body' => ':actor created the proposal “:subject”',

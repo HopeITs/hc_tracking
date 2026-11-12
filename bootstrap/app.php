@@ -4,6 +4,7 @@ use App\Http\DeniedAccessRecorder;
 use App\Http\Middleware\EnsureHrAccountIsActive;
 use App\Http\Middleware\EnsureRequestCameThroughTrustedProxy;
 use App\Http\Middleware\EnsureTwoFactorIsEnabled;
+use App\Http\Middleware\KeepDeskTabOnRedirect;
 use App\Http\Middleware\RedirectToHttps;
 use App\Http\Middleware\RemembersRecentRecord;
 use App\Http\Middleware\SecurityHeaders;
@@ -50,6 +51,7 @@ return Application::configure(basePath: dirname(__DIR__))
             SyncProgramsFromHr::class,
             EnsureHrAccountIsActive::class,
             RemembersRecentRecord::class,
+            KeepDeskTabOnRedirect::class,
         ]);
     })
     ->withExceptions(function (Exceptions $exceptions): void {

@@ -75,12 +75,19 @@ return [
     'filter_late' => 'متأخر',
     'filter_week' => 'هذا الأسبوع',
     'decision' => [
+        'proposal' => [
+            'finish_concept_note' => 'مشروعك · أكمل مذكرة المفهوم',
+            'collect_concept_reviews' => 'مشروعك · اجمع المراجعات وانقل مذكرة المفهوم للمرحلة التالية',
+            'finish_proposal' => 'مشروعك · أكمل المقترح',
+            'send_proposal' => 'مشروعك · أرسل المقترح إلى المانح',
+        ],
         'review' => 'مراجعتك في مرحلة :stage',
         'validate' => 'تقرير :month للاعتماد',
         'approve' => 'أُرسلت لمراجعتك',
         'accept' => 'سُلّمت لاستلامك',
     ],
     'decision_action' => [
+        'proposal' => 'فتح',
         'review' => 'راجِع',
         'validate' => 'اعتمد',
         'approve' => 'وافق',

@@ -75,12 +75,19 @@ return [
     'filter_late' => 'Late',
     'filter_week' => 'This week',
     'decision' => [
+        'proposal' => [
+            'finish_concept_note' => 'Your project · finish the concept note',
+            'collect_concept_reviews' => 'Your project · collect the reviews and move the concept note on',
+            'finish_proposal' => 'Your project · finish the proposal',
+            'send_proposal' => 'Your project · send the proposal to the donor',
+        ],
         'review' => 'Your :stage review',
         'validate' => ':month report to validate',
         'approve' => 'Sent for your review',
         'accept' => 'Delivered for your acceptance',
     ],
     'decision_action' => [
+        'proposal' => 'Open',
         'review' => 'Review',
         'validate' => 'Validate',
         'approve' => 'Approve',

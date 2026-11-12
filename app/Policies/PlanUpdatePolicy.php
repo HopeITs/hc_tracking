@@ -60,7 +60,8 @@ class PlanUpdatePolicy
 
     public function markSeen(User $user, PlanUpdate $planUpdate): bool
     {
-        return $planUpdate->status === PlanUpdateStatus::Reviewed && self::isProgramManager($user, $planUpdate->plan()->firstOrFail());
+        return ($planUpdate->status === PlanUpdateStatus::Reviewed || ($planUpdate->status === PlanUpdateStatus::OfficerApproved && $planUpdate->seen_at === null))
+            && self::isProgramManager($user, $planUpdate->plan()->firstOrFail());
     }
 
     public function answer(User $user, PlanUpdate $planUpdate): bool

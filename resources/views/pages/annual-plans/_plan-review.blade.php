@@ -63,5 +63,16 @@
 <div class="ap-foot">
     <button type="button" class="dk-btn" wire:click="sendBackPlan" data-test="send-back">↩︎ {{ __('annual_plans.wf.send_back_button') }}</button>
     <span class="ap-sp"></span>
-    <button type="button" class="dk-btn dk-primary" wire:click="approvePlan" wire:confirm="{{ __('annual_plans.wf.approve_confirm') }}" data-test="approve-plan">{{ __('annual_plans.wf.approve_button') }} ✓</button>
+    <button type="button" class="dk-btn dk-primary" wire:click="$set('confirmingApproval', true)" data-test="approve-plan">{{ __('annual_plans.wf.approve_button') }} ✓</button>
 </div>
+
+{{-- The app's own confirmation, never the browser's (user report 2026-11-12). --}}
+<x-ui.confirm-modal
+    wire:model="confirmingApproval"
+    tone="neutral"
+    :title="__('annual_plans.wf.approve_button')"
+    :message="__('annual_plans.wf.approve_confirm')"
+    confirm="approvePlan"
+    :confirm-label="__('annual_plans.wf.approve_button')"
+    confirm-test="confirm-approve-plan"
+/>

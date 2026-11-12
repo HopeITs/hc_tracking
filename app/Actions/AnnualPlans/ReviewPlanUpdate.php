@@ -9,6 +9,7 @@ use App\Models\PlanUpdate;
 use App\Models\PlanUpdateQuestion;
 use App\Models\User;
 use App\Support\PlanNotifier;
+use Closure;
 use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Gate;
@@ -39,7 +40,7 @@ final class ReviewPlanUpdate
             throw ValidationException::withMessages(['accountability' => __('annual_plans.up.accountability_required')]);
         }
 
-        $moved = $this->move($update, PlanUpdateStatus::Sent, [
+        $moved = $this->move($update, [PlanUpdateStatus::Sent], [
             'status' => PlanUpdateStatus::OfficerApproved,
             'accountability' => $accountability,
             'officer_approved_at' => now(),
@@ -56,7 +57,7 @@ final class ReviewPlanUpdate
     {
         Gate::forUser($user)->authorize('decideAsOfficer', $update);
 
-        $moved = $this->move($update, PlanUpdateStatus::Sent, [
+        $moved = $this->move($update, [PlanUpdateStatus::Sent], [
             'status' => PlanUpdateStatus::Returned,
             'accountability' => filled($accountability) ? trim((string) $accountability) : $update->accountability,
             'returned_at' => now(),
@@ -73,8 +74,9 @@ final class ReviewPlanUpdate
     {
         Gate::forUser($user)->authorize('decideAsMealManager', $update);
 
-        $moved = $this->move($update, PlanUpdateStatus::OfficerApproved, [
-            'status' => PlanUpdateStatus::Reviewed,
+        // MEAL manager and program manager both mark it seen, in either order (Rami, 2026-11-12): complete once both have.
+        $moved = $this->move($update, [PlanUpdateStatus::OfficerApproved], fn (PlanUpdate $locked): array => [
+            'status' => $locked->seen_at !== null ? PlanUpdateStatus::Seen : PlanUpdateStatus::Reviewed,
             'reviewed_at' => now(),
             'reviewed_by' => $user->id,
         ]);
@@ -91,21 +93,27 @@ final class ReviewPlanUpdate
         Gate::forUser($user)->authorize('decideAsMealManager', $update);
         $reason = $this->reason($reason);
 
-        $moved = $this->move($update, PlanUpdateStatus::OfficerApproved, $to === 'officer'
-            ? ['status' => PlanUpdateStatus::Sent, 'officer_approved_at' => null, 'officer_approved_by' => null, 'returned_at' => now(), 'returned_by' => $user->id, 'returned_to' => 'officer', 'return_reason' => $reason]
-            : ['status' => PlanUpdateStatus::Returned, 'officer_approved_at' => null, 'officer_approved_by' => null, 'returned_at' => now(), 'returned_by' => $user->id, 'returned_to' => 'project_manager', 'return_reason' => $reason]);
+        // A return clears the program manager's "seen": they see the corrected version again.
+        $cleared = ['officer_approved_at' => null, 'officer_approved_by' => null, 'seen_at' => null, 'seen_by' => null, 'program_manager_note' => null, 'returned_at' => now(), 'returned_by' => $user->id, 'return_reason' => $reason];
+        $moved = $this->move($update, [PlanUpdateStatus::OfficerApproved], $to === 'officer'
+            ? ['status' => PlanUpdateStatus::Sent, 'returned_to' => 'officer', ...$cleared]
+            : ['status' => PlanUpdateStatus::Returned, 'returned_to' => 'project_manager', ...$cleared]);
         PlanNotifier::update($moved, 'annual_plan.update_returned', [$to === 'officer' ? 'officer' : 'project_manager'], ['reason' => $reason], $user, true);
 
         return $moved;
     }
 
+    /**
+     * The program manager marks the update seen (required), with an optional
+     * note shown as a section below it. They never return it.
+     */
     public function markSeen(User $user, PlanUpdate $update, ?string $note): PlanUpdate
     {
         Gate::forUser($user)->authorize('markSeen', $update);
         $note = trim((string) $note);
 
-        $moved = $this->move($update, PlanUpdateStatus::Reviewed, [
-            'status' => PlanUpdateStatus::Seen,
+        $moved = $this->move($update, [PlanUpdateStatus::OfficerApproved, PlanUpdateStatus::Reviewed], fn (PlanUpdate $locked): array => [
+            'status' => $locked->status === PlanUpdateStatus::Reviewed ? PlanUpdateStatus::Seen : PlanUpdateStatus::OfficerApproved,
             'seen_at' => now(),
             'seen_by' => $user->id,
             'program_manager_note' => $note === '' ? null : $note,
@@ -166,18 +174,19 @@ final class ReviewPlanUpdate
     }
 
     /**
-     * @param  array<string, mixed>  $changes
+     * @param  list<PlanUpdateStatus>  $expected
+     * @param  array<string, mixed>|Closure(PlanUpdate): array<string, mixed>  $changes
      */
-    private function move(PlanUpdate $update, PlanUpdateStatus $expected, array $changes): PlanUpdate
+    private function move(PlanUpdate $update, array $expected, array|Closure $changes): PlanUpdate
     {
         return DB::transaction(function () use ($update, $expected, $changes): PlanUpdate {
             $locked = PlanUpdate::query()->lockForUpdate()->findOrFail($update->id);
 
-            if ($locked->status !== $expected) {
+            if (! in_array($locked->status, $expected, true)) {
                 throw ValidationException::withMessages(['status' => __('annual_plans.up.moved_on')]);
             }
 
-            $locked->forceFill($changes)->save();
+            $locked->forceFill($changes instanceof Closure ? $changes($locked) : $changes)->save();
 
             return $locked;
         });

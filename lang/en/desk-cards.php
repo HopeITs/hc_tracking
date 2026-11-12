@@ -30,6 +30,7 @@ return [
         'clear_hint' => 'Everything you are responsible for is on time.',
         'empty_view' => 'Nothing late matches this filter.',
         'kind' => [
+            'proposal' => 'Your proposal',
             'task' => 'Task',
             'milestone' => 'Milestone',
             'monthly-report' => 'Monthly report',

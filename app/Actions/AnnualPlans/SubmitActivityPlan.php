@@ -37,7 +37,7 @@ final class SubmitActivityPlan
                 'submitted_by' => $user->id,
                 'sent_back_reason' => null,
             ])->save();
-            PlanNotifier::plan($locked, 'annual_plan.plan_submitted', ['meal'], [], $user);
+            PlanNotifier::notifyReviewers($locked, $user);
 
             return $locked;
         });

@@ -20,7 +20,10 @@
             @endforeach
         </div>
     @empty
-        <div class="ap-info is-warn" data-no-activities>{{ __('annual_plans.wf.no_activities') }}</div>
+        <div class="ap-info is-warn ap-row" data-no-activities>
+            <span class="ap-sp">{{ __('annual_plans.wf.no_activities') }}</span>
+            <a class="dk-btn" href="{{ route('proposals.show', [$plan->proposal, 'tab' => 'logframe']) }}" wire:navigate data-test="open-logframe">{{ __('annual_plans.wf.open_logframe') }}</a>
+        </div>
     @endforelse
 
     @if ($groups !== [])
@@ -31,7 +34,35 @@
     @endif
     @error('activities') <p class="ap-err">{{ $message }}</p> @enderror
 
-    <div class="ap-info is-warn">{{ __('annual_plans.wf.missing_activity') }}</div>
+    @php($parentOptions = $this->activityParentOptions)
+    @if ($addingActivity)
+        <div class="ap-grp" data-add-activity-form>
+            <h3>{{ __('annual_plans.wf.add_activity') }}</h3>
+            <label class="ap-sm">{{ __('annual_plans.wf.activity_name') }}
+                <input type="text" class="form-box-input" wire:model="newActivityName" maxlength="500" dir="auto" data-test="new-activity-name" autofocus>
+            </label>
+            @error('newActivityName') <p class="ap-err">{{ $message }}</p> @enderror
+            <label class="ap-sm">{{ __('annual_plans.wf.activity_serves') }}
+                <select class="form-box-input" wire:model="newActivityParent" data-test="new-activity-parent">
+                    <option value="">{{ __('annual_plans.wf.pick_outcome') }}</option>
+                    @foreach ($parentOptions as $option)
+                        <option value="{{ $option['id'] }}">{{ $option['label'] }}</option>
+                    @endforeach
+                </select>
+            </label>
+            @error('newActivityParent') <p class="ap-err">{{ $message }}</p> @enderror
+            <label class="ap-row ap-sm"><input type="checkbox" wire:model="newActivitySingle"> {{ __('annual_plans.wf.activity_single_week') }}</label>
+            <div class="ap-row">
+                <button type="button" class="dk-btn" wire:click="$set('addingActivity', false)">{{ __('annual_plans.wf.cancel') }}</button>
+                <button type="button" class="dk-btn dk-primary" wire:click="addActivity" wire:loading.attr="disabled" wire:target="addActivity" data-test="save-new-activity">{{ __('annual_plans.wf.add_activity') }}</button>
+            </div>
+        </div>
+    @elseif ($parentOptions !== [])
+        <div class="ap-row">
+            <button type="button" class="dk-btn" wire:click="$set('addingActivity', true)" data-test="add-activity">+ {{ __('annual_plans.wf.add_activity') }}</button>
+            <span class="ap-faint ap-sm">{{ __('annual_plans.wf.missing_activity') }}</span>
+        </div>
+    @endif
 </section>
 
 <div class="ap-foot">

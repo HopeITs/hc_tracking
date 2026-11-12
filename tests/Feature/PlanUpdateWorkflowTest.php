@@ -132,23 +132,55 @@ test('the next month can be sent only once the officer approved the previous one
     expect($execution->sendBlockers($this->centre, $february, CarbonImmutable::parse('2027-03-01')))->toHaveCount(1);
 });
 
-test('the review chain runs officer, MEAL manager, program manager', function () {
+test('after the officer, the MEAL manager and the program manager both mark it seen, in either order; the note is optional', function () {
     $update = sentJanuary();
 
-    expect($update->status)->toBe(PlanUpdateStatus::Sent)
-        ->and(fn () => app(ReviewPlanUpdate::class)->officerApprove($this->officer, $update, ' '))->toThrow(ValidationException::class);
+    expect(fn () => app(ReviewPlanUpdate::class)->officerApprove($this->officer, $update, ' '))->toThrow(ValidationException::class);
 
     $update = app(ReviewPlanUpdate::class)->officerApprove($this->officer, $update, 'Two complaints, both answered.');
     expect($update->status)->toBe(PlanUpdateStatus::OfficerApproved)
         ->and(PlanExecution::for($this->plan)->sendBlockers($this->centre, CarbonImmutable::parse('2027-02-01'), CarbonImmutable::parse('2027-03-01')))->toBe([]);
 
-    expect(fn () => app(ReviewPlanUpdate::class)->markSeen($this->programManager, $update, null))->toThrow(AuthorizationException::class);
+    $update = app(ReviewPlanUpdate::class)->markSeen($this->programManager, $update, 'Add photos next time.');
+    expect($update->status)->toBe(PlanUpdateStatus::OfficerApproved)
+        ->and($this->programManager->can('markSeen', $update))->toBeFalse()
+        ->and($this->programManager->can('decideAsMealManager', $update))->toBeFalse();
 
     $update = app(ReviewPlanUpdate::class)->mealReviewed($this->mealManager, $update);
-    $update = app(ReviewPlanUpdate::class)->markSeen($this->programManager, $update, 'Add photos next time.');
-
     expect($update->status)->toBe(PlanUpdateStatus::Seen)
         ->and($update->program_manager_note)->toBe('Add photos next time.');
+
+});
+
+test('the MEAL manager first, then the program manager without a note, completes it', function () {
+    $update = app(ReviewPlanUpdate::class)->officerApprove($this->officer, sentJanuary(), 'Fine.');
+    $update = app(ReviewPlanUpdate::class)->mealReviewed($this->mealManager, $update);
+    expect($update->status)->toBe(PlanUpdateStatus::Reviewed);
+
+    $update = app(ReviewPlanUpdate::class)->markSeen($this->programManager, $update, '');
+    expect($update->status)->toBe(PlanUpdateStatus::Seen)->and($update->program_manager_note)->toBeNull();
+});
+
+test('the program manager page offers mark as seen with a note, never a return, and the note shows below the report', function () {
+    $update = app(ReviewPlanUpdate::class)->officerApprove($this->officer, sentJanuary(), 'Fine.');
+
+    Livewire::actingAs($this->programManager)->test('pages::annual-plans.update', ['activityPlan' => $this->plan, 'project' => $this->centre, 'month' => '2027-01'])
+        ->assertSet('mode', 'program')
+        ->assertDontSeeHtml('data-test="meal-return"')
+        ->set('pmNote', 'Check attendance sheets.')
+        ->call('markSeen')
+        ->assertHasNoErrors();
+
+    expect($update->fresh()->seen_at)->not->toBeNull()
+        ->and($update->fresh()->program_manager_note)->toBe('Check attendance sheets.');
+});
+
+test('a MEAL return clears the program manager seen mark', function () {
+    $update = app(ReviewPlanUpdate::class)->officerApprove($this->officer, sentJanuary(), 'Fine.');
+    $update = app(ReviewPlanUpdate::class)->markSeen($this->programManager, $update, 'ok');
+    $back = app(ReviewPlanUpdate::class)->mealReturn($this->mealManager, $update, 'Numbers look low', 'project_manager');
+
+    expect($back->seen_at)->toBeNull()->and($back->program_manager_note)->toBeNull();
 });
 
 test('a return keeps everything and is sent again', function () {
@@ -213,6 +245,7 @@ test('the project manager fills the update on its page and the officer sees the 
     Livewire::actingAs($this->officer)->test('pages::annual-plans.update', ['activityPlan' => $this->plan, 'project' => $this->centre, 'month' => '2027-01'])
         ->assertSet('mode', 'officer')
         ->assertSeeHtml('data-decision="officer"')
+        ->assertSeeHtml('target="_blank" rel="noopener" data-test="open-plan-update-file"')
         ->set('accountability', 'All fine.')
         ->call('officerApprove');
 

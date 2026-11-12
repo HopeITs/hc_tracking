@@ -29,7 +29,7 @@ class RemindAnnualPlanUpdates extends Command
     public function handle(): int
     {
         $today = $this->option('date') ? CarbonImmutable::parse((string) $this->option('date'))->startOfDay() : CarbonImmutable::today();
-        $sent = 0;
+        $sent = PlanNotifier::notifyAllReviewers();
 
         foreach (ActivityPlan::query()->where('status', ActivityPlanStatus::Approved->value)->get() as $plan) {
             $execution = PlanExecution::for($plan);

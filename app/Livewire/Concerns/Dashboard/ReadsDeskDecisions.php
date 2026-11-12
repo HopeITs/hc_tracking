@@ -6,12 +6,15 @@ namespace App\Livewire\Concerns\Dashboard;
 
 use App\Enums\DeliveryState;
 use App\Enums\MonthlyReportStatus;
+use App\Enums\ProposalStatus;
 use App\Enums\TaskKind;
 use App\Enums\TaskStatus;
 use App\Models\HrEmployee;
 use App\Models\MonthlyReport;
+use App\Models\Proposal;
 use App\Models\ProposalReviewer;
 use App\Models\Task;
+use App\Models\User;
 use App\Support\ProposalStoryLink;
 use Carbon\CarbonImmutable;
 use Illuminate\Database\Eloquent\Builder;
@@ -120,12 +123,52 @@ trait ReadsDeskDecisions
                 );
             });
 
-        return $reviews->concat($reports)->concat($tasks)
+        $proposals = $this->ownerProposalSteps($user);
+
+        return $reviews->concat($reports)->concat($tasks)->concat($proposals)
             ->sortBy([
                 fn (array $a, array $b): int => $b['late'] <=> $a['late'],
                 fn (array $a, array $b): int => ($a['since']?->timestamp ?? PHP_INT_MAX) <=> ($b['since']?->timestamp ?? PHP_INT_MAX),
             ])
             ->values();
+    }
+
+    /**
+     * Proposals of the viewer's own projects that wait on them (user decision
+     * 2026-11-12: the project owner is its project manager): a concept note
+     * or a proposal still being written, or in review and ready to move on.
+     *
+     * @return Collection<int, array{key: string, kind: string, title: string, context: string, who: string, since: CarbonImmutable|null, due: CarbonImmutable|null, late: bool, href: string, action: string, taskId: int|null}>
+     */
+    private function ownerProposalSteps(User $user): Collection
+    {
+        if ($user->employee_id === null) {
+            return new Collection;
+        }
+
+        $steps = [
+            ProposalStatus::ConceptNote->value => 'finish_concept_note',
+            ProposalStatus::ConceptNoteReview->value => 'collect_concept_reviews',
+            ProposalStatus::ProposalDraft->value => 'finish_proposal',
+            ProposalStatus::ProposalReview->value => 'send_proposal',
+        ];
+
+        return Proposal::query()
+            ->select(['proposals.id', 'proposals.slug', 'proposals.name', 'proposals.status', 'proposals.updated_at'])
+            ->whereIn('proposals.status', array_keys($steps))
+            ->whereHas('projects', fn (Builder $query) => $query->where('projects.user_id', $user->employee_id))
+            ->oldest('proposals.updated_at')
+            ->get()
+            ->map(fn (Proposal $proposal): array => $this->decision(
+                key: 'proposal-'.$proposal->id,
+                kind: 'proposal',
+                title: $proposal->name,
+                context: __('desk.decision.proposal.'.$steps[$proposal->status->value]),
+                who: '',
+                since: $proposal->updated_at,
+                due: null,
+                href: route('proposals.show', $proposal),
+            ));
     }
 
     /**

@@ -616,6 +616,24 @@ return [
             ],
         ],
         'proposal' => [
+            'waiting_on_you' => [
+                'finish_concept_note' => [
+                    'title' => 'مقترح بانتظارك',
+                    'body' => 'مشروعك · أكمل مذكرة المفهوم لـ“:proposal”.',
+                ],
+                'collect_concept_reviews' => [
+                    'title' => 'مقترح بانتظارك',
+                    'body' => 'مشروعك · اجمع مراجعات “:proposal” وانقله للمرحلة التالية.',
+                ],
+                'finish_proposal' => [
+                    'title' => 'مقترح بانتظارك',
+                    'body' => 'مشروعك · أكمل المقترح “:proposal”.',
+                ],
+                'send_proposal' => [
+                    'title' => 'مقترح بانتظارك',
+                    'body' => 'مشروعك · أرسل “:proposal” إلى المانح.',
+                ],
+            ],
             'created' => [
                 'title' => 'إنشاء مقترح',
                 'body' => 'أنشأ :actor المقترح «:subject»',

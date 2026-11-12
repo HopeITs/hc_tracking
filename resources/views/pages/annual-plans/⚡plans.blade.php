@@ -52,7 +52,7 @@ new #[Layout('layouts::desk'), Title('titles.annual_plans')] class extends Compo
     public function plans(): Collection
     {
         return ActivityPlan::query()
-            ->with(['proposal:id,slug,name', 'items:id,activity_plan_id,is_ready'])
+            ->with(['proposal:id,slug,name', 'program', 'items:id,activity_plan_id,is_ready'])
             ->when($this->status !== '', fn ($query) => $query->where('status', $this->status))
             ->when(trim($this->search) !== '', fn ($query) => $query->whereHas('proposal', fn ($proposals) => $proposals->where('name', 'like', '%'.trim($this->search).'%')))
             ->orderByRaw("case status when 'in_review' then 0 when 'draft' then 1 else 2 end")
@@ -119,7 +119,7 @@ new #[Layout('layouts::desk'), Title('titles.annual_plans')] class extends Compo
     #[Computed]
     public function approvedExecutions(): array
     {
-        return array_values(ActivityPlan::query()->where('status', ActivityPlanStatus::Approved->value)->with('proposal')->get()
+        return array_values(ActivityPlan::query()->where('status', ActivityPlanStatus::Approved->value)->with(['proposal', 'program'])->get()
             ->map(fn (ActivityPlan $plan): PlanExecution => PlanExecution::for($plan))->all());
     }
 
@@ -211,7 +211,7 @@ new #[Layout('layouts::desk'), Title('titles.annual_plans')] class extends Compo
                         $status === PlanUpdateStatus::Returned && $isProjectManager => [0, 'bad', __('annual_plans.next.fix_title', ['month' => $monthName]), __('annual_plans.next.fix_body', ['what' => $what, 'reason' => (string) $update->return_reason]), __('annual_plans.next.fix_button')],
                         $status === PlanUpdateStatus::Sent && $isOfficer => [1, $update->returned_to === 'officer' ? 'bad' : 'warn', __('annual_plans.next.officer_title', ['month' => $monthName]), $what, __('annual_plans.wf.review_now')],
                         $status === PlanUpdateStatus::OfficerApproved && $isMeal => [1, 'warn', __('annual_plans.next.meal_title', ['month' => $monthName]), $what, __('annual_plans.wf.review_now')],
-                        $status === PlanUpdateStatus::Reviewed && $isProgramManager => [2, 'warn', __('annual_plans.next.seen_title', ['month' => $monthName]), $what, __('annual_plans.next.open_update')],
+                        $isProgramManager && ($status === PlanUpdateStatus::Reviewed || ($status === PlanUpdateStatus::OfficerApproved && $update->seen_at === null)) => [2, 'warn', __('annual_plans.next.seen_title', ['month' => $monthName]), $what, __('annual_plans.next.open_update')],
                         ($status === null || $status === PlanUpdateStatus::Draft) && $isProjectManager && $today->gte($month->addMonth()) && $execution->sendBlockers($centre, $month, $today) === [] => [3, $today->gt(PlanCalendar::dueDateOf($month)) ? 'bad' : 'warn', __('annual_plans.next.send_title', ['month' => $monthName]), __('annual_plans.next.send_body', ['what' => $what, 'date' => PlanCalendar::dueDateOf($month)->translatedFormat(__('formats.date'))]), __('annual_plans.next.fill_button')],
                         default => null,
                     };

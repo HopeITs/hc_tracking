@@ -18,7 +18,7 @@
     $chain = [
         [__('annual_plans.up.role_project_manager'), $record?->sender?->name ?? \App\Models\HrEmployee::query()->whereKey($project->user_id)->first()?->name, __('annual_plans.up.chain_fills'), $record?->sent_at],
         [__('annual_plans.up.role_officer'), $record?->officer?->name ?? $officerName, __('annual_plans.up.chain_officer'), $record?->officer_approved_at],
-        [__('annual_plans.up.role_meal_manager'), $record?->reviewer?->name, __('annual_plans.up.chain_meal'), $record?->reviewed_at],
+        [__('annual_plans.up.role_meal_manager'), $record?->reviewer?->name ?? \App\Models\HrEmployee::query()->whereKey(\App\Support\MealCoverage::mealManagerEmployeeId())->first()?->name, __('annual_plans.up.chain_meal'), $record?->reviewed_at],
         [__('annual_plans.up.role_program_manager'), $record?->seer?->name ?? $plan->program?->manager?->name, __('annual_plans.up.chain_pm'), $record?->seen_at],
     ];
     $doneWords = [__('annual_plans.up.done_sent'), __('annual_plans.up.done_approved'), __('annual_plans.up.done_reviewed'), __('annual_plans.up.done_seen')];
@@ -32,7 +32,12 @@
 @else
     <div class="ap-flow" data-chain>
         @foreach ($chain as $index => [$role, $name, $todo, $at])
-            @php $isDone = $index <= $chainStage; $isNow = $status !== PlanUpdateStatus::Returned && $index === $chainStage + 1; @endphp
+            @php
+                // Steps 3 and 4 (MEAL manager, program manager) run at the same time once the officer approves.
+                // Steps 3 and 4 (MEAL manager, program manager) run at the same time once the officer approves.
+                $isDone = $index < 2 ? $index <= $chainStage : $at !== null && $status !== PlanUpdateStatus::Returned && $chainStage >= 1;
+                $isNow = $status !== PlanUpdateStatus::Returned && ! $isDone && ($index < 2 ? $index === $chainStage + 1 : $chainStage >= 1);
+            @endphp
             <div class="ap-fl {{ $isDone ? 'is-done' : ($isNow ? 'is-now' : '') }}">
                 <span class="ap-n">{{ $index + 1 }} · {{ $role }}</span>
                 <b dir="auto">{{ $name ?? '—' }}</b>

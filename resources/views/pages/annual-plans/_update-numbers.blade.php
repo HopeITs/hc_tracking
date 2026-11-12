@@ -33,7 +33,7 @@
         <div class="ap-files">
             @forelse ($files as $file)
                 <div class="ap-file" wire:key="file-{{ $file->id }}">📎 <span class="ap-sp" dir="auto">{{ $file->original_name }}</span>
-                    <a class="dk-btn dk-ghost" href="{{ route('plan-updates.files.download', $file) }}">{{ __('annual_plans.up.open_file') }}</a>
+                    <a class="dk-btn dk-ghost" href="{{ route('plan-updates.files.download', $file) }}" target="_blank" rel="noopener" data-test="open-plan-update-file">{{ __('annual_plans.up.open_file') }}</a>
                     @unless ($readOnly)<button type="button" class="dk-btn dk-ghost" wire:click="removeFile({{ $file->id }})">{{ __('annual_plans.wf.remove') }}</button>@endunless
                 </div>
             @empty

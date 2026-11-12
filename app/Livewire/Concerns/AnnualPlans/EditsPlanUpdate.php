@@ -160,6 +160,7 @@ trait EditsPlanUpdate
     {
         $this->loadDraft();
         $this->accountability = (string) ($this->record?->accountability ?? '');
+        $this->pmNote = (string) ($this->record?->program_manager_note ?? '');
     }
 
     // ---- project manager --------------------------------------------------------

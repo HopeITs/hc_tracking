@@ -26,7 +26,7 @@ class ProposalPolicy
      */
     public function view(User $user, Proposal $proposal): bool
     {
-        return $user->can('proposals.view') || $this->isReviewer($user, $proposal);
+        return $user->can('proposals.view') || $this->isReviewer($user, $proposal) || $this->ownsAProject($user, $proposal);
     }
 
     /**
@@ -42,7 +42,7 @@ class ProposalPolicy
      */
     public function update(User $user, Proposal $proposal): bool
     {
-        return $user->can('proposals.update');
+        return $user->can('proposals.update') || $this->ownsAProject($user, $proposal);
     }
 
     /**
@@ -52,7 +52,7 @@ class ProposalPolicy
      */
     public function transition(User $user, Proposal $proposal, ProposalStatus $to): bool
     {
-        return $user->can('proposals.update');
+        return $user->can('proposals.update') || $this->ownsAProject($user, $proposal);
     }
 
     /**
@@ -123,6 +123,38 @@ class ProposalPolicy
     public function forceDelete(User $user, Proposal $proposal): bool
     {
         return false;
+    }
+
+    /**
+     * Whether the user owns a project the proposal funds: the project owner
+     * is its project manager and the proposal's owner (contracts §15.2), so
+     * the steps the project page puts on them are theirs to do (user
+     * decision 2026-11-12). Recording the donor's decision stays with
+     * proposals.approve (D-70).
+     */
+    private function ownsAProject(User $user, Proposal $proposal): bool
+    {
+        if ($user->employee_id === null || $proposal->getKey() === null) {
+            return false;
+        }
+
+        $proposalId = (int) $proposal->getKey();
+
+        return in_array((int) $user->employee_id, $this->ownerIds($proposalId), true);
+    }
+
+    /**
+     * The owner employee ids of a proposal's projects, read once per request
+     * (a page asks the policy once per listed project).
+     *
+     * @return list<int>
+     */
+    private function ownerIds(int $proposalId): array
+    {
+        static $cache = [];
+        $request = spl_object_id(request());
+
+        return $cache[$request][$proposalId] ??= array_values(Proposal::ownerEmployeeIdsFor([$proposalId])[$proposalId] ?? []);
     }
 
     /**

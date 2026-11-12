@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Livewire\Concerns\AnnualPlans;
 
+use App\Actions\AnnualPlans\AddPlanActivity;
 use App\Actions\AnnualPlans\ChooseActivityPlanActivities;
 use App\Actions\AnnualPlans\CopyActivityPlanItemSettings;
 use App\Actions\AnnualPlans\ManageActivityPlanFollowUps;
@@ -13,6 +14,7 @@ use App\Actions\AnnualPlans\SubmitActivityPlan;
 use App\Enums\ActivityPlanStatus;
 use App\Enums\CountUnit;
 use App\Enums\FollowUpTrigger;
+use App\Enums\ResultType;
 use App\Models\ActivityPlan;
 use App\Models\ActivityPlanBatch;
 use App\Models\ActivityPlanItem;
@@ -234,6 +236,47 @@ trait EditsActivityPlan
         $this->picked = array_map('strval', ActivityPlanScope::activityIds($this->plan));
     }
 
+    public bool $addingActivity = false;
+
+    public string $newActivityName = '';
+
+    public string $newActivityParent = '';
+
+    public bool $newActivitySingle = false;
+
+    /**
+     * The outcomes and outputs of the plan's program a new activity can serve.
+     *
+     * @return list<array{id: int, label: string}>
+     */
+    #[Computed]
+    public function activityParentOptions(): array
+    {
+        return Result::query()
+            ->where('proposal_id', $this->plan->proposal_id)
+            ->whereIn('type', [ResultType::Outcome->value, ResultType::Output->value])
+            ->where(fn ($query) => $query->whereNull('program_id')->orWhere('program_id', $this->plan->program_id))
+            ->orderBy('id')
+            ->get(['id', 'statement', 'type'])
+            ->map(fn (Result $result): array => [
+                'id' => (int) $result->id,
+                'label' => __('annual_plans.wf.parent_'.$result->type->value, ['name' => mb_strimwidth((string) $result->statement, 0, 120, '…')]),
+            ])->all();
+    }
+
+    public function addActivity(): void
+    {
+        $this->run(function (): void {
+            $activity = app(AddPlanActivity::class)->handle(
+                $this->user(), $this->plan, $this->newActivityName, (int) $this->newActivityParent, $this->newActivitySingle,
+            );
+            $this->picked[] = (string) $activity->id;
+            $this->reset('newActivityName', 'newActivitySingle', 'addingActivity');
+            unset($this->activityGroups, $this->activityParentOptions);
+            Flux::toast(variant: 'success', text: __('annual_plans.wf.activity_added'));
+        });
+    }
+
     public function saveActivities(): void
     {
         $this->run(function (): void {
@@ -384,8 +427,11 @@ trait EditsActivityPlan
         });
     }
 
+    public bool $confirmingApproval = false;
+
     public function approvePlan(): void
     {
+        $this->confirmingApproval = false;
         $this->run(function (): void {
             app(ReviewActivityPlan::class)->approve($this->user(), $this->plan);
             $this->refreshPlan();

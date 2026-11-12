@@ -79,6 +79,11 @@ return [
     |
     */
 
+    /*
+     * Local testing only: pretend today is this date (Y-m-d). Ignored in production.
+     */
+    'pretend_today' => env('APP_PRETEND_TODAY'),
+
     'timezone' => env('APP_TIMEZONE', 'UTC'),
 
     /*

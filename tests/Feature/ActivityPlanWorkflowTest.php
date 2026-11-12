@@ -1,5 +1,6 @@
 <?php
 
+use App\Actions\AnnualPlans\AddPlanActivity;
 use App\Actions\AnnualPlans\ChooseActivityPlanActivities;
 use App\Actions\AnnualPlans\CopyActivityPlanItemSettings;
 use App\Actions\AnnualPlans\CreateActivityPlan;
@@ -14,7 +15,11 @@ use App\Models\Program;
 use App\Models\Project;
 use App\Models\Proposal;
 use App\Models\Result;
+use App\Models\UserNotification;
+use App\Support\ActivityPlanScope;
+use App\Support\PlanNotifier;
 use Illuminate\Auth\Access\AuthorizationException;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
 use Livewire\Livewire;
@@ -248,4 +253,76 @@ test('other people read a plan without editing it', function () {
 
     $this->actingAs($viewer)->get(route('activity-plans.show', $plan))->assertOk();
     $this->actingAs($viewer)->get(route('annual-plans.index'))->assertOk();
+});
+
+test('the program manager adds a missing activity from the plan: under a bare outcome an output is made for it', function () {
+    $plan = app(CreateActivityPlan::class)->handle($this->pm, $this->proposal->id, $this->program->id);
+    $bareOutcome = Result::factory()->type(ResultType::Outcome)->create(['proposal_id' => $this->proposal->id, 'program_id' => $this->program->id, 'statement' => 'Families earn more']);
+    $this->actingAs($this->pm);
+
+    $activity = app(AddPlanActivity::class)->handle($this->pm, $plan, 'Vocational training', $bareOutcome->id, false);
+    $output = Result::query()->find($activity->parent_id);
+
+    expect($activity->type)->toBe(ResultType::Activity)
+        ->and($output->type)->toBe(ResultType::Output)
+        ->and($output->parent_id)->toBe($bareOutcome->id)
+        ->and(ActivityPlanScope::activityIds($plan))->toContain($activity->id);
+
+    $second = app(AddPlanActivity::class)->handle($this->pm, $plan, 'Job fair', $bareOutcome->id, true);
+    expect($second->parent_id)->toBe($output->id);
+
+    expect(fn () => app(AddPlanActivity::class)->handle($this->pm, $plan, '  ', $bareOutcome->id, false))->toThrow(ValidationException::class)
+        ->and(fn () => app(AddPlanActivity::class)->handle($this->otherManager, $plan, 'X', $bareOutcome->id, false))->toThrow(AuthorizationException::class);
+});
+
+test('the activities step adds an activity and ticks it', function () {
+    $plan = app(CreateActivityPlan::class)->handle($this->pm, $this->proposal->id, $this->program->id);
+    $outcome = Result::query()->where('type', ResultType::Outcome->value)->first();
+
+    Livewire::actingAs($this->pm)->test('pages::annual-plans.plan', ['activityPlan' => $plan])
+        ->set('newActivityName', 'Parent meetings')
+        ->set('newActivityParent', (string) $outcome->id)
+        ->call('addActivity')
+        ->assertHasNoErrors()
+        ->assertSet('picked', fn (array $picked): bool => in_array((string) Result::query()->where('statement', 'Parent meetings')->value('id'), $picked, true));
+});
+
+test('a MEAL reviewer who arrives after the plan was sent is told once that it waits for them', function () {
+    Cache::flush();
+    $plan = ActivityPlan::factory()->inReview()->create(['proposal_id' => $this->proposal->id, 'program_id' => $this->program->id, 'submitted_by' => $this->pm->id]);
+    $late = userWithRole('MEAL', insertHrEmployee(firstNameEn: 'Late'));
+    $late->givePermissionTo('annual-plans.review');
+
+    expect(PlanNotifier::notifyReviewers($plan))->toBeGreaterThan(0)
+        ->and(PlanNotifier::notifyReviewers($plan))->toBe(0);
+
+    $rows = UserNotification::query()->forUser($late)->get()
+        ->filter(fn ($row): bool => $row->data['key'] === 'notifications.events.annual_plan.plan_submitted');
+    expect($rows)->toHaveCount(1);
+});
+
+test('approving asks in the app modal, not the browser dialog, then the plan goes live', function () {
+    $plan = chosenPlan();
+    foreach ($plan->items()->get() as $item) {
+        app(SaveActivityPlanItem::class)->handle($this->pm, $item, itemInput(), true);
+    }
+    $plan = app(SubmitActivityPlan::class)->handle($this->pm, $plan->fresh());
+
+    Livewire::actingAs($this->meal)->test('pages::annual-plans.plan', ['activityPlan' => $plan])
+        ->assertDontSeeHtml('wire:confirm')
+        ->set('confirmingApproval', true)
+        ->assertSeeHtml('data-test="confirm-approve-plan"')
+        ->call('approvePlan')
+        ->assertSet('confirmingApproval', false);
+
+    expect($plan->fresh()->status)->toBe(ActivityPlanStatus::Approved);
+});
+
+test('the plans register lists several plans, drafts and approved, without lazy loading their program', function () {
+    $other = Proposal::factory()->create();
+    ActivityPlan::factory()->create(['proposal_id' => $this->proposal->id, 'program_id' => $this->program->id]);
+    ActivityPlan::factory()->create(['proposal_id' => $other->id, 'program_id' => $this->program->id]);
+    ActivityPlan::factory()->count(2)->create(['program_id' => $this->program->id, 'status' => ActivityPlanStatus::Approved, 'proposal_id' => fn () => Proposal::factory()->create(['planned_date_begin' => '2027-01-01', 'planned_date_end' => '2027-12-31'])->id]);
+
+    Livewire::actingAs($this->pm)->test('pages::annual-plans.plans')->assertOk()->assertSee($other->name);
 });
