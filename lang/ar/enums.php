@@ -298,4 +298,27 @@ return [
         'upcoming' => 'قادم',
         'not_due' => 'غير مستحق',
     ],
+    'activity_plan_status' => [
+        'draft' => 'مسودة',
+        'in_review' => 'عند الميل للمراجعة',
+        'approved' => 'معتمدة',
+    ],
+    'count_unit' => [
+        'session' => 'جلسة',
+        'test' => 'امتحان / اختبار',
+        'kit' => 'حقيبة / سلة',
+        'item' => 'وحدة / قطعة',
+        'case' => 'حالة',
+        'course' => 'دورة',
+        'water_point' => 'نقطة مياه',
+        'event' => 'فعالية',
+        'field_visit' => 'زيارة ميدانية',
+        'survey' => 'استبيان',
+        'other' => 'أخرى',
+    ],
+    'follow_up_trigger' => [
+        'start' => 'عند بدايته',
+        'middle' => 'في منتصفه',
+        'finish' => 'عند انتهائه',
+    ],
 ];

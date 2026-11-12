@@ -92,4 +92,17 @@ return [
     'this_plan_has_no_targets_committed_in_it' => 'The :program plan for :year has no targets committed in it. Deleting it removes the plan only.',
     'this_program_already_has_a_plan_for_that_fiscal_year' => 'This program already has a plan for that fiscal year.',
     'vs_previous_year' => 'vs previous year',
+    'unit_other_fallback' => 'units',
+    'unit_noun' => [
+        'session' => '{0} :count sessions|{1} :count session|[2,*] :count sessions',
+        'test' => '{0} :count tests|{1} :count test|[2,*] :count tests',
+        'kit' => '{0} :count kits|{1} :count kit|[2,*] :count kits',
+        'item' => '{0} :count items|{1} :count item|[2,*] :count items',
+        'case' => '{0} :count cases|{1} :count case|[2,*] :count cases',
+        'course' => '{0} :count courses|{1} :count course|[2,*] :count courses',
+        'water_point' => '{0} :count water points|{1} :count water point|[2,*] :count water points',
+        'event' => '{0} :count events|{1} :count event|[2,*] :count events',
+        'field_visit' => '{0} :count field visits|{1} :count field visit|[2,*] :count field visits',
+        'survey' => '{0} :count surveys|{1} :count survey|[2,*] :count surveys',
+    ],
 ];

@@ -298,4 +298,27 @@ return [
         'upcoming' => 'Upcoming',
         'not_due' => 'Not due',
     ],
+    'activity_plan_status' => [
+        'draft' => 'Draft',
+        'in_review' => 'With MEAL for review',
+        'approved' => 'Approved',
+    ],
+    'count_unit' => [
+        'session' => 'Session',
+        'test' => 'Exam / test',
+        'kit' => 'Kit',
+        'item' => 'Unit / item',
+        'case' => 'Case',
+        'course' => 'Course',
+        'water_point' => 'Water point',
+        'event' => 'Event',
+        'field_visit' => 'Field visit',
+        'survey' => 'Survey',
+        'other' => 'Other',
+    ],
+    'follow_up_trigger' => [
+        'start' => 'When it starts',
+        'middle' => 'In the middle',
+        'finish' => 'When it finishes',
+    ],
 ];
