@@ -69,7 +69,6 @@ return [
         ],
     ],
     'hero' => [
-        'needs_link' => 'Jump to the decisions waiting on you',
         'late_link' => 'Jump to the late decisions',
     ],
     'deck' => [

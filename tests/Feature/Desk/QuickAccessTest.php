@@ -165,7 +165,7 @@ test('add to desk puts a button in quick access and takes it out, never on the d
     expect($user->fresh()->desk_quick_access)->toBeNull();
 });
 
-test('the customize sheet\'s buttons tab adds straight to quick access and hides what is already there', function () {
+test('the customize sheet\'s buttons tab marks buttons for quick access until Done and hides what is already there', function () {
     $user = User::factory()->role('Financial')->create(['desk_quick_access' => ['new:transfer']]);
 
     $this->actingAs($user)->get(route('dashboard'))
@@ -173,6 +173,9 @@ test('the customize sheet\'s buttons tab adds straight to quick access and hides
         ->assertSee('data-quick-items="'.e(json_encode(['a-transfer'])).'"', false)
         ->assertSee('data-customize-buttons-note', false)
         ->assertSee("pick('a-agreement')", false);
+
+    expect(file_get_contents(resource_path('js/desk-customize.js')))->toContain('this.quickPending = [...this.quickPending, panel];')
+        ->not->toContain('this.$wire.addQuickItem(panel)');
 
     Livewire::actingAs($user)->test('pages::desk.index')->call('addQuickItem', 'a-agreement')->assertReturned(true);
 

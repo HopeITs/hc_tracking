@@ -226,6 +226,20 @@ test('the plan page walks the program manager through the steps and saves an act
     expect($plan->items()->where('is_ready', true)->count())->toBe(1);
 });
 
+test('a number of weeks sets the batch end, capped at the plan end, and the dates step shows the whole calendar', function () {
+    $plan = chosenPlan();
+
+    $page = Livewire::actingAs($this->pm)->test('pages::annual-plans.plan', ['activityPlan' => $plan])
+        ->assertSeeHtml('data-dates-calendar')
+        ->set('form.batches.0.start', '2027-03-01')
+        ->call('setBatchWeeks', 0, '4')
+        ->assertSet('form.batches.0.end', '2027-03-22')
+        ->call('setBatchWeeks', 0, '0')
+        ->assertSet('form.batches.0.end', '2027-03-22')
+        ->call('setBatchWeeks', 0, '500')
+        ->assertSet('form.batches.0.end', '2027-12-27');
+});
+
 test('the MEAL manager sees every field of the plan read-only', function () {
     $plan = chosenPlan();
     foreach ($plan->items()->get() as $item) {

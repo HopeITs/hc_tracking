@@ -75,7 +75,13 @@
                             <option value="{{ $value }}" @selected($value === $batch['end'])>{{ $label }}</option>
                         @endforeach
                     </select>
-                    <span class="ap-faint ap-xs">{{ $endBefore ? __('annual_plans.end_before_start') : trans_choice('annual_plans.wf.weeks_count', $span, ['count' => $span]) }}</span>
+                    @if ($endBefore)
+                        <span class="ap-faint ap-xs">{{ __('annual_plans.end_before_start') }}</span>
+                    @else
+                        <label class="ap-mini">{{ __('annual_plans.wf.weeks_label') }}
+                            <input class="ap-inp is-n" type="number" min="1" step="1" value="{{ $span }}" @if (! $readOnly) wire:change="setBatchWeeks({{ $index }}, $event.target.value)" @endif {{ $dis }} aria-label="{{ __('annual_plans.wf.weeks_label') }}" data-test="batch-weeks">
+                        </label>
+                    @endif
                 @endunless
                 <span class="ap-sp"></span>
                 <label class="ap-mini">{{ $plural }}

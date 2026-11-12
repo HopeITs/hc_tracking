@@ -297,6 +297,7 @@ return [
         'unit_other_label' => 'Unit name',
         'unit_other_placeholder' => 'e.g. trainings',
         'until' => 'until',
+        'weeks_label' => 'Weeks',
         'week_n' => 'Week :n',
         'week_of' => 'Week of :date',
         'weeks_count' => '{0} :count weeks|{1} :count week|[2,*] :count weeks',

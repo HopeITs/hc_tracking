@@ -298,6 +298,7 @@ return [
         'unit_other_label' => 'اسم الوحدة',
         'unit_other_placeholder' => 'مثلاً: تدريبات',
         'until' => 'حتى',
+        'weeks_label' => 'عدد الأسابيع',
         'week_n' => 'الأسبوع :n',
         'week_of' => 'أسبوع :date',
         'weeks_count' => '{0} :count أسبوع|{1} أسبوع واحد|{2} أسبوعان|[3,10] :count أسابيع|[11,*] :count أسبوعاً',

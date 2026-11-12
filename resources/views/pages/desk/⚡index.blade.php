@@ -350,12 +350,9 @@ new #[Layout('layouts::desk'), Title('titles.dashboard')] class extends Componen
 
 @php
     $layout = $this->layout;
-    $needs = $this->needsCount;
-    $n = $needs['total'];
     $placed = array_column($layout, 'panel');
     /* "More to add" counts panels and page cards: buttons go to Quick access, never onto the Desk. */
     $more = count(array_diff(array_keys(array_filter($this->library, fn (array $item): bool => in_array($item['kind'], ['panel', 'card'], true))), $placed));
-    $needsPlaced = in_array('needs', $placed, true);
 @endphp
 
 <div data-desk x-data="{ removed: null, applied: null, placed: null, timer: null }" x-on:dk-panel-removed="removed = $event.detail; applied = null; placed = null; clearTimeout(timer); timer = setTimeout(() => removed = null, 6000)" x-on:dk-layout-applied="applied = $event.detail; removed = null; placed = null; clearTimeout(timer); timer = setTimeout(() => applied = null, 8000)" x-on:dk-item-placed.window="placed = $event.detail; removed = null; applied = null; clearTimeout(timer); timer = setTimeout(() => placed = null, 5000); $nextTick(() => document.getElementById('dk-panel-' + $event.detail.panel)?.scrollIntoView({ block: 'nearest', behavior: 'smooth' }))" x-on:dk-desk-changed.window="$wire.$refresh()">
@@ -369,18 +366,6 @@ new #[Layout('layouts::desk'), Title('titles.dashboard')] class extends Componen
         </div>
 
         <div class="dk-hello-end">
-            {{-- The day in two figures, across from the greeting; they lead down to the Needs you panel when that is on the desk. --}}
-            @if ($n === 0)
-                <p class="dk-hello-clear">{{ __('desk.hello_none') }}</p>
-            @else
-                <{{ $needsPlaced ? 'a href=#dk-panel-needs' : 'div' }} class="dk-hello-figs" @if ($needsPlaced) title="{{ __('desk-cards.hero.needs_link') }}" @endif data-desk-hello-figures>
-                    <span class="dk-hello-fig"><b class="dk-num page-title">{{ $n }}</b><span>{{ trans_choice('desk.hero_needs', $n) }}</span></span>
-                    @if ($needs['late'] > 0)
-                        <span class="dk-hello-fig dk-late"><b class="dk-num page-title text-brand-ink!">{{ $needs['late'] }}</b><span>{{ trans_choice('desk.hero_late', $needs['late']) }}</span></span>
-                    @endif
-                </{{ $needsPlaced ? 'a' : 'div' }}>
-            @endif
-
             @include('pages.desk._quick-access', ['quick' => $this->quickAccess])
         </div>
     </section>

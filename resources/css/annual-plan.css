@@ -105,6 +105,7 @@ textarea.ap-inp { height: auto; min-height: 90px; padding: 10px 12px; }
 .ap-tl .ap-b.is-alt { background: var(--warn); top: 16px; height: 10px; }
 .ap-tl .ap-o { position: absolute; top: 13px; width: 12px; height: 12px; margin-inline-start: -1px; border-radius: 3px; transform: rotate(45deg); background: var(--active); }
 .ap-gantt { border: 1px solid var(--line); border-radius: 14px; overflow: hidden; }
+.ap-pin { position: sticky; top: 0; z-index: 5; background: var(--paper); padding-block: 8px; max-height: 45vh; overflow-y: auto; display: grid; gap: 6px; }
 .ap-gr { display: grid; grid-template-columns: minmax(130px, 230px) 1fr; border-bottom: 1px solid var(--line); }
 .ap-gr:last-child { border-bottom: 0; }
 .ap-gr > div:first-child { padding: 10px 14px; font-weight: 600; font-size: .88rem; border-inline-end: 1px solid var(--line); background: var(--paper); min-width: 0; }

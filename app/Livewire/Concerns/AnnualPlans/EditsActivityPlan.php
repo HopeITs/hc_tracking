@@ -343,6 +343,24 @@ trait EditsActivityPlan
         ];
     }
 
+    /**
+     * The other way to fill a batch's end: how many weeks it runs from its
+     * start, capped at the plan's last week (Rami, 2026-11-12).
+     */
+    public function setBatchWeeks(int $index, mixed $weeks): void
+    {
+        $batch = $this->form['batches'][$index] ?? null;
+        $count = filter_var($weeks, FILTER_VALIDATE_INT);
+
+        if ($batch === null || blank($batch['start'] ?? null) || $count === false || $count < 1) {
+            return;
+        }
+
+        $mondays = $this->calendar->mondays();
+        $end = min(count($mondays) - 1, $this->calendar->indexOf(CarbonImmutable::parse($batch['start'])) + $count - 1);
+        $this->form['batches'][$index]['end'] = $mondays[$end]->toDateString();
+    }
+
     public function removeBatch(int $index): void
     {
         if (count($this->form['batches']) <= 1) {

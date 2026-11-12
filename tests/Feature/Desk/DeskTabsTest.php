@@ -56,3 +56,10 @@ test('only my desk hosts tabs, and its sidebar lets pages be dragged or added on
         ->assertDontSee('class="dk-tabs"', false)
         ->assertDontSee('data-side-add=', false);
 });
+
+test('the close-all button shows only while a page tab is in front, never on the desk', function () {
+    $this->actingAs(User::factory()->role('MEAL')->create())
+        ->get(route('dashboard'))
+        ->assertOk()
+        ->assertSee('x-show="active !== \'desk\'" x-on:click="closeAll()"', false);
+});

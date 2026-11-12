@@ -14,6 +14,11 @@
         <div class="ap-info is-bad" data-sent-back>↩︎ <b>{{ __('annual_plans.wf.sent_back_by', ['name' => $plan->sentBackBy?->name ?? __('annual_plans.wf.meal')]) }}</b> “<span dir="auto">{{ $plan->sent_back_reason }}</span>” {{ __('annual_plans.wf.fix_and_send') }}</div>
     @endif
 
+    <div class="ap-pin" data-dates-calendar>
+        <h3>{{ __('annual_plans.wf.whole_plan') }}</h3>
+        @include('pages.annual-plans._plan-gantt')
+    </div>
+
     <div class="ap-row"><b data-ready-count>{{ __('annual_plans.wf.ready_count', ['ready' => $readyCount, 'total' => $items->count()]) }}</b></div>
 
     <div class="ap-acts">
