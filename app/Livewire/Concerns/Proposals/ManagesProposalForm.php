@@ -21,7 +21,6 @@ use App\Models\Result;
 use App\Models\Task;
 use App\Models\User;
 use App\Rules\SecureUpload;
-use App\Support\Like;
 use Flux\Flux;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Collection;
@@ -35,11 +34,13 @@ use Livewire\Attributes\On;
 use Livewire\Features\SupportFileUploads\TemporaryUploadedFile;
 
 /**
- * The proposal form v2 (T06): create from one or more projects, or edit the
- * details, donor, budget and beneficiaries. Every save goes through
- * SaveProposal, so the form writes no status and no links of its own: a new
- * proposal starts at the concept note (or skips it with a reason), and an
- * edit leaves links to the proposal page's Projects tab.
+ * The proposal form v2 (T06): create with its location rows (W-34a slice 3,
+ * EditsProposalLocations), or edit the details, donor, budget, rows and
+ * beneficiaries. Every save goes through SaveProposal, so the form writes no
+ * status and no links of its own: a new proposal starts at the concept note
+ * (or skips it with a reason), and an edit leaves links to the proposal
+ * page's Projects tab. The one project a create may carry is the one the
+ * project page opened it from (New Concept Note).
  *
  * The property names are SaveProposal's `$data` keys, so a refusal from the
  * action lands under the field that caused it.
@@ -50,8 +51,7 @@ use Livewire\Features\SupportFileUploads\TemporaryUploadedFile;
  */
 trait ManagesProposalForm
 {
-    /** How many matching projects the picker lists at a time. */
-    private const ProjectPickerLimit = 25;
+    use EditsProposalLocations;
 
     public bool $showProposalModal = false;
 
@@ -70,10 +70,13 @@ trait ManagesProposalForm
 
     public string $donorId = '';
 
-    /** @var list<string> */
+    /**
+     * The project a create was opened from (New Concept Note on the project
+     * page), linked on save. There is no picker any more: places are rows.
+     *
+     * @var list<string>
+     */
     public array $projectIds = [];
-
-    public string $projectSearch = '';
 
     /** @var array<int|string, int|string|null> */
     public array $beneficiaries = [];
@@ -190,31 +193,7 @@ trait ManagesProposalForm
     }
 
     /**
-     * The picker's rows while creating: linkable projects matching the
-     * search, at most ProjectPickerLimit of them, plus the ones already
-     * chosen so a narrowed search never hides a choice.
-     *
-     * @return list<array{id: int, name: string, place: string, hosted: ?string, centerInactive: bool}>
-     */
-    #[Computed]
-    public function proposalPickerProjects(): array
-    {
-        if (! $this->showProposalModal || $this->editingProposalId !== null || ! $this->proposalActor()->can('projects.view')) {
-            return [];
-        }
-
-        $search = trim($this->projectSearch);
-
-        $matches = $this->linkableProjectQuery()
-            ->when($search !== '', fn (Builder $query) => $query->where(Like::matches('name', $search)))
-            ->limit(self::ProjectPickerLimit)
-            ->get();
-
-        return $this->projectRows($matches->merge($this->chosenProjects())->sortBy([['name', 'asc'], ['id', 'asc']]));
-    }
-
-    /**
-     * The chosen projects while creating, each with its beneficiaries input.
+     * The project a create was opened from, with its beneficiaries input.
      *
      * @return list<array{id: int, name: string, place: string, hosted: ?string, centerInactive: bool}>
      */
@@ -387,6 +366,8 @@ trait ManagesProposalForm
 
         if ($projectId !== null && $this->proposalActor()->can('projects.view') && $this->linkableProjectQuery()->whereKey($projectId)->exists()) {
             $this->projectIds = [(string) $projectId];
+        } else {
+            $this->addLocationRow();
         }
 
         $this->showProposalModal = true;
@@ -425,6 +406,10 @@ trait ManagesProposalForm
             $this->requestedCurrency = $proposal->requested_currency->value ?? '';
         }
 
+        if ($proposal->kind === ProposalKind::Project) {
+            $this->loadLocationRows($proposal->id);
+        }
+
         foreach ($proposal->projects()->select(['projects.id'])->get() as $project) {
             /** @var int|string|null $stored */
             $stored = $project->getRelation('pivot')->getAttribute('target_beneficiaries');
@@ -445,8 +430,9 @@ trait ManagesProposalForm
     }
 
     /**
-     * Choosing payroll on create drops the projects, beneficiaries, renewal
-     * and skip choices a project proposal had: payroll takes none of them.
+     * Choosing payroll on create drops the projects, rows, beneficiaries,
+     * renewal and skip choices a project proposal had: payroll takes none of
+     * them. Choosing project again starts with one empty row.
      * An edit never changes the kind, so the stored one is put back.
      */
     public function updatedKind(): void
@@ -469,6 +455,9 @@ trait ManagesProposalForm
             $this->previousProposalId = '';
             $this->startingStage = ProposalStatus::ConceptNote->value;
             $this->skipReason = '';
+            $this->resetLocationRows();
+        } elseif ($this->locations === [] && $this->projectIds === []) {
+            $this->addLocationRow();
         }
     }
 
@@ -641,7 +630,7 @@ trait ManagesProposalForm
         $this->internalProjectNumber = '';
         $this->donorId = '';
         $this->projectIds = [];
-        $this->projectSearch = '';
+        $this->resetLocationRows();
         $this->beneficiaries = [];
         $this->beneficiariesReason = '';
         $this->requestedBudget = '';
@@ -659,14 +648,15 @@ trait ManagesProposalForm
     }
 
     /**
-     * The form as SaveProposal's `$data`. Create sends the chosen projects,
-     * their beneficiaries and the starting stage; edit sends the linked
+     * The form as SaveProposal's `$data`. Create sends the location rows, the
+     * project it was opened from with its beneficiaries, and the starting
+     * stage; edit sends the rows (once the proposal has any) and the linked
      * projects' beneficiaries. The budget is sent only by a money holder.
      *
      * A payroll proposal (W-32) sends its narrative and, on create, its kind;
      * it never sends projects, beneficiaries or a starting stage.
      *
-     * @return array{name: string, internalProjectNumber: string, donorId: string|null, beneficiaries: array<int|string, int|string|null>, beneficiariesReason: string|null, plannedDateBegin: string|null, plannedDateEnd: string|null, notes: string, conceptNote: string|null, narrative?: string|null, kind?: string, projectIds?: list<string>, startingStage?: string, skipReason?: string|null, requestedBudget?: string|null, requestedCurrency?: string|null}
+     * @return array{name: string, internalProjectNumber: string, donorId: string|null, beneficiaries: array<int|string, int|string|null>, beneficiariesReason: string|null, plannedDateBegin: string|null, plannedDateEnd: string|null, notes: string, conceptNote: string|null, narrative?: string|null, kind?: string, projectIds?: list<string>, locations?: list<array{city_id: string, program_id: string|null, responsible_employee_id: string|null, center_ids: list<string>, is_new: bool, new_program_name_en: string, new_program_name_ar: string}>, startingStage?: string, skipReason?: string|null, requestedBudget?: string|null, requestedCurrency?: string|null}
      */
     private function proposalFormData(bool $isCreate): array
     {
@@ -699,9 +689,21 @@ trait ManagesProposalForm
         }
 
         if ($isCreate && ! $isPayroll) {
-            $data['projectIds'] = $this->projectIds;
+            if ($this->projectIds !== []) {
+                $data['projectIds'] = $this->projectIds;
+            }
+
+            // Rows are sent even when empty without a project, so the refusal names the missing place.
+            if ($this->hasLocationRows() || $this->projectIds === []) {
+                $data['locations'] = $this->locationPayload();
+            }
+
             $data['startingStage'] = $this->startingStage;
             $data['skipReason'] = $this->startingStage === ProposalStatus::ProposalDraft->value ? $this->skipReason : null;
+        }
+
+        if (! $isCreate && ! $isPayroll && ($this->hasLocationRows() || $this->hadLocationRows)) {
+            $data['locations'] = $this->locationPayload();
         }
 
         if (SaveProposal::canSeeMoney($this->proposalActor())) {

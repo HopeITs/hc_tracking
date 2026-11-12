@@ -7,6 +7,8 @@ namespace App\Actions\Proposals;
 use App\Enums\ProposalKind;
 use App\Enums\ProposalStatus;
 use App\Models\HrCenter;
+use App\Models\HrCity;
+use App\Models\HrEmployee;
 use App\Models\Indicator;
 use App\Models\Milestone;
 use App\Models\Project;
@@ -27,7 +29,8 @@ use Illuminate\Validation\ValidationException;
  * as an earlier one (D-30), linked through `previous_proposal_id` (T10).
  *
  * A renewal never creates a project. It copies what is worth keeping: the
- * donor, the notes, the linked projects with their beneficiaries, the planned
+ * donor, the notes, the linked projects with their beneficiaries, the
+ * location rows that still stand in HR (W-34a slice 3), the planned
  * duration (as editable planned dates), the framework (through
  * CopyResultTree, the one tree-copy routine) and the plan (milestones and
  * department tasks with planned dates only). It never copies a status,
@@ -132,8 +135,9 @@ final class CloneProposalForRenewal
         }
 
         $projects = $this->projects($previous);
+        $locations = $this->locations($previous);
 
-        if ($projects['ids'] === []) {
+        if ($projects['ids'] === [] && $locations === []) {
             throw ValidationException::withMessages(['projectIds' => __('proposals.link_at_least_one_project')]);
         }
 
@@ -143,6 +147,7 @@ final class CloneProposalForRenewal
             'name' => isset($data['name']) && $data['name'] !== '' ? (string) $data['name'] : $previous->name,
             'donorId' => $previous->donor_id,
             'projectIds' => $projects['ids'],
+            ...($locations === [] ? [] : ['locations' => $locations]),
             'beneficiaries' => $projects['beneficiaries'],
             'plannedDateBegin' => $begin->toDateString(),
             'plannedDateEnd' => $end->toDateString(),
@@ -195,6 +200,44 @@ final class CloneProposalForRenewal
             'notes' => array_key_exists('notes', $data) ? $data['notes'] : $previous->notes,
             'previousProposalId' => $previous->id,
         ], $user);
+    }
+
+    /**
+     * The previous proposal's location rows for the renewal: city, program,
+     * responsible and centers, merged by SaveProposal onto the rows its
+     * linked projects bring. Only rows that still stand are copied: a row
+     * without a program (its request belongs to the old proposal) or in a
+     * city HR has closed is left out, and a responsible who has left is
+     * dropped, so the renewal is never refused for last year's place.
+     *
+     * @return list<array{city_id: int, program_id: int, responsible_employee_id: int|null, center_ids: list<int>}>
+     */
+    private function locations(Proposal $previous): array
+    {
+        $rows = $previous->locations()->whereNotNull('program_id')->with('centers')->get();
+
+        if ($rows->isEmpty()) {
+            return [];
+        }
+
+        $activeCities = HrCity::query()->whereKey($rows->pluck('city_id')->unique()->all())->where('is_active', true)->pluck('id')->map(fn (mixed $id): int => (int) $id)->all();
+        $activeEmployees = HrEmployee::query()->whereKey($rows->pluck('responsible_employee_id')->filter()->unique()->all())->where('is_active', true)->pluck('id')->map(fn (mixed $id): int => (int) $id)->all();
+        $copied = [];
+
+        foreach ($rows as $row) {
+            if (! in_array((int) $row->city_id, $activeCities, true)) {
+                continue;
+            }
+
+            $copied[] = [
+                'city_id' => (int) $row->city_id,
+                'program_id' => (int) $row->program_id,
+                'responsible_employee_id' => in_array((int) $row->responsible_employee_id, $activeEmployees, true) ? (int) $row->responsible_employee_id : null,
+                'center_ids' => $row->centerIds(),
+            ];
+        }
+
+        return $copied;
     }
 
     /**
