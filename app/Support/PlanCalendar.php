@@ -10,7 +10,8 @@ use Carbon\CarbonInterface;
 
 /**
  * The Monday weeks an annual plan runs on (2026-11-11 agreement): from the
- * Monday of the week the proposal starts in to the week it ends in. A week
+ * Monday of the week the proposal starts in (or the next Monday when that one
+ * falls in the month before) to the week it ends in. A week
  * belongs to the month of its Monday; its number inside that month (1–5) is
  * its place among that month's Mondays, which is how activity_schedules
  * stores weeks.
@@ -27,7 +28,15 @@ final class PlanCalendar
     {
         $this->mondays = [];
 
-        for ($week = $begin->startOfWeek(CarbonInterface::MONDAY); $week->lte($end); $week = $week->addWeek()) {
+        $first = $begin->startOfWeek(CarbonInterface::MONDAY);
+
+        // A week belongs to the month of its Monday; a plan never opens with a
+        // week of the month before it starts (Fri 1 Jan starts on Mon 4 Jan).
+        if ($first->month !== $begin->month) {
+            $first = $first->addWeek();
+        }
+
+        for ($week = $first; $week->lte($end); $week = $week->addWeek()) {
             $this->mondays[] = $week;
         }
     }

@@ -32,6 +32,10 @@ use App\Models\MonthlyReportReopenRequest;
 use App\Models\NotificationMute;
 use App\Models\Permission;
 use App\Models\PlanIndicator;
+use App\Models\PlanUpdateFile;
+use App\Models\PlanUpdateNumber;
+use App\Models\PlanUpdateQuestion;
+use App\Models\PlanUpdateWeek;
 use App\Models\ProjectActivityStatus;
 use App\Models\ProposalLocationCenter;
 use App\Models\ProposalReviewer;
@@ -100,6 +104,10 @@ function modelsGuardedWithoutPolicy(): array
         MonthlyReportReopenRequest::class => ['reports', 'Raised and decided under MonthlyReportPolicy::requestReopen and decideReopen; never deleted.'],
         NotificationMute::class => [null, 'The signed-in user\'s own notification preferences only.'],
         Permission::class => ['access-management', 'access-management.* permissions and UserPolicy::grantPermission.'],
+        PlanUpdateFile::class => ['annual-plans', 'Part of its monthly update (PlanUpdatePolicy); written only by ManagePlanUpdateFiles, opened through plan-updates.files.download.'],
+        PlanUpdateNumber::class => ['annual-plans', 'Part of its monthly update (PlanUpdatePolicy::canFill); written only by SavePlanUpdate.'],
+        PlanUpdateQuestion::class => ['annual-plans', 'Part of its monthly update (PlanUpdatePolicy); written only by ReviewPlanUpdate::ask and answer.'],
+        PlanUpdateWeek::class => ['annual-plans', 'Part of its monthly update (PlanUpdatePolicy::canFill); written only by SavePlanUpdate.'],
         PlanIndicator::class => ['targets', 'targets.* permissions on the targets page.'],
         ProjectActivityStatus::class => ['reports', 'Written only when a monthly report is validated or reopened (MonthlyReportPolicy::validate, decideReopen).'],
         ProposalStatusNote::class => ['proposals', 'Written only through a proposal status change (ProposalPolicy::update).'],

@@ -65,12 +65,12 @@ function calendarRows(int $resultId, ?int $projectId): array
         ->all();
 }
 
-test('the plan runs on Mondays from the week the proposal starts in', function () {
+test('the plan runs on Mondays from the first week of its starting month', function () {
     $calendar = PlanCalendar::forProposal($this->proposal);
 
-    expect($calendar->firstMonday()->toDateString())->toBe('2026-12-28')
+    expect($calendar->firstMonday()->toDateString())->toBe('2027-01-04')
         ->and($calendar->lastMonday()->toDateString())->toBe('2027-12-27')
-        ->and($calendar->weekCount())->toBe(53)
+        ->and($calendar->weekCount())->toBe(52)
         ->and(count($calendar->mondaysOf(CarbonImmutable::parse('2027-03-01'))))->toBe(5);
 });
 

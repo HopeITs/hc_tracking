@@ -10,6 +10,8 @@ use App\Http\Controllers\MarkNotificationReadController;
 use App\Http\Controllers\MarkTourSeenController;
 use App\Http\Controllers\MonthlyReportFileDownloadController;
 use App\Http\Controllers\OpenNotificationController;
+use App\Http\Controllers\PlanUpdateExportController;
+use App\Http\Controllers\PlanUpdateFileDownloadController;
 use App\Http\Controllers\ProjectFileDownloadController;
 use App\Http\Controllers\ProposalFileDownloadController;
 use App\Http\Controllers\ProposalFilePreviewController;
@@ -90,6 +92,20 @@ Route::middleware(['auth', EnsureTwoFactorIsEnabled::class])->group(function () 
     Route::livewire('annual-plans/{activityPlan}', 'pages::annual-plans.plan')
         ->can('annual-plans.view')
         ->name('activity-plans.show');
+
+    Route::livewire('annual-plans/{activityPlan}/updates/{project}/{month}', 'pages::annual-plans.update')
+        ->can('annual-plans.view')
+        ->where('month', '\d{4}-\d{2}')
+        ->name('plan-updates.show');
+
+    Route::get('annual-plans/{activityPlan}/updates/{project}/{month}/export', PlanUpdateExportController::class)
+        ->can('annual-plans.view')
+        ->where('month', '\d{4}-\d{2}')
+        ->name('plan-updates.export');
+
+    Route::get('annual-plans/update-files/{planUpdateFile}', PlanUpdateFileDownloadController::class)
+        ->can('annual-plans.view')
+        ->name('plan-updates.files.download');
 
     Route::livewire('projects', 'pages::projects.index')
         ->can('projects.view')

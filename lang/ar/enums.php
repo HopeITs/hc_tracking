@@ -321,4 +321,22 @@ return [
         'middle' => 'في منتصفه',
         'finish' => 'عند انتهائه',
     ],
+    'plan_update_status' => [
+        'draft' => 'مسودة',
+        'sent' => 'مُرسل',
+        'officer_approved' => 'وافق عليه مسؤول الميل',
+        'reviewed' => 'راجعه مدير الميل',
+        'seen' => 'اطّلع',
+        'returned' => 'مُرجع',
+    ],
+    'plan_week_status' => [
+        'started' => 'بدأ',
+        'ongoing' => 'مستمر',
+        'completed' => 'مكتمل',
+        'conducted' => 'نُفّذ',
+        'rescheduled' => 'أُعيدت جدولته',
+        'suspended' => 'معلّق',
+        'cancelled' => 'ملغى',
+        'not_started' => 'لم يبدأ',
+    ],
 ];

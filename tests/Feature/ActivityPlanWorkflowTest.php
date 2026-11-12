@@ -87,7 +87,7 @@ test('chosen activities start with a default batch in every governorate and need
         ->and($plan->step)->toBe(2)
         ->and($plan->items->first()->is_ready)->toBeFalse()
         ->and($plan->items->first()->cityIds())->toBe([$this->aleppo, $this->homs])
-        ->and($plan->items->first()->batches->first()->start_week->toDateString())->toBe('2026-12-28');
+        ->and($plan->items->first()->batches->first()->start_week->toDateString())->toBe('2027-01-04');
 });
 
 test('an activity is ready only with every batch counted and timed', function () {

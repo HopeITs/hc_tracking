@@ -26,3 +26,5 @@
         <div><span class="ap-n">3</span><span>{!! __('annual_plans.wf.next_3') !!}</span></div>
     </div>
 </section>
+
+@include('pages.annual-plans._plan-updates')

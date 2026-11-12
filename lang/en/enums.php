@@ -321,4 +321,22 @@ return [
         'middle' => 'In the middle',
         'finish' => 'When it finishes',
     ],
+    'plan_update_status' => [
+        'draft' => 'Draft',
+        'sent' => 'Sent',
+        'officer_approved' => 'Approved by MEAL officer',
+        'reviewed' => 'Reviewed by MEAL manager',
+        'seen' => 'Seen',
+        'returned' => 'Returned',
+    ],
+    'plan_week_status' => [
+        'started' => 'Started',
+        'ongoing' => 'Ongoing',
+        'completed' => 'Completed',
+        'conducted' => 'Conducted',
+        'rescheduled' => 'Rescheduled',
+        'suspended' => 'Suspended',
+        'cancelled' => 'Cancelled',
+        'not_started' => 'Not started',
+    ],
 ];

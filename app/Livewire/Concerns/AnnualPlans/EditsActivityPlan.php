@@ -20,6 +20,7 @@ use App\Models\Result;
 use App\Models\User;
 use App\Support\ActivityPlanScope;
 use App\Support\PlanCalendar;
+use App\Support\PlanExecution;
 use Carbon\CarbonImmutable;
 use Closure;
 use Flux\Flux;
@@ -75,6 +76,12 @@ trait EditsActivityPlan
         return ActivityPlan::query()
             ->with(['proposal', 'items.activity:id,statement,activity_kind', 'items.batches', 'items.cities', 'followUps', 'submitter', 'approver', 'sentBackBy'])
             ->findOrFail($this->planId);
+    }
+
+    #[Computed]
+    public function execution(): PlanExecution
+    {
+        return PlanExecution::for($this->plan);
     }
 
     #[Computed]
