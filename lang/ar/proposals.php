@@ -584,6 +584,7 @@ return [
     'location_centers' => 'المراكز',
     'location_select_centers' => 'اختر المراكز',
     'location_centers_help' => 'يُنشأ مشروع لكل مركز عند الموافقة على المقترح.',
+    'location_centers_help_approved' => 'المراكز التي تنفّذ هذا المكان. لا تُنشأ مشاريع للمراكز الجديدة بعد الموافقة.',
     'location_choose_city_first' => 'اختر المدينة أولًا.',
     'location_no_centers_in_city' => 'لا يوجد في هذه المدينة مركز فعّال في الموارد البشرية.',
 ];

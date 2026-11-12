@@ -309,7 +309,7 @@
                                         wire:model="locations.{{ $index }}.center_ids"
                                         :label="__('proposals.location_centers')"
                                         :placeholder="__('proposals.location_select_centers')"
-                                        :help="$location['city_id'] === '' ? __('proposals.location_choose_city_first') : ($cityCenters === [] ? __('proposals.location_no_centers_in_city') : __('proposals.location_centers_help'))"
+                                        :help="$location['city_id'] === '' ? __('proposals.location_choose_city_first') : ($cityCenters === [] ? __('proposals.location_no_centers_in_city') : ($needsBeneficiariesReason ? __('proposals.location_centers_help_approved') : __('proposals.location_centers_help')))"
                                         :disabled="$cityCenters === []"
                                     >
                                         @foreach ($cityCenters as $center)

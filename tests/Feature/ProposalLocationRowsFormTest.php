@@ -129,6 +129,8 @@ test('an approved proposal row of a linked project takes centers, keeping its ci
         ->assertSet('locations.0.project', $project->name)
         ->assertSeeHtml('data-test="location-linked-project"')
         ->assertDontSeeHtml('data-test="remove-location"')
+        ->assertSeeText(__('proposals.location_centers_help_approved'))
+        ->assertDontSeeText(__('proposals.location_centers_help'))
         ->call('removeLocationRow', 0)
         ->assertCount('locations', 1)
         ->set('locations.0.center_ids', [(string) $this->aleppoCenter])

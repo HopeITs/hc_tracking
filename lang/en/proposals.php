@@ -584,6 +584,7 @@ return [
     'location_centers' => 'Centers',
     'location_select_centers' => 'Select centers',
     'location_centers_help' => 'One project is created per center when the proposal is approved.',
+    'location_centers_help_approved' => 'The centers that run this place. Projects for new centers are not created after approval.',
     'location_choose_city_first' => 'Choose the city first.',
     'location_no_centers_in_city' => 'This city has no active center in HR.',
 ];
