@@ -4,6 +4,7 @@ use App\Enums\ProposalStatus;
 use App\Models\Activity;
 use App\Models\Program;
 use App\Models\ProgramRequest;
+use App\Models\Project;
 use App\Models\Proposal;
 use App\Models\ProposalLocation;
 use App\Support\ProposalLocationRows;
@@ -170,12 +171,11 @@ test('a request someone already handled is not linked again', function () {
         ->and(DB::table('proposal_locations')->where('id', $request->proposal_location_id)->value('program_id'))->toBeNull();
 });
 
-test('linking on an approved proposal gives the row its project with the grant dates', function () {
+test('a manager linking on an approved proposal gives the row its project with the grant dates, and keeps no approval rights', function () {
     $request = pendingProgramRequest(ProposalStatus::Approved);
     $proposal = $request->location->proposal;
-    $admin = userWithRole('Super Admin');
 
-    Livewire::actingAs($admin)
+    Livewire::actingAs($this->manager)
         ->test('pages::admin.program-requests')
         ->call('openLinkModal', $request->id)
         ->set('programId', (string) $this->program->id)
@@ -190,5 +190,7 @@ test('linking on an approved proposal gives the row its project with the grant d
         ->and(substr((string) $project->start_date, 0, 10))->toBe('2026-11-01')
         ->and(substr((string) $project->end_date, 0, 10))->toBe('2027-10-31')
         ->and((int) DB::table('proposal_locations')->where('id', $request->proposal_location_id)->value('project_id'))->toBe($project->id)
-        ->and(DB::table('project_proposal')->where('proposal_id', $proposal->id)->pluck('project_id')->all())->toBe([$project->id]);
+        ->and(DB::table('project_proposal')->where('proposal_id', $proposal->id)->pluck('project_id')->all())->toBe([$project->id])
+        ->and($this->manager->can('approve', $proposal->refresh()))->toBeFalse()
+        ->and($this->manager->can('create', Project::class))->toBeFalse();
 });

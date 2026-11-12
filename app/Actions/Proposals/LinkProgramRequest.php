@@ -11,6 +11,8 @@ use App\Models\Program;
 use App\Models\ProgramRequest;
 use App\Models\Project;
 use App\Models\Proposal;
+use App\Models\User;
+use App\Support\ApprovalFollowUp;
 use App\Support\MaterialisationResult;
 use App\Support\ProposalLocationRows;
 use Illuminate\Support\Facades\Auth;
@@ -29,7 +31,10 @@ use Illuminate\Validation\ValidationException;
  * longer waits at its own approval, so the projects the row now needs are
  * materialised here (MaterialiseProposalLocations) and each one is given
  * the grant dates and approved like at the approval
- * (ApproveProjectFromProposal). Any refusal there undoes the link.
+ * (ApproveProjectFromProposal). That follow-up runs on the authority of
+ * the recorded approval (ApprovalFollowUp), so a `programs.update` holder
+ * without `proposals.approve` or `projects.create` can finish it. Any
+ * refusal there (no owner for a row) undoes the link.
  * ProposalLocationsChanged fires after the commit.
  */
 final class LinkProgramRequest
@@ -41,6 +46,7 @@ final class LinkProgramRequest
         private ProposalLocationRows $rows,
         private MaterialiseProposalLocations $materialiseLocations,
         private ApproveProjectFromProposal $approveProject,
+        private ApprovalFollowUp $followUp,
     ) {}
 
     /**
@@ -82,13 +88,18 @@ final class LinkProgramRequest
                 return null;
             }
 
-            $materialised = $this->materialiseLocations->handle($locked, (int) Auth::id());
+            /** @var User $actor */
+            $actor = Auth::user();
 
-            foreach ([...$materialised->createdProjectIds, ...$materialised->linkedProjectIds] as $projectId) {
-                $this->approveProject->handle(Project::query()->findOrFail($projectId), 'proposal_approval');
-            }
+            return $this->followUp->run($locked, $actor, function () use ($locked, $actor): MaterialisationResult {
+                $materialised = $this->materialiseLocations->handle($locked, (int) $actor->getKey());
 
-            return $materialised;
+                foreach ([...$materialised->createdProjectIds, ...$materialised->linkedProjectIds] as $projectId) {
+                    $this->approveProject->handle(Project::query()->findOrFail($projectId), 'proposal_approval');
+                }
+
+                return $materialised;
+            });
         });
 
         $request->refresh();

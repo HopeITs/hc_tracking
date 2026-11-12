@@ -36,6 +36,7 @@ use App\Models\Task;
 use App\Models\TransfersTracking;
 use App\Models\User;
 use App\Notifications\Alerts\NotificationSettings;
+use App\Support\ApprovalFollowUp;
 use App\Support\Desk\Destinations;
 use App\Support\Desk\PageCards;
 use App\Support\Desk\Panels;
@@ -55,6 +56,7 @@ use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Date;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Event;
+use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Support\Facades\Route;
@@ -77,6 +79,7 @@ class AppServiceProvider extends ServiceProvider
         // One instance per request or job, so queue workers never hold stale values.
         $this->app->scoped(NotificationSettings::class);
         $this->app->scoped(RouteSlugs::class);
+        $this->app->scoped(ApprovalFollowUp::class);
         $this->app->scoped(SupervisionMap::class);
         // The Desk's catalogues are asked many times per page (sidebar, Ask, cards, tabs, drops): built once per request.
         $this->app->scoped(Destinations::class);
@@ -159,6 +162,16 @@ class AppServiceProvider extends ServiceProvider
         $this->configureLivewire();
         $this->configureRateLimiting();
         $this->configureDateLocale();
+        $this->configureApprovalFollowUp();
+    }
+
+    /**
+     * Work a donor approval already decided may be finished later by the
+     * user running it (ApprovalFollowUp); outside that, policies decide.
+     */
+    protected function configureApprovalFollowUp(): void
+    {
+        Gate::before(fn (User $user, string $ability, array $arguments): ?bool => $this->app->make(ApprovalFollowUp::class)->grants($user, $ability, $arguments));
     }
 
     /**
