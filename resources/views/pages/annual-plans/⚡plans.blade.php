@@ -315,14 +315,7 @@ new #[Layout('layouts::desk'), Title('titles.annual_plans')] class extends Compo
             </section>
         @endif
 
-        <details class="ap-guide" data-guide>
-            <summary>{{ __('annual_plans.wf.guide_title') }}</summary>
-            <ol>
-                @foreach (__('annual_plans.wf.guide.'.$guideKey) as $line)
-                    <li>{!! $line !!}</li>
-                @endforeach
-            </ol>
-        </details>
+        @include('pages.annual-plans._guide', ['guideKey' => $guideKey])
 
         <div class="dk-chips" role="group" aria-label="{{ __('common.state') }}">
             @foreach ($statusTabs as $value => $label)

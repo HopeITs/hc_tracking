@@ -70,6 +70,13 @@ new #[Layout('layouts::desk'), Title('titles.annual_plan')] class extends Compon
     </x-ui.detail-header>
 
     <div class="ap-page">
+        @include('pages.annual-plans._guide', ['guideKey' => match ($mode) {
+            'fill', 'answer' => 'centre',
+            'officer' => 'officer',
+            'meal' => 'meal',
+            'program' => 'pm',
+            default => 'viewer',
+        }])
         @if ($mode === 'fill')
             @include('pages.annual-plans._update-form')
         @else

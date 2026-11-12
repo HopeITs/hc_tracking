@@ -155,6 +155,23 @@ test('the CEO sees the summary, not the grid', function () {
         ->assertDontSeeHtml('data-updates-grid');
 });
 
+test('the whole plan exports, planned and actual, as an Excel-readable sheet and a printable page', function () {
+    sendJanuaryWith(plainWeeks());
+
+    $this->actingAs($this->programManager)->get(route('activity-plans.export', [$this->plan, 'format' => 'xlsx']))->assertOk()->assertDownload();
+    $this->actingAs($this->programManager)->get(route('activity-plans.export', [$this->plan, 'format' => 'pdf']))->assertOk()
+        ->assertSee('Basic sessions')
+        ->assertSee(__('annual_plans.export.execution_part'));
+});
+
+test('every page shows the guide for the person reading it', function () {
+    sendJanuaryWith(plainWeeks());
+
+    Livewire::actingAs($this->programManager)->test('pages::annual-plans.plan', ['activityPlan' => $this->plan])->assertSeeHtml('data-guide=');
+    Livewire::actingAs($this->officer)->test('pages::annual-plans.update', ['activityPlan' => $this->plan, 'project' => $this->centre, 'month' => '2027-01'])->assertSeeHtml('data-guide="officer"');
+    Livewire::actingAs($this->projectManager)->test('pages::annual-plans.plans')->assertSeeHtml('data-guide="centre"');
+});
+
 test('updates export as an Excel-readable sheet and a printable page', function () {
     sendJanuaryWith(plainWeeks());
 

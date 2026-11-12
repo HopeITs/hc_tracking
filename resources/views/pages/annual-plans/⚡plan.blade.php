@@ -69,6 +69,22 @@ new #[Layout('layouts::desk'), Title('titles.annual_plan')] class extends Compon
     </x-ui.detail-header>
 
     <div class="ap-page">
+        @php
+            $viewer = auth()->user();
+            $guideKey = match (true) {
+                $mode === 'plan' || $mode === 'wait' => 'pm',
+                $mode === 'review' || \App\Policies\ActivityPlanPolicy::isMealManager($viewer) => 'meal',
+                $viewer->hasRole('General Manager') && ! $viewer->hasRole('Super Admin') => 'ceo',
+                $viewer->hasRole('MEAL') => 'officer',
+                $viewer->employee_id !== null && collect($this->execution->projects())->contains(fn ($centre) => (int) $centre->user_id === (int) $viewer->employee_id) => 'centre',
+                default => 'viewer',
+            };
+        @endphp
+        <div class="ap-row">
+            <div class="ap-sp">@include('pages.annual-plans._guide', ['guideKey' => $guideKey])</div>
+            <a class="dk-btn" href="{{ route('activity-plans.export', [$plan, 'format' => 'pdf']) }}" target="_blank" rel="noopener" data-test="plan-export-pdf">{{ __('annual_plans.up.export_pdf') }}</a>
+            <a class="dk-btn" href="{{ route('activity-plans.export', [$plan, 'format' => 'xlsx']) }}" data-test="plan-export-excel">{{ __('annual_plans.up.export_excel') }}</a>
+        </div>
         <div class="ap-rail" style="--ap-steps: 6" aria-label="{{ __('annual_plans.wf.progress') }}">
             @foreach ($steps as $index => $label)
                 <div @class(['ap-st', 'is-done' => $index < $railIndex, 'is-now' => $index === $railIndex]) @if ($index === $railIndex) aria-current="step" @endif><i></i>{{ $index + 1 }}. {{ $label }}</div>

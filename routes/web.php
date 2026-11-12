@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Controllers\ActivityPlanExportController;
 use App\Http\Controllers\DonorReportExportController;
 use App\Http\Controllers\DonorReportFileDownloadController;
 use App\Http\Controllers\DonorReportPrintController;
@@ -92,6 +93,10 @@ Route::middleware(['auth', EnsureTwoFactorIsEnabled::class])->group(function () 
     Route::livewire('annual-plans/{activityPlan}', 'pages::annual-plans.plan')
         ->can('annual-plans.view')
         ->name('activity-plans.show');
+
+    Route::get('annual-plans/{activityPlan}/export', ActivityPlanExportController::class)
+        ->can('annual-plans.view')
+        ->name('activity-plans.export');
 
     Route::livewire('annual-plans/{activityPlan}/updates/{project}/{month}', 'pages::annual-plans.update')
         ->can('annual-plans.view')

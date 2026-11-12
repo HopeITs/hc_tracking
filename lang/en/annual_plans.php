@@ -170,6 +170,7 @@ return [
                 'Tick the logframe activities you will run, then give each one its weeks, what it counts and how many, and where it runs.',
                 "Check the calendar and send it to MEAL. You can't edit it while MEAL reviews it.",
                 'If MEAL sends it back, you see the reason; fix it and send again. Once approved it is live.',
+                "Every month, after the MEAL manager reviews a centre's update, open it and mark it as seen; you can add a note for the project manager.",
             ],
             'meal' => [
                 'A plan reaches you when the program manager sends it.',
@@ -493,5 +494,15 @@ return [
     ],
     'tasks' => [
         'description' => 'MEAL follow-up for ":activity" in :centre (:when). Close it by uploading the result.',
+    ],
+    'export' => [
+        'held' => 'Units held',
+        'planned_so_far' => 'Planned so far',
+        'planned_total' => 'Planned in total',
+        'batch' => 'Batch / week',
+        'count' => 'Planned count',
+        'plan_part' => 'The plan',
+        'execution_part' => 'Execution per centre',
+        'details' => 'Total · places',
     ],
 ];
