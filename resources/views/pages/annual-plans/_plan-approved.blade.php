@@ -27,4 +27,6 @@
     </div>
 </section>
 
+@include('pages.annual-plans._plan-live')
+
 @include('pages.annual-plans._plan-updates')

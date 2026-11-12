@@ -8,6 +8,7 @@ use App\Enums\PlanUpdateStatus;
 use App\Models\PlanUpdate;
 use App\Models\PlanUpdateQuestion;
 use App\Models\User;
+use App\Support\PlanNotifier;
 use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Gate;
@@ -38,7 +39,7 @@ final class ReviewPlanUpdate
             throw ValidationException::withMessages(['accountability' => __('annual_plans.up.accountability_required')]);
         }
 
-        return $this->move($update, PlanUpdateStatus::Sent, [
+        $moved = $this->move($update, PlanUpdateStatus::Sent, [
             'status' => PlanUpdateStatus::OfficerApproved,
             'accountability' => $accountability,
             'officer_approved_at' => now(),
@@ -46,13 +47,16 @@ final class ReviewPlanUpdate
             'returned_to' => null,
             'return_reason' => null,
         ]);
+        PlanNotifier::update($moved, 'annual_plan.update_officer_approved', ['project_manager', 'meal', 'program_manager'], [], $user);
+
+        return $moved;
     }
 
     public function officerReturn(User $user, PlanUpdate $update, string $reason, ?string $accountability = null): PlanUpdate
     {
         Gate::forUser($user)->authorize('decideAsOfficer', $update);
 
-        return $this->move($update, PlanUpdateStatus::Sent, [
+        $moved = $this->move($update, PlanUpdateStatus::Sent, [
             'status' => PlanUpdateStatus::Returned,
             'accountability' => filled($accountability) ? trim((string) $accountability) : $update->accountability,
             'returned_at' => now(),
@@ -60,17 +64,23 @@ final class ReviewPlanUpdate
             'returned_to' => 'project_manager',
             'return_reason' => $this->reason($reason),
         ]);
+        PlanNotifier::update($moved, 'annual_plan.update_returned', ['project_manager'], ['reason' => (string) $moved->return_reason], $user, true);
+
+        return $moved;
     }
 
     public function mealReviewed(User $user, PlanUpdate $update): PlanUpdate
     {
         Gate::forUser($user)->authorize('decideAsMealManager', $update);
 
-        return $this->move($update, PlanUpdateStatus::OfficerApproved, [
+        $moved = $this->move($update, PlanUpdateStatus::OfficerApproved, [
             'status' => PlanUpdateStatus::Reviewed,
             'reviewed_at' => now(),
             'reviewed_by' => $user->id,
         ]);
+        PlanNotifier::update($moved, 'annual_plan.update_reviewed', ['program_manager', 'project_manager', 'officer'], [], $user);
+
+        return $moved;
     }
 
     /**
@@ -81,9 +91,12 @@ final class ReviewPlanUpdate
         Gate::forUser($user)->authorize('decideAsMealManager', $update);
         $reason = $this->reason($reason);
 
-        return $this->move($update, PlanUpdateStatus::OfficerApproved, $to === 'officer'
+        $moved = $this->move($update, PlanUpdateStatus::OfficerApproved, $to === 'officer'
             ? ['status' => PlanUpdateStatus::Sent, 'officer_approved_at' => null, 'officer_approved_by' => null, 'returned_at' => now(), 'returned_by' => $user->id, 'returned_to' => 'officer', 'return_reason' => $reason]
             : ['status' => PlanUpdateStatus::Returned, 'officer_approved_at' => null, 'officer_approved_by' => null, 'returned_at' => now(), 'returned_by' => $user->id, 'returned_to' => 'project_manager', 'return_reason' => $reason]);
+        PlanNotifier::update($moved, 'annual_plan.update_returned', [$to === 'officer' ? 'officer' : 'project_manager'], ['reason' => $reason], $user, true);
+
+        return $moved;
     }
 
     public function markSeen(User $user, PlanUpdate $update, ?string $note): PlanUpdate
@@ -91,12 +104,15 @@ final class ReviewPlanUpdate
         Gate::forUser($user)->authorize('markSeen', $update);
         $note = trim((string) $note);
 
-        return $this->move($update, PlanUpdateStatus::Reviewed, [
+        $moved = $this->move($update, PlanUpdateStatus::Reviewed, [
             'status' => PlanUpdateStatus::Seen,
             'seen_at' => now(),
             'seen_by' => $user->id,
             'program_manager_note' => $note === '' ? null : $note,
         ]);
+        PlanNotifier::update($moved, $note === '' ? 'annual_plan.update_seen' : 'annual_plan.update_seen_note', ['project_manager', 'meal', 'officer'], ['note' => $note], $user);
+
+        return $moved;
     }
 
     /**
@@ -111,14 +127,20 @@ final class ReviewPlanUpdate
             throw new AuthorizationException;
         }
 
-        return $this->post($update, $user, $question, 'question');
+        $posted = $this->post($update, $user, $question, 'question');
+        PlanNotifier::update($update, 'annual_plan.update_question', ['project_manager'], ['question' => $posted->body], $user);
+
+        return $posted;
     }
 
     public function answer(User $user, PlanUpdate $update, string $answer): PlanUpdateQuestion
     {
         Gate::forUser($user)->authorize('answer', $update);
 
-        return $this->post($update, $user, $answer, 'answer');
+        $posted = $this->post($update, $user, $answer, 'answer');
+        PlanNotifier::update($update, 'annual_plan.update_answered', ['officer', 'meal'], ['answer' => $posted->body], $user);
+
+        return $posted;
     }
 
     private function post(PlanUpdate $update, User $user, string $body, string $field): PlanUpdateQuestion

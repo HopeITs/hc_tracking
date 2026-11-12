@@ -434,6 +434,70 @@ return [
             ],
         ],
         'annual_plan' => [
+            'plan_submitted' => [
+                'title' => 'خطة سنوية جديدة للمراجعة',
+                'body' => 'أرسل :actor خطة :plan إلى الميل للمراجعة.',
+            ],
+            'plan_approved' => [
+                'title' => 'اعتُمدت الخطة السنوية',
+                'body' => 'اعتُمدت خطة :plan وأصبحت فعّالة.',
+            ],
+            'plan_sent_back' => [
+                'title' => 'أُرجعت الخطة السنوية',
+                'body' => 'أرجع :actor خطة :plan: ":reason"',
+            ],
+            'update_sent' => [
+                'title' => 'أُرسل تقرير شهري',
+                'body' => 'أُرسل تقرير :centre · :month.',
+            ],
+            'update_officer_approved' => [
+                'title' => 'وافق مسؤول الميل على تقرير شهري',
+                'body' => 'وافق :actor على تقرير :centre · :month.',
+            ],
+            'update_returned' => [
+                'title' => 'أُرجع تقرير شهري',
+                'body' => 'أُرجع تقرير :centre · :month: ":reason"',
+            ],
+            'update_reviewed' => [
+                'title' => 'رُوجع تقرير شهري',
+                'body' => 'راجع :actor تقرير :centre · :month.',
+            ],
+            'update_seen' => [
+                'title' => 'اطّلع على تقرير شهري',
+                'body' => 'وضع :actor "اطّلعت" على تقرير :centre · :month.',
+            ],
+            'update_seen_note' => [
+                'title' => 'اطّلع على تقرير شهري مع ملاحظة',
+                'body' => 'وضع :actor "اطّلعت" على تقرير :centre · :month: ":note"',
+            ],
+            'update_question' => [
+                'title' => 'سؤال على تقرير شهري',
+                'body' => 'سأل :actor عن :centre · :month: ":question"',
+            ],
+            'update_answered' => [
+                'title' => 'إجابة على تقرير شهري',
+                'body' => 'أجاب :actor على :centre · :month: ":answer"',
+            ],
+            'update_due' => [
+                'title' => 'اقترب موعد التقرير الشهري',
+                'body' => 'موعد تقرير :centre · :month هو :date.',
+            ],
+            'update_late' => [
+                'title' => 'تقرير شهري متأخر',
+                'body' => 'كان موعد تقرير :centre · :month هو :date ولم يُرسل.',
+            ],
+            'update_rescheduled' => [
+                'title' => 'عدّل الخطة السنوية',
+                'body' => 'أُعيدت جدولة :activity في :centre بمقدار :weeks أسابيع. يجب تعديل الخطة.',
+            ],
+            'update_paused' => [
+                'title' => 'نشاط متوقف',
+                'body' => ':activity في :centre: :status.',
+            ],
+            'follow_up_task' => [
+                'title' => 'مهمة متابعة جديدة من الميل',
+                'body' => ':task (:activity، :centre) مهلتها أسبوعان.',
+            ],
             'created' => 'أنشأ :actor الخطة السنوية «:subject»',
             'created_you' => 'جعلك :actor مديرًا للخطة السنوية الجديدة «:subject»',
             'manager_changed' => 'جعل :actor :to مديرًا للخطة السنوية «:subject»',

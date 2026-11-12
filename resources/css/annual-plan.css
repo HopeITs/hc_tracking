@@ -147,6 +147,41 @@ textarea.ap-inp { height: auto; min-height: 90px; padding: 10px 12px; }
 .ap-msg:hover { background: var(--tint); }
 .ap-dot { width: 38px; height: 38px; border-radius: 10px; display: grid; place-items: center; font-weight: 700; background: var(--sunk); font-size: .8rem; flex: none; }
 
+.ap-stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 10px; }
+.ap-stat { border: 1px solid var(--line); border-radius: 14px; padding: 12px 14px; display: flex; flex-direction: column; gap: 2px; background: var(--paper); }
+.ap-stat b { font-size: 1.55rem; line-height: 1.1; font-variant-numeric: tabular-nums; }
+.ap-stat span { font-size: .8rem; color: var(--ink-2); }
+.ap-legend { display: flex; flex-wrap: wrap; gap: 6px 14px; font-size: .78rem; color: var(--ink-2); }
+.ap-legend span { display: inline-flex; gap: 6px; align-items: center; }
+.ap-lg { width: 13px; height: 13px; border-radius: 3px; display: inline-block; flex: none; background: var(--sunk); }
+.ap-trk { border: 1px solid var(--line); border-radius: 14px; background: var(--paper); overflow: hidden; }
+.ap-trk-h { display: flex; flex-wrap: wrap; gap: 6px 10px; align-items: center; padding: 14px 16px; cursor: pointer; list-style: none; }
+.ap-trk-h::-webkit-details-marker { display: none; }
+.ap-trk-h:hover { background: var(--tint); }
+.ap-meter { display: flex; flex-direction: column; gap: 5px; font-size: .8rem; color: var(--ink-2); padding: 0 16px 12px; }
+.ap-bar { height: 8px; border-radius: 9px; background: var(--sunk); position: relative; overflow: hidden; }
+.ap-bar i { position: absolute; inset-block: 0; inset-inline-start: 0; border-radius: 9px; background: var(--active); }
+.ap-bar s { position: absolute; top: -2px; bottom: -2px; width: 2px; background: var(--ink); opacity: .5; }
+.ap-weeks { padding: 4px 16px 14px; display: flex; flex-direction: column; gap: 6px; overflow-x: auto; }
+.ap-wrow { display: grid; grid-template-columns: 170px minmax(430px, 1fr); gap: 10px; align-items: center; font-size: .78rem; color: var(--ink-2); }
+.ap-wline { display: grid; grid-template-columns: repeat(var(--ap-n), 1fr); gap: 2px; }
+.ap-wline i { height: 16px; border-radius: 3px; position: relative; background: var(--sunk); }
+.ap-mlab { position: relative; height: 14px; font-size: .62rem; color: var(--faint); }
+.ap-mlab span { position: absolute; top: 0; }
+.ap-wline i.is-future { background: repeating-linear-gradient(135deg, transparent 0 3px, var(--sunk) 3px 4px); }
+.ap-wline i.is-off::after, .ap-lg.is-off-dot { content: ""; position: absolute; top: -3px; inset-inline-end: -3px; width: 6px; height: 6px; border-radius: 50%; background: var(--brand); border: 1px solid var(--paper); }
+.ap-lg.is-off-dot { position: static; width: 8px; height: 8px; border-radius: 50%; }
+.ap-wline i.is-today, .ap-lg.is-today { outline: 2px solid var(--ink); outline-offset: 1px; }
+.is-plan { background: var(--line-2) !important; }
+.is-started { background: #8db4e2 !important; } .is-ongoing { background: var(--active) !important; } .is-completed { background: var(--good) !important; }
+.is-conducted { background: #8a5a9e !important; } .is-suspended { background: #d6941f !important; } .is-cancelled { background: #7a1418 !important; }
+.is-rescheduled { background: #e07a2f !important; } .ap-wline i.is-not_started, .ap-lg.is-not_started { background: transparent !important; box-shadow: inset 0 0 0 2px var(--brand); }
+.ap-notes { padding: 0 16px 14px; display: flex; flex-direction: column; gap: 4px; font-size: .82rem; }
+.ap-grid { display: grid; gap: 4px; font-size: .78rem; align-items: center; min-width: 640px; }
+.ap-grid > span { padding: 6px; border-radius: 8px; text-align: center; }
+.ap-grid > .is-h { font-weight: 700; color: var(--faint); }
+.ap-grid > .is-l { text-align: start; font-weight: 600; color: var(--ink); }
+
 /* sticky action bar */
 .ap-foot .dk-btn:disabled, .ap-card .dk-btn:disabled { opacity: .45; cursor: not-allowed; }
 .ap-foot { position: sticky; bottom: 0; z-index: 5; display: flex; flex-wrap: wrap; gap: 10px; align-items: center; padding: 12px 16px; border: 1px solid var(--line); border-radius: 14px; background: var(--paper); box-shadow: var(--dk-shadow); }
@@ -157,5 +192,6 @@ textarea.ap-inp { height: auto; min-height: 90px; padding: 10px 12px; }
     .ap-gr { grid-template-columns: 120px 1fr; }
     .ap-task { grid-template-columns: 1fr; }
     .ap-flow { grid-template-columns: 1fr 1fr; }
+    .ap-wrow { grid-template-columns: 110px minmax(430px, 1fr); }
 }
 }

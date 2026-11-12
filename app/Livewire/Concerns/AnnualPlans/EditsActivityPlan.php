@@ -16,9 +16,13 @@ use App\Enums\FollowUpTrigger;
 use App\Models\ActivityPlan;
 use App\Models\ActivityPlanBatch;
 use App\Models\ActivityPlanItem;
+use App\Models\Project;
 use App\Models\Result;
 use App\Models\User;
+use App\Policies\ActivityPlanPolicy;
+use App\Policies\PlanUpdatePolicy;
 use App\Support\ActivityPlanScope;
+use App\Support\MealCoverage;
 use App\Support\PlanCalendar;
 use App\Support\PlanExecution;
 use Carbon\CarbonImmutable;
@@ -70,6 +74,8 @@ trait EditsActivityPlan
 
     public string $sendBackReason = '';
 
+    public bool $attentionOnly = false;
+
     #[Computed]
     public function plan(): ActivityPlan
     {
@@ -82,6 +88,27 @@ trait EditsActivityPlan
     public function execution(): PlanExecution
     {
         return PlanExecution::for($this->plan);
+    }
+
+    /**
+     * The centres the live plan shows: only their own to a centre's project
+     * manager or MEAL officer, every centre to everyone else.
+     *
+     * @return list<Project>
+     */
+    #[Computed]
+    public function liveCentres(): array
+    {
+        $user = $this->user();
+        $all = $this->execution->projects();
+
+        if (ActivityPlanPolicy::isMealManager($user) || PlanUpdatePolicy::isProgramManager($user, $this->plan) || $user->hasRole('Super Admin')) {
+            return $all;
+        }
+
+        $own = array_values(array_filter($all, fn ($centre): bool => PlanUpdatePolicy::isProjectManager($user, $centre) || ($user->employee_id !== null && MealCoverage::responsibleFor($centre) === (int) $user->employee_id)));
+
+        return $own === [] ? $all : $own;
     }
 
     #[Computed]
@@ -553,7 +580,7 @@ trait EditsActivityPlan
 
     private function refreshPlan(): void
     {
-        unset($this->plan, $this->siblingPlans, $this->mode);
+        unset($this->plan, $this->siblingPlans, $this->mode, $this->execution, $this->liveCentres);
     }
 
     private function user(): User

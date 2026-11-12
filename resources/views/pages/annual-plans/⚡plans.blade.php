@@ -8,6 +8,14 @@ use App\Models\Program;
 use App\Models\Proposal;
 use App\Policies\ActivityPlanPolicy;
 use App\Support\ProposalFramework;
+use App\Enums\PlanUpdateStatus;
+use App\Models\Task;
+use App\Policies\PlanUpdatePolicy;
+use App\Support\MealCoverage;
+use App\Support\PlanCalendar;
+use App\Support\PlanExecution;
+use Carbon\CarbonImmutable;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Gate;
@@ -103,21 +111,48 @@ new #[Layout('layouts::desk'), Title('titles.annual_plans')] class extends Compo
     }
 
     /**
-     * The signed-in person's next step on the plans: a plan sent back or in
-     * progress for the program manager, a plan to review for MEAL.
+     * Every approved plan, read once for the grid, the CEO summary and the
+     * next step.
      *
-     * @return array{tone: string, title: string, body: string, plan: ActivityPlan|null, label: string}|null
+     * @return list<PlanExecution>
+     */
+    #[Computed]
+    public function approvedExecutions(): array
+    {
+        return array_values(ActivityPlan::query()->where('status', ActivityPlanStatus::Approved->value)->with('proposal')->get()
+            ->map(fn (ActivityPlan $plan): PlanExecution => PlanExecution::for($plan))->all());
+    }
+
+    /**
+     * The tasks MEAL's follow-ups created, newest first.
+     *
+     * @return Collection<int, Task>
+     */
+    #[Computed]
+    public function followUpTasks(): Collection
+    {
+        $ids = DB::table('activity_plan_follow_up_tasks')->latest('id')->limit(30)->pluck('task_id');
+
+        return Task::query()->withoutGlobalScopes()->whereKey($ids)->latest('id')->get();
+    }
+
+    /**
+     * The signed-in person's one next step (2026-11-11 mockup): a plan to
+     * review or fix, then a monthly update to fix, review, mark seen or send.
+     *
+     * @return array{tone: string, title: string, body: string, url: string, label: string}|null
      */
     #[Computed]
     public function nextStep(): ?array
     {
         $user = auth()->user();
+        $isMeal = ActivityPlanPolicy::isMealManager($user);
 
-        if (ActivityPlanPolicy::isMealManager($user)) {
+        if ($isMeal) {
             $toReview = ActivityPlan::query()->with('proposal:id,slug,name')->where('status', ActivityPlanStatus::InReview->value)->oldest('submitted_at')->first();
 
             if ($toReview !== null) {
-                return ['tone' => 'warn', 'title' => __('annual_plans.wf.next_review_title'), 'body' => __('annual_plans.wf.next_review_body', ['plan' => $toReview->proposal->name]), 'plan' => $toReview, 'label' => __('annual_plans.wf.review_now')];
+                return ['tone' => 'warn', 'title' => __('annual_plans.wf.next_review_title'), 'body' => __('annual_plans.wf.next_review_body', ['plan' => $toReview->proposal->name]), 'url' => route('activity-plans.show', $toReview), 'label' => __('annual_plans.wf.review_now')];
             }
         }
 
@@ -126,13 +161,75 @@ new #[Layout('layouts::desk'), Title('titles.annual_plans')] class extends Compo
             ->sortByDesc(fn (ActivityPlan $plan): int => $plan->sent_back_reason ? 1 : 0)
             ->first();
 
+        if ($mine?->sent_back_reason) {
+            return ['tone' => 'bad', 'title' => __('annual_plans.wf.next_fix_title'), 'body' => __('annual_plans.wf.next_fix_body', ['reason' => $mine->sent_back_reason]), 'url' => route('activity-plans.show', $mine), 'label' => __('annual_plans.wf.fix_plan')];
+        }
+
+        $found = $this->updateSteps($user, $isMeal);
+
+        if ($found !== []) {
+            $first = $found[0];
+
+            if (count($found) > 1) {
+                $first['body'] .= ' · '.trans_choice('annual_plans.next.more', count($found) - 1, ['count' => count($found) - 1]);
+            }
+
+            return $first;
+        }
+
         if ($mine !== null) {
-            return $mine->sent_back_reason
-                ? ['tone' => 'bad', 'title' => __('annual_plans.wf.next_fix_title'), 'body' => __('annual_plans.wf.next_fix_body', ['reason' => $mine->sent_back_reason]), 'plan' => $mine, 'label' => __('annual_plans.wf.fix_plan')]
-                : ['tone' => 'warn', 'title' => __('annual_plans.wf.next_finish_title'), 'body' => __('annual_plans.wf.next_finish_body', ['plan' => $mine->proposal->name]), 'plan' => $mine, 'label' => __('annual_plans.wf.open_plan')];
+            return ['tone' => 'warn', 'title' => __('annual_plans.wf.next_finish_title'), 'body' => __('annual_plans.wf.next_finish_body', ['plan' => $mine->proposal->name]), 'url' => route('activity-plans.show', $mine), 'label' => __('annual_plans.wf.open_plan')];
         }
 
         return null;
+    }
+
+    /**
+     * The monthly updates waiting for this person, most urgent first: one to
+     * fix, to review (officer, MEAL manager), to mark seen, then to send.
+     *
+     * @return list<array{tone: string, title: string, body: string, url: string, label: string}>
+     */
+    private function updateSteps(\App\Models\User $user, bool $isMeal): array
+    {
+        $today = CarbonImmutable::today();
+        $found = [];
+
+        foreach ($this->approvedExecutions as $execution) {
+            $isProgramManager = PlanUpdatePolicy::isProgramManager($user, $execution->plan) && ! $user->hasRole('Super Admin');
+
+            foreach ($execution->projects() as $centre) {
+                $isProjectManager = PlanUpdatePolicy::isProjectManager($user, $centre) && ! $user->hasRole('Super Admin');
+                $isOfficer = $user->employee_id !== null && MealCoverage::responsibleFor($centre) === (int) $user->employee_id;
+
+                foreach ($execution->startedMonths($today) as $month) {
+                    $update = $execution->update($centre, $month);
+                    $status = $update?->status;
+                    $what = $centre->name.' · '.$month->translatedFormat('F Y');
+                    $monthName = $month->translatedFormat('F');
+                    $step = match (true) {
+                        $status === PlanUpdateStatus::Returned && $isProjectManager => [0, 'bad', __('annual_plans.next.fix_title', ['month' => $monthName]), __('annual_plans.next.fix_body', ['what' => $what, 'reason' => (string) $update->return_reason]), __('annual_plans.next.fix_button')],
+                        $status === PlanUpdateStatus::Sent && $isOfficer => [1, $update->returned_to === 'officer' ? 'bad' : 'warn', __('annual_plans.next.officer_title', ['month' => $monthName]), $what, __('annual_plans.wf.review_now')],
+                        $status === PlanUpdateStatus::OfficerApproved && $isMeal => [1, 'warn', __('annual_plans.next.meal_title', ['month' => $monthName]), $what, __('annual_plans.wf.review_now')],
+                        $status === PlanUpdateStatus::Reviewed && $isProgramManager => [2, 'warn', __('annual_plans.next.seen_title', ['month' => $monthName]), $what, __('annual_plans.next.open_update')],
+                        ($status === null || $status === PlanUpdateStatus::Draft) && $isProjectManager && $today->gte($month->addMonth()) && $execution->sendBlockers($centre, $month, $today) === [] => [3, $today->gt(PlanCalendar::dueDateOf($month)) ? 'bad' : 'warn', __('annual_plans.next.send_title', ['month' => $monthName]), __('annual_plans.next.send_body', ['what' => $what, 'date' => PlanCalendar::dueDateOf($month)->translatedFormat(__('formats.date'))]), __('annual_plans.next.fill_button')],
+                        default => null,
+                    };
+
+                    if ($step !== null) {
+                        $found[] = ['rank' => $step[0], 'tone' => $step[1], 'title' => $step[2], 'body' => $step[3], 'url' => route('plan-updates.show', [$execution->plan, $centre, $month->format('Y-m')]), 'label' => $step[4]];
+                    }
+                }
+            }
+        }
+
+        usort($found, fn (array $a, array $b): int => $a['rank'] <=> $b['rank']);
+
+        return array_map(function (array $step): array {
+            unset($step['rank']);
+
+            return $step;
+        }, $found);
     }
 
     public function openCreateModal(): void
@@ -187,7 +284,15 @@ new #[Layout('layouts::desk'), Title('titles.annual_plans')] class extends Compo
     $counts = $this->counts;
     $next = $this->nextStep;
     $user = auth()->user();
-    $guideKey = \App\Policies\ActivityPlanPolicy::isMealManager($user) ? 'meal' : ($user->can('create', \App\Models\ActivityPlan::class) ? 'pm' : 'viewer');
+    $ownsCentre = $user->employee_id !== null && \App\Models\Project::query()->where('user_id', $user->employee_id)->exists();
+    $guideKey = match (true) {
+        $user->hasRole('General Manager') && ! $user->hasRole('Super Admin') => 'ceo',
+        \App\Policies\ActivityPlanPolicy::isMealManager($user) => 'meal',
+        $user->hasRole('MEAL') => 'officer',
+        $ownsCentre && ! \App\Models\Program::query()->where('manager_id', $user->employee_id)->exists() => 'centre',
+        $user->can('create', \App\Models\ActivityPlan::class) => 'pm',
+        default => 'viewer',
+    };
     $statusTabs = ['' => __('annual_plans.wf.all_plans'), ActivityPlanStatus::InReview->value => ActivityPlanStatus::InReview->label(), ActivityPlanStatus::Draft->value => ActivityPlanStatus::Draft->label(), ActivityPlanStatus::Approved->value => ActivityPlanStatus::Approved->label()];
 @endphp
 
@@ -206,7 +311,7 @@ new #[Layout('layouts::desk'), Title('titles.annual_plans')] class extends Compo
             <section class="ap-next" data-next-step>
                 <span class="ap-ic is-{{ $next['tone'] }}" aria-hidden="true">!</span>
                 <div style="flex: 1; min-width: 220px"><h2>{{ $next['title'] }}</h2><p class="ap-sm ap-muted" dir="auto">{{ $next['body'] }}</p></div>
-                <a class="dk-btn dk-primary" href="{{ route('activity-plans.show', $next['plan']) }}" wire:navigate>{{ $next['label'] }}</a>
+                <a class="dk-btn dk-primary" href="{{ $next['url'] }}" wire:navigate data-test="next-step-button">{{ $next['label'] }}</a>
             </section>
         @endif
 
@@ -263,6 +368,8 @@ new #[Layout('layouts::desk'), Title('titles.annual_plans')] class extends Compo
                 @endforeach
             </x-ui.data-table>
         @endif
+
+        @include('pages.annual-plans._plans-overview')
     </div>
 
     <flux:modal wire:model="showCreateModal" class="w-full max-w-lg" data-test="new-plan-modal">

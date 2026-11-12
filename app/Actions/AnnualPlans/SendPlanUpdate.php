@@ -11,6 +11,7 @@ use App\Models\Project;
 use App\Models\User;
 use App\Policies\PlanUpdatePolicy;
 use App\Support\PlanExecution;
+use App\Support\PlanNotifier;
 use Carbon\CarbonImmutable;
 use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Support\Facades\DB;
@@ -50,7 +51,7 @@ final class SendPlanUpdate
             throw ValidationException::withMessages(['send' => __('annual_plans.up.incomplete', ['count' => count($missing)])]);
         }
 
-        return DB::transaction(function () use ($user, $update): PlanUpdate {
+        $sent = DB::transaction(function () use ($user, $update): PlanUpdate {
             $locked = PlanUpdate::query()->lockForUpdate()->findOrFail($update->id);
             $wasReturned = $locked->status === PlanUpdateStatus::Returned;
             $locked->forceFill([
@@ -65,6 +66,33 @@ final class SendPlanUpdate
 
             return $locked;
         });
+
+        PlanNotifier::update($sent, 'annual_plan.update_sent', ['officer', 'meal', 'program_manager'], [], $user);
+        app(FireActivityPlanFollowUps::class)->handle($sent);
+        self::alertOnWeeks($sent->load('weeks.batch.item.activity'));
+
+        return $sent;
+    }
+
+    /**
+     * A batch rescheduled two weeks or more tells the program manager to
+     * revise the plan (it never blocks sending); a suspension or a
+     * cancellation tells the program manager and MEAL.
+     */
+    private static function alertOnWeeks(PlanUpdate $update): void
+    {
+        foreach ($update->weeks as $week) {
+            $activity = (string) $week->batch?->item?->activity?->statement;
+            $moved = $week->new_week === null ? 0 : intdiv((int) $week->week->diffInDays($week->new_week), 7);
+
+            if ($week->status === PlanWeekStatus::Rescheduled && $moved >= 2) {
+                PlanNotifier::update($update, 'annual_plan.update_rescheduled', ['program_manager'], ['activity' => $activity, 'weeks' => (string) $moved], null, true);
+            }
+
+            if ($week->status === PlanWeekStatus::Suspended || $week->status === PlanWeekStatus::Cancelled) {
+                PlanNotifier::update($update, 'annual_plan.update_paused', ['program_manager', 'meal'], ['activity' => $activity, 'status' => $week->status->label()]);
+            }
+        }
     }
 
     /**

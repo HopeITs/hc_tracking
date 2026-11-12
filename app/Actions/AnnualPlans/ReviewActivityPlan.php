@@ -7,6 +7,7 @@ namespace App\Actions\AnnualPlans;
 use App\Enums\ActivityPlanStatus;
 use App\Models\ActivityPlan;
 use App\Models\User;
+use App\Support\PlanNotifier;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Validation\ValidationException;
@@ -32,6 +33,7 @@ final class ReviewActivityPlan
                 'approved_by' => $user->id,
             ])->save();
             $this->sync->handle($locked);
+            PlanNotifier::plan($locked, 'annual_plan.plan_approved', ['program_manager', 'project_manager', 'officer'], [], $user);
 
             return $locked;
         });
@@ -55,6 +57,7 @@ final class ReviewActivityPlan
                 'sent_back_by' => $user->id,
                 'sent_back_reason' => $reason,
             ])->save();
+            PlanNotifier::plan($locked, 'annual_plan.plan_sent_back', ['program_manager'], ['reason' => $reason], $user, true);
 
             return $locked;
         });

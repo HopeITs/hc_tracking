@@ -7,6 +7,7 @@ namespace App\Actions\AnnualPlans;
 use App\Enums\ActivityPlanStatus;
 use App\Models\ActivityPlan;
 use App\Models\User;
+use App\Support\PlanNotifier;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Validation\ValidationException;
@@ -36,6 +37,7 @@ final class SubmitActivityPlan
                 'submitted_by' => $user->id,
                 'sent_back_reason' => null,
             ])->save();
+            PlanNotifier::plan($locked, 'annual_plan.plan_submitted', ['meal'], [], $user);
 
             return $locked;
         });
