@@ -38,7 +38,7 @@ new #[Layout('layouts::desk'), Title('titles.proposals')] class extends Componen
     use WithPagination;
 
     /** @var list<string> */
-    public const FLAGS = ['on_hold', 'no_agreement', 'overdue', 'report_overdue'];
+    public const FLAGS = ['on_hold', 'no_agreement', 'overdue', 'report_overdue', 'no_center'];
 
     /**
      * Every property a filter control writes.
@@ -238,6 +238,7 @@ new #[Layout('layouts::desk'), Title('titles.proposals')] class extends Componen
         ['label' => __('finance_tables.flag_no_agreement'), 'model' => 'flag', 'value' => 'no_agreement', 'toggle' => true, 'active' => $chosen['flag'] === 'no_agreement', 'test' => 'flag-no-agreement'],
         $canTransfers ? ['label' => __('finance_tables.flag_has_overdue'), 'model' => 'flag', 'value' => 'overdue', 'toggle' => true, 'active' => $chosen['flag'] === 'overdue', 'tone' => 'critical', 'test' => 'flag-overdue'] : null,
         ['label' => __('finance_tables.flag_report_overdue'), 'model' => 'flag', 'value' => 'report_overdue', 'toggle' => true, 'active' => $chosen['flag'] === 'report_overdue', 'test' => 'flag-report-overdue'],
+        ['label' => __('finance_tables.flag_no_center'), 'model' => 'flag', 'value' => 'no_center', 'toggle' => true, 'active' => $chosen['flag'] === 'no_center', 'tone' => 'warn', 'test' => 'flag-no-center'],
     ]));
 @endphp
 

@@ -456,29 +456,29 @@ test('the form offers no free status, only the concept note or a skip to the pro
     expect(DB::table('proposals')->count())->toBe(0);
 });
 
-test('the project picker lists linkable projects with their center and city, and searches by name', function () {
+test('a create opened from a project shows that project with its center, program and city instead of a picker', function () {
     $cityId = insertHrCity('Idlib', 'إدلب');
     $centerId = insertHrCenter($cityId, 'Hope Center Idlib', 'مركز الأمل إدلب');
     $water = Project::factory()->create(['name' => 'Water Network Rehabilitation', 'city_id' => $cityId, 'center_id' => $centerId]);
-    Project::factory()->status(ProjectStatus::Closed)->create(['name' => 'Bakery Support']);
-    Project::factory()->status(ProjectStatus::Archived)->create(['name' => 'Old Mobile Clinic']);
+    Project::factory()->create(['name' => 'Bakery Support']);
 
-    openProposalCreateForm(userWithRole('Financial'))
+    Livewire::actingAs(userWithRole('Financial'))->test('pages::proposals.index')
+        ->call('openCreateModal', $water->id)
+        ->assertSet('projectIds', [(string) $water->id])
+        ->assertSet('locations', [])
+        ->assertDontSeeHtml('data-test="proposal-project-picker"')
         ->assertSeeText('Water Network Rehabilitation')
         ->assertSeeText('Hope Center Idlib · '.$water->program->name.' · Idlib')
-        ->assertSeeText('Bakery Support')
-        ->assertDontSeeText('Old Mobile Clinic')
-        ->set('projectSearch', 'Water')
-        ->assertSeeText('Water Network Rehabilitation')
         ->assertDontSeeText('Bakery Support');
 });
 
-test('the project picker labels a hosted project with its host center', function () {
+test('a create opened from a hosted project labels it with its host center', function () {
     $idleb = insertHrCity('Idleb', 'إدلب');
     $host = insertHrCenter(insertHrCity('Aleppo', 'حلب'), 'Head Office Aleppo', 'المكتب الرئيسي حلب');
     $wells = Project::factory()->hostedBy($host)->create(['name' => 'Wells Idleb', 'city_id' => $idleb]);
 
-    openProposalCreateForm(userWithRole('Financial'))
+    Livewire::actingAs(userWithRole('Financial'))->test('pages::proposals.index')
+        ->call('openCreateModal', $wells->id)
         ->assertSeeText('Wells Idleb')
         ->assertSeeText($wells->program->name.' · Idleb')
         ->assertSeeText('Hosted by Head Office Aleppo')

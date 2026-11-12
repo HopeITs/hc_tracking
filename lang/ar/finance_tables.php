@@ -43,6 +43,7 @@ return [
     'flag_in_transit' => 'أموال قيد التحويل',
     'flag_no_account' => 'بلا حساب',
     'flag_no_agreement' => 'بلا اتفاقية',
+    'flag_no_center' => 'بلا مركز',
     'flag_no_tranches' => 'بلا دفعات',
     'flag_no_transfers' => 'بلا تحويلات',
     'flag_on_hold' => 'معلّق',

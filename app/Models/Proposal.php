@@ -19,6 +19,7 @@ use Carbon\CarbonImmutable;
 use Database\Factories\ProposalFactory;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Attributes\ObservedBy;
+use Illuminate\Database\Eloquent\Attributes\Scope;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Casts\Attribute;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
@@ -199,6 +200,23 @@ class Proposal extends Model implements TracksActivity
     public function locations(): HasMany
     {
         return $this->hasMany(ProposalLocation::class)->orderBy('sort')->orderBy('id');
+    }
+
+    /**
+     * Project proposals whose place is not known down to the center (W-34a
+     * slice 3): a location row with no center, or no location row at all.
+     * Payroll proposals have no place and never match. The team works this
+     * list down by giving each row its centers.
+     *
+     * @param  Builder<static>  $query
+     */
+    #[Scope]
+    protected function withoutCenter(Builder $query): void
+    {
+        $query->where('proposals.kind', ProposalKind::Project)
+            ->where(fn (Builder $inner) => $inner
+                ->doesntHave('locations')
+                ->orWhereHas('locations', fn (Builder $rows) => $rows->doesntHave('centers')));
     }
 
     /**

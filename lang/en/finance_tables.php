@@ -43,6 +43,7 @@ return [
     'flag_in_transit' => 'Money in transit',
     'flag_no_account' => 'No account',
     'flag_no_agreement' => 'No agreement',
+    'flag_no_center' => 'Without a center',
     'flag_no_tranches' => 'No tranches',
     'flag_no_transfers' => 'No transfers',
     'flag_on_hold' => 'On hold',

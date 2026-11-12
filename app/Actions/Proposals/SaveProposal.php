@@ -42,9 +42,9 @@ use Illuminate\Validation\Validator as ValidatorInstance;
  * is validated as a whole, then replaced under the proposal lock through
  * ProposalLocationRows, a new row without a program opens its program
  * request, and ProposalLocationsChanged fires after commit with the counts.
- * On create, each `projectIds` entry still becomes a row with `project_id`
- * through LinkProposalProject, so a form without rows keeps working until
- * the picker goes (W-34a slice 3).
+ * On create, each `projectIds` entry (the project a create was opened
+ * from, or a renewal's projects) becomes a row with `project_id` through
+ * LinkProposalProject; a create that sends `locations` needs no project.
  * A payroll proposal (D-55b, W-32) is chosen on create only and never changes
  * kind. It needs a narrative, links no project and starts in `proposal
  * draft`: created at the concept note like any other, then moved on at once
@@ -250,7 +250,8 @@ final class SaveProposal
         }
 
         if ($proposal === null && ! $isPayroll) {
-            $rules['projectIds'] = ['bail', 'required_without:locations', 'array'];
+            // A form that sends its rows needs no project: the rows are the place (W-34a slice 3).
+            $rules['projectIds'] = array_key_exists('locations', $input) ? ['bail', 'nullable', 'array'] : ['bail', 'required_without:locations', 'array'];
             $rules['locations'] = ['bail', 'required_without:projectIds', 'array'];
             $rules['startingStage'] = ['required', Rule::in([ProposalStatus::ConceptNote->value, ProposalStatus::ProposalDraft->value])];
             $rules['skipReason'] = ['nullable', 'required_if:startingStage,'.ProposalStatus::ProposalDraft->value, 'string', 'min:10', 'max:5000'];
