@@ -137,6 +137,7 @@ return [
     'work_not_tied_to_a_project' => 'Work not tied to a project',
     'weighted_milestones_reached' => 'Weighted milestones reached',
     'weighted_progress_of_total' => ':reached of :total progress points reached',
+    'milestone_progress_from_projects' => 'Counts only :measured of :count projects. The rest have no milestones yet.',
     'timeline_behind' => 'Behind schedule',
     'timeline_complete' => 'Complete',
     'timeline_expected' => ':percent% expected by today',

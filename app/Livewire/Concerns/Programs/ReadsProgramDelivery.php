@@ -150,7 +150,13 @@ trait ReadsProgramDelivery
         return $this->chain['summary'];
     }
 
-    /** @return array{percentage: float|null, reached: float, total: float} */
+    /**
+     * The program's weighted milestone progress, and how many of its projects
+     * it is drawn from, so a figure built on one project never reads as the
+     * whole program's.
+     *
+     * @return array{percentage: float|null, reached: float, total: float, measuredProjects: int, projects: int}
+     */
     #[Computed]
     public function milestoneProgress(): array
     {
@@ -158,7 +164,7 @@ trait ReadsProgramDelivery
             ->whereIn('project_id', Project::query()->select('id')->where('program_id', $this->programId))
             ->where('status', '!=', MilestoneStatus::Cancelled->value)
             ->selectRaw(
-                'coalesce(sum(case when status = ? then weight_percentage else 0 end), 0) as reached_weight, coalesce(sum(weight_percentage), 0) as total_weight',
+                'coalesce(sum(case when status = ? then weight_percentage else 0 end), 0) as reached_weight, coalesce(sum(weight_percentage), 0) as total_weight, count(distinct case when weight_percentage > 0 then project_id end) as measured_projects',
                 [MilestoneStatus::Reached->value],
             )
             ->toBase()
@@ -171,6 +177,8 @@ trait ReadsProgramDelivery
             'percentage' => $total > 0 ? round(($reached / $total) * 100, 1) : null,
             'reached' => $reached,
             'total' => $total,
+            'measuredProjects' => (int) ($weights->measured_projects ?? 0),
+            'projects' => Project::query()->where('program_id', $this->programId)->count(),
         ];
     }
 }

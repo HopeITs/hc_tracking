@@ -297,7 +297,24 @@ test('program detail calculates milestone progress without cancelled milestones'
     Livewire::actingAs(User::factory()->role('General Manager')->create())
         ->test('pages::programs.show', ['program' => $program])
         ->assertSee('40%')
-        ->assertSee('40 of 100 progress points reached');
+        ->assertSee('40 of 100 progress points reached')
+        ->assertDontSeeHtml('data-milestone-coverage');
+});
+
+test('milestone progress says how few projects it is drawn from when others have no milestones', function () {
+    $program = Program::factory()->create();
+    $measured = Project::factory()->create(['program_id' => $program->id]);
+    Project::factory()->count(2)->create(['program_id' => $program->id]);
+    Milestone::factory()->create([
+        'project_id' => $measured->id,
+        'status' => MilestoneStatus::Reached,
+        'weight_percentage' => '100.00',
+    ]);
+
+    Livewire::actingAs(User::factory()->role('General Manager')->create())
+        ->test('pages::programs.show', ['program' => $program])
+        ->assertSee('100%')
+        ->assertSee('Counts only 1 of 3 projects. The rest have no milestones yet.');
 });
 
 test('program detail links each annual plan year to its plan', function () {

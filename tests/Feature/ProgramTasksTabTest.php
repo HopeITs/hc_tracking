@@ -207,6 +207,21 @@ test('a user without task rights cannot change a task and sees no edit controls'
         ->and($task->fresh()->priority)->not->toBe(TaskPriority::High);
 });
 
+test('a read-only viewer sees the tasks but no add button or add line', function () {
+    ['program' => $program, 'project' => $project] = programTaskSetup();
+    projectTask($project, ['title' => 'Order the pumps']);
+    $reader = User::factory()->create();
+    $reader->givePermissionTo('programs.view');
+    expect($reader->can('create', Task::class))->toBeFalse();
+
+    Livewire::actingAs($reader)
+        ->test('pages::programs.show', ['program' => $program])
+        ->set('tab', 'tasks')
+        ->assertSee('Order the pumps')
+        ->assertDontSeeHtml('data-test="add-program-task-button"')
+        ->assertDontSeeHtml('data-task-add=');
+});
+
 test('the task list shows seven tasks a page', function () {
     ['program' => $program, 'project' => $project, 'manager' => $manager] = programTaskSetup();
     foreach (range(1, 12) as $day) {

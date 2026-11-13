@@ -341,6 +341,9 @@ new #[Layout('layouts::desk'), Title('titles.program')] class extends Component 
             <span class="dk-prog-stat-n dk-num">{{ $progress['percentage'] === null ? '—' : number_format($progress['percentage'], 0).'%' }}</span>
             <span class="dk-prog-bar" aria-hidden="true"><i style="width: {{ $progress['percentage'] ?? 0 }}%"></i></span>
             <span class="dk-prog-stat-s">{{ $progress['percentage'] === null ? __('programs.no_weighted_milestones') : __('programs.weighted_progress_of_total', ['reached' => number_format($progress['reached'], 0), 'total' => number_format($progress['total'], 0)]) }}</span>
+            @if ($progress['percentage'] !== null && $progress['measuredProjects'] < $progress['projects'])
+                <span class="dk-prog-stat-s text-status-warn" data-milestone-coverage>{{ __('programs.milestone_progress_from_projects', ['measured' => $progress['measuredProjects'], 'count' => $progress['projects']]) }}</span>
+            @endif
         </div>
 
         <div class="dk-prog-stat">

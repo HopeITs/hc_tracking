@@ -137,6 +137,7 @@ return [
     'weighted_milestones_reached' => 'المعالم المنجزة ذات الوزن',
     'work_not_tied_to_a_project' => 'عمل غير مرتبط بمشروع',
     'weighted_progress_of_total' => 'تم إنجاز :reached من أصل :total نقطة تقدّم',
+    'milestone_progress_from_projects' => 'محسوبة من :measured من أصل :count مشاريع فقط، والبقية بلا معالم بعد.',
     'timeline_behind' => 'متأخر عن الجدول',
     'timeline_complete' => 'مكتمل',
     'timeline_expected' => 'المتوقع حتى اليوم :percent%',
