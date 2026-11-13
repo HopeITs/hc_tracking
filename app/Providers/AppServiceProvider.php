@@ -398,5 +398,20 @@ class AppServiceProvider extends ServiceProvider
         // Livewire deletes temporary uploads older than 24 hours by the file's real time: with the clock
         // moved, a file uploaded a second ago looked months old and was deleted before it was saved.
         config(['livewire.temporary_file_upload.cleanup' => false]);
+
+        $this->keepPretendTodayCacheApart($now->toDateString());
+    }
+
+    /**
+     * Gives each pretend date its own file-cache folder.
+     *
+     * Cache entries carry an expiry stamped by the moved clock. Left in the
+     * shared folder they outlive the real clock by months once the pretend
+     * date is cleared: the Livewire rate-limit counter never reset, reached
+     * its cap, and every Livewire request was refused with a 429 (2026-11-13).
+     */
+    protected function keepPretendTodayCacheApart(string $pretendDate): void
+    {
+        config(['cache.stores.file.path' => storage_path('framework/cache/pretend-'.$pretendDate)]);
     }
 }
