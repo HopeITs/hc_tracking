@@ -34,6 +34,22 @@ test('the three headline counts are disjoint, add up to the total and match what
         ->assertSet('focus', '');
 });
 
+test('a pressed button says how many it shows and how to show all again', function () {
+    seedReportsInEveryState();
+
+    Livewire::actingAs(User::factory()->role('Media Team')->create())
+        ->test('pages::reports.index')
+        ->assertDontSeeHtml('data-test="focus-showing"')
+        ->call('setFocus', 'attention')
+        ->assertSeeHtml('data-test="focus-tab-clear-attention"')
+        ->assertDontSeeHtml('data-test="focus-tab-clear-approved"')
+        ->assertSeeText('Showing 2 of 4 reports.')
+        ->assertSeeHtml('wire:click="setFocus(\'attention\')" class="cursor-pointer')
+        ->call('setFocus', 'attention')
+        ->assertDontSeeHtml('data-test="focus-showing"')
+        ->assertDontSeeHtml('data-test="focus-tab-clear-attention"');
+});
+
 test('each report names one status word and late drafts come before waiting ones, then drafts, then approved', function () {
     seedReportsInEveryState();
 

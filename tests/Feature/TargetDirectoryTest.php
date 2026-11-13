@@ -254,6 +254,29 @@ test('the pulse counts and filters targets by achievement status', function () {
         ->assertSee('Halfway indicator');
 });
 
+test('a pressed status button says how many targets it shows and how to show all again', function () {
+    $plan = AnnualPlan::factory()->create();
+    foreach (['First untouched', 'Second untouched'] as $name) {
+        PlanIndicator::factory()->create([
+            'source_type' => 'annual_plan',
+            'source_id' => $plan->id,
+            'indicator_id' => Indicator::factory()->create(['name' => $name, 'measure' => 'numeric'])->id,
+            'target' => 10,
+        ]);
+    }
+
+    Livewire::actingAs(User::factory()->role('General Manager')->create())
+        ->test('pages::targets.index')
+        ->assertDontSeeHtml('data-test="status-showing"')
+        ->call('filterStatus', 'achieved')
+        ->assertSeeHtml('data-test="status-filter-clear-achieved"')
+        ->assertSeeText('Showing 0 of 2 targets.')
+        ->assertSeeHtml('data-test="status-show-all"')
+        ->call('filterStatus', 'achieved')
+        ->assertDontSeeHtml('data-test="status-showing"')
+        ->assertDontSeeHtml('data-test="status-filter-clear-achieved"');
+});
+
 test('confirming a delete opens the dialog and cancelling closes it', function () {
     $user = User::factory()->role('General Manager')->create();
     $target = PlanIndicator::factory()->create([
