@@ -53,7 +53,6 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Blade;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Date;
-use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\RateLimiter;
@@ -361,10 +360,6 @@ class AppServiceProvider extends ServiceProvider
         Model::shouldBeStrict(! app()->isProduction());
 
         Date::use(CarbonImmutable::class);
-
-        DB::prohibitDestructiveCommands(
-            app()->isProduction(),
-        );
 
         Password::defaults(fn (): ?Password => app()->isProduction()
             ? Password::min(12)
