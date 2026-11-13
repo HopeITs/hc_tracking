@@ -1256,7 +1256,21 @@ test('the board view offers a keyboard accessible status menu as a non pointer a
         ->set('view', 'board')
         ->assertSee('data-test="task-quick-status-'.$task->id.'"', false)
         ->assertSee("\$store.taskMenu.openFor('status', 'board-status-".$task->id."'", false)
-        ->assertDontSee('wire:change="quickSetStatus(', false);
+        ->assertDontSee('wire:change="quickSetStatus(', false)
+        ->assertSeeHtml('x-on:keydown="$store.taskMenu.onKeydown($event)"');
+});
+
+test('every board column finds its own cards on a drop, the two-word statuses included', function () {
+    $user = User::factory()->role('General Manager')->create();
+    Task::factory()->create(['status' => TaskStatus::Todo]);
+
+    $page = Livewire::actingAs($user)->test('pages::tasks.index')->set('view', 'board');
+
+    foreach (TaskStatus::cases() as $status) {
+        $page->assertSeeHtml("querySelector(`[data-test='task-board-cards-".$status->value."']`)");
+    }
+
+    $page->assertDontSeeHtml("querySelector('[data-test=task-board-cards-");
 });
 
 test('the board view marks a todo task missed once its due date passes', function () {

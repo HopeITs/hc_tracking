@@ -18,7 +18,8 @@
         x-show="$store.taskMenu.open"
         x-cloak
         x-on:click.outside="$store.taskMenu.close()"
-        x-on:keydown.escape.window="$store.taskMenu.close()"
+        x-on:keydown.escape.window="$store.taskMenu.open && $store.taskMenu.close(true)"
+        x-on:keydown="$store.taskMenu.onKeydown($event)"
         x-transition.opacity.duration.100ms
         x-bind:style="`top: ${$store.taskMenu.top}px; ` + ($store.taskMenu.right === null ? `left: ${$store.taskMenu.left}px;` : `right: ${$store.taskMenu.right}px;`)"
         role="menu"
