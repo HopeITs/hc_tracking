@@ -103,8 +103,27 @@ document.addEventListener('alpine:init', () => {
             }
 
             this.open = false;
+            this.reset();
             window.hcUnlockPageScroll?.();
             document.querySelector('[data-desk-ask]')?.focus();
+        },
+
+        /** Closing forgets what was typed: the next open starts from an empty box. */
+        reset() {
+            const input = document.getElementById('dk-pal-q');
+
+            if (input) {
+                input.value = '';
+            }
+
+            this.typed = '';
+            this.instant = [];
+            this.selected = 0;
+            this.flash = '';
+
+            if (this.$wire.query !== '') {
+                this.$wire.$set('query', '');
+            }
         },
 
         /**

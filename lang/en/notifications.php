@@ -434,6 +434,70 @@ return [
             ],
         ],
         'annual_plan' => [
+            'plan_submitted' => [
+                'title' => 'New annual plan to review',
+                'body' => ':actor sent the :plan plan to MEAL for review.',
+            ],
+            'plan_approved' => [
+                'title' => 'Annual plan approved',
+                'body' => 'The :plan plan is approved and live.',
+            ],
+            'plan_sent_back' => [
+                'title' => 'Annual plan sent back',
+                'body' => ':actor sent the :plan plan back: ":reason"',
+            ],
+            'update_sent' => [
+                'title' => 'Monthly update sent',
+                'body' => ':centre · :month update was sent.',
+            ],
+            'update_officer_approved' => [
+                'title' => 'Monthly update approved by the MEAL officer',
+                'body' => ':centre · :month update was approved by :actor.',
+            ],
+            'update_returned' => [
+                'title' => 'Monthly update returned',
+                'body' => ':centre · :month update was returned: ":reason"',
+            ],
+            'update_reviewed' => [
+                'title' => 'Monthly update reviewed',
+                'body' => ':centre · :month update was reviewed by :actor.',
+            ],
+            'update_seen' => [
+                'title' => 'Monthly update seen',
+                'body' => ':actor marked the :centre · :month update as seen.',
+            ],
+            'update_seen_note' => [
+                'title' => 'Monthly update seen, with a note',
+                'body' => ':actor marked the :centre · :month update as seen: ":note"',
+            ],
+            'update_question' => [
+                'title' => 'Question on a monthly update',
+                'body' => ':actor asked about :centre · :month: ":question"',
+            ],
+            'update_answered' => [
+                'title' => 'Answer on a monthly update',
+                'body' => ':actor answered on :centre · :month: ":answer"',
+            ],
+            'update_due' => [
+                'title' => 'Monthly update due soon',
+                'body' => ':centre · :month update is due :date.',
+            ],
+            'update_late' => [
+                'title' => 'Monthly update late',
+                'body' => ':centre · :month update was due :date and is not sent.',
+            ],
+            'update_rescheduled' => [
+                'title' => 'Revise the annual plan',
+                'body' => ':activity in :centre was rescheduled :weeks weeks. The plan should be revised.',
+            ],
+            'update_paused' => [
+                'title' => 'Activity paused',
+                'body' => ':activity in :centre: :status.',
+            ],
+            'follow_up_task' => [
+                'title' => 'New MEAL follow-up task',
+                'body' => ':task (:activity, :centre) is due in 2 weeks.',
+            ],
             'created' => ':actor created the annual plan “:subject”',
             'created_you' => ':actor made you the manager of the new annual plan “:subject”',
             'manager_changed' => ':actor made :to the manager of the annual plan “:subject”',
@@ -552,6 +616,24 @@ return [
             ],
         ],
         'proposal' => [
+            'waiting_on_you' => [
+                'finish_concept_note' => [
+                    'title' => 'A proposal is waiting on you',
+                    'body' => 'Your project · finish the concept note of “:proposal”.',
+                ],
+                'collect_concept_reviews' => [
+                    'title' => 'A proposal is waiting on you',
+                    'body' => 'Your project · collect the reviews of “:proposal” and move it on.',
+                ],
+                'finish_proposal' => [
+                    'title' => 'A proposal is waiting on you',
+                    'body' => 'Your project · finish the proposal “:proposal”.',
+                ],
+                'send_proposal' => [
+                    'title' => 'A proposal is waiting on you',
+                    'body' => 'Your project · send “:proposal” to the donor.',
+                ],
+            ],
             'created' => [
                 'title' => 'Proposal created',
                 'body' => ':actor created the proposal “:subject”',

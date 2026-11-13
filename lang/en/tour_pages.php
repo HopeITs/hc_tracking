@@ -17,7 +17,7 @@ return [
     'pages' => [
         'dashboard' => [
             'intro' => ['title' => 'Your desk', 'body' => 'Everything that needs you, on panels you arrange yourself. The sidebar opens any page, and the Ask bar at the top answers questions and takes actions. Let’s walk through it.'],
-            'hello' => ['title' => 'The greeting', 'body' => 'The date and who you are, then one sentence: how many things need you and how many are late.'],
+            'hello' => ['title' => 'The greeting', 'body' => 'The date and who you are.'],
             'grip' => ['title' => 'The dots move it', 'body' => 'Drag a panel by the six dots and drop it on another panel. The grid packs itself so no space is left empty.'],
             'count' => ['title' => 'The number', 'body' => 'How many items in the panel need attention.'],
             'register' => ['title' => 'Open in full', 'body' => 'The arrows open the full page behind the panel.'],

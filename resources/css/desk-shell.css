@@ -508,7 +508,7 @@
      * suggestions sit on the Desk's dot-thread; answers read as big live figures; result rows have round icons like the
      * top bar's tools, and the highlighted row (mouse or arrows) shows the ↵ that opens it.
      */
-    .dk-pal-scrim { backdrop-filter: blur(6px) saturate(1.2); -webkit-backdrop-filter: blur(6px) saturate(1.2); }
+    /* No backdrop blur: every key changes the palette, and a blurred page under it was re-blurred each time, so the whole screen flickered while typing. */
     .dk-pal { width: min(640px, calc(100% - 32px)); height: min(600px, 72vh); border: 1px solid var(--line); border-radius: 22px; box-shadow: 0 30px 70px -24px rgb(16 24 40 / .45), 0 2px 6px rgb(16 24 40 / .06); animation: dk-pal-in .22s cubic-bezier(.2, .8, .2, 1); }
     .dark .dk-pal { box-shadow: 0 30px 70px -20px rgb(0 0 0 / .7); }
     @keyframes dk-pal-in { from { opacity: 0; transform: translate(-50%, -10px) scale(.98); } to { opacity: 1; transform: translateX(-50%); } }
@@ -518,8 +518,10 @@
     .dk-pal-in:focus-within > svg.dk-i { color: var(--ink); }
     .dk-pal-in input { font-size: 17px; font-weight: 500; letter-spacing: -.005em; color: var(--ink); }
     .dk-pal-in input::placeholder { color: var(--faint); }
-    .dk-pal-busy { position: absolute; inset-inline: 0; bottom: -1px; height: 2px; background: linear-gradient(90deg, transparent, var(--brand), transparent) no-repeat; background-size: 40% 100%; animation: dk-pal-scan 1s ease-in-out infinite; pointer-events: none; }
-    @keyframes dk-pal-scan { from { background-position: -70% 0; } to { background-position: 170% 0; } }
+    /* The scan moves by transform only, so it never repaints anything around it. */
+    .dk-pal-busy { position: absolute; inset-inline: 0; bottom: -1px; height: 2px; overflow: hidden; pointer-events: none; }
+    .dk-pal-busy::after { content: ""; position: absolute; inset-block: 0; inset-inline-start: 0; width: 40%; background: linear-gradient(90deg, transparent, var(--brand), transparent); animation: dk-pal-scan 1s ease-in-out infinite; will-change: transform; }
+    @keyframes dk-pal-scan { from { transform: translateX(-100%); } to { transform: translateX(250%); } }
     .dk-pal-in .dk-pal-esc { flex: none; height: 24px; padding-inline: 9px; border: 0; border-radius: 999px; background: var(--sunk); color: var(--ink-3); font: inherit; font-size: 11px; font-weight: 700; letter-spacing: .02em; cursor: pointer; transition: background .15s, color .15s; }
     .dk-pal-in .dk-pal-esc:hover { background: var(--line); color: var(--ink); }
     .dk-pal-in .dk-pal-esc:focus-visible { outline: 2px solid var(--ink-3); outline-offset: 2px; }
@@ -572,7 +574,7 @@
 
     @media (prefers-reduced-motion: reduce) {
         .dk-pal, .dk-answer > i { animation: none; }
-        .dk-pal-busy { animation: none; background-size: 100% 100%; opacity: .6; }
+        .dk-pal-busy::after { animation: none; width: 100%; opacity: .6; }
     }
 }
 

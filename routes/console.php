@@ -15,3 +15,5 @@ Schedule::command('monthly-reports:prepare')->dailyAt('05:00')->withoutOverlappi
 Schedule::command('model:prune', ['--model' => [Activity::class, TrustedDevice::class, UserNotification::class]])->daily();
 Schedule::command('files:prune')->dailyAt('03:00')->withoutOverlapping();
 Schedule::command('cache:prune-expired')->hourly()->withoutOverlapping();
+Schedule::command('annual-plans:remind')->dailyAt('07:00')->withoutOverlapping()->onOneServer();
+Schedule::command('proposals:remind-owners')->dailyAt('07:05')->withoutOverlapping()->onOneServer();

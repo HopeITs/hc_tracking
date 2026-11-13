@@ -6,6 +6,7 @@ namespace App\Observers;
 
 use App\Exceptions\InvalidParentException;
 use App\Models\Proposal;
+use App\Support\ProposalOwnerNotifier;
 
 /**
  * Keeps the renewal chain (proposals.previous_proposal_id) free of cycles.
@@ -19,6 +20,18 @@ use App\Models\Proposal;
  */
 final class ProposalObserver
 {
+    /**
+     * A proposal entering a step that waits on its project owners tells them
+     * (2026-11-12): finish the concept note, collect reviews, finish the
+     * proposal, or send it.
+     */
+    public function saved(Proposal $proposal): void
+    {
+        if ($proposal->wasChanged('status') || $proposal->wasRecentlyCreated) {
+            ProposalOwnerNotifier::notifyWaiting($proposal, auth()->user());
+        }
+    }
+
     /**
      * @throws InvalidParentException
      */

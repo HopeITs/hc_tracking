@@ -62,7 +62,7 @@
         <div class="dk-tabs-tools" role="group" aria-label="{{ __('desk-workspace.tabs.tools') }}">
             <button type="button" class="dk-iconbtn dk-sm" x-show="active !== 'desk'" x-on:click="reload(active)" aria-label="{{ __('desk-workspace.tabs.reload') }}" title="{{ __('desk-workspace.tabs.reload') }}" data-tabs-reload><x-desk.icon name="reload" /></button>
             <button type="button" class="dk-iconbtn dk-sm" x-show="active !== 'desk'" x-on:click="popOut(active)" aria-label="{{ __('desk-workspace.tabs.pop_out') }}" title="{{ __('desk-workspace.tabs.pop_out') }}" data-tabs-popout><x-desk.icon name="popout" /></button>
-            <button type="button" class="dk-iconbtn dk-sm" x-on:click="closeAll()" aria-label="{{ __('desk-workspace.tabs.close_all') }}" title="{{ __('desk-workspace.tabs.close_all') }}" data-tabs-close-all><x-desk.icon name="x" /></button>
+            <button type="button" class="dk-iconbtn dk-sm" x-show="active !== 'desk'" x-on:click="closeAll()" aria-label="{{ __('desk-workspace.tabs.close_all') }}" title="{{ __('desk-workspace.tabs.close_all') }}" data-tabs-close-all><x-desk.icon name="x" /></button>
         </div>
     </div>
 

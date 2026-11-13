@@ -87,9 +87,6 @@ test('every page title shares the HR title style and the eyebrow uses the faint 
         expect($views[$path])->toContain('<h1 class="page-title"');
     }
 
-    expect($views['pages/desk/⚡index.blade.php'])->toContain('<span class="dk-hello-fig"><b class="dk-num page-title">')
-        ->toContain('<span class="dk-hello-fig dk-late"><b class="dk-num page-title text-brand-ink!">');
-
     expect($views['components/ui/page-header.blade.php'])->toContain('class="page-title!"')
         ->and($views['components/ui/detail-header.blade.php'])->toContain('class="page-title! {{ $titleClass }}"')
         ->and(implode("\n", $views))->not->toMatch('/title-class="[^"]*(text-3xl|text-\[|font-|leading-|tracking-)/');

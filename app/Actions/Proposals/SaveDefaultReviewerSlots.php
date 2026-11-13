@@ -8,6 +8,7 @@ use App\Enums\ReviewerSlot;
 use App\Models\HrPosition;
 use App\Models\User;
 use App\Notifications\Alerts\NotificationSettings;
+use App\Support\PlanNotifier;
 use App\Support\Slots;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Validation\ValidationException;
@@ -63,5 +64,8 @@ final class SaveDefaultReviewerSlots
             'employee_id' => Slots::holderOf('meal_manager'),
             'previous_employee_id' => $previousHolder,
         ]);
+
+        // The new MEAL manager hears of the annual plans already waiting for MEAL.
+        PlanNotifier::notifyAllReviewers();
     }
 }

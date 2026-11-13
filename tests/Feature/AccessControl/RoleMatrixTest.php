@@ -159,6 +159,7 @@ test('the General Manager holds everything except role and permission management
             'targets.create', 'targets.update',
             'proposals.approve',
             'ai.draft',
+            'annual-plans.review',
         ])
         ->pluck('name')
         ->all();

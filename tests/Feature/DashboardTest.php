@@ -28,6 +28,7 @@ test('the home page is the desk: greeting, the role layout and the add tile', fu
         ->get(route('dashboard'))
         ->assertOk()
         ->assertSee('data-desk-hello', false)
+        ->assertDontSee('data-desk-hello-figures', false)
         ->assertSee('data-panel="glance"', false)
         ->assertSee('data-panel="flow"', false)
         ->assertSeeHtml('class="dk-addtile"')

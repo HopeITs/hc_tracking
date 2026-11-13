@@ -179,6 +179,18 @@
         @endif
     @endif
 
+    {{-- Every error, whatever step it belongs to: a refusal on Parties used to show only as a red step number while the user stood on Installments (user report 2026-11-12). --}}
+    @if ($errors->hasAny(['agreementProposalId', 'budget', 'agreementCurrency', 'externalProjectNumber', 'installments', 'confirmInstallmentSum']))
+        <div class="mt-4 flex gap-2 rounded-lg border border-status-critical/40 bg-status-critical-soft px-3 py-2 text-sm text-secondary-dark dark:text-ink" role="alert" data-agreement-errors>
+            <flux:icon.exclamation-triangle variant="mini" class="mt-0.5 size-4 shrink-0 text-status-critical" aria-hidden="true" />
+            <ul class="flex flex-col gap-0.5">
+                @foreach (['agreementProposalId', 'budget', 'agreementCurrency', 'externalProjectNumber', 'installments'] as $field)
+                    @error($field)<li>{{ $message }}</li>@enderror
+                @endforeach
+            </ul>
+        </div>
+    @endif
+
     @if ($editing)
         <x-slot:footerMeta>
             @can('funding-agreements.delete')

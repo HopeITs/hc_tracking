@@ -154,6 +154,7 @@ class AppServiceProvider extends ServiceProvider
     public function boot(): void
     {
         $this->configureDefaults();
+        $this->configurePretendToday();
         $this->configureHttps();
         $this->configureMorphMap();
         $this->configureLivewire();
@@ -374,5 +375,33 @@ class AppServiceProvider extends ServiceProvider
                 ->uncompromised()
             : null,
         );
+    }
+
+    /**
+     * Outside production, APP_PRETEND_TODAY (Y-m-d) moves "today" for the
+     * whole app, keeping the clock time, so month-based flows (annual plan
+     * monthly updates) can be tried before their month comes. Off when empty.
+     */
+    private function configurePretendToday(): void
+    {
+        $pretend = config('app.pretend_today');
+
+        if ($this->app->isProduction() || $this->app->runningUnitTests() || ! is_string($pretend) || $pretend === '') {
+            return;
+        }
+
+        $now = CarbonImmutable::parse($pretend)->setTimeFrom(CarbonImmutable::now());
+        Carbon::setTestNow($now);
+        CarbonImmutable::setTestNow($now);
+
+        // File sessions expire by the file's real modified time, which the moved clock reads as months old:
+        // every login was dropped (419). Database sessions stamp last_activity with the same moved clock.
+        if (config('session.driver') === 'file') {
+            config(['session.driver' => 'database']);
+        }
+
+        // Livewire deletes temporary uploads older than 24 hours by the file's real time: with the clock
+        // moved, a file uploaded a second ago looked months old and was deleted before it was saved.
+        config(['livewire.temporary_file_upload.cleanup' => false]);
     }
 }

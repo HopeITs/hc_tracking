@@ -4,9 +4,9 @@
     MediaCollection::ConceptNote, under the proposal's own title, its donor and
     the date it was created.
 
-    Through the ideation phase it is open, because it is what the phase is
-    about; from the planning phase on it folds to one line that expands, so the
-    status history stays the headline. Included by _show-status-tab.blade.php,
+    It opens unfolded in every phase (user report 2026-11-12: the folded line
+    was hard to open); from the planning phase on its title can fold it away.
+    wire:ignore.self keeps the reader's choice across Livewire updates. Included by _show-status-tab.blade.php,
     which inherits $mutedText, $inkText and $hairline from ⚡show.blade.php.
 
     The text is printed, never rendered: {{ }} escapes it and the paragraphs
@@ -30,7 +30,8 @@
         :title="$isIdeation ? __('proposals.concept_note.title') : null"
         class="mb-8"
         data-concept-note
-        x-data="{ open: @js($isIdeation) }"
+        x-data="{ open: true }"
+        wire:ignore.self
     >
         @unless ($isIdeation)
             {{-- Folded: one line that expands, so a later phase keeps the note within reach. --}}
@@ -49,7 +50,7 @@
             </button>
         @endunless
 
-        <div id="concept-note-body" class="px-4 py-4" @unless ($isIdeation) x-show="open" x-collapse style="display: none" @endunless>
+        <div id="concept-note-body" class="px-4 py-4" @unless ($isIdeation) x-show="open" @endunless>
             <h3 class="text-base font-bold {{ $inkText }}" dir="auto">{{ $this->proposal->name }}</h3>
 
             <p class="mt-1 flex flex-wrap items-center gap-x-2 gap-y-0.5 text-xs {{ $mutedText }}">

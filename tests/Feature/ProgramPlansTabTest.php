@@ -158,7 +158,7 @@ test('picking a year with no plan offers to write that year\'s plan', function (
         ->set('tab', 'plans')
         ->call('pickPlanYear', 2027)
         ->assertSee('No plan for 2027 yet')
-        ->assertSee(route('annual-plans.index', ['create' => 1, 'program' => $program->id, 'year' => 2027]));
+        ->assertSee(route('annual-plans.targets', ['create' => 1, 'program' => $program->id, 'year' => 2027]));
 });
 
 test('a viewer who may not see targets gets the plan without its targets', function () {

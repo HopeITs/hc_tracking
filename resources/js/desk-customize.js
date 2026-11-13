@@ -20,8 +20,9 @@
  *
  * Buttons ("New …" actions a-…, page buttons g-…) are never part of the
  * draft: the Desk holds only panels and page cards. A click in the Buttons
- * tab puts the button in Quick access at once ($wire.addQuickItem), and the
- * tab hides what Quick access already holds (data-quick-items).
+ * tab only marks the button (quickPending, hidden from the tab); "Done" puts
+ * the marked buttons in Quick access ($wire.addQuickItem), Cancel drops them.
+ * The tab hides what Quick access already holds (data-quick-items).
  */
 import { flush, resized, sameLayout } from './desk-rows';
 
@@ -41,6 +42,7 @@ document.addEventListener('alpine:init', () => {
         resizing: null,
         search: '',
         quick: [],
+        quickPending: [],
         signals: {},
         signalsAt: 0,
         signalsRead: false,
@@ -52,6 +54,7 @@ document.addEventListener('alpine:init', () => {
             this.saved = JSON.parse(this.$root.dataset.layout || '[]');
             this.draft = this.saved.map((entry) => ({ ...entry }));
             this.quick = JSON.parse(this.$root.dataset.quickItems || '[]');
+            this.quickPending = [];
             this.resetting = false;
             this.selected = null;
             this.search = '';
@@ -77,8 +80,12 @@ document.addEventListener('alpine:init', () => {
         },
 
         async save() {
+            const buttons = [...this.quickPending];
+            this.quickPending = [];
+
             if (this.isUnchanged()) {
                 this.discard();
+                await this.addButtons(buttons);
 
                 return;
             }
@@ -96,8 +103,21 @@ document.addEventListener('alpine:init', () => {
                 return;
             }
 
+            await this.addButtons(buttons);
+
             if (choice) {
                 this.$root.dispatchEvent(new CustomEvent('dk-layout-applied', { bubbles: true, detail: { title: choice.title, previous } }));
+            }
+        },
+
+        /** The buttons marked in the Buttons tab, put in Quick access once "Done" is pressed. */
+        async addButtons(buttons) {
+            for (const button of buttons) {
+                try {
+                    await this.$wire.addQuickItem(button);
+                } catch {
+                    return;
+                }
             }
         },
 
@@ -235,7 +255,7 @@ document.addEventListener('alpine:init', () => {
             this.selected = null;
         },
 
-        /** A button goes straight to Quick access (no draft, no Done); anything else into the draft. */
+        /** A button is marked for Quick access (added on Done); anything else goes into the draft. */
         pick(panel) {
             if (! isButton(panel)) {
                 this.add(panel);
@@ -251,12 +271,8 @@ document.addEventListener('alpine:init', () => {
             const next = offered[offered.findIndex((button) => button.closest('[data-customize-add]').dataset.customizeAdd === panel) + 1];
 
             this.quick = [...this.quick, panel];
+            this.quickPending = [...this.quickPending, panel];
             this.$nextTick(() => (next ?? this.$refs.search).focus());
-            this.$wire.addQuickItem(panel).then((kept) => {
-                if (kept !== true) {
-                    this.quick = this.quick.filter((each) => each !== panel);
-                }
-            });
         },
 
         add(panel) {
