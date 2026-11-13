@@ -173,16 +173,18 @@
                     <flux:icon.exclamation-triangle variant="micro" class="size-3.5" aria-hidden="true" />
                     {{ __('results_framework.no_indicator_yet') }}
                 </span>
-                {{-- The next step, one click away: the indicator form opens already tied to this statement. --}}
-                <a
-                    href="{{ route('indicators.index', ['create' => $result->id]) }}"
-                    wire:navigate
-                    class="inline-flex items-center gap-1 rounded-md type-meta font-semibold text-primary dark:text-brand-text hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-secondary-medium"
-                    data-test="add-indicator-for-result-{{ $result->id }}"
-                >
-                    <flux:icon.plus variant="micro" class="size-3.5" aria-hidden="true" />
-                    {{ __('results_framework.add_indicator') }}
-                </a>
+                {{-- The next step, one click away: the indicator form opens here, already tied to this statement. --}}
+                @if ($editable)
+                    @can('indicators.create')<button
+                        type="button"
+                        wire:click="$dispatch('add-indicator', { resultId: {{ $result->id }} })"
+                        class="inline-flex items-center gap-1 rounded-md type-meta font-semibold text-primary dark:text-brand-text hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-secondary-medium"
+                        data-test="add-indicator-for-result-{{ $result->id }}"
+                    >
+                        <flux:icon.plus variant="micro" class="size-3.5" aria-hidden="true" />
+                        {{ __('results_framework.add_indicator') }}
+                    </button>@endcan
+                @endif
             @endif
 
             <span class="inline-flex items-center gap-1.5 type-meta text-secondary-medium dark:text-ink-muted">
@@ -265,6 +267,17 @@
                                 <p class="flex flex-wrap items-center gap-2">
                                     <a href="{{ route('indicators.index', ['inspect' => $indicator->id]) }}" wire:navigate class="truncate text-sm font-semibold text-secondary-dark hover:text-primary dark:hover:text-brand-text hover:underline dark:text-ink">{{ $indicator->name }}</a>
                                     <x-ui.enum-badge :case="$indicator->measure" class="shrink-0" />
+                                    @if ($editable)
+                                        @can('indicators.update')<x-ui.button
+                                            tone="ghost"
+                                            size="sm"
+                                            icon="pencil-square"
+                                            class="size-7! shrink-0"
+                                            wire:click="$dispatch('edit-indicator', { indicatorId: {{ $indicator->id }} })"
+                                            :aria-label="__('common.edit_name', ['name' => $indicator->name])"
+                                            data-test="edit-indicator-{{ $indicator->id }}"
+                                        />@endcan
+                                    @endif
                                     @if ($indicator->project !== null)
                                         <span class="inline-flex shrink-0 items-center gap-1 type-meta text-secondary-medium dark:text-ink-muted">
                                             <flux:icon.briefcase variant="micro" class="size-3.5" aria-hidden="true" />{{ $indicator->project->name }}
@@ -390,10 +403,12 @@
                     <a href="{{ route('indicators.index', ['result' => $result->id]) }}" wire:navigate class="type-meta font-semibold text-secondary-medium hover:text-primary dark:hover:text-brand-text hover:underline dark:text-ink-muted">
                         {{ __('results_framework.manage_indicators') }}
                     </a>
-                    <a href="{{ route('indicators.index', ['create' => $result->id]) }}" wire:navigate class="inline-flex items-center gap-1 type-meta font-semibold text-secondary-medium hover:text-primary dark:hover:text-brand-text hover:underline dark:text-ink-muted">
-                        <flux:icon.plus variant="micro" class="size-3.5" aria-hidden="true" />
-                        {{ __('results_framework.add_indicator') }}
-                    </a>
+                    @if ($editable)
+                        @can('indicators.create')<button type="button" wire:click="$dispatch('add-indicator', { resultId: {{ $result->id }} })" class="inline-flex items-center gap-1 type-meta font-semibold text-secondary-medium hover:text-primary dark:hover:text-brand-text hover:underline dark:text-ink-muted" data-test="add-another-indicator-{{ $result->id }}">
+                            <flux:icon.plus variant="micro" class="size-3.5" aria-hidden="true" />
+                            {{ __('results_framework.add_indicator') }}
+                        </button>@endcan
+                    @endif
                     @if ($measurement['targets'] > 0)
                         <a href="{{ route('targets.index', ['result' => $result->id]) }}" wire:navigate class="type-meta font-semibold text-secondary-medium hover:text-primary dark:hover:text-brand-text hover:underline dark:text-ink-muted">
                             {{ __('results_framework.view_targets') }}

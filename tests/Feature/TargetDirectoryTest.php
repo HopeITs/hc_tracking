@@ -49,7 +49,7 @@ test('targets can be filtered by source type', function () {
 });
 
 test('a target stores the morph map key and never a class name', function () {
-    $user = User::factory()->role('MEAL')->create();
+    $user = mealManager();
     $plan = AnnualPlan::factory()->create();
     $indicator = Indicator::factory()->create();
 
@@ -72,7 +72,7 @@ test('a target stores the morph map key and never a class name', function () {
 });
 
 test('the source type select offers exactly the two mapped sources', function () {
-    $user = User::factory()->role('MEAL')->create();
+    $user = mealManager();
 
     Livewire::actingAs($user)
         ->test('pages::targets.index')
@@ -83,7 +83,7 @@ test('the source type select offers exactly the two mapped sources', function ()
 });
 
 test('changing the source type clears the chosen source', function () {
-    $user = User::factory()->role('MEAL')->create();
+    $user = mealManager();
     $plan = AnnualPlan::factory()->create();
 
     Livewire::actingAs($user)
@@ -164,7 +164,7 @@ test('a reported target is not deleted because its reports would cascade', funct
 });
 
 test('a target value that would overflow the decimal column is rejected', function () {
-    $user = User::factory()->role('MEAL')->create();
+    $user = mealManager();
     $plan = AnnualPlan::factory()->create();
     $indicator = Indicator::factory()->create();
 
@@ -388,7 +388,7 @@ test('the report trail shows evidence files and MEAL visibility', function () {
 });
 
 test('the indicator chain can open the commit form already tied to an indicator', function () {
-    $user = User::factory()->role('MEAL')->create();
+    $user = mealManager();
     $project = Project::factory()->create();
     $indicator = Indicator::factory()->create(['project_id' => $project->id, 'frequency' => Period::Monthly]);
 
@@ -402,7 +402,7 @@ test('the indicator chain can open the commit form already tied to an indicator'
 });
 
 test('the form offers only the plans and projects that fit the chosen indicator and source', function () {
-    $user = User::factory()->role('MEAL')->create();
+    $user = mealManager();
     $program = Program::factory()->create();
     $indicator = Indicator::factory()->for(Result::factory()->for($program))->create();
     $fittingPlan = AnnualPlan::factory()->for($program)->create();
@@ -429,7 +429,7 @@ test('the form offers only the plans and projects that fit the chosen indicator 
 });
 
 test('a target that does not fit its chain is refused', function () {
-    $user = User::factory()->role('MEAL')->create();
+    $user = mealManager();
     $indicator = Indicator::factory()->for(Result::factory()->for(Program::factory()))->create();
     $otherPlan = AnnualPlan::factory()->create();
 
@@ -460,7 +460,7 @@ test('a target that does not fit its chain is refused', function () {
 });
 
 test('a percentage target above 100 is refused', function () {
-    $user = User::factory()->role('MEAL')->create();
+    $user = mealManager();
     $indicator = Indicator::factory()->create(['measure' => IndicatorMeasure::Percentage]);
 
     Livewire::actingAs($user)
@@ -476,7 +476,7 @@ test('a percentage target above 100 is refused', function () {
 });
 
 test('the same indicator cannot be targeted twice in one source for one project', function () {
-    $user = User::factory()->role('MEAL')->create();
+    $user = mealManager();
     $existing = PlanIndicator::factory()->create();
 
     Livewire::actingAs($user)
@@ -493,7 +493,7 @@ test('the same indicator cannot be targeted twice in one source for one project'
 });
 
 test('a reported target keeps its indicator and source but its value can still change', function () {
-    $user = User::factory()->role('MEAL')->create();
+    $user = mealManager();
     $target = PlanIndicator::factory()->create(['target' => 100]);
     Report::factory()->for($target)->create();
 
@@ -515,7 +515,7 @@ test('a reported target keeps its indicator and source but its value can still c
 });
 
 test('a target already out of step is flagged but its value can still be corrected', function () {
-    $user = User::factory()->role('MEAL')->create();
+    $user = mealManager();
     $indicator = Indicator::factory()->for(Result::factory()->for(Program::factory()))->create();
     $target = PlanIndicator::factory()
         ->forAnnualPlan(AnnualPlan::factory()->create())

@@ -262,7 +262,7 @@ test('proposal and donor names render as text without links for a user without p
     $proposalImpact = chainNode($this->proposal, ResultType::Impact, programId: $this->program->id);
     $proposalImpact->forceFill(['contributes_to_result_id' => $programImpact->id])->saveQuietly();
     $donorName = $this->proposal->donor->name;
-    $meal = User::factory()->role('MEAL')->create();
+    $meal = mealManager();
 
     Livewire::actingAs($meal)->test('pages::programs.show', ['program' => $this->program])->set('tab', 'results')
         ->assertSee('Water Access Proposal')
@@ -293,7 +293,7 @@ test('the chain renders in Arabic with logical classes and keeps the tree order'
 });
 
 test('an empty framework offers Start Logical Framework only to results.create holders', function () {
-    chainTab(User::factory()->role('MEAL')->create(), $this->proposal)
+    chainTab(mealManager(), $this->proposal)
         ->assertSee(__('results_framework.chain_start'));
 
     chainTab($this->viewer, $this->proposal)

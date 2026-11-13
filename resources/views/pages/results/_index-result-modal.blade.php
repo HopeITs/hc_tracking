@@ -21,6 +21,7 @@
                     <x-ui.form-segmented
                         wire:model.live="resultType"
                         :label="__('common.type')"
+                        class="@2xl/modal:col-span-2"
                         required
                         :options="[
                             ['value' => ResultType::Impact->value, 'label' => ResultType::Impact->label(), 'dot' => 'bg-secondary-dark dark:bg-ink'],
@@ -57,9 +58,9 @@
                         :label="__('results_framework.contributes_to_label')"
                         :disabled="in_array($resultType, [ResultType::Impact->value, ResultType::CrossCutting->value], true)"
                         :locked-reason="$resultType === ResultType::CrossCutting->value ? __('results_framework.cross_cutting_root') : __('results_framework.an_impact_sits_at_the_top_of_the_chain')"
-                        :help="__('results_framework.only_the_level_directly_above_is_offered')"
+                        :help="$resultType === ResultType::Activity->value ? __('results_framework.free_activity_help') : __('results_framework.only_the_level_directly_above_is_offered')"
                     >
-                        <option value="">{{ __('common.top_level') }}</option>
+                        <option value="">{{ $resultType === ResultType::Activity->value ? __('results_framework.no_statement_free_activity') : __('common.top_level') }}</option>
                         @foreach ($this->parentOptions as $parentOption)
                             <option value="{{ $parentOption->id }}">{{ Str::limit($parentOption->statement, 60) }} · {{ $parentOption->program?->name ?? __('common.unassigned') }}</option>
                         @endforeach

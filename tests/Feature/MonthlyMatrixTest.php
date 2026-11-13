@@ -799,6 +799,21 @@ test('the Activities tab shows validated statuses, carries them forward and plan
     $page->assertSee(__('enums.activity_status.ongoing'))->assertSee($output->statement);
 });
 
+test('an activity linked to no statement gets its own group after the outputs', function () {
+    $project = mmProject();
+    $proposal = mmProposal($project);
+    ['output' => $output] = mmActivities($proposal, $project);
+    $free = Activity::withoutRecording(fn (): Result => Result::factory()->type(ResultType::Activity)->create([
+        'statement' => 'Run a launch event.', 'proposal_id' => $proposal->id, 'program_id' => $project->program_id, 'parent_id' => null,
+    ]));
+
+    $board = Livewire::actingAs(mmViewer())->withQueryParams(['tab' => 'activities'])->test('pages::reports.monthly-matrix')->instance()->activityBoard;
+
+    expect(array_column($board['outputs'], 'output_id'))->toBe([$output->id, 0])
+        ->and($board['outputs'][1]['statement'])->toBe(__('results_framework.free_activities'))
+        ->and($board['outputs'][1]['activities'][0]['activity_id'])->toBe($free->id);
+});
+
 test('the Activities tab honours the same filters and the window', function () {
     $first = mmProject();
     $second = mmProject();

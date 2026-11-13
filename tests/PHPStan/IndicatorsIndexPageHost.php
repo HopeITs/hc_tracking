@@ -39,6 +39,8 @@ abstract class IndicatorsIndexPageHost extends Component
 
     public string $measure = '';
 
+    public string $level = '';
+
     public string $program = '';
 
     public string $rag = '';

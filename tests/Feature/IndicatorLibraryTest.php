@@ -28,7 +28,7 @@ describe('access', function () {
         $this->get(route('indicator-library.index'))->assertRedirect(route('login'));
     });
 
-    it('shows the library to every role, and the write controls only to MEAL and the General Manager', function (string $role, bool $writes) {
+    it('shows the library to every role, and the write controls to the General Manager but not a MEAL officer', function (string $role, bool $writes) {
         LibraryIndicator::factory()->create(['name_en' => 'Households reached']);
 
         $response = $this->actingAs(userWithRole($role))->get(route('indicator-library.index'))->assertOk()->assertSee('Households reached');
@@ -37,7 +37,7 @@ describe('access', function () {
             ? $response->assertSee('data-test="create-library-entry"', false)
             : $response->assertDontSee('data-test="create-library-entry"', false);
     })->with([
-        'MEAL' => ['MEAL', true],
+        'MEAL' => ['MEAL', false],
         'General Manager' => ['General Manager', true],
         'Team Member' => ['Team Member', false],
         'Managers' => ['Managers', false],
@@ -53,8 +53,8 @@ describe('access', function () {
 });
 
 describe('writing through the page', function () {
-    it('lets MEAL and the General Manager create, edit, deactivate, reactivate and delete an unused entry', function (string $role) {
-        $user = userWithRole($role);
+    it('lets the MEAL manager and the General Manager create, edit, deactivate, reactivate and delete an unused entry', function (Closure $actor) {
+        $user = $actor();
 
         $component = Livewire::actingAs($user)->test('pages::indicator-library.index')
             ->call('openCreateModal')
@@ -98,7 +98,7 @@ describe('writing through the page', function () {
             ->assertDontSee('Families reached');
 
         expect(LibraryIndicator::query()->exists())->toBeFalse();
-    })->with(['MEAL', 'General Manager']);
+    })->with(['the MEAL manager' => fn () => mealManager(), 'the General Manager' => fn () => userWithRole('General Manager')]);
 
     it('forbids every other role from each write', function (string $role, string $method, bool $passesId) {
         $entry = LibraryIndicator::factory()->create(['name_en' => 'Untouched']);
@@ -112,7 +112,7 @@ describe('writing through the page', function () {
 
         expect($entry->fresh()->only(['name_en', 'is_active']))->toBe(['name_en' => 'Untouched', 'is_active' => true])
             ->and(LibraryIndicator::query()->count())->toBe(1);
-    })->with(['Team Member', 'Managers', 'Financial'])->with([
+    })->with(['Team Member', 'Managers', 'Financial', 'MEAL'])->with([
         'open create' => ['openCreateModal', false],
         'save a new entry' => ['saveEntry', false],
         'open edit' => ['openEditModal', true],
@@ -122,7 +122,7 @@ describe('writing through the page', function () {
     ]);
 
     it('shows the Arabic-name message under its field when the Arabic name is missing', function () {
-        Livewire::actingAs(userWithRole('MEAL'))->test('pages::indicator-library.index')
+        Livewire::actingAs(mealManager())->test('pages::indicator-library.index')
             ->call('openCreateModal')
             ->set('entry.institutional', true)
             ->set('entry.level_ref', 'OP1')
@@ -140,7 +140,7 @@ describe('measure', function () {
     it('refuses a measure change once a linked indicator has targets', function () {
         $entry = libraryEntryInUse(withTargets: true);
 
-        Livewire::actingAs(userWithRole('MEAL'))->test('pages::indicator-library.index')
+        Livewire::actingAs(mealManager())->test('pages::indicator-library.index')
             ->call('openEditModal', $entry->id)
             ->assertSet('measureIsLocked', true)
             ->set('entry.measure', 'percentage')
@@ -154,7 +154,7 @@ describe('measure', function () {
     it('carries a measure change to every linked indicator while none has targets', function () {
         $entry = libraryEntryInUse();
 
-        Livewire::actingAs(userWithRole('MEAL'))->test('pages::indicator-library.index')
+        Livewire::actingAs(mealManager())->test('pages::indicator-library.index')
             ->call('openEditModal', $entry->id)
             ->assertSet('measureIsLocked', false)
             ->set('entry.measure', 'average')
@@ -170,7 +170,7 @@ describe('deleting and deactivating', function () {
     it('refuses to delete an entry in use and says to deactivate it instead', function () {
         $entry = libraryEntryInUse();
 
-        Livewire::actingAs(userWithRole('MEAL'))->test('pages::indicator-library.index')
+        Livewire::actingAs(mealManager())->test('pages::indicator-library.index')
             ->call('confirmDelete', $entry->id)
             ->call('deleteEntry')
             ->assertSet('showDeleteModal', false)
@@ -259,7 +259,7 @@ describe('status buttons', function () {
         LibraryIndicator::factory()->create(['name_en' => 'Fresh entry']);
         LibraryIndicator::factory()->inactive()->create(['name_en' => 'Old entry']);
 
-        $page = Livewire::actingAs(userWithRole('MEAL'))->test('pages::indicator-library.index');
+        $page = Livewire::actingAs(mealManager())->test('pages::indicator-library.index');
 
         expect($page->instance()->focusCounts)->toBe(['inuse' => 1, 'unused' => 1, 'off' => 1]);
 
@@ -279,7 +279,7 @@ describe('status buttons', function () {
         LibraryIndicator::factory()->create(['name_en' => 'Wells planned']);
         LibraryIndicator::factory()->create(['name_en' => 'Schools opened']);
 
-        $page = Livewire::actingAs(userWithRole('MEAL'))->test('pages::indicator-library.index')
+        $page = Livewire::actingAs(mealManager())->test('pages::indicator-library.index')
             ->set('search', 'Wells');
 
         expect($page->instance()->focusCounts)->toBe(['inuse' => 1, 'unused' => 1, 'off' => 0]);
@@ -288,7 +288,7 @@ describe('status buttons', function () {
     it('names the entry in the switch off and delete dialogs', function () {
         $entry = LibraryIndicator::factory()->create(['name_en' => 'Households reached']);
 
-        Livewire::actingAs(userWithRole('MEAL'))->test('pages::indicator-library.index')
+        Livewire::actingAs(mealManager())->test('pages::indicator-library.index')
             ->call('confirmDeactivate', $entry->id)
             ->assertSee('Switch off “Households reached”?')
             ->call('cancelDeactivate')
@@ -299,7 +299,7 @@ describe('status buttons', function () {
     it('keeps the buttons and rows inside the component and disables deleting an entry in use with its reason', function () {
         libraryEntryInUse(attributes: ['name_en' => 'Used entry']);
 
-        $html = Livewire::actingAs(userWithRole('MEAL'))->test('pages::indicator-library.index')->html();
+        $html = Livewire::actingAs(mealManager())->test('pages::indicator-library.index')->html();
 
         $dom = new DOMDocument;
         @$dom->loadHTML('<?xml encoding="utf-8"?>'.$html);
@@ -326,7 +326,7 @@ describe('presentation', function () {
 
     it('renders its labels in Arabic for an Arabic reader', function () {
         LibraryIndicator::factory()->create();
-        $user = userWithRole('MEAL');
+        $user = mealManager();
         $user->forceFill(['locale' => 'ar'])->save();
 
         $this->actingAs($user)->get(route('indicator-library.index'))
@@ -346,7 +346,7 @@ describe('presentation', function () {
     });
 
     it('reads a flat number of queries however many entries there are', function () {
-        $user = userWithRole('MEAL');
+        $user = mealManager();
 
         $countQueries = function () use ($user): int {
             $queries = 0;

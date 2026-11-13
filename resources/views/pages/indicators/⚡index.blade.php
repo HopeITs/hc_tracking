@@ -39,6 +39,10 @@ new #[Layout('layouts::desk'), Title('titles.indicators')] class extends Compone
     #[Url(except: '')]
     public string $measure = '';
 
+    /** One of the ResultType values: the level of the result the indicator measures. */
+    #[Url(except: '')]
+    public string $level = '';
+
     #[Url(except: '')]
     public string $program = '';
 
@@ -111,6 +115,11 @@ new #[Layout('layouts::desk'), Title('titles.indicators')] class extends Compone
         $this->resetPage();
     }
 
+    public function updatedLevel(): void
+    {
+        $this->resetPage();
+    }
+
     public function updatedProgram(): void
     {
         $this->resetPage();
@@ -126,6 +135,7 @@ new #[Layout('layouts::desk'), Title('titles.indicators')] class extends Compone
         $this->search = '';
         $this->result = '';
         $this->measure = '';
+        $this->level = '';
         $this->program = '';
         $this->donor = '';
         $this->rag = '';
@@ -167,7 +177,7 @@ new #[Layout('layouts::desk'), Title('titles.indicators')] class extends Compone
 @php
     use App\Enums\ResultType;
 
-    $filtersAreActive = $search !== '' || $result !== '' || $measure !== '' || $program !== '' || $donor !== '' || $rag !== '' || $focus !== '' || $this->strategyFilter !== null;
+    $filtersAreActive = $search !== '' || $result !== '' || $measure !== '' || $level !== '' || $program !== '' || $donor !== '' || $rag !== '' || $focus !== '' || $this->strategyFilter !== null;
     $overview = $this->overview;
     $paged = $this->pagedRows;
     $focusCounts = $this->focusCounts;
@@ -199,7 +209,7 @@ new #[Layout('layouts::desk'), Title('titles.indicators')] class extends Compone
                 @endforeach
             </x-ui.header-filter-select>
 
-            <div class="contents" x-data="{ open: @js($donor !== '' || $result !== '' || $measure !== '') }">
+            <div class="contents" x-data="{ open: @js($donor !== '' || $result !== '' || $measure !== '' || $level !== '') }">
                 <button type="button" class="dk-btn" x-on:click="open = ! open" x-bind:aria-expanded="open.toString()" data-test="more-filters-button">
                     <flux:icon.adjustments-horizontal variant="micro" class="size-4" />
                     {{ __('indicators.more_filters') }}
@@ -217,6 +227,13 @@ new #[Layout('layouts::desk'), Title('titles.indicators')] class extends Compone
                     <option value="">{{ __('indicators.all_results') }}</option>
                     @foreach ($this->resultOptions as $resultOption)
                         <option value="{{ $resultOption->id }}">{{ Str::limit($resultOption->statement, 50) }}</option>
+                    @endforeach
+                </x-ui.header-filter-select>
+
+                <x-ui.header-filter-select :label="__('indicators.level')" wire:model.live="level" :value="$level" data-test="indicator-level-filter">
+                    <option value="">{{ __('indicators.all_levels') }}</option>
+                    @foreach (ResultType::cases() as $levelCase)
+                        <option value="{{ $levelCase->value }}">{{ $levelCase->label() }}</option>
                     @endforeach
                 </x-ui.header-filter-select>
 

@@ -10,6 +10,7 @@ use App\Http\Middleware\EnsureTwoFactorIsEnabled;
 use App\Notifications\ActivityRecorder;
 use App\Notifications\TracksActivity;
 use App\Support\EmployeeProfile;
+use App\Support\Slots;
 use Carbon\CarbonImmutable;
 use Database\Factories\UserFactory;
 use Illuminate\Contracts\Translation\HasLocalePreference;
@@ -70,7 +71,54 @@ use Spatie\Permission\Traits\HasRoles;
 class User extends Authenticatable implements HasLocalePreference, PasskeyUser, TracksActivity
 {
     /** @use HasFactory<UserFactory> */
-    use HasFactory, HasRoles, Notifiable, PasskeyAuthenticatable, RecordsActivity, TwoFactorAuthenticatable;
+    use HasFactory, Notifiable, PasskeyAuthenticatable, RecordsActivity, TwoFactorAuthenticatable;
+
+    use HasRoles {
+        checkPermissionTo as protected roleGrantsPermissionTo;
+    }
+
+    /**
+     * Whether the user holds a permission, as every `can()` and `@can` asks.
+     *
+     * The abilities under `access-control.meal_manager_only` (building the
+     * logframe and its targets) are honoured only for the holder of the MEAL
+     * Manager slot or a bypass role, whatever the user's roles grant.
+     *
+     * @param  string|int|Permission|\BackedEnum  $permission
+     */
+    public function checkPermissionTo($permission, ?string $guardName = null): bool
+    {
+        if (is_string($permission)
+            && in_array($permission, config('access-control.meal_manager_only.abilities'), true)
+            && ! $this->buildsTheLogframe()) {
+            return false;
+        }
+
+        return $this->roleGrantsPermissionTo($permission, $guardName);
+    }
+
+    /**
+     * Whether the user's roles grant a permission, leaving the MEAL manager
+     * rule aside: for the places that only ask "is this person MEAL?" (a MEAL
+     * reviewer attaching a need assessment), not "may they build the logframe".
+     */
+    public function roleGrants(string $permission): bool
+    {
+        return $this->roleGrantsPermissionTo($permission);
+    }
+
+    /**
+     * Whether this user may build the logframe at all: the MEAL Manager slot
+     * holder, or a bypass role (Super Admin, General Manager).
+     */
+    public function buildsTheLogframe(): bool
+    {
+        if ($this->hasAnyRole(config('access-control.meal_manager_only.bypass_roles'))) {
+            return true;
+        }
+
+        return $this->employee_id !== null && (int) $this->employee_id === Slots::holderOf('meal_manager');
+    }
 
     /**
      * Mirror the columns' DB defaults so a user that has not been round-tripped

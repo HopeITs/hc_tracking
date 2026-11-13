@@ -20,7 +20,7 @@ use Livewire\Livewire;
 
 beforeEach(function () {
     $this->seed(RolesAndPermissionsSeeder::class);
-    $this->meal = User::factory()->role('MEAL')->create();
+    $this->meal = mealManager();
     $this->actingAs($this->meal);
 
     $this->program = Program::factory()->create();

@@ -184,6 +184,8 @@ new #[Layout('layouts::desk'), Title('titles.results_framework')] class extends 
 
     @include('pages.results._index-result-modal')
 
+    <livewire:indicators.quick-form />
+
     <x-ui.confirm-modal
         wire:model="showDeleteModal"
         close="cancelDelete"

@@ -35,6 +35,7 @@ return [
     'security_settings' => 'Security Settings',
     'strategies' => 'Strategies',
     'strategy' => 'Strategy',
+    'strategic_plan' => 'Strategic plan',
     'targets' => 'Targets',
     'task' => 'Task',
     'tasks' => 'Tasks',

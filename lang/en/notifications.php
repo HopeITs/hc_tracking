@@ -433,6 +433,20 @@ return [
                 'body' => 'The program “:subject” has no logframe yet',
             ],
         ],
+        'strategic_plan' => [
+            'submitted' => [
+                'title' => 'Strategic plan to approve',
+                'body' => ':actor sent the :program strategic plan (:strategy) for your approval.',
+            ],
+            'approved' => [
+                'title' => 'Strategic plan approved',
+                'body' => ':actor approved the :program strategic plan (:strategy).',
+            ],
+            'sent_back' => [
+                'title' => 'Strategic plan sent back',
+                'body' => ':actor sent the :program strategic plan back: ":reason"',
+            ],
+        ],
         'annual_plan' => [
             'plan_submitted' => [
                 'title' => 'New annual plan to review',

@@ -46,9 +46,10 @@ trait BuildsMatrixActivities
         }
 
         $activities = DB::table('results as r')
-            ->join('results as o', 'o.id', '=', 'r.parent_id')
+            ->leftJoin('results as o', 'o.id', '=', 'r.parent_id')
             ->where('r.type', ResultType::Activity->value)
             ->whereIn('r.proposal_id', $links->pluck('proposal_id')->unique()->all())
+            ->orderByRaw('o.id IS NULL')
             ->orderBy('o.id')
             ->orderBy('r.id')
             ->get(['r.id', 'r.statement', 'r.activity_kind', 'r.proposal_id', 'o.id as output_id', 'o.statement as output_statement']);
@@ -74,8 +75,10 @@ trait BuildsMatrixActivities
         foreach ($activities as $activity) {
             foreach ($linksByProposal->get($activity->proposal_id, collect()) as $link) {
                 $project = (int) $link->project_id;
-                $outputs[$activity->output_id] ??= ['output_id' => (int) $activity->output_id, 'statement' => $activity->output_statement, 'activities' => []];
-                $outputs[$activity->output_id]['activities'][] = [
+                // A free activity (no output above it) is grouped on its own, under key 0.
+                $outputKey = (int) ($activity->output_id ?? 0);
+                $outputs[$outputKey] ??= ['output_id' => $outputKey, 'statement' => $activity->output_statement ?? __('results_framework.free_activities'), 'activities' => []];
+                $outputs[$outputKey]['activities'][] = [
                     'key' => 'activity-'.$activity->id.'-'.$project,
                     'activity_id' => (int) $activity->id,
                     'statement' => $activity->statement,

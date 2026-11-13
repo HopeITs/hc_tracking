@@ -431,7 +431,7 @@
     .dk-sprow-state.dk-warn { color: var(--warn); }
     .dk-sprow-state.dk-bad { color: var(--bad); }
     .dk-sprow-count { font-size: 13.5px; white-space: nowrap; color: var(--ink-3); }
-    .dk-sprow-act { display: flex; justify-content: flex-end; }
+    .dk-sprow-act { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 0 16px; }
     @media (max-width: 860px) {
         .dk-sprow { grid-template-columns: minmax(0, 1fr) auto; gap: 2px 16px; padding-block: 12px; }
         .dk-sprow > :not(.dk-sprow-name, .dk-sprow-act) { grid-column: 1; padding-inline-start: 19px; }

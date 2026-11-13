@@ -33,6 +33,7 @@ use App\Models\User;
 use App\Models\UserNotification;
 use App\Notifications\Alerts\NotificationSettings;
 use App\Notifications\NotificationPresenter;
+use App\Support\EmployeeProfile;
 use App\Support\FileKeyring;
 use Carbon\CarbonImmutable;
 use Database\Seeders\RolesAndPermissionsSeeder;
@@ -795,6 +796,9 @@ function holdMealManagerSlot(?int $employeeId = null): int
     app(NotificationSettings::class)->save(['proposal_default_reviewers' => [
         'meal_manager' => $positionId, 'finance_manager' => null, 'fundraising_manager' => null, 'ceo' => null,
     ]]);
+
+    // The holder is read through a remembered HR lookup; drop it so a slot moved mid-test is seen.
+    EmployeeProfile::forgetRememberedLookup();
 
     return $employeeId;
 }

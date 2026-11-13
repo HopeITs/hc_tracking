@@ -52,10 +52,29 @@
                     </div>
                 </x-slot:toolbar>
 
+                @php
+                    $freeActivityCount = collect($nodes)->filter(fn (array $node): bool => $node['result']->type === \App\Enums\ResultType::Activity)->count();
+                    $canAddFreeActivity = $groupProposal === null && auth()->user()->can('results.create');
+                    $freeActivityHeadingShown = false;
+                @endphp
                 <div class="space-y-5 bg-ground px-3 py-5 @2xl/directory:px-5 @2xl/directory:py-6">
                     @foreach ($nodes as $node)
+                        {{-- Free activities (no statement above them) follow the chain under their own heading. --}}
+                        @if ($node['result']->type === \App\Enums\ResultType::Activity && ! $freeActivityHeadingShown)
+                            @php $freeActivityHeadingShown = true; @endphp
+                            <h3 class="type-label text-secondary-medium dark:text-ink-muted" data-test="free-activities-heading">{{ __('results_framework.free_activities') }}</h3>
+                        @endif
                         <x-ui.framework-node :node="$node" :depth="0" :order="$loop->index" wire:key="framework-root-{{ $node['result']->id }}" />
                     @endforeach
+
+                    @if ($canAddFreeActivity)
+                        <div class="flex flex-wrap items-center gap-2 border-t border-dashed border-secondary-soft pt-4 dark:border-line">
+                            @if ($freeActivityCount === 0)
+                                <span class="type-meta text-secondary-medium dark:text-ink-muted">{{ __('results_framework.free_activities_empty') }}</span>
+                            @endif
+                            <x-ui.button tone="ghost" size="sm" icon="plus" class="ms-auto" wire:click="openCreateActivity({{ $groupProgram?->id ?? 'null' }})" data-test="add-free-activity-{{ $groupProgram?->id ?? 'none' }}">{{ __('results_framework.add_free_activity') }}</x-ui.button>
+                        </div>
+                    @endif
                 </div>
             </x-ui.panel>
         @endforeach

@@ -298,6 +298,11 @@ return [
         'upcoming' => 'قادم',
         'not_due' => 'غير مستحق',
     ],
+    'strategic_plan_status' => [
+        'draft' => 'مسودة',
+        'submitted' => 'عند مدير البرنامج للموافقة',
+        'approved' => 'معتمدة',
+    ],
     'activity_plan_status' => [
         'draft' => 'مسودة',
         'in_review' => 'عند الميل للمراجعة',

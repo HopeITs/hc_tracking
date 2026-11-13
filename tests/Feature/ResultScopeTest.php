@@ -17,7 +17,7 @@ use Illuminate\Validation\ValidationException;
 
 beforeEach(function () {
     $this->seed(RolesAndPermissionsSeeder::class);
-    $this->actingAs(User::factory()->role('MEAL')->create());
+    $this->actingAs(mealManager());
     $this->program = Program::factory()->create();
 });
 
@@ -84,13 +84,19 @@ test('an activity sits under an output', function () {
         ->and($activity->program_id)->toBe($this->program->id);
 });
 
-test('an activity under an outcome, or with no parent, is refused', function () {
+test('an activity under an outcome is refused', function () {
     $outcome = saveFrameworkResult(['type' => 'outcome', 'program_id' => $this->program->id]);
 
     expect(resultScopeRefusal(fn () => saveFrameworkResult(['type' => 'activity', 'parent_id' => $outcome->id])))
-        ->toBe(['parent_id' => [__('results_framework.activity_under_output')]])
-        ->and(resultScopeRefusal(fn () => saveFrameworkResult(['type' => 'activity'])))
         ->toBe(['parent_id' => [__('results_framework.activity_under_output')]]);
+});
+
+test('an activity may stand on its own, linked to no statement', function () {
+    $activity = saveFrameworkResult(['type' => 'activity', 'program_id' => $this->program->id]);
+
+    expect($activity->parent_id)->toBeNull()
+        ->and($activity->type)->toBe(ResultType::Activity)
+        ->and($activity->program_id)->toBe($this->program->id);
 });
 
 test('nothing sits under an activity', function () {
@@ -249,7 +255,7 @@ test('proposals.update alone cannot write the framework', function () {
 
 test('the framework is editable at concept note by a results.create holder', function () {
     $proposal = proposalInPrograms($this->program);
-    $this->actingAs(tap(User::factory()->create())->givePermissionTo('results.create'));
+    $this->actingAs(tap(User::factory()->create(['employee_id' => holdMealManagerSlot()]))->givePermissionTo('results.create'));
 
     expect(saveFrameworkResult(['type' => 'impact'], $proposal)->exists)->toBeTrue();
 });
@@ -259,20 +265,20 @@ test('after submission only results.update holders change the structure', functi
     $impact = saveFrameworkResult(['type' => 'impact'], $proposal);
     fileProposalStatus($proposal, 'submitted');
     $proposal->refresh();
-    $this->actingAs(tap(User::factory()->create())->givePermissionTo('results.create', 'results.delete'));
+    $this->actingAs(tap(User::factory()->create(['employee_id' => holdMealManagerSlot()]))->givePermissionTo('results.create', 'results.delete'));
     $lock = ['structure' => [__('results_framework.structural_lock')]];
 
     expect(resultScopeRefusal(fn () => saveFrameworkResult(['type' => 'outcome', 'parent_id' => $impact->id], $proposal)))->toBe($lock)
         ->and(resultScopeRefusal(fn () => app(DeleteResult::class)->handle($impact, $proposal)))->toBe($lock);
 
-    $this->actingAs(User::factory()->role('MEAL')->create());
+    $this->actingAs(userWithRole('General Manager'));
 
     expect(saveFrameworkResult(['type' => 'outcome', 'parent_id' => $impact->id], $proposal)->exists)->toBeTrue();
 });
 
 test('a held proposal keeps the lock of the status it was held from', function () {
     $proposal = proposalInPrograms($this->program);
-    $this->actingAs(tap(User::factory()->create())->givePermissionTo('results.create'));
+    $this->actingAs(tap(User::factory()->create(['employee_id' => holdMealManagerSlot()]))->givePermissionTo('results.create'));
 
     DB::table('proposal_status_notes')->insert([
         ['proposal_id' => $proposal->id, 'status' => 'concept note submitted', 'context' => 'Sent.', 'date' => '2026-01-01', 'created_at' => now(), 'updated_at' => now()],

@@ -44,7 +44,7 @@ trait ManagesIndicatorReadings
 
     public function openProgressModal(int $indicatorId): void
     {
-        Gate::authorize('indicators.update');
+        Gate::authorize('indicators.record');
 
         $this->resetValidation();
         $this->progressIndicatorId = $indicatorId;
@@ -62,7 +62,7 @@ trait ManagesIndicatorReadings
      */
     public function openEditReadingModal(int $readingId): void
     {
-        Gate::authorize('indicators.update');
+        Gate::authorize('indicators.record');
 
         $reading = IndicatorProgress::query()->findOrFail($readingId);
 
@@ -101,7 +101,7 @@ trait ManagesIndicatorReadings
 
     public function saveProgress(): void
     {
-        Gate::authorize('indicators.update');
+        Gate::authorize('indicators.record');
 
         if ($this->progressIndicatorId === null) {
             return;
@@ -162,7 +162,7 @@ trait ManagesIndicatorReadings
      */
     public function confirmDeleteReading(int $readingId): void
     {
-        Gate::authorize('indicators.update');
+        Gate::authorize('indicators.record');
 
         $this->deletingReadingId = $readingId;
     }
@@ -174,7 +174,7 @@ trait ManagesIndicatorReadings
 
     public function deleteReading(): void
     {
-        Gate::authorize('indicators.update');
+        Gate::authorize('indicators.record');
 
         if ($this->deletingReadingId === null || $this->inspectingIndicatorId === null) {
             return;

@@ -298,6 +298,11 @@ return [
         'upcoming' => 'Upcoming',
         'not_due' => 'Not due',
     ],
+    'strategic_plan_status' => [
+        'draft' => 'Draft',
+        'submitted' => 'With the program manager',
+        'approved' => 'Approved',
+    ],
     'activity_plan_status' => [
         'draft' => 'Draft',
         'in_review' => 'With MEAL for review',

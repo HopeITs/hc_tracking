@@ -52,7 +52,7 @@ it('never gives out the serial of a deactivated entry again', function () {
 });
 
 it('gives two saves at the same program and level different codes', function () {
-    $this->actingAs(userWithRole('MEAL'));
+    $this->actingAs(mealManager());
     $programId = insertHrProgram(code: '002');
     $input = libraryIndicatorInput(['institutional' => false, 'program_id' => $programId, 'level_ref' => 'OP1.2']);
 
@@ -81,7 +81,7 @@ it('refuses a program whose code HR has given to two programs', function () {
 })->throws(ValidationException::class, "This program's code is duplicated in HR. Ask the HR team to fix it.");
 
 it('writes nothing when the HR program code is duplicated', function () {
-    $this->actingAs(userWithRole('MEAL'));
+    $this->actingAs(mealManager());
     insertHrProgram(code: '009');
     $programId = insertHrProgram(code: '009');
 
@@ -94,7 +94,7 @@ it('writes nothing when the HR program code is duplicated', function () {
 });
 
 it('keeps the code when an entry in use is renamed', function () {
-    $this->actingAs(userWithRole('MEAL'));
+    $this->actingAs(mealManager());
     $entry = app(SaveLibraryIndicator::class)->handle(null, libraryIndicatorInput());
     Indicator::factory()->create(['library_indicator_id' => $entry->id]);
 
@@ -105,7 +105,7 @@ it('keeps the code when an entry in use is renamed', function () {
 });
 
 it('refuses to move an entry in use to another level, keeping its code', function () {
-    $this->actingAs(userWithRole('MEAL'));
+    $this->actingAs(mealManager());
     $entry = app(SaveLibraryIndicator::class)->handle(null, libraryIndicatorInput());
     Indicator::factory()->create(['library_indicator_id' => $entry->id]);
 
@@ -116,7 +116,7 @@ it('refuses to move an entry in use to another level, keeping its code', functio
 });
 
 it('gives an unused entry moved to another program and level a new code', function () {
-    $this->actingAs(userWithRole('MEAL'));
+    $this->actingAs(mealManager());
     $programId = insertHrProgram(code: '002');
     $entry = app(SaveLibraryIndicator::class)->handle(null, libraryIndicatorInput());
 

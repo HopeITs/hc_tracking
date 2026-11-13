@@ -62,7 +62,7 @@ test('the proposal page renders the logframe tab', function () {
 });
 
 test('MEAL builds the four levels and links the root to the program framework', function () {
-    $meal = User::factory()->role('MEAL')->create();
+    $meal = mealManager();
     $programImpact = Result::factory()->type(ResultType::Impact)->create(['program_id' => $this->program->id]);
 
     $tab = logframeTab($meal, $this->proposal)
@@ -110,7 +110,7 @@ test('MEAL builds the four levels and links the root to the program framework', 
 });
 
 test('the contributes-to picker offers only program-framework results of the proposal programs', function () {
-    $meal = User::factory()->role('MEAL')->create();
+    $meal = mealManager();
     $ownProgramResult = Result::factory()->type(ResultType::Outcome)->create(['program_id' => $this->program->id]);
     $otherProgramResult = Result::factory()->type(ResultType::Outcome)->create(['program_id' => Program::factory()->create()->id]);
     $otherProposalRoot = logframeNode(logframeProposal($this->program), ResultType::Impact, programId: $this->program->id);
@@ -127,25 +127,19 @@ test('the contributes-to picker offers only program-framework results of the pro
         ->not->toContain($otherProposalRoot->id);
 });
 
-test('Managers create and edit the framework but cannot delete from it', function () {
-    $manager = User::factory()->role('Managers')->create();
+test('Managers and MEAL officers read the framework but cannot write it', function (string $role) {
     $impact = logframeNode($this->proposal, ResultType::Impact, programId: $this->program->id);
+    $tab = fn () => logframeTab(userWithRole($role), $this->proposal);
 
-    logframeTab($manager, $this->proposal)
-        ->call('openCreateModal', $impact->id)
-        ->set('statement', 'Households grow more of their own food.')
-        ->call('saveResult')
-        ->assertHasNoErrors()
-        ->call('openEditModal', $impact->id)
-        ->set('statement', 'Families are food secure.')
-        ->call('saveResult')
-        ->assertHasNoErrors()
+    $tab()
+        ->assertSee($impact->statement)
+        ->assertDontSeeHtml('data-test="add-child-result-'.$impact->id.'"')
         ->assertDontSeeHtml('data-test="delete-result-');
 
-    expect($impact->refresh()->statement)->toBe('Families are food secure.');
-
-    logframeTab($manager, $this->proposal)->call('confirmDelete', $impact->id)->assertForbidden();
-});
+    $tab()->call('openCreateModal', $impact->id)->assertForbidden();
+    $tab()->call('openEditModal', $impact->id)->assertForbidden();
+    $tab()->call('confirmDelete', $impact->id)->assertForbidden();
+})->with(['Managers', 'MEAL']);
 
 test('a proposal editor without results permissions cannot write the framework', function () {
     $financial = User::factory()->role('Financial')->create();
@@ -167,7 +161,7 @@ test('a proposal editor without results permissions cannot write the framework',
 });
 
 test('another proposal\'s result cannot be reached from this tab', function () {
-    $meal = User::factory()->role('MEAL')->create();
+    $meal = mealManager();
     $foreignOutcome = logframeNode(logframeProposal($this->program), ResultType::Outcome, programId: $this->program->id);
     $tab = fn () => logframeTab($meal, $this->proposal);
 
@@ -186,7 +180,7 @@ test('another proposal\'s result cannot be reached from this tab', function () {
 });
 
 test('the framework is editable at the concept note stage', function () {
-    $meal = User::factory()->role('MEAL')->create();
+    $meal = mealManager();
 
     expect($this->proposal->refresh()->status->value)->toBe('concept note');
 
@@ -205,7 +199,7 @@ test('the framework is editable at the concept note stage', function () {
 test('after submission only results.update holders change the structure', function () {
     DB::table('proposals')->where('id', $this->proposal->id)->update(['status' => 'submitted']);
     $impact = logframeNode($this->proposal, ResultType::Impact, programId: $this->program->id);
-    $creator = User::factory()->create();
+    $creator = User::factory()->create(['employee_id' => holdMealManagerSlot()]);
     $creator->givePermissionTo('results.create');
 
     logframeTab($creator, $this->proposal)
@@ -219,7 +213,7 @@ test('after submission only results.update holders change the structure', functi
         ->call('saveResult')
         ->assertHasErrors(['statement' => __('results_framework.structural_lock')]);
 
-    logframeTab(User::factory()->role('MEAL')->create(), $this->proposal)
+    logframeTab(userWithRole('General Manager'), $this->proposal)
         ->assertDontSee(__('results_framework.locked_read_only'))
         ->call('openCreateModal', $impact->id)
         ->set('statement', 'Households grow more of their own food.')
@@ -248,7 +242,7 @@ test('a proposal spanning programs shows the multi-program badge', function () {
 });
 
 test('the tab holds a flat query count whatever the framework size', function () {
-    $user = User::factory()->role('MEAL')->create();
+    $user = mealManager();
     $programImpact = Result::factory()->type(ResultType::Impact)->create(['program_id' => $this->program->id]);
 
     $seed = function (int $outputs) use ($programImpact): void {

@@ -53,16 +53,22 @@ final class SaveResult
 {
     /**
      * @param  array{statement?: mixed, type?: mixed, activity_kind?: mixed, checkout_period?: mixed, program_id?: mixed, parent_id?: mixed, contributes_to_result_id?: mixed}  $validated
+     * @param  bool  $callerAuthorized  true only for a workflow that has already authorized this write
+     *                                  itself (the program manager adding an activity from their annual
+     *                                  plan, AddPlanActivity): it is then not asked for results.* nor
+     *                                  held by the structural lock.
      *
      * @throws ValidationException
      */
-    public function handle(?Result $existing, array $validated, ?Proposal $proposal = null): Result
+    public function handle(?Result $existing, array $validated, ?Proposal $proposal = null, bool $callerAuthorized = false): Result
     {
-        Gate::authorize($existing === null ? 'results.create' : 'results.update');
+        if (! $callerAuthorized) {
+            Gate::authorize($existing === null ? 'results.create' : 'results.update');
+        }
 
         $input = $this->validateInput($validated);
 
-        return DB::transaction(function () use ($existing, $input, $proposal): Result {
+        return DB::transaction(function () use ($existing, $input, $proposal, $callerAuthorized): Result {
             $lockedProposal = $proposal === null
                 ? null
                 : Proposal::query()->whereKey($proposal->getKey())->lockForUpdate()->firstOrFail();
@@ -82,7 +88,7 @@ final class SaveResult
             $isStructural = ! $result->exists || $result->parent_id !== $parentId || $result->type !== $type;
 
             if ($lockedProposal !== null && $isStructural
-                && ProposalFramework::isStructureLocked($lockedProposal) && ! Gate::allows('results.update')) {
+                && ! $callerAuthorized && ProposalFramework::isStructureLocked($lockedProposal) && ! Gate::allows('results.update')) {
                 $this->refuse('structure', 'results_framework.structural_lock');
             }
 
@@ -250,7 +256,8 @@ final class SaveResult
             $this->refuse('parent_id', 'results_framework.cross_cutting_root');
         }
 
-        if ($type === ResultType::Activity && $parent?->type !== ResultType::Output) {
+        // An activity sits under an output, or stands on its own with no parent.
+        if ($type === ResultType::Activity && $parent !== null && $parent->type !== ResultType::Output) {
             $this->refuse('parent_id', 'results_framework.activity_under_output');
         }
 

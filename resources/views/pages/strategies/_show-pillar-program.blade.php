@@ -26,6 +26,8 @@
     <span class="dk-sprow-count dk-num">{{ trans_choice('common.count_project', $program->projects_count, ['count' => $program->projects_count]) }}</span>
     <x-ui.employee-chip :employee="$program->manager" compact :empty="__('strategies.no_manager')" class="dk-sprow-who" />
     <span class="dk-sprow-act">
+        @php $strategicPlanStatus = $this->strategicPlanStatuses[$program->id] ?? null; @endphp
+        <a href="{{ route('strategic-plans.show', [$this->strategy, $program]) }}" wire:navigate class="dk-slink" aria-label="{{ __('strategic_plans.open_plan_named', ['program' => $program->name]) }}" data-test="strategic-plan-link-{{ $program->id }}">{{ __('strategic_plans.open_plan') }} · {{ $strategicPlanStatus?->label() ?? __('strategic_plans.not_started') }}</a>
         @can('strategies.update')
             @php
                 $assignAria = $assignLabel === 'move' ? __('strategies.move_to_pillar_named', ['program' => $program->name]) : __('strategies.choose_pillar_for', ['program' => $program->name]);
