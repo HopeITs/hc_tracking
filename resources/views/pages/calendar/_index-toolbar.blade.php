@@ -127,7 +127,7 @@
                     x-effect="paint(optionSearch, touched)"
                     x-on:click="pick($event)"
                     class="contents"
-                    data-employees-url="{{ route('employees.picker-options', ['l' => app()->getLocale()]) }}"
+                    data-employees-url="{{ route('employees.picker-options', ['l' => app()->getLocale(), 'v' => \App\Models\HrEmployee::PickerListVersion]) }}"
                     data-model="filterEmployeeIds"
                     data-role="option"
                     data-item-class="flex w-full cursor-pointer items-center gap-2 rounded-md px-2 py-1.5 text-start text-sm hover:bg-secondary-soft dark:hover:bg-white/[0.06]"

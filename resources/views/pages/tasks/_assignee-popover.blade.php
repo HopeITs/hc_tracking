@@ -10,7 +10,7 @@
 <template x-teleport="body">
     <div
         x-data="assigneePopover"
-        data-employees-url="{{ route('employees.picker-options', ['l' => app()->getLocale()]) }}"
+        data-employees-url="{{ route('employees.picker-options', ['l' => app()->getLocale(), 'v' => \App\Models\HrEmployee::PickerListVersion]) }}"
         x-show="$store.assigneePicker.open"
         x-cloak
         x-on:click.outside="$store.assigneePicker.close()"

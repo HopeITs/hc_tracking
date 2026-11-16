@@ -35,7 +35,7 @@ test('the employee picker options are sorted for the interface language and cach
 
     expect($order($english))->toBe([$amy, $zed])
         ->and($order($arabic))->toBe([$zed, $amy])
-        ->and(collect($english->json())->firstWhere('value', (string) $amy)['photo'])->toBe(HrEmployee::avatarUrl($amy));
+        ->and(collect($english->json())->firstWhere('value', (string) $amy)['photo'])->toBe(parse_url(HrEmployee::avatarUrl($amy), PHP_URL_PATH));
 });
 
 test('an employees dropdown renders only the picked names on the server', function () {
@@ -71,7 +71,7 @@ test('a person filter hands its employee list url to the filter menu', function 
 
     $html = Livewire::actingAs($user)->test('pages::projects.index')->html();
 
-    expect($html)->toContain('data-employees-url="'.route('employees.picker-options', ['l' => app()->getLocale()]).'"')
+    expect($html)->toContain('data-employees-url="'.e(route('employees.picker-options', ['l' => app()->getLocale(), 'v' => HrEmployee::PickerListVersion])).'"')
         ->and($html)->not->toContain('@js(');
 });
 

@@ -53,12 +53,60 @@ window.hcEmployeeList = {
                 const detail = item.detail ? `<span class="block truncate text-xs text-secondary-medium dark:text-ink-muted">${this.escape(item.detail)}</span>` : '';
                 const inactive = item.inactive ? ' data-inactive' : '';
 
-                const photo = item.photo ? `<img src="${this.escape(item.photo)}" alt="" loading="lazy" decoding="async" class="hc-picker-photo${item.inactive ? ' opacity-60' : ''}" onerror="this.style.visibility='hidden'">` : '';
+                const photo = item.photo ? `<img data-photo-src="${this.escape(item.photo)}" alt="" decoding="async" class="hc-picker-photo${item.inactive ? ' opacity-60' : ''}" onerror="this.style.visibility='hidden'">` : '';
 
                 return `<button type="button"${role} data-order="${index}" class="${this.escape(container.dataset.itemClass)}" data-flux-menu-item data-option-value="${this.escape(item.value)}" data-option-label="${this.escape(item.label)}"${inactive}>${photo}<span class="min-w-0 flex-1"><span class="block truncate${item.inactive ? ' opacity-60' : ''}">${this.escape(item.label)}</span>${detail}</span>${check}</button>`;
             })
             .join('');
         container.dataset.count = String(items.length);
+        this.watchPhotos(container);
+    },
+
+    /**
+     * Load each photo when its row scrolls into the open menu. The browser's
+     * own loading="lazy" never starts for images drawn inside a closed
+     * dropdown, so the faces stayed blank; fetching all 270+ at once would
+     * queue every other request behind them. The menu is the observer's root,
+     * so rows hidden by the search or below the fold wait.
+     */
+    watchPhotos(container) {
+        container._hcPhotoObserver?.disconnect();
+
+        if (! ('IntersectionObserver' in window)) {
+            container.querySelectorAll('img[data-photo-src]').forEach((image) => this.showPhoto(image));
+
+            return;
+        }
+
+        const observer = new IntersectionObserver((entries) => {
+            for (const entry of entries) {
+                if (entry.isIntersecting) {
+                    this.showPhoto(entry.target);
+                    observer.unobserve(entry.target);
+                }
+            }
+        }, { root: this.scrollParent(container), rootMargin: '200px 0px' });
+
+        container.querySelectorAll('img[data-photo-src]').forEach((image) => observer.observe(image));
+        container._hcPhotoObserver = observer;
+    },
+
+    showPhoto(image) {
+        image.src = image.dataset.photoSrc;
+        image.removeAttribute('data-photo-src');
+    },
+
+    /** The nearest ancestor that scrolls the list, or null for the viewport. */
+    scrollParent(element) {
+        for (let node = element.parentElement; node !== null; node = node.parentElement) {
+            const overflowY = getComputedStyle(node).overflowY;
+
+            if (overflowY === 'auto' || overflowY === 'scroll') {
+                return node;
+            }
+        }
+
+        return null;
     },
 
     /** Show the check mark on the selected items only. */
