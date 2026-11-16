@@ -27,6 +27,7 @@ surface a centered popup.
 6. **No side drawers.** Every sheet (forms, record sheets, settings, customize) is a centered popup. Long forms
    become step wizards (Back / Next, last step submits; a server error jumps to the step holding the first
    invalid field). All form popups share one size so the site feels consistent.
+   *Steps superseded 2026-11-16 by `2026-11-16-sectioned-modal-design.md`: no modal steps any more.*
 7. **Inner pages** sit on a clear grid: functional sections (details, files, history, team, lists) are
    bordered cards aligned to that grid; headline figures stay typographic (not stat tiles — see the
    "boxy/bland" feedback).

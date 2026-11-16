@@ -41,6 +41,7 @@ Before planning or editing, find the row whose globs match the file's path and r
 | {app/Livewire/Concerns/**,resources/views/components/funding/**} | .ai/rules/funding.md |
 | resources/views/pages/indicator-library/**, app/Livewire/Concerns/IndicatorLibrary/** | .ai/rules/indicator-library.md |
 | resources/views/pages/indicators/** | .ai/rules/indicators.md |
+| {resources/views/components/ui/modal.blade.php,resources/js/modal-shell.js,resources/views/components/ui/form-section.blade.php} | .ai/rules/js-views-components-ui.md |
 | resources/js/** | .ai/rules/js.md |
 | {resources/views/components/ui/gantt.blade.php,resources/js/gantt/**,app/Livewire/Concerns/*Gantt.php} | .ai/rules/livewire-concerns.md |
 | {app/Models/User.php,app/Console/Commands/**,app/Http/Middleware/**,app/Actions/Fortify/**} | .ai/rules/middleware-actions-fortify.md |

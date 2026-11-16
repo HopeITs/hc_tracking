@@ -264,6 +264,51 @@
         font-size: 0.75rem;
     }
 
+    /* After a failed save: how many fields need attention, and a jump to the first one. Red outline pill; fills red on hover. */
+    .modal-shell-error {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.5rem;
+        min-width: 0;
+        padding: 0.4375rem 0.875rem;
+        border: 1px solid var(--color-primary);
+        border-radius: 9999px;
+        color: var(--color-status-critical);
+        font-size: 0.8125rem;
+        font-weight: 700;
+        line-height: 1.25rem;
+        text-align: start;
+        transition: background-color 0.15s ease, color 0.15s ease;
+    }
+
+    .modal-shell-error:hover {
+        background-color: var(--color-primary);
+        color: var(--color-white);
+    }
+
+    .modal-shell-error:focus-visible {
+        outline: 2px solid var(--color-primary);
+        outline-offset: 2px;
+    }
+
+    .dark .modal-shell-error {
+        color: var(--color-ink);
+    }
+
+    .dark .modal-shell-error svg {
+        color: var(--color-primary);
+    }
+
+    .dark .modal-shell-error:hover,
+    .dark .modal-shell-error:hover svg {
+        color: var(--color-white);
+    }
+
+    /* A red line across the top of every dialog: the one strong accent before the content. */
+    .modal-shell-header {
+        box-shadow: inset 0 3px 0 var(--color-primary);
+    }
+
     .modal-shell-actions {
         display: flex;
         gap: 0.5rem;
@@ -295,6 +340,328 @@
 
     .modal-shell-xl .modal-shell-footer {
         padding-inline: 1.75rem;
+    }
+
+    /*
+     * Section index (x-ui.modal with 5+ form sections): a start-side list that
+     * follows the scroll, beside the scrolling body. A red ring fills as the
+     * required fields are done; the current entry carries a red edge and a red
+     * number. On a narrow dialog the list becomes a row of chips under the header.
+     */
+    .modal-shell-main {
+        display: flex;
+        flex: 1 1 auto;
+        min-height: 0;
+    }
+
+    .modal-shell-main > .modal-shell-body {
+        flex: 1 1 auto;
+        min-width: 0;
+    }
+
+    .modal-shell-index {
+        display: flex;
+        flex: 0 0 220px;
+        flex-direction: column;
+        gap: 0.875rem;
+        min-height: 0;
+        padding-block: 1rem;
+        padding-inline: 1rem 0.75rem;
+        overflow-y: auto;
+        border-inline-end: 1px solid var(--color-secondary-soft);
+        background-color: var(--color-white);
+    }
+
+    .modal-shell-index-progress {
+        display: flex;
+        align-items: center;
+        gap: 0.75rem;
+        padding: 0.75rem;
+        border: 1px solid var(--color-secondary-soft);
+        border-radius: 0.75rem;
+        color: var(--color-secondary-medium);
+        font-size: 0.75rem;
+        font-weight: 600;
+        line-height: 1.125rem;
+        font-variant-numeric: tabular-nums;
+    }
+
+    .modal-shell-index-ring {
+        flex-shrink: 0;
+        transform: rotate(-90deg);
+    }
+
+    .modal-shell-index-ring circle {
+        fill: none;
+        stroke-width: 5;
+    }
+
+    .modal-shell-index-ring circle:first-child {
+        stroke: var(--color-secondary-soft);
+    }
+
+    .modal-shell-index-ring circle:last-child {
+        stroke: var(--color-primary);
+        stroke-linecap: round;
+        transition: stroke-dashoffset 0.3s ease;
+    }
+
+    :where(:dir(rtl)) .modal-shell-index-ring {
+        transform: rotate(-90deg) scaleY(-1);
+    }
+
+    .modal-shell-index-caption {
+        margin-inline: 0.5rem;
+        color: var(--color-secondary-medium);
+        font-size: 0.6875rem;
+        font-weight: 700;
+        letter-spacing: 0.06em;
+        text-transform: uppercase;
+    }
+
+    .modal-shell-index-caption:lang(ar) {
+        letter-spacing: normal;
+    }
+
+    .modal-shell-index-list {
+        display: grid;
+        gap: 2px;
+    }
+
+    .modal-shell-index-entry {
+        position: relative;
+        display: flex;
+        align-items: center;
+        gap: 0.625rem;
+        padding: 0.4375rem 0.5rem;
+        border-radius: 0.625rem;
+        color: var(--color-secondary-medium);
+        font-size: 0.8125rem;
+        font-weight: 500;
+        line-height: 1.125rem;
+    }
+
+    .modal-shell-index-entry:hover {
+        background-color: var(--color-board-head);
+        color: var(--color-secondary-dark);
+    }
+
+    .modal-shell-index-entry:focus-visible {
+        outline: 2px solid var(--color-primary);
+        outline-offset: 1px;
+    }
+
+    .modal-shell-index-entry.is-current {
+        background-color: var(--color-board-head);
+        color: var(--color-secondary-dark);
+        font-weight: 700;
+    }
+
+    /* The red edge on the current entry, on the start side. */
+    .modal-shell-index-entry.is-current::before {
+        content: '';
+        position: absolute;
+        inset-block: 0.5rem;
+        inset-inline-start: -1rem;
+        width: 3px;
+        border-start-end-radius: 3px;
+        border-end-end-radius: 3px;
+        background-color: var(--color-primary);
+    }
+
+    .modal-shell-index-dot {
+        display: grid;
+        flex-shrink: 0;
+        place-items: center;
+        width: 1.375rem;
+        height: 1.375rem;
+        border: 1.5px solid var(--color-secondary-light);
+        border-radius: 9999px;
+        color: var(--color-secondary-medium);
+        font-size: 0.6875rem;
+        font-weight: 800;
+        line-height: 1;
+        font-variant-numeric: tabular-nums;
+    }
+
+    .modal-shell-index-entry.is-current .modal-shell-index-dot,
+    .modal-shell-index-entry.is-invalid .modal-shell-index-dot {
+        border-color: var(--color-primary);
+        background-color: var(--color-primary);
+        color: var(--color-white);
+    }
+
+    .modal-shell-index-entry.is-done .modal-shell-index-dot {
+        border-color: var(--color-secondary-dark);
+        background-color: var(--color-secondary-dark);
+        color: var(--color-white);
+    }
+
+    .modal-shell-index-entry.is-current.is-done .modal-shell-index-dot {
+        border-color: var(--color-primary);
+        background-color: var(--color-primary);
+    }
+
+    .modal-shell-index-entry.is-invalid {
+        color: var(--color-status-critical);
+        font-weight: 600;
+    }
+
+    .modal-shell-index-label {
+        min-width: 0;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+    }
+
+    .modal-shell-index-optional {
+        margin-inline-start: auto;
+        color: var(--color-secondary-light);
+        font-size: 0.625rem;
+        font-weight: 500;
+    }
+
+    .modal-shell-index-count {
+        min-width: 1.125rem;
+        margin-inline-start: auto;
+        padding-inline: 0.375rem;
+        border-radius: 9999px;
+        background-color: var(--color-primary);
+        color: var(--color-white);
+        font-size: 0.6875rem;
+        font-weight: 700;
+        line-height: 1.125rem;
+        text-align: center;
+        font-variant-numeric: tabular-nums;
+    }
+
+    .modal-shell-index-hint {
+        margin-top: auto;
+        margin-inline: 0.5rem;
+        color: var(--color-secondary-light);
+        font-size: 0.6875rem;
+        line-height: 1rem;
+    }
+
+    .modal-shell-chips {
+        display: none;
+        flex-shrink: 0;
+        gap: 0.375rem;
+        padding: 0.625rem 1rem;
+        overflow-x: auto;
+        border-bottom: 1px solid var(--color-secondary-soft);
+        background-color: var(--color-white);
+        scrollbar-width: none;
+    }
+
+    .modal-shell-chip {
+        flex: 0 0 auto;
+        padding: 0.3125rem 0.75rem;
+        border: 1px solid var(--color-secondary-soft);
+        border-radius: 9999px;
+        color: var(--color-secondary-medium);
+        font-size: 0.8125rem;
+        font-weight: 600;
+        white-space: nowrap;
+    }
+
+    .modal-shell-chip.is-current {
+        border-color: var(--color-primary);
+        background-color: var(--color-primary);
+        color: var(--color-white);
+    }
+
+    .modal-shell-chip.is-invalid {
+        border-color: var(--color-primary);
+        color: var(--color-status-critical);
+    }
+
+    .modal-shell-chip.is-current.is-invalid {
+        color: var(--color-white);
+    }
+
+    .modal-shell-chip:focus-visible {
+        outline: 2px solid var(--color-primary);
+        outline-offset: 1px;
+    }
+
+    .dark .modal-shell-index,
+    .dark .modal-shell-chips {
+        border-color: var(--color-line);
+        background-color: var(--color-surface-3);
+    }
+
+    .dark .modal-shell-index-progress {
+        border-color: var(--color-line);
+        color: var(--color-ink-muted);
+    }
+
+    .dark .modal-shell-index-ring circle:first-child {
+        stroke: var(--color-line-strong);
+    }
+
+    .dark .modal-shell-index-caption,
+    .dark .modal-shell-index-entry {
+        color: var(--color-ink-muted);
+    }
+
+    .dark .modal-shell-index-entry:hover,
+    .dark .modal-shell-index-entry.is-current {
+        background-color: var(--color-surface-2);
+        color: var(--color-ink);
+    }
+
+    .dark .modal-shell-index-entry.is-invalid {
+        color: var(--color-ink);
+    }
+
+    .dark .modal-shell-index-dot {
+        border-color: var(--color-line-strong);
+        color: var(--color-ink-muted);
+    }
+
+    .dark .modal-shell-index-entry.is-current .modal-shell-index-dot,
+    .dark .modal-shell-index-entry.is-invalid .modal-shell-index-dot {
+        border-color: var(--color-primary);
+        background-color: var(--color-primary);
+        color: var(--color-white);
+    }
+
+    .dark .modal-shell-index-entry.is-done .modal-shell-index-dot {
+        border-color: var(--color-ink);
+        background-color: var(--color-ink);
+        color: var(--color-surface-0);
+    }
+
+    .dark .modal-shell-index-optional,
+    .dark .modal-shell-index-hint {
+        color: var(--color-ink-faint);
+    }
+
+    .dark .modal-shell-chip {
+        border-color: var(--color-line-strong);
+        color: var(--color-ink-muted);
+    }
+
+    .dark .modal-shell-chip.is-current {
+        border-color: var(--color-primary);
+        background-color: var(--color-primary);
+        color: var(--color-white);
+    }
+
+    .dark .modal-shell-chip.is-invalid {
+        border-color: var(--color-primary);
+        color: var(--color-ink);
+    }
+
+    @media (width < 48rem) {
+        .modal-shell-index {
+            display: none;
+        }
+
+        .modal-shell-chips {
+            display: flex;
+        }
     }
 
     /* Viewers (file previews) fill the body edge to edge. */
@@ -358,6 +725,10 @@
             display: none;
         }
 
+        .modal-shell-error {
+            flex: 1 1 100%;
+        }
+
         .modal-shell-actions {
             display: grid;
             grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -370,56 +741,127 @@
     }
 
     /*
-     * Rail sections (x-ui.form-section). In a wide dialog each section's name sits
-     * in a start-side rail, one dot per section on a single thread (the app's
-     * dot-thread motif), so headings cost width instead of height. Narrower
-     * dialogs fold the rail into a dot + hairline heading above the fields.
+     * Form sections (x-ui.form-section), v2 (user 2026-11-16): inside a dialog
+     * every section is a white card on the grey body, with a red number (CSS
+     * counter), the title, a one-line hint and a live status chip. Red and
+     * greys only: red marks what guides (numbers, focus, errors), grey the rest.
+     * The card you type in takes a red edge; a failed card stays red.
+     * Optional sections start folded behind a dashed "Add …" button.
      */
-    .form-section {
-        display: grid;
+    .modal-shell-body:has(section.form-section) {
+        display: flex;
+        flex-direction: column;
         gap: 0.75rem;
-        padding-block: 0.75rem;
+        padding-block: 1rem 1.25rem;
+        counter-reset: form-section;
+        background-color: var(--color-board-head);
+    }
+
+    .modal-shell-xl .modal-shell-body:has(section.form-section) {
+        padding: 1rem 1.25rem 1.25rem;
+    }
+
+    .form-section {
+        counter-increment: form-section;
+        scroll-margin-top: 0.75rem;
+    }
+
+    .form-section-card {
+        display: grid;
+        gap: 0.875rem;
+        padding: 1rem 1.125rem 1.125rem;
+        border: 1px solid var(--color-secondary-soft);
+        border-radius: 0.875rem;
+        background-color: var(--color-white);
+        box-shadow: 0 1px 2px rgb(16 24 40 / 0.04), 0 1px 3px rgb(16 24 40 / 0.06);
+        transition: border-color 0.15s ease, box-shadow 0.15s ease;
+    }
+
+    .form-section-card:focus-within {
+        border-color: var(--color-primary);
+        box-shadow: 0 0 0 1px var(--color-primary), 0 4px 14px rgb(16 24 40 / 0.08);
+    }
+
+    .form-section[data-invalid] .form-section-card {
+        border-color: var(--color-primary);
     }
 
     .form-section-rail {
-        position: relative;
+        display: flex;
+        align-items: flex-start;
+        gap: 0.75rem;
         min-width: 0;
+    }
+
+    .form-section-num {
+        display: grid;
+        flex-shrink: 0;
+        place-items: center;
+        width: 1.625rem;
+        height: 1.625rem;
+        border-radius: 9999px;
+        background-color: var(--color-primary);
+        color: var(--color-white);
+        font-size: 0.75rem;
+        font-weight: 800;
+        font-variant-numeric: tabular-nums;
+    }
+
+    .form-section-num::after {
+        content: counter(form-section);
+    }
+
+    .form-section[data-done]:not([data-invalid]) .form-section-num {
+        background-color: var(--color-secondary-dark);
+    }
+
+    .form-section[data-done]:not([data-invalid]) .form-section-num::after {
+        content: '✓';
+    }
+
+    .form-section[data-invalid] .form-section-num::after {
+        content: '!';
     }
 
     .form-section-heading {
         display: flex;
+        flex-wrap: wrap;
         align-items: center;
-        gap: 0.625rem;
-        font-size: 0.875rem;
-        font-weight: 600;
-        line-height: 1.25rem;
+        gap: 0.5rem;
+        font-size: 0.9375rem;
+        font-weight: 700;
+        line-height: 1.625rem;
     }
 
-    .form-section-heading::after {
-        content: '';
-        flex: 1 1 auto;
-        height: 1px;
-        background-color: var(--color-secondary-soft);
-    }
-
+    /* The plain dot only shows where a section is not a card (outside a dialog). */
     .form-section-dot {
-        position: relative;
-        z-index: 1;
         flex-shrink: 0;
         width: 7px;
         height: 7px;
         border-radius: 9999px;
         background-color: var(--color-secondary-dark);
-        box-shadow: 0 0 0 4px var(--color-white);
     }
 
-    .form-section[data-invalid] .form-section-dot {
-        background-color: var(--color-primary);
+    .modal-shell-body .form-section-dot {
+        display: none;
+    }
+
+    .form-section:not(.modal-shell-body .form-section) .form-section-num {
+        display: none;
+    }
+
+    .form-section-optional {
+        padding: 1px 8px;
+        border-radius: 9999px;
+        background-color: var(--color-secondary-soft);
+        color: var(--color-secondary-medium);
+        font-size: 0.6875rem;
+        font-weight: 600;
+        line-height: 1rem;
     }
 
     .form-section-hint {
         margin-top: 0.125rem;
-        margin-inline-start: 17px;
         color: var(--color-secondary-medium);
         font-size: 0.75rem;
         line-height: 1rem;
@@ -428,6 +870,7 @@
 
     .form-section[data-invalid] .form-section-hint {
         color: var(--color-status-critical);
+        font-weight: 600;
     }
 
     .form-section-figure {
@@ -435,77 +878,182 @@
         font-weight: 600;
     }
 
-    .dark .form-section-heading::after {
-        background-color: var(--color-line);
+    /* Live status chip (modal-shell.js paintSection). */
+    .form-section-state {
+        flex-shrink: 0;
+        margin-inline-start: auto;
+        border-radius: 9999px;
+        font-size: 0.6875rem;
+        font-weight: 700;
+        line-height: 1.375rem;
+        white-space: nowrap;
     }
 
-    /* The ring is a gap cut into the thread, so it takes the dialog's own surface. */
+    .form-section-state:empty {
+        display: none;
+    }
+
+    .form-section-state[data-tone='is-required'] {
+        padding-inline: 0.625rem;
+        border: 1px solid var(--color-secondary-soft);
+        color: var(--color-secondary-medium);
+    }
+
+    .form-section-state[data-tone='is-done'] {
+        padding-inline: 0.625rem;
+        background-color: var(--color-secondary-dark);
+        color: var(--color-white);
+    }
+
+    .form-section-state[data-tone='is-invalid'] {
+        padding-inline: 0.625rem;
+        background-color: var(--color-primary);
+        color: var(--color-white);
+    }
+
+    /* Folded optional section. */
+    .form-section-fold {
+        display: flex;
+        align-items: center;
+        gap: 0.75rem;
+        width: 100%;
+        padding: 0.875rem 1.125rem;
+        border: 1px dashed var(--color-secondary-light);
+        border-radius: 0.875rem;
+        background-color: transparent;
+        color: var(--color-secondary-medium);
+        text-align: start;
+        cursor: pointer;
+        transition: border-color 0.15s ease, background-color 0.15s ease;
+    }
+
+    .form-section-fold:hover {
+        border-color: var(--color-primary);
+        background-color: var(--color-white);
+    }
+
+    .form-section-fold:focus-visible {
+        outline: 2px solid var(--color-primary);
+        outline-offset: 2px;
+    }
+
+    .form-section-fold-plus {
+        display: grid;
+        flex-shrink: 0;
+        place-items: center;
+        width: 1.625rem;
+        height: 1.625rem;
+        border-radius: 9999px;
+        background-color: var(--color-primary);
+        color: var(--color-white);
+        font-size: 1rem;
+        font-weight: 800;
+        line-height: 1;
+    }
+
+    .form-section-fold-title {
+        display: block;
+        color: var(--color-secondary-dark);
+        font-size: 0.875rem;
+        font-weight: 700;
+    }
+
+    .form-section-fold-hint {
+        display: block;
+        margin-top: 0.125rem;
+        font-size: 0.75rem;
+    }
+
+    /* Readable labels inside dialogs: sentence case in full ink, not tiny grey capitals. */
+    .modal-shell .form-label {
+        color: var(--color-secondary-dark);
+        font-size: 0.8125rem;
+        font-weight: 600;
+        letter-spacing: normal;
+        text-transform: none;
+    }
+
+    /* The chosen segment carries the red edge. */
+    .modal-shell .form-segment[aria-checked='true'] {
+        color: var(--color-secondary-dark);
+        box-shadow: 0 0 0 1.5px var(--color-primary), 0 1px 2px rgb(16 24 40 / 0.12);
+    }
+
+    .dark .modal-shell-body:has(section.form-section) {
+        background-color: var(--color-surface-2);
+    }
+
+    .dark .form-section-card {
+        border-color: var(--color-line);
+        background-color: var(--color-surface-3);
+        box-shadow: var(--shadow-raised);
+    }
+
+    .dark .form-section-card:focus-within,
+    .dark .form-section[data-invalid] .form-section-card {
+        border-color: var(--color-primary);
+    }
+
+    .dark .form-section-card:focus-within {
+        box-shadow: 0 0 0 1px var(--color-primary);
+    }
+
+    .dark .form-section[data-done]:not([data-invalid]) .form-section-num,
+    .dark .form-section-state[data-tone='is-done'] {
+        background-color: var(--color-ink);
+        color: var(--color-surface-0);
+    }
+
     .dark .form-section-dot {
         background-color: var(--color-ink-muted);
-        box-shadow: 0 0 0 4px var(--color-surface-3);
     }
 
-    .dark .form-section[data-invalid] .form-section-dot {
-        background-color: var(--color-brand);
+    .dark .form-section-optional {
+        background-color: var(--color-surface-2);
+        color: var(--color-ink-muted);
     }
 
-    .dark .form-section-hint {
+    .dark .form-section-hint,
+    .dark .form-section-fold {
         color: var(--color-ink-muted);
     }
 
     .dark .form-section[data-invalid] .form-section-hint {
-        color: var(--color-brand-text);
-    }
-
-    .dark .form-section-figure {
         color: var(--color-ink);
     }
 
-    @container modal (width >= 56rem) {
-        .form-section {
-            grid-template-columns: 10rem minmax(0, 1fr);
-            column-gap: 2rem;
-        }
+    .dark .form-section-figure,
+    .dark .form-section-fold-title,
+    .dark .modal-shell .form-label {
+        color: var(--color-ink);
+    }
 
-        .form-section + .form-section {
-            border-top: 1px solid color-mix(in srgb, var(--color-secondary-soft) 70%, transparent);
-        }
+    .dark .form-section-state[data-tone='is-required'] {
+        border-color: var(--color-line-strong);
+        color: var(--color-ink-muted);
+    }
 
-        .dark .form-section + .form-section {
-            border-top-color: var(--color-line);
-        }
+    .dark .form-section-fold {
+        border-color: var(--color-line-strong);
+    }
 
-        .form-section-heading::after {
-            content: none;
-        }
+    .dark .form-section-fold:hover {
+        border-color: var(--color-primary);
+        background-color: var(--color-surface-3);
+    }
 
-        /* The thread: out of the first dot, through every section, into the last dot. */
-        .form-section-rail::before {
-            content: '';
-            position: absolute;
-            inset-inline-start: 3px;
-            top: -0.75rem;
-            bottom: -0.75rem;
-            width: 1px;
-            background-color: var(--color-secondary-soft);
-        }
+    /* One red only (#be1f24): in dark the error line reads in ink beside a red icon. */
+    .dark .modal-shell .form-error {
+        color: var(--color-ink);
+    }
 
-        .form-section:first-child .form-section-rail::before {
-            top: 0.625rem;
-        }
+    .dark .modal-shell .form-error svg {
+        color: var(--color-primary);
+    }
 
-        .form-section:last-child .form-section-rail::before {
-            bottom: auto;
-            height: 1.375rem;
-        }
-
-        .form-section:only-child .form-section-rail::before {
-            content: none;
-        }
-
-        .dark .form-section-rail::before {
-            background-color: var(--color-line-strong);
-        }
+    .dark .modal-shell .form-segment[aria-checked='true'] {
+        color: var(--color-ink);
+        box-shadow: 0 0 0 1.5px var(--color-primary);
     }
 
     /* Confirmations (x-ui.confirm-modal): the small warning mark beside the title. */

@@ -649,7 +649,46 @@ test('a form section with invalid fields turns its dot red and counts them inste
     $xpath = formXPath(Blade::render('<x-ui.form-section title="Placement" hint="Where it runs" :fields="[\'cityId\', \'programId\', \'userId\']"><p>Fields</p></x-ui.form-section>'));
 
     expect($xpath->query('//section[@data-invalid]')->length)->toBe(1)
-        ->and(trim($xpath->query('//*[contains(@class, "form-section-hint")]')->item(0)->textContent))->toBe('2 fields need attention');
+        ->and(trim($xpath->query('//*[contains(@class, "form-section-hint")]')->item(0)->textContent))->toBe('2 fields need attention')
+        ->and($xpath->query('//section[@data-invalid-count="2"]')->length)->toBe(1);
+});
+
+test('a clean form section reports zero failed fields', function () {
+    View::share('errors', new ViewErrorBag);
+
+    $xpath = formXPath(Blade::render('<x-ui.form-section title="Details"><p>Fields</p></x-ui.form-section>'));
+
+    expect($xpath->query('//section[@data-invalid-count="0"]')->length)->toBe(1);
+});
+
+test('an optional form section starts folded behind an add button', function () {
+    View::share('errors', new ViewErrorBag);
+
+    $xpath = formXPath(Blade::render('<x-ui.form-section title="Notes" hint="Anything the team should know" :optional="true"><p>Fields</p></x-ui.form-section>'));
+
+    expect($xpath->query('//section[@x-data="formSectionFold"]')->length)->toBe(1)
+        ->and(trim($xpath->query('//*[@data-section-fold]//*[contains(@class, "form-section-fold-title")]')->item(0)->textContent))->toBe('Add notes')
+        ->and($xpath->query('//*[contains(@class, "form-section-card")][@x-show="open"]')->length)->toBe(1);
+});
+
+test('a required form section is never folded and carries its live status chip', function () {
+    View::share('errors', new ViewErrorBag);
+
+    $xpath = formXPath(Blade::render('<x-ui.form-section title="Details"><p>Fields</p></x-ui.form-section>'));
+
+    expect($xpath->query('//*[@data-section-fold]')->length)->toBe(0)
+        ->and($xpath->query('//section[@x-data]')->length)->toBe(0)
+        ->and($xpath->query('//*[@data-section-state][@*[name()="wire:ignore"]]')->length)->toBe(1)
+        ->and($xpath->query('//*[contains(@class, "form-section-num")]')->length)->toBe(1);
+});
+
+test('a form section marked optional says so in its heading', function () {
+    View::share('errors', new ViewErrorBag);
+
+    $xpath = formXPath(Blade::render('<x-ui.form-section title="Notes" :optional="true"><p>Fields</p></x-ui.form-section>'));
+
+    expect($xpath->query('//section[@data-optional]')->length)->toBe(1)
+        ->and(trim($xpath->query('//*[contains(@class, "form-section-optional")]')->item(0)->textContent))->toBe('Optional');
 });
 
 test('the attention count reads naturally in arabic', function () {
