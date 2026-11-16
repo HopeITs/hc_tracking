@@ -53,7 +53,7 @@ The one place for every name, value, signature, payload, column and permission t
 Key meanings:
 - `linked_project`: at least 1 linked project. Kept for one release behind the rows (W-34a: linking a project = a row with `project_id`), then removed.
 - `locations` (W-34a, D-62): at least 1 `proposal_locations` row with a city. Message `proposals.locations_required`.
-- `locations_complete` (W-34a, D-62): every `proposal_locations` row has program **and** responsible **and** (center or `is_new`), and no `program_requests` row of the proposal is still `pending`. Checked by `ApproveProposal`. Message `proposals.locations_incomplete`.
+- `locations_complete` (W-34a, D-62): every `proposal_locations` row has program **and** responsible **and** (center or `city_wide` or `is_new`), and no `program_requests` row of the proposal is still `pending`. Checked by `ApproveProposal`. Message `proposals.locations_incomplete`.
 - `donor`: `donor_id` is set.
 - `planned_dates`: `planned_date_begin` and `planned_date_end` are set.
 - `reason`: required text.
@@ -139,7 +139,7 @@ ClearProposalOnHold::handle(Proposal $proposal, ProposalStatus $expectedStatus, 
 
 // W-34a (D-62): SaveProposal also accepts
 //   locations?: list<array{city_id: int|string, program_id?: int|string|null, responsible_employee_id?: int|string|null,
-//                          center_ids?: list<int|string>, is_new?: bool, new_program_name_en?: ?string, new_program_name_ar?: ?string}>
+//                          center_ids?: list<int|string>, is_new?: bool, new_program_name_en?: ?string, new_program_name_ar?: ?string, city_wide?: bool}>  (city_wide: Y-01, D-88, default false)
 //   Validation: city active in HR; centers belong to the city; program exists; responsible is an active HR employee;
 //   is_new + no program → both names required, creates/updates the program_requests row. Rows are replaced as a set
 //   inside the proposal transaction (diff by (city_id, program_id), delete removed); ProposalLocationsChanged after commit.
@@ -229,6 +229,7 @@ proposal_locations
   program_id         FK programs nullOnDelete, NULL allowed
   responsible_employee_id  unsigned big int, HR id, no FK, NULL allowed
   is_new             boolean default false   -- "no program/center exists yet for this row"
+  city_wide          boolean default false   -- Y-01, D-88: runs across the city with no center of its own; no proposal_location_centers rows (`proposals.location_city_wide_has_centers` otherwise)
   project_id         FK projects nullOnDelete, NULL  -- filled on approval (or when linked to an existing project)
   sort               unsigned small int
   timestamps
