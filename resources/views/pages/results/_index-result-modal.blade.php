@@ -46,6 +46,7 @@
                         wire:model="checkoutPeriod"
                         :label="__('results_framework.checked')"
                         required
+                        class="@2xl/modal:col-span-2"
                         :options="collect(Period::cases())->map(fn (Period $periodCase): array => ['value' => $periodCase->value, 'label' => $periodCase->label()])->all()"
                     />
                 </div>
@@ -88,8 +89,9 @@
                             data-test="contributes-to-select"
                         >
                             <option value="">{{ __('results_framework.no_program_link') }}</option>
+                            {{-- Every option here is in the proposal's own program framework, so the program name is the same on all of them: showing it on each row only crowds the long statement out under the chevron. --}}
                             @foreach ($this->contributesToOptions as $programResult)
-                                <option value="{{ $programResult->id }}">{{ $programResult->type->label() }} · {{ Str::limit($programResult->statement, 60) }} · {{ $programResult->program?->name ?? __('common.unassigned') }}</option>
+                                <option value="{{ $programResult->id }}">{{ $programResult->type->label() }} · {{ Str::limit($programResult->statement, 70) }}</option>
                             @endforeach
                         </x-ui.form-select>
                     @endif
