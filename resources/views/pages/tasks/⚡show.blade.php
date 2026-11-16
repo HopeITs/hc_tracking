@@ -74,6 +74,12 @@ new #[Layout('layouts::desk'), Title('titles.task')] class extends Component
     }
 
     /**
+     * Whether the folded Activity history has been opened, so its timeline
+     * is only built for someone who looks at it.
+     */
+    public bool $showActivity = false;
+
+    /**
      * What to fix, when the approver sends an Under review task back.
      */
     public string $reviewNote = '';
@@ -138,7 +144,8 @@ new #[Layout('layouts::desk'), Title('titles.task')] class extends Component
     /**
      * Save the task. Editors (tasks.update, or the task's creator) change
      * every field; its assignees may only move status and progress, so for
-     * them every other field keeps its stored value.
+     * them every other field keeps its stored value. Moving an unstarted
+     * task to In progress sets its start date to today.
      */
     public function updateTask(): void
     {
@@ -183,8 +190,19 @@ new #[Layout('layouts::desk'), Title('titles.task')] class extends Component
         $note = SendNudge::cleanNote($this->reviewNote);
         TaskWorkflow::guard(auth()->user(), $task, TaskStatus::from($validated['taskStatus']), $note, 'taskStatus');
 
-        DB::transaction(function () use ($task, $validated, $canEdit): void {
+        $startsWork = $validated['taskStatus'] === TaskStatus::InProgress->value
+            && $from !== TaskStatus::InProgress
+            && $task->start_date === null
+            && $validated['startDate'] === '';
+
+        if ($startsWork) {
+            $validated['startDate'] = today()->toDateString();
+            $this->startDate = $validated['startDate'];
+        }
+
+        DB::transaction(function () use ($task, $validated, $canEdit, $startsWork): void {
             $progress = [
+                ...($startsWork ? ['start_date' => $validated['startDate']] : []),
                 'status' => $validated['taskStatus'],
                 'completed_date' => $validated['completedDate'] === '' ? null : $validated['completedDate'],
                 'progress_percentage' => (int) $validated['progressPercentage'],
@@ -299,6 +317,21 @@ new #[Layout('layouts::desk'), Title('titles.task')] class extends Component
     }
 
     /**
+     * Take one person off the task from their chip's x, saved at once like
+     * every other details field (editors only; updateTask keeps the
+     * assignees for everyone else).
+     */
+    public function removeAssignee(int $employeeId): void
+    {
+        $this->assignedTo = array_values(array_filter(
+            $this->assignedTo,
+            fn (string $assignedId): bool => (int) $assignedId !== $employeeId,
+        ));
+
+        $this->saveInPlace('assignedTo');
+    }
+
+    /**
      * Throw away an unsaved title or description edit.
      */
     public function cancelDetails(): void
@@ -373,6 +406,20 @@ new #[Layout('layouts::desk'), Title('titles.task')] class extends Component
         $canUpdateTaskStatus = $canEditTask || auth()->user()->can('updateStatus', $this->task);
         $canRescheduleTask = $canEditTask && $this->task->created_by === auth()->id();
         $canEditAttachments = auth()->user()->can('manageFiles', $this->task);
+        $approvesTask = \App\Support\TaskWorkflow::approves(auth()->user(), $this->task);
+        $hasDescription = filled($this->task->description);
+        $canAddSubtask = $this->task->parent_task_id === null && auth()->user()->can('create', \App\Models\Task::class);
+        $canMoveTask = $this->moveDestinations !== null && $canEditTask;
+        $nextStep = match ($this->task->status) {
+            TaskStatus::Todo => ['label' => __('tasks.show.start_task'), 'to' => TaskStatus::InProgress],
+            TaskStatus::InProgress => $approvesTask
+                ? ['label' => __('tasks.show.mark_done'), 'to' => TaskStatus::Done]
+                : ['label' => __('tasks.show.submit_for_review'), 'to' => TaskStatus::UnderReview],
+            TaskStatus::UnderReview => $approvesTask
+                ? ['label' => __('tasks.show.approve_done'), 'to' => TaskStatus::Done]
+                : ['label' => __('tasks.show.waiting_for_approval'), 'to' => null],
+            TaskStatus::Done => null,
+        };
     @endphp
 
     <x-ui.detail-header
@@ -385,16 +432,24 @@ new #[Layout('layouts::desk'), Title('titles.task')] class extends Component
         ]"
         :title="$this->task->title"
         :unread="app(\App\Notifications\UnreadSubjects::class)->has(auth()->user(), 'task', $this->task->id)"
-        :subtitle="$this->task->sourceLabel()"
     >
         <x-slot:meta>
+            <span class="font-medium text-secondary-dark dark:text-ink">{{ $this->task->sourceLabel() }}</span>
             @if ($this->task->source instanceof \App\Models\Milestone && $this->task->source->project !== null)
+                <span aria-hidden="true">·</span>
                 <a href="{{ route('projects.show', $this->task->source->project) }}" wire:navigate class="font-medium hover:underline">
                     {{ $this->task->source->name }} · {{ $this->task->source->ownerName() }}
                 </a>
-            @elseif ($this->task->source instanceof \App\Models\Milestone)
-                <span class="font-medium">{{ $this->task->source->name }} · {{ $this->task->source->ownerName() }}</span>
             @endif
+            <span aria-hidden="true">·</span>
+            <span>{{ __('tasks.created_by_name', ['name' => $this->task->creator->name]) }}</span>
+            @if ($this->task->parentTask !== null)
+                <span aria-hidden="true">·</span>
+                <a href="{{ route('tasks.show', $this->task->parentTask) }}" wire:navigate class="font-medium hover:underline">
+                    {{ __('tasks.subtask_of_title', ['title' => $this->task->parentTask->title]) }}
+                </a>
+            @endif
+            <x-tasks.paused-chip :task="$this->task" :paused-ids="$this->pausedProjectIds" :full="true" />
             @if ($this->task->isReportTask())
                 <x-ui.enum-badge :case="$this->task->kind" data-test="report-task-chip" />
                 @if ($this->task->reportUrl() !== null)
@@ -402,41 +457,79 @@ new #[Layout('layouts::desk'), Title('titles.task')] class extends Component
                 @endif
                 <span class="basis-full text-xs text-secondary-medium dark:text-ink-muted" data-test="report-task-helper">{{ __('tasks.report_task_helper') }}</span>
             @endif
-            <x-tasks.paused-chip :task="$this->task" :paused-ids="$this->pausedProjectIds" :full="true" />
-            <span>{{ __('tasks.created_by_name', ['name' => $this->task->creator->name]) }}</span>
-            @if ($this->task->parentTask !== null)
-                <a href="{{ route('tasks.show', $this->task->parentTask) }}" wire:navigate class="font-medium hover:underline">
-                    {{ __('tasks.subtask_of_title', ['title' => $this->task->parentTask->title]) }}
-                </a>
-            @endif
         </x-slot:meta>
 
-        @if ($this->moveDestinations !== null && auth()->user()->can('update', $this->task))
-            <x-slot:actions>
-                <x-ui.button tone="secondary" size="sm" icon="folder-arrow-down" wire:click="openMoveModal" data-test="task-move-button">{{ __('tasks.move_to') }}</x-ui.button>
-            </x-slot:actions>
-        @endif
+        <x-slot:actions>
+            <div class="flex items-center gap-2">
+                @if ($nextStep !== null && $canUpdateTaskStatus)
+                    @if ($nextStep['to'] !== null)
+                        <x-ui.button tone="primary" wire:click="changeStatus('{{ $nextStep['to']->value }}')" wire:loading.attr="disabled" wire:target="changeStatus" data-test="task-next-step">{{ $nextStep['label'] }}</x-ui.button>
+                    @else
+                        <x-ui.button tone="secondary" disabled data-test="task-next-step">{{ $nextStep['label'] }}</x-ui.button>
+                    @endif
+                @endif
+
+                @if ($canEditTask || $canAddSubtask || $canMoveTask)
+                    <flux:dropdown align="end">
+                        <flux:button variant="ghost" icon="ellipsis-horizontal" :aria-label="__('tasks.show.more_actions')" data-test="task-more-actions" />
+                        <flux:menu>
+                            @if ($canEditTask)
+                                <flux:menu.item icon="pencil-square" x-on:click="$dispatch('task-edit-details')" data-test="task-edit-details-button">{{ $hasDescription ? __('tasks.show.edit_title_description') : __('tasks.show.add_description') }}</flux:menu.item>
+                            @endif
+                            @if ($canAddSubtask)
+                                <flux:menu.item icon="plus" wire:click="openAddSubtaskModal" data-test="add-subtask-button">{{ __('tasks.add_subtask') }}</flux:menu.item>
+                            @endif
+                            @if ($canMoveTask)
+                                <flux:menu.item icon="folder-arrow-down" wire:click="openMoveModal" data-test="task-move-button">{{ __('tasks.move_to') }}</flux:menu.item>
+                            @endif
+                        </flux:menu>
+                    </flux:dropdown>
+                @endif
+            </div>
+        </x-slot:actions>
     </x-ui.detail-header>
 
-    {{-- Content, then the properties on the inline-end side once the page is wide. On a phone the properties come first. --}}
+    @include('pages.tasks._show-status-panel')
+
+    {{-- Content, then the details on the inline-end side once the page is wide. On a phone the details come first. --}}
     <div class="grid items-start gap-4 @4xl/detail:grid-cols-[minmax(0,1fr)_20rem]">
         <aside class="min-w-0 @4xl/detail:sticky @4xl/detail:top-4 @4xl/detail:col-start-2 @4xl/detail:row-start-1" aria-labelledby="task-properties-heading" data-test="task-properties">
             @include('pages.tasks._show-properties')
         </aside>
 
         <div class="grid min-w-0 gap-4 @4xl/detail:col-start-1 @4xl/detail:row-start-1">
-            @include('pages.tasks._show-details')
+            @if ($hasDescription || $canEditTask)
+                @include('pages.tasks._show-details')
+            @endif
 
-            @if ($this->task->parent_task_id === null)
+            @if ($this->task->parent_task_id === null && $this->subtasks->isNotEmpty())
                 @include('pages.tasks._show-subtasks')
             @endif
 
             @include('pages.tasks._show-attachments')
 
-            <section aria-labelledby="record-activity-heading" class="grid gap-3" data-record-activity>
-                <h2 id="record-activity-heading" class="text-base font-bold">{{ __('activity.title') }}</h2>
-                <livewire:activity.timeline :subjects="['task' => [$this->task->id]]" :key="'task-activity-'.$this->task->id" />
-            </section>
+            {{-- The history is for whoever approves the task (its creator, or an editor not doing the work); assignees see only the work. --}}
+            @if ($approvesTask)
+                <x-ui.panel :clip="false" data-record-activity>
+                    <button
+                        type="button"
+                        wire:click="$toggle('showActivity')"
+                        aria-expanded="{{ $showActivity ? 'true' : 'false' }}"
+                        aria-controls="task-activity-body"
+                        class="flex w-full cursor-pointer items-center justify-between gap-2 px-4 py-3 text-start"
+                        data-test="task-activity-toggle"
+                    >
+                        <h2 id="record-activity-heading" class="text-base font-bold">{{ __('tasks.show.activity') }}</h2>
+                        <flux:icon name="chevron-down" variant="micro" wire:loading.remove wire:target="showActivity" @class(['size-4 text-secondary-medium transition-transform dark:text-ink-muted', 'rotate-180' => $showActivity]) />
+                        <flux:icon.loading variant="micro" wire:loading wire:target="showActivity" class="size-4 text-secondary-medium dark:text-ink-muted" />
+                    </button>
+                    @if ($showActivity)
+                        <div id="task-activity-body" class="border-t border-panel-border p-4">
+                            <livewire:activity.timeline :subjects="['task' => [$this->task->id]]" :key="'task-activity-'.$this->task->id" />
+                        </div>
+                    @endif
+                </x-ui.panel>
+            @endif
         </div>
     </div>
 
@@ -450,3 +543,4 @@ new #[Layout('layouts::desk'), Title('titles.task')] class extends Component
         @include('pages.tasks._show-move-modal')
     @endif
 </section>
+

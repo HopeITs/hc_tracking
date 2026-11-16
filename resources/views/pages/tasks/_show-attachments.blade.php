@@ -1,23 +1,24 @@
 {{-- The attachments panel on ⚡show.blade.php: the file list with preview, download, edit and delete. --}}
 @use('App\Enums\FileType')
 @use('Illuminate\Support\Str')
-    <x-ui.panel :title="__('tasks.attachments')" :count="$this->attachments->count()" :subtitle="__('tasks.attachments_subtitle')">
-        @if ($canEditAttachments)
+    <x-ui.panel :title="__('tasks.show.files')" :count="$this->attachments->count() ?: null">
+        @if ($canEditAttachments || ($this->task->evidence_required && $this->attachments->isEmpty()))
             <x-slot:toolbar>
-                <x-ui.button size="sm" tone="primary" icon="arrow-up-tray" wire:click="openCreateFileModal" data-test="create-file-button">
-                    {{ __('tasks.upload_file') }}
-                </x-ui.button>
+                <div class="flex items-center gap-2">
+                    @if ($this->task->evidence_required && $this->attachments->isEmpty())
+                        <span class="rounded-md border border-primary px-1.5 text-[11px] font-bold text-primary dark:border-brand-text dark:text-brand-text" data-test="task-proof-badge">{{ __('tasks.show.proof_before_done') }}</span>
+                    @endif
+                    @if ($canEditAttachments)
+                        <x-ui.button size="sm" tone="primary" icon="arrow-up-tray" wire:click="openCreateFileModal" data-test="create-file-button">
+                            {{ __('tasks.upload_file') }}
+                        </x-ui.button>
+                    @endif
+                </div>
             </x-slot:toolbar>
         @endif
 
         @if ($this->attachments->isEmpty())
-            <x-ui.empty-state icon="paper-clip" :heading="__('common.no_files_recorded')" :body="__('tasks.attachment_records_for_this_task_will_appear_here')">
-                @if ($canEditAttachments)
-                    <x-slot:action>
-                        <x-ui.button size="sm" tone="primary" icon="arrow-up-tray" wire:click="openCreateFileModal">{{ __('tasks.upload_file') }}</x-ui.button>
-                    </x-slot:action>
-                @endif
-            </x-ui.empty-state>
+            <p class="px-4 py-5 text-center text-sm text-secondary-medium dark:text-ink-muted">{{ __('common.no_files_recorded') }}</p>
         @else
             <ul class="divide-y divide-secondary-soft dark:divide-line">
                 @foreach ($this->attachments as $attachment)

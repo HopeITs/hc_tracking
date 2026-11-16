@@ -52,7 +52,7 @@ test('task detail shows the task milestone project assignees and creator', funct
         ->assertSeeText('Winter Support')
         ->assertSeeText('Alice Nadir')
         ->assertSeeText('Bob Rahman')
-        ->assertSeeText('35%');
+        ->assertDontSeeText('35%');
 });
 
 test('task detail shows the task proposal as its source when it is not raised against a milestone', function () {
@@ -246,7 +246,8 @@ test('the related tasks panel lists a subtask without inline editing controls', 
 
     Livewire::actingAs($user)
         ->test('pages::tasks.show', ['task' => $parent])
-        ->assertSeeText('Related tasks')
+        ->assertSeeHtml('data-test="task-subtasks-panel"')
+        ->assertSeeText('0/1')
         ->assertSeeText('Confirm the delivery window')
         ->assertDontSee('data-test="subtask-toggle-complete-'.$subtask->id.'"', false)
         ->assertDontSee('data-test="subtask-edit-button-'.$subtask->id.'"', false);
@@ -446,10 +447,16 @@ test('sending an Under review task back waits for the approver note', function (
 test('the title and description are edited in place from the description panel', function () {
     $user = User::factory()->role('General Manager')->create();
     $task = Task::factory()->create(['title' => 'Draft plan', 'description' => null]);
+    Role::create(['name' => 'Task Reader', 'guard_name' => 'web'])->givePermissionTo('tasks.view');
+
+    Livewire::actingAs(User::factory()->role('Task Reader')->create())
+        ->test('pages::tasks.show', ['task' => $task])
+        ->assertDontSeeHtml('data-test="task-description"');
 
     Livewire::actingAs($user)
         ->test('pages::tasks.show', ['task' => $task])
-        ->assertSeeHtml('data-test="task-no-description"')
+        ->assertDontSeeHtml('data-test="task-no-description"')
+        ->assertSeeHtml('data-test="task-details-form"')
         ->set('title', 'Final plan')
         ->set('description', 'Cover every district.')
         ->call('saveDetails')
@@ -479,8 +486,10 @@ test('someone who may only view a task reads every property as text', function (
         ->test('pages::tasks.show', ['task' => $task])
         ->assertSeeText('Sep 1, 2026')
         ->assertSeeText('Sep 30, 2026')
-        ->assertSeeText('35%')
         ->assertSeeHtml('data-test="task-assignee-names"')
+        ->assertSeeHtml('data-test="task-priority-text"')
+        ->assertSeeHtml('data-test="task-evidence-required-text"')
+        ->assertDontSeeHtml('data-record-activity')
         ->assertSeeText('Alice Nadir')
         ->assertSeeHtml('data-test="task-related-to"')
         ->assertDontSeeHtml('data-test="task-edit-form"')
@@ -489,4 +498,113 @@ test('someone who may only view a task reads every property as text', function (
         ->assertDontSeeHtml('data-test="task-edit-assignee-picker"')
         ->assertDontSeeHtml('data-test="task-edit-start-date-input"')
         ->assertDontSeeHtml('data-test="task-details-form"');
+});
+
+test('a task with no subtasks shows no subtask panel, and subtasks are added from the more menu', function () {
+    $user = User::factory()->role('General Manager')->create();
+    $task = Task::factory()->create();
+
+    Livewire::actingAs($user)
+        ->test('pages::tasks.show', ['task' => $task])
+        ->assertDontSeeHtml('data-test="task-subtasks-panel"')
+        ->assertSeeHtml('data-test="add-subtask-button"');
+});
+
+test('moving an unstarted task to In progress sets its start date to today', function () {
+    $this->travelTo('2026-11-16 09:00');
+    $user = User::factory()->role('General Manager')->create();
+    $task = Task::factory()->create(['status' => TaskStatus::Todo, 'start_date' => null, 'due_date' => null]);
+
+    Livewire::actingAs($user)
+        ->test('pages::tasks.show', ['task' => $task])
+        ->call('changeStatus', TaskStatus::InProgress->value)
+        ->assertHasNoErrors()
+        ->assertSet('startDate', '2026-11-16');
+
+    expect($task->fresh()->start_date->toDateString())->toBe('2026-11-16');
+});
+
+test('starting work keeps a start date that is already set', function () {
+    $user = User::factory()->role('General Manager')->create();
+    $task = Task::factory()->create(['status' => TaskStatus::Todo, 'start_date' => '2026-09-01', 'due_date' => null]);
+
+    Livewire::actingAs($user)
+        ->test('pages::tasks.show', ['task' => $task])
+        ->call('changeStatus', TaskStatus::InProgress->value)
+        ->assertHasNoErrors();
+
+    expect($task->fresh()->start_date->toDateString())->toBe('2026-09-01');
+});
+
+test('the creator sees the activity history and the next step to approve a task under review', function () {
+    $creator = User::factory()->role('General Manager')->create();
+    $task = Task::factory()->create(['created_by' => $creator->id, 'status' => TaskStatus::UnderReview]);
+
+    Livewire::actingAs($creator)
+        ->test('pages::tasks.show', ['task' => $task])
+        ->assertSeeHtml('data-record-activity')
+        ->assertSeeText('Approve and mark done')
+        ->assertDontSeeHtml('data-test="task-edit-status-done" disabled');
+});
+
+test('the creator turns proof needed on from the details switch and it saves at once', function () {
+    $creator = User::factory()->role('General Manager')->create();
+    $task = Task::factory()->create(['created_by' => $creator->id, 'evidence_required' => false]);
+
+    Livewire::actingAs($creator)
+        ->test('pages::tasks.show', ['task' => $task])
+        ->assertSeeHtml('data-test="task-evidence-required"')
+        ->toggle('evidenceRequired')
+        ->assertHasNoErrors()
+        ->assertSeeHtml('aria-checked="true"');
+
+    expect($task->fresh()->evidence_required)->toBeTrue();
+});
+
+test('the activity history is only built once the creator opens it', function () {
+    $creator = User::factory()->role('General Manager')->create();
+    $task = Task::factory()->create(['created_by' => $creator->id]);
+
+    Livewire::actingAs($creator)
+        ->test('pages::tasks.show', ['task' => $task])
+        ->assertSeeHtml('data-test="task-activity-toggle"')
+        ->assertDontSeeHtml('id="task-activity-body"')
+        ->toggle('showActivity')
+        ->assertSeeHtml('id="task-activity-body"');
+});
+
+test('an editor removes one assignee with the x on their chip', function () {
+    $creator = User::factory()->role('General Manager')->create();
+    $kept = insertHrEmployee(firstNameEn: 'Alice', lastNameEn: 'Nadir');
+    $removed = insertHrEmployee(firstNameEn: 'Bob', lastNameEn: 'Karam');
+    $task = Task::factory()->create(['created_by' => $creator->id]);
+    $task->taskAssignees()->delete();
+    $task->taskAssignees()->create(['employee_id' => $kept]);
+    $task->taskAssignees()->create(['employee_id' => $removed]);
+
+    Livewire::actingAs($creator)
+        ->test('pages::tasks.show', ['task' => $task])
+        ->assertSeeHtml('data-test="task-remove-assignee-'.$removed.'"')
+        ->call('removeAssignee', $removed)
+        ->assertHasNoErrors()
+        ->assertSet('assignedTo', [(string) $kept]);
+
+    expect($task->taskAssignees()->pluck('employee_id')->all())->toBe([$kept]);
+});
+
+test('someone who may not edit the task sees no remove x and cannot drop an assignee', function () {
+    Role::create(['name' => 'Task Viewer', 'guard_name' => 'web'])->givePermissionTo('tasks.view');
+    $viewer = User::factory()->role('Task Viewer')->create();
+    $assignee = insertHrEmployee(firstNameEn: 'Alice', lastNameEn: 'Nadir');
+    $task = Task::factory()->create();
+    $task->taskAssignees()->delete();
+    $task->taskAssignees()->create(['employee_id' => $assignee]);
+
+    Livewire::actingAs($viewer)
+        ->test('pages::tasks.show', ['task' => $task])
+        ->assertDontSeeHtml('data-test="task-remove-assignee-'.$assignee.'"')
+        ->call('removeAssignee', $assignee)
+        ->assertForbidden();
+
+    expect($task->taskAssignees()->pluck('employee_id')->all())->toBe([$assignee]);
 });
