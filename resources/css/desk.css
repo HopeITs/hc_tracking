@@ -391,10 +391,6 @@
 [lang="ar"] .dk-adm h3{ letter-spacing:0;font-size:13px }
 .dk-adm li{ display:flex;justify-content:space-between;align-items:center;padding-block:10px;border-bottom:1px solid var(--line);font-size:14.5px;font-weight:700 }
 .dk-adm li span{ font-size:12.5px;color:var(--ink-3);font-weight:400 }
-/* Toast */
-.dk-toast{ position:fixed;z-index:70;left:50%;bottom:calc(24px + env(safe-area-inset-bottom,0px));transform:translateX(-50%);display:flex;align-items:center;gap:14px;max-width:calc(100% - 32px);padding:12px 14px 12px 18px;border-radius:12px;background:var(--ink);color:var(--paper);font-size:14px;font-weight:700;box-shadow:var(--dk-shadow);animation:dk-rise .22s cubic-bezier(.2,.8,.2,1) }
-.dk-toast button{ background:none;border:1px solid currentColor;color:inherit;border-radius:8px;height:30px;padding-inline:10px;font-weight:800;cursor:pointer;display:inline-flex;align-items:center;gap:6px;flex:none }
-.dk-toast small{ display:block;font-weight:400;opacity:.75;font-size:12.5px }
 /* Tour: same grammar as the live app's tour */
 @keyframes dk-ping{ 75%,100%{ transform:scale(2.4);opacity:0 }
  }
@@ -405,8 +401,6 @@
 @keyframes dk-slide-rtl{ from{ transform:translateX(-100%) }
  }
 @keyframes dk-drop{ from{ opacity:0;transform:translate(-50%,-8px) }
- }
-@keyframes dk-rise{ from{ opacity:0;transform:translate(-50%,8px) }
  }
 @keyframes dk-enter{ from{ transform:translateY(6px) }
  }
@@ -435,7 +429,6 @@
 .dk-rail{ top:calc(env(safe-area-inset-top,0px) + 56px) }
 .dk-ask{ position:fixed;z-index:40;left:0;right:0;bottom:0;max-width:none;height:auto;margin:0;border-radius:0;border:0;border-top:1px solid var(--line);background:var(--header-bg);backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);padding:10px max(16px,env(safe-area-inset-right,0px)) calc(10px + env(safe-area-inset-bottom,0px)) max(16px,env(safe-area-inset-left,0px)) }
 .dk-ask .dk-inner{ display:flex;align-items:center;gap:10px;width:100%;height:46px;padding-inline:14px;border-radius:999px;border:1px solid var(--line-2);background:var(--paper) }
-.dk-toast{ bottom:calc(84px + env(safe-area-inset-bottom,0px)) }
 .dk-scope main{ padding-block:20px 120px }
 .dk-items>li{ grid-template-columns:14px minmax(0,1fr) }
 .dk-items .dk-acts{ grid-column:2;justify-content:flex-start;padding-top:8px }
@@ -496,13 +489,21 @@
 .dk-start-btn:hover{ border-color:var(--ink-3);background:var(--tint) }
 .dk-start-btn svg.dk-i{ width:16px;height:16px;color:var(--ink-3) }
 /* Undo after removing a panel */
-.dk-undo{ position:fixed;z-index:40;inset-block-end:calc(20px + env(safe-area-inset-bottom,0px));inset-inline:16px;margin-inline:auto;width:fit-content;display:flex;align-items:center;gap:10px;padding-block:8px;padding-inline:16px 8px;border-radius:18px;background:var(--ink);color:var(--paper);box-shadow:var(--dk-shadow);font-size:13.5px;font-weight:700;line-height:1.35 }
+.dk-undo{ position:fixed;z-index:40;inset-block-end:calc(20px + env(safe-area-inset-bottom,0px));inset-inline:16px;margin-inline:auto;width:fit-content;display:flex;align-items:center;gap:10px;padding-block:10px;padding-inline:18px 10px;border-radius:16px;border:1px solid var(--line);background:var(--paper);color:var(--ink);box-shadow:0 1px 2px rgb(88 89 91 / .1),0 24px 56px -16px rgb(88 89 91 / .45);font-size:14px;font-weight:600;line-height:1.4;overflow:hidden }
 .dk-undo>span{ flex:1;min-width:0;overflow-wrap:anywhere }
 .dk-undo>button{ flex:none }
+/* Time left before the Undo goes, as a red line (toasts use a grey one: flux-overrides.css .hc-toast-timer). */
+.dk-undo-timer{ position:absolute;inset-inline:0;bottom:0;height:3px;background:var(--brand);transform-origin:left center;animation:dk-undo-timer var(--dk-undo-ms,6s) linear forwards;pointer-events:none }
+.dk-undo-timer:dir(rtl){ transform-origin:right center }
+@keyframes dk-undo-timer{ to{ transform:scaleX(0) } }
+@media (prefers-reduced-motion: reduce){ .dk-undo-timer{ display:none } }
 /* Clear of the Ask button, which sits at the foot of a phone screen */
 @media (max-width: 720px){ .dk-undo{ inset-block-end:calc(76px + env(safe-area-inset-bottom,0px)) } }
-.dk-undo .dk-btn{ background:var(--paper);color:var(--ink);border-color:transparent }
-.dk-undo .dk-iconbtn{ color:var(--paper) }
+.dk-undo .dk-btn{ background:var(--brand);color:#fff;border-color:transparent }
+.dk-undo .dk-btn:hover{ background:var(--brand-hover) }
+.dark .dk-undo{ box-shadow:0 24px 56px -16px rgb(0 0 0 / .6) }
+.dk-undo .dk-iconbtn{ color:var(--ink-3) }
+.dk-undo .dk-iconbtn:hover{ color:var(--ink);background:color-mix(in srgb,var(--ink) 8%,transparent) }
 @media (max-width: 760px){ .dk-start{ flex-wrap:nowrap;flex-direction:column;align-items:stretch }
 .dk-start-row{ flex-wrap:nowrap;overflow-x:auto;scrollbar-width:none;margin-inline:-16px;padding-inline:16px;scroll-snap-type:x proximity }
 .dk-start-row::-webkit-scrollbar{ display:none }

@@ -264,11 +264,9 @@
     .dk-tools > .dk-pmenu { display: flex; }
     /* The unread count rides the bell's top corner, cut out of the dock by a paper ring. */
     /* The bell's unread mark is a small red dot on the icon's top corner, like the sidebar rail's; the number is inside the panel. */
-    .dk-tools [data-unread-count] { top: 6px !important; inset-inline-end: 6px !important; width: 8px; height: 8px; box-shadow: 0 0 0 2px var(--paper) !important; --tw-ring-shadow: 0 0 #0000 !important; pointer-events: none; }
+    /* The Help button's "new" dot (.dk-fresh) shares this exact rule so the two marks match in size, spot and colour. */
+    .dk-tools [data-unread-count], .dk-tools .dk-fresh { position: absolute; top: 5px !important; inset-inline-end: 5px !important; width: 8px; height: 8px; border-radius: 50%; background: var(--brand) !important; box-shadow: 0 0 0 2px var(--paper) !important; --tw-ring-shadow: 0 0 #0000 !important; pointer-events: none; }
     .dk-top .dk-tools .dk-iconbtn:active, .dk-tools [data-notification-bell] > button:active { transform: scale(.92); }
-
-    /* The Help button's "new" dot: a still dot on the button's top corner, clear of the question mark's ring. */
-    .dk-fresh { position: absolute; top: 3px; inset-inline-end: 3px; width: 9px; height: 9px; border-radius: 50%; background: var(--brand); box-shadow: 0 0 0 2px var(--paper); pointer-events: none; }
 
     .dk-seg { display: contents; }
     .dk-seg-lang { font-size: 15px !important; font-weight: 600 !important; line-height: 1 !important; }
