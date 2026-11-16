@@ -518,8 +518,28 @@ document.addEventListener('alpine:init', () => {
             this.save();
         },
 
+        /**
+         * Follow a tab to the page it landed on. A link that redirects (a
+         * notification's /notifications/{id}/open) only shows where it goes
+         * once loaded: when another tab is already on that page, this one
+         * closes and the earlier tab is shown instead of a duplicate.
+         */
         moveTab(tab, href) {
             const url = this.clean(href);
+            const key = url.pathname + url.search;
+            const twin = this.tabs.find((each) => each.id !== tab.id && each.key === key);
+
+            if (twin) {
+                const wasActive = this.active === tab.id;
+
+                this.close(tab.id);
+
+                if (wasActive) {
+                    this.activate(twin.id);
+                }
+
+                return;
+            }
 
             tab.url = url.pathname + url.search;
             tab.key = tab.url;
