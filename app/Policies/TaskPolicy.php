@@ -72,12 +72,13 @@ class TaskPolicy
 
     /**
      * Determine whether the user can add, replace or remove the task's
-     * files: everyone who may edit it, plus status-and-files-only roles on
-     * their own and department work.
+     * files: everyone who may edit it, the people it is assigned to (they
+     * hand in the file the task asks for), and status-and-files-only roles
+     * on their own and department work.
      */
     public function manageFiles(User $user, Task $task): bool
     {
-        return $this->update($user, $task) || $this->isStatusAndFilesWork($user, $task);
+        return $this->update($user, $task) || $this->isAssignee($user, $task) || $this->isStatusAndFilesWork($user, $task);
     }
 
     /**
