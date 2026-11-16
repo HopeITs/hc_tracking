@@ -64,7 +64,7 @@ final class SaveProposal
      * are ignored entirely for a user who may not see money. `locations`, when
      * sent, replaces the rows; an edit that omits it leaves them alone.
      *
-     * @param  array{kind?: ?string, name: string, donorId: int|string|null, narrative?: ?string, projectIds?: list<int|string>, locations?: list<array{city_id: int|string|null, program_id?: int|string|null, responsible_employee_id?: int|string|null, center_ids?: list<int|string>, is_new?: bool|int|string|null, new_program_name_en?: ?string, new_program_name_ar?: ?string}>, beneficiaries?: array<int|string, int|string|null>, beneficiariesReason?: ?string, requestedBudget?: string|int|float|null, requestedCurrency?: ?string, plannedDateBegin: ?string, plannedDateEnd: ?string, notes?: ?string, conceptNote?: ?string, startingStage?: string, skipReason?: ?string, previousProposalId?: int|null}  $data
+     * @param  array{kind?: ?string, name: string, donorId: int|string|null, narrative?: ?string, projectIds?: list<int|string>, locations?: list<array{city_id: int|string|null, program_id?: int|string|null, responsible_employee_id?: int|string|null, center_ids?: list<int|string>, is_new?: bool|int|string|null, city_wide?: bool|int|string|null, new_program_name_en?: ?string, new_program_name_ar?: ?string}>, beneficiaries?: array<int|string, int|string|null>, beneficiariesReason?: ?string, requestedBudget?: string|int|float|null, requestedCurrency?: ?string, plannedDateBegin: ?string, plannedDateEnd: ?string, notes?: ?string, conceptNote?: ?string, startingStage?: string, skipReason?: ?string, previousProposalId?: int|null}  $data
      */
     public function handle(?Proposal $existing, array $data, User $actor): Proposal
     {
@@ -304,7 +304,7 @@ final class SaveProposal
      * The location rows as a whole (contracts.md §6, W-34a): every row names
      * an active HR city; cities are distinct per program, with at most one
      * row per city still waiting for a program; a program exists in
-     * tracking; every center stands in the row's city; a responsible is an
+     * tracking; a city-wide row (D-88) holds no centers; every center stands in the row's city; a responsible is an
      * active HR employee; a new row without a program names it in both
      * languages. HR is read once per rule, never per row; the centers come
      * from the in-memory lookup.
@@ -347,7 +347,9 @@ final class SaveProposal
                 $validator->errors()->add("locations.{$index}.program_id", __('proposals.location_choose_the_program'));
             }
 
-            if ($cityOk) {
+            if ($row['city_wide'] && $row['center_ids'] !== []) {
+                $validator->errors()->add("locations.{$index}.center_ids", __('proposals.location_city_wide_has_centers'));
+            } elseif ($cityOk) {
                 foreach ($row['center_ids'] as $centerId) {
                     if (HrCenter::remembered($centerId)?->city_id !== $row['city_id']) {
                         $validator->errors()->add("locations.{$index}.center_ids", __('proposals.location_center_not_in_city'));
@@ -377,7 +379,7 @@ final class SaveProposal
      * form sent no `locations` key at all.
      *
      * @param  array<string, mixed>  $input
-     * @return list<array{city_id: int|null, program_id: int|null, responsible_employee_id: int|null, center_ids: list<int>, is_new: bool, new_program_name_en: string, new_program_name_ar: string}>|null
+     * @return list<array{city_id: int|null, program_id: int|null, responsible_employee_id: int|null, center_ids: list<int>, is_new: bool, city_wide: bool, new_program_name_en: string, new_program_name_ar: string}>|null
      */
     private function locationRows(array $input): ?array
     {
@@ -399,6 +401,7 @@ final class SaveProposal
                 'responsible_employee_id' => $id($row['responsible_employee_id'] ?? null),
                 'center_ids' => $centerIds,
                 'is_new' => filter_var($row['is_new'] ?? false, FILTER_VALIDATE_BOOLEAN),
+                'city_wide' => filter_var($row['city_wide'] ?? false, FILTER_VALIDATE_BOOLEAN),
                 'new_program_name_en' => is_string($row['new_program_name_en'] ?? null) ? trim($row['new_program_name_en']) : '',
                 'new_program_name_ar' => is_string($row['new_program_name_ar'] ?? null) ? trim($row['new_program_name_ar']) : '',
             ];

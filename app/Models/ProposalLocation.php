@@ -18,7 +18,8 @@ use Illuminate\Database\Eloquent\Relations\HasOne;
 /**
  * One location row of a proposal (contracts.md §7, W-34a, D-62): a city, and
  * optionally the program, the responsible employee and the centers the work
- * runs from. `is_new` says no project exists for it yet; `project_id` is
+ * runs from. `is_new` says no project exists for it yet; `city_wide` (D-88) says the
+ * program runs across the city with no center, so the row holds none; `project_id` is
  * filled when the row is linked to an existing project or materialised on
  * approval. City, employee and center ids are HR ids, never copied names.
  *
@@ -33,12 +34,13 @@ use Illuminate\Database\Eloquent\Relations\HasOne;
  * @property int|null $program_id
  * @property int|null $responsible_employee_id
  * @property bool $is_new
+ * @property bool $city_wide
  * @property int|null $project_id
  * @property int $sort
  * @property CarbonImmutable|null $created_at
  * @property CarbonImmutable|null $updated_at
  */
-#[Fillable(['proposal_id', 'city_id', 'program_id', 'responsible_employee_id', 'is_new', 'project_id', 'sort'])]
+#[Fillable(['proposal_id', 'city_id', 'program_id', 'responsible_employee_id', 'is_new', 'city_wide', 'project_id', 'sort'])]
 class ProposalLocation extends Model
 {
     /** @use HasFactory<ProposalLocationFactory> */
@@ -51,6 +53,7 @@ class ProposalLocation extends Model
      */
     protected $attributes = [
         'is_new' => false,
+        'city_wide' => false,
         'sort' => 0,
     ];
 
@@ -64,6 +67,7 @@ class ProposalLocation extends Model
             'program_id' => 'integer',
             'responsible_employee_id' => 'integer',
             'is_new' => 'boolean',
+            'city_wide' => 'boolean',
             'project_id' => 'integer',
             'sort' => 'integer',
         ];

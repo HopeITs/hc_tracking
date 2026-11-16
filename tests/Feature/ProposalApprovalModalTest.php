@@ -5,8 +5,10 @@ use App\Enums\MediaCollection;
 use App\Enums\ProjectStatus;
 use App\Enums\ProposalStatus;
 use App\Models\Media;
+use App\Models\Program;
 use App\Models\Project;
 use App\Models\Proposal;
+use App\Models\ProposalLocation;
 use Illuminate\Support\Facades\Storage;
 use Livewire\Features\SupportTesting\Testable;
 use Livewire\Livewire;
@@ -174,4 +176,26 @@ test('the preview names extended and skipped projects too', function () {
 
     expect($outcomes['Running project'])->toBe('extended')
         ->and($outcomes['Archived project'])->toBe('skipped');
+});
+
+test('the dialog counts the projects the rows will create, link and leave waiting, with the linked-existing warning', function () {
+    $city = insertHrCity('Idlib', 'إدلب');
+    $employee = insertHrEmployee($city);
+    $program = Program::factory()->create(['manager_id' => $employee]);
+    $centerA = insertHrCenter($city, 'Hope Center Idlib', 'مركز الأمل إدلب');
+    $centerB = insertHrCenter($city, 'Study Zone Idlib', 'ستادي زون إدلب');
+    $proposal = Proposal::factory()->create(['status' => ProposalStatus::Submitted, 'planned_date_begin' => '2026-11-01', 'planned_date_end' => '2027-10-31']);
+
+    $row = ProposalLocation::factory()->create(['proposal_id' => $proposal->id, 'city_id' => $city, 'program_id' => $program->id, 'responsible_employee_id' => $employee, 'sort' => 0]);
+    $row->centers()->create(['center_id' => $centerA]);
+    $row->centers()->create(['center_id' => $centerB]);
+    Project::factory()->create(['city_id' => $city, 'program_id' => $program->id, 'center_id' => $centerB, 'status' => ProjectStatus::Draft]);
+    ProposalLocation::factory()->isNew()->create(['proposal_id' => $proposal->id, 'city_id' => insertHrCity('Homs', 'حمص'), 'sort' => 1]);
+
+    $component = approveModal('Public Relations Manager', $proposal)
+        ->assertSeeHtml('data-test="approve-locations-preview"')
+        ->assertSeeHtml('data-test="approve-locations-warning-location_linked_existing"')
+        ->assertSeeText(__('proposals.approval_warning_location_linked_existing'));
+
+    expect($component->instance()->approvalLocations)->toMatchArray(['create' => 1, 'link' => 1, 'wait' => 1, 'warnings' => ['location_linked_existing']]);
 });
