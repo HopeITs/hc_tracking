@@ -524,3 +524,13 @@ test('the donor form is rendered only while its modal is open', function () {
         ->call('openCreateModal')
         ->assertSeeHtml('data-follow-up-fields');
 });
+
+test('the donor form shows its three sections stacked, without the section index, and marks contact and follow-up optional', function () {
+    $html = Livewire::actingAs(User::factory()->role('Financial')->create())
+        ->test('pages::donors.index')
+        ->call('openCreateModal')
+        ->html();
+
+    expect($html)->not->toContain('data-modal-index')
+        ->and(substr_count($html, 'data-optional'))->toBe(2);
+});

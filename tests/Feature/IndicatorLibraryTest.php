@@ -374,3 +374,15 @@ describe('presentation', function () {
         expect($large)->toBe($small);
     });
 });
+
+test('the entry form opens on the name, ahead of the program and level, and marks the definition optional', function () {
+    $html = Livewire::actingAs(mealManager())->test('pages::indicator-library.index')
+        ->call('openCreateModal')
+        ->html();
+
+    $titleAt = fn (string $key): int|false => strpos($html, '<span class="form-section-title">'.e(__($key)).'</span>');
+
+    expect($titleAt('indicator_library.section_name'))->toBeInt()->toBeLessThan($titleAt('indicator_library.section_placement'))
+        ->and($html)->toContain('data-modal-index')
+        ->and(substr_count($html, 'data-optional'))->toBe(1);
+});

@@ -33,7 +33,7 @@
             </div>
         </x-ui.form-section>
 
-        <x-ui.form-section :title="__('donors.section_contact')" :fields="['contactPerson', 'email', 'phone', 'country']">
+        <x-ui.form-section :title="__('donors.section_contact')" :optional="true" :fields="['contactPerson', 'email', 'phone', 'country']">
             <div class="grid gap-x-4 gap-y-3 @2xl/modal:grid-cols-2">
                 <x-ui.form-input wire:model="contactPerson" :label="__('donors.contact_person')" maxlength="255" />
                 <x-ui.form-input wire:model="email" :label="__('common.email')" type="email" maxlength="255" />
@@ -42,7 +42,7 @@
             </div>
         </x-ui.form-section>
 
-        <x-ui.form-section :title="__('donors.follow_up')" :fields="['lastContactedOn', 'nextStepDueOn', 'nextStep']" data-follow-up-fields>
+        <x-ui.form-section :title="__('donors.follow_up')" :optional="true" :fields="['lastContactedOn', 'nextStepDueOn', 'nextStep']" data-follow-up-fields>
             <div class="grid grid-cols-2 gap-x-4 gap-y-3 @4xl/modal:grid-cols-3">
                 <x-ui.form-input wire:model="lastContactedOn" :label="__('donors.last_contacted_on')" type="date" :max="now()->toDateString()" />
                 <x-ui.form-input wire:model="nextStepDueOn" :label="__('donors.next_step_due_on')" type="date" />

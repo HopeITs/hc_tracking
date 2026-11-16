@@ -244,7 +244,7 @@
             @endif
 
             <x-ui.form-section
-                :title="__('projects.section_beneficiaries')"
+                :title="__('projects.section_beneficiaries')" :optional="true"
                 :fields="['targetBeneficiaries', 'targetMen', 'targetWomen', 'targetBoys', 'targetGirls']"
             >
                 <x-slot:hint>

@@ -315,7 +315,7 @@
 
         {{-- 4 · Concept note (W-24): the text, the document, or both. Neither is required. --}}
         @unless ($isRenewal || $isPayroll)
-        <x-ui.form-section :title="__('proposals.concept_note.section')" :fields="$sectionFields[__('proposals.concept_note.section')]" data-test="concept-note-section">
+        <x-ui.form-section :title="__('proposals.concept_note.section')" :optional="true" :fields="$sectionFields[__('proposals.concept_note.section')]" data-test="concept-note-section">
             <div class="grid gap-y-3">
                 <x-ui.form-textarea
                     wire:model="conceptNote"
@@ -385,7 +385,7 @@
         @endunless
 
         {{-- 7 · Notes, last (D-62). --}}
-        <x-ui.form-section :title="__('proposals.section_notes')" :fields="$sectionFields[__('proposals.section_notes')]">
+        <x-ui.form-section :title="__('proposals.section_notes')" :optional="true" :fields="$sectionFields[__('proposals.section_notes')]">
             <x-ui.form-textarea wire:model="notes" :label="__('common.notes')" rows="2" dir="auto" />
         </x-ui.form-section>
     @endif
