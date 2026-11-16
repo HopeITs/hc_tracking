@@ -25,8 +25,8 @@
 >
     <template x-for="item in items" :key="item.id">
         <article
-            x-transition:enter="transition duration-200 ease-out motion-reduce:transition-none"
-            x-transition:enter-start="translate-y-3 opacity-0"
+            x-transition:enter="transition duration-300 ease-[cubic-bezier(0.16,1,0.3,1)] motion-reduce:transition-none"
+            x-transition:enter-start="translate-y-6 opacity-0"
             x-transition:enter-end="translate-y-0 opacity-100"
             x-transition:leave="transition duration-150 ease-in motion-reduce:transition-none"
             x-transition:leave-start="opacity-100"
@@ -37,7 +37,7 @@
             x-on:focusout="resume(item)"
             x-bind:role="item.sticky ? 'alert' : 'status'"
             x-bind:data-priority="item.priority"
-            class="pointer-events-auto relative w-full overflow-hidden rounded-2xl bg-white text-secondary-dark shadow-[0_18px_40px_-12px_rgba(16,24,40,0.28),0_2px_6px_rgba(16,24,40,0.08)] ring-1 ring-secondary-soft sm:w-[23rem] dark:bg-surface-3 dark:shadow-raised dark:text-ink dark:ring-line"
+            class="pointer-events-auto relative w-full overflow-hidden rounded-[1.25rem] border border-secondary-soft bg-white text-secondary-dark shadow-[0_1px_2px_rgb(88_89_91/0.1),0_24px_56px_-16px_rgb(88_89_91/0.45)] sm:w-[23rem] dark:border-line dark:bg-surface-3 dark:text-ink dark:shadow-[0_24px_56px_-16px_rgb(0_0_0/0.6)]"
             data-notification-toast
         >
             <span x-show="item.sticky" class="absolute inset-y-0 start-0 w-1 bg-primary dark:bg-status-critical" aria-hidden="true"></span>
@@ -49,7 +49,7 @@
                     <div class="flex items-center gap-2">
                         <span
                             class="size-2 shrink-0 rounded-full"
-                            x-bind:class="item.sticky ? 'bg-primary dark:bg-status-critical' : 'bg-status-warn'"
+                            x-bind:class="item.sticky ? 'bg-primary dark:bg-status-critical' : 'bg-secondary-light dark:bg-ink-faint'"
                             aria-hidden="true"
                         ></span>
                         <p class="min-w-0 truncate text-[11px] font-semibold uppercase tracking-[0.1em] text-secondary-medium dark:text-ink-muted" x-text="item.module_label"></p>
@@ -72,15 +72,15 @@
                 <button
                     type="button"
                     x-on:click="dismiss(item.id)"
-                    class="inline-flex size-8 shrink-0 cursor-pointer items-center justify-center rounded-lg text-secondary-light hover:bg-secondary-soft/60 hover:text-secondary-dark dark:hover:bg-white/10 dark:hover:text-ink"
+                    class="inline-flex size-8 shrink-0 cursor-pointer items-center justify-center rounded-[0.625rem] text-secondary-light transition-colors hover:bg-secondary-dark/8 hover:text-secondary-dark focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-primary dark:text-ink-faint dark:hover:bg-ink/8 dark:hover:text-ink"
                     aria-label="{{ __('notifications.toast.dismiss') }}"
                 >
                     <flux:icon.x-mark variant="micro" />
                 </button>
             </div>
 
-            <div x-show="! item.sticky" class="absolute inset-x-0 bottom-0 h-0.5 bg-secondary-soft/60 dark:bg-white/10" aria-hidden="true">
-                <div class="hc-toast-countdown h-full origin-left bg-primary dark:bg-ink-muted rtl:origin-right" x-bind:style="{ animationPlayState: item.paused ? 'paused' : 'running' }"></div>
+            <div x-show="! item.sticky" class="absolute inset-x-0 bottom-0 h-[3px]" aria-hidden="true">
+                <div class="hc-toast-countdown h-full origin-left bg-primary dark:bg-brand rtl:origin-right" x-bind:style="{ animationPlayState: item.paused ? 'paused' : 'running' }"></div>
             </div>
         </article>
     </template>

@@ -467,186 +467,325 @@
 }
 
 /*
- * Flux toasts (Flux::toast(), CRUD confirmations), styled as a centred,
- * SweetAlert-style popup instead of a corner snackbar. `position="center"` on
- * <flux:toast.group> (see the app and auth layouts) is the hook for all of this.
+ * Flux toasts (Flux::toast(), every save/delete note): a paper card at the
+ * bottom centre of the window that never covers or dims the page. The markup
+ * is the app's own (resources/views/flux/toast/index.blade.php), so everything
+ * hangs off hc-toast-* classes; the group (resources/views/flux/toast/
+ * group.blade.php) sets each toast's life and copies it onto the toast as
+ * data-life / --hc-toast-life for the time-left line below.
  *
- * True centring: Flux's own [position*="center"] rule only centers horizontally.
- * The group collapses to zero height (its dialog is absolutely positioned inside
- * it), so auto margins alone don't centre it vertically — Flux's CSS only sets
- * top/bottom for "top"/"bottom" positions, and "center" matches neither, leaving
- * the dialog at its static position. `top: 50%` plus a same-height translateY
- * fixes that regardless of the dialog's rendered height.
+ * Flux's group script owns the motion and the stack: it rises each card in,
+ * tucks older toasts behind the newest (scaled, 10px apart, at most three
+ * showing) and fans them out while one is hovered, all by inline styles on the
+ * dialog and the card. So nothing here sets a transform on either.
  *
- * The rest restyles Flux's fixed toast markup (vendor/livewire/flux/stubs/.../
- * toast/index.blade.php has no class hooks of its own) by structural position:
- * card (first div) > content row (its only child) > [icon+text row, action/close row].
- *
- * Unlayered on purpose, like the rule it re-centres: these must out-rank Flux's
- * toast utilities and its own unlayered position rules.
+ * Unlayered on purpose: these must out-rank Flux's own unlayered toast rules.
  */
-ui-toast-group[position='center'] {
-    margin-top: auto;
-    margin-bottom: auto;
+ui-toast-group {
+    width: min(25rem, calc(100vw - 1.5rem));
+}
 
-    [data-flux-toast-dialog] {
-        top: 50%;
-        /* !important: Flux's JS sets an inline `transform` on this element itself
-           (it positions stacked toasts by translating each one), which otherwise
-           always beats an external rule regardless of specificity. */
-        transform: translateY(-50%) scale(0.94) !important;
-        transition: opacity 0.25s allow-discrete, transform 0.25s allow-discrete, height 0.35s allow-discrete;
+/* Phone: full width and clear of the home bar. */
+@media (width < 40rem) {
+    ui-toast-group {
+        width: calc(100vw - 1.5rem);
+        margin: 0.75rem 0.75rem calc(0.75rem + env(safe-area-inset-bottom, 0px));
+    }
+}
 
-        &.showing {
-            transform: translateY(-50%) scale(1) !important;
+/* The Desk's Ask bar sits at the foot of a phone screen (desk.css): toasts rise above it. */
+@media (max-width: 720px) {
+    body:has(.dk-ask) ui-toast-group[position*='bottom'] {
+        margin-bottom: calc(4.75rem + env(safe-area-inset-bottom, 0px));
+    }
+}
+
+.hc-toast {
+    width: 100%;
+}
+
+.hc-toast-card {
+    position: relative;
+    display: flex;
+    align-items: flex-start;
+    gap: 0.75rem;
+    width: 100%;
+    padding-block: 0.8125rem;
+    padding-inline: 0.875rem 0.625rem;
+    /* !important: Flux sets an inline overflow:auto on the card while the stack is fanned out, and a 1px rounding then shows a scrollbar. */
+    overflow: hidden !important;
+    border: 1px solid var(--color-line);
+    border-radius: 1rem;
+    background-color: var(--color-surface-3);
+    color: var(--color-ink);
+    text-align: start;
+    box-shadow:
+        0 1px 2px color-mix(in srgb, var(--color-secondary-dark) 12%, transparent),
+        0 16px 36px -14px color-mix(in srgb, var(--color-secondary-dark) 42%, transparent);
+}
+
+/* The badge: one circle, one icon, coloured by variant. */
+.hc-toast-badge {
+    display: grid;
+    place-items: center;
+    width: 1.75rem;
+    height: 1.75rem;
+    flex: none;
+    margin-top: 0.0625rem;
+    border-radius: 9999px;
+    animation: hc-toast-pop 0.36s cubic-bezier(0.34, 1.56, 0.64, 1) 0.04s both;
+}
+
+.hc-toast-icon {
+    display: none;
+    width: 1rem;
+    height: 1rem;
+}
+
+.hc-toast-tick {
+    stroke-dasharray: 1;
+    stroke-dashoffset: 1;
+    animation: hc-toast-tick 0.32s cubic-bezier(0.65, 0, 0.35, 1) 0.18s forwards;
+}
+
+.hc-toast[data-variant='success'] {
+    .hc-toast-badge {
+        background-color: var(--color-ink);
+        color: var(--color-surface-3);
+    }
+
+    [data-icon='success'] {
+        display: block;
+    }
+}
+
+.hc-toast[data-variant='danger'] {
+    .hc-toast-badge {
+        background-color: var(--color-brand);
+        color: #fff;
+    }
+
+    [data-icon='alert'] {
+        display: block;
+    }
+}
+
+.hc-toast[data-variant='warning'] {
+    .hc-toast-badge {
+        box-shadow: inset 0 0 0 2px var(--color-brand);
+        color: var(--color-brand-text);
+    }
+
+    [data-icon='alert'] {
+        display: block;
+    }
+}
+
+.hc-toast:is([data-variant=''], [data-variant='info']) {
+    .hc-toast-badge {
+        background-color: color-mix(in srgb, var(--color-ink) 10%, transparent);
+        color: var(--color-ink);
+    }
+
+    [data-icon='info'] {
+        display: block;
+    }
+}
+
+/* Words: the message alone reads as the headline; under a heading it supports it. */
+.hc-toast-body {
+    display: grid;
+    gap: 0.125rem;
+    flex: 1 1 auto;
+    min-width: 0;
+    padding-block: 0.1875rem;
+    overflow-wrap: anywhere;
+}
+
+.hc-toast-heading {
+    font-size: 0.9375rem;
+    font-weight: 600;
+    line-height: 1.4;
+    color: var(--color-ink);
+
+    &:empty {
+        display: none;
+    }
+}
+
+.hc-toast-text {
+    font-size: 0.9375rem;
+    font-weight: 600;
+    line-height: 1.4;
+    color: var(--color-ink);
+
+    .hc-toast-heading:not(:empty) + & {
+        font-size: 0.875rem;
+        font-weight: 400;
+        color: var(--color-ink-muted);
+    }
+}
+
+/* One button at most, at the end of the row, only when the toast carries one. */
+.hc-toast-actions {
+    display: flex;
+    flex: none;
+    align-self: center;
+    gap: 0.25rem;
+
+    &:not(:has(a, button)) {
+        display: none;
+    }
+}
+
+.hc-toast-action {
+    display: contents;
+}
+
+.hc-toast-button {
+    position: relative;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    height: 2rem;
+    padding-inline: 0.75rem;
+    border-radius: 0.625rem;
+    background-color: color-mix(in srgb, var(--color-ink) 9%, transparent);
+    color: var(--color-ink);
+    font-size: 0.8125rem;
+    font-weight: 700;
+    white-space: nowrap;
+    cursor: pointer;
+    transition: background-color 0.15s;
+
+    &:hover {
+        background-color: color-mix(in srgb, var(--color-ink) 15%, transparent);
+    }
+
+    &:focus-visible {
+        outline: 2px solid var(--color-brand);
+        outline-offset: 2px;
+    }
+
+    .hc-toast[data-variant='danger'] & {
+        background-color: var(--color-brand);
+        color: #fff;
+
+        &:hover {
+            background-color: var(--color-brand-hover);
+        }
+    }
+
+    &[data-loading] {
+        pointer-events: none;
+
+        [data-flux-toast-action-label] {
+            opacity: 0;
         }
 
-        /* Card: Flux's own p-2/rounded-xl/shadow-lg wrapper, widened and padded into a popup.
-           The backdrop dimming the rest of the page is a giant-spread box-shadow rather than
-           a real ::backdrop — a real backdrop only paints while the popover is genuinely
-           open, and the group here never reliably reports "closed" once every toast in it
-           has been dismissed, which left the dimming stuck on screen. A shadow is just paint
-           tied to this element, so it appears and fades with the popup itself, every time. */
-        > div {
-            position: relative;
-            overflow: hidden;
-            width: 22rem;
-            max-width: calc(100vw - 2.5rem);
-            padding: 1.75rem 1.5rem 1.375rem;
-            border-radius: 1.25rem;
-            box-shadow:
-                0 2px 8px color-mix(in srgb, var(--color-secondary-dark) 22%, transparent),
-                0 24px 64px color-mix(in srgb, var(--color-secondary-dark) 40%, transparent),
-                0 0 0 100vmax color-mix(in srgb, var(--color-secondary-dark) 45%, transparent);
-        }
-
-        /* Content row: stack icon above text instead of side-by-side, and centre it. */
-        > div > div {
-            flex-direction: column;
-            align-items: center;
-            gap: 0.625rem;
-            overflow: visible;
-        }
-
-        /* Icon + text column: also stacked, icon first. */
-        > div > div > div:first-child {
-            flex-direction: column;
-            align-items: center;
-            gap: 0.75rem;
-            padding: 0;
-            text-align: center;
-        }
-
-        /* The variant icon becomes a colour-tinted circular badge. */
-        svg {
-            width: 2.75rem;
-            height: 2.75rem;
-            padding: 0.625rem;
-            border-radius: 9999px;
-        }
-
-        /* Action/close row: off the content flow, into the card's top-end corner,
-           clear of the icon badge's own padding. */
-        > div > div > div:last-child {
-            position: absolute;
-            top: 0.375rem;
-            inset-inline-end: 0.375rem;
-        }
-
-        /* The dismiss countdown. Flux tracks its own `duration` in JS with no CSS
-           hook, so this assumes the shared default (Flux::toast()'s 5s) — every
-           toast in this app relies on that default rather than passing its own. */
-        > div::after {
-            content: '';
-            position: absolute;
-            inset-inline: 0;
-            bottom: 0;
-            height: 3px;
-            transform-origin: left center;
-            animation: hc-center-toast-countdown 5s linear forwards;
-        }
-
-        &[data-variant='success'] {
-            svg {
-                background-color: var(--color-status-good-soft);
-                color: var(--color-status-good);
-            }
-
-            > div::after {
-                background-color: var(--color-status-good);
-            }
-        }
-
-        &[data-variant='warning'] {
-            svg {
-                background-color: var(--color-status-warn-soft);
-                color: var(--color-status-warn);
-            }
-
-            > div::after {
-                background-color: var(--color-status-warn);
-            }
-        }
-
-        &[data-variant='danger'] {
-            svg {
-                background-color: var(--color-status-critical-soft);
-                color: var(--color-status-critical);
-            }
-
-            > div::after {
-                background-color: var(--color-status-critical);
-            }
-        }
-
-        &:not([data-variant]),
-        &[data-variant='info'] {
-            svg {
-                background-color: var(--color-status-active-soft);
-                color: var(--color-status-active);
-            }
-
-            > div::after {
-                background-color: var(--color-status-active);
-            }
+        .hc-toast-spinner {
+            opacity: 1;
         }
     }
 }
 
-[dir='rtl'] ui-toast-group[position='center'] [data-flux-toast-dialog] > div::after {
-    transform-origin: right center;
+.hc-toast-spinner {
+    position: absolute;
+    width: 1rem;
+    height: 1rem;
+    border: 2px solid color-mix(in srgb, currentColor 30%, transparent);
+    border-top-color: currentColor;
+    border-radius: 9999px;
+    opacity: 0;
+    animation: hc-toast-spin 0.7s linear infinite;
 }
 
-/* Dark toasts: a surface-3 card on a black/60 dim, Graphite text, no drop shadow. */
-.dark [data-flux-toast-dialog] > div {
-    border-color: var(--color-line);
-    background-color: var(--color-surface-3);
+/* Close: quiet until pointed at. */
+.hc-toast-close {
+    flex: none;
+    align-self: center;
+
+    button {
+        display: grid;
+        place-items: center;
+        width: 1.75rem;
+        height: 1.75rem;
+        border-radius: 0.5rem;
+        color: var(--color-ink-faint);
+        cursor: pointer;
+        transition: background-color 0.15s, color 0.15s;
+
+        &:hover {
+            background-color: color-mix(in srgb, var(--color-ink) 9%, transparent);
+            color: var(--color-ink);
+        }
+
+        &:focus-visible {
+            outline: 2px solid var(--color-brand);
+            outline-offset: 1px;
+        }
+    }
+
+    svg {
+        width: 1rem;
+        height: 1rem;
+    }
 }
 
-.dark ui-toast-group[position='center'] [data-flux-toast-dialog] > div {
+/* Time left: a thin grey line that runs down and waits while the stack is hovered. An error has none: it stays. */
+.hc-toast-timer {
+    position: absolute;
+    inset-inline: 0;
+    bottom: 0;
+    height: 2px;
+    background-color: color-mix(in srgb, var(--color-ink) 28%, transparent);
+    transform-origin: left center;
+    animation: hc-toast-timer var(--hc-toast-life, 4000ms) linear forwards;
+
+    [dir='rtl'] & {
+        transform-origin: right center;
+    }
+
+    ui-toast-group:hover & {
+        animation-play-state: paused;
+    }
+
+    .hc-toast[data-life='0'] & {
+        display: none;
+    }
+}
+
+.dark .hc-toast-card {
+    border-color: var(--color-line-strong);
     box-shadow:
         var(--shadow-raised),
-        0 0 0 100vmax rgb(0 0 0 / 0.6);
+        0 16px 40px -12px rgb(0 0 0 / 0.7);
 }
 
-/* Heading, then text: the text is primary on its own and supporting under a heading, as in Flux. */
-.dark [data-flux-toast-dialog] > div > div > div:first-child > div > div {
-    color: var(--color-ink);
+@keyframes hc-toast-pop {
+    from {
+        opacity: 0;
+        transform: scale(0.5);
+    }
+    to {
+        opacity: 1;
+        transform: scale(1);
+    }
 }
 
-.dark [data-flux-toast-dialog] > div > div > div:first-child > div > div:not(:empty) + div {
-    color: var(--color-ink-muted);
+@keyframes hc-toast-tick {
+    to {
+        stroke-dashoffset: 0;
+    }
 }
 
-.dark [data-flux-toast-dialog] ui-close button {
-    color: var(--color-ink-muted);
+@keyframes hc-toast-spin {
+    to {
+        transform: rotate(360deg);
+    }
 }
 
-.dark [data-flux-toast-dialog] ui-close button:hover {
-    color: var(--color-ink);
-}
-
-@keyframes hc-center-toast-countdown {
+@keyframes hc-toast-timer {
     from {
         transform: scaleX(1);
     }
@@ -656,14 +795,17 @@ ui-toast-group[position='center'] {
 }
 
 @media (prefers-reduced-motion: reduce) {
-    ui-toast-group[position='center'] [data-flux-toast-dialog] {
-        transition: opacity 0.2s;
-        transform: none !important;
+    .hc-toast-badge,
+    .hc-toast-tick {
+        animation: none;
+    }
 
-        > div::after {
-            animation: none;
-            opacity: 0;
-        }
+    .hc-toast-tick {
+        stroke-dashoffset: 0;
+    }
+
+    .hc-toast-timer {
+        display: none;
     }
 }
 
