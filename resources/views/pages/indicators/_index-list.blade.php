@@ -71,7 +71,7 @@
                 </div>
 
                 <div class="flex items-center gap-1 md:justify-end">
-                    @can('indicators.update')
+                    @can('indicators.record')
                         <x-ui.button size="sm" icon="plus" class="min-h-11 md:min-h-9" wire:click="openProgressModal({{ $indicator->id }})" data-test="log-reading-button-{{ $indicator->id }}">
                             {{ __('indicators.log_reading') }}
                         </x-ui.button>

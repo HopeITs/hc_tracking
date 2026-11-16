@@ -522,7 +522,7 @@ test('a program move is refused when it would strand an indicator or a plan targ
     }
 });
 
-test('a target reads its achievement from approved reports only, and an unmeasured statement links to adding an indicator', function () {
+test('a target reads its achievement from approved reports only, and an unmeasured statement offers to add an indicator', function () {
     $user = User::factory()->role('General Manager')->create();
     $measured = Result::factory()->type(ResultType::Outcome)->create();
     $unmeasured = Result::factory()->type(ResultType::Outcome)->create();
@@ -537,7 +537,7 @@ test('a target reads its achievement from approved reports only, and an unmeasur
         ->test('pages::results.index')
         ->assertSee('25% achieved')
         ->assertDontSee('100% achieved')
-        ->assertSeeHtml('href="'.route('indicators.index', ['create' => $unmeasured->id]).'"');
+        ->assertSeeHtml('data-test="add-indicator-for-result-'.$unmeasured->id.'"');
 });
 
 test('each proposal framework reads as its own group after the program groups', function () {
@@ -581,7 +581,7 @@ test('the framework filter narrows to the program framework or to one proposal',
 });
 
 test('a proposal node is edited in its own framework from the results page', function () {
-    $user = User::factory()->role('MEAL')->create();
+    $user = mealManager();
     $proposal = Proposal::factory()->create();
     $output = Result::factory()->type(ResultType::Output)->create(['proposal_id' => $proposal->id]);
     $programOutcome = Result::factory()->type(ResultType::Outcome)->create();
@@ -650,7 +650,7 @@ describe('the create deep link (T14)', function () {
     });
 
     test('?program=&create=1 opens the create form pre-filled with that program at impact level', function () {
-        ($this->deepLink)(userWithRole('MEAL'), ['program' => (string) $this->program->id, 'create' => '1'])
+        ($this->deepLink)(mealManager(), ['program' => (string) $this->program->id, 'create' => '1'])
             ->assertSet('showResultModal', true)
             ->assertSet('resultProgramId', (string) $this->program->id)
             ->assertSet('resultType', ResultType::Impact->value);

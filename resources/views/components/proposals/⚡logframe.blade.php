@@ -136,9 +136,13 @@ new class extends Component {
     public function frameworkRoots(): array
     {
         $roots = collect($this->rootNodes());
-        [$crossCutting, $tree] = $roots->partition(fn (array $node): bool => $node['result']->type === ResultType::CrossCutting);
+        $ofType = fn (ResultType $type): array => $roots->filter(fn (array $node): bool => $node['result']->type === $type)->values()->all();
 
-        return ['tree' => $tree->values()->all(), 'crossCutting' => $crossCutting->values()->all()];
+        return [
+            'tree' => $roots->reject(fn (array $node): bool => in_array($node['result']->type, [ResultType::Activity, ResultType::CrossCutting], true))->values()->all(),
+            'activities' => $ofType(ResultType::Activity),
+            'crossCutting' => $ofType(ResultType::CrossCutting),
+        ];
     }
 };
 ?>
@@ -207,7 +211,7 @@ new class extends Component {
                 @endif
             </x-ui.logframe>
         </div>
-    @elseif ($roots['tree'] === [] && $roots['crossCutting'] === [])
+    @elseif ($roots['tree'] === [] && $roots['activities'] === [] && $roots['crossCutting'] === [])
         <x-ui.panel>
             <x-ui.empty-state
                 icon="share"
@@ -215,7 +219,12 @@ new class extends Component {
                 :body="$canCreate ? __('results_framework.logframe_empty_body_editor') : __('results_framework.logframe_empty_body_viewer')"
             >
                 <x-slot:action>
-                    @if ($canCreate)<x-ui.button tone="primary" icon="plus" wire:click="openCreateModal">{{ __('results_framework.add_result') }}</x-ui.button>@endif
+                    @if ($canCreate)
+                        <div class="flex flex-wrap justify-center gap-2">
+                            <x-ui.button tone="primary" icon="plus" wire:click="openCreateModal">{{ __('results_framework.add_result') }}</x-ui.button>
+                            <x-ui.button icon="plus" wire:click="openCreateActivity" data-test="add-free-activity">{{ __('results_framework.add_free_activity') }}</x-ui.button>
+                        </div>
+                    @endif
                 </x-slot:action>
             </x-ui.empty-state>
         </x-ui.panel>
@@ -225,6 +234,23 @@ new class extends Component {
                 <x-ui.framework-node :node="$node" :depth="0" :order="$loop->index" :editable="$editable" :risk-counts="$this->riskCounts" wire:key="logframe-root-{{ $node['result']->id }}" />
             @endforeach
         </div>
+
+        @if ($roots['activities'] !== [] || $canCreate)
+            <section class="space-y-3" aria-labelledby="logframe-free-activities-heading" data-test="logframe-free-activities">
+                <div class="flex flex-wrap items-center gap-x-3 gap-y-1">
+                    <h3 id="logframe-free-activities-heading" class="type-label text-secondary-medium dark:text-ink-muted">{{ __('results_framework.free_activities') }}</h3>
+                    @if ($canCreate)
+                        <x-ui.button tone="ghost" size="sm" icon="plus" class="ms-auto" wire:click="openCreateActivity" data-test="add-free-activity">{{ __('results_framework.add_free_activity') }}</x-ui.button>
+                    @endif
+                </div>
+                @if ($roots['activities'] === [])
+                    <p class="type-meta text-secondary-medium dark:text-ink-muted">{{ __('results_framework.free_activities_empty') }}</p>
+                @endif
+                @foreach ($roots['activities'] as $node)
+                    <x-ui.framework-node :node="$node" :depth="0" :order="$loop->index" :editable="$editable" :risk-counts="$this->riskCounts" wire:key="logframe-free-activity-{{ $node['result']->id }}" />
+                @endforeach
+            </section>
+        @endif
 
         @if ($roots['crossCutting'] !== [])
             <section class="space-y-3" aria-labelledby="logframe-cross-cutting-heading" data-test="logframe-cross-cutting">
@@ -246,6 +272,8 @@ new class extends Component {
     @include('components.proposals._logframe-risks-drawer')
 
     @include('pages.results._index-result-modal')
+
+    <livewire:indicators.quick-form :key="'logframe-indicator-form-'.$proposalId" />
 
     @if ($canCreate)
         @include('components.proposals._logframe-copy-modal')

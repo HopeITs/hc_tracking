@@ -30,7 +30,7 @@ beforeEach(function () {
     DB::table('project_proposal')->insert(['project_id' => $this->project->id, 'proposal_id' => $this->proposal->id]);
     $this->output = scheduleOutput($this->proposal, $this->program);
     $this->activity = Result::factory()->activity($this->output)->create();
-    $this->meal = User::factory()->role('MEAL')->create();
+    $this->meal = mealManager();
 });
 
 /**

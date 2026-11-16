@@ -14,8 +14,8 @@ use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Validation\ValidationException;
 
 describe('authorization', function () {
-    it('lets MEAL and the General Manager create, edit, deactivate, reactivate and delete an unused entry', function (string $role) {
-        $this->actingAs(userWithRole($role));
+    it('lets the MEAL manager and the General Manager create, edit, deactivate, reactivate and delete an unused entry', function (Closure $actor) {
+        $this->actingAs($actor());
 
         $entry = app(SaveLibraryIndicator::class)->handle(null, libraryIndicatorInput());
         app(SaveLibraryIndicator::class)->handle($entry->id, libraryIndicatorInput(['name_en' => 'Households reached']));
@@ -31,7 +31,7 @@ describe('authorization', function () {
                 'library_indicator.reactivated',
                 'library_indicator.deleted',
             ]);
-    })->with(['MEAL', 'General Manager']);
+    })->with(['the MEAL manager' => fn () => mealManager(), 'the General Manager' => fn () => userWithRole('General Manager')]);
 
     it('forbids every other role from writing to the library', function (string $role, Closure $write) {
         $entry = LibraryIndicator::factory()->create(['name_en' => 'Untouched']);
@@ -41,7 +41,7 @@ describe('authorization', function () {
 
         expect(LibraryIndicator::query()->count())->toBe(1)
             ->and($entry->fresh()->only(['name_en', 'is_active']))->toBe(['name_en' => 'Untouched', 'is_active' => true]);
-    })->with(['Team Member', 'Managers', 'Financial'])->with([
+    })->with(['Team Member', 'Managers', 'Financial', 'MEAL'])->with([
         'create' => fn (LibraryIndicator $entry) => app(SaveLibraryIndicator::class)->handle(null, libraryIndicatorInput()),
         'update' => fn (LibraryIndicator $entry) => app(SaveLibraryIndicator::class)->handle($entry->id, libraryIndicatorInput(['name_en' => 'Changed'])),
         'deactivate' => fn (LibraryIndicator $entry) => app(DeactivateLibraryIndicator::class)->handle($entry->id),
@@ -54,7 +54,7 @@ describe('authorization', function () {
 });
 
 describe('saving', function () {
-    beforeEach(fn () => $this->actingAs(userWithRole('MEAL')));
+    beforeEach(fn () => $this->actingAs(mealManager()));
 
     it('rejects an entry that breaks a form rule with its message', function (array $overrides, string $message) {
         expect(fn () => app(SaveLibraryIndicator::class)->handle(null, libraryIndicatorInput($overrides)))
@@ -120,7 +120,7 @@ describe('saving', function () {
 });
 
 describe('deactivating, reactivating and deleting', function () {
-    beforeEach(fn () => $this->actingAs(userWithRole('MEAL')));
+    beforeEach(fn () => $this->actingAs(mealManager()));
 
     it('takes a deactivated entry off new selection and brings it back on reactivation', function () {
         $entry = LibraryIndicator::factory()->create();

@@ -18,7 +18,7 @@ $groups = [
     'programs' => ['view', 'update'],
     'projects' => ['view', 'create', 'update', 'delete'],
     'milestones' => ['view', 'create', 'update', 'delete'],
-    'indicators' => ['view', 'create', 'update', 'delete'],
+    'indicators' => ['view', 'create', 'update', 'delete', 'record'],
     'indicator-library' => ['view', 'create', 'update', 'delete'],
     'results' => ['view', 'create', 'update', 'delete'],
     'risks' => ['view', 'create', 'update', 'delete'],
@@ -85,6 +85,28 @@ $aiDrafter = ['ai.draft'];
 return [
 
     'groups' => $groups,
+
+    /*
+    |--------------------------------------------------------------------------
+    | MEAL manager only
+    |--------------------------------------------------------------------------
+    |
+    | Building the logframe and its targets belongs to the one person holding
+    | the MEAL Manager slot (MEAL manager decision, 2026-11-13), not to every
+    | MEAL officer: a role that grants one of these abilities is honoured only
+    | for that person, or for a role listed under bypass_roles (see
+    | App\Models\User::checkPermissionTo()). Logging an indicator reading is
+    | `indicators.record` and is not restricted.
+    */
+    'meal_manager_only' => [
+        'abilities' => [
+            'results.create', 'results.update', 'results.delete',
+            'indicators.create', 'indicators.update', 'indicators.delete',
+            'targets.create', 'targets.update', 'targets.delete',
+            'indicator-library.create', 'indicator-library.update', 'indicator-library.delete',
+        ],
+        'bypass_roles' => ['Super Admin', 'General Manager'],
+    ],
 
     /*
     |--------------------------------------------------------------------------
@@ -197,7 +219,7 @@ return [
         ],
         'MEAL' => [
             ...$viewEverything, ...$taskWriter, ...$reportWriter, 'reports.approve', 'reports.mark-seen',
-            'indicators.create', 'indicators.update', 'indicators.delete',
+            'indicators.create', 'indicators.update', 'indicators.delete', 'indicators.record',
             'results.create', 'results.update', 'results.delete',
             'targets.create', 'targets.update', 'targets.delete',
             'indicator-library.create', 'indicator-library.update', 'indicator-library.delete',
@@ -221,8 +243,8 @@ return [
             'projects.update', 'projects.delete',
             'milestones.create', 'milestones.update', 'milestones.delete',
             'risks.create', 'risks.update', 'risks.delete',
-            'indicators.create', 'indicators.update',
-            'results.create', 'results.update',
+            // Building the logframe is the MEAL manager's alone (2026-11-13); managers still log readings.
+            'indicators.record',
             ...$aiDrafter,
         ],
         'General Manager' => array_values(array_diff($allPermissions, [

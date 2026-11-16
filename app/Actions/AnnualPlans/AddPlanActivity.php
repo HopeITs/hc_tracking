@@ -21,6 +21,10 @@ use Illuminate\Validation\ValidationException;
  * SaveResult, so every chain rule still holds. An activity sits under an
  * output, so under an outcome with no output yet one is created for it
  * first. The new activity is ticked in the plan.
+ *
+ * Building the logframe is otherwise the MEAL manager's alone (2026-11-13);
+ * this one step stays with the program manager, authorized here by the plan
+ * itself, so SaveResult is told the write is already authorized.
  */
 final class AddPlanActivity
 {
@@ -52,7 +56,7 @@ final class AddPlanActivity
                         'type' => ResultType::Output->value,
                         'parent_id' => $parent->id,
                         'checkout_period' => $parent->checkout_period?->value ?? 'monthly',
-                    ], $proposal));
+                    ], $proposal, callerAuthorized: true));
 
             return $this->save->handle(null, [
                 'statement' => $statement,
@@ -60,7 +64,7 @@ final class AddPlanActivity
                 'activity_kind' => ($singleWeek ? ActivityKind::Event : ActivityKind::Continuous)->value,
                 'parent_id' => $output->id,
                 'checkout_period' => $output->checkout_period?->value ?? 'monthly',
-            ], $proposal);
+            ], $proposal, callerAuthorized: true);
         });
     }
 }

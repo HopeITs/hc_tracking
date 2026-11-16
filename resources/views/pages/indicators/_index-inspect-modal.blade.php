@@ -120,8 +120,8 @@
                                                 </span>
                                             @else
                                                 <span class="ms-auto inline-flex items-center gap-0.5">
-                                                    @can('indicators.update')<x-ui.button tone="ghost" size="sm" icon="pencil-square" class="size-7!" wire:click="openEditReadingModal({{ $entry['reading']->id }})" :aria-label="__('indicators.edit_reading_from_date', ['date' => $entry['reading']->date->translatedFormat(__('formats.date'))])" data-test="edit-reading-{{ $entry['reading']->id }}" />@endcan
-                                                    @can('indicators.update')<x-ui.button tone="ghost" size="sm" icon="trash" class="size-7!" wire:click="confirmDeleteReading({{ $entry['reading']->id }})" :aria-label="__('indicators.delete_reading_from_date', ['date' => $entry['reading']->date->translatedFormat(__('formats.date'))])" data-test="delete-reading-{{ $entry['reading']->id }}" />@endcan
+                                                    @can('indicators.record')<x-ui.button tone="ghost" size="sm" icon="pencil-square" class="size-7!" wire:click="openEditReadingModal({{ $entry['reading']->id }})" :aria-label="__('indicators.edit_reading_from_date', ['date' => $entry['reading']->date->translatedFormat(__('formats.date'))])" data-test="edit-reading-{{ $entry['reading']->id }}" />@endcan
+                                                    @can('indicators.record')<x-ui.button tone="ghost" size="sm" icon="trash" class="size-7!" wire:click="confirmDeleteReading({{ $entry['reading']->id }})" :aria-label="__('indicators.delete_reading_from_date', ['date' => $entry['reading']->date->translatedFormat(__('formats.date'))])" data-test="delete-reading-{{ $entry['reading']->id }}" />@endcan
                                                 </span>
                                             @endif
                                         </div>
@@ -261,7 +261,7 @@
                         {{ __('indicators.commit_a_target') }}
                     </x-ui.button>
                 @endif
-                @can('indicators.update')<x-ui.button type="button" tone="primary" icon="plus-circle" wire:click="openProgressModal({{ $indicator->id }})">
+                @can('indicators.record')<x-ui.button type="button" tone="primary" icon="plus-circle" wire:click="openProgressModal({{ $indicator->id }})">
                     {{ __('indicators.log_reading') }}
                 </x-ui.button>@endcan
             </x-slot:actions>

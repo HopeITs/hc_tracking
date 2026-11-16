@@ -59,5 +59,6 @@ return [
         'correct-status' => 'Correct status',
         'draft' => 'Draft with AI',
         'view-usage' => 'View usage',
+        'record' => 'Log readings',
     ],
 ];

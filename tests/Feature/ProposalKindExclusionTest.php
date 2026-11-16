@@ -65,7 +65,7 @@ test('the donor report aggregator and composer refuse a payroll proposal', funct
 test('a payroll proposal takes no logframe, target or activity schedule', function (Closure $call, string $field, string $message) {
     $proposal = activePayrollProposal();
     // MEAL writes the logframe and targets; copying a tree also needs to see the proposal.
-    $meal = userWithRole('MEAL');
+    $meal = mealManager();
     $meal->givePermissionTo('proposals.view');
     $this->actingAs($meal);
 

@@ -118,7 +118,7 @@ test('each role holds every view permission plus exactly its approved write perm
     ]],
     'MEAL' => ['MEAL', [
         'tasks.create', 'tasks.update', 'reports.create', 'reports.update', 'reports.approve', 'reports.mark-seen',
-        'indicators.create', 'indicators.update', 'indicators.delete',
+        'indicators.create', 'indicators.update', 'indicators.delete', 'indicators.record',
         'results.create', 'results.update', 'results.delete',
         'targets.create', 'targets.update', 'targets.delete',
         'indicator-library.create', 'indicator-library.update', 'indicator-library.delete',
@@ -144,8 +144,7 @@ test('each role holds every view permission plus exactly its approved write perm
         'projects.update', 'projects.delete',
         'milestones.create', 'milestones.update', 'milestones.delete',
         'risks.create', 'risks.update', 'risks.delete',
-        'indicators.create', 'indicators.update',
-        'results.create', 'results.update',
+        'indicators.record',
         'ai.draft',
     ]],
 ]);

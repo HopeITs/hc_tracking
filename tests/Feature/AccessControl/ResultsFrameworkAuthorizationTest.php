@@ -12,13 +12,14 @@ dataset('framework deletes', [
     'target' => [fn (): array => ['pages::targets.index', PlanIndicator::factory()->create()->id, 'deleteTarget', PlanIndicator::class]],
 ]);
 
-test('Team Members and Managers cannot delete framework records; MEAL can', function (Closure $case) {
+test('Team Members, Managers and MEAL officers cannot delete framework records; the MEAL manager can', function (Closure $case) {
     [$page, $id, $delete, $model] = $case();
     $attempt = fn (User $user) => Livewire::actingAs($user)->test($page)->call('confirmDelete', $id);
 
     $attempt(userWithRole('Team Member'))->assertForbidden();
     $attempt(userWithRole('Managers'))->assertForbidden();
-    $attempt(userWithRole('MEAL'))->call($delete)->assertOk();
+    $attempt(userWithRole('MEAL'))->assertForbidden();
+    $attempt(mealManager())->call($delete)->assertOk();
 
     expect($model::query()->find($id))->toBeNull();
 })->with('framework deletes');
@@ -27,15 +28,16 @@ test('a Team Member cannot open any framework create form', function (string $pa
     Livewire::actingAs(userWithRole('Team Member'))->test($page)->call('openCreateModal')->assertForbidden();
 })->with(['pages::results.index', 'pages::indicators.index', 'pages::targets.index']);
 
-test('Managers edit framework records', function () {
+test('only the MEAL manager edits framework records', function () {
     $indicator = Indicator::factory()->create();
+    $edit = fn (User $user) => Livewire::actingAs($user)->test('pages::indicators.index')->call('openEditModal', $indicator->id);
 
-    Livewire::actingAs(userWithRole('Managers'))->test('pages::indicators.index')
-        ->call('openEditModal', $indicator->id)
-        ->assertOk();
+    $edit(userWithRole('Managers'))->assertForbidden();
+    $edit(userWithRole('MEAL'))->assertForbidden();
+    $edit(mealManager())->assertOk();
 });
 
-test('recording an indicator reading needs indicators.update', function () {
+test('recording an indicator reading needs indicators.record', function () {
     $indicator = Indicator::factory()->create();
 
     Livewire::actingAs(userWithRole('Team Member'))->test('pages::indicators.index')->call('openProgressModal', $indicator->id)->assertForbidden();

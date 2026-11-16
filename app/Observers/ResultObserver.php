@@ -48,11 +48,9 @@ final class ResultObserver
             $this->ensureChildrenStillFit($result, $type);
         }
 
+        // A root of any level but cross-cutting's own rule is fine: an activity
+        // may stand on its own, unlinked to any statement (2026-11-13).
         if ($parentKey === null) {
-            if ($type === ResultType::Activity) {
-                throw InvalidParentException::wrongLevel();
-            }
-
             return;
         }
 

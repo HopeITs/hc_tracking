@@ -199,7 +199,8 @@ trait BuildsResultsTree
     }
 
     /**
-     * The visible framework as root nodes, cross-cutting roots last.
+     * The visible framework as root nodes: the chain, then the free
+     * activities (no parent), then the cross-cutting roots.
      *
      * A statement whose parent the filters hid is promoted to a root of its
      * own so nothing disappears silently; it carries the hidden lineage.
@@ -225,7 +226,11 @@ trait BuildsResultsTree
         }
 
         return array_values(collect($roots)
-            ->sortBy(fn (Result $result): int => $result->type === ResultType::CrossCutting ? 1 : 0)
+            ->sortBy(fn (Result $result): int => match ($result->type) {
+                ResultType::Activity => 1,
+                ResultType::CrossCutting => 2,
+                default => 0,
+            })
             ->map(fn (Result $result): array => $this->buildNode($result, $childrenByParent, $visibleIds, 0))
             ->all());
     }

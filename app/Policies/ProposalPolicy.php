@@ -81,7 +81,7 @@ class ProposalPolicy
      */
     public function uploadNeedAssessment(User $user, Proposal $proposal): bool
     {
-        return $user->can('proposals.update') || ($user->can('results.create') && $this->isReviewer($user, $proposal));
+        return $user->can('proposals.update') || ($user->roleGrants('results.create') && $this->isReviewer($user, $proposal));
     }
 
     /**

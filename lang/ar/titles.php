@@ -35,6 +35,7 @@ return [
     'security_settings' => 'إعدادات الأمان',
     'strategies' => 'الاستراتيجيات',
     'strategy' => 'الاستراتيجية',
+    'strategic_plan' => 'الخطة الاستراتيجية',
     'targets' => 'المستهدفات',
     'task' => 'المهمة',
     'tasks' => 'المهام',

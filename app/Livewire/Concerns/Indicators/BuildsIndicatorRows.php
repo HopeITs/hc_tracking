@@ -27,12 +27,13 @@ use Livewire\Attributes\Computed;
  * indicator with its whole chain loaded once, each one rated and described,
  * then filtered and paged in memory (see .ai/rules/indicators.md).
  *
- * Used by indicators/index only. The page provides its six #[Url] filters
+ * Used by indicators/index only. The page provides its #[Url] filters
  * and WithPagination's getPage().
  *
  * @property string $search #[Url] filter on the page
  * @property string $result #[Url] filter on the page
  * @property string $measure #[Url] filter on the page
+ * @property string $level #[Url] filter on the page: a ResultType value, the level of the result measured
  * @property string $program #[Url] filter on the page
  * @property string $rag #[Url] filter on the page
  * @property string $focus #[Url] filter on the page
@@ -341,6 +342,10 @@ trait BuildsIndicatorRows
         }
 
         if ($this->measure !== '' && $indicator->measure->value !== $this->measure) {
+            return false;
+        }
+
+        if ($this->level !== '' && $indicator->result->type->value !== $this->level) {
             return false;
         }
 

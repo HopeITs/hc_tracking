@@ -222,7 +222,7 @@ describe('what is refused', function () {
         DB::table('proposals')->where('id', $this->proposal->id)->update(['status' => 'submitted']);
         $proposal = $this->proposal->fresh();
 
-        $creatorOnly = User::factory()->role('Financial')->create();
+        $creatorOnly = User::factory()->role('Financial')->create(['employee_id' => holdMealManagerSlot()]);
         $creatorOnly->givePermissionTo('results.create');
 
         $this->actingAs($creatorOnly);

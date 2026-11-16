@@ -433,6 +433,20 @@ return [
                 'body' => 'لا يوجد إطار منطقي للبرنامج «:subject» بعد',
             ],
         ],
+        'strategic_plan' => [
+            'submitted' => [
+                'title' => 'خطة استراتيجية بانتظار موافقتك',
+                'body' => 'أرسل :actor الخطة الاستراتيجية لبرنامج :program (:strategy) لموافقتك.',
+            ],
+            'approved' => [
+                'title' => 'اعتُمدت الخطة الاستراتيجية',
+                'body' => 'اعتمد :actor الخطة الاستراتيجية لبرنامج :program (:strategy).',
+            ],
+            'sent_back' => [
+                'title' => 'أُعيدت الخطة الاستراتيجية',
+                'body' => 'أعاد :actor الخطة الاستراتيجية لبرنامج :program: ":reason"',
+            ],
+        ],
         'annual_plan' => [
             'plan_submitted' => [
                 'title' => 'خطة سنوية جديدة للمراجعة',
