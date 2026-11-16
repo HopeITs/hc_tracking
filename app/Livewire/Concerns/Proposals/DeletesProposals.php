@@ -9,6 +9,7 @@ use App\Models\Proposal;
 use Flux\Flux;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Validation\ValidationException;
+use Livewire\Attributes\Computed;
 use Livewire\Attributes\Locked;
 
 /**
@@ -40,6 +41,20 @@ trait DeletesProposals
             ->find($proposalId);
 
         return $proposal !== null && $proposal->donor_proposals_count === 0;
+    }
+
+    /**
+     * The proposal the open confirmation falls on: its name for the record card
+     * and its internal number, which must be typed before the delete unlocks.
+     */
+    #[Computed]
+    public function deletingProposal(): ?Proposal
+    {
+        if ($this->deletingProposalId === null) {
+            return null;
+        }
+
+        return Proposal::query()->select(['id', 'name', 'internal_project_number'])->find($this->deletingProposalId);
     }
 
     public function confirmDelete(int $proposalId): void

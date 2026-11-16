@@ -921,6 +921,7 @@ new class extends Component {
     @endif
 
     <x-ui.confirm-modal
+        icon="link-slash"
         wire:model="showDetachModal"
         :title="__('targets.detach_title')"
         :message="__('targets.detach_message')"

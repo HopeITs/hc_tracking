@@ -40,6 +40,7 @@
 </x-ui.modal>
 
 <x-ui.confirm-modal
+    icon="document-duplicate"
     wire:model="showCopyConfirmModal"
     close="cancelCopyConfirmation"
     tone="neutral"

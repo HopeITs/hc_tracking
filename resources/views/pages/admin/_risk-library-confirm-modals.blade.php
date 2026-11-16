@@ -4,6 +4,7 @@
     cannot be deleted and offers to deactivate it instead.
 --}}
 <x-ui.confirm-modal
+    icon="no-symbol"
     wire:model="showDeactivateModal"
     close="cancelDeactivate"
     tone="neutral"
@@ -16,6 +17,8 @@
 
 {{-- One dialog whose text follows $deletingEntryInUse: two dialogs swapped behind an @if would replace the open <dialog> element mid-request. --}}
 <x-ui.confirm-modal
+    :icon="$deletingEntryInUse ? 'no-symbol' : 'trash'"
+    :permanent="! $deletingEntryInUse"
     wire:model="showDeleteModal"
     close="cancelDelete"
     :tone="$deletingEntryInUse ? 'neutral' : 'danger'"

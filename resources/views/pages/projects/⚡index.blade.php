@@ -457,6 +457,7 @@ new #[Layout('layouts::desk'), Title('titles.projects')] class extends Component
 
     {{-- Archiving is reversible, so the dialog explains where the work goes, not what is lost. --}}
     <x-ui.confirm-modal
+        icon="archive-box"
         wire:model="showArchiveModal"
         close="cancelArchive"
         tone="neutral"

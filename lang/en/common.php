@@ -152,4 +152,7 @@ return [
     'discard_changes_question' => 'Discard your changes?',
     'discard' => 'Discard',
     'keep_editing' => 'Keep editing',
+    'to_cancel' => 'to cancel',
+    'cannot_be_undone' => 'This can’t be undone.',
+    'type_to_confirm' => 'Type :code to confirm',
 ];

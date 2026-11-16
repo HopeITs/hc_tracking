@@ -223,6 +223,7 @@ new #[Layout('layouts::desk'), Title('titles.annual_plans')] class extends Compo
     @include('pages.annual-plans._index-plan-modal')
 
     <x-ui.confirm-modal
+        permanent
         wire:model="showDeleteModal"
         close="cancelDelete"
         :title="__('annual_plans.delete_this_annual_plan')"

@@ -118,8 +118,12 @@ test('the register deletes through the action and explains a refusal', function 
     ]);
     Report::factory()->create(['plan_indicator_id' => $target->id]);
 
+    $this->proposal->forceFill(['internal_project_number' => 'WR-2026-07'])->save();
+
     Livewire::test('pages::proposals.index')
         ->call('confirmDelete', $this->proposal->id)
+        ->assertSeeHtml('<span class="confirm-record-name">Winter Response</span>')
+        ->assertSeeHtml('placeholder="WR-2026-07"')
         ->call('deleteProposal')
         ->assertSet('showDeleteModal', false);
 

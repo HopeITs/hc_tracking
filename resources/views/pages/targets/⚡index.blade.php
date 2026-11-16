@@ -186,6 +186,7 @@ new #[Layout('layouts::desk'), Title('titles.targets')] class extends Component 
     @include('pages.targets._index-target-modal')
 
     <x-ui.confirm-modal
+        permanent
         wire:model="showDeleteModal"
         close="cancelDelete"
         :title="__('targets.delete_named_target', ['name' => $deletingTargetName ?? '—'])"

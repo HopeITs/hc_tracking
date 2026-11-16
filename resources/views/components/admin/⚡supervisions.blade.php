@@ -279,6 +279,7 @@ new class extends Component {
     </x-ui.modal>
 
     <x-ui.confirm-modal
+        icon="user-minus"
         wire:model="showRemoveModal"
         close="closeRemoveModal"
         :title="__('users.supervision_remove_title')"

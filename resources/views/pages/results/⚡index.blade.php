@@ -187,6 +187,7 @@ new #[Layout('layouts::desk'), Title('titles.results_framework')] class extends 
     <livewire:indicators.quick-form />
 
     <x-ui.confirm-modal
+        permanent
         wire:model="showDeleteModal"
         close="cancelDelete"
         :title="__('results_framework.delete_this_result')"

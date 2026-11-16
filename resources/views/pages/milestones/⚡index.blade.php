@@ -414,12 +414,13 @@ new #[Layout('layouts::desk'), Title('titles.milestones')] class extends Compone
     @include('pages.milestones._index-milestone-modal')
 
     <x-ui.confirm-modal
+        permanent
         wire:model="showDeleteModal"
         close="cancelDelete"
         :title="__('milestones.delete_this_milestone')"
-        :message="$this->deletingMilestone !== null
-            ? __('milestones.are_you_sure_you_want_to_delete_this_milestone', ['name' => $this->deletingMilestone->name])
-            : __('milestones.only_a_milestone_with_no_nested_milestones_and_no_tasks_can')"
+        :message="__('milestones.only_a_milestone_with_no_nested_milestones_and_no_tasks_can')"
+        :record="$this->deletingMilestone?->name"
+        record-icon="flag"
         confirm="deleteMilestone"
         :confirm-label="__('milestones.delete_milestone')"
         confirm-test="confirm-delete-milestone"

@@ -79,6 +79,7 @@
     </x-ui.modal>
 
     <x-ui.confirm-modal
+        permanent
         wire:model="showDeleteModal"
         close="cancelDelete"
         :title="__('indicators.delete_this_indicator')"

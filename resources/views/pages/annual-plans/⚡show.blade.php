@@ -379,6 +379,7 @@ new #[Layout('layouts::desk'), Title('titles.annual_plan')] class extends Compon
     </x-ui.modal>
 
     <x-ui.confirm-modal
+        permanent
         wire:model="confirmingDelete"
         :title="__('annual_plans.delete_this_annual_plan')"
         :message="$summary['targets'] > 0

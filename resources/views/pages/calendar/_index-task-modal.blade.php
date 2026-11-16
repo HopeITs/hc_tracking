@@ -14,6 +14,7 @@
     />
 
     <x-ui.confirm-modal
+        permanent
         wire:model="showTaskDeleteModal"
         :title="__('tasks.delete_this_task')"
         confirm="deleteTask"

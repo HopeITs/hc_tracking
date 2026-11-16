@@ -95,6 +95,7 @@
     </x-ui.modal>
 
     <x-ui.confirm-modal
+        icon="pencil-square"
         wire:model="showCorrectModal"
         close="closeCorrectModal"
         :title="__('proposals.correct_status')"

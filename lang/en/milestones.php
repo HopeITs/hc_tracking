@@ -11,7 +11,6 @@ return [
     'add_milestone_to_project' => 'Add a milestone to :name',
     'add_related_milestone' => 'Add related milestone',
     'add_the_first_milestone_to_a_project' => 'Add the first milestone to a project.',
-    'are_you_sure_you_want_to_delete_this_milestone' => 'Are you sure you want to delete ":name"? This cannot be undone.',
     'assignment' => 'Assignment',
     'board_view' => 'Board',
     'calendar_view' => 'Calendar',

@@ -67,6 +67,7 @@
     </x-ui.modal>
 
     <x-ui.confirm-modal
+        icon="check-circle"
         wire:model="showAcceptModal"
         tone="neutral"
         :title="__('department_tasks.accept_title')"

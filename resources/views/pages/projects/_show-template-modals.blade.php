@@ -48,6 +48,7 @@
 </x-ui.modal>
 
 <x-ui.confirm-modal
+    icon="clipboard-document-check"
     wire:model="showTemplateConfirmModal"
     tone="neutral"
     :title="__('report_templates.tab.confirm_title')"
@@ -58,6 +59,7 @@
 />
 
 <x-ui.confirm-modal
+    icon="archive-box"
     wire:model="showRetireTemplateLineModal"
     :title="__('report_templates.tab.retire_title')"
     :message="__('report_templates.tab.retire_body')"

@@ -363,6 +363,7 @@ new #[Layout('layouts::desk'), Title('titles.donor_report')] class extends Compo
     @endif
 
     <x-ui.confirm-modal
+        icon="arrow-path"
         wire:model="showRegenerateModal"
         tone="neutral"
         :title="__('donor_reports.regenerate_title')"
@@ -378,6 +379,7 @@ new #[Layout('layouts::desk'), Title('titles.donor_report')] class extends Compo
     </x-ui.confirm-modal>
 
     <x-ui.confirm-modal
+        permanent
         wire:model="showFileDeleteModal"
         close="closeFileDeleteModal"
         :title="__('donor_reports.remove_file_title')"

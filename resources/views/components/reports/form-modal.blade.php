@@ -98,6 +98,7 @@
 </x-ui.modal>
 
 <x-ui.confirm-modal
+    permanent
     wire:model="showDeleteReportModal"
     close="cancelDeleteReport"
     :title="__('reports.delete_this_draft_report')"
