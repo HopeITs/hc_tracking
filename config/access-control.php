@@ -110,6 +110,24 @@ return [
 
     /*
     |--------------------------------------------------------------------------
+    | MEAL manager grants
+    |--------------------------------------------------------------------------
+    |
+    | Granted to the MEAL Manager slot holder whatever their roles say (user
+    | decision 2026-11-16): every proposal tab, editing, status and reviewers,
+    | and the Funding tab's agreements and transfers. Recording the donor's
+    | approval (D-70) and deleting stay out. MEAL officers get none of these.
+    | See App\Models\User::checkPermissionTo().
+    */
+    'meal_manager_grants' => [
+        'proposals.view', 'proposals.update', 'proposals.manage-reviewers', 'proposals.correct-status',
+        'donors.view',
+        'funding-agreements.view', 'funding-agreements.create', 'funding-agreements.update',
+        'transfers.view', 'transfers.create', 'transfers.update',
+    ],
+
+    /*
+    |--------------------------------------------------------------------------
     | Administrator roles
     |--------------------------------------------------------------------------
     |

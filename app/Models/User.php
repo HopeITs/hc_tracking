@@ -82,7 +82,9 @@ class User extends Authenticatable implements HasLocalePreference, PasskeyUser, 
      *
      * The abilities under `access-control.meal_manager_only` (building the
      * logframe and its targets) are honoured only for the holder of the MEAL
-     * Manager slot or a bypass role, whatever the user's roles grant.
+     * Manager slot or a bypass role, whatever the user's roles grant. The
+     * abilities under `access-control.meal_manager_grants` (the proposal page,
+     * its Funding tab included) are added for the MEAL Manager slot holder.
      *
      * @param  string|int|Permission|\BackedEnum  $permission
      */
@@ -94,7 +96,21 @@ class User extends Authenticatable implements HasLocalePreference, PasskeyUser, 
             return false;
         }
 
-        return $this->roleGrantsPermissionTo($permission, $guardName);
+        if ($this->roleGrantsPermissionTo($permission, $guardName)) {
+            return true;
+        }
+
+        return is_string($permission)
+            && in_array($permission, config('access-control.meal_manager_grants'), true)
+            && $this->holdsMealManagerSlot();
+    }
+
+    /**
+     * Whether this user's HR employee holds the MEAL Manager slot right now.
+     */
+    public function holdsMealManagerSlot(): bool
+    {
+        return $this->employee_id !== null && (int) $this->employee_id === Slots::holderOf('meal_manager');
     }
 
     /**
@@ -117,7 +133,7 @@ class User extends Authenticatable implements HasLocalePreference, PasskeyUser, 
             return true;
         }
 
-        return $this->employee_id !== null && (int) $this->employee_id === Slots::holderOf('meal_manager');
+        return $this->holdsMealManagerSlot();
     }
 
     /**
