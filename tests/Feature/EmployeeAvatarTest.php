@@ -2,6 +2,7 @@
 
 use App\Models\HrEmployee;
 use App\Models\User;
+use App\Support\AvatarThumbnail;
 use Illuminate\Support\Facades\Storage;
 
 test('guests cannot fetch an employee photo', function () {
@@ -79,4 +80,38 @@ test('a user avatar follows their linked HR employee', function () {
     $user = User::factory()->create(['employee_id' => $employee]);
 
     expect($user->avatarUrl())->toBe(HrEmployee::avatarUrl($employee));
+});
+
+test('a real photo is served as a small square jpeg thumbnail', function () {
+    Storage::fake('hr');
+    Storage::fake('local');
+    $employee = insertHrEmployee();
+    $mediaId = insertHrAvatar($employee, 'sami.png');
+    $image = imagecreatetruecolor(800, 600);
+    ob_start();
+    imagepng($image);
+    Storage::disk('hr')->put('public/'.$mediaId.'/sami.png', (string) ob_get_clean());
+
+    $response = $this->actingAs(User::factory()->create())
+        ->get(route('employees.avatar', ['employee' => $employee]))
+        ->assertOk()
+        ->assertHeader('Content-Type', 'image/jpeg')
+        ->assertHeader('X-Content-Type-Options', 'nosniff');
+
+    $size = getimagesize($response->baseResponse->getFile()->getPathname());
+
+    expect($size[0])->toBe(AvatarThumbnail::Size)
+        ->and($size[1])->toBe(AvatarThumbnail::Size)
+        ->and($response->headers->get('Cache-Control'))->toContain('private');
+});
+
+test('the cached picker list links photos without a host, so every visitor\'s browser sends its sign-in cookie', function () {
+    $employee = insertHrEmployee();
+    insertHrAvatar($employee);
+    HrEmployee::forgetPickerOptions();
+
+    $photo = HrEmployee::pickerLabels()->firstWhere('value', (string) $employee)['photo'];
+
+    expect($photo)->toStartWith('/employees/'.$employee.'/avatar?v=')
+        ->and(parse_url($photo, PHP_URL_HOST))->toBeNull();
 });
