@@ -28,11 +28,16 @@ it('counts in use, not used yet and switched off as three disjoint buttons that 
     expect($page->instance()->focusCounts)->toMatchArray(['inuse' => 1, 'unused' => 1, 'off' => 1, 'total' => 3]);
 
     $page->call('setFocus', 'unused')
+        ->assertSeeHtml('data-test="focus-tab-clear-unused"')
+        ->assertSeeText('Showing 1 of 3 risks.')
+        ->assertSeeHtml('wire:click="setFocus(&#039;unused&#039;)" class="cursor-pointer')
         ->assertSee('Fresh risk')
         ->assertDontSee('Used risk')
         ->assertDontSee('Old risk')
         ->call('setFocus', 'unused')
         ->assertSet('focus', '')
+        ->assertDontSeeHtml('data-test="focus-showing"')
+        ->assertDontSeeHtml('data-test="focus-tab-clear-unused"')
         ->assertSee('Old risk')
         ->call('setFocus', 'nonsense')
         ->assertSet('focus', '');

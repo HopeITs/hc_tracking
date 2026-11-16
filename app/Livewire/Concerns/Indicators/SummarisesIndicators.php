@@ -103,7 +103,8 @@ trait SummarisesIndicators
      * How many indicators each attention chip would show.
      *
      * Counted with that chip held and the others released, so a chip never
-     * promises a number the click cannot deliver.
+     * promises a number the click cannot deliver. `total` is the count with
+     * no chip held.
      *
      * @return array<string, int>
      */
@@ -117,6 +118,11 @@ trait SummarisesIndicators
                 ->filter(fn (array $row): bool => $this->matchesFilters($row, $focus))
                 ->count();
         }
+
+        // Every indicator the other filters keep, for "Showing 2 of 12 indicators".
+        $counts['total'] = collect($this->rows)
+            ->filter(fn (array $row): bool => $this->matchesFilters($row, ''))
+            ->count();
 
         return $counts;
     }
