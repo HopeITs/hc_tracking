@@ -59,7 +59,7 @@
             </div>
         </x-ui.form-section>
 
-        <x-ui.form-section :title="__('accounts.section_address')" :fields="['poBoxStreet', 'companyAddress']">
+        <x-ui.form-section :title="__('accounts.section_address')" :optional="true" :fields="['poBoxStreet', 'companyAddress']">
             <div class="grid gap-x-4 gap-y-3 @2xl/modal:grid-cols-2">
                 <x-ui.form-textarea wire:model="poBoxStreet" :label="__('accounts.po_box_street')" rows="2" />
                 <x-ui.form-textarea wire:model="companyAddress" :label="__('accounts.company_address')" rows="2" />

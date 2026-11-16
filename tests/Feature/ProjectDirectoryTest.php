@@ -735,11 +735,12 @@ test('the project form lays its fields along a three-section rail with no native
     $dialog = '//dialog[contains(@class, "modal-shell")][.//*[@data-test="save-project-button"]]';
     $headings = array_map(
         fn (DOMNode $heading): string => trim($heading->textContent),
-        iterator_to_array($xpath->query($dialog.'//*[contains(@class, "form-section-heading")]')),
+        iterator_to_array($xpath->query($dialog.'//*[contains(@class, "form-section-title")]')),
     );
 
     expect($xpath->query($dialog)->length)->toBe(1)
         ->and($headings)->toBe(['Details', 'Placement', 'Beneficiaries'])
+        ->and($xpath->query($dialog.'//section[@data-optional]//*[contains(@class, "form-section-title")]')->item(0)?->textContent)->toBe('Beneficiaries')
         ->and($xpath->query($dialog.'//select')->length)->toBe(0)
         // Center, city and host center (the last two only while no center is chosen, W-01), program, owner.
         ->and($xpath->query($dialog.'//*[@data-form-select]')->length)->toBe(5)

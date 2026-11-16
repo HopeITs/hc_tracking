@@ -61,7 +61,7 @@
     .dk-card-t { grid-area: t; min-width: 0; font-size: 14px; font-weight: 700; line-height: 20px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
     .dk-card-m { grid-area: m; min-width: 0; font-size: 12.5px; color: var(--ink-3); line-height: 18px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
     .dk-card-row:not(:has(.dk-card-m)) > .dk-card-t { grid-row: 1 / -1; }
-    .dk-card-b { grid-area: b; justify-self: end; max-width: 132px; margin-inline-start: 10px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .dk-card-row > .dk-card-b { grid-area: b; justify-self: end; max-width: 132px; margin-inline-start: 10px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
     /* ── Record shapes (PageCard::layout) ─────────────────────────────
      * lead (.dk-card-l, data-kind): date · year · avatar · coin · code · rank · number · dot
@@ -139,8 +139,8 @@
     @container panel (max-width: 513px) { .dk-pagecard[data-rows="2"] .dk-card-pager { display: none; } }
 
     /* Narrow: the badge gives way before the record's name does */
-    @container pb (max-width: 279px) { .dk-card-b { max-width: 88px; } }
-    @container pb (max-width: 219px) { .dk-card-b { display: none; } }
+    @container pb (max-width: 279px) { .dk-card-row > .dk-card-b { max-width: 88px; } }
+    @container pb (max-width: 219px) { .dk-card-row > .dk-card-b { display: none; } }
     /* A narrow record with a bar: the bar's colour already says its state, so the pill gives its room to the name. */
     @container pb (max-width: 339px) {
         /* Where colour already says the state (a bar, an edge, a date leaf), the pill gives its room to the name. */

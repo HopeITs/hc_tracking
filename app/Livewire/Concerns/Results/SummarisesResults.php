@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace App\Livewire\Concerns\Results;
 
-use App\Enums\ResultType;
 use App\Models\Result;
 use Illuminate\Database\Eloquent\Collection;
 use Livewire\Attributes\Computed;
@@ -123,61 +122,5 @@ trait SummarisesResults
         }
 
         return $counts;
-    }
-
-    /**
-     * The visible statements as a grid: one row per program (or proposal
-     * framework), one column per level, each cell reduced to its worst status.
-     *
-     * Worst first: behind, then waiting, then needing an indicator, then on
-     * track. Rows that most need a hand come first, then by name.
-     *
-     * @return array{
-     *     levels: list<array{value: string, label: string}>,
-     *     rows: list<array{label: string, needs: int, cells: array<string, array{total: int, needs: int, worst: string}>}>,
-     *     totals: array<string, int>,
-     * }
-     */
-    #[Computed]
-    public function statusGrid(): array
-    {
-        $severity = ['behind' => 0, 'waiting' => 1, 'none' => 2, 'notarget' => 3, 'ontrack' => 4];
-        $totals = array_fill_keys(['ontrack', 'waiting', 'behind', 'none', 'notarget'], 0);
-        $rows = [];
-        $present = [];
-
-        foreach ($this->visibleNodes as $row) {
-            $status = $row['node']['measurement']['status'];
-            $level = $row['node']['result']->type->value;
-            $cell = $rows[$row['program']]['cells'][$level] ?? ['total' => 0, 'needs' => 0, 'worst' => 'ontrack'];
-
-            $cell['total']++;
-            $cell['needs'] += in_array($status, ['behind', 'waiting', 'none'], true) ? 1 : 0;
-            $cell['worst'] = $severity[$status] < $severity[$cell['worst']] ? $status : $cell['worst'];
-
-            $rows[$row['program']]['cells'][$level] = $cell;
-            $present[$level] = true;
-            $totals[$status]++;
-        }
-
-        $rows = collect($rows)
-            ->map(fn (array $group, string $label): array => [
-                'label' => $label,
-                'needs' => array_sum(array_column($group['cells'], 'needs')),
-                'cells' => $group['cells'],
-            ])
-            ->sort(fn (array $left, array $right): int => [$right['needs'], $left['label']] <=> [$left['needs'], $right['label']])
-            ->values()
-            ->all();
-
-        return [
-            'levels' => collect(ResultType::cases())
-                ->filter(fn (ResultType $case): bool => isset($present[$case->value]))
-                ->map(fn (ResultType $case): array => ['value' => $case->value, 'label' => $case->label()])
-                ->values()
-                ->all(),
-            'rows' => $rows,
-            'totals' => $totals,
-        ];
     }
 }

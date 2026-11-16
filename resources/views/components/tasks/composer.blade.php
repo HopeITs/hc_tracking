@@ -213,7 +213,7 @@
                         @if ($dueDate === '') data-empty @endif
                         x-on:input="filled = $el.value !== ''"
                         x-on:change="filled = $el.value !== ''"
-                        x-on:click="try { $el.showPicker() } catch (error) {}"
+                        x-on:click="$el.showPicker?.()"
                         data-test="{{ $testPrefix }}-due-date"
                     />
                 </label>
@@ -272,7 +272,7 @@
                             @if ($dateValue === '') data-empty @endif
                             x-on:input="filled = $el.value !== ''"
                             x-on:change="filled = $el.value !== ''"
-                            x-on:click="try { $el.showPicker() } catch (error) {}"
+                            x-on:click="$el.showPicker?.()"
                             data-test="{{ $testPrefix }}-{{ Illuminate\Support\Str::kebab($dateField) }}"
                         />
                     </label>

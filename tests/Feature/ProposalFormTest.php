@@ -973,3 +973,11 @@ test('editing a payroll proposal shows its narrative and a locked kind, and a se
     expect($proposal->fresh()->kind)->toBe(ProposalKind::Payroll)
         ->and($proposal->fresh()->narrative)->toBe('Volunteer salaries, equipment and running costs of the Micro Aleppo center.');
 });
+
+test('the create form shows every section at once with the section index and its optional parts marked', function () {
+    $html = openProposalCreateForm(userWithRole('Financial'))->html();
+
+    expect($html)->toContain('data-modal-index')
+        ->not->toContain('data-modal-steps')
+        ->and(substr_count($html, 'data-optional'))->toBe(2);
+});

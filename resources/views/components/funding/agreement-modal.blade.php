@@ -81,7 +81,7 @@
             </div>
         </x-ui.form-section>
 
-        <x-ui.form-section :title="__('funding_agreements.section_installments')" :fields="['installments', 'confirmInstallmentSum']" data-installments-editor>
+        <x-ui.form-section :title="__('funding_agreements.section_installments')" :optional="true" :fields="['installments', 'confirmInstallmentSum']" data-installments-editor>
             <div class="grid gap-3">
                 <p class="form-help">{{ __('funding_agreements.installments_help') }}</p>
 

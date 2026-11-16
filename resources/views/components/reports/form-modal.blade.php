@@ -72,7 +72,7 @@
             </div>
         </x-ui.form-section>
 
-        <x-ui.form-section :title="__('reports.section_narrative')" :fields="['periodStart', 'periodEnd', 'narrativeNotes']">
+        <x-ui.form-section :title="__('reports.section_narrative')" :optional="true" :fields="['periodStart', 'periodEnd', 'narrativeNotes']">
             <div class="grid grid-cols-2 gap-4">
                 <x-ui.form-input wire:model="periodStart" :label="__('reports.narrative_window_start')" type="date" />
                 <x-ui.form-input wire:model="periodEnd" :label="__('reports.narrative_window_end')" type="date" />
@@ -80,7 +80,7 @@
             </div>
         </x-ui.form-section>
 
-        <x-ui.form-section :title="__('reports.section_summary')" :fields="['keyAchievements', 'challenges', 'lessonsLearned', 'nextPeriodPlans']">
+        <x-ui.form-section :title="__('reports.section_summary')" :optional="true" :fields="['keyAchievements', 'challenges', 'lessonsLearned', 'nextPeriodPlans']">
             <div class="grid gap-4 @2xl/modal:grid-cols-2">
                 <x-ui.form-textarea wire:model="keyAchievements" :label="__('reports.key_achievements')" rows="2" />
                 <x-ui.form-textarea wire:model="challenges" :label="__('reports.challenges')" rows="2" />

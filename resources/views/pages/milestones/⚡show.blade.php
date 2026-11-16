@@ -658,7 +658,7 @@ new #[Layout('layouts::desk'), Title('titles.milestone')] class extends Componen
                 </div>
             </x-ui.form-section>
 
-            <x-ui.form-section :title="__('common.section_placement')" :fields="['relatedParentMilestoneId', 'relatedResponsibleUserId', 'relatedActivityId']">
+            <x-ui.form-section :title="__('common.section_placement')" :optional="true" :fields="['relatedParentMilestoneId', 'relatedResponsibleUserId', 'relatedActivityId']">
                 <div class="grid gap-x-4 gap-y-3 @2xl/modal:grid-cols-2">
                     <x-ui.form-select wire:model="relatedParentMilestoneId" :label="__('milestones.nest_under')" :search-label="__('milestones.search_milestones')">
                         <option value="">{{ __('common.top_level') }}</option>

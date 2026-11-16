@@ -28,6 +28,13 @@
             $yesNo = [['value' => '1', 'label' => __('indicator_library.yes')], ['value' => '0', 'label' => __('indicator_library.no')]];
         @endphp
 
+        <x-ui.form-section :title="__('indicator_library.section_name')" :fields="['entry.name_ar', 'entry.name_en']">
+            <div class="grid gap-x-4 gap-y-3 @2xl/modal:grid-cols-2">
+                <x-ui.form-input wire:model="entry.name_ar" :label="__('indicator_library.fields.name_ar')" maxlength="255" dir="rtl" lang="ar" required autofocus />
+                <x-ui.form-input wire:model="entry.name_en" :label="__('indicator_library.fields.name_en')" :help="__('indicator_library.name_en_help')" maxlength="255" dir="ltr" lang="en" />
+            </div>
+        </x-ui.form-section>
+
         <x-ui.form-section :title="__('indicator_library.section_placement')" :fields="['entry.institutional', 'entry.program_id', 'entry.level_ref']">
             <div class="grid gap-x-4 gap-y-3 @2xl/modal:grid-cols-2">
                 <x-ui.form-segmented
@@ -72,13 +79,6 @@
                         <p class="text-sm text-secondary-medium dark:text-ink-muted">{{ __('indicator_library.code_generated_on_save') }}</p>
                     @endif
                 </div>
-            </div>
-        </x-ui.form-section>
-
-        <x-ui.form-section :title="__('indicator_library.section_name')" :fields="['entry.name_ar', 'entry.name_en']">
-            <div class="grid gap-x-4 gap-y-3 @2xl/modal:grid-cols-2">
-                <x-ui.form-input wire:model="entry.name_ar" :label="__('indicator_library.fields.name_ar')" maxlength="255" dir="rtl" lang="ar" required autofocus />
-                <x-ui.form-input wire:model="entry.name_en" :label="__('indicator_library.fields.name_en')" :help="__('indicator_library.name_en_help')" maxlength="255" dir="ltr" lang="en" />
             </div>
         </x-ui.form-section>
 
@@ -137,7 +137,7 @@
             </div>
         </x-ui.form-section>
 
-        <x-ui.form-section :title="__('indicator_library.section_definition')" :fields="['entry.definition', 'entry.suggested_level', 'entry.data_source', 'entry.means_of_verification']">
+        <x-ui.form-section :title="__('indicator_library.section_definition')" :optional="true" :fields="['entry.definition', 'entry.suggested_level', 'entry.data_source', 'entry.means_of_verification']">
             <div class="grid gap-x-4 gap-y-3 @2xl/modal:grid-cols-2">
                 <x-ui.form-textarea wire:model="entry.definition" :label="__('indicator_library.fields.definition')" :help="__('indicator_library.definition_help')" rows="3" maxlength="5000" class="@2xl/modal:col-span-2" />
 
