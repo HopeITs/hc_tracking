@@ -132,6 +132,8 @@ trait CopiesProgramFramework
         $source = $this->copySourceId === null || $this->copySourceId === '' ? null : Result::query()->find((int) $this->copySourceId);
 
         if ($source === null) {
+            $this->showCopyModal = true;
+
             throw ValidationException::withMessages(['copySourceId' => __('results_framework.choose_a_framework_of_this_proposal')]);
         }
 
@@ -159,8 +161,19 @@ trait CopiesProgramFramework
         $this->showCopyConfirmModal = false;
     }
 
+    /**
+     * The picker's close action. x-ui.modal runs it on every close, also when
+     * Review hides the picker to open the confirmation: the choice then stays
+     * for copyFramework.
+     */
     public function closeCopyModal(): void
     {
+        if ($this->showCopyConfirmModal) {
+            $this->showCopyModal = false;
+
+            return;
+        }
+
         $this->showCopyModal = false;
         $this->showCopyConfirmModal = false;
         $this->copySourceId = null;
