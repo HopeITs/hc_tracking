@@ -118,6 +118,8 @@ trait ReadsProposalRegister
             ->when($this->currency !== '' && $canAgreements, fn (Builder $query) => $query->whereHas('donorProposals', fn (Builder $query) => $query->where('currency', $this->currency)))
             // A hold is a flag, not a status (W-06, D-58), so it filters here and not in the status picker. Not money: no permission gate.
             ->when($this->flag === 'on_hold', fn (Builder $query) => $query->whereNotNull('proposals.on_hold_since'))
+            // Without a center (W-34a slice 3): a project proposal with a place row that names no center, or with no place at all. Not money: no permission gate.
+            ->when($this->flag === 'no_center', fn (Builder $query) => $query->withoutCenter())
             ->when($this->flag === 'no_agreement' && $canAgreements, fn (Builder $query) => $query->doesntHave('donorProposals'))
             ->when($this->flag === 'report_overdue' && $canAgreements, fn (Builder $query) => $query->whereHas('donorProposals.reports', fn (Builder $query) => $query->whereNull('submitted_on')->whereDate('due_on', '<', $today)))
             ->when($this->flag === 'overdue' && $canTransfers, fn (Builder $query) => $query->whereHas('donorProposals.transfers', fn (Builder $query) => $query->inState('late')))

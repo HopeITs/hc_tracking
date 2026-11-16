@@ -6,8 +6,9 @@
     locations; concept note; planned dates; budget; starting stage (create only); notes last. Reordering
     the markup is what sets the tab order, so keep the submit button in the actions slot, after everything.
 
-    Locations still holds the project picker (`projectIds`); W-34a replaces its contents with location
-    rows. The concept note (W-24) offers the text and the document; neither is required, and the
+    Locations holds the location rows (W-34a slice 3, EditsProposalLocations): city, program or a new
+    program request, responsible and centers per row. A row of a linked project shows its city and
+    program locked. The concept note (W-24) offers the text and the document; neither is required, and the
     document is filed on the saved proposal, so a renewal — whose contents are copied, not typed — does
     not show the section at all.
 
@@ -15,9 +16,8 @@
     shows a Narrative section after Donor and leaves out Locations, the starting stage and the renewal
     preset; its attachment is filed on the proposal's Documents tab. On edit the kind is a locked chip.
 
-    Create chooses the projects (a server-searched picker, each row naming its center, program and city)
-    with a beneficiaries input beside each chosen one. Edit shows the linked projects with their
-    beneficiaries only: links change on the proposal page's Projects tab. The budget is rendered only for a
+    Below the rows, create shows the project it was opened from (New Concept Note) and edit the linked
+    projects, each with its beneficiaries input: links change on the proposal page's Projects tab. The budget is rendered only for a
     money holder; for anyone else the whole section is absent, not hidden.
 --}}
 @use('App\Enums\Currency')
@@ -31,7 +31,10 @@
     'donors' => [],
     'donorPending' => false,
     'canAddDonor' => false,
-    'pickerProjects' => [],
+    'locations' => [],
+    'cities' => [],
+    'programs' => [],
+    'centersByCity' => [],
     'chosenProjects' => [],
     'linkedProjects' => [],
     'showsMoney' => false,
@@ -49,8 +52,8 @@
     $isPayroll = $kind === ProposalKind::Payroll->value;
     $isRenewal = $renewal !== null && ! $isPayroll;
     $projectRows = $editing ? $linkedProjects : ($isRenewal ? $renewal['projects'] : $chosenProjects);
-    $chosenCount = count($chosenProjects);
     $projectsError = $errors->first('projectIds') ?: $errors->first('beneficiaries');
+    $locationsError = $errors->first('locations');
 
     /*
      * Which validation keys each section holds, in the order the sections
@@ -64,7 +67,14 @@
         ...($isPayroll
             ? [__('proposals.section_narrative') => ['narrative']]
             : [
-                __('proposals.section_locations') => ['projectIds', 'beneficiaries', 'beneficiariesReason', ...array_map(fn (array $row): string => 'beneficiaries.'.$row['id'], $projectRows)],
+                __('proposals.section_locations') => [
+                    'projectIds', 'locations', 'beneficiaries', 'beneficiariesReason',
+                    ...array_map(fn (array $row): string => 'beneficiaries.'.$row['id'], $projectRows),
+                    ...collect(array_keys($locations))->flatMap(fn (int $index): array => array_map(
+                        fn (string $field): string => "locations.{$index}.{$field}",
+                        ['city_id', 'program_id', 'responsible_employee_id', 'center_ids', 'new_program_name_en', 'new_program_name_ar'],
+                    ))->all(),
+                ],
                 __('proposals.concept_note.section') => ['conceptNote', 'conceptNoteFile'],
             ]),
         __('proposals.section_planned_dates') => ['plannedDateBegin', 'plannedDateEnd'],
@@ -235,52 +245,85 @@
             </x-ui.form-section>
         @endif
 
-        {{-- 3 · Locations. W-34a replaces the picker inside with its rows; the
-             section and its place in the order stay. Absent for payroll. --}}
+        {{-- 3 · Locations (W-34a slice 3): where the proposal runs, one row per city and
+             program, with the centers that run it. Absent for payroll. --}}
         @unless ($isPayroll)
         <x-ui.form-section
             :title="__('proposals.section_locations')"
-            :hint="$editing ? __('proposals.links_change_in_the_projects_tab') : __('proposals.beneficiaries_can_wait_until_the_proposal_review')"
+            :hint="$editing ? __('proposals.locations_hint_edit') : __('proposals.locations_hint_create')"
             :fields="$sectionFields[__('proposals.section_locations')]"
+            data-test="locations-section"
         >
             <div class="grid gap-y-3">
-                @unless ($editing || $isRenewal)
-                    <x-ui.form-field :label="__('proposals.projects_label')" for="proposal-project-picker" required :help="__('proposals.projects_label_help')" :error="$projectsError">
-                        <x-ui.multi-select-popover
-                            in-modal
-                            :searchable="false"
-                            :label="__('proposals.choose_projects')"
-                            id="proposal-project-picker"
-                            class="form-box cursor-pointer"
-                            :aria-invalid="$projectsError !== '' ? 'true' : null"
-                            data-test="proposal-project-picker"
-                        >
-                            <x-slot:trigger>
-                                <span class="min-w-0 flex-1 truncate">{{ $chosenCount > 0 ? __('common.count_selected', ['count' => $chosenCount]) : __('proposals.choose_projects') }}</span>
-                                <flux:icon.chevron-down variant="micro" class="size-4 shrink-0 {{ $mutedText }}" />
-                            </x-slot:trigger>
+                @unless ($isRenewal)
+                    @if ($locationsError !== '')
+                        <p class="text-sm text-status-critical" role="alert" data-test="locations-error">{{ $locationsError }}</p>
+                    @endif
 
-                            <div class="border-b border-secondary-soft p-1.5 dark:border-line">
-                                <x-ui.input type="search" size="sm" icon="magnifying-glass" wire:model.live.debounce.300ms="projectSearch" x-on:keydown.enter.prevent :aria-label="__('proposals.search_projects')" :placeholder="__('proposals.search_projects')" />
-                            </div>
+                    @if ($locations === [] && $editing)
+                        <p class="text-sm {{ $mutedText }}" data-test="locations-none-yet">{{ __('proposals.locations_none_yet') }}</p>
+                    @endif
 
-                            <div wire:loading.class="opacity-60" wire:target="projectSearch">
-                                @forelse ($pickerProjects as $row)
-                                    <label class="flex cursor-pointer items-start gap-2 rounded-md px-2 py-1.5 text-start text-sm hover:bg-secondary-soft dark:hover:bg-white/[0.06]" wire:key="proposal-picker-{{ $row['id'] }}" data-picker-project="{{ $row['id'] }}">
-                                        <input type="checkbox" wire:model.live="projectIds" value="{{ $row['id'] }}" class="mt-0.5 size-4 shrink-0 accent-primary" />
-                                        <span class="min-w-0">
-                                            <span class="block truncate font-medium text-secondary-dark dark:text-ink" dir="auto">{{ $row['name'] }}</span>
-                                            <span class="block truncate text-xs {{ $mutedText }}">{{ $row['place'] }}</span>
-                                            <x-projects.host-center-badge :host-name="$row['hosted']" class="mt-0.5" />
-                                            <x-projects.center-inactive-badge :inactive="$row['centerInactive']" class="mt-0.5" />
-                                        </span>
-                                    </label>
-                                @empty
-                                    <p class="px-2 py-3 text-sm {{ $mutedText }}">{{ __('proposals.no_linkable_project_matches') }}</p>
-                                @endforelse
-                            </div>
-                        </x-ui.multi-select-popover>
-                    </x-ui.form-field>
+                    <ol class="grid gap-3" data-proposal-locations>
+                        @foreach ($locations as $index => $location)
+                            @php
+                                $isLinked = $location['project'] !== null;
+                                $cityCenters = $location['city_id'] === '' ? [] : ($centersByCity[(int) $location['city_id']] ?? []);
+                                $isNewProgram = $location['program_id'] === 'new';
+                            @endphp
+                            <li class="grid gap-x-4 gap-y-3 rounded-lg border border-secondary-soft p-3 @2xl/modal:grid-cols-2 dark:border-line" wire:key="proposal-location-{{ $location['key'] }}" data-proposal-location="{{ $index }}">
+                                <div class="flex items-center justify-between gap-2 @2xl/modal:col-span-2">
+                                    <p class="min-w-0 truncate text-sm font-semibold text-secondary-dark dark:text-ink">
+                                        {{ __('proposals.location_row_title', ['number' => $index + 1]) }}
+                                        @if ($isLinked)
+                                            <span class="ms-1 text-xs font-normal {{ $mutedText }}" dir="auto" data-test="location-linked-project">{{ __('proposals.location_linked_project', ['name' => $location['project']]) }}</span>
+                                        @endif
+                                    </p>
+                                    @unless ($isLinked)
+                                        <x-ui.button type="button" tone="ghost" size="sm" icon="x-mark" class="size-9! shrink-0" wire:click="removeLocationRow({{ $index }})" :aria-label="__('proposals.remove_location', ['number' => $index + 1])" data-test="remove-location" />
+                                    @endunless
+                                </div>
+
+                                <x-ui.form-select wire:model.live="locations.{{ $index }}.city_id" :label="__('proposals.location_city')" :placeholder="__('proposals.location_select_city')" required :disabled="$isLinked" :locked-reason="$isLinked ? __('proposals.location_linked_place_locked') : null">
+                                    @foreach ($cities as $city)
+                                        <option value="{{ $city->id }}">{{ $city->name }}</option>
+                                    @endforeach
+                                </x-ui.form-select>
+
+                                <x-ui.form-select wire:model.live="locations.{{ $index }}.program_id" :label="__('proposals.location_program')" :placeholder="__('proposals.location_select_program')" required :disabled="$isLinked" :locked-reason="$isLinked ? __('proposals.location_linked_place_locked') : null">
+                                    @foreach ($programs as $program)
+                                        <option value="{{ $program->id }}">{{ $program->name }}</option>
+                                    @endforeach
+                                    <option value="new">{{ __('proposals.location_new_program') }}</option>
+                                </x-ui.form-select>
+
+                                @if ($isNewProgram)
+                                    <x-ui.form-input wire:model="locations.{{ $index }}.new_program_name_en" :label="__('proposals.location_program_name_en')" maxlength="255" required dir="ltr" />
+                                    <x-ui.form-input wire:model="locations.{{ $index }}.new_program_name_ar" :label="__('proposals.location_program_name_ar')" maxlength="255" required dir="rtl" />
+                                @endif
+
+                                <x-ui.form-select wire:model="locations.{{ $index }}.responsible_employee_id" :label="__('proposals.location_responsible')" :placeholder="__('proposals.location_select_responsible')" :help="__('proposals.location_responsible_help')" employees />
+
+                                <div wire:key="proposal-location-centers-{{ $location['key'] }}-{{ $location['city_id'] }}">
+                                    <x-ui.form-multiselect
+                                        wire:model="locations.{{ $index }}.center_ids"
+                                        :label="__('proposals.location_centers')"
+                                        :placeholder="__('proposals.location_select_centers')"
+                                        :help="$location['city_id'] === '' ? __('proposals.location_choose_city_first') : ($cityCenters === [] ? __('proposals.location_no_centers_in_city') : ($needsBeneficiariesReason ? __('proposals.location_centers_help_approved') : __('proposals.location_centers_help')))"
+                                        :disabled="$cityCenters === []"
+                                    >
+                                        @foreach ($cityCenters as $center)
+                                            <option value="{{ $center['id'] }}">{{ $center['name'] }}</option>
+                                        @endforeach
+                                    </x-ui.form-multiselect>
+                                </div>
+                            </li>
+                        @endforeach
+                    </ol>
+
+                    <div>
+                        <x-ui.button type="button" tone="secondary" size="sm" icon="plus" wire:click="addLocationRow" data-test="add-location">{{ __('proposals.add_location') }}</x-ui.button>
+                    </div>
                 @endunless
 
                 @if ($projectRows !== [])
