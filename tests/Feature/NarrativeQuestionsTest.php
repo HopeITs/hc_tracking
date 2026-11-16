@@ -121,7 +121,10 @@ describe('the page', function () {
         $arrows = (new DOMXPath($dom))->query('//*[@data-test="move-narrative-question-up" or @data-test="move-narrative-question-down"]');
         expect($arrows->length)->toBe(2);
         foreach ($arrows as $arrow) {
-            expect($arrow->hasAttribute('disabled'))->toBeTrue();
+            expect($arrow->hasAttribute('disabled'))->toBeTrue()
+                // A disabled button takes no pointer events, so the reason must sit on the wrapper the pointer reaches.
+                ->and($arrow->parentNode->getAttribute('data-test'))->toBe('move-narrative-question-arrows')
+                ->and($arrow->parentNode->getAttribute('title'))->toBe(__('narrative_questions.clear_to_reorder'));
         }
 
         $page->set('search', 'ثان')->assertSee('Second one')
@@ -130,6 +133,7 @@ describe('the page', function () {
             ->assertSeeHtml('data-test="empty-reset-filters"')
             ->call('clearFilters')
             ->assertSet('search', '')
+            ->assertDontSee(__('narrative_questions.clear_to_reorder'))
             ->assertSee('First one');
     });
 

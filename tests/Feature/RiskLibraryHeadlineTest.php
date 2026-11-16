@@ -53,7 +53,10 @@ it('searches by title or category and keeps each entry\'s place in the whole lib
     $arrows = (new DOMXPath($dom))->query('//*[@data-test="move-entry-up" or @data-test="move-entry-down"]');
     expect($arrows->length)->toBe(2);
     foreach ($arrows as $arrow) {
-        expect($arrow->hasAttribute('disabled'))->toBeTrue();
+        expect($arrow->hasAttribute('disabled'))->toBeTrue()
+            // A disabled button takes no pointer events, so the reason must sit on the wrapper the pointer reaches.
+            ->and($arrow->parentNode->getAttribute('data-test'))->toBe('move-entry-arrows')
+            ->and($arrow->parentNode->getAttribute('title'))->toBe(__('risk_library.clear_to_reorder'));
     }
 
     $page->set('search', 'zzz-no-match')
@@ -61,6 +64,7 @@ it('searches by title or category and keeps each entry\'s place in the whole lib
         ->assertSeeHtml('data-test="empty-reset-filters"')
         ->call('clearFilters')
         ->assertSet('search', '')
+        ->assertDontSee(__('risk_library.clear_to_reorder'))
         ->assertSee('Fresh risk');
 });
 
