@@ -65,6 +65,7 @@
 
 <div
     {{ $attributes }}
+    id="framework-result-{{ $result->id }}"
     data-tree-depth="{{ $depth }}"
     data-result-type="{{ $result->type->value }}"
     x-data="{ branchOpen: true, measuresOpen: {{ $indicatorCount > 0 && $indicatorCount <= 4 ? 'true' : 'false' }} }"

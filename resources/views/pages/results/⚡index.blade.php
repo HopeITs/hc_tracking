@@ -45,7 +45,7 @@ new #[Layout('layouts::desk'), Title('titles.results_framework')] class extends 
     #[Url(except: '')]
     public string $focus = '';
 
-    /** 'list' draws the framework, 'chart' counts the same statements by status. */
+    /** 'list' draws the framework as cards, 'tree' as a top-down logframe diagram. */
     #[Url(except: 'list')]
     public string $view = 'list';
 
@@ -108,7 +108,7 @@ new #[Layout('layouts::desk'), Title('titles.results_framework')] class extends 
     $overview = $this->overview;
 @endphp
 
-<x-desk.register class="@container/directory" heading-id="results-framework-heading" :title="__('common.results_framework')" :count="$overview['statements']" :views="['list' => ['icon' => 'table', 'label' => __('results_framework.view_as_list'), 'test' => 'results-view-list'], 'chart' => ['icon' => 'chart', 'label' => __('results_framework.view_as_chart'), 'test' => 'results-view-chart']]" :view="$view">
+<x-desk.register class="@container/directory" heading-id="results-framework-heading" :title="__('common.results_framework')" :count="$overview['statements']" :views="['list' => ['icon' => 'list', 'label' => __('results_framework.view_as_list'), 'test' => 'results-view-list'], 'tree' => ['icon' => 'subtask', 'label' => __('results_framework.view_as_tree'), 'test' => 'results-view-tree']]" :view="$view">
         <x-slot:search>
             <x-desk.register-search :label="__('results_framework.search_the_framework')" :placeholder="__('results_framework.statement_or_indicator_name')" wire:model.live.debounce.300ms="search" />
         </x-slot:search>
@@ -176,8 +176,8 @@ new #[Layout('layouts::desk'), Title('titles.results_framework')] class extends 
                 </x-slot:action>
             </x-ui.empty-state>
         </x-ui.panel>
-    @elseif ($view === 'chart')
-        @include('pages.results._index-chart')
+    @elseif ($view === 'tree')
+        @include('pages.results._index-tree')
     @else
         @include('pages.results._index-cascade')
     @endif
