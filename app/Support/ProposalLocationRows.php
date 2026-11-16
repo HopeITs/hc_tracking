@@ -25,7 +25,8 @@ use Illuminate\Database\Eloquent\Collection;
  * `(proposal_id, city_id, program_id)` leaves "no program yet" rows alone,
  * so the application keeps at most one of those per city. Rows that carry a
  * project are owned by the link: a replacement updates them but never
- * deletes them, only UnlinkProposalProject does.
+ * deletes them, only UnlinkProposalProject does. After approval only
+ * fillEmpty writes: centers or `city_wide` on a row that has neither (D-83).
  */
 final class ProposalLocationRows
 {
@@ -104,6 +105,40 @@ final class ProposalLocationRows
 
             if (! isset($kept[$row->id])) {
                 $next++;
+            }
+        }
+
+        return $counts;
+    }
+
+    /**
+     * Fill the rows of an approved proposal (D-83, D-88): a row with no
+     * center and not city-wide gains the sent centers or is marked
+     * city-wide; every other row is left exactly as it is, and no row is
+     * added, removed or linked to a project (D-74). SaveProposal has already
+     * refused any other difference. `changed` counts the rows filled.
+     *
+     * @param  list<array{city_id: int|null, program_id: int|null, center_ids: list<int>, city_wide?: bool}>  $rows
+     * @return array{added: int, removed: int, changed: int}
+     */
+    public function fillEmpty(Proposal $locked, array $rows): array
+    {
+        $existing = $this->existingByKey($locked);
+        $counts = ['added' => 0, 'removed' => 0, 'changed' => 0];
+
+        foreach ($rows as $sent) {
+            $row = $existing[$this->key((int) $sent['city_id'], $sent['program_id'])] ?? null;
+
+            if ($row === null || $row->city_wide || $row->centerIds() !== []) {
+                continue;
+            }
+
+            if ($sent['city_wide'] ?? false) {
+                $row->forceFill(['city_wide' => true])->save();
+                $counts['changed']++;
+            } elseif ($sent['center_ids'] !== []) {
+                $this->writeCenters($row, $sent['center_ids']);
+                $counts['changed']++;
             }
         }
 

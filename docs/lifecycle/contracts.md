@@ -193,6 +193,8 @@ SyncReportTask::handle(DonorReport $report): ?Task
     // No Gate: the caller (the report action) has already authorised.
 ```
 
+**Post-approval center fill (Y-01, D-83).** On a proposal whose status `isApprovedByDonor()`, `SaveProposal` accepts `locations[]` only as a fill: a row that has **no center and is not city-wide** may gain centers **or** be marked `city_wide`; a row that already has a center or is city-wide is unchanged. Changing or removing a center, or changing a row's city, program or responsible, is refused (`proposals.location_locked_after_approval`). No reason is asked. The change is recorded as `proposal.locations_changed` with the counts; no project is created or linked by this edit (D-74).
+
 ## §7 Schema owned by Team A (frozen at CP1)
 **T03:**
 - `proposals`: `donor_id` (NOT NULL, FK `donors` restrictOnDelete), `requested_budget` decimal(14,2) null, `requested_currency` varchar(10) null (`Currency`), `status_remind_on` date null, `approval_note` text null (D-26), `final_report_accepted_on` date null, `final_report_accepted_by` FK `users` null nullOnDelete (D-02c), `previous_proposal_id` self FK null nullOnDelete, indexed (renewal chain, T10; cycle guard in T10). Unique `proposals(id, donor_id)`.

@@ -6,6 +6,7 @@ use App\Livewire\Concerns\ManagesAgreementForm;
 use App\Livewire\Concerns\ManagesTransferForm;
 use App\Livewire\Concerns\PreviewsFiles;
 use App\Livewire\Concerns\Proposals\ChartsProposalChronology;
+use App\Livewire\Concerns\Proposals\FillsProposalCenters;
 use App\Livewire\Concerns\Proposals\ManagesFinalReportAcceptance;
 use App\Livewire\Concerns\Proposals\ManagesNegotiationNotes;
 use App\Livewire\Concerns\Proposals\ManagesProposalApproval;
@@ -42,6 +43,7 @@ new #[Layout('layouts::desk'), Title('titles.proposal')] class extends Component
     use BuildsProposalPlanGantt;
     use ChartsProposalChronology;
     use ChecksFinanceVisibility;
+    use FillsProposalCenters;
     use ManagesAgreementForm;
     use ManagesFinalReportAcceptance;
     use ManagesNegotiationNotes;
@@ -112,6 +114,13 @@ new #[Layout('layouts::desk'), Title('titles.proposal')] class extends Component
     #[Url(as: 'record_agreement', except: false)]
     public bool $recordAgreementLink = false;
 
+    /**
+     * Deep link from the "Missing a center" list: opens the Add centers
+     * editor once for a proposal that may take it, then clears itself.
+     */
+    #[Url(as: 'add-centers', except: false)]
+    public bool $addCentersLink = false;
+
     public function mount(Proposal $proposal): void
     {
         $this->proposalId = $proposal->id;
@@ -129,6 +138,13 @@ new #[Layout('layouts::desk'), Title('titles.proposal')] class extends Component
         }
 
         $this->recordAgreementLink = false;
+
+        if ($this->addCentersLink && $this->canFillCenters) {
+            $this->tab = 'projects';
+            $this->openCenterFill();
+        }
+
+        $this->addCentersLink = false;
 
         $this->openExtensionFromLink();
     }
@@ -342,6 +358,7 @@ new #[Layout('layouts::desk'), Title('titles.proposal')] class extends Component
             $this->projectFiles, $this->conceptNoteFiles, $this->documents, $this->deadlines, $this->warnings, $this->lifecycle, $this->chronology,
             $this->arrivals, $this->vitals, $this->term, $this->tabs, $this->proposalFiles, $this->reviewStages, $this->needAssessments, $this->approvalSubject, $this->approvalPreview, $this->approvalLocations,
             $this->canRecordFinalReportAcceptance, $this->finalReportAcceptance,
+            $this->canFillCenters, $this->centerFillRows, $this->centerFillCentersByCity,
         );
     }
 };

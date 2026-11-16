@@ -7,7 +7,13 @@
     whose host defines $mutedText and $inkText.
 --}}
 <section class="mb-8" aria-labelledby="proposal-locations-title" data-test="locations-chapter">
-    <h3 id="proposal-locations-title" class="type-label {{ $mutedText }}">{{ __('proposals.locations_chapter_title') }}</h3>
+    <div class="flex flex-wrap items-center justify-between gap-2">
+        <h3 id="proposal-locations-title" class="type-label {{ $mutedText }}">{{ __('proposals.locations_chapter_title') }}</h3>
+
+        @if ($this->canFillCenters)
+            <x-ui.button type="button" tone="secondary" size="sm" icon="plus" class="min-h-10 touch-manipulation" wire:click="openCenterFill" data-test="add-centers">{{ __('proposals.add_centers') }}</x-ui.button>
+        @endif
+    </div>
 
     @if ($this->locationRows === [])
         <p class="mt-2 text-sm {{ $mutedText }}" data-test="locations-chapter-empty">{{ __('proposals.locations_chapter_empty') }}</p>
