@@ -33,7 +33,7 @@ Two findings that shape the order:
 
 | # | Decision | Status | Blocks |
 |---|---|---|---|
-| D-74 | **`projects` stays, nothing new depends on it.** No table is dropped and no `project_id` column is removed. Code written in wave 4 adds no foreign key to `projects` and no new read of `projects` or `project_proposal`. Where an existing table still needs the project (per-center targets, coverage), the read goes through one bridge class, `App\Support\Reporting\PlaceBridge`, and nowhere else. | Signed | all |
+| D-74 | **`projects` stays, nothing new depends on it.** No table is dropped and no `project_id` column is removed. Code written in wave 4 adds no foreign key to `projects` and no new read of `projects` or `project_proposal`. Where an existing table still needs the project (per-center targets, coverage), the read goes through one bridge class, `App\Support\Reporting\PlaceBridge`, and nowhere else. **Revised 16 Nov by D-92:** the table does not stay; this rule holds for Stage A (Y-01…Y-10) and until Y-18 drops it. | Signed | all |
 | D-75 | **A place = city + program + center.** Same city, same program and same center is one place. A program that works **in the field** in a city, with no center, is the **city-wide** place of that city and program (D-88). | Signed | Y-02 |
 | D-76 | **The template is the reporting unit.** A template belongs to one place and to one or more proposals. One monthly report per template per month. | Signed | Y-02, Y-03 |
 | D-77 | **MEAL chooses on approval.** Either join the new proposal to a template that already exists at the same place and pick which of its indicators are added (the center manager keeps entering one report), or create a new template (the center manager enters two reports that month). | Signed | Y-04 |
@@ -51,6 +51,9 @@ Two findings that shape the order:
 | D-89 | **Change request.** An approved proposal can still change, but only through a change request: the PR team opens it on the proposal, states what changes and **why** (reason required), and the change is recorded under that name with who, when, the reason and the before / after values. It covers a center changed or removed, a row's city, program or responsible, and any other field of the proposal that is editable after approval today. The one-time fill of D-83 is not a change request. | Signed (13 Nov) | Y-09 |
 | D-90 | **A target belongs to the row; its centers reach it together.** When a location row has several centers (two Zone centers in Homs), a target of that row is **one shared target**: every center of the row carries it as a line in its own template and reports its own figure, and achievement is the centers' validated figures together (counts summed, ratios pooled) against the one target value. Nobody splits the target between centers and no center is guessed for it. A row with one center, or a field-work row, has its target at that one place as before. | Signed (13 Nov) | Y-02, Y-08, Y-03, Y-05 |
 | D-91 | **Targets are entered per location row, not per center.** In the proposal's targets grid MEAL enters one target per indicator per row (city × program). A row with several centers has one target for them together (D-90); the grid offers no per-center column and no way to split a target. Annual-plan targets (D-44) are not changed. | Signed (13 Nov) | Y-10 |
+| D-92 | **The `projects` table is dropped in wave 4.** It will not remain physically. Stage A (Y-01…Y-10) takes reporting off it; Stage B (Y-11…Y-18, §2) moves every other module and ends with the drop. Until Y-18, legacy `project_id` columns are still written so untouched readers keep working. | Signed (16 Nov) | Y-11…Y-18 |
+| D-93 | **The location row takes the project's place.** Milestones, tasks, risks and everything else that belonged to a project belong to a **location row** of a proposal (city × program, `proposal_locations`). A row is of one proposal: nothing is shared across proposals any more. | Signed (16 Nov) | Y-11…Y-17 |
+| D-94 | **A project funded by several proposals: where do its milestones and risks go?** Today 13 of 36 projects are carried by rows of two or more proposals, with 29 milestones and 9 risks on them. **Ruled: by date.** Each goes to the row of the proposal whose period covers its date (a milestone: its planned start; a risk: the day it was identified, else the day it was recorded); when none or several cover it, to the row of the most recent proposal; the dry run lists every case and nothing is copied. Tasks follow their milestone. | Signed (16 Nov) | Y-12, Y-13 |
 | D-89a | **A change request needs approval.** The PR team opens it (`proposals.update`); it changes **nothing** until the **PR Manager** approves it (holders of `proposals.approve`, D-70). Before that decision the request is **reviewed** by the Finance Manager and the MEAL Manager (the `finance_manager` and `meal_manager` slots): each records "no objection" or "remarks" with a note. The PR Manager can approve only once both reviews are in, sees them on the decision screen, and still decides alone; a review with remarks does not block. Reject is possible at any time. A slot with no active holder is skipped and recorded as such. Approve applies the change; reject keeps the proposal as it was and asks a reason. One request may be open per proposal at a time. A PR Manager who opens a request may approve it themself: no second approver exists for that role. A change that would move or remove a center whose template already has a **submitted or validated** monthly report is refused when it is opened and again when it is approved. *Ruled against the recommendation (which was: no approver).* | Signed (13 Nov) | Y-09 |
 
 ---
@@ -70,15 +73,41 @@ Two findings that shape the order:
 | Y-07 | **MEAL edits the template's narrative questions.** | Y-02, D-78 | M · 2 slices | [task](https://app.clickup.com/t/123jdbat8bw) |
 | Y-09 | **Change request on an approved proposal.** The PR team asks for a change to an approved proposal (centers, rows, other fields) with a reason; the Finance Manager and the MEAL Manager review it; the PR Manager approves or rejects it; the proposal page lists its change requests. | Y-01, Y-02, D-89, D-89a | L · 2 slices | — |
 
-Order: Y-01 → Y-02 → Y-08 → Y-10 → Y-03 → (Y-04 ‖ Y-05) → Y-06 → Y-07 → Y-09. Y-01 slice 1 touches only the proposal form and can start today; everything from Y-02 on changes `[contract]` §12.1, §12.4 and §13. All decisions D-74…D-91 are signed.
+Order: Y-01 → Y-02 → Y-08 → Y-10 → Y-03 → (Y-04 ‖ Y-05) → Y-06 → Y-07 → Y-09. Y-01 slice 1 touches only the proposal form and can start today; everything from Y-02 on changes `[contract]` §12.1, §12.4 and §13. All decisions D-74…D-94 are signed.
 
 Between Y-01 and Y-02 there is a **human step**: the team gives every row of the 36 existing proposals its centers, or marks it city-wide, through the form. Y-01 slice 3 gives them the list.
+
+### Stage B · Leaving `projects` (D-92, D-93, D-94)
+
+Stage A (Y-01…Y-10) moves reporting off `projects`. Stage B moves everything else to the location row and ends by dropping the table. Its common rules are in `wave4/AGENT.md §8`.
+
+Measured on `main` (16 Nov 2026): about 35 tables carry or reach `project_id`; over 100 files under `app/` name `Project`; 167 test files build one; the `projects` pages have 23 partials. Local data: 36 projects, 52 location rows, **13 projects carried by rows of two or more proposals** (29 of 53 milestones and 9 of 37 risks sit on them), 2 projects with no row at all.
+
+**How it is done.** Mirror first, flip later: Y-11 makes each row a faithful copy of its project while `projects` is still the writer; Y-12…Y-16 move one module at a time, checking the mirror at each step; Y-17 makes the row the only writer; Y-18 drops the table.
+
+| # | Item | Depends on | Size |
+|---|---|---|---|
+| Y-11 | **The location row carries what the project carried.** Status, period, working days, owner and acknowledgement, target beneficiaries, sectors, files. `ProjectSuccessor` (the one project → row mapper, D-94) and the mirror. Nothing a user sees changes. | Y-01, Y-03, D-92, D-93, D-94 | XL · 2 slices |
+| Y-12 | **Milestones, tasks and the schedule move to the row.** `milestones`, the `project` task source, `schedule_dependencies`, `schedule_baselines`, the Gantt, the calendar. | Y-11, D-94 | XL · 3 slices |
+| Y-13 | **Risks move to the row.** The register only; logframe risks already belong to a proposal. | Y-11, D-94 | L · 2 slices |
+| Y-14 | **MEAL coverage moves to places.** An officer covers a governorate or a place (program + center or field work), not a project; every "who is the MEAL officer here" lookup follows. | Y-02, Y-03, Y-11, D-84 | L · 2 slices |
+| Y-15 | **Activity plan pieces move to the row.** The calendar override (D-49), activity statuses (D-51), plan updates and follow-up tasks. | Y-06, Y-11, Y-14 | L · 3 slices |
+| Y-16 | **Every remaining reader.** Indicators, targets and figures; the Projects pages (now listing rows); notifications; the Desk, the calendar, program pages. | Y-11…Y-15 | XL · 4 slices |
+| Y-17 | **The row becomes the writer.** Approval creates no project; activate, close, archive, files act on the row; link / unlink and the open-project rule are removed. | Y-11…Y-16 | XL · 3 slices |
+| Y-18 | **Drop.** Tests and seeders stop building projects; the legacy `project_id` columns and the `project` morph key go; then `project_sector`, `project_proposal`, `projects`. Not reversible: Dev 1 runs it in production after a backup. | Y-17 | XL · 3 slices |
+
+Order: Y-11 → (Y-12 ‖ Y-13) → Y-14 → Y-15 → Y-16 → Y-17 → Y-18. Stage B starts only after Y-03 is merged. Y-12 and Y-13 may run side by side (different tables and pages); everything else runs alone.
+
+Three choices made in the prompts, to confirm or overrule before Y-11 starts:
+- **Coverage is by place, not by row** (Y-14): an officer keeps their centers when a proposal ends.
+- **"Create a project by hand" is removed** (Y-16, Y-17): a project without a proposal no longer exists (D-84, D-87).
+- **The open-project rule is withdrawn** (Y-17): two proposals may each have a row at the same place; MEAL decides whether they share a report (D-77).
 
 ---
 
 ## 3. What wave 4 does not do
 
-- Drop `projects`, `project_proposal`, or any `project_id` column.
-- Move MEAL coverage, milestones, tasks or risks off `projects`.
-- Change the donor report (`DonorReport`) or its aggregation, beyond reading the new filters where Y-05 says so.
-- Change `MaterialiseProposalLocations`: an approval still creates its projects, so every module outside reporting keeps working.
+- Drop `projects`, `project_proposal`, or any `project_id` column **before Y-18** (D-92): Stage A tasks keep and still write them.
+- Share a milestone, a task or a risk between proposals (D-93).
+- Change the donor report (`DonorReport`) or its figures. Y-05 reads the new filters; Y-16 changes what the aggregator groups by (places instead of projects) and proves the totals are the same.
+- Change `MaterialiseProposalLocations` **before Y-17**: until then an approval still creates its projects, so every module not yet moved keeps working.
