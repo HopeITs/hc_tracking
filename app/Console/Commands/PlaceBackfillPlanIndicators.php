@@ -77,7 +77,7 @@ class PlaceBackfillPlanIndicators extends Command
             }
 
             $projectCenter = $project->center_id === null ? null : (int) $project->center_id;
-            $answers = $target->source_type === 'proposal' ? $this->rowAnswers((int) $target->source_id, (int) $target->project_id) : [];
+            $answers = $this->rowAnswers($target->source_type === 'proposal' ? (int) $target->source_id : null, (int) $target->project_id);
 
             $centerId = $projectCenter;
             $cityWide = false;
@@ -87,13 +87,14 @@ class PlaceBackfillPlanIndicators extends Command
             $noRow = false;
 
             if ($projectCenter !== null) {
-                $disagree = collect($answers)->contains(fn (array $answer): bool => $answer['center_ids'] !== [] && ! in_array($projectCenter, $answer['center_ids'], true));
+                $disagree = $target->source_type === 'proposal'
+                    && collect($answers)->contains(fn (array $answer): bool => $answer['center_ids'] !== [] && ! in_array($projectCenter, $answer['center_ids'], true));
                 $centerId = $disagree ? null : $projectCenter;
-            } elseif ($target->source_type === 'proposal') {
-                $noRow = $answers === [];
+            } else {
+                $noRow = $target->source_type === 'proposal' && $answers === [];
                 $disagree = count($answers) > 1;
 
-                if (! $noRow && ! $disagree) {
+                if ($answers !== [] && ! $disagree) {
                     $answer = array_values($answers)[0];
                     $cityWide = $answer['city_wide'];
                     $centerIds = $answer['center_ids'];
@@ -153,21 +154,26 @@ class PlaceBackfillPlanIndicators extends Command
             'with_place' => $rows->count(),
             'with_center' => $rows->filter(fn (array $row): bool => $row['center_id'] !== null)->count(),
             'city_wide' => $rows->filter(fn (array $row): bool => $row['city_wide'])->count(),
-            'shared' => $rows->filter(fn (array $row): bool => $row['all_centers'])->count(),
             'without_center' => $rows->filter(fn (array $row): bool => $row['center_id'] === null && ! $row['city_wide'] && ! $row['all_centers'])->count(),
+            'shared' => $rows->filter(fn (array $row): bool => $row['all_centers'])->count(),
             'without_project' => $withoutProject,
         ];
     }
 
     /**
-     * What each row carrying the project says, de-duplicated by its centers.
+     * What each row carrying the project says, de-duplicated by its centers:
+     * the proposal's rows for a proposal target, every row for an annual-plan
+     * target (as on main, Dev 1, 17 Nov).
      *
      * @return array<string, array{center_ids: list<int>, city_wide: bool}>
      */
-    private function rowAnswers(int $proposalId, int $projectId): array
+    private function rowAnswers(?int $proposalId, int $projectId): array
     {
         $answers = [];
-        $rows = DB::table('proposal_locations')->where('proposal_id', $proposalId)->where('project_id', $projectId)->get(['id', 'city_wide']);
+        $rows = DB::table('proposal_locations')
+            ->where('project_id', $projectId)
+            ->when($proposalId !== null, fn ($query) => $query->where('proposal_id', $proposalId))
+            ->get(['id', 'city_wide']);
 
         foreach ($rows as $row) {
             $centerIds = array_values(array_map(intval(...), DB::table('proposal_location_centers')->where('proposal_location_id', $row->id)->orderBy('center_id')->pluck('center_id')->all()));

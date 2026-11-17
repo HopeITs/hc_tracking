@@ -10,6 +10,7 @@ use App\Enums\IndicatorMeasure;
 use App\Enums\Period;
 use App\Enums\ReportStatus;
 use App\Notifications\TracksActivity;
+use App\Support\Reporting\ReportPlace;
 use Carbon\CarbonImmutable;
 use Database\Factories\PlanIndicatorFactory;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
@@ -35,15 +36,31 @@ use InvalidArgumentException;
  * @property string $target
  * @property string|null $target_population
  * @property int|null $project_id
+ * @property int|null $city_id
+ * @property int|null $program_id
+ * @property int|null $center_id
+ * @property bool $city_wide
+ * @property bool $all_centers
  * @property Period $period
  * @property CarbonImmutable|null $created_at
  * @property CarbonImmutable|null $updated_at
  */
-#[Fillable(['source_type', 'source_id', 'indicator_id', 'target', 'target_population', 'project_id', 'period'])]
+#[Fillable(['source_type', 'source_id', 'indicator_id', 'target', 'target_population', 'project_id', 'city_id', 'program_id', 'center_id', 'city_wide', 'all_centers', 'period'])]
 class PlanIndicator extends Model implements TracksActivity
 {
     /** @use HasFactory<PlanIndicatorFactory> */
     use HasFactory, RecordsActivity;
+
+    /**
+     * Mirror the column defaults so a target that has not been round-tripped
+     * through the database still reports them under strict mode.
+     *
+     * @var array<string, mixed>
+     */
+    protected $attributes = [
+        'city_wide' => false,
+        'all_centers' => false,
+    ];
 
     /**
      * The plan or proposal this target was committed in.
@@ -76,6 +93,73 @@ class PlanIndicator extends Model implements TracksActivity
     public function project(): BelongsTo
     {
         return $this->belongsTo(Project::class);
+    }
+
+    /**
+     * The place this target reports for (D-75, Y-08), read from its own
+     * columns. Null for a target with no city, no program, or a shared target
+     * (D-90), which has no single place. A target with a city and a program
+     * but neither a center nor the city-wide flag has an unset place (D-82),
+     * which equals nothing.
+     */
+    public function place(): ?ReportPlace
+    {
+        if ($this->city_id === null || $this->program_id === null || $this->all_centers) {
+            return null;
+        }
+
+        return new ReportPlace($this->city_id, $this->program_id, $this->center_id, $this->city_wide);
+    }
+
+    /**
+     * Whether the target reports at the place: its own place equals it, or it
+     * is a shared target (D-90) and the place's center is one of the centers
+     * of its proposal's location row for that city and program.
+     */
+    public function coversPlace(ReportPlace $place): bool
+    {
+        $own = $this->place();
+
+        if ($own !== null) {
+            return $own->equals($place);
+        }
+
+        if (! $this->all_centers || $this->city_id === null || $this->program_id === null || $this->source_type !== 'proposal' || $place->centerId === null || $place->cityWide) {
+            return false;
+        }
+
+        if ($this->city_id !== $place->cityId || $this->program_id !== $place->programId) {
+            return false;
+        }
+
+        return ProposalLocation::query()
+            ->where('proposal_id', $this->source_id)
+            ->where('city_id', $place->cityId)
+            ->where('program_id', $place->programId)
+            ->where('city_wide', false)
+            ->whereHas('centers', fn (Builder $centers) => $centers->where('center_id', $place->centerId))
+            ->exists();
+    }
+
+    /**
+     * Targets at the place. An unset place matches none (D-82).
+     *
+     * @param  Builder<self>  $query
+     */
+    #[Scope]
+    protected function atPlace(Builder $query, ReportPlace $place): void
+    {
+        if ($place->isUnset()) {
+            $query->whereRaw('1 = 0');
+
+            return;
+        }
+
+        $query->where('plan_indicators.city_id', $place->cityId)
+            ->where('plan_indicators.program_id', $place->programId)
+            ->where('plan_indicators.all_centers', false)
+            ->where('plan_indicators.city_wide', $place->cityWide)
+            ->where('plan_indicators.center_id', $place->centerId);
     }
 
     /**
@@ -592,6 +676,11 @@ class PlanIndicator extends Model implements TracksActivity
             'target' => 'decimal:2',
             'target_population' => 'decimal:2',
             'period' => Period::class,
+            'city_id' => 'integer',
+            'program_id' => 'integer',
+            'center_id' => 'integer',
+            'city_wide' => 'boolean',
+            'all_centers' => 'boolean',
         ];
     }
 

@@ -118,16 +118,29 @@ it('leaves a target without a project placeless', function (): void {
         ->and(targetPlaceColumns($target))->toMatchArray(['city_id' => null, 'program_id' => null, 'center_id' => null, 'city_wide' => 0, 'all_centers' => 0]);
 });
 
-it('places an annual plan target from its project only', function (): void {
+it('places an annual plan target whose project has no center from the rows that carry the project, as main did (Dev 1)', function (): void {
     $project = Project::factory()->approved()->create(['city_id' => $this->cityId, 'center_id' => null]);
     $target = PlanIndicator::factory()->forAnnualPlan(AnnualPlan::factory()->create())->create(['project_id' => $project->id]);
     clearTargetPlace($target);
-    $proposal = Proposal::factory()->create();
-    targetRow($proposal, $project, [$this->centerA]);
+    targetRow(Proposal::factory()->create(), $project, [$this->centerA]);
 
     $this->backfill->apply($this->backfill->plan());
 
-    expect(targetPlaceColumns($target))->toMatchArray(['city_id' => $this->cityId, 'program_id' => $project->program_id, 'center_id' => null, 'all_centers' => 0]);
+    expect(targetPlaceColumns($target))->toMatchArray(['city_id' => $this->cityId, 'program_id' => $project->program_id, 'center_id' => $this->centerA, 'all_centers' => 0]);
+});
+
+it('leaves an annual plan target unset when the rows that carry its project disagree', function (): void {
+    $project = Project::factory()->approved()->create(['city_id' => $this->cityId, 'center_id' => null]);
+    $target = PlanIndicator::factory()->forAnnualPlan(AnnualPlan::factory()->create())->create(['project_id' => $project->id]);
+    clearTargetPlace($target);
+    targetRow(Proposal::factory()->create(), $project, [$this->centerA]);
+    targetRow(Proposal::factory()->create(), $project, [$this->centerB]);
+
+    $plan = $this->backfill->plan();
+    $this->backfill->apply($plan);
+
+    expect($plan[$target->id]['disagree'])->toBeTrue()
+        ->and(targetPlaceColumns($target))->toMatchArray(['center_id' => null, 'city_wide' => 0, 'all_centers' => 0]);
 });
 
 it('leaves the center null and lists the target when project and row disagree', function (): void {
