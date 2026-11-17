@@ -101,6 +101,8 @@
     .dk-todo-check:hover > i { border-color: var(--ink); }
     .dk-todo-t { min-width: 0; overflow-wrap: anywhere; unicode-bidi: plaintext; }
     .dk-todo-check[aria-checked="true"] .dk-todo-t { color: var(--ink-3); text-decoration: line-through; }
+    .dk-todo-edit { display: flex; flex: 1; min-width: 0; padding: 3px 0; }
+    .dk-todo-edit .dk-todo-input { flex: 1; min-width: 0; }
     .dk-todo-x { flex: none; opacity: 0; }
     .dk-todo-row:hover .dk-todo-x, .dk-todo-row:focus-within .dk-todo-x { opacity: 1; }
     .dk-todo-done-h { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 10px 0 2px; font-size: 12.5px; color: var(--ink-3); }

@@ -8,12 +8,15 @@ use App\Livewire\Concerns\Tasks\ManagesSubtasks;
 use App\Livewire\Concerns\Tasks\ManagesTaskAttachments;
 use App\Livewire\Concerns\Tasks\MovesTask;
 use App\Models\HrEmployee;
+use App\Models\Program;
 use App\Models\Project;
+use App\Models\Proposal;
 use App\Models\Task;
 use App\Models\TaskAttachment;
 use App\Support\TaskWorkflow;
 use Flux\Flux;
 use Illuminate\Database\Eloquent\Collection;
+use Illuminate\Database\Eloquent\Relations\MorphTo;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Str;
@@ -119,6 +122,7 @@ new #[Layout('layouts::desk'), Title('titles.task')] class extends Component
                 'completed_date',
                 'progress_percentage',
                 'evidence_required',
+                'returned_reason',
                 'created_by',
                 'kind',
                 'department_id',
@@ -127,7 +131,13 @@ new #[Layout('layouts::desk'), Title('titles.task')] class extends Component
                 'activity_plan_milestone_id',
             ])
             ->with([
-                'source',
+                'source' => fn (MorphTo $source) => $source
+                    ->morphWith([
+                        Proposal::class => ['donor:id,name', 'projects:id,slug,name'],
+                        Project::class => ['program', 'user', 'city', 'proposals:id,slug,name,donor_id', 'proposals.donor:id,name'],
+                        Program::class => ['manager', 'strategy:id,name'],
+                    ])
+                    ->morphWithCount([Program::class => ['projects']]),
                 'planMilestone:id,activity_plan_id,title',
                 'planMilestone.plan:id,slug',
                 'taskAssignees.employee:id,first_name_en,last_name_en,first_name_ar,last_name_ar',
@@ -202,9 +212,15 @@ new #[Layout('layouts::desk'), Title('titles.task')] class extends Component
             $this->startDate = $validated['startDate'];
         }
 
-        DB::transaction(function () use ($task, $validated, $canEdit, $startsWork): void {
+        $returnsWork = $from === TaskStatus::UnderReview
+            && in_array($validated['taskStatus'], [TaskStatus::Todo->value, TaskStatus::InProgress->value], true)
+            && $note !== null && $note !== '';
+
+        DB::transaction(function () use ($task, $validated, $canEdit, $startsWork, $returnsWork, $note): void {
             $progress = [
                 ...($startsWork ? ['start_date' => $validated['startDate']] : []),
+                ...($returnsWork ? ['returned_reason' => $note] : []),
+                ...($validated['taskStatus'] === TaskStatus::Done->value ? ['returned_reason' => null] : []),
                 'status' => $validated['taskStatus'],
                 'completed_date' => $validated['completedDate'] === '' ? null : $validated['completedDate'],
                 'progress_percentage' => (int) $validated['progressPercentage'],
@@ -282,6 +298,20 @@ new #[Layout('layouts::desk'), Title('titles.task')] class extends Component
         }
 
         $this->saveInPlace('taskStatus');
+    }
+
+    /**
+     * Open the Return box: the approver sends an Under review task back to
+     * To do, and sendBack() saves it once the reason is written.
+     */
+    public function startReturn(): void
+    {
+        if ($this->task->status !== TaskStatus::UnderReview || ! TaskWorkflow::approves(auth()->user(), $this->task)) {
+            return;
+        }
+
+        $this->resetValidation(['taskStatus', 'reviewNote']);
+        $this->taskStatus = TaskStatus::Todo->value;
     }
 
     /**
@@ -468,6 +498,9 @@ new #[Layout('layouts::desk'), Title('titles.task')] class extends Component
             <div class="flex items-center gap-2">
                 @if ($nextStep !== null && $canUpdateTaskStatus)
                     @if ($nextStep['to'] !== null)
+                        @if ($this->task->status === TaskStatus::UnderReview && $approvesTask)
+                            <x-ui.button tone="secondary" wire:click="startReturn" wire:loading.attr="disabled" wire:target="startReturn" data-test="task-return-button">{{ __('tasks.show.return') }}</x-ui.button>
+                        @endif
                         <x-ui.button tone="primary" wire:click="changeStatus('{{ $nextStep['to']->value }}')" wire:loading.attr="disabled" wire:target="changeStatus" data-test="task-next-step">{{ $nextStep['label'] }}</x-ui.button>
                     @else
                         <x-ui.button tone="secondary" disabled data-test="task-next-step">{{ $nextStep['label'] }}</x-ui.button>
@@ -496,10 +529,21 @@ new #[Layout('layouts::desk'), Title('titles.task')] class extends Component
 
     @include('pages.tasks._show-status-panel')
 
+    @if (filled($this->task->returned_reason) && $this->task->status !== TaskStatus::Done)
+        <div class="flex items-start gap-3 rounded-panel border border-primary/40 bg-white p-3 dark:bg-surface-1" role="note" data-test="task-returned-reason">
+            <flux:icon name="arrow-uturn-left" variant="micro" class="mt-0.5 size-4 shrink-0 text-primary" />
+            <div class="min-w-0 text-sm">
+                <p class="font-bold text-primary">{{ __('tasks.show.returned_banner') }}</p>
+                <p class="whitespace-pre-line text-secondary-dark dark:text-ink" dir="auto">{{ $this->task->returned_reason }}</p>
+            </div>
+        </div>
+    @endif
+
     {{-- Content, then the details on the inline-end side once the page is wide. On a phone the details come first. --}}
     <div class="grid items-start gap-4 @4xl/detail:grid-cols-[minmax(0,1fr)_20rem]">
         <aside class="min-w-0 @4xl/detail:sticky @4xl/detail:top-4 @4xl/detail:col-start-2 @4xl/detail:row-start-1" aria-labelledby="task-properties-heading" data-test="task-properties">
             @include('pages.tasks._show-properties')
+            @include('pages.tasks._show-related')
         </aside>
 
         <div class="grid min-w-0 gap-4 @4xl/detail:col-start-1 @4xl/detail:row-start-1">

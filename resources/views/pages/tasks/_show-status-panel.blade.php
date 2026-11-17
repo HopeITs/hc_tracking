@@ -1,4 +1,4 @@
-{{-- The status bar under the header on ⚡show.blade.php. Editors and assignees move the task in place (TaskWorkflow decides which moves are allowed): Done is dimmed for anyone who does not approve the task, and an approver sending an Under review task back writes a note first. Everyone else reads the phase. --}}
+{{-- The status bar under the header on ⚡show.blade.php. Editors and assignees move the task in place (TaskWorkflow decides which moves are allowed): Done is dimmed for anyone who does not approve the task, and an approver returning an Under review task (the header's Return button, or a To do / In progress pill) writes the reason first. Everyone else reads the phase. --}}
 @use('App\Enums\TaskStatus')
 <div class="flex flex-col items-start gap-2" aria-label="{{ __('tasks.show.status') }}">
     @if ($canUpdateTaskStatus)
@@ -31,11 +31,13 @@
         <flux:error name="taskStatus" />
 
         @if ($this->reviewNoteNeeded())
-            <div class="grid w-full max-w-xl gap-2 rounded-panel border border-panel-border bg-white p-3 dark:bg-surface-1" data-test="task-send-back-form">
-                <flux:textarea wire:model="reviewNote" :label="__('tasks.workflow.send_back_note')" rows="2" maxlength="200" data-test="task-review-note" />
+            @php $returnTo = TaskStatus::from($taskStatus); @endphp
+            <div class="grid w-full max-w-xl gap-2 rounded-panel border border-primary/40 bg-white p-3 dark:bg-surface-1" x-init="$nextTick(() => $el.querySelector('textarea')?.focus())" data-test="task-send-back-form">
+                <p class="text-sm font-bold text-secondary-dark dark:text-ink">{{ __('tasks.show.return_title', ['status' => $returnTo->label()]) }}</p>
+                <flux:textarea wire:model="reviewNote" :label="__('tasks.show.return_reason')" :placeholder="__('tasks.show.return_reason_placeholder')" rows="2" maxlength="200" required data-test="task-review-note" />
                 <div class="flex justify-end gap-2">
                     <x-ui.button type="button" tone="ghost" size="sm" wire:click="cancelStatusChange" data-test="task-cancel-send-back-button">{{ __('common.cancel') }}</x-ui.button>
-                    <x-ui.button type="button" tone="primary" size="sm" wire:click="sendBack" data-test="task-send-back-button">{{ __('tasks.send_back') }}</x-ui.button>
+                    <x-ui.button type="button" tone="primary" size="sm" wire:click="sendBack" wire:loading.attr="disabled" wire:target="sendBack" data-test="task-send-back-button">{{ __('tasks.show.return_confirm', ['status' => $returnTo->label()]) }}</x-ui.button>
                 </div>
             </div>
         @endif

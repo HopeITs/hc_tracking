@@ -21,6 +21,8 @@ return [
         'clear_done' => 'Clear done',
         'drag' => 'Drag to reorder',
         'remove' => 'Remove “:title”',
+        'edit' => 'Edit “:title”',
+        'edit_hint' => 'Edit (or double-click the text)',
         'required' => 'Write the to-do first.',
         'too_long' => 'A to-do can hold at most :max characters.',
         'full' => 'Your list is full: clear some to-dos first.',

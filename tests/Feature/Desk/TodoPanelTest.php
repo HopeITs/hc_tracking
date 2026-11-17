@@ -199,3 +199,30 @@ test('the to-do panel is a small card', function () {
         ->and($panels->rowsOf('todo'))->toBe(4)
         ->and($panels->iconOf('todo'))->toBe('check');
 });
+
+test('the owner edits a to-do in place, trimmed and checked like a new one', function () {
+    $user = User::factory()->create();
+    $todo = UserTodo::factory()->for($user)->create(['title' => 'Call the donor']);
+
+    $panel = Livewire::actingAs($user)->test('desk.panels.todo');
+
+    $panel->call('rename', $todo->id, '   ')->assertHasErrors(['title']);
+    $panel->call('rename', $todo->id, str_repeat('a', 201))->assertHasErrors(['title']);
+
+    expect($todo->fresh()->title)->toBe('Call the donor');
+
+    $panel->call('rename', $todo->id, '  Call the donor on Monday ')->assertHasNoErrors()->assertSee('Call the donor on Monday');
+
+    expect($todo->fresh()->title)->toBe('Call the donor on Monday');
+});
+
+test('another user\'s to-do cannot be edited', function () {
+    $todo = UserTodo::factory()->for(User::factory()->create())->create(['title' => 'Mine']);
+
+    Livewire::actingAs(User::factory()->create())
+        ->test('desk.panels.todo')
+        ->call('rename', $todo->id, 'Hacked')
+        ->assertNotFound();
+
+    expect($todo->fresh()->title)->toBe('Mine');
+});

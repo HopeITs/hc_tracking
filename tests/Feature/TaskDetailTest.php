@@ -3,11 +3,13 @@
 use App\Enums\FileType;
 use App\Enums\TaskPriority;
 use App\Enums\TaskStatus;
+use App\Models\Donor;
 use App\Models\Project;
 use App\Models\Proposal;
 use App\Models\Task;
 use App\Models\TaskAttachment;
 use App\Models\User;
+use Carbon\CarbonImmutable;
 use Livewire\Livewire;
 use Spatie\Permission\Models\Role;
 
@@ -597,4 +599,93 @@ test('someone who may not edit the task sees no remove x and cannot drop an assi
         ->assertForbidden();
 
     expect($task->taskAssignees()->pluck('employee_id')->all())->toBe([$assignee]);
+});
+
+test('a proposal task shows its donor and dates in the related-to card', function () {
+    $user = User::factory()->role('General Manager')->create();
+    $donor = Donor::factory()->create(['name' => 'Aid Fund']);
+    $proposal = Proposal::factory()->create([
+        'name' => 'Emergency Response',
+        'donor_id' => $donor->id,
+        'planned_date_begin' => '2026-03-01',
+        'planned_date_end' => '2027-02-28',
+    ]);
+    $task = Task::factory()->create(['source_type' => 'proposal', 'source_id' => $proposal->id]);
+
+    $this->actingAs($user)
+        ->get(route('tasks.show', $task))
+        ->assertOk()
+        ->assertSeeHtml('data-test="task-related-card"')
+        ->assertSeeText('Aid Fund')
+        ->assertSeeText(CarbonImmutable::parse('2026-03-01')->translatedFormat(__('formats.date')))
+        ->assertSeeText(CarbonImmutable::parse('2027-02-28')->translatedFormat(__('formats.date')));
+});
+
+test('a project task shows its dates and program in the related-to card', function () {
+    $user = User::factory()->role('General Manager')->create();
+    $project = Project::factory()->create(['name' => 'Winter Support', 'start_date' => '2026-01-05', 'end_date' => '2026-12-20']);
+    $task = Task::factory()->create(['source_type' => 'project', 'source_id' => $project->id]);
+
+    $this->actingAs($user)
+        ->get(route('tasks.show', $task))
+        ->assertOk()
+        ->assertSeeText(__('tasks.related.program'))
+        ->assertSeeText(CarbonImmutable::parse('2026-12-20')->translatedFormat(__('formats.date')));
+});
+
+test('the approver returns an Under review task to To do with a reason the assignee sees', function () {
+    $creator = User::factory()->role('General Manager')->create();
+    $worker = userWithRole('Team Member', insertHrEmployee());
+    $task = Task::factory()->create(['created_by' => $creator->id, 'status' => TaskStatus::UnderReview]);
+    $task->taskAssignees()->delete();
+    $task->taskAssignees()->create(['employee_id' => $worker->employee_id]);
+
+    Livewire::actingAs($creator)
+        ->test('pages::tasks.show', ['task' => $task])
+        ->assertSeeHtml('data-test="task-return-button"')
+        ->call('startReturn')
+        ->assertSet('taskStatus', TaskStatus::Todo->value)
+        ->assertSeeHtml('data-test="task-send-back-form"')
+        ->call('sendBack')
+        ->assertHasErrors(['taskStatus'])
+        ->set('reviewNote', 'The signed list is missing')
+        ->call('sendBack')
+        ->assertHasNoErrors();
+
+    expect($task->fresh())
+        ->status->toBe(TaskStatus::Todo)
+        ->returned_reason->toBe('The signed list is missing');
+
+    Livewire::actingAs($worker)
+        ->test('pages::tasks.show', ['task' => $task])
+        ->assertSeeHtml('data-test="task-returned-reason"')
+        ->assertSeeText('The signed list is missing')
+        ->assertDontSeeHtml('data-test="task-return-button"');
+
+    expect(collect(sentencesFor($worker))->filter(fn (string $line): bool => str_contains($line, 'The signed list is missing')))->toHaveCount(1);
+});
+
+test('approving a returned task clears its return reason', function () {
+    $creator = User::factory()->role('General Manager')->create();
+    $task = Task::factory()->create(['created_by' => $creator->id, 'status' => TaskStatus::UnderReview, 'returned_reason' => 'Fix totals']);
+
+    Livewire::actingAs($creator)
+        ->test('pages::tasks.show', ['task' => $task])
+        ->call('changeStatus', TaskStatus::Done->value)
+        ->assertHasNoErrors();
+
+    expect($task->fresh())->status->toBe(TaskStatus::Done)->returned_reason->toBeNull();
+});
+
+test('only the approver of an Under review task can open the return box', function () {
+    $creator = User::factory()->role('General Manager')->create();
+    $worker = userWithRole('Team Member', insertHrEmployee());
+    $task = Task::factory()->create(['created_by' => $creator->id, 'status' => TaskStatus::UnderReview]);
+    $task->taskAssignees()->delete();
+    $task->taskAssignees()->create(['employee_id' => $worker->employee_id]);
+
+    Livewire::actingAs($worker)
+        ->test('pages::tasks.show', ['task' => $task])
+        ->call('startReturn')
+        ->assertSet('taskStatus', TaskStatus::UnderReview->value);
 });
