@@ -343,7 +343,7 @@ trait ReadsMonthlyReport
      * page: the statuses the activity's kind allows, its planned weeks, its
      * carry-over badge, its saved entry and that entry's files.
      *
-     * @return list<array{id: int, statement: string, statuses: list<ActivityStatus>, entry_id: ?int, status: ?ActivityStatus, reason: ?string, started_on: ?string, completed_on: ?string, executed_on: ?string, note: ?string, planned: ?string, carried: ?string, late: bool, files: list<array{id: int, name: string, type: string, url: string}>}>
+     * @return list<array{id: int, statement: string, proposal: ?string, statuses: list<ActivityStatus>, entry_id: ?int, status: ?ActivityStatus, reason: ?string, started_on: ?string, completed_on: ?string, executed_on: ?string, note: ?string, planned: ?string, carried: ?string, late: bool, files: list<array{id: int, name: string, type: string, url: string}>}>
      */
     #[Computed]
     public function activities(): array
@@ -359,6 +359,7 @@ trait ReadsMonthlyReport
             $rows[] = [
                 'id' => $activity->id,
                 'statement' => $activity->statement,
+                'proposal' => $row['proposal_name'],
                 'statuses' => ActivityStatus::allowedFor($activity->activity_kind ?? ActivityKind::Continuous),
                 'entry_id' => $entry?->id,
                 'status' => $entry?->status,
