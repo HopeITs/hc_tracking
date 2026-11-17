@@ -77,12 +77,16 @@ class KeyboardLayout
     /**
      * The text as typed, then its readings on the other layout. Text under
      * three letters stays as typed: «في» read as "hd" would match unrelated
-     * rows, and so short a search is rarely a layout mistake.
+     * rows, and so short a search is rarely a layout mistake. Tashkeel and
+     * tatweel are dropped first: search ignores them, so «شَمَّه» must read
+     * exactly as «شمه» does, not as keys nobody meant.
      *
      * @return non-empty-list<string>
      */
     public static function readings(string $text): array
     {
+        $text = ArabicText::withoutMarks($text);
+
         if (preg_match_all('/[\p{L}\p{M}]/u', $text) < 3) {
             return [$text];
         }

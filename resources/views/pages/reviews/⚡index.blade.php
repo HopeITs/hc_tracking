@@ -2,7 +2,9 @@
 
 use App\Models\HrEmployee;
 use App\Models\ProposalReviewer;
+use App\Support\ArabicText;
 use App\Support\Desk\DeskWork;
+use App\Support\Like;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Collection;
 use Livewire\Attributes\Computed;
@@ -129,14 +131,16 @@ new #[Layout('layouts::desk'), Title('titles.my_reviews')] class extends Compone
 
     /**
      * Load a query oldest ask first with its proposal and projects, then keep
-     * the rows whose proposal or project name holds the search words.
+     * the rows whose proposal or project name holds every search word, read
+     * as the other pages read it (ArabicText::containsTyped: tashkeel, alef
+     * forms and the wrong keyboard layout do not matter).
      *
      * @param  Builder<ProposalReviewer>  $query
      * @return Collection<int, ProposalReviewer>
      */
     private function searched(Builder $query): Collection
     {
-        $term = trim($this->search);
+        $term = Like::term($this->search);
 
         return $query
             ->with(['proposal:id,slug,name,status', 'proposal.projects:projects.id,projects.slug,projects.name'])
@@ -146,7 +150,7 @@ new #[Layout('layouts::desk'), Title('titles.my_reviews')] class extends Compone
             ->when($term !== '', fn (Collection $reviews) => $reviews->filter(fn (ProposalReviewer $review): bool => $review->proposal->projects
                 ->pluck('name')
                 ->prepend($review->proposal->name)
-                ->contains(fn (string $name): bool => mb_stripos($name, $term) !== false)))
+                ->contains(fn (string $name): bool => ArabicText::containsTyped($name, $term))))
             ->values();
     }
 };
