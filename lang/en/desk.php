@@ -473,6 +473,12 @@ return [
             'empty' => 'Every indicator is on pace.',
             'locked' => 'Your role does not open targets.',
         ],
+        'plan-milestones' => [
+            'title' => 'Plan milestones',
+            'description' => 'Milestones for the plans you manage.',
+            'empty' => 'No milestones in your plans.',
+            'locked' => 'Available to program and project managers.',
+        ],
         'duties' => [
             'title' => 'Donor reporting',
             'description' => 'Reports owed to donors, by due date.',

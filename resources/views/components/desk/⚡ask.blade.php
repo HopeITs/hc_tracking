@@ -186,7 +186,8 @@ new class extends Component {
 
         $terms = implode(' ', $meaning['terms']);
 
-        if (mb_strlen($terms) >= 2) {
+        // From three letters: two ("pr") matched dozens of records and buried the page being looked for.
+        if (mb_strlen($terms) >= 3) {
             foreach ($this->records($terms, $meaning['entityGuessed'] ? null : $entity) as $group) {
                 $groups[] = $group;
             }
@@ -381,8 +382,8 @@ new class extends Component {
 >
     <template x-teleport="body">
         <div x-show="open" x-cloak class="dk-scope">
-            <div class="dk-pal-scrim" x-on:click="hide()"></div>
-            <div class="dk-pal" role="dialog" aria-modal="true" aria-label="{{ __('desk.ask_placeholder') }}" x-on:keydown.escape.stop="hide()">
+            <div class="dk-pal-scrim" x-bind:class="{ 'dk-pal-opening': opening }" x-on:click="hide()"></div>
+            <div class="dk-pal" x-bind:class="{ 'dk-pal-opening': opening }" role="dialog" aria-modal="true" aria-label="{{ __('desk.ask_placeholder') }}" x-on:keydown.escape.stop="hide()">
                 <div class="dk-pal-in">
                     <x-desk.icon name="search" />
                     <label class="dk-sr" for="dk-pal-q">{{ __('desk.search') }}</label>
@@ -398,7 +399,8 @@ new class extends Component {
                         x-on:input="type($event.target.value)"
                     >
                     {{-- While Livewire answers, a red line scans along the input row's bottom edge. --}}
-                    <span class="dk-pal-busy" wire:loading.delay wire:target="query" aria-hidden="true"></span>
+                    {{-- Only for a slow answer: on every key it flashed while typing. --}}
+                    <span class="dk-pal-busy" wire:loading.delay.longer wire:target="query" aria-hidden="true"></span>
                     <button type="button" class="dk-pal-esc" x-on:click="hide()" aria-label="{{ __('common.close') }}">{{ __('desk.key_esc') }}</button>
                 </div>
 
@@ -428,7 +430,8 @@ new class extends Component {
                     @if ($results['suggestions'] !== [])
                         {{-- Example questions on the Desk's dot-thread; the highlighted one takes the brand ring. --}}
                         {{-- Hidden as soon as a key is typed, not a round trip later, so the list never jumps under the instant rows. --}}
-                        <div class="dk-pal-try" @if (trim($query) === '') x-show="typed.trim() === ''" @endif data-ask-suggestions>
+                        {{-- Drawn for one text only: an answer to an older text never fades in under the instant rows. --}}
+                        <div class="dk-pal-try" @if (trim($query) === '') x-show="typed.trim() === ''" @else x-show="instant.length === 0 && typed.trim() === @js(trim($query))" @endif data-ask-suggestions>
                             @if (trim($query) !== '')
                                 <div class="dk-pal-none" x-show="instant.length === 0">
                                     <strong>{{ __('desk.ask_nothing_title') }}</strong>
@@ -465,7 +468,7 @@ new class extends Component {
 
                     @foreach ($results['groups'] as $group)
                         {{-- Pages and actions stand back while the instant rows above show them. --}}
-                        <div class="dk-pal-grp" @if (in_array($group['kind'] ?? null, ['go', 'do'], true)) x-show="instant.length === 0" @endif data-ask-group="{{ $group['kind'] ?? 'answer' }}">
+                        <div class="dk-pal-grp" @if (in_array($group['kind'] ?? null, ['go', 'do'], true)) x-show="instant.length === 0 && typed.trim() === @js(trim($query))" @endif data-ask-group="{{ $group['kind'] ?? 'answer' }}">
                         <div class="dk-pal-g">{{ $group['name'] }}</div>
                         @foreach ($group['items'] as $item)
                             <a href="{{ $item['href'] }}" wire:navigate @class(['dk-pal-i', 'dk-pal-act' => $item['action'] ?? false]) data-pi="{{ $index }}" x-on:click="hide()" @if ($item['action'] ?? false) data-ask-action @endif>

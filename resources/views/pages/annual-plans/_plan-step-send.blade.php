@@ -1,4 +1,4 @@
-{{-- Step 4 of the plan: the summary and the calendar, then send it to MEAL. --}}
+{{-- Section 4 of the plan: the summary and the calendar. The send button sits in the page footer. --}}
 @php
     $governorates = array_values(array_intersect_key($this->cityNames, array_flip(array_unique(array_merge(...array_map(fn ($item) => $item->cityIds(), $plan->items->all()))))));
 @endphp
@@ -19,8 +19,3 @@
     @error('plan') <p class="ap-err">{{ $message }}</p> @enderror
 </section>
 
-<div class="ap-foot">
-    <button type="button" class="dk-btn" wire:click="goToStep(2)">‹ {{ __('annual_plans.wf.back') }}</button>
-    <span class="ap-sp"></span>
-    <button type="button" class="dk-btn dk-primary" wire:click="submitPlan" data-test="send-to-meal">{{ __('annual_plans.wf.send_button') }} ✓</button>
-</div>

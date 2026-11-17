@@ -29,4 +29,8 @@
 
 @include('pages.annual-plans._plan-live')
 
+@if (app(\App\Actions\AnnualPlans\ManagePlanMilestones::class)->mayView(auth()->user(), $plan))
+    @include('pages.annual-plans._plan-milestones')
+@endif
+
 @include('pages.annual-plans._plan-updates')

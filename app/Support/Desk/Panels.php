@@ -93,7 +93,7 @@ final class Panels
         'Public Relations' => [['needs', 'L'], ['overdue', 'L'], ['flow', 'XL'], ['coming', 'L'], ['tasks', 'L'], ['projects', 'XL']],
         'MEAL' => [['needs', 'L'], ['overdue', 'L'], ['flow', 'XL'], ['validate', 'L'], ['templates', 'L'], ['matrix', 'XL'], ['targets', 'XL'], ['projects', 'XL']],
         'Financial' => [['needs', 'L'], ['overdue', 'L'], ['flow', 'XL'], ['money', 'L'], ['transfers', 'L'], ['deliverables', 'L'], ['duties', 'L'], ['projects', 'XL']],
-        'Managers' => [['needs', 'L'], ['overdue', 'L'], ['flow', 'XL'], ['coming', 'L'], ['matrix', 'XL'], ['tasks', 'L'], ['myteam', 'L']],
+        'Managers' => [['needs', 'L'], ['overdue', 'L'], ['flow', 'XL'], ['coming', 'L'], ['plan-milestones', 'L'], ['matrix', 'XL'], ['tasks', 'L'], ['myteam', 'L']],
         'Media Team' => [['needs', 'L'], ['overdue', 'L'], ['flow', 'XL'], ['deliverables', 'L'], ['coming', 'L'], ['tasks', 'XL'], ['projects', 'XL']],
         'Team Member' => [['needs', 'L'], ['overdue', 'L'], ['flow', 'XL'], ['tasks', 'L'], ['coming', 'L'], ['projects', 'XL']],
     ];
@@ -228,7 +228,7 @@ final class Panels
     private const array ReadyKinds = [
         'money' => 'money', 'transfers' => 'money', 'pipeline' => 'money', 'donors' => 'money',
         'myteam' => 'people', 'waiting' => 'people', 'reviews' => 'people',
-        'needs' => 'work', 'coming' => 'work', 'overdue' => 'work', 'tasks' => 'work', 'deliverables' => 'work', 'projects' => 'work', 'flow' => 'work', 'todo' => 'work',
+        'needs' => 'work', 'coming' => 'work', 'overdue' => 'work', 'tasks' => 'work', 'deliverables' => 'work', 'projects' => 'work', 'flow' => 'work', 'todo' => 'work', 'plan-milestones' => 'work',
         'targets' => 'results', 'validate' => 'results', 'matrix' => 'results', 'templates' => 'results', 'duties' => 'results', 'glance' => 'results',
     ];
 
@@ -964,6 +964,7 @@ final class Panels
             'templates' => ['icon' => 'file', 'size' => 'M', 'register' => null, 'allows' => $can('report-templates.manage')],
             'reviews' => ['icon' => 'search', 'size' => 'M', 'register' => 'reviews.index', 'allows' => $this->hasReviews(...)],
             'tasks' => ['icon' => 'check', 'size' => 'L', 'register' => 'tasks.index', 'allows' => $can('tasks.view')],
+            'plan-milestones' => ['icon' => 'flag', 'size' => 'L', 'register' => null, 'allows' => fn (User $user): bool => $user->can('annual-plans.view') && ($user->managedProgramIds() !== [] || $user->ownedProjectIds() !== [])],
             /* The Department Tasks surface in panel form, so it follows the page's rule (W-14, D-65). */
             'deliverables' => ['icon' => 'board', 'size' => 'M', 'register' => 'department-tasks.index', 'allows' => fn (User $user): bool => $user->can('viewDepartmentQueue', Task::class)],
             'myteam' => ['icon' => 'users', 'size' => 'M', 'register' => null, 'allows' => fn (User $user): bool => $user->employee_id !== null || $user->isAdministrator()],

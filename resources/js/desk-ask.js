@@ -44,6 +44,8 @@ document.addEventListener('livewire:navigated', () => {
 document.addEventListener('alpine:init', () => {
     window.Alpine.data('hcDeskAsk', () => ({
         open: false,
+        opening: false,
+        openingTimer: null,
         selected: 0,
         instant: [],
         instantRecent: false,
@@ -65,11 +67,20 @@ document.addEventListener('alpine:init', () => {
 
             const observer = new MutationObserver(() => this.sync());
 
+            // Once a server answer has fully landed (morph, then Alpine's x-show), draw the highlight again:
+            // the observer alone could run mid-update and leave no row highlighted until the next key.
+            window.Livewire?.hook('commit', ({ component, succeed }) => {
+                if (component.id === this.$wire.$id) {
+                    succeed(() => this.$nextTick(() => setTimeout(() => this.sync())));
+                }
+            });
+
             this.$nextTick(() => {
                 const list = document.querySelector('.dk-pal-list');
 
                 if (list) {
-                    observer.observe(list, { childList: true, subtree: true });
+                    // Classes too: a Livewire answer resets row classes and took the highlight off until the next key.
+                    observer.observe(list, { childList: true, subtree: true, attributes: true, attributeFilter: ['class', 'style'] });
                 }
             });
 
@@ -89,6 +100,10 @@ document.addEventListener('alpine:init', () => {
             }
 
             this.open = true;
+            // The pop-in plays on opening only: tied to the box itself, every Livewire answer replayed it while typing.
+            this.opening = true;
+            clearTimeout(this.openingTimer);
+            this.openingTimer = setTimeout(() => (this.opening = false), 260);
             this.selected = 0;
             this.flash = '';
             this.type(document.getElementById('dk-pal-q')?.value ?? '');

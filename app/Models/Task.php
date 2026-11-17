@@ -65,6 +65,7 @@ use Illuminate\Support\Collection;
  */
 #[Fillable([
     'parent_task_id',
+    'activity_plan_milestone_id',
     'source_type',
     'source_id',
     'department_id',
@@ -239,6 +240,16 @@ class Task extends Model implements TracksActivity
     public function source(): MorphTo
     {
         return $this->morphTo();
+    }
+
+    /**
+     * The annual plan milestone this task supports, when it was raised from one.
+     *
+     * @return BelongsTo<ActivityPlanMilestone, $this>
+     */
+    public function planMilestone(): BelongsTo
+    {
+        return $this->belongsTo(ActivityPlanMilestone::class, 'activity_plan_milestone_id');
     }
 
     /**

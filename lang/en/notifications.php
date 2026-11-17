@@ -436,6 +436,9 @@ return [
             ],
         ],
         'annual_plan' => [
+            'milestone_week' => ['title' => 'Milestone due in one week', 'body' => ':milestone is due on :date.'],
+            'milestone_three_days' => ['title' => 'Milestone due in three days', 'body' => ':milestone is due on :date.'],
+            'milestone_missed' => ['title' => 'Milestone missed', 'body' => ':milestone was due on :date.'],
             'plan_submitted' => [
                 'title' => 'New annual plan to review',
                 'body' => ':actor sent the :plan plan to MEAL for review.',

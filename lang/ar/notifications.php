@@ -436,6 +436,9 @@ return [
             ],
         ],
         'annual_plan' => [
+            'milestone_week' => ['title' => 'مرحلة رئيسية مستحقة بعد أسبوع', 'body' => 'موعد استحقاق :milestone هو :date.'],
+            'milestone_three_days' => ['title' => 'مرحلة رئيسية مستحقة بعد ثلاثة أيام', 'body' => 'موعد استحقاق :milestone هو :date.'],
+            'milestone_missed' => ['title' => 'مرحلة رئيسية فائتة', 'body' => 'كان موعد استحقاق :milestone في :date.'],
             'plan_submitted' => [
                 'title' => 'خطة سنوية جديدة للمراجعة',
                 'body' => 'أرسل :actor خطة :plan إلى الميل للمراجعة.',

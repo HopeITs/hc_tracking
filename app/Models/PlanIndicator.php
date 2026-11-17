@@ -171,9 +171,13 @@ class PlanIndicator extends Model implements TracksActivity
      * a list of targets does not query per row. achievedValueSql() is the same
      * rule for queries that filter or count on it, and must stay in step.
      */
-    public function achievedValue(): float
+    public function achievedValue(?CarbonImmutable $through = null): float
     {
         $approved = $this->loadedReports()->where('status', ReportStatus::Approved);
+
+        if ($through !== null) {
+            $approved = $approved->filter(fn (Report $report): bool => $report->planned_date->toDateString() <= $through->toDateString());
+        }
 
         if ($this->measuresLevel()) {
             $latest = $approved

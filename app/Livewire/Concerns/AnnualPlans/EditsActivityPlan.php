@@ -8,6 +8,7 @@ use App\Actions\AnnualPlans\AddPlanActivity;
 use App\Actions\AnnualPlans\ChooseActivityPlanActivities;
 use App\Actions\AnnualPlans\CopyActivityPlanItemSettings;
 use App\Actions\AnnualPlans\ManageActivityPlanFollowUps;
+use App\Actions\AnnualPlans\ManagePlanMilestones;
 use App\Actions\AnnualPlans\ReviewActivityPlan;
 use App\Actions\AnnualPlans\SaveActivityPlanItem;
 use App\Actions\AnnualPlans\SubmitActivityPlan;
@@ -18,6 +19,7 @@ use App\Enums\ResultType;
 use App\Models\ActivityPlan;
 use App\Models\ActivityPlanBatch;
 use App\Models\ActivityPlanItem;
+use App\Models\PlanIndicator;
 use App\Models\Project;
 use App\Models\Result;
 use App\Models\User;
@@ -77,6 +79,141 @@ trait EditsActivityPlan
     public string $sendBackReason = '';
 
     public bool $attentionOnly = false;
+
+    public bool $showMilestoneModal = false;
+
+    public bool $showDeleteMilestoneModal = false;
+
+    #[Locked]
+    public ?int $editingMilestoneId = null;
+
+    #[Locked]
+    public ?int $deletingMilestoneId = null;
+
+    /** @var array<string, mixed> */
+    public array $milestoneForm = [];
+
+    public bool $showMilestoneTaskModal = false;
+
+    #[Locked]
+    public ?int $taskMilestoneId = null;
+
+    /** @var array{title: string, due_date: string, assignees: list<string>} */
+    public array $milestoneTaskForm = ['title' => '', 'due_date' => '', 'assignees' => []];
+
+    #[Computed]
+    public function milestones(): Collection
+    {
+        abort_unless(app(ManagePlanMilestones::class)->mayView($this->user(), $this->plan), 403);
+
+        return $this->plan->milestones()->with(['target.indicator', 'target.reports', 'tasks:id,slug,activity_plan_milestone_id,title,status,due_date'])->get()->toBase();
+    }
+
+    #[Computed]
+    public function milestoneTargets(): Collection
+    {
+        abort_unless(app(ManagePlanMilestones::class)->mayManage($this->user(), $this->plan), 403);
+
+        return PlanIndicator::query()->where('source_type', 'proposal')
+            ->where('source_id', $this->plan->proposal_id)
+            ->whereHas('indicator.result', fn ($query) => $query->where(fn ($query) => $query
+                ->where('program_id', $this->plan->program_id)->orWhereNull('program_id')))
+            ->with('indicator')->get()->toBase();
+    }
+
+    public function openMilestoneModal(?int $id = null): void
+    {
+        abort_unless(app(ManagePlanMilestones::class)->mayManage($this->user(), $this->plan), 403);
+        $milestone = $id === null ? null : $this->plan->milestones()->findOrFail($id);
+        $this->editingMilestoneId = $milestone?->id;
+        $this->milestoneForm = [
+            'title' => $milestone?->title ?? '',
+            'description' => $milestone?->description ?? '',
+            'due_date' => $milestone?->due_date?->toDateString() ?? '',
+            'measure' => $milestone?->measure ?? 'checkpoint',
+            'plan_indicator_id' => (string) ($milestone?->plan_indicator_id ?? ''),
+            'threshold' => (string) ($milestone?->threshold ?? ''),
+        ];
+        $this->resetErrorBag();
+        $this->showMilestoneModal = true;
+    }
+
+    public function saveMilestone(ManagePlanMilestones $action): void
+    {
+        try {
+            $action->save($this->user(), $this->plan, $this->editingMilestoneId, $this->milestoneForm);
+        } catch (ValidationException $exception) {
+            foreach ($exception->errors() as $field => $messages) {
+                $this->addError('milestoneForm.'.$field, $messages[0]);
+            }
+
+            return;
+        }
+        $this->showMilestoneModal = false;
+        unset($this->milestones);
+    }
+
+    public function completeMilestone(int $id, bool $complete, ManagePlanMilestones $action): void
+    {
+        $action->setCompleted($this->user(), $this->plan, $id, $complete);
+        unset($this->milestones);
+    }
+
+    public function openMilestoneTaskModal(int $milestoneId): void
+    {
+        abort_unless(app(ManagePlanMilestones::class)->mayManage($this->user(), $this->plan), 403);
+        $milestone = $this->plan->milestones()->findOrFail($milestoneId);
+        $this->taskMilestoneId = $milestone->id;
+        $this->milestoneTaskForm = ['title' => '', 'due_date' => $milestone->due_date->toDateString(), 'assignees' => []];
+        $this->resetErrorBag();
+        $this->showMilestoneTaskModal = true;
+    }
+
+    public function saveMilestoneTask(ManagePlanMilestones $action): void
+    {
+        if ($this->taskMilestoneId === null) {
+            return;
+        }
+
+        try {
+            $action->addTask($this->user(), $this->plan, $this->taskMilestoneId, $this->milestoneTaskForm);
+        } catch (ValidationException $exception) {
+            foreach ($exception->errors() as $field => $messages) {
+                $this->addError('milestoneTaskForm.'.str($field)->before('.'), $messages[0]);
+            }
+
+            return;
+        }
+
+        $this->showMilestoneTaskModal = false;
+        $this->taskMilestoneId = null;
+        unset($this->milestones);
+    }
+
+    public function confirmDeleteMilestone(int $id): void
+    {
+        abort_unless(app(ManagePlanMilestones::class)->mayManage($this->user(), $this->plan), 403);
+        $this->plan->milestones()->findOrFail($id);
+        $this->deletingMilestoneId = $id;
+        $this->showDeleteMilestoneModal = true;
+    }
+
+    public function deleteMilestone(ManagePlanMilestones $action): void
+    {
+        if ($this->deletingMilestoneId === null) {
+            return;
+        }
+
+        $action->delete($this->user(), $this->plan, $this->deletingMilestoneId);
+        $this->cancelDeleteMilestone();
+        unset($this->milestones);
+    }
+
+    public function cancelDeleteMilestone(): void
+    {
+        $this->showDeleteMilestoneModal = false;
+        $this->deletingMilestoneId = null;
+    }
 
     #[Computed]
     public function plan(): ActivityPlan
@@ -191,7 +328,7 @@ trait EditsActivityPlan
     {
         $this->picked = array_values($this->plan->items->pluck('result_id')->map(fn (int $id): string => (string) $id)->all());
 
-        if ($this->mode === 'plan' && $this->plan->step === 2) {
+        if ($this->mode === 'plan' && $this->plan->items->isNotEmpty()) {
             $this->openFirstUnready();
         }
     }

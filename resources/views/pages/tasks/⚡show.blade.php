@@ -124,9 +124,12 @@ new #[Layout('layouts::desk'), Title('titles.task')] class extends Component
                 'department_id',
                 'reportable_type',
                 'reportable_id',
+                'activity_plan_milestone_id',
             ])
             ->with([
                 'source',
+                'planMilestone:id,activity_plan_id,title',
+                'planMilestone.plan:id,slug',
                 'taskAssignees.employee:id,first_name_en,last_name_en,first_name_ar,last_name_ar',
                 'creator:id,hr_user_id',
                 'parentTask:id,title',
@@ -437,6 +440,12 @@ new #[Layout('layouts::desk'), Title('titles.task')] class extends Component
     >
         <x-slot:meta>
             <span class="font-medium text-secondary-dark dark:text-ink">{{ $this->task->sourceLabel() }}</span>
+            @if ($this->task->planMilestone?->plan !== null)
+                <span aria-hidden="true">·</span>
+                <a href="{{ route('activity-plans.show', $this->task->planMilestone->plan) }}" wire:navigate class="font-medium hover:underline" data-test="task-plan-milestone" dir="auto">
+                    {{ __('annual_plans.milestones.supports', ['name' => $this->task->planMilestone->title]) }}
+                </a>
+            @endif
             <span aria-hidden="true">·</span>
             <span>{{ __('tasks.created_by_name', ['name' => $this->task->creator->name]) }}</span>
             @if ($this->task->parentTask !== null)
