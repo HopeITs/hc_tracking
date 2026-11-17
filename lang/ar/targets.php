@@ -162,4 +162,17 @@ return [
     'count_waiting_for_approval' => '{1} تقرير واحد بانتظار الاعتماد|{2} تقريران بانتظار الاعتماد|[3,10] :count تقارير بانتظار الاعتماد|[11,*] :count تقريرًا بانتظار الاعتماد',
     'where_committed' => 'أين تم الالتزام به',
     'delete_named_target' => 'حذف مستهدف «:name»؟',
+    'console' => [
+        'backfill_targets' => 'المستهدفات: :count',
+        'backfill_with_place' => 'لها مكان: :count',
+        'backfill_with_center' => 'لها مركز: :count',
+        'backfill_city_wide' => 'على مستوى المدينة (عمل ميداني): :count',
+        'backfill_shared' => 'مشتركة بين عدة مراكز: :count',
+        'backfill_without_center' => 'بلا مركز (المركز غير محدد): :count',
+        'backfill_without_project' => 'بلا مشروع (بلا مكان): :count',
+        'backfill_shared_ids' => 'مستهدفات مشتركة (الرقم والمراكز): :ids',
+        'backfill_without_center_ids' => 'مستهدفات تُركت بلا مركز (الأرقام): :ids',
+        'backfill_disagree_ids' => 'مستهدفات يتعارض فيها مركز المشروع ومركز الصف (الأرقام): :ids',
+        'backfill_no_row_ids' => 'مستهدفات مقترحات لا يطابق مشروعها أي صف موقع (الأرقام): :ids',
+    ],
 ];
