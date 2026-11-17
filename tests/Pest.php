@@ -22,6 +22,7 @@ use App\Models\PlanIndicator;
 use App\Models\Program;
 use App\Models\Project;
 use App\Models\Proposal;
+use App\Models\ProposalLocation;
 use App\Models\Report;
 use App\Models\Result;
 use App\Models\Role;
@@ -772,6 +773,30 @@ function proposalPlaceRow(): array
         'new_program_name_ar' => '',
         'project' => null,
     ];
+}
+
+/**
+ * A location row of the proposal that carries the project (Y-02): the
+ * project's city and program, and one center (a new HR center of the city
+ * unless one is given; `null` makes the row city-wide).
+ *
+ * @param  int|false|null  $centerId  false = city-wide, null = a new center
+ */
+function proposalRowForProject(Proposal $proposal, Project $project, int|false|null $centerId = null): ProposalLocation
+{
+    $row = ProposalLocation::factory()->create([
+        'proposal_id' => $proposal->id,
+        'city_id' => $project->city_id,
+        'program_id' => $project->program_id,
+        'project_id' => $project->id,
+        'city_wide' => $centerId === false,
+    ]);
+
+    if ($centerId !== false) {
+        $row->centers()->create(['center_id' => $centerId ?? insertHrCenter((int) $project->city_id, 'Center '.Str::random(6))]);
+    }
+
+    return $row;
 }
 
 /**

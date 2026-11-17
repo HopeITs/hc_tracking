@@ -13,6 +13,7 @@ return [
     'evidence_types_invalid' => 'Choose active evidence types only.',
     'fixed_denominator_invalid' => 'Enter a whole number of at least 1.',
     'queue' => [
+        'field_work' => 'Field work, no center',
         'new_templates' => 'New templates',
         'search' => 'Search templates',
         'search_placeholder' => 'Project, proposal or city',
@@ -29,6 +30,7 @@ return [
         'empty_body' => 'When a proposal is approved, the templates of the projects you cover appear here for you to confirm.',
     ],
     'tab' => [
+        'proposals' => 'Proposals',
         'preparing_monthly_reports' => 'Preparing monthly reports. They will appear once generation finishes.',
         'title' => 'Monthly report template',
         'subtitle' => 'What the center manager reports each month, per proposal.',
@@ -92,6 +94,15 @@ return [
         'line_missing' => 'This line is no longer on this template. Reload the page.',
     ],
     'console' => [
+        'backfill_templates' => 'Templates to place: :count.',
+        'backfill_with_center' => 'With a center: :count.',
+        'backfill_city_wide' => 'City-wide (field work): :count.',
+        'backfill_center_not_set' => 'Center not set: :count.',
+        'backfill_disagree' => 'Rows that disagree (left with the center not set): :count.',
+        'backfill_proposals_linked' => 'Proposals linked: :count.',
+        'backfill_without_proposal' => 'Templates with no proposal: :count.',
+        'backfill_disagree_ids' => 'Templates whose rows disagree (ids): :ids.',
+        'backfill_stopped' => 'Stopped: templates with no proposal (ids): :ids. Nothing was written.',
         'prefill_row' => 'Project :project: template :template, :created lines created, :skipped already there, unlinked targets (link them to the library first): :unlinked.',
         'template_new' => 'new',
         'template_existing' => 'already there',

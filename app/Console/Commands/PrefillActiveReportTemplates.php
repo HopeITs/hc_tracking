@@ -9,8 +9,8 @@ use App\Enums\ProjectStatus;
 use App\Enums\ReportTemplateLineStatus;
 use App\Models\Activity;
 use App\Models\Project;
-use App\Models\ReportTemplate;
 use App\Support\PrefillResult;
+use App\Support\Reporting\PlaceBridge;
 use App\Support\ReportTemplatePrefiller;
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\DB;
@@ -83,14 +83,12 @@ class PrefillActiveReportTemplates extends Command
      */
     private function apply(ReportTemplatePrefiller $prefiller, Project $project): array
     {
-        $result = Activity::withoutRecording(fn (): PrefillResult => $prefiller->prefillProject($project));
-        $lines = DB::table('report_template_lines')
-            ->join('report_templates', 'report_templates.id', '=', 'report_template_lines.report_template_id')
-            ->where('report_templates.project_id', $project->id)
-            ->count();
+        $result = Activity::withoutRecording(fn (): PrefillResult => $prefiller->prefillProject($project->id));
+        $templateIds = app(PlaceBridge::class)->templateIdsOfProject($project->id);
+        $lines = DB::table('report_template_lines')->whereIn('report_template_id', $templateIds)->count();
 
         return [
-            'hasTemplate' => ReportTemplate::query()->where('project_id', $project->id)->exists(),
+            'hasTemplate' => $templateIds !== [],
             'templateCreated' => $result->createdTemplateIds !== [],
             'created' => count($result->createdLineIds),
             'skipped' => $lines - count($result->createdLineIds),
@@ -107,7 +105,7 @@ class PrefillActiveReportTemplates extends Command
      */
     private function preview(ReportTemplatePrefiller $prefiller, Project $project): array
     {
-        $preview = $prefiller->previewProject($project);
+        $preview = $prefiller->previewProject($project->id);
 
         return [
             'hasTemplate' => $preview['hasTemplate'],
@@ -130,11 +128,14 @@ class PrefillActiveReportTemplates extends Command
     {
         return array_values(DB::table('report_template_lines')
             ->join('report_templates', 'report_templates.id', '=', 'report_template_lines.report_template_id')
-            ->join('projects', 'projects.id', '=', 'report_templates.project_id')
+            ->join('proposal_report_template', 'proposal_report_template.report_template_id', '=', 'report_templates.id')
+            ->join('proposal_locations', 'proposal_locations.proposal_id', '=', 'proposal_report_template.proposal_id')
+            ->join('projects', 'projects.id', '=', 'proposal_locations.project_id')
             ->join('plan_indicators', 'plan_indicators.id', '=', 'report_template_lines.plan_indicator_id')
             ->join('indicators', 'indicators.id', '=', 'plan_indicators.indicator_id')
             ->join('library_indicators', 'library_indicators.id', '=', 'indicators.library_indicator_id')
             ->where('projects.status', ProjectStatus::Active->value)
+            ->distinct()
             ->whereIn('report_template_lines.status', [ReportTemplateLineStatus::Pending->value, ReportTemplateLineStatus::Confirmed->value])
             ->where('library_indicators.denominator_basis', DenominatorBasis::Fixed->value)
             ->whereNull('report_template_lines.fixed_denominator')

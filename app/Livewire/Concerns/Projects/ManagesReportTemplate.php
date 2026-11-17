@@ -15,6 +15,7 @@ use App\Enums\ReportTemplateStatus;
 use App\Models\EvidenceType;
 use App\Models\Project;
 use App\Models\ReportTemplate;
+use App\Support\Reporting\PlaceBridge;
 use App\Support\ReportTemplateReader;
 use Flux\Flux;
 use Illuminate\Database\Eloquent\Collection;
@@ -84,13 +85,11 @@ trait ManagesReportTemplate
     #[Computed]
     public function reportTemplate(): ?ReportTemplate
     {
-        $template = ReportTemplate::query()
-            ->where('project_id', $this->projectId)
+        return ReportTemplate::query()
+            ->whereKey(app(PlaceBridge::class)->templateIdsOfProject($this->projectId))
             ->withCount(['lines as pending_lines_count' => fn ($query) => $query->where('status', ReportTemplateLineStatus::Pending)])
+            ->orderBy('id')
             ->first();
-        $template?->setRelation('project', $this->project);
-
-        return $template;
     }
 
     #[Computed]
@@ -118,7 +117,7 @@ trait ManagesReportTemplate
             return null;
         }
 
-        return app(ReportTemplateReader::class)->tabItems($this->project);
+        return app(ReportTemplateReader::class)->tabItems($this->reportTemplate);
     }
 
     /**
@@ -366,7 +365,7 @@ trait ManagesReportTemplate
 
     private function managedTemplate(): ReportTemplate
     {
-        return ReportTemplate::query()->where('project_id', $this->projectId)->firstOrFail();
+        return ReportTemplate::query()->whereKey(app(PlaceBridge::class)->templateIdsOfProject($this->projectId))->orderBy('id')->firstOrFail();
     }
 
     /**

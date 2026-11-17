@@ -7,6 +7,7 @@ namespace App\Policies;
 use App\Models\ReportTemplate;
 use App\Models\User;
 use App\Support\MealCoverage;
+use App\Support\Reporting\PlaceBridge;
 use App\Support\Slots;
 
 /**
@@ -25,7 +26,7 @@ class ReportTemplatePolicy
     public function view(User $user, ReportTemplate $reportTemplate): bool
     {
         return $user->can('report-templates.manage')
-            || in_array($reportTemplate->project_id, $user->ownedProjectIds(), true);
+            || in_array(app(PlaceBridge::class)->legacyProjectIdFor($reportTemplate), $user->ownedProjectIds(), true);
     }
 
     /**
@@ -42,9 +43,7 @@ class ReportTemplatePolicy
             return true;
         }
 
-        $project = $reportTemplate->relationLoaded('project')
-            ? $reportTemplate->project
-            : $reportTemplate->project()->select(['id', 'city_id', 'center_id'])->first();
+        $project = app(PlaceBridge::class)->legacyProjectFor($reportTemplate);
 
         return $project !== null && $user->employee_id === MealCoverage::responsibleFor($project);
     }

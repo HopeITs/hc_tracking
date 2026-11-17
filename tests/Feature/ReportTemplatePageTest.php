@@ -21,6 +21,7 @@ use App\Models\ReportTemplate;
 use App\Models\ReportTemplateLine;
 use App\Models\ReportTemplateQuestion;
 use App\Models\User;
+use App\Support\Reporting\ReportPlace;
 use Illuminate\Support\Facades\DB;
 use Livewire\Features\SupportTesting\Testable;
 use Livewire\Livewire;
@@ -388,4 +389,18 @@ test('a confirmed active template shows when its monthly reports are still being
     MonthlyReport::factory()->for($project)->create(['period' => '2026-11-01']);
 
     rtpPage($manager, $project)->assertDontSeeHtml('data-monthly-reports-preparing');
+});
+
+test('the tab finds a template at the place of the project row and names its proposals', function () {
+    ['project' => $project, 'template' => $legacy] = rtpProject();
+    $legacy->delete();
+    $proposal = rtpProposal($project, 'Place proposal');
+    $row = proposalRowForProject($proposal, $project);
+    $place = new ReportPlace((int) $project->city_id, (int) $project->program_id, $row->centers()->value('center_id'), false);
+    $template = Activity::withoutRecording(fn (): ReportTemplate => ReportTemplate::factory()->forPlace($place, $proposal)->create());
+    rtpLine($template, $proposal, ['name_en' => 'Place line'], attributes: []);
+
+    rtpPage(mealManager(), $project)
+        ->assertSeeHtml('data-test="template-proposals"')
+        ->assertSee('Place proposal');
 });

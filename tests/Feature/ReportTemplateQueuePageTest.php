@@ -5,11 +5,13 @@ use App\Enums\ReportTemplateLineStatus;
 use App\Models\Activity;
 use App\Models\MealCoverageAssignment;
 use App\Models\PlanIndicator;
+use App\Models\Program;
 use App\Models\Project;
 use App\Models\Proposal;
 use App\Models\ReportTemplate;
 use App\Models\ReportTemplateLine;
 use App\Models\User;
+use App\Support\Reporting\ReportPlace;
 use Illuminate\Support\Facades\DB;
 use Livewire\Livewire;
 
@@ -232,4 +234,41 @@ test('the status buttons, search and review links sit inside the component root'
     }
 
     expect($xpath->query('//*[@*[name()="wire:id"]]//a[@data-queue-open][contains(@href, "'.$template->project->slug.'")]')->length)->toBe(1);
+});
+
+test('two templates at one place are listed with their own proposals at a fixed query count', function () {
+    holdMealManagerSlot();
+    $manager = mealManager();
+    $countQueries = function () use ($manager): int {
+        $this->actingAs($manager);
+        DB::flushQueryLog();
+        DB::enableQueryLog();
+        $this->get(route('report-templates.index'))->assertOk();
+        $count = count(DB::getQueryLog());
+        DB::disableQueryLog();
+
+        return $count;
+    };
+
+    $program = Program::factory()->create();
+    $cityId = insertHrCity('Queue '.Str::random(4), 'طابور');
+    $centerId = insertHrCenter($cityId, 'Queue center '.Str::random(4));
+    $place = new ReportPlace($cityId, $program->id, $centerId, false);
+    $make = function (string $name) use ($place): ReportTemplate {
+        $proposal = Proposal::factory()->create(['name' => $name]);
+        $template = ReportTemplate::factory()->forPlace($place, $proposal)->create();
+        $target = PlanIndicator::factory()->forProposal($proposal)->create();
+        ReportTemplateLine::factory()->create(['report_template_id' => $template->id, 'plan_indicator_id' => $target->id]);
+
+        return $template;
+    };
+
+    $make('First proposal');
+    $countQueries();
+    $before = $countQueries();
+    $make('Second proposal');
+    $make('Third proposal');
+
+    $this->get(route('report-templates.index'))->assertSee('First proposal')->assertSee('Second proposal')->assertSee('Third proposal');
+    expect($countQueries())->toBe($before);
 });

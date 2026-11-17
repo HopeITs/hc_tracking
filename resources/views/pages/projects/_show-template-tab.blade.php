@@ -19,6 +19,14 @@
                     @endif
                 </div>
             </x-slot:toolbar>
+            @if ($templateItems['template']['proposals'] !== [])
+                <p class="mb-3 flex flex-wrap items-baseline gap-x-2 gap-y-1 text-sm text-secondary-medium dark:text-ink-muted" data-test="template-proposals">
+                    <span class="font-semibold">{{ __('report_templates.tab.proposals') }}</span>
+                    @foreach ($templateItems['template']['proposals'] as $proposal)
+                        <span dir="auto">{{ $proposal['name'] }}</span>
+                    @endforeach
+                </p>
+            @endif
 
             @if ($this->awaitingMonthlyReports)
                 <p role="status" class="px-4 py-2.5 text-sm text-secondary-medium dark:text-ink-muted" data-monthly-reports-preparing>

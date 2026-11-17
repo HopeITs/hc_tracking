@@ -13,6 +13,7 @@ return [
     'evidence_types_invalid' => 'اختر أنواع أدلة فعّالة فقط',
     'fixed_denominator_invalid' => 'أدخل عددًا صحيحًا لا يقل عن 1',
     'queue' => [
+        'field_work' => 'عمل ميداني، بدون مركز',
         'new_templates' => 'قوالب جديدة',
         'search' => 'ابحث في القوالب',
         'search_placeholder' => 'المشروع أو المقترح أو المدينة',
@@ -29,6 +30,7 @@ return [
         'empty_body' => 'عند اعتماد مقترح تظهر هنا قوالب المشاريع التي تغطيها لتؤكدها.',
     ],
     'tab' => [
+        'proposals' => 'المقترحات',
         'preparing_monthly_reports' => 'يجري تجهيز التقارير الشهرية. ستظهر عند اكتمال التجهيز.',
         'title' => 'قالب التقرير الشهري',
         'subtitle' => 'ما يبلّغ عنه مدير المركز كل شهر، لكل مقترح.',
@@ -92,6 +94,15 @@ return [
         'line_missing' => 'لم يعد هذا السطر في هذا القالب، أعد تحميل الصفحة.',
     ],
     'console' => [
+        'backfill_templates' => 'القوالب المطلوب تحديد مكانها: :count',
+        'backfill_with_center' => 'لها مركز: :count',
+        'backfill_city_wide' => 'على مستوى المدينة (عمل ميداني): :count',
+        'backfill_center_not_set' => 'المركز غير محدد: :count',
+        'backfill_disagree' => 'صفوف متعارضة (تُترك دون مركز): :count',
+        'backfill_proposals_linked' => 'المقترحات المربوطة: :count',
+        'backfill_without_proposal' => 'قوالب بلا مقترح: :count',
+        'backfill_disagree_ids' => 'قوالب صفوفها متعارضة (الأرقام): :ids',
+        'backfill_stopped' => 'توقّف التنفيذ: قوالب بلا مقترح (الأرقام): :ids. لم يُكتب شيء.',
         'prefill_row' => 'المشروع :project: القالب :template، أُنشئ :created سطرًا، و:skipped موجودة مسبقًا، والمستهدفات غير المربوطة (اربطها بالمكتبة أولًا): :unlinked',
         'template_new' => 'جديد',
         'template_existing' => 'موجود مسبقًا',

@@ -7,11 +7,14 @@ namespace App\Models;
 use App\Concerns\RecordsActivity;
 use App\Enums\ReportTemplateStatus;
 use App\Notifications\TracksActivity;
+use App\Support\Reporting\ReportPlace;
 use Carbon\CarbonImmutable;
 use Database\Factories\ReportTemplateFactory;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 
 /**
@@ -26,7 +29,11 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
  * ConfirmReportTemplate.
  *
  * @property int $id
- * @property int $project_id
+ * @property int|null $project_id Only for templates that existed before Y-02.
+ * @property int $city_id
+ * @property int $program_id
+ * @property int|null $center_id
+ * @property bool $city_wide
  * @property ReportTemplateStatus $status
  * @property CarbonImmutable|null $confirmed_at
  * @property int|null $confirmed_by
@@ -46,10 +53,60 @@ class ReportTemplate extends Model implements TracksActivity
      */
     protected $attributes = [
         'status' => 'pending',
+        'city_wide' => false,
     ];
 
     /**
-     * The project this template belongs to.
+     * The proposals this template reports for (Y-02, D-76).
+     *
+     * @return BelongsToMany<Proposal, $this>
+     */
+    public function proposals(): BelongsToMany
+    {
+        return $this->belongsToMany(Proposal::class, 'proposal_report_template')
+            ->withPivot(['joined_at', 'joined_by']);
+    }
+
+    /**
+     * The program of the template's place.
+     *
+     * @return BelongsTo<Program, $this>
+     */
+    public function program(): BelongsTo
+    {
+        return $this->belongsTo(Program::class);
+    }
+
+    /**
+     * The place the template reports for (D-75).
+     */
+    public function place(): ReportPlace
+    {
+        return new ReportPlace($this->city_id, $this->program_id, $this->center_id, $this->city_wide);
+    }
+
+    /**
+     * Templates at the place. An unset place matches none (D-82).
+     *
+     * @param  Builder<ReportTemplate>  $query
+     */
+    public function scopeAtPlace(Builder $query, ReportPlace $place): void
+    {
+        if ($place->isUnset()) {
+            $query->whereRaw('1 = 0');
+
+            return;
+        }
+
+        $query->where('city_id', $place->cityId)
+            ->where('program_id', $place->programId)
+            ->where('city_wide', $place->cityWide)
+            ->where('center_id', $place->centerId);
+    }
+
+    /**
+     * The project of a template that existed before Y-02; null for newer
+     * ones. Read only through PlaceBridge::legacyProjectIdFor().
      *
      * @return BelongsTo<Project, $this>
      */
@@ -102,6 +159,10 @@ class ReportTemplate extends Model implements TracksActivity
     {
         return [
             'project_id' => 'integer',
+            'city_id' => 'integer',
+            'program_id' => 'integer',
+            'center_id' => 'integer',
+            'city_wide' => 'boolean',
             'status' => ReportTemplateStatus::class,
             'confirmed_at' => 'datetime',
             'confirmed_by' => 'integer',
@@ -114,16 +175,24 @@ class ReportTemplate extends Model implements TracksActivity
     }
 
     /**
-     * The project's name.
+     * The project's name for a template that has one, else the program's.
      */
     public function activityLabel(): string
     {
-        return (string) Project::query()->whereKey($this->activityAttribute('project_id'))->value('name');
+        $projectId = $this->activityAttribute('project_id');
+
+        if ($projectId !== null) {
+            return (string) Project::query()->whereKey($projectId)->value('name');
+        }
+
+        return (string) Program::query()->find($this->activityAttribute('program_id'))?->name;
     }
 
     public function activityProgramId(): ?int
     {
-        return Project::programIdFor($this->activityAttribute('project_id'));
+        $programId = $this->activityAttribute('program_id');
+
+        return $programId !== null ? (int) $programId : Project::programIdFor($this->activityAttribute('project_id'));
     }
 
     /**
@@ -141,11 +210,13 @@ class ReportTemplate extends Model implements TracksActivity
     /**
      * The project, so MEAL oversight reaches the project's responsible officer.
      *
-     * @return array{project_id: int}
+     * @return array{project_id?: int}
      */
     protected function activityProperties(string $event): array
     {
-        return ['project_id' => (int) $this->activityAttribute('project_id')];
+        $projectId = $this->activityAttribute('project_id');
+
+        return $projectId === null ? [] : ['project_id' => (int) $projectId];
     }
 
     protected function activityEventForChange(string $field, mixed $old, mixed $new): ?string
