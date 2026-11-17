@@ -153,6 +153,11 @@ final class SaveProposal
 
             $this->validate($input, $actor, $locked, $isApproved && $this->beneficiaryChanges($linked, $input) !== [], $linked);
 
+            // One door (Y-09, D-89): once approved, only the center fill passes here.
+            if ($isApproved && $this->detailDifferences($locked, $input, $actor, $linked) !== []) {
+                throw ValidationException::withMessages(['changeRequest' => __('proposals.change_request_required')]);
+            }
+
             $changes = $this->beneficiaryChanges($linked, $input);
 
             $this->fillDetails($locked, $input, $actor);
@@ -183,6 +188,223 @@ final class SaveProposal
         $existing->refresh();
 
         return $proposal->fresh() ?? $proposal;
+    }
+
+    /**
+     * The differences a change request would make on an approved proposal
+     * (contracts.md §6, Y-09, D-89). `$data` is laid over the proposal as it
+     * is now, so a key left out stays as it is; it is validated as update()
+     * would, without the fill-only limit on `locations`. Writes nothing. The
+     * caller holds the proposal's lock and has authorized the request.
+     *
+     * A row that still carries a legacy `project_id` cannot be dropped or
+     * moved to another city or program (`proposals.location_row_has_project`)
+     * until Stage B; its centers and responsible may change.
+     *
+     * @param  array<string, mixed>  $data
+     * @return list<array{field: string, from: mixed, to: mixed, row?: array{city_id: int, program_id: int|null}, project_id?: int}>
+     *
+     * @throws ValidationException
+     */
+    public function changesFor(Proposal $locked, array $data, User $actor): array
+    {
+        $input = $this->normalize([...$this->currentForm($locked), ...$data, 'kind' => $locked->kind->value]);
+
+        /** @var Collection<int, Project> $linked */
+        $linked = $locked->projects()->select(['projects.id', 'projects.name'])->orderBy('projects.id')->get();
+
+        $this->validate($input, $actor, $locked, false, $linked, viaChangeRequest: true);
+
+        $rows = $this->locationRows($input);
+
+        return [
+            ...$this->detailDifferences($locked, $input, $actor, $linked),
+            ...($rows === null ? [] : $this->locationDifferences($locked, $rows)),
+        ];
+    }
+
+    /**
+     * Write an approved change request (contracts.md §6, Y-09): the details,
+     * the beneficiaries of the linked projects and the rows through
+     * ProposalLocationRows::replace(), without the post-approval lock. A
+     * beneficiaries change still records `proposal.beneficiaries_changed`
+     * with the request's reason. The caller has re-checked the request with
+     * changesFor(), holds the proposal's lock and runs the transaction.
+     *
+     * @param  array<string, mixed>  $payload
+     */
+    public function applyChange(Proposal $locked, array $payload, string $reason, User $actor): void
+    {
+        $input = $this->normalize([...$this->currentForm($locked), ...$payload, 'kind' => $locked->kind->value]);
+        $rows = $this->locationRows($input);
+
+        /** @var Collection<int, Project> $linked */
+        $linked = $locked->projects()->select(['projects.id', 'projects.name'])->orderBy('projects.id')->get();
+        $changes = $this->beneficiaryChanges($linked, $input);
+
+        $this->fillDetails($locked, $input, $actor);
+        $locked->save();
+
+        foreach ($changes as $change) {
+            $locked->projects()->updateExistingPivot($change['project_id'], ['target_beneficiaries' => $change['to']]);
+        }
+
+        if ($changes !== []) {
+            $locked->recordActivity('proposal.beneficiaries_changed', [], [
+                'reason' => $reason,
+                'projects' => $changes,
+            ]);
+        }
+
+        if ($rows !== null) {
+            $this->announceLocations($locked, app(ProposalLocationRows::class)->replace($locked, $rows, $actor), $actor);
+        }
+    }
+
+    /**
+     * The proposal's own form fields as they are stored, in the shape the
+     * form sends them. The base a change request is laid over.
+     *
+     * @return array<string, mixed>
+     */
+    private function currentForm(Proposal $proposal): array
+    {
+        return [
+            'name' => $proposal->name,
+            'donorId' => $proposal->donor_id,
+            'plannedDateBegin' => $proposal->planned_date_begin?->toDateString(),
+            'plannedDateEnd' => $proposal->planned_date_end?->toDateString(),
+            'notes' => $proposal->notes,
+            // Read as the stored pair so a request that sends only one of them validates; a
+            // reader without money never has them compared or written (canSeeMoney()).
+            'requestedBudget' => $proposal->requested_budget,
+            'requestedCurrency' => $proposal->requested_currency?->value,
+            ...($proposal->kind === ProposalKind::Payroll ? ['narrative' => $proposal->narrative] : []),
+        ];
+    }
+
+    /**
+     * Each of the proposal's own fields the input changes, with the stored
+     * and the sent value (plain values, never names). The budget counts only
+     * for a money holder who sent it; the concept note only when sent.
+     *
+     * @param  array<string, mixed>  $input
+     * @param  Collection<int, Project>  $linked
+     * @return list<array{field: string, from: mixed, to: mixed, project_id?: int}>
+     */
+    private function detailDifferences(Proposal $proposal, array $input, User $actor, Collection $linked): array
+    {
+        $text = fn (mixed $value): ?string => $value === null || trim((string) $value) === '' ? null : trim((string) $value);
+        $date = fn (mixed $value): ?string => blank($value) ? null : CarbonImmutable::parse((string) $value)->toDateString();
+        $money = fn (mixed $value): ?string => $value === null || $value === '' ? null : number_format((float) $value, 2, '.', '');
+
+        $pairs = [
+            'name' => [trim((string) $proposal->name), trim((string) $input['name'])],
+            'plannedDateBegin' => [$proposal->planned_date_begin?->toDateString(), $date($input['plannedDateBegin'] ?? null)],
+            'plannedDateEnd' => [$proposal->planned_date_end?->toDateString(), $date($input['plannedDateEnd'] ?? null)],
+            'notes' => [$text($proposal->notes), $text($input['notes'] ?? null)],
+        ];
+
+        if (is_numeric($input['donorId'] ?? null)) {
+            $pairs['donorId'] = [$proposal->donor_id, (int) $input['donorId']];
+        }
+
+        if (array_key_exists('conceptNote', $input)) {
+            $pairs['conceptNote'] = [$text($proposal->concept_note), $text($input['conceptNote'])];
+        }
+
+        if ($proposal->kind === ProposalKind::Payroll) {
+            $pairs['narrative'] = [$text($proposal->narrative), $text($input['narrative'] ?? null)];
+        }
+
+        // Either money key sent writes both (fillDetails), so both are compared.
+        if (self::canSeeMoney($actor) && (array_key_exists('requestedBudget', $input) || array_key_exists('requestedCurrency', $input))) {
+            $pairs['requestedBudget'] = [$money($proposal->requested_budget), $money($input['requestedBudget'] ?? null)];
+            $pairs['requestedCurrency'] = [$proposal->requested_currency?->value, $text($input['requestedCurrency'] ?? null)];
+        }
+
+        $differences = [];
+
+        foreach ($pairs as $field => [$from, $to]) {
+            if ($from !== $to) {
+                $differences[] = ['field' => $field, 'from' => $from, 'to' => $to];
+            }
+        }
+
+        foreach ($this->beneficiaryChanges($linked, $input) as $change) {
+            $differences[] = ['field' => 'beneficiaries', 'project_id' => $change['project_id'], 'from' => $change['from'], 'to' => $change['to']];
+        }
+
+        return $differences;
+    }
+
+    /**
+     * Each row the sent set adds, drops or changes, keyed by city and
+     * program: `from` and `to` are the row's centers, field-work flag and
+     * responsible (null for an added or a dropped row). Ids only.
+     *
+     * @param  list<array{city_id: int|null, program_id: int|null, responsible_employee_id: int|null, center_ids: list<int>, is_new: bool, city_wide: bool, new_program_name_en: string, new_program_name_ar: string}>  $rows
+     * @return list<array{field: string, row: array{city_id: int, program_id: int|null}, from: array{responsible_employee_id: int|null, center_ids: list<int>, city_wide: bool, is_new: bool}|null, to: array{responsible_employee_id: int|null, center_ids: list<int>, city_wide: bool, is_new: bool}|null}>
+     *
+     * @throws ValidationException a dropped row that still carries a project
+     */
+    private function locationDifferences(Proposal $proposal, array $rows): array
+    {
+        $shape = fn (?int $responsible, array $centerIds, bool $cityWide, bool $isNew): array => [
+            'responsible_employee_id' => $responsible,
+            'center_ids' => array_values(array_map('intval', $centerIds)),
+            'city_wide' => $cityWide,
+            'is_new' => $isNew,
+        ];
+
+        $stored = [];
+
+        /** @var ProposalLocation $row */
+        foreach ($proposal->locations()->with('centers')->get() as $row) {
+            $stored[$row->city_id.':'.($row->program_id ?? '')] = $row;
+        }
+
+        $sent = [];
+
+        foreach ($rows as $row) {
+            $sent[$row['city_id'].':'.($row['program_id'] ?? '')] = $row;
+        }
+
+        $differences = [];
+
+        foreach ($stored as $key => $row) {
+            $from = $shape($row->responsible_employee_id, $row->centerIds(), $row->city_wide, $row->is_new);
+            $place = ['city_id' => (int) $row->city_id, 'program_id' => $row->program_id];
+
+            if (! array_key_exists($key, $sent)) {
+                if ($row->project_id !== null) {
+                    throw ValidationException::withMessages(['locations' => __('proposals.location_row_has_project')]);
+                }
+
+                $differences[] = ['field' => 'locations', 'row' => $place, 'from' => $from, 'to' => null];
+
+                continue;
+            }
+
+            $to = $shape($sent[$key]['responsible_employee_id'], $sent[$key]['center_ids'], $sent[$key]['city_wide'], $sent[$key]['is_new']);
+
+            if ($from !== $to) {
+                $differences[] = ['field' => 'locations', 'row' => $place, 'from' => $from, 'to' => $to];
+            }
+        }
+
+        foreach ($sent as $key => $row) {
+            if (! array_key_exists($key, $stored)) {
+                $differences[] = [
+                    'field' => 'locations',
+                    'row' => ['city_id' => (int) $row['city_id'], 'program_id' => $row['program_id']],
+                    'from' => null,
+                    'to' => $shape($row['responsible_employee_id'], $row['center_ids'], $row['city_wide'], $row['is_new']),
+                ];
+            }
+        }
+
+        return $differences;
     }
 
     /**
@@ -222,7 +444,7 @@ final class SaveProposal
      * @param  array<string, mixed>  $input
      * @param  Collection<int, Project>|null  $linked
      */
-    private function validate(array $input, User $actor, ?Proposal $proposal, bool $requiresBeneficiariesReason, ?Collection $linked = null): void
+    private function validate(array $input, User $actor, ?Proposal $proposal, bool $requiresBeneficiariesReason, ?Collection $linked = null, bool $viaChangeRequest = false): void
     {
         $rules = [
             'name' => ['required', 'string', 'max:255'],
@@ -288,7 +510,7 @@ final class SaveProposal
 
         $validator = Validator::make($input, $rules, $messages);
 
-        $validator->after(function (ValidatorInstance $validator) use ($input, $actor, $proposal, $linked, $isPayroll): void {
+        $validator->after(function (ValidatorInstance $validator) use ($input, $actor, $proposal, $linked, $isPayroll, $viaChangeRequest): void {
             if ($isPayroll && ! $validator->errors()->has('narrative') && ! Proposal::isNarrativeComplete(is_string($input['narrative'] ?? null) ? $input['narrative'] : null)) {
                 $validator->errors()->add('narrative', __('proposals.narrative_required'));
             }
@@ -305,7 +527,7 @@ final class SaveProposal
 
             $this->checkDonorApproved($validator, $input, $proposal);
 
-            if ($proposal !== null && $proposal->status->isApprovedByDonor()) {
+            if ($proposal !== null && $proposal->status->isApprovedByDonor() && ! $viaChangeRequest) {
                 $this->checkApprovedFill($validator, $input, $proposal);
             }
 

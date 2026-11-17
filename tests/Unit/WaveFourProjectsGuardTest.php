@@ -14,6 +14,8 @@ it('names the Project model only in the place bridge', function (): void {
         dirname(__DIR__, 2).'/app/Support/ReportTemplateReader.php',
         dirname(__DIR__, 2).'/app/Support/ReportTemplateQueue.php',
         ...glob(dirname(__DIR__, 2).'/app/Actions/ReportTemplates/*.php'),
+        // Y-09: the change-request actions.
+        ...glob(dirname(__DIR__, 2).'/app/Actions/Proposals/*ProposalChange.php'),
     ];
 
     $offenders = [];
