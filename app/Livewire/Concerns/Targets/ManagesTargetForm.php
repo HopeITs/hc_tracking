@@ -11,6 +11,7 @@ use App\Models\Indicator;
 use App\Models\PlanIndicator;
 use App\Models\Project;
 use App\Models\Proposal;
+use App\Support\Reporting\PlaceBridge;
 use Flux\Flux;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Database\Eloquent\Relations\MorphTo;
@@ -233,6 +234,11 @@ trait ManagesTargetForm
             $this->addError('targetIndicatorId', __('targets.this_indicator_already_has_a_target_here'));
 
             return;
+        }
+
+        // The place moves with the project, in the same save (Y-08).
+        if (! $target->exists || $target->isDirty(['project_id', 'source_type', 'source_id'])) {
+            $target->fill(app(PlaceBridge::class)->placeColumnsForTargets($source, [$projectId])[$projectId ?? '']);
         }
 
         $target->save();

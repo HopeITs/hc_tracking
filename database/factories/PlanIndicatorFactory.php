@@ -6,7 +6,9 @@ use App\Models\AnnualPlan;
 use App\Models\Indicator;
 use App\Models\PlanIndicator;
 use App\Models\Proposal;
+use App\Support\Reporting\PlaceBridge;
 use Illuminate\Database\Eloquent\Factories\Factory;
+use Illuminate\Database\Eloquent\Relations\Relation;
 
 /**
  * @extends Factory<PlanIndicator>
@@ -30,6 +32,29 @@ class PlanIndicatorFactory extends Factory
             'indicator_id' => Indicator::factory(),
             'target' => fake()->randomFloat(2, 100, 500000),
         ];
+    }
+
+    /**
+     * A target attributed to a project carries the place the writers would
+     * give it (Y-08, PlaceBridge::placeColumnsForTargets()), unless the caller
+     * sets one. Build the proposal's location rows before its targets.
+     */
+    public function configure(): static
+    {
+        return $this->afterMaking(function (PlanIndicator $target): void {
+            if ($target->project_id === null || $target->city_id !== null) {
+                return;
+            }
+
+            $class = Relation::getMorphedModel($target->source_type);
+            $source = $class === null ? null : $class::query()->find($target->source_id);
+
+            if ($source === null) {
+                return;
+            }
+
+            $target->fill(app(PlaceBridge::class)->placeColumnsForTargets($source, [$target->project_id])[$target->project_id]);
+        });
     }
 
     /**

@@ -12,12 +12,10 @@ use App\Models\Activity;
 use App\Models\Assignment;
 use App\Models\Donor;
 use App\Models\DonorProposal;
-use App\Models\MealCoverageAssignment;
 use App\Models\Program;
 use App\Models\Project;
 use App\Models\Proposal;
 use App\Models\User;
-use App\Models\UserNotification;
 use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\DB;
@@ -337,33 +335,18 @@ test('after approval a beneficiary change without a reason is refused', function
         ->and(DB::table('project_proposal')->where('proposal_id', $proposal->id)->value('target_beneficiaries'))->toBe(400);
 });
 
-test('after approval a beneficiary change with a reason is logged and reaches MEAL', function () {
+test('after approval a beneficiary change with a reason still needs a change request (Y-09)', function () {
     $proposal = linkedProposal(ProposalStatus::Approved);
     $project = $proposal->projects()->sole();
-    $officer = insertHrEmployee(firstNameEn: 'Nour', lastNameEn: 'Ali');
-    Activity::withoutRecording(fn () => MealCoverageAssignment::factory()->forProject($project->id)->create(['employee_id' => $officer]));
-    $officerUser = userWithRole('Team Member', $officer);
-    $mealUser = userWithRole('MEAL');
-    $bystander = userWithRole('Media Team');
-    $actor = userWithRole('Financial');
 
-    saveProposal($actor, $proposal, proposalEditData($proposal, [
+    $errors = refusedSave(fn () => saveProposal(userWithRole('Financial'), $proposal, proposalEditData($proposal, [
         'beneficiaries' => [$project->id => 650],
         'beneficiariesReason' => 'The donor widened the target group.',
-    ]));
+    ])));
 
-    $activity = Activity::query()->where('event', 'proposal.beneficiaries_changed')->sole();
-    $key = 'notifications.events.proposal.beneficiaries_changed';
-
-    expect(DB::table('project_proposal')->where('proposal_id', $proposal->id)->value('target_beneficiaries'))->toBe(650)
-        ->and($activity->subject_id)->toBe($proposal->id)
-        ->and($activity->changes)->toBe([])
-        ->and($activity->properties['reason'])->toBe('The donor widened the target group.')
-        ->and($activity->properties['projects'])->toEqual([['project_id' => $project->id, 'name' => 'Water Network Rehabilitation', 'from' => 400, 'to' => 650]])
-        ->and(Activity::query()->get()->toJson())->not->toContain('120000')
-        ->and(UserNotification::query()->forUser($mealUser)->get()->pluck('data.key')->all())->toContain($key)
-        ->and(UserNotification::query()->forUser($officerUser)->get()->pluck('data.key')->all())->toContain($key)
-        ->and(UserNotification::query()->forUser($bystander)->get()->pluck('data.key')->all())->not->toContain($key);
+    expect($errors['changeRequest'])->toBe([__('proposals.change_request_required')])
+        ->and(DB::table('project_proposal')->where('proposal_id', $proposal->id)->value('target_beneficiaries'))->toBe(400)
+        ->and(Activity::query()->where('event', 'proposal.beneficiaries_changed')->exists())->toBeFalse();
 });
 
 test('a user without proposals.create cannot create a proposal', function () {
@@ -559,7 +542,7 @@ test('New Concept Note opens nothing for a user who cannot create proposals', fu
         ->assertSet('locations', []);
 });
 
-test('editing from the register changes the beneficiaries and asks for a reason after approval', function () {
+test('editing from the register asks for a reason, then refuses the direct change after approval', function () {
     $proposal = linkedProposal(ProposalStatus::Approved);
     $projectId = (int) $proposal->projects()->value('projects.id');
 
@@ -573,12 +556,12 @@ test('editing from the register changes the beneficiaries and asks for a reason 
         ->call('saveProposal')
         ->assertHasErrors(['beneficiariesReason']);
 
+    // Y-09 (D-89): with the reason given, the direct edit is still refused; it needs a change request.
     $form->set('beneficiariesReason', 'The donor widened the target group.')
         ->call('saveProposal')
-        ->assertHasNoErrors()
-        ->assertSet('showProposalModal', false);
+        ->assertHasErrors(['changeRequest']);
 
-    expect(DB::table('project_proposal')->where('proposal_id', $proposal->id)->value('target_beneficiaries'))->toBe(450);
+    expect(DB::table('project_proposal')->where('proposal_id', $proposal->id)->value('target_beneficiaries'))->toBe(400);
 });
 
 test('a proposal cannot be created for a donor the General Manager has not approved', function () {

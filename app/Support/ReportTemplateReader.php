@@ -16,6 +16,7 @@ use App\Enums\ResultType;
 use App\Models\ActivitySchedule;
 use App\Models\AnnualPlan;
 use App\Models\EvidenceType;
+use App\Models\MonthlyReportAnswer;
 use App\Models\PlanIndicator;
 use App\Models\Proposal;
 use App\Models\ReportTemplate;
@@ -24,6 +25,7 @@ use App\Models\ReportTemplateQuestion;
 use App\Models\Result;
 use App\Support\Reporting\PlaceBridge;
 use Carbon\CarbonImmutable;
+use Illuminate\Database\Eloquent\Collection as EloquentCollection;
 use Illuminate\Support\Collection;
 
 /**
@@ -34,7 +36,7 @@ use Illuminate\Support\Collection;
  *
  * No money is read. The query count is fixed whatever the number of lines:
  * the template with its lines, targets, indicators, library entries and
- * evidence types, the questions, the proposals, the annual plans and the
+ * evidence types, the questions (with whether each is answered), the proposals, the annual plans and the
  * unlinked targets, each in one eager-loaded query.
  */
 final class ReportTemplateReader
@@ -45,7 +47,7 @@ final class ReportTemplateReader
      * @return array{
      *     template: array{id: int, status: ReportTemplateStatus, pendingCount: int, confirmableCount: int, lineCount: int, proposals: list<array{id: int, name: string, number: string|null}>},
      *     groups: list<array{key: string, title: string, code: string|null, lines: list<array{id: int, name: string, code: string|null, target: string|null, status: ReportTemplateLineStatus, schedule: LineSchedule, scheduleLabel: string, scheduleMonths: list<int>, onceAfterMonths: int|null, enteredBy: IndicatorCollector, evidence: list<string>, evidenceTypeIds: list<int>, window: string, fixedDenominator: int|null, updatedAt: string, unlinked: bool, needsMonths: bool, missingFixedDenominator: bool, confirmable: bool}>, unlinkedTargets: list<array{id: int, name: string, code: string|null, target: string|null}>}>,
-     *     questions: list<array{id: int, text: string, frequency: NarrativeQuestionFrequency, isActive: bool}>
+     *     questions: list<array{id: int, text: string, textAr: string, textEn: string|null, frequency: NarrativeQuestionFrequency, isActive: bool, fromBank: bool, hasAnswers: bool, position: int, updatedAt: string}>
      * }|null
      */
     public function tabItems(ReportTemplate $template): ?array
@@ -59,7 +61,12 @@ final class ReportTemplateReader
                 'lines.planIndicator.indicator:id,name,code,library_indicator_id',
                 'lines.planIndicator.indicator.libraryIndicator:id,code,name_ar,name_en,frequency,denominator_basis',
                 'lines.evidenceTypes' => fn ($query) => $query->select(['evidence_types.id', 'evidence_types.name_ar', 'evidence_types.name_en'])->ordered(),
-                'questions' => fn ($query) => $query->ordered(),
+                'questions' => fn ($query) => $query->ordered()->select('report_template_questions.*')->addSelect([
+                    'has_answers' => MonthlyReportAnswer::query()
+                        ->selectRaw('1')
+                        ->whereColumn('monthly_report_answers.report_template_question_id', 'report_template_questions.id')
+                        ->limit(1),
+                ]),
             ])
             ->first();
 
@@ -151,13 +158,41 @@ final class ReportTemplateReader
                 'proposals' => array_values($template->proposals->sortBy('name')->map(fn (Proposal $proposal): array => ['id' => $proposal->id, 'name' => (string) $proposal->name, 'number' => $proposal->internal_project_number])->all()),
             ],
             'groups' => $groups,
-            'questions' => array_values($template->questions->map(fn (ReportTemplateQuestion $question): array => [
+            'questions' => $this->questionItems($template->questions),
+        ];
+    }
+
+    /**
+     * The template's questions in asking order, each with its position in the
+     * whole frequency (as on the bank's page), where it came from and whether
+     * a monthly report has answered it (one subquery on the eager load).
+     *
+     * @param  EloquentCollection<int, ReportTemplateQuestion>  $questions
+     * @return list<array{id: int, text: string, textAr: string, textEn: string|null, frequency: NarrativeQuestionFrequency, isActive: bool, fromBank: bool, hasAnswers: bool, position: int, updatedAt: string}>
+     */
+    private function questionItems(EloquentCollection $questions): array
+    {
+        $positions = [];
+        $items = [];
+
+        foreach ($questions as $question) {
+            $positions[$question->frequency->value] = ($positions[$question->frequency->value] ?? 0) + 1;
+
+            $items[] = [
                 'id' => $question->id,
                 'text' => $question->localizedText(),
+                'textAr' => $question->text_ar,
+                'textEn' => $question->text_en,
                 'frequency' => $question->frequency,
                 'isActive' => $question->is_active,
-            ])->all()),
-        ];
+                'fromBank' => $question->narrative_question_id !== null,
+                'hasAnswers' => $question->getAttribute('has_answers') !== null,
+                'position' => $positions[$question->frequency->value],
+                'updatedAt' => (string) $question->updated_at?->toIso8601String(),
+            ];
+        }
+
+        return $items;
     }
 
     /**

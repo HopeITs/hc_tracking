@@ -34,7 +34,7 @@ new #[Layout('layouts::desk'), Title('titles.monthly_report')] class extends Com
     $report = $this->report;
     $abilities = $this->abilities;
     $isEditable = collect($this->rows)->contains(fn (array $row): bool => $row['editable']);
-    $monthIsEmpty = $this->rows === [] && $this->activities === [] && $this->questions->isEmpty();
+    $monthIsEmpty = $this->rows === [] && $this->activities === [] && $this->questions->isEmpty() && $this->answeredQuestions->isEmpty();
 @endphp
 
 <section class="@container/detail flex w-full flex-1 flex-col gap-8 text-secondary-dark dark:text-ink">

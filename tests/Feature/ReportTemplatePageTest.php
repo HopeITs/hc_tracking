@@ -4,6 +4,7 @@ use App\Enums\AssignmentStatus;
 use App\Enums\CollectionFrequency;
 use App\Enums\DenominatorBasis;
 use App\Enums\LineSchedule;
+use App\Enums\NarrativeQuestionFrequency;
 use App\Enums\ProjectStatus;
 use App\Enums\ProposalStatus;
 use App\Enums\ReportTemplateLineStatus;
@@ -16,6 +17,8 @@ use App\Models\Indicator;
 use App\Models\LibraryIndicator;
 use App\Models\MealCoverageAssignment;
 use App\Models\MonthlyReport;
+use App\Models\MonthlyReportAnswer;
+use App\Models\NarrativeQuestion;
 use App\Models\PlanIndicator;
 use App\Models\Project;
 use App\Models\Proposal;
@@ -33,7 +36,8 @@ use Livewire\Livewire;
 | The "Report template" tab on projects/show (contracts.md §12.4, T33 slice 3):
 | lines grouped by proposal, edited and confirmed by the responsible MEAL
 | officer or the MEAL Manager only, read-only for the owner, hidden from
-| everyone else.
+| everyone else. Its narrative questions panel (Y-07 slice 2) is edited the
+| same way as the bank's page.
 */
 
 beforeEach(fn () => $this->travelTo('2026-10-14 10:00:00'));
@@ -537,4 +541,236 @@ test('the activity calendar renders in Arabic', function () {
     rtpPage(mealManager(), $project)
         ->assertSee(__('report_templates.calendar.title'))
         ->assertSee('نشاط الدعم');
+});
+
+/**
+ * A question on the template, in the order given.
+ *
+ * @param  array<string, mixed>  $attributes
+ */
+function rtpQuestion(ReportTemplate $template, string $textEn, array $attributes = []): ReportTemplateQuestion
+{
+    return ReportTemplateQuestion::factory()->create(['report_template_id' => $template->id, 'text_en' => $textEn, ...$attributes]);
+}
+
+function rtpAnswer(ReportTemplateQuestion $question): void
+{
+    Activity::withoutRecording(fn () => MonthlyReportAnswer::factory()->create(['report_template_question_id' => $question->id]));
+}
+
+function rtpXpath(Testable $page): DOMXPath
+{
+    $dom = new DOMDocument;
+    @$dom->loadHTML('<?xml encoding="utf-8"?>'.$page->html());
+
+    return new DOMXPath($dom);
+}
+
+$questionToast = fn (string $text): Closure => fn (string $event, array $params): bool => ($params['slots']['text'] ?? null) === $text;
+
+test('a manager sees the questions grouped by frequency with status words, origin, menus and arrows off at the ends', function () {
+    ['project' => $project, 'template' => $template] = rtpProject();
+    $bank = NarrativeQuestion::factory()->create();
+    $first = rtpQuestion($template, 'What went well?', ['sort_order' => 1, 'narrative_question_id' => $bank->id]);
+    $last = rtpQuestion($template, 'What was hard?', ['sort_order' => 2, 'is_active' => false]);
+    $quarter = rtpQuestion($template, 'What did the quarter teach?', ['frequency' => NarrativeQuestionFrequency::QuarterEnd]);
+
+    $page = rtpPage(mealManager(), $project)
+        ->assertSeeHtml('data-test="template-add-question"')
+        ->assertSee(__('enums.narrative_question_frequency.monthly'))
+        ->assertSee(__('enums.narrative_question_frequency.quarter_end'))
+        ->assertSee(__('narrative_questions.status_on'))
+        ->assertSee(__('narrative_questions.status_off'))
+        ->assertSee(__('report_templates.tab.question_from_bank'))
+        ->assertSee(__('report_templates.tab.question_own'))
+        ->assertSeeHtml('data-test="switch-off-template-question-'.$first->id.'"')
+        ->assertSeeHtml('data-test="switch-on-template-question-'.$last->id.'"')
+        ->assertSeeHtml('data-test="delete-template-question-'.$quarter->id.'"')
+        ->assertSeeHtml('data-test="edit-template-question-'.$first->id.'"')
+        ->assertDontSeeHtml('data-test="template-questions-shared"');
+
+    $xpath = rtpXpath($page);
+    $arrow = fn (ReportTemplateQuestion $question, string $direction): DOMElement => $xpath->query('//li[@data-template-question="'.$question->id.'"]//*[@data-test="move-template-question-'.$direction.'"]')->item(0);
+
+    expect($xpath->query('//section[@data-frequency-group="monthly"]//li[@data-template-question]')->length)->toBe(2)
+        ->and($xpath->query('//section[@data-frequency-group="quarter_end"]//li[@data-template-question]')->length)->toBe(1)
+        ->and($xpath->query('//li[@data-template-question="'.$last->id.'"]')->item(0)->getAttribute('data-status'))->toBe('off')
+        ->and($arrow($first, 'up')->hasAttribute('disabled'))->toBeTrue()
+        ->and($arrow($first, 'down')->hasAttribute('disabled'))->toBeFalse()
+        ->and($arrow($last, 'up')->hasAttribute('disabled'))->toBeFalse()
+        ->and($arrow($last, 'down')->hasAttribute('disabled'))->toBeTrue()
+        ->and($arrow($quarter, 'up')->hasAttribute('disabled'))->toBeTrue()
+        ->and($arrow($quarter, 'down')->hasAttribute('disabled'))->toBeTrue();
+});
+
+test('a viewer reads the questions without any control', function () {
+    ['project' => $project, 'template' => $template] = rtpProject();
+    $question = rtpQuestion($template, 'What went well?');
+    $owner = userWithRole('Team Member', $project->user_id);
+
+    rtpPage($owner, $project)
+        ->assertSee('What went well?')
+        ->assertSee(__('narrative_questions.status_on'))
+        ->assertDontSeeHtml('data-test="template-add-question"')
+        ->assertDontSeeHtml('data-test="move-template-question-up"')
+        ->assertDontSeeHtml('data-test="edit-template-question-'.$question->id.'"')
+        ->assertDontSeeHtml('data-test="template-question-menu-'.$question->id.'"');
+
+    $page = fn () => rtpPage($owner, $project);
+    $page()->call('openAddTemplateQuestion')->assertForbidden();
+    $page()->call('moveTemplateQuestion', $question->id, 'down')->assertForbidden();
+    $page()->call('askDeleteTemplateQuestion', $question->id)->assertForbidden();
+
+    expect(ReportTemplateQuestion::query()->whereKey($question->id)->exists())->toBeTrue();
+});
+
+test('a manager adds and edits a question through the dialog', function () {
+    ['project' => $project, 'template' => $template] = rtpProject();
+    $existing = rtpQuestion($template, 'What went well?', ['sort_order' => 1]);
+
+    $page = rtpPage(mealManager(), $project)
+        ->call('openAddTemplateQuestion')
+        ->assertSet('showTemplateQuestionModal', true)
+        ->assertSet('templateQuestionFrequency', 'monthly')
+        ->call('saveTemplateQuestion')
+        ->assertHasErrors(['templateQuestionTextAr'])
+        ->set('templateQuestionTextAr', 'ما الجديد؟')
+        ->set('templateQuestionTextEn', 'What is new?')
+        ->call('saveTemplateQuestion')
+        ->assertHasNoErrors()
+        ->assertSet('showTemplateQuestionModal', false)
+        ->assertSee('What is new?');
+
+    $added = $template->questions()->where('text_en', 'What is new?')->sole();
+
+    expect($added->narrative_question_id)->toBeNull()
+        ->and($added->sort_order)->toBe(2);
+
+    $page->call('openEditTemplateQuestion', $existing->id)
+        ->assertSet('showTemplateQuestionModal', true)
+        ->assertSet('templateQuestionTextEn', 'What went well?')
+        ->set('templateQuestionTextEn', 'What went really well?')
+        ->call('saveTemplateQuestion')
+        ->assertHasNoErrors()
+        ->assertSet('showTemplateQuestionModal', false);
+
+    expect($existing->fresh()->text_en)->toBe('What went really well?');
+});
+
+test('the frequency of an answered question is refused on its field', function () {
+    ['project' => $project, 'template' => $template] = rtpProject();
+    $question = rtpQuestion($template, 'What went well?');
+    rtpAnswer($question);
+
+    rtpPage(mealManager(), $project)
+        ->call('openEditTemplateQuestion', $question->id)
+        ->set('templateQuestionFrequency', 'quarter_end')
+        ->call('saveTemplateQuestion')
+        ->assertHasErrors(['templateQuestionFrequency'])
+        ->assertSet('showTemplateQuestionModal', true);
+
+    expect($question->fresh()->frequency)->toBe(NarrativeQuestionFrequency::Monthly);
+});
+
+test('a manager moves a question and focus follows it', function () {
+    ['project' => $project, 'template' => $template] = rtpProject();
+    $first = rtpQuestion($template, 'What went well?', ['sort_order' => 1]);
+    $second = rtpQuestion($template, 'What was hard?', ['sort_order' => 2]);
+
+    rtpPage(mealManager(), $project)
+        ->call('moveTemplateQuestion', $first->id, 'down')
+        ->assertDispatched('template-question-moved', questionId: $first->id, direction: 'down')
+        ->assertSet('templateQuestionAnnouncement', __('narrative_questions.moved_to', ['text' => 'What went well?', 'position' => 2, 'total' => 2, 'frequency' => __('enums.narrative_question_frequency.monthly')]));
+
+    expect($template->questions()->ordered()->pluck('id')->all())->toBe([$second->id, $first->id]);
+});
+
+test('switching off goes through a dialog that names the question, and switching on is one click', function () {
+    ['project' => $project, 'template' => $template] = rtpProject();
+    $question = rtpQuestion($template, 'What went well?');
+
+    $page = rtpPage(mealManager(), $project)
+        ->call('askSwitchOffTemplateQuestion', $question->id)
+        ->assertSet('showSwitchOffTemplateQuestionModal', true)
+        ->assertSee('Switch off “What went well?”?')
+        ->call('switchOffTemplateQuestion')
+        ->assertSet('showSwitchOffTemplateQuestionModal', false);
+
+    expect($question->fresh()->is_active)->toBeFalse();
+
+    $page->call('switchOnTemplateQuestion', $question->id);
+
+    expect($question->fresh()->is_active)->toBeTrue();
+});
+
+test('a question without answers is deleted after a dialog that names it', function () {
+    ['project' => $project, 'template' => $template] = rtpProject();
+    $question = rtpQuestion($template, 'What went well?');
+
+    rtpPage(mealManager(), $project)
+        ->call('askDeleteTemplateQuestion', $question->id)
+        ->assertSet('showDeleteTemplateQuestionModal', true)
+        ->assertSet('deletingTemplateQuestionHasAnswers', false)
+        ->assertSee('Delete “What went well?”?')
+        ->call('deleteTemplateQuestion')
+        ->assertSet('showDeleteTemplateQuestionModal', false);
+
+    expect(ReportTemplateQuestion::query()->whereKey($question->id)->exists())->toBeFalse();
+});
+
+test('an answered question cannot be deleted: its dialog offers to switch it off instead', function () use ($questionToast) {
+    ['project' => $project, 'template' => $template] = rtpProject();
+    $question = rtpQuestion($template, 'What went well?');
+    rtpAnswer($question);
+
+    rtpPage(mealManager(), $project)
+        ->call('askDeleteTemplateQuestion', $question->id)
+        ->assertSet('deletingTemplateQuestionHasAnswers', true)
+        ->assertSee(__('report_templates.question_has_answers'))
+        ->assertSee(__('narrative_questions.deactivate_instead'))
+        ->assertSeeHtml('data-test="confirm-switch-off-instead-template-question"')
+        ->call('switchOffInsteadOfDeleteTemplateQuestion')
+        ->assertSet('showDeleteTemplateQuestionModal', false);
+
+    expect($question->fresh()->is_active)->toBeFalse();
+
+    $late = rtpQuestion($template, 'What was hard?');
+    $page = rtpPage(mealManager(), $project)->call('askDeleteTemplateQuestion', $late->id);
+    rtpAnswer($late);
+
+    $page->call('deleteTemplateQuestion')
+        ->assertDispatched('toast-show', $questionToast(__('report_templates.question_has_answers')));
+
+    expect(ReportTemplateQuestion::query()->whereKey($late->id)->exists())->toBeTrue();
+});
+
+test('a question of another template is not found from this tab', function () use ($questionToast) {
+    ['project' => $project] = rtpProject();
+    ['template' => $otherTemplate] = rtpProject();
+    $foreign = rtpQuestion($otherTemplate, 'Not yours');
+
+    rtpPage(mealManager(), $project)
+        ->call('askDeleteTemplateQuestion', $foreign->id)
+        ->assertDispatched('toast-show', $questionToast(__('report_templates.tab.question_missing')))
+        ->assertSet('showDeleteTemplateQuestionModal', false)
+        ->call('moveTemplateQuestion', $foreign->id, 'up')
+        ->assertDispatched('toast-show', $questionToast(__('report_templates.tab.question_missing')));
+
+    expect(ReportTemplateQuestion::query()->whereKey($foreign->id)->exists())->toBeTrue();
+});
+
+test('a template covering two or more proposals says so once above the questions', function () {
+    ['project' => $project, 'template' => $template] = rtpProject();
+    rtpQuestion($template, 'What went well?');
+    $first = rtpProposal($project, 'Winter WASH');
+    $template->proposals()->attach($first->id, ['joined_at' => now()]);
+
+    rtpPage(mealManager(), $project)->assertDontSeeHtml('data-test="template-questions-shared"');
+
+    $second = rtpProposal($project, 'Spring WASH');
+    $template->proposals()->attach($second->id, ['joined_at' => now()]);
+
+    rtpPage(mealManager(), $project)
+        ->assertSeeHtml('data-test="template-questions-shared"')
+        ->assertSee(__('report_templates.tab.questions_shared', ['proposals' => 'Spring WASH'.__('report_templates.tab.list_separator').'Winter WASH']));
 });

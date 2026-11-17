@@ -9,6 +9,7 @@ use App\Models\Project;
 use App\Models\Proposal;
 use App\Models\ProposalLocation;
 use App\Models\ReportTemplate;
+use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 
@@ -20,85 +21,40 @@ use Illuminate\Support\Facades\DB;
 final class PlaceBridge
 {
     /**
-     * The place of a proposal target, or null for a shared target (one row,
-     * several centers, D-90) and for a target whose row has no center and is
-     * not city-wide.
-     *
-     * Removed by Y-08, which moves targets to places: until then the place is
-     * read from the target's project and from the location row that carries
-     * that project.
+     * The place of a target, read from its own columns (Y-08, D-85): no
+     * `projects` read is left in it. Null for a target with no place and for a
+     * shared target (D-90).
      */
     public function placeOfTarget(PlanIndicator $target): ?ReportPlace
     {
-        $project = $this->projectOf($target);
-
-        if ($project === null) {
-            return null;
-        }
-
-        if ($project->center_id !== null) {
-            return new ReportPlace((int) $project->city_id, (int) $project->program_id, (int) $project->center_id, false);
-        }
-
-        $places = $this->rowsOf($project, $target)
-            ->map(fn (ProposalLocation $row): ?ReportPlace => $this->singlePlaceOfRow($row))
-            ->unique(fn (?ReportPlace $place): string => $place?->key() ?? 'none')
-            ->values();
-
-        return $places->count() === 1 ? $places->first() : null;
+        return $target->place();
     }
 
     /**
      * Whether the target reports at the place: its own place, or a shared
-     * target (D-90) of a row that lists the place's center.
-     *
-     * Removed by Y-08, with placeOfTarget().
+     * target (D-90) of a row that lists the place's center. No `projects`
+     * read is left in it (Y-08).
      */
     public function targetCoversPlace(PlanIndicator $target, ReportPlace $place): bool
     {
-        $own = $this->placeOfTarget($target);
-
-        if ($own !== null) {
-            return $own->equals($place);
-        }
-
-        $project = $this->projectOf($target);
-
-        if ($project === null || $project->center_id !== null || $place->centerId === null || $place->cityWide) {
-            return false;
-        }
-
-        return $this->rowsOf($project, $target)->contains(
-            fn (ProposalLocation $row): bool => ! $row->city_wide
-                && $row->centers->count() > 1
-                && $row->city_id === $place->cityId
-                && $row->program_id === $place->programId
-                && $row->centers->contains('center_id', $place->centerId),
-        );
+        return $target->coversPlace($place);
     }
 
     /**
-     * Whether the target is shared (D-90): its project has no center and is
-     * carried by a row with several centers. Such a target has no single place.
-     *
-     * Removed by Y-08, with placeOfTarget().
+     * Whether the target is shared (D-90): reached together by every center of
+     * its proposal's location row. Such a target has no single place. No
+     * `projects` read is left in it (Y-08).
      */
     public function isSharedTarget(PlanIndicator $target): bool
     {
-        $project = $this->projectOf($target);
-
-        if ($project === null || $project->center_id !== null || $this->placeOfTarget($target) !== null) {
-            return false;
-        }
-
-        return $this->rowsOf($project, $target)->contains(fn (ProposalLocation $row): bool => ! $row->city_wide && $row->centers->count() > 1);
+        return $target->all_centers;
     }
 
     /**
      * `project_proposal.target_beneficiaries` of a proposal target's project
      * (D-25), the source of a `fixed` line's denominator.
      *
-     * Removed by Y-08, with placeOfTarget().
+     * Removed by Y-10, when targets are keyed by location row (D-91).
      */
     public function targetBeneficiariesOf(PlanIndicator $target): ?int
     {
@@ -288,50 +244,96 @@ final class PlaceBridge
         return $ids;
     }
 
-    private function projectOf(PlanIndicator $target): ?Project
-    {
-        return $target->project_id === null ? null : Project::query()->find($target->project_id);
-    }
-
     /**
-     * The location rows that carry the project, narrowed to the target's
-     * own proposal when it has rows there.
+     * The place a new or re-pointed target gets (Y-08), by the backfill's
+     * rule: the project's city and program; its center when it has one (left
+     * unset when a row of the proposal names other centers); else, for a
+     * proposal target, what the proposal's one row carrying the project says
+     * (for an annual-plan target, what every row carrying the project says,
+     * as on main: Dev 1, 17 Nov): its single center, city-wide (D-88) or
+     * shared by several centers (D-90). Rows that disagree leave it unset.
+     * Null without a project.
      *
-     * @return Collection<int, ProposalLocation>
+     * Its project branch is replaced by Y-10, when targets are keyed by
+     * location row (D-91).
      */
-    private function rowsOf(Project $project, PlanIndicator $target): Collection
+    public function placeForTarget(Model $source, ?int $projectId): ?ReportPlace
     {
-        $rows = ProposalLocation::query()->with('centers')->where('project_id', $project->id)->orderBy('id')->get();
-
-        if ($target->source_type === 'proposal') {
-            $own = $rows->where('proposal_id', $target->source_id);
-
-            if ($own->isNotEmpty()) {
-                return $own->values();
-            }
-        }
-
-        return $rows;
-    }
-
-    /**
-     * The one place of a row, or null when it has none or several.
-     */
-    private function singlePlaceOfRow(ProposalLocation $row): ?ReportPlace
-    {
-        if ($row->program_id === null) {
+        if ($projectId === null) {
             return null;
         }
 
-        if ($row->city_wide) {
-            return new ReportPlace($row->city_id, $row->program_id, null, true);
+        $columns = $this->placeColumnsForTargets($source, [$projectId])[$projectId];
+
+        if ($columns['city_id'] === null || $columns['program_id'] === null || $columns['all_centers']) {
+            return null;
         }
 
-        if ($row->centers->count() === 1) {
-            return new ReportPlace($row->city_id, $row->program_id, $row->centers->first()->center_id, false);
+        return new ReportPlace($columns['city_id'], $columns['program_id'], $columns['center_id'], $columns['city_wide']);
+    }
+
+    /**
+     * The place columns a writer stores next to `project_id`, per project, in
+     * a fixed number of queries (the targets grid saves many cells at once).
+     * Same rule as placeForTarget(), which cannot express a shared target.
+     *
+     * Its project branch is replaced by Y-10 (D-91).
+     *
+     * @param  list<int|null>  $projectIds
+     * @return array<int|string, array{city_id: int|null, program_id: int|null, center_id: int|null, city_wide: bool, all_centers: bool}> keyed by project id ('' for none)
+     */
+    public function placeColumnsForTargets(Model $source, array $projectIds): array
+    {
+        $none = ['city_id' => null, 'program_id' => null, 'center_id' => null, 'city_wide' => false, 'all_centers' => false];
+        $ids = array_values(array_unique(array_filter($projectIds, fn (?int $id): bool => $id !== null)));
+        $result = in_array(null, $projectIds, true) ? ['' => $none] : [];
+
+        if ($ids === []) {
+            return $result;
         }
 
-        return null;
+        $projects = Project::query()->select(['id', 'city_id', 'program_id', 'center_id'])->whereKey($ids)->get()->keyBy('id');
+        $rows = ProposalLocation::query()
+            ->with('centers')
+            ->whereIn('project_id', $ids)
+            ->when($source->getMorphClass() === 'proposal', fn ($query) => $query->where('proposal_id', $source->getKey()))
+            ->orderBy('id')
+            ->get();
+
+        foreach ($ids as $id) {
+            $project = $projects->get($id);
+
+            if ($project === null) {
+                $result[$id] = $none;
+
+                continue;
+            }
+
+            $answers = $rows->where('project_id', $id)
+                ->map(fn (ProposalLocation $row): array => [
+                    'city_wide' => (bool) $row->city_wide,
+                    'center_ids' => $row->city_wide ? [] : $row->centers->pluck('center_id')->map(intval(...))->sort()->values()->all(),
+                ])
+                ->unique(fn (array $answer): string => $answer['city_wide'] ? 'cw' : implode('-', $answer['center_ids']))
+                ->values();
+
+            $columns = [...$none, 'city_id' => (int) $project->city_id, 'program_id' => (int) $project->program_id];
+
+            if ($project->center_id !== null) {
+                $center = (int) $project->center_id;
+                $disagree = $source->getMorphClass() === 'proposal' && $answers->contains(fn (array $answer): bool => $answer['center_ids'] !== [] && ! in_array($center, $answer['center_ids'], true));
+                $columns['center_id'] = $disagree ? null : $center;
+            } elseif ($answers->count() === 1) {
+                $answer = $answers->first();
+                $columns['city_wide'] = $answer['city_wide'];
+                $columns['all_centers'] = count($answer['center_ids']) > 1;
+                $columns['center_id'] = count($answer['center_ids']) === 1 ? $answer['center_ids'][0] : null;
+            }
+
+            $result[$id] = $columns;
+        }
+
+        return $result;
     }
 
     /**

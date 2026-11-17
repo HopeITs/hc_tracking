@@ -12,6 +12,7 @@ use App\Models\PlanIndicator;
 use App\Models\Project;
 use App\Models\Proposal;
 use App\Models\Result;
+use App\Support\Reporting\PlaceBridge;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Gate;
@@ -133,7 +134,7 @@ final class SaveProposalTargetsGrid
                 throw ValidationException::withMessages(['cells' => __('targets.grid_refused'), ...$errors]);
             }
 
-            return $this->write($locked, $plan);
+            return $this->write($locked, $plan, app(PlaceBridge::class)->placeColumnsForTargets($locked, array_values($projects->keys()->all())));
         });
     }
 
@@ -183,9 +184,10 @@ final class SaveProposalTargetsGrid
      * Apply the checked cells and record the summary.
      *
      * @param  list<array{0: array{indicator_id: int, project_id: int, value: ?string, period: ?string, target_population: ?string, version: ?string}, 1: Indicator, 2: Project, 3: ?PlanIndicator}>  $plan
+     * @param  array<int|string, array{city_id: int|null, program_id: int|null, center_id: int|null, city_wide: bool, all_centers: bool}>  $places  place columns by project id (Y-08)
      * @return array{created: int, updated: int, deleted: int}
      */
-    private function write(Proposal $proposal, array $plan): array
+    private function write(Proposal $proposal, array $plan, array $places): array
     {
         $counts = ['created' => 0, 'updated' => 0, 'deleted' => 0];
 
@@ -199,7 +201,7 @@ final class SaveProposalTargetsGrid
             Gate::authorize($operation);
         }
 
-        Activity::withoutRecording(function () use ($proposal, $plan, &$counts): void {
+        Activity::withoutRecording(function () use ($proposal, $plan, $places, &$counts): void {
             foreach ($plan as [$cell, $indicator, $project, $target]) {
                 if ($cell['value'] === null) {
                     if ($target !== null) {
@@ -222,6 +224,10 @@ final class SaveProposalTargetsGrid
                 if ($population === null && ! $row->exists && $indicator->measure === IndicatorMeasure::Percentage) {
                     $beneficiaries = $project->getRelation('pivot')->getAttribute('target_beneficiaries');
                     $population = $beneficiaries === null ? null : (string) $beneficiaries;
+                }
+
+                if (! $row->exists) {
+                    $row->fill($places[$project->id]);
                 }
 
                 $row->fill([

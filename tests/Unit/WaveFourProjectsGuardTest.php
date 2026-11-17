@@ -9,11 +9,13 @@ declare(strict_types=1);
  */
 it('names the Project model only in the place bridge', function (): void {
     $paths = [
-        ...glob(base_path('app/Support/Reporting/*.php')),
-        base_path('app/Support/ReportTemplatePrefiller.php'),
-        base_path('app/Support/ReportTemplateReader.php'),
-        base_path('app/Support/ReportTemplateQueue.php'),
-        ...glob(base_path('app/Actions/ReportTemplates/*.php')),
+        ...glob(dirname(__DIR__, 2).'/app/Support/Reporting/*.php'),
+        dirname(__DIR__, 2).'/app/Support/ReportTemplatePrefiller.php',
+        dirname(__DIR__, 2).'/app/Support/ReportTemplateReader.php',
+        dirname(__DIR__, 2).'/app/Support/ReportTemplateQueue.php',
+        ...glob(dirname(__DIR__, 2).'/app/Actions/ReportTemplates/*.php'),
+        // Y-09: the change-request actions.
+        ...glob(dirname(__DIR__, 2).'/app/Actions/Proposals/*ProposalChange.php'),
     ];
 
     $offenders = [];
@@ -24,7 +26,7 @@ it('names the Project model only in the place bridge', function (): void {
         }
 
         if (preg_match('/App\\\\Models\\\\Project\b|\bProject::/', (string) file_get_contents($path)) === 1) {
-            $offenders[] = str_replace(base_path().DIRECTORY_SEPARATOR, '', $path);
+            $offenders[] = str_replace(dirname(__DIR__, 2).DIRECTORY_SEPARATOR, '', $path);
         }
     }
 

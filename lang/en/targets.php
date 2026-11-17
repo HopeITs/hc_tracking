@@ -162,4 +162,17 @@ return [
     'count_waiting_for_approval' => '{1} :count report is waiting for approval|[2,*] :count reports are waiting for approval',
     'where_committed' => 'Where it was committed',
     'delete_named_target' => 'Delete the target for “:name”?',
+    'console' => [
+        'backfill_targets' => 'Targets: :count.',
+        'backfill_with_place' => 'With a place: :count.',
+        'backfill_with_center' => 'With a center: :count.',
+        'backfill_city_wide' => 'City-wide (field work): :count.',
+        'backfill_shared' => 'Shared across several centers: :count.',
+        'backfill_without_center' => 'Without a center (center not set): :count.',
+        'backfill_without_project' => 'Without a project (no place): :count.',
+        'backfill_shared_ids' => 'Shared targets (id and centers): :ids.',
+        'backfill_without_center_ids' => 'Targets left without a center (ids): :ids.',
+        'backfill_disagree_ids' => 'Targets whose project center and row center disagree (ids): :ids.',
+        'backfill_no_row_ids' => 'Proposal targets whose project matches no location row (ids): :ids.',
+    ],
 ];

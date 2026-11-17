@@ -5,18 +5,25 @@ declare(strict_types=1);
 namespace App\Livewire\Concerns\Projects;
 
 use App\Actions\ReportTemplates\ConfirmReportTemplate;
+use App\Actions\ReportTemplates\DeleteReportTemplateQuestion;
+use App\Actions\ReportTemplates\MoveReportTemplateQuestion;
 use App\Actions\ReportTemplates\RetireReportTemplateLine;
 use App\Actions\ReportTemplates\SaveReportTemplateLine;
+use App\Actions\ReportTemplates\SaveReportTemplateQuestion;
+use App\Actions\ReportTemplates\SetReportTemplateQuestionActive;
 use App\Enums\IndicatorCollector;
 use App\Enums\LineSchedule;
+use App\Enums\NarrativeQuestionFrequency;
 use App\Enums\ProjectStatus;
 use App\Enums\ReportTemplateLineStatus;
 use App\Enums\ReportTemplateStatus;
 use App\Models\ActivitySchedule;
 use App\Models\EvidenceType;
+use App\Models\MonthlyReportAnswer;
 use App\Models\Project;
 use App\Models\Proposal;
 use App\Models\ReportTemplate;
+use App\Models\ReportTemplateQuestion;
 use App\Support\Reporting\PlaceBridge;
 use App\Support\ReportTemplateReader;
 use Flux\Flux;
@@ -24,6 +31,7 @@ use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Database\Eloquent\ModelNotFoundException;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Gate;
+use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
 use Livewire\Attributes\Computed;
 use Livewire\Attributes\Locked;
@@ -31,10 +39,12 @@ use Livewire\Attributes\Locked;
 /**
  * The "Report template" tab on projects/show (contracts.md §12.4, T33 slice
  * 3): the lines picked for confirmation, the edit-line dialog and the retire
- * confirmation. Every write goes through the T33 actions, which authorize
- * `manage` themselves and load each line through the template (BOLA); this
- * trait only gates the dialogs and turns refusals into translated toasts or
- * field errors.
+ * confirmation, and the narrative questions panel (Y-07 slice 2: add, edit,
+ * reorder, switch off / on, delete). Every write goes through the T33 and
+ * Y-07 actions, which authorize `manage` themselves and load each line or
+ * question through the template (BOLA); this trait only gates the dialogs and
+ * turns refusals into translated toasts or field errors. The template is
+ * always the one the tab shows, resolved server-side from the project.
  *
  * Used by projects/show only. The page provides projectId and the #[Computed]
  * project().
@@ -80,6 +90,43 @@ trait ManagesReportTemplate
     public array $templateLineEvidenceTypeIds = [];
 
     public string $templateLineFixedDenominator = '';
+
+    public bool $showTemplateQuestionModal = false;
+
+    #[Locked]
+    public ?int $editingTemplateQuestionId = null;
+
+    #[Locked]
+    public string $templateQuestionUpdatedAt = '';
+
+    public string $templateQuestionTextAr = '';
+
+    public string $templateQuestionTextEn = '';
+
+    public string $templateQuestionFrequency = '';
+
+    public bool $showSwitchOffTemplateQuestionModal = false;
+
+    #[Locked]
+    public ?int $switchingOffTemplateQuestionId = null;
+
+    #[Locked]
+    public string $switchingOffTemplateQuestionName = '';
+
+    public bool $showDeleteTemplateQuestionModal = false;
+
+    #[Locked]
+    public ?int $deletingTemplateQuestionId = null;
+
+    #[Locked]
+    public string $deletingTemplateQuestionName = '';
+
+    /** An answered question cannot be deleted: its delete dialog offers to switch it off instead. */
+    #[Locked]
+    public bool $deletingTemplateQuestionHasAnswers = false;
+
+    /** Read out by the panel's polite live region after a move. */
+    public string $templateQuestionAnnouncement = '';
 
     /**
      * The project's template, with just enough of the project for the policy.
@@ -366,6 +413,194 @@ trait ManagesReportTemplate
         Flux::toast(variant: 'success', text: __('report_templates.tab.retired'));
     }
 
+    public function openAddTemplateQuestion(): void
+    {
+        $this->authorizeTemplate('manage');
+
+        $this->resetTemplateQuestionForm();
+        $this->templateQuestionFrequency = NarrativeQuestionFrequency::Monthly->value;
+        $this->showTemplateQuestionModal = true;
+    }
+
+    public function openEditTemplateQuestion(int $questionId): void
+    {
+        $question = $this->findTemplateQuestion($questionId);
+
+        if ($question === null) {
+            return;
+        }
+
+        $this->resetTemplateQuestionForm();
+        $this->editingTemplateQuestionId = $question->id;
+        $this->templateQuestionUpdatedAt = (string) $question->updated_at?->toIso8601String();
+        $this->templateQuestionTextAr = $question->text_ar;
+        $this->templateQuestionTextEn = (string) $question->text_en;
+        $this->templateQuestionFrequency = $question->frequency->value;
+        $this->showTemplateQuestionModal = true;
+    }
+
+    public function saveTemplateQuestion(): void
+    {
+        $template = $this->authorizeTemplate('manage');
+        $isCreate = $this->editingTemplateQuestionId === null;
+
+        try {
+            app(SaveReportTemplateQuestion::class)->handle($template, $this->editingTemplateQuestionId, [
+                'text_ar' => $this->templateQuestionTextAr,
+                'text_en' => $this->templateQuestionTextEn,
+                'frequency' => $this->templateQuestionFrequency,
+            ], $isCreate ? null : $this->templateQuestionUpdatedAt);
+        } catch (ValidationException $exception) {
+            $this->showTemplateQuestionErrors($exception);
+
+            return;
+        } catch (ModelNotFoundException) {
+            $this->closeTemplateQuestionModal();
+            $this->templateQuestionMissing();
+
+            return;
+        }
+
+        $this->closeTemplateQuestionModal();
+        $this->forgetReportTemplate();
+
+        Flux::toast(variant: 'success', text: __($isCreate ? 'narrative_questions.created' : 'narrative_questions.updated'));
+    }
+
+    public function closeTemplateQuestionModal(): void
+    {
+        $this->showTemplateQuestionModal = false;
+        $this->resetTemplateQuestionForm();
+    }
+
+    /**
+     * Move a question one place up or down in its whole frequency; the panel
+     * puts keyboard focus back on the moved row's arrow.
+     */
+    public function moveTemplateQuestion(int $questionId, string $direction): void
+    {
+        $template = $this->authorizeTemplate('manage');
+        $direction = $direction === 'up' ? 'up' : 'down';
+
+        try {
+            app(MoveReportTemplateQuestion::class)->handle($template, $questionId, $direction);
+        } catch (ValidationException $exception) {
+            $this->forgetReportTemplate();
+            Flux::toast(variant: 'danger', text: (string) collect($exception->errors())->flatten()->first());
+
+            return;
+        } catch (ModelNotFoundException) {
+            $this->templateQuestionMissing();
+
+            return;
+        }
+
+        $this->forgetReportTemplate();
+
+        $questions = collect($this->reportTemplateItems['questions'] ?? []);
+        $moved = $questions->firstWhere('id', $questionId);
+
+        $this->templateQuestionAnnouncement = $moved === null ? '' : __('narrative_questions.moved_to', [
+            'text' => Str::limit($moved['text'], 80),
+            'position' => $moved['position'],
+            'total' => $questions->where('frequency', $moved['frequency'])->count(),
+            'frequency' => $moved['frequency']->label(),
+        ]);
+
+        // Flux disables the clicked arrow while the request runs, which drops
+        // keyboard focus; the panel puts it back on the moved row.
+        $this->dispatch('template-question-moved', questionId: $questionId, direction: $direction);
+    }
+
+    public function askSwitchOffTemplateQuestion(int $questionId): void
+    {
+        $question = $this->findTemplateQuestion($questionId);
+
+        if ($question === null) {
+            return;
+        }
+
+        $this->switchingOffTemplateQuestionId = $question->id;
+        $this->switchingOffTemplateQuestionName = Str::limit($question->localizedText(), 80);
+        $this->showSwitchOffTemplateQuestionModal = true;
+    }
+
+    public function switchOffTemplateQuestion(): void
+    {
+        if ($this->switchingOffTemplateQuestionId === null) {
+            return;
+        }
+
+        $questionId = $this->switchingOffTemplateQuestionId;
+        $this->cancelSwitchOffTemplateQuestion();
+
+        $this->runTemplateQuestionAction(fn (ReportTemplate $template) => app(SetReportTemplateQuestionActive::class)->handle($template, $questionId, false), 'narrative_questions.deactivated');
+    }
+
+    public function cancelSwitchOffTemplateQuestion(): void
+    {
+        $this->showSwitchOffTemplateQuestionModal = false;
+        $this->switchingOffTemplateQuestionId = null;
+        $this->switchingOffTemplateQuestionName = '';
+    }
+
+    /**
+     * Switching a question back on loses nothing, so it needs no confirmation.
+     */
+    public function switchOnTemplateQuestion(int $questionId): void
+    {
+        $this->runTemplateQuestionAction(fn (ReportTemplate $template) => app(SetReportTemplateQuestionActive::class)->handle($template, $questionId, true), 'narrative_questions.reactivated');
+    }
+
+    public function askDeleteTemplateQuestion(int $questionId): void
+    {
+        $question = $this->findTemplateQuestion($questionId);
+
+        if ($question === null) {
+            return;
+        }
+
+        $this->deletingTemplateQuestionId = $question->id;
+        $this->deletingTemplateQuestionName = Str::limit($question->localizedText(), 80);
+        $this->deletingTemplateQuestionHasAnswers = $question->getAttribute('has_answers') !== null;
+        $this->showDeleteTemplateQuestionModal = true;
+    }
+
+    public function deleteTemplateQuestion(): void
+    {
+        if ($this->deletingTemplateQuestionId === null) {
+            return;
+        }
+
+        $questionId = $this->deletingTemplateQuestionId;
+        $this->cancelDeleteTemplateQuestion();
+
+        $this->runTemplateQuestionAction(fn (ReportTemplate $template) => app(DeleteReportTemplateQuestion::class)->handle($template, $questionId), 'narrative_questions.deleted');
+    }
+
+    /**
+     * The delete dialog of an answered question: switch it off, as the message explains.
+     */
+    public function switchOffInsteadOfDeleteTemplateQuestion(): void
+    {
+        if ($this->deletingTemplateQuestionId === null) {
+            return;
+        }
+
+        $questionId = $this->deletingTemplateQuestionId;
+        $this->cancelDeleteTemplateQuestion();
+
+        $this->runTemplateQuestionAction(fn (ReportTemplate $template) => app(SetReportTemplateQuestionActive::class)->handle($template, $questionId, false), 'narrative_questions.deactivated');
+    }
+
+    public function cancelDeleteTemplateQuestion(): void
+    {
+        $this->showDeleteTemplateQuestionModal = false;
+        $this->deletingTemplateQuestionId = null;
+        $this->deletingTemplateQuestionName = '';
+        $this->deletingTemplateQuestionHasAnswers = false;
+    }
+
     /**
      * The confirm dialog's consequence: activation for an approved project,
      * new lines from next report for an active one.
@@ -455,6 +690,105 @@ trait ManagesReportTemplate
         $this->forgetReportTemplate();
 
         Flux::toast(variant: 'danger', text: __('report_templates.tab.line_missing'));
+    }
+
+    /**
+     * The question on the tab's template, with whether a monthly report has
+     * answered it; null (and a toast) when it is not on this template.
+     */
+    private function findTemplateQuestion(int $questionId): ?ReportTemplateQuestion
+    {
+        $template = $this->authorizeTemplate('manage');
+
+        $question = $template->questions()
+            ->whereKey($questionId)
+            ->select('report_template_questions.*')
+            ->addSelect(['has_answers' => MonthlyReportAnswer::query()
+                ->selectRaw('1')
+                ->whereColumn('monthly_report_answers.report_template_question_id', 'report_template_questions.id')
+                ->limit(1)])
+            ->first();
+
+        if ($question === null) {
+            $this->templateQuestionMissing();
+        }
+
+        return $question;
+    }
+
+    /**
+     * Run a switch off, switch on or delete on the tab's template; a refusal
+     * (answered, stale) becomes a toast, since there is no form.
+     *
+     * @param  callable(ReportTemplate): mixed  $action
+     */
+    private function runTemplateQuestionAction(callable $action, string $successKey): void
+    {
+        $template = $this->authorizeTemplate('manage');
+
+        try {
+            $action($template);
+        } catch (ValidationException $exception) {
+            $this->forgetReportTemplate();
+            Flux::toast(variant: 'danger', text: (string) collect($exception->errors())->flatten()->first());
+
+            return;
+        } catch (ModelNotFoundException) {
+            $this->templateQuestionMissing();
+
+            return;
+        }
+
+        $this->forgetReportTemplate();
+
+        Flux::toast(variant: 'success', text: __($successKey));
+    }
+
+    /**
+     * Put the action's messages on the dialog's fields; a stale question
+     * closes the dialog and reloads the panel.
+     */
+    private function showTemplateQuestionErrors(ValidationException $exception): void
+    {
+        $fields = [
+            'text_ar' => 'templateQuestionTextAr',
+            'text_en' => 'templateQuestionTextEn',
+            'frequency' => 'templateQuestionFrequency',
+        ];
+
+        foreach ($exception->errors() as $key => $messages) {
+            $field = $fields[$key] ?? null;
+
+            if ($field === null) {
+                $this->closeTemplateQuestionModal();
+                $this->forgetReportTemplate();
+                Flux::toast(variant: 'danger', text: (string) ($messages[0] ?? __('report_templates.stale')));
+
+                return;
+            }
+
+            $this->addError($field, (string) ($messages[0] ?? ''));
+        }
+    }
+
+    private function resetTemplateQuestionForm(): void
+    {
+        $this->resetValidation();
+        $this->editingTemplateQuestionId = null;
+        $this->templateQuestionUpdatedAt = '';
+        $this->templateQuestionTextAr = '';
+        $this->templateQuestionTextEn = '';
+        $this->templateQuestionFrequency = '';
+    }
+
+    private function templateQuestionMissing(): void
+    {
+        $this->showTemplateQuestionModal = false;
+        $this->showSwitchOffTemplateQuestionModal = false;
+        $this->showDeleteTemplateQuestionModal = false;
+        $this->forgetReportTemplate();
+
+        Flux::toast(variant: 'danger', text: __('report_templates.tab.question_missing'));
     }
 
     private function forgetReportTemplate(): void

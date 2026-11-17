@@ -55,6 +55,7 @@ use Livewire\Attributes\Locked;
  * @property-read Collection<int, EvidenceType> $evidenceTypes  #[Computed] evidenceTypes()
  * @property-read list<array<string, mixed>> $activities  #[Computed] activities()
  * @property-read Collection<int, ReportTemplateQuestion> $questions  #[Computed] questions()
+ * @property-read Collection<int, MonthlyReportAnswer> $answeredQuestions  #[Computed] answeredQuestions()
  * @property-read array{done: int, total: int, percent: int, needed: list<string>}|null $progress  #[Computed] progress()
  */
 trait ReadsMonthlyReport
@@ -382,15 +383,45 @@ trait ReadsMonthlyReport
     }
 
     /**
-     * The narrative questions asked this month (contracts §13.1 item 3),
-     * in MEAL's order.
+     * The narrative questions a draft asks this month (contracts §13.1
+     * item 3), live from the template in MEAL's order. Empty once the
+     * report left draft: it then shows its stored answers instead (D-41).
      *
      * @return Collection<int, ReportTemplateQuestion>
      */
     #[Computed]
     public function questions(): Collection
     {
+        if ($this->report->status !== MonthlyReportStatus::Draft) {
+            return new Collection;
+        }
+
         return SaveMonthlyReportAnswers::questions($this->report)->get(['id', 'report_template_id', 'text_ar', 'text_en', 'frequency']);
+    }
+
+    /**
+     * The answers a submitted or validated report keeps, with the question
+     * text stored at answer time (D-41): a later change to the template never
+     * shows here. Ordered by the linked question's current frequency and
+     * position, answers whose question was removed last, then by id. Empty
+     * on a draft.
+     *
+     * @return Collection<int, MonthlyReportAnswer>
+     */
+    #[Computed]
+    public function answeredQuestions(): Collection
+    {
+        $report = $this->report;
+
+        if ($report->status === MonthlyReportStatus::Draft) {
+            return new Collection;
+        }
+
+        $report->answers->loadMissing('question:id,frequency,sort_order');
+
+        return $report->answers
+            ->sort(fn (MonthlyReportAnswer $left, MonthlyReportAnswer $right): int => self::answerOrder($left) <=> self::answerOrder($right))
+            ->values();
     }
 
     /**
@@ -506,7 +537,7 @@ trait ReadsMonthlyReport
         unset(
             $this->report, $this->periods, $this->attribution, $this->abilities, $this->decidableRequest,
             $this->submitBlocker, $this->rows, $this->incompleteLines, $this->pendingMealLines,
-            $this->missingEvidence, $this->evidenceTypes, $this->activities, $this->questions, $this->progress,
+            $this->missingEvidence, $this->evidenceTypes, $this->activities, $this->questions, $this->answeredQuestions, $this->progress,
         );
 
         $this->renderedStatus = $this->report->status->value;
@@ -515,6 +546,19 @@ trait ReadsMonthlyReport
     protected function renderedStatus(): MonthlyReportStatus
     {
         return MonthlyReportStatus::from($this->renderedStatus);
+    }
+
+    /**
+     * The sort key of a stored answer: removed question last, then the
+     * question's frequency and position, then the answer's id.
+     *
+     * @return array{int, string, int, int}
+     */
+    protected static function answerOrder(MonthlyReportAnswer $answer): array
+    {
+        $question = $answer->question;
+
+        return [$question === null ? 1 : 0, $question?->frequency->value ?? '', $question?->sort_order ?? 0, $answer->id];
     }
 
     /**

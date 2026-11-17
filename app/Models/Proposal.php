@@ -203,6 +203,25 @@ class Proposal extends Model implements TracksActivity
     }
 
     /**
+     * The change requests asked for on this proposal after its approval
+     * (contracts.md §7, Y-09, D-89), newest first.
+     *
+     * @return HasMany<ProposalChangeRequest, $this>
+     */
+    public function changeRequests(): HasMany
+    {
+        return $this->hasMany(ProposalChangeRequest::class)->latest('id');
+    }
+
+    /**
+     * The one change request still waiting for its decision, if any.
+     */
+    public function pendingChangeRequest(): ?ProposalChangeRequest
+    {
+        return $this->changeRequests()->pending()->first();
+    }
+
+    /**
      * Project proposals still missing a center (Y-01 slice 3): not rejected,
      * with at least one location row that has no center and is not city-wide
      * field work (D-88). A proposal with no rows is not listed: it belongs to

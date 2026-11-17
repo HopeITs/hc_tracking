@@ -67,3 +67,61 @@
     :confirm-label="__('report_templates.tab.retire')"
     confirm-test="template-retire"
 />
+
+{{-- The narrative question dialogs (Y-07 slice 2), mirroring the bank's page: add / edit, switch off, delete. --}}
+<x-ui.modal
+    wire:model="showTemplateQuestionModal"
+    size="sm"
+    :title="$editingTemplateQuestionId === null ? __('narrative_questions.add_question') : __('narrative_questions.edit_question')"
+    :description="__('report_templates.tab.question_dialog_description')"
+    submit="saveTemplateQuestion"
+    close="closeTemplateQuestionModal"
+    required-note
+>
+    @if ($showTemplateQuestionModal)
+        @php
+            $chosenQuestionFrequency = \App\Enums\NarrativeQuestionFrequency::tryFrom($templateQuestionFrequency);
+        @endphp
+        <div class="grid gap-y-3" data-test="template-question-form">
+            <x-ui.form-textarea wire:model="templateQuestionTextAr" :label="__('narrative_questions.fields.text_ar')" required maxlength="1000" dir="rtl" lang="ar" data-test="template-question-text-ar" />
+            <x-ui.form-textarea wire:model="templateQuestionTextEn" :label="__('narrative_questions.fields.text_en')" :help="__('narrative_questions.text_en_help')" maxlength="1000" dir="ltr" lang="en" data-test="template-question-text-en" />
+            <x-ui.form-segmented
+                wire:model.live="templateQuestionFrequency"
+                :label="__('narrative_questions.fields.frequency')"
+                :help="$chosenQuestionFrequency === null ? null : __('narrative_questions.frequency_help.'.$chosenQuestionFrequency->value)"
+                required
+                :options="collect(\App\Enums\NarrativeQuestionFrequency::cases())->map(fn (\App\Enums\NarrativeQuestionFrequency $case): array => ['value' => $case->value, 'label' => $case->label(), 'test' => 'template-question-frequency-'.$case->value])->all()"
+            />
+        </div>
+    @endif
+
+    <x-slot:actions>
+        <x-ui.button type="submit" tone="primary" wire:target="saveTemplateQuestion" wire:loading.attr="disabled" data-test="template-question-save">{{ __('common.save_changes') }}</x-ui.button>
+    </x-slot:actions>
+</x-ui.modal>
+
+<x-ui.confirm-modal
+    icon="no-symbol"
+    wire:model="showSwitchOffTemplateQuestionModal"
+    close="cancelSwitchOffTemplateQuestion"
+    tone="neutral"
+    :title="__('narrative_questions.deactivate_title', ['name' => $switchingOffTemplateQuestionName])"
+    :message="__('report_templates.tab.question_switch_off_message')"
+    confirm="switchOffTemplateQuestion"
+    :confirm-label="__('narrative_questions.deactivate')"
+    confirm-test="confirm-switch-off-template-question"
+/>
+
+{{-- One dialog whose text follows $deletingTemplateQuestionHasAnswers: two dialogs swapped behind an @if would replace the open <dialog> element mid-request. --}}
+<x-ui.confirm-modal
+    :icon="$deletingTemplateQuestionHasAnswers ? 'no-symbol' : 'trash'"
+    :permanent="! $deletingTemplateQuestionHasAnswers"
+    wire:model="showDeleteTemplateQuestionModal"
+    close="cancelDeleteTemplateQuestion"
+    :tone="$deletingTemplateQuestionHasAnswers ? 'neutral' : 'danger'"
+    :title="__('narrative_questions.delete_title', ['name' => $deletingTemplateQuestionName])"
+    :message="$deletingTemplateQuestionHasAnswers ? __('report_templates.question_has_answers') : __('report_templates.tab.question_delete_message')"
+    :confirm="$deletingTemplateQuestionHasAnswers ? 'switchOffInsteadOfDeleteTemplateQuestion' : 'deleteTemplateQuestion'"
+    :confirm-label="$deletingTemplateQuestionHasAnswers ? __('narrative_questions.deactivate_instead') : __('narrative_questions.delete')"
+    :confirm-test="$deletingTemplateQuestionHasAnswers ? 'confirm-switch-off-instead-template-question' : 'confirm-delete-template-question'"
+/>
