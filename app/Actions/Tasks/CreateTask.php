@@ -18,7 +18,7 @@ class CreateTask
 {
     /**
      * @param  string  $sourceType  the morph map key: 'program', 'project' or 'proposal'
-     * @param  array{newTaskTitle: string, newTaskDescription?: string|null, newTaskStatus: string, newTaskPriority: string, newTaskDueDate: string, newTaskAssignedTo: array<int, int|string>}  $validated  keyed by the add-task form's property names
+     * @param  array{newTaskTitle: string, newTaskDescription?: string|null, newTaskStatus: string, newTaskPriority: string, newTaskDueDate: string, newTaskAssignedTo: array<int, int|string>, newTaskEvidenceRequired?: bool}  $validated  keyed by the add-task form's property names
      */
     public function handle(string $sourceType, int $sourceId, array $validated, int $createdBy): Task
     {
@@ -36,6 +36,7 @@ class CreateTask
                 'status' => $statusCase,
                 'priority' => $validated['newTaskPriority'],
                 'due_date' => $validated['newTaskDueDate'] === '' ? null : $validated['newTaskDueDate'],
+                'evidence_required' => (bool) ($validated['newTaskEvidenceRequired'] ?? false),
                 'progress_percentage' => $statusCase === TaskStatus::Done ? 100 : 0,
                 'completed_date' => $statusCase === TaskStatus::Done ? CarbonImmutable::today() : null,
                 'created_by' => $createdBy,

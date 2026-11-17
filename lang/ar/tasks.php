@@ -111,6 +111,7 @@ return [
     'no_tasks_in_this_status' => 'لا توجد مهام في هذه الحالة',
     'nothing_open_for_you' => 'لا توجد مهام مفتوحة مُسندة إليك.',
     'only_the_task_creator_can_change_the_due_date' => 'يمكن فقط لمن أسند هذه المهمة تغيير تاريخ استحقاقها.',
+    'only_the_task_creator_can_change_proof' => 'يمكن فقط لمن أسند هذه المهمة تغيير ما إذا كانت تتطلب إثباتًا.',
     'open_in_new_tab' => 'فتح في علامة تبويب جديدة',
     'open_task_title' => 'فتح :title',
     'overdue' => 'متأخرة',

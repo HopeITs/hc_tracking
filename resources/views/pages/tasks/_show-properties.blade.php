@@ -1,4 +1,4 @@
-{{-- The details column on ⚡show.blade.php: assignees, priority, dates, proof and what the task is related to, one row each. Each field saves the moment it changes for whoever may change it (updated() in the page); everyone else reads it as text. Only the creator moves the due date; the start date fills itself when work starts; the completed date shows once the task is done. --}}
+{{-- The details column on ⚡show.blade.php: assignees, priority, dates, proof and what the task is related to, one row each. Each field saves the moment it changes for whoever may change it (updated() in the page); everyone else reads it as text. Only the creator moves the due date or switches proof needed; the start date fills itself when work starts; the completed date shows once the task is done. --}}
 @use('App\Enums\TaskPriority')
 @use('App\Enums\TaskStatus')
 @php
@@ -144,7 +144,7 @@
         <div class="{{ $rowClass }}">
             <dt class="{{ $rowLabelClass }}">{{ __('tasks.show.proof_needed') }}</dt>
             <dd>
-                @if ($canEditTask)
+                @if ($canRescheduleTask)
                     <button
                         type="button"
                         role="switch"

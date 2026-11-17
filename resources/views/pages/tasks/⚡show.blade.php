@@ -178,6 +178,12 @@ new #[Layout('layouts::desk'), Title('titles.task')] class extends Component
             $this->dueDate = $validated['dueDate'];
         }
 
+        $evidenceKept = $canEdit && $task->created_by !== auth()->id() && $this->evidenceRequired !== $task->evidence_required;
+
+        if ($evidenceKept) {
+            $this->evidenceRequired = $task->evidence_required;
+        }
+
         $from = $task->status;
         $approved = TaskWorkflow::approves(auth()->user(), $task);
         $note = SendNudge::cleanNote($this->reviewNote);
@@ -233,6 +239,10 @@ new #[Layout('layouts::desk'), Title('titles.task')] class extends Component
 
         if ($dueDateKept) {
             Flux::toast(variant: 'danger', text: __('tasks.only_the_task_creator_can_change_the_due_date'));
+        }
+
+        if ($evidenceKept) {
+            Flux::toast(variant: 'danger', text: __('tasks.only_the_task_creator_can_change_proof'));
         }
 
         Flux::toast(variant: 'success', text: __('tasks.task_updated'));

@@ -9,6 +9,7 @@
         :editing="$editingTaskId !== null"
         :source-type-options="$showTaskModal ? $this->sourceTypeOptions : []"
         :source-options="$showTaskModal ? collect($this->sourceOptions)->mapWithKeys(fn ($sourceOption) => [$sourceOption->id => $sourceOption->name])->all() : []"
+        :proof-locked="$editingTaskId !== null && $editingTaskCreatedBy !== auth()->id()"
         test-prefix="calendar-task-form"
         save-test="calendar-save-task-button"
     />

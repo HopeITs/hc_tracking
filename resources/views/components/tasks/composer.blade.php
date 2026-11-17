@@ -7,6 +7,7 @@
     'sourceOptions' => [],
     'statusLocked' => false,
     'dueDateLocked' => false,
+    'proofLocked' => false,
     'dueFlag' => null,
     'testPrefix' => 'task-drawer',
     'saveTest' => 'save-task-button',
@@ -20,10 +21,11 @@
     single screen, not a step wizard. Where the task is filed ("Related to")
     sits on top, the title and description read like the task itself, and
     every property is a chip in one row (status, assignees, due date,
-    priority); start date, completed date and progress fold under "More
+    priority, proof needed); start date, completed date and progress fold under "More
     fields". Both pages' components own the same properties (title,
     description, taskSourceType, taskSourceId, taskStatus, taskPriority,
-    assignedTo, startDate, dueDate, completedDate, progressPercentage) and
+    assignedTo, startDate, dueDate, completedDate, progressPercentage,
+    evidenceRequired) and
     saveTask(), so the business rules stay in SavesTaskForm.
 
     @var array<string, string> $sourceTypeOptions  value => label
@@ -60,6 +62,7 @@
     $notes = collect([
         $statusLocked ? __('tasks.completed_tasks_cannot_change_status') : null,
         $dueDateLocked ? __('tasks.only_the_task_creator_can_change_the_due_date') : null,
+        $proofLocked ? __('tasks.only_the_task_creator_can_change_proof') : null,
     ])->filter()->values();
 
     $titleError = $errors->first('title');
@@ -239,6 +242,17 @@
                         <option value="{{ $priorityCase->value }}">{{ $priorityCase->label() }}</option>
                     @endforeach
                 </x-ui.form-select>
+
+                {{-- Proof needed: when on, the task can only be marked done once a file is attached. --}}
+                <label
+                    class="form-chip form-chip-toggle"
+                    title="{{ __('tasks.workflow.evidence_required_help') }}{{ $proofLocked ? ' · '.__('tasks.only_the_task_creator_can_change_proof') : '' }}"
+                    @if ($proofLocked) data-disabled @endif
+                >
+                    <input type="checkbox" wire:model="evidenceRequired" class="sr-only" @disabled($proofLocked) data-test="{{ $testPrefix }}-proof-needed" />
+                    <flux:icon.paper-clip variant="micro" class="size-3.5 shrink-0" aria-hidden="true" />
+                    <span>{{ __('tasks.show.proof_needed') }}</span>
+                </label>
 
                 <button
                     type="button"

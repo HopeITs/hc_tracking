@@ -1778,6 +1778,12 @@
         color: var(--color-secondary-medium);
     }
 
+    /* An on/off chip (a hidden checkbox inside the label): red while on. */
+    :is(.task-composer, .filter-picker) .form-chip-toggle:has(input:checked) {
+        border-color: var(--color-primary);
+        color: var(--color-primary);
+    }
+
     .form-chip-dot {
         flex-shrink: 0;
         width: 8px;
@@ -1889,6 +1895,11 @@
 
     .dark .form-chip[data-invalid] {
         border-color: var(--color-brand-text);
+    }
+
+    .dark :is(.task-composer, .filter-picker) .form-chip-toggle:has(input:checked) {
+        border-color: var(--color-brand-text);
+        color: var(--color-brand-text);
     }
 
     .dark :is(.task-composer, .filter-picker) .form-chip-ghost {

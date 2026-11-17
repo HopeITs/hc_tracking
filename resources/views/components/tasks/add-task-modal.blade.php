@@ -12,7 +12,7 @@
     to" on top, a large task name and quiet description, then every property
     as a chip. Each page's component owns the same properties (newTaskTitle,
     newTaskDescription, newTaskStatus, newTaskPriority, newTaskAssignedTo,
-    newTaskDueDate, newTaskTarget) and actions (addTask, closeAddTaskModal);
+    newTaskDueDate, newTaskEvidenceRequired, newTaskTarget) and actions (addTask, closeAddTaskModal);
     `testPrefix` keeps each page's data-test hooks distinct. "Related to" is a
     "Goes to" picker when the page's record sits in a program
     (AddsQuickTask::quickTaskPlaces), else the record itself, read-only.
@@ -193,6 +193,16 @@
                         <option value="{{ $priorityCase->value }}">{{ $priorityCase->label() }}</option>
                     @endforeach
                 </x-ui.form-select>
+
+                {{-- Proof needed: when on, the task can only be marked done once a file is attached. --}}
+                <label
+                    class="form-chip form-chip-toggle"
+                    title="{{ __('tasks.workflow.evidence_required_help') }}"
+                >
+                    <input type="checkbox" wire:model="newTaskEvidenceRequired" class="sr-only" data-test="{{ $testPrefix }}-proof-needed" />
+                    <flux:icon.paper-clip variant="micro" class="size-3.5 shrink-0" aria-hidden="true" />
+                    <span>{{ __('tasks.show.proof_needed') }}</span>
+                </label>
             </div>
 
             @if ($chipErrors->isNotEmpty())

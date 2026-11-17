@@ -1,6 +1,6 @@
 {{--
     The create/edit task dialog of tasks/index, with the locks it derives from
-    the draft (done status, past due date, creator-only due date). Included by
+    the draft (done status, past due date, creator-only due date and proof). Included by
     ⚡index.blade.php. The dialog itself is x-tasks.composer, shared with the
     calendar page.
 --}}
@@ -23,6 +23,7 @@
         :source-options="$showTaskDrawer ? collect($this->sourceOptions)->pluck('name', 'id')->all() : []"
         :status-locked="$isStatusLocked"
         :due-date-locked="$isDueDateLocked"
+        :proof-locked="$isDueDateLocked"
         :due-flag="$isMissedDraft ? 'missed' : ($isOverdueDraft ? 'overdue' : null)"
         test-prefix="task-drawer"
         save-test="save-task-button"

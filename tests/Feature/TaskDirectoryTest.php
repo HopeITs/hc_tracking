@@ -157,6 +157,47 @@ test('a task can have several assignees at once', function () {
         ->toBe(collect([$alice, $bob])->sort()->values()->all());
 });
 
+test('a task created from the drawer can ask for proof, and only its creator changes that later', function () {
+    $creator = User::factory()->role('General Manager')->create();
+    $editor = User::factory()->role('General Manager')->create();
+    $proposal = Proposal::factory()->create();
+
+    Livewire::actingAs($creator)
+        ->test('pages::tasks.index')
+        ->call('openCreateDrawer')
+        ->assertSet('evidenceRequired', false)
+        ->set('title', 'Signed attendance sheet')
+        ->set('taskSourceType', 'proposal')
+        ->set('taskSourceId', (string) $proposal->id)
+        ->set('assignedTo', [(string) insertHrEmployee()])
+        ->set('evidenceRequired', true)
+        ->call('saveTask')
+        ->assertHasNoErrors();
+
+    $task = Task::query()->where('title', 'Signed attendance sheet')->sole();
+    expect($task->evidence_required)->toBeTrue();
+
+    Livewire::actingAs($editor)
+        ->test('pages::tasks.index')
+        ->call('openEditDrawer', $task->id)
+        ->assertSet('evidenceRequired', true)
+        ->assertSeeHtml('Only the person who assigned this task can change whether it needs proof.')
+        ->set('evidenceRequired', false)
+        ->call('saveTask')
+        ->assertHasNoErrors();
+
+    expect($task->fresh()->evidence_required)->toBeTrue();
+
+    Livewire::actingAs($creator)
+        ->test('pages::tasks.index')
+        ->call('openEditDrawer', $task->id)
+        ->set('evidenceRequired', false)
+        ->call('saveTask')
+        ->assertHasNoErrors();
+
+    expect($task->fresh()->evidence_required)->toBeFalse();
+});
+
 test('creating a task rejects missing and invalid required selections', function () {
     $user = User::factory()->role('General Manager')->create();
 

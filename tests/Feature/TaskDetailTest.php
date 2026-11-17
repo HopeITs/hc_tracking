@@ -536,6 +536,21 @@ test('the creator turns proof needed on from the details switch and it saves at 
     expect($task->fresh()->evidence_required)->toBeTrue();
 });
 
+test('an editor who did not create the task reads proof needed as text and cannot change it', function () {
+    $creator = User::factory()->role('General Manager')->create();
+    $editor = User::factory()->role('General Manager')->create();
+    $task = Task::factory()->create(['created_by' => $creator->id, 'evidence_required' => true]);
+
+    Livewire::actingAs($editor)
+        ->test('pages::tasks.show', ['task' => $task])
+        ->assertSeeHtml('data-test="task-evidence-required-text"')
+        ->assertDontSeeHtml('data-test="task-evidence-required"')
+        ->set('evidenceRequired', false)
+        ->assertSet('evidenceRequired', true);
+
+    expect($task->fresh()->evidence_required)->toBeTrue();
+});
+
 test('the activity history is only built once the creator opens it', function () {
     $creator = User::factory()->role('General Manager')->create();
     $task = Task::factory()->create(['created_by' => $creator->id]);

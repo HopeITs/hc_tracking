@@ -206,6 +206,30 @@ test('adding a task from the project show page requires a title but no assignee'
         ->assertHasNoErrors(['newTaskAssignedTo']);
 });
 
+test('a task added from the project page can ask for proof, off by default', function () {
+    $user = User::factory()->role('General Manager')->create();
+    $project = Project::factory()->create();
+
+    $page = Livewire::actingAs($user)
+        ->test('pages::projects.show', ['project' => $project])
+        ->set('tab', 'tasks')
+        ->call('openAddTaskModal')
+        ->assertSet('newTaskEvidenceRequired', false)
+        ->assertSeeHtml('data-test="new-project-task-proof-needed"')
+        ->set('newTaskTitle', 'Plain task')
+        ->call('addTask')
+        ->assertHasNoErrors();
+
+    $page->call('openAddTaskModal')
+        ->set('newTaskTitle', 'Distribution photos')
+        ->set('newTaskEvidenceRequired', true)
+        ->call('addTask')
+        ->assertHasNoErrors();
+
+    expect(Task::query()->where('title', 'Plain task')->sole()->evidence_required)->toBeFalse()
+        ->and(Task::query()->where('title', 'Distribution photos')->sole()->evidence_required)->toBeTrue();
+});
+
 test('project detail shows targets naming this project', function () {
     $user = User::factory()->role('General Manager')->create();
     $project = Project::factory()->create();

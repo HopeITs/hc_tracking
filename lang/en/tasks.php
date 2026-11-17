@@ -111,6 +111,7 @@ return [
     'no_tasks_in_this_status' => 'No tasks in this status',
     'nothing_open_for_you' => 'Nothing open is assigned to you.',
     'only_the_task_creator_can_change_the_due_date' => 'Only the person who assigned this task can change its due date.',
+    'only_the_task_creator_can_change_proof' => 'Only the person who assigned this task can change whether it needs proof.',
     'open_in_new_tab' => 'Open in new tab',
     'open_task_title' => 'Open :title',
     'overdue' => 'Overdue',

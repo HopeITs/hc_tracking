@@ -45,6 +45,9 @@ trait AddsQuickTask
     /** @var array<int, string> */
     public array $newTaskAssignedTo = [];
 
+    /** Whether the task can only be marked done once a file is attached. */
+    public bool $newTaskEvidenceRequired = false;
+
     /** Where the new task goes: "program" or "project:ID". */
     public string $newTaskTarget = '';
 
@@ -115,6 +118,7 @@ trait AddsQuickTask
         $this->newTaskPriority = TaskPriority::Medium->value;
         $this->newTaskDueDate = '';
         $this->newTaskAssignedTo = [];
+        $this->newTaskEvidenceRequired = false;
         $this->newTaskTarget = $this->quickTaskTarget();
         $this->showAddTaskModal = true;
     }
@@ -138,6 +142,7 @@ trait AddsQuickTask
             'newTaskDueDate' => ['nullable', 'date'],
             'newTaskAssignedTo' => ['array'],
             'newTaskAssignedTo.*' => ['integer', Rule::exists(HrEmployee::class, 'id')],
+            'newTaskEvidenceRequired' => ['boolean'],
         ], [
             'newTaskTitle.required' => __('tasks.enter_a_task_title'),
             'newTaskAssignedTo.*.exists' => __('tasks.the_selected_assignee_is_no_longer_available'),

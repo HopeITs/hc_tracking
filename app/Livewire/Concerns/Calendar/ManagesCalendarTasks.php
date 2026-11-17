@@ -68,6 +68,12 @@ trait ManagesCalendarTasks
 
     public string $progressPercentage = '0';
 
+    /** Whether the task can only be marked done once a file is attached; only its creator changes it. */
+    public bool $evidenceRequired = false;
+
+    /** Who created the task being edited, so the form locks what only its creator may change. */
+    public ?int $editingTaskCreatedBy = null;
+
     /** @var array<int, string> */
     public array $assignedTo = [];
 
@@ -132,7 +138,7 @@ trait ManagesCalendarTasks
     public function openEditTaskModal(int $taskId): void
     {
         $task = Task::query()
-            ->select(['id', 'slug', 'source_type', 'source_id', 'title', 'description', 'status', 'priority', 'start_date', 'due_date', 'completed_date', 'progress_percentage', 'created_by'])
+            ->select(['id', 'slug', 'source_type', 'source_id', 'title', 'description', 'status', 'priority', 'start_date', 'due_date', 'completed_date', 'progress_percentage', 'evidence_required', 'created_by'])
             ->with('taskAssignees:id,task_id,employee_id')
             ->findOrFail($taskId);
 
@@ -146,6 +152,7 @@ trait ManagesCalendarTasks
 
         $this->resetValidation();
         $this->editingTaskId = $task->id;
+        $this->editingTaskCreatedBy = $task->created_by;
         $this->title = $task->title;
         $this->description = $task->description ?? '';
         $this->taskStatus = $task->status->value;
@@ -154,6 +161,7 @@ trait ManagesCalendarTasks
         $this->dueDate = $task->due_date?->toDateString() ?? '';
         $this->completedDate = $task->completed_date?->toDateString() ?? '';
         $this->progressPercentage = (string) $task->progress_percentage;
+        $this->evidenceRequired = $task->evidence_required;
         $this->assignedTo = $task->taskAssignees->pluck('employee_id')->map(fn (int $id): string => (string) $id)->all();
         $this->taskSourceType = $task->source_type;
         $this->taskSourceId = (string) $task->source_id;
@@ -214,6 +222,7 @@ trait ManagesCalendarTasks
     {
         $this->resetValidation();
         $this->editingTaskId = null;
+        $this->editingTaskCreatedBy = null;
         $this->title = '';
         $this->description = '';
         $this->taskStatus = TaskStatus::Todo->value;
@@ -222,6 +231,7 @@ trait ManagesCalendarTasks
         $this->dueDate = '';
         $this->completedDate = '';
         $this->progressPercentage = '0';
+        $this->evidenceRequired = false;
         $this->assignedTo = [];
         $this->taskSourceType = 'proposal';
         $this->taskSourceId = '';

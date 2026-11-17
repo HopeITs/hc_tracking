@@ -13,13 +13,14 @@ use Illuminate\Support\Facades\Gate;
 /**
  * Create or edit a task from the task form (tasks directory drawer, calendar
  * dialog). A done task is closed and is not changed; only the task's creator
- * moves its due date, so anyone else's due-date change is dropped. A status
- * change follows TaskWorkflow (refused as a taskStatus error).
+ * moves its due date and decides whether it needs proof, so anyone else's
+ * change to either is dropped. A status change follows TaskWorkflow (refused
+ * as a taskStatus error).
  */
 class SaveTask
 {
     /**
-     * @param  array{title: string, description: string, taskStatus: string, taskPriority: string, startDate: string, dueDate: string, completedDate: string, progressPercentage: string, assignedTo: array<int, string>, taskSourceType: string, taskSourceId: string}  $validated  keyed by the task form's property names
+     * @param  array{title: string, description: string, taskStatus: string, taskPriority: string, startDate: string, dueDate: string, completedDate: string, progressPercentage: string, assignedTo: array<int, string>, taskSourceType: string, taskSourceId: string, evidenceRequired?: bool}  $validated  keyed by the task form's property names
      * @return array{task: ?Task, lockedBecauseDone: bool, dueDateKept: bool}
      */
     public function handle(?Task $existing, array $validated, int $actorId): array
@@ -53,6 +54,10 @@ class SaveTask
             $dueDateKept = true;
         }
 
+        $evidenceRequired = $isCreate || $task->created_by === $actorId
+            ? (bool) ($validated['evidenceRequired'] ?? false)
+            : $task->evidence_required;
+
         $attributes = [
             'title' => $validated['title'],
             'description' => $validated['description'] === '' ? null : $validated['description'],
@@ -60,6 +65,7 @@ class SaveTask
             'priority' => $validated['taskPriority'],
             'start_date' => $validated['startDate'] === '' ? null : $validated['startDate'],
             'due_date' => $dueDate,
+            'evidence_required' => $evidenceRequired,
             'completed_date' => $validated['completedDate'] === '' ? null : $validated['completedDate'],
             'progress_percentage' => (int) $validated['progressPercentage'],
             'source_type' => $validated['taskSourceType'],
