@@ -101,7 +101,7 @@ final class ConfirmReportTemplate
             if ($project?->status === ProjectStatus::Approved) {
                 $this->activateProject->handle($project, 'template_confirmation');
             } elseif ($lines->isNotEmpty()) {
-                $this->recordLinesAdded($locked, $lines, $project);
+                $this->recordLinesAdded($locked, $lines, $project?->id, $project?->end_date);
             }
 
             return $locked;
@@ -171,9 +171,10 @@ final class ConfirmReportTemplate
      * from and the months they cover (`report_template.lines_added`).
      *
      * @param  Collection<int, ReportTemplateLine>  $lines
-     * @param  object|null  $project  the template's legacy project, when it has one
+     * @param  int|null  $projectId  the template's legacy project, when it has one
+     * @param  CarbonImmutable|null  $projectEnd  that project's end date
      */
-    private function recordLinesAdded(ReportTemplate $template, Collection $lines, ?object $project): void
+    private function recordLinesAdded(ReportTemplate $template, Collection $lines, ?int $projectId, ?CarbonImmutable $projectEnd): void
     {
         $proposalIds = $lines
             ->map(fn (ReportTemplateLine $line): ?int => $line->planIndicator?->source_type === 'proposal' ? $line->planIndicator->source_id : null)
@@ -192,26 +193,16 @@ final class ConfirmReportTemplate
 
         $from = $lines->min(fn (ReportTemplateLine $line): string => $line->effective_from->format('Y-m'));
         $to = $lines->contains(fn (ReportTemplateLine $line): bool => $line->effective_to === null)
-            ? $this->projectEndMonth($project) ?? $from
+            ? $projectEnd?->format('Y-m') ?? $from
             : $lines->max(fn (ReportTemplateLine $line): string => $line->effective_to?->format('Y-m') ?? '');
 
         $template->recordActivity('report_template.lines_added', properties: [
-            'project_id' => $project?->id,
+            'project_id' => $projectId,
             'line_ids' => $lines->modelKeys(),
             'proposal_ids' => array_values(array_map(intval(...), $proposalIds)),
             'proposals' => array_values($proposalNames),
             'from_month' => $from,
             'to_month' => $to,
         ]);
-    }
-
-    /**
-     * The project's last month, for a line with no end of its own.
-     */
-    private function projectEndMonth(?object $project): ?string
-    {
-        $end = $project?->end_date;
-
-        return $end === null ? null : CarbonImmutable::parse($end->toDateString())->format('Y-m');
     }
 }

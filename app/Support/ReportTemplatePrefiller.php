@@ -542,7 +542,7 @@ final class ReportTemplatePrefiller
             module: $event['module'],
             priority: NotificationPriority::Important,
             key: 'notifications.events.'.self::PendingEvent,
-            params: ['subject' => $project?->name ?? $template->activityLabel()],
+            params: ['subject' => $project->name ?? $template->activityLabel()],
             subjectType: $subject->getMorphClass(),
             subjectId: $subject->getKey(),
         );

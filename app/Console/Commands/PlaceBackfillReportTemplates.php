@@ -102,7 +102,7 @@ class PlaceBackfillReportTemplates extends Command
                 'city_wide' => $cityWide,
                 'disagree' => $disagree && $project->center_id === null,
                 'created_at' => $template->created_at,
-                'proposal_ids' => DB::table('project_proposal')->where('project_id', $template->project_id)->orderBy('proposal_id')->pluck('proposal_id')->map(fn ($id): int => (int) $id)->all(),
+                'proposal_ids' => array_values(DB::table('project_proposal')->where('project_id', $template->project_id)->orderBy('proposal_id')->pluck('proposal_id')->map(fn ($id): int => (int) $id)->all()),
             ];
         }
 
@@ -139,7 +139,7 @@ class PlaceBackfillReportTemplates extends Command
     /**
      * What each row carrying the project says, de-duplicated: one center, city-wide, or nothing.
      *
-     * @return array<string, array{center_id: int|null, city_wide: bool}>
+     * @return array<int|string, array{center_id: int|null, city_wide: bool}>
      */
     private function rowAnswers(int $projectId): array
     {

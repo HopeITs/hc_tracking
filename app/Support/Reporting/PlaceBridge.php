@@ -32,7 +32,7 @@ final class PlaceBridge
     {
         $project = $this->projectOf($target);
 
-        if ($project === null || $project->program_id === null) {
+        if ($project === null) {
             return null;
         }
 

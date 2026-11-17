@@ -185,7 +185,7 @@ class ReportTemplate extends Model implements TracksActivity
             return (string) Project::query()->whereKey($projectId)->value('name');
         }
 
-        return (string) Program::query()->find($this->activityAttribute('program_id'))?->name;
+        return (string) Program::query()->whereKey($this->activityAttribute('program_id'))->first()?->name;
     }
 
     public function activityProgramId(): ?int
