@@ -42,6 +42,9 @@
                     <div class="flex flex-wrap items-start justify-between gap-x-6 gap-y-3">
                         <div class="min-w-0 flex-1 basis-64">
                             <p class="font-semibold" dir="auto">{{ $activity['statement'] }}</p>
+                            @if ($activity['proposal'] !== null)
+                                <p class="type-meta {{ $mutedText }}" dir="auto" data-activity-proposal="{{ $activity['id'] }}">{{ $activity['proposal'] }}</p>
+                            @endif
                             <p class="mt-0.5 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs {{ $mutedText }}">
                                 @if ($activity['planned'] !== null)
                                     <span class="inline-flex items-center gap-1">

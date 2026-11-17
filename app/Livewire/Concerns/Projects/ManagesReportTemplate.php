@@ -12,8 +12,10 @@ use App\Enums\LineSchedule;
 use App\Enums\ProjectStatus;
 use App\Enums\ReportTemplateLineStatus;
 use App\Enums\ReportTemplateStatus;
+use App\Models\ActivitySchedule;
 use App\Models\EvidenceType;
 use App\Models\Project;
+use App\Models\Proposal;
 use App\Models\ReportTemplate;
 use App\Support\Reporting\PlaceBridge;
 use App\Support\ReportTemplateReader;
@@ -118,6 +120,35 @@ trait ManagesReportTemplate
         }
 
         return app(ReportTemplateReader::class)->tabItems($this->reportTemplate);
+    }
+
+    /**
+     * The template's activity calendar (Y-06): read only, with a link to each
+     * proposal's own calendar tab for those who may edit it there. The link
+     * also needs the right to open the proposal (MEAL may edit a calendar
+     * without holding `proposals.view`).
+     *
+     * @return array{months: list<array{key: string, label: string}>, groups: list<array{proposal: Proposal, editUrl: string|null, rows: list<array<string, mixed>>}>, multiple: bool}|null
+     */
+    #[Computed]
+    public function templateCalendar(): ?array
+    {
+        if (! $this->canViewReportTemplate) {
+            return null;
+        }
+
+        $calendar = app(ReportTemplateReader::class)->calendarFor($this->reportTemplate);
+        $user = Auth::user();
+
+        $calendar['groups'] = array_map(function (array $group) use ($user): array {
+            $mayEdit = $user !== null
+                && $user->can('update', [ActivitySchedule::class, $group['proposal']])
+                && $user->can('view', $group['proposal']);
+
+            return [...$group, 'editUrl' => $mayEdit ? route('proposals.show', ['proposal' => $group['proposal'], 'ptab' => 'logframe']) : null];
+        }, $calendar['groups']);
+
+        return $calendar;
     }
 
     /**
@@ -428,6 +459,6 @@ trait ManagesReportTemplate
 
     private function forgetReportTemplate(): void
     {
-        unset($this->reportTemplate, $this->reportTemplateItems, $this->canViewReportTemplate, $this->canManageReportTemplate);
+        unset($this->reportTemplate, $this->reportTemplateItems, $this->templateCalendar, $this->canViewReportTemplate, $this->canManageReportTemplate);
     }
 }
