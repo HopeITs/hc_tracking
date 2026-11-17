@@ -1,4 +1,4 @@
-{{-- The "Report template" tab (T33 slice 3): lines grouped by proposal, editable and confirmable by MEAL only. --}}
+{{-- The "Report template" tab (T33 slice 3): lines grouped by proposal, editable and confirmable by MEAL only; then the narrative questions panel (Y-07). --}}
 @php
     $templateItems = $this->reportTemplateItems;
     $canManageTemplate = $this->canManageReportTemplate;
@@ -195,24 +195,6 @@
             @endif
         </x-ui.panel>
 
-        <x-ui.panel :title="__('report_templates.tab.questions')" :subtitle="__('report_templates.tab.questions_help')" :count="count($templateItems['questions'])">
-            @if ($templateItems['questions'] === [])
-                <p class="p-3.5 text-sm italic text-secondary-medium dark:text-ink-muted">{{ __('report_templates.tab.questions_empty') }}</p>
-            @else
-                <ol class="flex flex-col divide-y divide-secondary-soft dark:divide-line" data-template-questions>
-                    @foreach ($templateItems['questions'] as $question)
-                        <li class="flex flex-wrap items-start justify-between gap-2 px-4 py-2.5" wire:key="template-question-{{ $question['id'] }}">
-                            <span class="min-w-0 text-sm text-secondary-dark dark:text-ink" dir="auto">{{ $question['text'] }}</span>
-                            <span class="flex shrink-0 items-center gap-1.5">
-                                <x-ui.enum-badge :case="$question['frequency']" />
-                                @unless ($question['isActive'])
-                                    <span class="inline-flex items-center rounded-md border border-secondary-soft px-2 py-0.5 text-xs font-semibold text-secondary-medium dark:border-line dark:text-ink-muted">{{ __('report_templates.tab.question_inactive') }}</span>
-                                @endunless
-                            </span>
-                        </li>
-                    @endforeach
-                </ol>
-            @endif
-        </x-ui.panel>
+        @include('pages.projects._show-template-questions')
     @endif
 </div>

@@ -22,7 +22,9 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
  * for a project's own question, or once the bank question is deleted).
  *
  * `sort_order` is fillable so the bank copy keeps its order; `is_active` is
- * not, and moves only through the template-question actions (slice 3).
+ * not, and moves only through the Y-07 template-question actions
+ * (SaveReportTemplateQuestion, MoveReportTemplateQuestion,
+ * SetReportTemplateQuestionActive, DeleteReportTemplateQuestion).
  *
  * @property int $id
  * @property int $report_template_id

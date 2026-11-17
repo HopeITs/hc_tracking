@@ -1,6 +1,8 @@
-{{-- The narrative questions of the month on ⚡show.blade.php (contracts §13.1 item 3, D-43a); answers save on blur and are optional on submit. --}}
+{{-- The narrative questions of the month on ⚡show.blade.php (contracts §13.1 item 3, D-43a); answers save on blur and are optional on submit. A draft asks the template's live questions; a submitted or validated report lists the answers it kept, with the question text stored at answer time (D-41). --}}
 @php
+    $isDraft = $this->report->status === \App\Enums\MonthlyReportStatus::Draft;
     $questions = $this->questions;
+    $answeredQuestions = $this->answeredQuestions;
     $fillsNarrative = $this->fillsNarrative();
     $storedAnswers = $this->report->answers->keyBy('report_template_question_id');
     $mutedText = 'text-secondary-medium dark:text-ink-muted';
@@ -14,7 +16,28 @@
         @endif
     </div>
 
-    @if ($questions->isEmpty())
+    @if (! $isDraft && $answeredQuestions->isEmpty())
+        @include('pages.monthly-reports._show-empty-line', ['key' => 'answers', 'icon' => 'chat-bubble-left-right', 'heading' => __('monthly_reports.no_stored_answers'), 'body' => null])
+    @elseif (! $isDraft)
+        <ol class="flex flex-col border-t border-secondary-soft dark:border-line" role="list">
+            @foreach ($answeredQuestions as $storedAnswer)
+                <li class="flex flex-col gap-2 border-b border-secondary-soft py-4 dark:border-line" wire:key="stored-answer-{{ $storedAnswer->id }}">
+                    <div class="flex flex-wrap items-center gap-2">
+                        <p class="font-semibold" dir="auto">{{ $storedAnswer->question_text }}</p>
+                        @if ($storedAnswer->question?->frequency === \App\Enums\NarrativeQuestionFrequency::QuarterEnd)
+                            <span class="rounded-md border border-secondary-light px-1.5 py-0.5 text-[11px] font-semibold dark:border-line-strong">{{ __('monthly_reports.quarter_end_question') }}</span>
+                        @endif
+                    </div>
+
+                    @if (filled($storedAnswer->answer))
+                        <p class="text-sm whitespace-pre-line" dir="auto">{{ $storedAnswer->answer }}</p>
+                    @else
+                        <p class="text-sm {{ $mutedText }}">{{ __('monthly_reports.no_answer') }}</p>
+                    @endif
+                </li>
+            @endforeach
+        </ol>
+    @elseif ($questions->isEmpty())
         @include('pages.monthly-reports._show-empty-line', ['key' => 'answers', 'icon' => 'chat-bubble-left-right', 'heading' => __('monthly_reports.no_questions'), 'body' => __('monthly_reports.no_questions_body')])
     @else
         <ol class="flex flex-col border-t border-secondary-soft dark:border-line" role="list">

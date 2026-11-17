@@ -927,6 +927,10 @@ return [
                 'title' => 'مؤشرات جديدة للتقرير',
                 'body' => 'أضاف :actor مؤشرات المقترح «:proposal» إلى قالب تقرير المشروع «:subject»، من :from_month إلى :to_month',
             ],
+            'question_added' => 'أضاف :actor سؤالًا سرديًا إلى قالب تقرير المشروع «:subject»',
+            'question_changed' => 'عدّل :actor سؤالًا سرديًا في قالب تقرير المشروع «:subject»',
+            'question_switched' => 'أوقف :actor سؤالًا سرديًا في قالب تقرير المشروع «:subject» أو شغّله',
+            'question_removed' => 'حذف :actor سؤالًا سرديًا من قالب تقرير المشروع «:subject»',
         ],
         'department_task' => [
             'created' => [

@@ -927,6 +927,10 @@ return [
                 'title' => 'New indicators to report',
                 'body' => ':actor added indicators for “:proposal” to the report template of “:subject”, from :from_month to :to_month',
             ],
+            'question_added' => ':actor added a narrative question to the report template of “:subject”',
+            'question_changed' => ':actor edited a narrative question of the report template of “:subject”',
+            'question_switched' => ':actor switched a narrative question of the report template of “:subject” off or on',
+            'question_removed' => ':actor deleted a narrative question from the report template of “:subject”',
         ],
         'department_task' => [
             'created' => [
