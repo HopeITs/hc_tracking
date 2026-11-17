@@ -656,6 +656,22 @@ return [
                 'title' => 'Beneficiaries changed',
                 'body' => ':actor changed the beneficiaries of “:subject”',
             ],
+            'change_requested' => [
+                'title' => 'Change request',
+                'body' => ':actor asked for a change to “:subject”',
+            ],
+            'change_reviewed' => [
+                'title' => 'Change request ready for your decision',
+                'body' => ':actor reviewed the change request on “:subject”',
+            ],
+            'change_approved' => [
+                'title' => 'Change request approved',
+                'body' => ':actor approved the change request on “:subject”',
+            ],
+            'change_rejected' => [
+                'title' => 'Change request rejected',
+                'body' => ':actor rejected the change request on “:subject”',
+            ],
             'project_linked' => [
                 'title' => 'Project linked',
                 'body' => ':actor linked a project to “:subject”',
@@ -918,6 +934,10 @@ return [
                 'title' => 'New indicators to report',
                 'body' => ':actor added indicators for “:proposal” to the report template of “:subject”, from :from_month to :to_month',
             ],
+            'question_added' => ':actor added a narrative question to the report template of “:subject”',
+            'question_changed' => ':actor edited a narrative question of the report template of “:subject”',
+            'question_switched' => ':actor switched a narrative question of the report template of “:subject” off or on',
+            'question_removed' => ':actor deleted a narrative question from the report template of “:subject”',
         ],
         'department_task' => [
             'created' => [

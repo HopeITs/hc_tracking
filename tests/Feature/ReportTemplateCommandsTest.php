@@ -122,6 +122,10 @@ describe('report-templates:prefill-active', function () {
             $this->approved->id => ['target_beneficiaries' => 40],
             $this->closed->id => ['target_beneficiaries' => 40],
         ]);
+        foreach ([$this->active, $this->approved, $this->closed] as $project) {
+            proposalRowForProject($this->proposal, $project);
+        }
+
         $this->output = Result::factory()->create(['type' => ResultType::Output, 'program_id' => $this->program->id, 'proposal_id' => $this->proposal->id]);
 
         $this->target = function (Project $project, ?array $library = []): PlanIndicator {
@@ -158,7 +162,9 @@ describe('report-templates:prefill-active', function () {
             ->assertSuccessful();
 
         $template = ReportTemplate::query()->sole();
-        expect($template->project_id)->toBe($this->active->id)
+        expect($template->project_id)->toBeNull()
+            ->and($template->city_id)->toBe($this->active->city_id)
+            ->and($template->proposals()->pluck('proposals.id')->all())->toBe([$this->proposal->id])
             ->and($template->status)->toBe(ReportTemplateStatus::Pending)
             ->and(DB::table('report_template_questions')->where('report_template_id', $template->id)->count())->toBe($questions)
             ->and(ReportTemplateLine::query()->orderBy('plan_indicator_id')->pluck('plan_indicator_id')->all())->toBe([$this->fixed->id, $this->count->id])

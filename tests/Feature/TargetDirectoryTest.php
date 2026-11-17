@@ -649,3 +649,38 @@ test('a filter with no match offers a way out and the delete dialog names the ta
         ->call('confirmDelete', $target->id)
         ->assertSee('Delete the target for “Meals served”?');
 });
+
+test('a saved form target carries the place of its project, and re-pointing it rewrites the place (Y-08)', function () {
+    $user = mealManager();
+    $program = Program::factory()->create();
+    $indicator = Indicator::factory()->for(Result::factory()->for($program))->create();
+    $plan = AnnualPlan::factory()->for($program)->create();
+    $first = Project::factory()->for($program)->create(['center_id' => 9201]);
+    $second = Project::factory()->for($program)->create(['center_id' => 9202]);
+
+    Livewire::actingAs($user)
+        ->test('pages::targets.index')
+        ->call('openCreateModal')
+        ->set('targetIndicatorId', (string) $indicator->id)
+        ->set('targetSourceType', 'annual_plan')
+        ->set('targetSourceId', (string) $plan->id)
+        ->set('targetProjectId', (string) $first->id)
+        ->set('targetValue', '500')
+        ->call('saveTarget')
+        ->assertHasNoErrors();
+
+    $target = PlanIndicator::query()->sole();
+    expect($target->place()?->centerId)->toBe(9201)
+        ->and($target->city_id)->toBe($first->city_id)
+        ->and($target->program_id)->toBe($program->id);
+
+    Livewire::actingAs($user)
+        ->test('pages::targets.index')
+        ->call('openEditModal', $target->id)
+        ->set('targetProjectId', (string) $second->id)
+        ->call('saveTarget')
+        ->assertHasNoErrors();
+
+    expect($target->refresh()->place()?->centerId)->toBe(9202)
+        ->and($target->city_id)->toBe($second->city_id);
+});

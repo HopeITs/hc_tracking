@@ -250,3 +250,37 @@ test('the window scope reads a project\'s proposal targets in a period', functio
 
     expect($inside)->toBe(1)->and($outside)->toBe(0);
 });
+
+test('a saved cell carries the place of its project (Y-08)', function () {
+    $this->centerA->forceFill(['center_id' => 9101])->save();
+
+    saveGrid($this->proposal, [gridCell($this->indicator, $this->centerA, '120')]);
+
+    expect((array) DB::table('plan_indicators')->first(['city_id', 'program_id', 'center_id', 'city_wide', 'all_centers']))->toBe([
+        'city_id' => $this->centerA->city_id,
+        'program_id' => $this->program->id,
+        'center_id' => 9101,
+        'city_wide' => 0,
+        'all_centers' => 0,
+    ]);
+});
+
+test('the grid resolves the places once per save, not per cell (3 projects × 5 indicators)', function () {
+    $centerC = Project::factory()->create(['program_id' => $this->program->id]);
+    DB::table('project_proposal')->insert(['project_id' => $centerC->id, 'proposal_id' => $this->proposal->id]);
+    $indicators = [$this->indicator, ...collect(range(1, 4))->map(fn (): Indicator => gridIndicator($this->output))->all()];
+    $cells = [];
+
+    foreach ($indicators as $indicator) {
+        foreach ([$this->centerA, $this->centerB, $centerC] as $project) {
+            $cells[] = gridCell($indicator, $project, '10');
+        }
+    }
+
+    DB::enableQueryLog();
+    saveGrid($this->proposal, $cells);
+    $queries = collect(DB::getQueryLog())->pluck('query');
+
+    expect($queries->filter(fn (string $sql): bool => str_contains($sql, 'from `proposal_locations`'))->count())->toBe(1)
+        ->and(DB::table('plan_indicators')->whereNotNull('city_id')->count())->toBe(15);
+});

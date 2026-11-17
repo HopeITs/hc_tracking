@@ -36,7 +36,7 @@ new #[Layout('layouts::desk'), Title('titles.report_templates')] class extends C
     /**
      * Every queue row of this user, at a fixed query count.
      *
-     * @return list<array{template: \App\Models\ReportTemplate, project: \App\Models\Project, status: ReportTemplateStatus, pendingLineCount: int, annualPlanLineCount: int, proposals: list<array{id: int, name: string, number: string}>, cityId: int|null, cityName: string|null, centerName: string|null}>
+     * @return list<array{template: \App\Models\ReportTemplate, project: object|null, name: string, status: ReportTemplateStatus, pendingLineCount: int, annualPlanLineCount: int, proposals: list<array{id: int, name: string, number: string}>, cityId: int|null, cityName: string|null, centerName: string|null}>
      */
     #[Computed]
     public function rows(): array
@@ -89,7 +89,7 @@ new #[Layout('layouts::desk'), Title('titles.report_templates')] class extends C
      * The rows that match the city and the search, whatever button is pressed.
      * The two buttons count these, so a click shows exactly that many.
      *
-     * @return list<array{template: \App\Models\ReportTemplate, project: \App\Models\Project, status: ReportTemplateStatus, pendingLineCount: int, annualPlanLineCount: int, proposals: list<array{id: int, name: string, number: string}>, cityId: int|null, cityName: string|null, centerName: string|null}>
+     * @return list<array{template: \App\Models\ReportTemplate, project: object|null, name: string, status: ReportTemplateStatus, pendingLineCount: int, annualPlanLineCount: int, proposals: list<array{id: int, name: string, number: string}>, cityId: int|null, cityName: string|null, centerName: string|null}>
      */
     #[Computed]
     public function matchingRows(): array
@@ -105,7 +105,7 @@ new #[Layout('layouts::desk'), Title('titles.report_templates')] class extends C
                 return true;
             }
 
-            $haystack = collect([$row['project']->name, $row['cityName'], $row['centerName'], ...array_column($row['proposals'], 'name')])->filter()->implode(' ');
+            $haystack = collect([$row['name'], $row['cityName'], $row['centerName'], ...array_column($row['proposals'], 'name')])->filter()->implode(' ');
 
             return str_contains(mb_strtolower($haystack), $term);
         }));
@@ -125,7 +125,7 @@ new #[Layout('layouts::desk'), Title('titles.report_templates')] class extends C
     }
 
     /**
-     * @return list<array{template: \App\Models\ReportTemplate, project: \App\Models\Project, status: ReportTemplateStatus, pendingLineCount: int, annualPlanLineCount: int, proposals: list<array{id: int, name: string, number: string}>, cityId: int|null, cityName: string|null, centerName: string|null}>
+     * @return list<array{template: \App\Models\ReportTemplate, project: object|null, name: string, status: ReportTemplateStatus, pendingLineCount: int, annualPlanLineCount: int, proposals: list<array{id: int, name: string, number: string}>, cityId: int|null, cityName: string|null, centerName: string|null}>
      */
     #[Computed]
     public function visibleRows(): array
@@ -218,11 +218,12 @@ new #[Layout('layouts::desk'), Title('titles.report_templates')] class extends C
             @foreach ($rows as $row)
                 @php
                     $project = $row['project'];
+                    $openProposal = $row['templateProposals'][0]['id'] ?? null;
                     $place = collect([$row['cityName'], $row['centerName']])->filter()->implode(' · ');
                 @endphp
-                <tr wire:key="queue-{{ $row['template']->id }}" data-queue-row="{{ $project->id }}">
+                <tr wire:key="queue-{{ $row['template']->id }}" data-queue-row="{{ $project?->id ?? 't'.$row['template']->id }}">
                     <x-ui.data-table.cell :label="__('report_templates.queue.project')">
-                        <span class="block font-semibold" dir="auto">{{ $project->name }}</span>
+                        <span class="block font-semibold" dir="auto">{{ $row['name'] }}</span>
                         <span class="block text-xs {{ $muted }}" dir="auto">{{ $place !== '' ? $place : __('common.unknown_city') }}</span>
                     </x-ui.data-table.cell>
                     <x-ui.data-table.cell :label="__('common.state')">
@@ -263,10 +264,10 @@ new #[Layout('layouts::desk'), Title('titles.report_templates')] class extends C
                                 size="sm"
                                 icon="eye"
                                 class="min-h-8 touch-manipulation"
-                                :href="route('projects.show', [$project, 'tab' => 'template'])"
+                                :href="$project !== null ? route('projects.show', [$project, 'tab' => 'template']) : route('proposals.show', [$openProposal])"
                                 wire:navigate
                                 data-queue-open
-                                :aria-label="__('report_templates.queue.open', ['name' => $project->name])"
+                                :aria-label="__('report_templates.queue.open', ['name' => $row['name']])"
                             >{{ __('report_templates.queue.review') }}</x-ui.button>
                         </span>
                     </x-ui.data-table.cell>

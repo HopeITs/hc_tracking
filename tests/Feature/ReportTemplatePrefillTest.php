@@ -11,6 +11,7 @@ use App\Events\ProposalStatusChanged;
 use App\Listeners\PrefillReportTemplates;
 use App\Models\Activity;
 use App\Models\AnnualPlan;
+use App\Models\Donor;
 use App\Models\Indicator;
 use App\Models\LibraryIndicator;
 use App\Models\MealCoverageAssignment;
@@ -23,8 +24,10 @@ use App\Models\ReportTemplate;
 use App\Models\ReportTemplateLine;
 use App\Models\Result;
 use App\Models\UserNotification;
+use App\Support\Reporting\PlaceBridge;
 use App\Support\ReportTemplatePrefiller;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
 
 beforeEach(function () {
     $this->travelTo('2026-10-16 10:00:00');
@@ -47,6 +50,7 @@ function prefillProposal(array $centers, string $begin = '2026-11-15', string $e
 
     foreach ($centers as $projectId => $beneficiaries) {
         $proposal->projects()->attach($projectId, ['target_beneficiaries' => $beneficiaries]);
+        proposalRowForProject($proposal, Project::query()->findOrFail($projectId));
     }
 
     return $proposal;
@@ -72,7 +76,7 @@ function approveForPrefill(Proposal $proposal): void
 
 function templateOf(Project $project): ?ReportTemplate
 {
-    return ReportTemplate::query()->where('project_id', $project->id)->first();
+    return ReportTemplate::query()->whereKey(app(PlaceBridge::class)->templateIdsOfProject($project->id))->orderBy('id')->first();
 }
 
 test('approving a two-center proposal pre-fills a pending template per center with one pending line per library target', function () {
@@ -139,7 +143,7 @@ test('handling the approval twice creates no duplicate template, line or questio
         ->and($second->createdLineIds)->toBe([]);
 });
 
-test('a new approved proposal on an active project adds pending lines and leaves the confirmed template and lines alone', function () {
+test('a new approved proposal at another place gets its own pending template and leaves the confirmed template and lines alone', function () {
     $project = Project::factory()->active()->create(['program_id' => $this->program->id]);
     $first = prefillProposal([$project->id => 50], '2025-01-01', '2026-12-31');
     $template = ReportTemplate::factory()->confirmed()->create(['project_id' => $project->id]);
@@ -157,12 +161,68 @@ test('a new approved proposal on an active project adds pending lines and leaves
 
     $added = ReportTemplateLine::query()->where('plan_indicator_id', $newTarget->id)->sole();
     expect($template->fresh()->status)->toBe(ReportTemplateStatus::Confirmed)
-        ->and($added->report_template_id)->toBe($template->id)
+        ->and($added->report_template_id)->not->toBe($template->id)
+        ->and($added->template->status)->toBe(ReportTemplateStatus::Pending)
+        ->and($added->template->proposals()->pluck('proposals.id')->all())->toBe([$second->id])
         ->and($added->status)->toBe(ReportTemplateLineStatus::Pending)
         ->and($added->effective_from->toDateString())->toBe('2026-12-01')
         ->and($existing->fresh()->toArray())->toBe($before)
-        ->and(DB::table('report_template_questions')->where('report_template_id', $template->id)->count())->toBe(0)
         ->and($project->fresh()->status)->toBe(ProjectStatus::Active);
+});
+
+test('a second proposal at an occupied place gets its own pending template and a re-run adds nothing', function () {
+    $center = insertHrCenter((int) $this->centerA->city_id, 'Shared '.Str::random(5));
+    $first = prefillProposal([]);
+    $second = prefillProposal([]);
+
+    foreach ([$first, $second] as $proposal) {
+        proposalRowForProject($proposal, $this->centerA, $center);
+        prefillTarget($proposal, Result::factory()->create(['type' => ResultType::Output, 'program_id' => $this->program->id, 'proposal_id' => $proposal->id]), $this->centerA);
+        approveForPrefill($proposal);
+    }
+
+    $templates = ReportTemplate::query()->where('center_id', $center)->get();
+    expect($templates)->toHaveCount(2)
+        ->and($templates->every(fn (ReportTemplate $template): bool => $template->status === ReportTemplateStatus::Pending && $template->proposals()->count() === 1))->toBeTrue();
+
+    approveForPrefill($first);
+    expect(ReportTemplate::query()->where('center_id', $center)->count())->toBe(2);
+});
+
+test('a proposal with two centers gets a template per center and a shared target is a line in both', function () {
+    $project = Project::factory()->approved()->create(['program_id' => $this->program->id, 'center_id' => null]);
+    $proposal = prefillProposal([]);
+    $proposal->projects()->attach($project->id, ['target_beneficiaries' => 40]);
+    $row = proposalRowForProject($proposal, $project);
+    $secondCenter = insertHrCenter((int) $project->city_id, 'Second '.Str::random(5));
+    $row->centers()->create(['center_id' => $secondCenter]);
+    $output = Result::factory()->create(['type' => ResultType::Output, 'program_id' => $this->program->id, 'proposal_id' => $proposal->id]);
+    $shared = prefillTarget($proposal, $output, $project);
+    $sharedFixed = prefillTarget($proposal, $output, $project, ['denominator_basis' => 'fixed', 'measure' => 'percentage', 'unit' => null]);
+    Log::spy();
+
+    $result = app(ReportTemplatePrefiller::class)->prefillForProposal($proposal);
+
+    Log::shouldHaveReceived('warning')->withArgs(fn (string $message, array $context): bool => str_contains($message, 'once per target') && $context['plan_indicator_ids'] === [$sharedFixed->id]);
+
+    $templates = ReportTemplate::query()->where('program_id', $this->program->id)->whereHas('proposals', fn ($query) => $query->whereKey($proposal->id))->get();
+    expect($templates)->toHaveCount(2)
+        ->and($templates->pluck('center_id')->sort()->values()->all())->toBe(collect($row->centers()->pluck('center_id')->all())->sort()->values()->all())
+        ->and(ReportTemplateLine::query()->where('plan_indicator_id', $shared->id)->pluck('report_template_id')->sort()->values()->all())->toBe($templates->pluck('id')->sort()->values()->all())
+        ->and(ReportTemplateLine::query()->where('plan_indicator_id', $sharedFixed->id)->pluck('report_template_id')->sort()->values()->all())->toBe($templates->pluck('id')->sort()->values()->all())
+        ->and(ReportTemplateLine::query()->where('plan_indicator_id', $sharedFixed->id)->pluck('fixed_denominator')->unique()->values()->all())->toBe([40])
+        ->and($result->sharedFixedPlanIndicatorIds)->toBe([$sharedFixed->id]);
+});
+
+test('a proposal of an internal donor is pre-filled like any other', function () {
+    $internal = Donor::factory()->create(['is_internal' => true]);
+    $proposal = prefillProposal([$this->centerA->id => 10]);
+    $proposal->forceFill(['donor_id' => $internal->id])->save();
+    prefillTarget($proposal, Result::factory()->create(['type' => ResultType::Output, 'program_id' => $this->program->id, 'proposal_id' => $proposal->id]), $this->centerA);
+
+    approveForPrefill($proposal);
+
+    expect(templateOf($this->centerA)?->proposals()->pluck('proposals.id')->all())->toBe([$proposal->id]);
 });
 
 test('the active bank questions are copied once, when the template is created', function () {
@@ -182,7 +242,7 @@ test('the active bank questions are copied once, when the template is created', 
         ->toBe(['ما أبرز الإنجازات؟', 'Main achievements?', 'monthly', 3, true]);
 
     NarrativeQuestion::factory()->create();
-    app(ReportTemplatePrefiller::class)->prefillProject($this->centerA);
+    app(ReportTemplatePrefiller::class)->prefillProject($this->centerA->id);
 
     expect(DB::table('report_template_questions')->where('report_template_id', templateOf($this->centerA)->id)->count())->toBe($copies->count());
 });
@@ -257,7 +317,7 @@ test('a project with no line to plan gets no template, and its unlinked targets 
     expect(ReportTemplate::query()->count())->toBe(0)
         ->and($result->createdTemplateIds)->toBe([])
         ->and($result->unlinkedPlanIndicatorIds)->toBe([$unlinked->id])
-        ->and(app(ReportTemplatePrefiller::class)->previewProject($this->centerA))
+        ->and(app(ReportTemplatePrefiller::class)->previewProject($this->centerA->id))
         ->toMatchArray(['hasTemplate' => false, 'createsTemplate' => false, 'newLinePlanIndicatorIds' => []]);
 });
 
@@ -266,21 +326,21 @@ test('a re-run fills the fixed_denominator of a pending line once the beneficiar
     $pendingTarget = prefillTarget($this->proposal, $this->output, $this->centerB, $fixed);
     $confirmedTarget = prefillTarget($this->proposal, $this->output, $this->centerB, $fixed);
     $prefiller = app(ReportTemplatePrefiller::class);
-    $prefiller->prefillProject($this->centerB);
+    $prefiller->prefillProject($this->centerB->id);
     $pending = ReportTemplateLine::query()->where('plan_indicator_id', $pendingTarget->id)->sole();
     $confirmed = ReportTemplateLine::query()->where('plan_indicator_id', $confirmedTarget->id)->sole();
     $confirmed->forceFill(['status' => ReportTemplateLineStatus::Confirmed])->save();
 
     $this->proposal->projects()->updateExistingPivot($this->centerB->id, ['target_beneficiaries' => 240]);
 
-    expect($prefiller->previewProject($this->centerB)['refreshedLineIds'])->toBe([$pending->id])
+    expect($prefiller->previewProject($this->centerB->id)['refreshedLineIds'])->toBe([$pending->id])
         ->and($pending->fresh()->fixed_denominator)->toBeNull();
 
-    $result = $prefiller->prefillProject($this->centerB);
+    $result = $prefiller->prefillProject($this->centerB->id);
 
     expect($result->refreshedLineIds)->toBe([$pending->id])
         ->and($result->createdLineIds)->toBe([])
         ->and($pending->fresh()->fixed_denominator)->toBe(240)
         ->and($confirmed->fresh()->fixed_denominator)->toBeNull()
-        ->and($prefiller->prefillProject($this->centerB)->refreshedLineIds)->toBe([]);
+        ->and($prefiller->prefillProject($this->centerB->id)->refreshedLineIds)->toBe([]);
 });

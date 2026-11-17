@@ -4,14 +4,20 @@ declare(strict_types=1);
 
 namespace App\Livewire\Concerns\Proposals;
 
+use App\Enums\Locale;
 use App\Enums\ReportStatus;
 use App\Models\DonorProposal;
 use App\Models\DonorReport;
+use App\Models\HrCenter;
+use App\Models\HrCity;
+use App\Models\HrEmployee;
 use App\Models\PlanIndicator;
 use App\Models\Project;
 use App\Models\Proposal;
+use App\Models\ProposalLocation;
 use App\Models\Report;
 use App\Models\Task;
+use App\Support\ProposalLocationRows;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Collection;
 use Livewire\Attributes\Computed;
@@ -31,6 +37,60 @@ use Livewire\Attributes\Computed;
  */
 trait ReadsProposalDelivery
 {
+    /**
+     * The Locations chapter (Y-01): one entry per location row in `sort`
+     * order, with its place and a single status. The status comes from the
+     * one definition of `locations_complete` (ProposalLocationRows): a row it
+     * does not list is `complete`, a listed one says why, program first. A
+     * city-wide row (D-88) shows field work in place of centers and is never
+     * `missing_center`. City, center, employee and program names are read from
+     * HR, never copied; the rows load their relations once.
+     *
+     * @return list<array{id: int, city: string, program: string|null, programRequestName: string|null, responsible: string|null, centers: list<string>, fieldWork: bool, status: string, project: string|null}>
+     */
+    #[Computed]
+    public function locationRows(): array
+    {
+        $rows = $this->proposal->locations()
+            ->with(['centers', 'programRequest', 'program:id', 'project:id,slug,name,status'])
+            ->orderBy('sort')
+            ->orderBy('id')
+            ->get();
+
+        $incomplete = array_flip(ProposalLocationRows::incompleteRowIds($this->proposal));
+        $cities = HrCity::query()
+            ->whereKey($rows->pluck('city_id')->unique()->all())
+            ->get(['id', 'name_en', 'name_ar'])
+            ->keyBy('id');
+        $employees = HrEmployee::query()
+            ->whereKey($rows->pluck('responsible_employee_id')->filter()->unique()->all())
+            ->get(HrEmployee::NameColumns)
+            ->keyBy('id');
+
+        return $rows->map(function (ProposalLocation $row) use ($incomplete, $cities, $employees): array {
+            $status = match (true) {
+                ! isset($incomplete[$row->id]) => 'complete',
+                $row->program_id === null || ($row->programRequest?->isPending() ?? false) => 'waiting_program',
+                $row->responsible_employee_id === null => 'missing_responsible',
+                default => 'missing_center',
+            };
+
+            return [
+                'id' => $row->id,
+                'city' => $cities->get($row->city_id)?->name ?? __('common.unknown_city'),
+                'program' => $row->program?->name,
+                'programRequestName' => $row->program_id === null && $row->programRequest !== null
+                    ? (Locale::current() === Locale::Arabic && trim($row->programRequest->name_ar) !== '' ? trim($row->programRequest->name_ar) : trim($row->programRequest->name_en))
+                    : null,
+                'responsible' => $row->responsible_employee_id === null ? null : ($employees->get($row->responsible_employee_id)?->name ?? '#'.$row->responsible_employee_id),
+                'centers' => $row->city_wide ? [] : array_map(fn (int $centerId): string => HrCenter::remembered($centerId)?->name ?? '#'.$centerId, $row->centerIds()),
+                'fieldWork' => $row->city_wide,
+                'status' => $status,
+                'project' => $row->project?->name,
+            ];
+        })->all();
+    }
+
     /**
      * The projects this proposal funds.
      *

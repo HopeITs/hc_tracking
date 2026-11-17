@@ -19,6 +19,16 @@ return [
         'created' => 'Created',
         'declined' => 'Declined',
     ],
+    'proposal_change_request_status' => [
+        'pending' => 'Waiting',
+        'approved' => 'Approved',
+        'rejected' => 'Rejected',
+    ],
+    'change_review_verdict' => [
+        'no_objection' => 'No objection',
+        'remarks' => 'Remarks',
+        'skipped' => 'No holder',
+    ],
     'donor_type' => [
         'bilateral' => 'Bilateral',
         'foundation' => 'Foundation',

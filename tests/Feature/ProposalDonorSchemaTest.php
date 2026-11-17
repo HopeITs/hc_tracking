@@ -220,7 +220,7 @@ test('creating a proposal requires a donor', function () {
 
     expect(Proposal::query()->where('name', 'Donorless')->exists())->toBeFalse();
 
-    $form->set('donorId', (string) $donor->id)->set('projectIds', [(string) Project::factory()->create()->id])->call('saveProposal')->assertHasNoErrors();
+    $form->set('donorId', (string) $donor->id)->set('locations.0', proposalPlaceRow())->call('saveProposal')->assertHasNoErrors();
 
     expect(Proposal::query()->where('name', 'Donorless')->sole()->donor_id)->toBe($donor->id);
 });

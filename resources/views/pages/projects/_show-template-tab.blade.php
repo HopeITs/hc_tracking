@@ -1,4 +1,4 @@
-{{-- The "Report template" tab (T33 slice 3): lines grouped by proposal, editable and confirmable by MEAL only. --}}
+{{-- The "Report template" tab (T33 slice 3): lines grouped by proposal, editable and confirmable by MEAL only; then the narrative questions panel (Y-07). --}}
 @php
     $templateItems = $this->reportTemplateItems;
     $canManageTemplate = $this->canManageReportTemplate;
@@ -19,6 +19,14 @@
                     @endif
                 </div>
             </x-slot:toolbar>
+            @if ($templateItems['template']['proposals'] !== [])
+                <p class="mb-3 flex flex-wrap items-baseline gap-x-2 gap-y-1 text-sm text-secondary-medium dark:text-ink-muted" data-test="template-proposals">
+                    <span class="font-semibold">{{ __('report_templates.tab.proposals') }}</span>
+                    @foreach ($templateItems['template']['proposals'] as $proposal)
+                        <span dir="auto">{{ $proposal['name'] }}</span>
+                    @endforeach
+                </p>
+            @endif
 
             @if ($this->awaitingMonthlyReports)
                 <p role="status" class="px-4 py-2.5 text-sm text-secondary-medium dark:text-ink-muted" data-monthly-reports-preparing>
@@ -187,24 +195,90 @@
             @endif
         </x-ui.panel>
 
-        <x-ui.panel :title="__('report_templates.tab.questions')" :subtitle="__('report_templates.tab.questions_help')" :count="count($templateItems['questions'])">
-            @if ($templateItems['questions'] === [])
-                <p class="p-3.5 text-sm italic text-secondary-medium dark:text-ink-muted">{{ __('report_templates.tab.questions_empty') }}</p>
+        @php
+            $calendar = $this->templateCalendar;
+            $calendarHasActivities = collect($calendar['groups'])->contains(fn (array $group): bool => $group['rows'] !== []);
+            $calendarEditUrl = collect($calendar['groups'])->pluck('editUrl')->filter()->first();
+            $calendarScope = $this->reportTemplate->city_wide ? 'adjusted_field' : 'adjusted_center';
+        @endphp
+
+        <x-ui.panel :title="__('report_templates.calendar.title')" :subtitle="__('report_templates.calendar.subtitle')" data-activity-calendar>
+            @if (! $calendarHasActivities)
+                <p class="px-4 py-3 text-sm text-secondary-medium dark:text-ink-muted" data-calendar-empty>
+                    {{ __('report_templates.calendar.empty') }}
+                    @if ($calendarEditUrl !== null)
+                        <a href="{{ $calendarEditUrl }}" wire:navigate class="font-semibold text-secondary-dark underline underline-offset-2 dark:text-ink" data-calendar-edit-link>{{ __('report_templates.calendar.edit_link') }}</a>
+                    @endif
+                </p>
             @else
-                <ol class="flex flex-col divide-y divide-secondary-soft dark:divide-line" data-template-questions>
-                    @foreach ($templateItems['questions'] as $question)
-                        <li class="flex flex-wrap items-start justify-between gap-2 px-4 py-2.5" wire:key="template-question-{{ $question['id'] }}">
-                            <span class="min-w-0 text-sm text-secondary-dark dark:text-ink" dir="auto">{{ $question['text'] }}</span>
-                            <span class="flex shrink-0 items-center gap-1.5">
-                                <x-ui.enum-badge :case="$question['frequency']" />
-                                @unless ($question['isActive'])
-                                    <span class="inline-flex items-center rounded-md border border-secondary-soft px-2 py-0.5 text-xs font-semibold text-secondary-medium dark:border-line dark:text-ink-muted">{{ __('report_templates.tab.question_inactive') }}</span>
-                                @endunless
-                            </span>
-                        </li>
-                    @endforeach
-                </ol>
+                <p class="border-b border-secondary-soft px-4 py-2.5 text-sm text-secondary-medium dark:border-line dark:text-ink-muted">
+                    {{ __('report_templates.calendar.where_edited') }}
+                    @if ($calendarEditUrl !== null && ! $calendar['multiple'])
+                        <a href="{{ $calendarEditUrl }}" wire:navigate class="font-semibold text-secondary-dark underline underline-offset-2 dark:text-ink" data-calendar-edit-link>{{ __('report_templates.calendar.edit_link') }}</a>
+                    @endif
+                </p>
+
+                <div class="overflow-x-auto" tabindex="0" role="region" aria-label="{{ __('report_templates.calendar.title') }}">
+                    <table class="w-max min-w-full border-collapse text-start text-sm">
+                        <caption class="sr-only">{{ __('report_templates.calendar.title') }}</caption>
+                        <thead class="bg-board-head">
+                            <tr>
+                                <th scope="col" class="type-label sticky start-0 z-10 min-w-56 bg-board-head px-3.5 py-2.5 text-start text-secondary-medium dark:text-ink-faint">{{ __('report_templates.calendar.col_activity') }}</th>
+                                @foreach ($calendar['months'] as $month)
+                                    <th scope="col" class="type-label px-2 py-2.5 text-center whitespace-nowrap text-secondary-medium dark:text-ink-faint" dir="ltr">{{ $month['label'] }}</th>
+                                @endforeach
+                            </tr>
+                        </thead>
+                        <tbody class="divide-y divide-board-line">
+                            @foreach ($calendar['groups'] as $group)
+                                @if ($calendar['multiple'])
+                                    <tr data-calendar-group="{{ $group['proposal']->id }}">
+                                        <th scope="colgroup" colspan="{{ count($calendar['months']) + 1 }}" class="sticky start-0 bg-secondary-soft px-3.5 py-2 text-start text-sm font-bold text-secondary-dark dark:bg-surface-2 dark:text-ink">
+                                            <span dir="auto">{{ $group['proposal']->name }}</span>
+                                            @if ($group['editUrl'] !== null)
+                                                <a href="{{ $group['editUrl'] }}" wire:navigate class="ms-3 text-xs font-semibold underline underline-offset-2" data-calendar-edit-link>{{ __('report_templates.calendar.edit_link') }}</a>
+                                            @endif
+                                        </th>
+                                    </tr>
+                                @endif
+                                @foreach ($group['rows'] as $row)
+                                    <tr wire:key="calendar-row-{{ $row['id'] }}" data-calendar-row="{{ $row['id'] }}">
+                                        <th scope="row" class="sticky start-0 z-10 min-w-56 bg-white px-3.5 py-2 text-start font-semibold text-secondary-dark dark:bg-surface-1 dark:text-ink">
+                                            <span dir="auto">{{ $row['statement'] }}</span>
+                                            @if ($row['adjusted'])
+                                                <span class="mt-1 flex">
+                                                    <span class="inline-flex items-center gap-1 rounded-full bg-status-warn-soft px-2 py-0.5 text-[11px] font-bold text-status-warn" data-calendar-adjusted="{{ $row['id'] }}">
+                                                        <flux:icon name="adjustments-horizontal" variant="micro" class="size-3 shrink-0" aria-hidden="true" />
+                                                        {{ __('report_templates.calendar.'.$calendarScope) }}
+                                                    </span>
+                                                </span>
+                                            @endif
+                                        </th>
+                                        @foreach ($calendar['months'] as $month)
+                                            @php
+                                                $cell = $row['cells'][$month['key']] ?? null;
+                                            @endphp
+                                            <td class="px-2 py-2 text-center">
+                                                @if ($cell !== null)
+                                                    <span class="inline-flex min-w-8 flex-col items-center gap-0.5 rounded-md bg-secondary-soft px-1.5 py-1 text-secondary-dark dark:bg-surface-2 dark:text-ink" data-calendar-cell="{{ $row['id'] }}-{{ $month['key'] }}">
+                                                        <flux:icon name="check" variant="micro" class="size-3.5" aria-hidden="true" />
+                                                        @if ($cell['weeks'] !== null)
+                                                            <span class="type-meta tabular-nums" dir="ltr" aria-hidden="true">{{ \App\Support\ReportTemplateReader::weeksText($cell['weeks']) }}</span>
+                                                        @endif
+                                                        <span class="sr-only">{{ $cell['label'] }}</span>
+                                                    </span>
+                                                @endif
+                                            </td>
+                                        @endforeach
+                                    </tr>
+                                @endforeach
+                            @endforeach
+                        </tbody>
+                    </table>
+                </div>
             @endif
         </x-ui.panel>
+
+        @include('pages.projects._show-template-questions')
     @endif
 </div>

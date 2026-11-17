@@ -16,8 +16,10 @@
     shows a Narrative section after Donor and leaves out Locations, the starting stage and the renewal
     preset; its attachment is filed on the proposal's Documents tab. On edit the kind is a locked chip.
 
-    Below the rows, create shows the project it was opened from (New Concept Note) and edit the linked
-    projects, each with its beneficiaries input: links change on the proposal page's Projects tab. The budget is rendered only for a
+    Each row either lists centers or is ticked "Field work, no center" (city_wide, D-88), which disables
+    and clears its centers; the server stays the validator. Rows stack as cards on a narrow screen.
+    Below the rows, edit shows the linked projects, each with its beneficiaries input: links change on
+    the proposal page's Projects tab, and the form has no project picker. The budget is rendered only for a
     money holder; for anyone else the whole section is absent, not hidden.
 --}}
 @use('App\Enums\Currency')
@@ -35,7 +37,6 @@
     'cities' => [],
     'programs' => [],
     'centersByCity' => [],
-    'chosenProjects' => [],
     'linkedProjects' => [],
     'showsMoney' => false,
     'lockedDonorName' => null,
@@ -51,8 +52,7 @@
     $mutedText = 'text-secondary-medium dark:text-ink-muted';
     $isPayroll = $kind === ProposalKind::Payroll->value;
     $isRenewal = $renewal !== null && ! $isPayroll;
-    $projectRows = $editing ? $linkedProjects : ($isRenewal ? $renewal['projects'] : $chosenProjects);
-    $projectsError = $errors->first('projectIds') ?: $errors->first('beneficiaries');
+    $projectRows = $editing ? $linkedProjects : ($isRenewal ? $renewal['projects'] : []);
     $locationsError = $errors->first('locations');
 
     /*
@@ -68,11 +68,11 @@
             ? [__('proposals.section_narrative') => ['narrative']]
             : [
                 __('proposals.section_locations') => [
-                    'projectIds', 'locations', 'beneficiaries', 'beneficiariesReason',
+                    'locations', 'beneficiaries', 'beneficiariesReason',
                     ...array_map(fn (array $row): string => 'beneficiaries.'.$row['id'], $projectRows),
                     ...collect(array_keys($locations))->flatMap(fn (int $index): array => array_map(
                         fn (string $field): string => "locations.{$index}.{$field}",
-                        ['city_id', 'program_id', 'responsible_employee_id', 'center_ids', 'new_program_name_en', 'new_program_name_ar'],
+                        ['city_id', 'program_id', 'responsible_employee_id', 'center_ids', 'city_wide', 'new_program_name_en', 'new_program_name_ar'],
                     ))->all(),
                 ],
                 __('proposals.concept_note.section') => ['conceptNote', 'conceptNoteFile'],
@@ -82,6 +82,10 @@
         ...($isPayroll ? [] : [__('proposals.section_start') => ['startingStage', 'skipReason']]),
         __('proposals.section_notes') => ['notes'],
     ];
+
+    /* The first location row that holds a failure, so the summary can name it. */
+    $firstFailingRow = collect(array_keys($locations))->first(fn (int $index): bool => collect(['city_id', 'program_id', 'responsible_employee_id', 'center_ids', 'city_wide', 'new_program_name_en', 'new_program_name_ar'])
+        ->contains(fn (string $field): bool => $errors->has("locations.{$index}.{$field}")));
 
     $failingSections = array_keys(array_filter(
         $sectionFields,
@@ -106,6 +110,9 @@
                     <p class="font-semibold text-status-critical">{{ trans_choice('common.fields_need_attention', $errors->count(), ['count' => $errors->count()]) }}</p>
                     @if ($failingSections !== [])
                         <p class="text-xs text-status-critical" data-form-error-sections>{{ __('proposals.form_error_summary_sections', ['sections' => implode(' · ', $failingSections)]) }}</p>
+                    @endif
+                    @if ($firstFailingRow !== null)
+                        <p class="text-xs text-status-critical" data-form-error-row>{{ __('proposals.form_error_summary_row', ['number' => $firstFailingRow + 1]) }}</p>
                     @endif
                 </div>
                 <button
@@ -264,12 +271,22 @@
                         <p class="text-sm {{ $mutedText }}" data-test="locations-none-yet">{{ __('proposals.locations_none_yet') }}</p>
                     @endif
 
-                    <ol class="grid gap-3" data-proposal-locations>
+                    <ol
+                        class="grid gap-3"
+                        data-proposal-locations
+                        x-data
+                        x-on:proposal-location-focus.window="$nextTick(() => setTimeout(() => {
+                            const row = $el.querySelector(`[data-proposal-location='${$event.detail.index}']`);
+                            const field = row?.querySelector('[data-form-field] :is(button, select, input):not([disabled])') ?? row?.querySelector('[data-test=remove-location]');
+                            (field ?? document.querySelector('[data-test=add-location]'))?.focus();
+                        }, 30))"
+                    >
                         @foreach ($locations as $index => $location)
                             @php
                                 $isLinked = $location['project'] !== null;
                                 $cityCenters = $location['city_id'] === '' ? [] : ($centersByCity[(int) $location['city_id']] ?? []);
                                 $isNewProgram = $location['program_id'] === 'new';
+                                $isCityWide = $location['city_wide'];
                             @endphp
                             <li class="grid gap-x-4 gap-y-3 rounded-lg border border-secondary-soft p-3 @2xl/modal:grid-cols-2 dark:border-line" wire:key="proposal-location-{{ $location['key'] }}" data-proposal-location="{{ $index }}">
                                 <div class="flex items-center justify-between gap-2 @2xl/modal:col-span-2">
@@ -304,18 +321,23 @@
 
                                 <x-ui.form-select wire:model="locations.{{ $index }}.responsible_employee_id" :label="__('proposals.location_responsible')" :placeholder="__('proposals.location_select_responsible')" :help="__('proposals.location_responsible_help')" employees />
 
-                                <div wire:key="proposal-location-centers-{{ $location['key'] }}-{{ $location['city_id'] }}">
+                                <div class="grid gap-y-3 @2xl/modal:col-span-2" wire:key="proposal-location-centers-{{ $location['key'] }}-{{ $location['city_id'] }}-{{ $isCityWide ? 'field' : 'centers' }}">
                                     <x-ui.form-multiselect
                                         wire:model="locations.{{ $index }}.center_ids"
                                         :label="__('proposals.location_centers')"
-                                        :placeholder="__('proposals.location_select_centers')"
-                                        :help="$location['city_id'] === '' ? __('proposals.location_choose_city_first') : ($cityCenters === [] ? __('proposals.location_no_centers_in_city') : ($needsBeneficiariesReason ? __('proposals.location_centers_help_approved') : __('proposals.location_centers_help')))"
-                                        :disabled="$cityCenters === []"
+                                        :placeholder="$isCityWide ? __('proposals.location_field_work') : __('proposals.location_select_centers')"
+                                        :help="$isCityWide ? __('proposals.location_city_wide_help') : ($location['city_id'] === '' ? __('proposals.location_choose_city_first') : ($cityCenters === [] ? __('proposals.location_no_centers_in_city') : ($needsBeneficiariesReason ? __('proposals.location_centers_help_approved') : __('proposals.location_centers_help'))))"
+                                        :disabled="$isCityWide || $cityCenters === []"
                                     >
                                         @foreach ($cityCenters as $center)
                                             <option value="{{ $center['id'] }}">{{ $center['name'] }}</option>
                                         @endforeach
                                     </x-ui.form-multiselect>
+
+                                    <label class="flex min-h-10 items-center gap-2 text-sm text-secondary-dark dark:text-ink" data-test="location-city-wide">
+                                        <input type="checkbox" wire:model.live="locations.{{ $index }}.city_wide" class="size-4 shrink-0 accent-primary dark:accent-brand" @checked($isCityWide) />
+                                        <span>{{ __('proposals.location_city_wide_label') }}</span>
+                                    </label>
                                 </div>
                             </li>
                         @endforeach
@@ -338,9 +360,6 @@
                                 </div>
                                 @unless ($isRenewal)
                                     <x-ui.form-input wire:model="beneficiaries.{{ $row['id'] }}" :label="__('proposals.target_beneficiaries')" type="number" min="1" step="1" inputmode="numeric" dir="ltr" class="w-36" />
-                                @endunless
-                                @unless ($editing || $isRenewal)
-                                    <x-ui.button type="button" tone="ghost" size="sm" icon="x-mark" class="size-10! shrink-0" wire:click="removeChosenProject({{ $row['id'] }})" :aria-label="__('proposals.remove_project_name', ['name' => $row['name']])" />
                                 @endunless
                             </li>
                         @endforeach

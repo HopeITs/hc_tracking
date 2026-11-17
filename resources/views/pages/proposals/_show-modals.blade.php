@@ -9,6 +9,8 @@
 
     @include('pages.proposals._approve-modal')
 
+    @include('pages.proposals._center-fill-modal')
+
     @include('pages.proposals._final-report-modal')
 
     {{-- W-06 (D-58): a hold keeps the status, so both dialogs state that in one

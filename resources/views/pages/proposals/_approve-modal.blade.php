@@ -63,9 +63,29 @@
                 <div class="col-span-2" data-test="approve-preview">
                     <p class="type-label mb-2 text-secondary-medium dark:text-ink-muted">{{ __('proposals.approval_preview') }}</p>
 
-                    @if ($this->approvalPreview === [])
+                    @php($locationPlan = $this->approvalLocations)
+                    @php($hasLocationPlan = $locationPlan['create'] + $locationPlan['link'] + $locationPlan['wait'] > 0)
+
+                    @if ($hasLocationPlan)
+                        <div class="mb-3 rounded-lg border border-board-line p-3 text-sm" data-test="approve-locations-preview">
+                            <p class="font-semibold text-secondary-dark dark:text-ink">{{ __('proposals.approval_locations_title') }}</p>
+                            <ul class="mt-1.5 grid gap-1 text-secondary-dark dark:text-ink">
+                                <li class="flex items-center gap-2" data-test="approve-locations-create"><flux:icon.plus-circle variant="micro" class="size-4 shrink-0" aria-hidden="true" />{{ trans_choice('proposals.approval_locations_create', $locationPlan['create'], ['count' => $locationPlan['create']]) }}</li>
+                                <li class="flex items-center gap-2" data-test="approve-locations-link"><flux:icon.link variant="micro" class="size-4 shrink-0" aria-hidden="true" />{{ trans_choice('proposals.approval_locations_link', $locationPlan['link'], ['count' => $locationPlan['link']]) }}</li>
+                                <li class="flex items-center gap-2" data-test="approve-locations-wait"><flux:icon.clock variant="micro" class="size-4 shrink-0" aria-hidden="true" />{{ trans_choice('proposals.approval_locations_wait', $locationPlan['wait'], ['count' => $locationPlan['wait']]) }}</li>
+                            </ul>
+                            @foreach ($locationPlan['warnings'] as $locationWarning)
+                                <p class="mt-2 flex items-start gap-2 rounded-md bg-status-warn-soft px-2 py-1.5 text-status-warn" role="status" data-test="approve-locations-warning-{{ $locationWarning }}">
+                                    <flux:icon.exclamation-triangle variant="micro" class="mt-0.5 size-4 shrink-0" aria-hidden="true" />
+                                    {{ __('proposals.approval_warning_'.$locationWarning) }}
+                                </p>
+                            @endforeach
+                        </div>
+                    @endif
+
+                    @if ($this->approvalPreview === [] && $locationPlan['create'] + $locationPlan['link'] === 0)
                         <p class="text-sm text-status-critical" data-test="approve-no-projects">{{ __('proposals.link_project_first') }}</p>
-                    @else
+                    @elseif ($this->approvalPreview !== [])
                         <ul class="divide-y divide-board-line rounded-lg border border-board-line">
                             @foreach ($this->approvalPreview as $previewProjectId => $previewProject)
                                 <li class="flex flex-wrap items-center justify-between gap-2 px-3 py-2 text-sm" data-test="approve-preview-{{ $previewProject['outcome'] }}">
@@ -93,7 +113,7 @@
         @endif
 
         <x-slot:actions>
-            <x-ui.button type="submit" tone="primary" wire:loading.attr="disabled" wire:target="approveProposal,approveFile" :disabled="! $showApproveModal || $this->approvalPreview === []" data-test="confirm-approve-button">
+            <x-ui.button type="submit" tone="primary" wire:loading.attr="disabled" wire:target="approveProposal,approveFile" :disabled="! $showApproveModal || ($this->approvalPreview === [] && $this->approvalLocations['create'] + $this->approvalLocations['link'] === 0)" data-test="confirm-approve-button">
                 {{ __('proposals.approve_proposal') }}
             </x-ui.button>
         </x-slot:actions>

@@ -7,14 +7,12 @@ namespace App\Support;
 use App\Enums\DenominatorBasis;
 use App\Enums\NotificationKind;
 use App\Enums\NotificationPriority;
-use App\Enums\ProjectStatus;
 use App\Enums\ProposalStatus;
 use App\Enums\ReportTemplateLineStatus;
 use App\Models\AnnualPlan;
 use App\Models\LibraryIndicator;
 use App\Models\NarrativeQuestion;
 use App\Models\PlanIndicator;
-use App\Models\Project;
 use App\Models\Proposal;
 use App\Models\ReportTemplate;
 use App\Models\ReportTemplateLine;
@@ -25,6 +23,8 @@ use App\Notifications\EmployeeRecipients;
 use App\Notifications\EventCatalog;
 use App\Notifications\NotificationPayload;
 use App\Notifications\RecipientFilter;
+use App\Support\Reporting\PlaceBridge;
+use App\Support\Reporting\ReportPlace;
 use Carbon\CarbonImmutable;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Collection;
@@ -32,33 +32,43 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 
 /**
- * Pre-fills projects' monthly report templates as `pending` (contracts.md
- * §12.4, T33, D-41, D-44, D-45): one template per project, the active bank
- * questions copied when it is created, and one pending line per
- * library-linked target that has none yet. A project with no line to plan
- * gets no template, so the MEAL queue never holds one it cannot confirm.
- * Lines already there and the template's status are not touched, so a
- * confirmed template stays confirmed and MEAL confirms the new lines; the one
- * exception is a pending `fixed`-basis line created without a
+ * Pre-fills monthly report templates as `pending` (contracts.md §12.4, T33,
+ * Y-02, D-41, D-44, D-45, D-75, D-76, D-87, D-90): one template per place of
+ * the proposal (PlaceBridge::placesOfProposal), linked to the proposal, the
+ * active bank questions copied when it is created, and one pending line per
+ * library-linked target that covers the place and has none yet. A place with
+ * no line to plan gets no template, so the MEAL queue never holds one it
+ * cannot confirm. Lines already there and the template's status are not
+ * touched, so a confirmed template stays confirmed and MEAL confirms the new
+ * lines; the one exception is a pending `fixed`-basis line created without a
  * `fixed_denominator`, which takes the `target_beneficiaries` filled since
  * (T27 step 8a).
  *
- * Targets are the project's proposal targets (one proposal on approval, every
- * donor-approved proposal for prefillProject()) and its annual-plan targets
- * of institutional `HC.*` library entries. Line defaults: `library_default`
- * schedule, `entered_by` = the library `collected_by`, `fixed_denominator` =
- * `project_proposal.target_beneficiaries` when the library basis is `fixed`,
- * no evidence types, and the window = the months of the proposal's dates
- * (actual once both are set, else planned) or, for an `HC.*` target, the
- * plan year cut to the project's dates.
+ * An approval always creates its own template at a place where the proposal
+ * has none; it never joins another proposal's template (MEAL's choice, Y-04).
+ * Until then a second proposal at an occupied place gets a second pending
+ * template. A self-funded proposal (internal donor) is pre-filled like any
+ * other (D-87).
+ *
+ * A shared target (D-90: one target of a row with several centers) gets one
+ * line in each center's template. A shared target on a `fixed` basis would
+ * pool one denominator twice, so it gets no line and is listed in the result
+ * for Dev 1.
+ *
+ * Targets are the proposal's own and the annual-plan targets of institutional
+ * `HC.*` library entries of the projects its rows carry. Line defaults:
+ * `library_default` schedule, `entered_by` = the library `collected_by`,
+ * `fixed_denominator` = `project_proposal.target_beneficiaries` when the
+ * library basis is `fixed`, no evidence types, and the window = the months of
+ * the proposal's dates (actual once both are set, else planned) or, for an
+ * `HC.*` target, the plan year cut to those dates.
  *
  * A system writer, so there is no Gate: it runs from the queue after a donor
  * approval (PrefillReportTemplates) and from the launch command
- * (`report-templates:prefill-active`, slice 4), where no user acts. It never
- * writes a project or proposal status. Idempotent: the template row is locked
- * (or created against its unique index) before the lines are compared, so
- * concurrent runs on one project serialise and the unique (template, target)
- * index backs the check.
+ * (`report-templates:prefill-active`), where no user acts. It never writes a
+ * project or proposal status. Idempotent: the proposal row is locked before
+ * the proposal's templates are compared, so concurrent runs serialise, and
+ * the unique (template, target) index backs the line check.
  */
 final class ReportTemplatePrefiller
 {
@@ -69,139 +79,140 @@ final class ReportTemplatePrefiller
         private RecipientFilter $filter,
         private EventCatalog $catalog,
         private ActivityRecorder $activities,
+        private PlaceBridge $places,
     ) {}
 
     /**
-     * Pre-fill every open project the proposal funds with the proposal's
-     * targets (and the project's `HC.*` annual-plan targets). A proposal the
-     * donor has not approved pre-fills nothing.
+     * Pre-fill every place of the proposal. A proposal the donor has not
+     * approved pre-fills nothing.
      */
     public function prefillForProposal(Proposal $proposal): PrefillResult
     {
-        $result = new PrefillResult;
-
         if (! $proposal->status->isApprovedByDonor()) {
-            return $result;
+            return new PrefillResult;
         }
 
-        $projects = $proposal->projects()
-            ->whereNotIn('projects.status', [ProjectStatus::Closed, ProjectStatus::Archived])
-            ->orderBy('projects.id')
-            ->get();
+        return $this->prefillPlaces($proposal, $this->places->placesOfProposal($proposal));
+    }
 
-        foreach ($projects as $project) {
-            /** @var int|null $beneficiaries */
-            $beneficiaries = $project->getRelation('pivot')->getAttribute('target_beneficiaries');
+    /**
+     * Pre-fill the places of the project's rows, for each of its
+     * donor-approved proposals (the launch command, one project at a time).
+     */
+    public function prefillProject(int $projectId): PrefillResult
+    {
+        $result = new PrefillResult;
 
-            $result = $result->merge($this->prefill(
-                $project,
-                new Collection([$proposal]),
-                [$proposal->id => $beneficiaries === null ? null : (int) $beneficiaries],
-            ));
+        foreach ($this->approvedProposals($projectId) as $proposal) {
+            $result = $result->merge($this->prefillPlaces($proposal, $this->places->placesOfProject($proposal, $projectId)));
         }
 
         return $result;
     }
 
     /**
-     * Pre-fill one project with the targets of all its donor-approved
-     * proposals and its `HC.*` annual-plan targets.
-     */
-    public function prefillProject(Project $project): PrefillResult
-    {
-        ['proposals' => $proposals, 'beneficiaries' => $beneficiaries] = $this->approvedProposals($project);
-
-        return $this->prefill($project, $proposals, $beneficiaries);
-    }
-
-    /**
-     * What prefillProject() would do, read-only: whether the project has or
-     * would get a template and whether it is new, the lines already on it,
-     * the targets that would get a new line, the lines whose
-     * `fixed_denominator` would be filled, the unlinked targets and the
+     * What prefillProject() would do, read-only: whether the project's
+     * places have or would get a template and whether any is new, the lines
+     * already on them, the targets that would get a new line, the lines
+     * whose `fixed_denominator` would be filled, the unlinked targets and the
      * would-be-new `fixed`-basis lines with no `fixed_denominator` (as target
      * ids, since no line exists yet). Writes nothing
      * (`report-templates:prefill-active --dry-run`).
      *
-     * @return array{hasTemplate: bool, createsTemplate: bool, existingLineCount: int, newLinePlanIndicatorIds: list<int>, refreshedLineIds: list<int>, unlinkedPlanIndicatorIds: list<int>, missingFixedDenominatorPlanIndicatorIds: list<int>}
+     * @return array{hasTemplate: bool, createsTemplate: bool, existingLineCount: int, newLinePlanIndicatorIds: list<int>, refreshedLineIds: list<int>, unlinkedPlanIndicatorIds: list<int>, missingFixedDenominatorPlanIndicatorIds: list<int>, sharedFixedPlanIndicatorIds: list<int>}
      */
-    public function previewProject(Project $project): array
+    public function previewProject(int $projectId): array
     {
-        ['proposals' => $proposals, 'beneficiaries' => $beneficiaries] = $this->approvedProposals($project);
-        ['lines' => $lines, 'unlinked' => $unlinked] = $this->plannedLines($project, $proposals, $beneficiaries);
+        $preview = [
+            'hasTemplate' => false,
+            'createsTemplate' => false,
+            'existingLineCount' => 0,
+            'newLinePlanIndicatorIds' => [],
+            'refreshedLineIds' => [],
+            'unlinkedPlanIndicatorIds' => [],
+            'missingFixedDenominatorPlanIndicatorIds' => [],
+            'sharedFixedPlanIndicatorIds' => [],
+        ];
 
-        $template = ReportTemplate::query()->where('project_id', $project->id)->first();
-        $existing = $template === null ? new Collection : $template->lines()->get()->keyBy(fn (ReportTemplateLine $line): int => (int) $line->plan_indicator_id);
-        $new = [];
-        $refresh = [];
-        $missing = [];
+        foreach ($this->approvedProposals($projectId) as $proposal) {
+            foreach ($this->places->placesOfProject($proposal, $projectId) as $place) {
+                ['lines' => $lines, 'unlinked' => $unlinked, 'sharedFixed' => $sharedFixed] = $this->plannedLines($proposal, $place);
+                $preview['sharedFixedPlanIndicatorIds'] = [...$preview['sharedFixedPlanIndicatorIds'], ...$sharedFixed];
 
-        foreach ($lines as $planIndicatorId => $attributes) {
-            $line = $existing->get($planIndicatorId);
+                $template = $this->existingTemplate($proposal, $place);
+                $existing = $template === null ? new Collection : $template->lines()->get()->keyBy(fn (ReportTemplateLine $line): int => (int) $line->plan_indicator_id);
+                $new = [];
 
-            if ($line !== null) {
-                if ($this->refreshesDenominator($line, $attributes)) {
-                    $refresh[] = $line->id;
+                foreach ($lines as $planIndicatorId => $attributes) {
+                    $line = $existing->get($planIndicatorId);
+
+                    if ($line !== null) {
+                        if ($this->refreshesDenominator($line, $attributes)) {
+                            $preview['refreshedLineIds'][] = $line->id;
+                        }
+
+                        continue;
+                    }
+
+                    $new[] = $planIndicatorId;
+
+                    if ($attributes['fixed'] && $attributes['values']['fixed_denominator'] === null) {
+                        $preview['missingFixedDenominatorPlanIndicatorIds'][] = $planIndicatorId;
+                    }
                 }
 
-                continue;
-            }
-
-            $new[] = $planIndicatorId;
-
-            if ($attributes['fixed'] && $attributes['values']['fixed_denominator'] === null) {
-                $missing[] = $planIndicatorId;
+                $preview['hasTemplate'] = $preview['hasTemplate'] || $template !== null || $new !== [];
+                $preview['createsTemplate'] = $preview['createsTemplate'] || ($template === null && $new !== []);
+                $preview['existingLineCount'] += $existing->count();
+                $preview['newLinePlanIndicatorIds'] = [...$preview['newLinePlanIndicatorIds'], ...$new];
+                $preview['unlinkedPlanIndicatorIds'] = [...$preview['unlinkedPlanIndicatorIds'], ...$unlinked];
             }
         }
 
-        return [
-            'hasTemplate' => $template !== null || $new !== [],
-            'createsTemplate' => $template === null && $new !== [],
-            'existingLineCount' => $existing->count(),
-            'newLinePlanIndicatorIds' => $new,
-            'refreshedLineIds' => $refresh,
-            'unlinkedPlanIndicatorIds' => $unlinked,
-            'missingFixedDenominatorPlanIndicatorIds' => $missing,
-        ];
+        $preview['newLinePlanIndicatorIds'] = array_values(array_unique($preview['newLinePlanIndicatorIds']));
+        $preview['sharedFixedPlanIndicatorIds'] = array_values(array_unique($preview['sharedFixedPlanIndicatorIds']));
+        $preview['unlinkedPlanIndicatorIds'] = array_values(array_unique($preview['unlinkedPlanIndicatorIds']));
+
+        return $preview;
     }
 
     /**
-     * The project's donor-approved proposals and their
-     * `project_proposal.target_beneficiaries`.
+     * The project's donor-approved proposals.
      *
-     * @return array{proposals: Collection<int, Proposal>, beneficiaries: array<int, int|null>}
+     * @return Collection<int, Proposal>
      */
-    private function approvedProposals(Project $project): array
+    private function approvedProposals(int $projectId): Collection
     {
-        $proposals = $project->proposals()
-            ->whereIn('proposals.status', ProposalStatus::approvedByDonor())
-            ->orderBy('proposals.id')
-            ->get();
-
-        $beneficiaries = [];
-
-        foreach ($proposals as $proposal) {
-            $value = $proposal->getRelation('pivot')->getAttribute('target_beneficiaries');
-            $beneficiaries[$proposal->id] = $value === null ? null : (int) $value;
-        }
-
-        return ['proposals' => $proposals, 'beneficiaries' => $beneficiaries];
+        return new Collection($this->places->proposalsOfProject($projectId, array_map(
+            fn (ProposalStatus $status): string => $status->value,
+            ProposalStatus::approvedByDonor(),
+        ))->all());
     }
 
     /**
-     * @param  Collection<int, Proposal>  $proposals
-     * @param  array<int, int|null>  $beneficiaries  proposal id => project_proposal.target_beneficiaries
+     * @param  list<ReportPlace>  $places
      */
-    private function prefill(Project $project, Collection $proposals, array $beneficiaries): PrefillResult
+    private function prefillPlaces(Proposal $proposal, array $places): PrefillResult
     {
-        ['lines' => $lines, 'unlinked' => $unlinked] = $this->plannedLines($project, $proposals, $beneficiaries);
+        $result = new PrefillResult;
+
+        foreach ($places as $place) {
+            $result = $result->merge($this->prefill($proposal, $place));
+        }
+
+        return $result;
+    }
+
+    private function prefill(Proposal $proposal, ReportPlace $place): PrefillResult
+    {
+        ['lines' => $lines, 'unlinked' => $unlinked, 'sharedFixed' => $sharedFixed] = $this->plannedLines($proposal, $place);
 
         if ($lines === []) {
-            return new PrefillResult(unlinkedPlanIndicatorIds: $unlinked);
+            return new PrefillResult(unlinkedPlanIndicatorIds: $unlinked, sharedFixedPlanIndicatorIds: $sharedFixed);
         }
 
-        $result = DB::transaction(function () use ($project, $lines, $unlinked): PrefillResult {
-            [$template, $created] = $this->lockedTemplate($project);
+        [$result, $templateId] = DB::transaction(function () use ($proposal, $place, $lines, $unlinked, $sharedFixed): array {
+            [$template, $created] = $this->lockedTemplate($proposal, $place);
 
             if ($created) {
                 $this->copyQuestions($template);
@@ -232,18 +243,25 @@ final class ReportTemplatePrefiller
                 }
             }
 
-            return new PrefillResult($created ? [$template->id] : [], $createdLineIds, $unlinked, $missing, $refreshedLineIds);
+            return [new PrefillResult($created ? [$template->id] : [], $createdLineIds, $unlinked, $missing, $refreshedLineIds, $sharedFixed), $template->id];
         });
 
         if ($result->missingFixedDenominatorLineIds !== []) {
             Log::warning('Report template lines with a fixed denominator basis have no fixed_denominator.', [
-                'project_id' => $project->id,
+                'report_template_id' => $templateId,
                 'line_ids' => $result->missingFixedDenominatorLineIds,
             ]);
         }
 
+        if ($result->sharedFixedPlanIndicatorIds !== []) {
+            Log::warning('Shared fixed-basis targets have a line in each center: count their denominator once per target when pooling (D-90).', [
+                'report_template_id' => $templateId,
+                'plan_indicator_ids' => $result->sharedFixedPlanIndicatorIds,
+            ]);
+        }
+
         if ($result->createdLineIds !== []) {
-            DB::afterCommit(fn () => $this->notifyPending($project));
+            DB::afterCommit(fn () => $this->notifyPending(ReportTemplate::query()->findOrFail($templateId)));
         }
 
         return $result;
@@ -266,28 +284,37 @@ final class ReportTemplatePrefiller
     }
 
     /**
-     * The pending line wanted per target (plan_indicator id => attributes),
-     * and the proposal targets whose indicator has no library link.
+     * The pending line wanted per target (plan_indicator id => attributes)
+     * at the place, the proposal targets whose indicator has no library link,
+     * and the shared `fixed`-basis targets (D-90): they get a line in each
+     * center's template with the row's one denominator, which aggregation
+     * must count once per target, never once per center (Dev 1, 17 Nov).
      *
-     * @param  Collection<int, Proposal>  $proposals
-     * @param  array<int, int|null>  $beneficiaries
-     * @return array{lines: array<int, array{values: array<string, mixed>, fixed: bool}>, unlinked: list<int>}
+     * @return array{lines: array<int, array{values: array<string, mixed>, fixed: bool}>, unlinked: list<int>, sharedFixed: list<int>}
      */
-    private function plannedLines(Project $project, Collection $proposals, array $beneficiaries): array
+    private function plannedLines(Proposal $proposal, ReportPlace $place): array
     {
         $lines = [];
         $unlinked = [];
-        $proposalsById = $proposals->keyBy('id');
+        $sharedFixed = [];
 
-        $proposalTargets = $proposals->isEmpty() ? new Collection : PlanIndicator::query()
+        $useActual = $proposal->actual_date_begin !== null && $proposal->actual_date_end !== null;
+        $begin = $useActual ? $proposal->actual_date_begin : $proposal->planned_date_begin;
+        $end = $useActual ? $proposal->effectiveDateEnd() : $proposal->planned_date_end;
+
+        $proposalTargets = PlanIndicator::query()
             ->with('indicator.libraryIndicator')
-            ->where('project_id', $project->id)
+            ->whereNotNull('project_id')
             ->where('source_type', 'proposal')
-            ->whereIn('source_id', $proposalsById->keys())
+            ->where('source_id', $proposal->id)
             ->orderBy('id')
             ->get();
 
         foreach ($proposalTargets as $target) {
+            if (! $this->places->targetCoversPlace($target, $place)) {
+                continue;
+            }
+
             $library = $target->indicator->libraryIndicator;
 
             if ($library === null) {
@@ -296,71 +323,107 @@ final class ReportTemplatePrefiller
                 continue;
             }
 
-            /** @var Proposal $proposal */
-            $proposal = $proposalsById->get($target->source_id);
-            $useActual = $proposal->actual_date_begin !== null && $proposal->actual_date_end !== null;
-            $begin = $useActual ? $proposal->actual_date_begin : $proposal->planned_date_begin;
-            $end = $useActual ? $proposal->effectiveDateEnd() : $proposal->planned_date_end;
             $fixed = $library->denominator_basis === DenominatorBasis::Fixed;
 
+            if ($fixed && $this->places->placeOfTarget($target) === null) {
+                $sharedFixed[] = $target->id;
+            }
+
             $lines[$target->id] = [
-                'values' => $this->lineValues($library, $begin->startOfMonth(), $end->startOfMonth(), $fixed ? ($beneficiaries[$proposal->id] ?? null) : null),
+                'values' => $this->lineValues($library, $begin->startOfMonth(), $end->startOfMonth(), $fixed ? $this->places->targetBeneficiariesOf($target) : null),
                 'fixed' => $fixed,
             ];
         }
 
-        foreach ($this->institutionalPlanTargets($project) as $target) {
+        foreach ($this->institutionalPlanTargets($proposal) as $target) {
+            if (! $this->places->targetCoversPlace($target, $place) || $this->placeAlreadyHasLine($place, $target->id)) {
+                continue;
+            }
+
             /** @var LibraryIndicator $library */
             $library = $target->indicator->libraryIndicator;
             /** @var AnnualPlan $plan */
             $plan = $target->source;
-            $window = $this->planWindow($project, $plan->year);
+            $window = $this->planWindow($begin, $end, $plan->year);
 
             if ($window === null) {
                 continue;
             }
 
-            $fixed = $library->denominator_basis === DenominatorBasis::Fixed;
-            $lines[$target->id] = ['values' => $this->lineValues($library, $window[0], $window[1], null), 'fixed' => $fixed];
+            if ($library->denominator_basis === DenominatorBasis::Fixed && $this->places->placeOfTarget($target) === null) {
+                $sharedFixed[] = $target->id;
+            }
+
+            $lines[$target->id] = ['values' => $this->lineValues($library, $window[0], $window[1], null), 'fixed' => $library->denominator_basis === DenominatorBasis::Fixed];
         }
 
-        return ['lines' => $lines, 'unlinked' => $unlinked];
+        return ['lines' => $lines, 'unlinked' => $unlinked, 'sharedFixed' => $sharedFixed];
     }
 
     /**
-     * The project's annual-plan targets of institutional `HC.*` library
-     * entries (D-44).
+     * The annual-plan targets of institutional `HC.*` library entries
+     * (D-44) of the projects the proposal's rows carry.
      *
      * @return Collection<int, PlanIndicator>
      */
-    private function institutionalPlanTargets(Project $project): Collection
+    private function institutionalPlanTargets(Proposal $proposal): Collection
     {
+        $projectIds = $proposal->locations()->whereNotNull('project_id')->pluck('project_id')->all();
+
+        if ($projectIds === []) {
+            return new Collection;
+        }
+
         return PlanIndicator::query()
             ->with(['indicator.libraryIndicator', 'source'])
-            ->where('project_id', $project->id)
+            ->whereIn('project_id', $projectIds)
             ->where('source_type', 'annual_plan')
-            ->whereHas('indicator.libraryIndicator', fn (Builder $library) => $library->where('code', 'like', 'HC.%'))
+            ->whereHas('indicator.libraryIndicator', fn ($library) => $library->where('code', 'like', 'HC.%'))
             ->orderBy('id')
             ->get();
     }
 
     /**
-     * The plan year's months cut to the project's dates, null when they do
+     * An `HC.*` target belongs to the place once, not once per proposal
+     * template: another template there may already carry it.
+     */
+    private function placeAlreadyHasLine(ReportPlace $place, int $planIndicatorId): bool
+    {
+        return ReportTemplateLine::query()
+            ->where('plan_indicator_id', $planIndicatorId)
+            ->whereIn('report_template_id', $this->templatesAt($place)->select('id'))
+            ->exists();
+    }
+
+    /**
+     * @return Builder<ReportTemplate>
+     */
+    private function templatesAt(ReportPlace $place): Builder
+    {
+        return ReportTemplate::query()
+            ->where('city_id', $place->cityId)
+            ->where('program_id', $place->programId)
+            ->where('city_wide', $place->cityWide)
+            ->where('center_id', $place->centerId);
+    }
+
+    /**
+     * The plan year's months cut to the proposal's dates, null when they do
      * not overlap.
      *
      * @return array{0: CarbonImmutable, 1: CarbonImmutable}|null
      */
-    private function planWindow(Project $project, int $year): ?array
+    private function planWindow(CarbonImmutable $begin, CarbonImmutable $end, int $year): ?array
     {
         $from = CarbonImmutable::create($year, 1, 1);
         $to = CarbonImmutable::create($year, 12, 1);
 
-        if ($project->start_date !== null && $project->start_date->startOfMonth()->greaterThan($from)) {
-            $from = $project->start_date->startOfMonth();
+        if ($begin->startOfMonth()->greaterThan($from)) {
+            $from = $begin->startOfMonth();
         }
 
-        if ($project->end_date !== null && $project->end_date->startOfMonth()->lessThan($to)) {
-            $to = $project->end_date->startOfMonth();
+        if ($end->startOfMonth()->lessThan($to)) {
+            $to = $end->startOfMonth();
         }
 
         return $from->greaterThan($to) ? null : [$from, $to];
@@ -380,34 +443,56 @@ final class ReportTemplatePrefiller
     }
 
     /**
-     * The project's template, locked, and whether this call created it. A
-     * concurrent creator is absorbed by the unique `project_id` index.
+     * The proposal's template at the place, if it is linked to one.
+     */
+    private function existingTemplate(Proposal $proposal, ReportPlace $place, bool $lock = false): ?ReportTemplate
+    {
+        return $this->templatesAt($place)
+            ->whereHas('proposals', fn ($query) => $query->whereKey($proposal->id))
+            ->orderBy('id')
+            ->when($lock, fn ($query) => $query->lockForUpdate())
+            ->first();
+    }
+
+    /**
+     * The proposal's template at the place, locked, and whether this call
+     * created it. The proposal row is locked first, so two runs for one
+     * proposal cannot both create one (a place is not unique, D-76).
      *
      * @return array{0: ReportTemplate, 1: bool}
      */
-    private function lockedTemplate(Project $project): array
+    private function lockedTemplate(Proposal $proposal, ReportPlace $place): array
     {
-        $template = ReportTemplate::query()->where('project_id', $project->id)->lockForUpdate()->first();
+        Proposal::query()->whereKey($proposal->id)->lockForUpdate()->firstOrFail();
+
+        $template = $this->existingTemplate($proposal, $place, lock: true);
 
         if ($template !== null) {
             return [$template, false];
         }
 
         $now = now();
-        $created = DB::table('report_templates')->insertOrIgnore([
-            'project_id' => $project->id,
+        $id = DB::table('report_templates')->insertGetId([
+            'city_id' => $place->cityId,
+            'program_id' => $place->programId,
+            'center_id' => $place->centerId,
+            'city_wide' => $place->cityWide,
             'status' => 'pending',
             'created_at' => $now,
             'updated_at' => $now,
-        ]) === 1;
+        ]);
+        DB::table('proposal_report_template')->insert([
+            'proposal_id' => $proposal->id,
+            'report_template_id' => $id,
+            'joined_at' => $now,
+            'created_at' => $now,
+            'updated_at' => $now,
+        ]);
 
-        $template = ReportTemplate::query()->where('project_id', $project->id)->lockForUpdate()->firstOrFail();
+        $template = ReportTemplate::query()->whereKey($id)->lockForUpdate()->firstOrFail();
+        $this->activities->record($template, 'report_template.created', notify: false);
 
-        if ($created) {
-            $this->activities->record($template, 'report_template.created', notify: false);
-        }
-
-        return [$template, $created];
+        return [$template, true];
     }
 
     /**
@@ -427,11 +512,11 @@ final class ReportTemplatePrefiller
     }
 
     /**
-     * "Report template to confirm" for the project's responsible MEAL officer
-     * and the MEAL Manager slot holder, once each. Both are named directly,
-     * so no module permission or mute removes them.
+     * "Report template to confirm" for the template's responsible MEAL
+     * officer and the MEAL Manager slot holder, once each. Both are named
+     * directly, so no module permission or mute removes them.
      */
-    private function notifyPending(Project $project): void
+    private function notifyPending(ReportTemplate $template): void
     {
         $event = $this->catalog->effective(self::PendingEvent);
 
@@ -439,8 +524,9 @@ final class ReportTemplatePrefiller
             return;
         }
 
+        $project = $this->places->legacyProjectFor($template);
         $employeeIds = array_values(array_unique(array_filter([
-            MealCoverage::responsibleFor($project),
+            $project === null ? null : MealCoverage::responsibleFor($project),
             Slots::holderOf('meal_manager'),
         ])));
         $userIds = array_values($this->employees->usersFor($employeeIds));
@@ -450,14 +536,15 @@ final class ReportTemplatePrefiller
             return;
         }
 
+        $subject = $project ?? $template;
         $payload = new NotificationPayload(
             kind: NotificationKind::Action,
             module: $event['module'],
             priority: NotificationPriority::Important,
             key: 'notifications.events.'.self::PendingEvent,
-            params: ['subject' => $project->name],
-            subjectType: $project->getMorphClass(),
-            subjectId: $project->id,
+            params: ['subject' => $project->name ?? $template->activityLabel()],
+            subjectType: $subject->getMorphClass(),
+            subjectId: $subject->getKey(),
         );
 
         foreach (User::query()->whereIn('id', $recipients)->get() as $user) {

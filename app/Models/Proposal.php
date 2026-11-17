@@ -203,10 +203,30 @@ class Proposal extends Model implements TracksActivity
     }
 
     /**
-     * Project proposals whose place is not known down to the center (W-34a
-     * slice 3): a location row with no center, or no location row at all.
-     * Payroll proposals have no place and never match. The team works this
-     * list down by giving each row its centers.
+     * The change requests asked for on this proposal after its approval
+     * (contracts.md §7, Y-09, D-89), newest first.
+     *
+     * @return HasMany<ProposalChangeRequest, $this>
+     */
+    public function changeRequests(): HasMany
+    {
+        return $this->hasMany(ProposalChangeRequest::class)->latest('id');
+    }
+
+    /**
+     * The one change request still waiting for its decision, if any.
+     */
+    public function pendingChangeRequest(): ?ProposalChangeRequest
+    {
+        return $this->changeRequests()->pending()->first();
+    }
+
+    /**
+     * Project proposals still missing a center (Y-01 slice 3): not rejected,
+     * with at least one location row that has no center and is not city-wide
+     * field work (D-88). A proposal with no rows is not listed: it belongs to
+     * the `locations` requirement. Payroll proposals have no place and never
+     * match. The team works this list down by giving each row its centers.
      *
      * @param  Builder<static>  $query
      */
@@ -214,9 +234,10 @@ class Proposal extends Model implements TracksActivity
     protected function withoutCenter(Builder $query): void
     {
         $query->where('proposals.kind', ProposalKind::Project)
-            ->where(fn (Builder $inner) => $inner
-                ->doesntHave('locations')
-                ->orWhereHas('locations', fn (Builder $rows) => $rows->doesntHave('centers')));
+            ->where('proposals.status', '!=', ProposalStatus::Rejected)
+            ->whereHas('locations', fn (Builder $rows) => $rows
+                ->where('city_wide', false)
+                ->doesntHave('centers'));
     }
 
     /**

@@ -23,6 +23,7 @@ use App\Models\Proposal;
 use App\Models\ReportTemplate;
 use App\Models\ReportTemplateLine;
 use App\Models\User;
+use App\Support\Reporting\ReportPlace;
 use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Database\Eloquent\ModelNotFoundException;
 use Illuminate\Support\Facades\DB;
@@ -180,6 +181,41 @@ test('a confirmation rolled back by its caller activates nothing and dispatches 
         ->and($line->fresh()->status)->toBe(ReportTemplateLineStatus::Pending);
 
     Event::assertNotDispatched(ProjectActivated::class);
+});
+
+test('a template at a place activates the approved project of its row through the bridge, and one with no project only confirms', function () {
+    $actor = mealManager();
+    ['project' => $project, 'proposal' => $proposal] = rtFixture();
+    $row = proposalRowForProject($proposal, $project);
+    $place = new ReportPlace((int) $project->city_id, (int) $project->program_id, $row->centers()->value('center_id'), false);
+    $template = ReportTemplate::factory()->forPlace($place, $proposal)->create();
+    $line = Activity::withoutRecording(fn () => ReportTemplateLine::factory()->create([
+        'report_template_id' => $template->id,
+        'plan_indicator_id' => PlanIndicator::factory()->forProposal($proposal)->create(['indicator_id' => Indicator::factory()->create(['library_indicator_id' => LibraryIndicator::factory()->create()->id])->id, 'project_id' => $project->id])->id,
+        'effective_from' => '2026-11-01',
+        'effective_to' => '2027-10-01',
+    ]));
+    Event::fake([ProjectActivated::class]);
+
+    rtConfirm($actor, $template, [$line->id]);
+
+    expect($template->fresh()->project_id)->toBeNull()
+        ->and($template->fresh()->status)->toBe(ReportTemplateStatus::Confirmed)
+        ->and($project->fresh()->status)->toBe(ProjectStatus::Active);
+    Event::assertDispatchedTimes(ProjectActivated::class, 1);
+
+    $other = ReportTemplate::factory()->forPlace(new ReportPlace((int) $project->city_id, (int) $project->program_id, insertHrCenter((int) $project->city_id, 'No project '.Str::random(4)), false), $proposal)->create();
+    $otherLine = Activity::withoutRecording(fn () => ReportTemplateLine::factory()->create([
+        'report_template_id' => $other->id,
+        'plan_indicator_id' => PlanIndicator::factory()->forProposal($proposal)->create(['indicator_id' => Indicator::factory()->create(['library_indicator_id' => LibraryIndicator::factory()->create()->id])->id, 'project_id' => $project->id])->id,
+        'effective_from' => '2026-11-01',
+        'effective_to' => '2027-10-01',
+    ]));
+
+    rtConfirm($actor, $other, [$otherLine->id]);
+
+    expect($other->fresh()->status)->toBe(ReportTemplateStatus::Confirmed);
+    Event::assertDispatchedTimes(ProjectActivated::class, 1);
 });
 
 test('confirming no line is refused and writes nothing', function () {

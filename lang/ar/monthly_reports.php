@@ -173,6 +173,7 @@ return [
     'no_questions' => 'لا أسئلة هذا الشهر',
     'no_questions_body' => 'يحدد فريق المتابعة والتقييم الأسئلة في قالب تقرير المشروع.',
     'no_answer' => 'لا إجابة.',
+    'no_stored_answers' => 'لم تُقدَّم إجابات هذا الشهر',
     'grid_files' => 'الشواهد',
     'attach_file' => 'إرفاق',
     'attach_file_to' => 'إرفاق شاهد إلى :name',

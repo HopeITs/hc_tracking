@@ -21,6 +21,7 @@ use App\Models\PlanIndicator;
 use App\Models\Program;
 use App\Models\Project;
 use App\Models\Proposal;
+use App\Models\ProposalLocation;
 use App\Models\Report;
 use App\Models\Result;
 use App\Models\Role;
@@ -41,6 +42,7 @@ use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
+use Illuminate\Support\Str;
 use Livewire\Features\SupportTesting\Testable;
 use Tests\TestCase;
 
@@ -729,6 +731,55 @@ function userWithRole(string $role, ?int $employeeId = null): User
     }
 
     return Activity::withoutRecording(fn (): User => User::factory()->role($role)->create(['employee_id' => $employeeId]));
+}
+
+/**
+ * One location row for the proposal form's `locations.0`: a fresh HR city, a
+ * program with a manager and a city-wide (field work, no center) row, so a
+ * form test that only needs "a place" fills it in one `set`.
+ *
+ * @return array<string, mixed>
+ */
+function proposalPlaceRow(): array
+{
+    $cityId = insertHrCity('Place '.Str::random(5), 'مكان');
+    $employeeId = insertHrEmployee($cityId);
+
+    return [
+        'key' => Str::random(8),
+        'city_id' => (string) $cityId,
+        'program_id' => (string) Program::factory()->create(['manager_id' => $employeeId])->id,
+        'responsible_employee_id' => (string) $employeeId,
+        'center_ids' => [],
+        'city_wide' => true,
+        'new_program_name_en' => '',
+        'new_program_name_ar' => '',
+        'project' => null,
+    ];
+}
+
+/**
+ * A location row of the proposal that carries the project (Y-02): the
+ * project's city and program, and one center (a new HR center of the city
+ * unless one is given; `null` makes the row city-wide).
+ *
+ * @param  int|false|null  $centerId  false = city-wide, null = a new center
+ */
+function proposalRowForProject(Proposal $proposal, Project $project, int|false|null $centerId = null): ProposalLocation
+{
+    $row = ProposalLocation::factory()->create([
+        'proposal_id' => $proposal->id,
+        'city_id' => $project->city_id,
+        'program_id' => $project->program_id,
+        'project_id' => $project->id,
+        'city_wide' => $centerId === false,
+    ]);
+
+    if ($centerId !== false) {
+        $row->centers()->create(['center_id' => $centerId ?? insertHrCenter((int) $project->city_id, 'Center '.Str::random(6))]);
+    }
+
+    return $row;
 }
 
 /**

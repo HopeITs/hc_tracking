@@ -10,10 +10,10 @@ use App\Enums\LineSchedule;
 use App\Enums\ProjectStatus;
 use App\Enums\ReportTemplateLineStatus;
 use App\Enums\ReportTemplateStatus;
-use App\Models\Project;
 use App\Models\Proposal;
 use App\Models\ReportTemplate;
 use App\Models\ReportTemplateLine;
+use App\Support\Reporting\PlaceBridge;
 use Carbon\CarbonImmutable;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Database\Eloquent\ModelNotFoundException;
@@ -50,7 +50,7 @@ final class ConfirmReportTemplate
         CollectionFrequency::OneTime,
     ];
 
-    public function __construct(private ActivateProject $activateProject) {}
+    public function __construct(private ActivateProject $activateProject, private PlaceBridge $places) {}
 
     /**
      * @param  list<int>  $lineIds
@@ -64,12 +64,11 @@ final class ConfirmReportTemplate
 
         $confirmed = DB::transaction(function () use ($template, $lineIds): ReportTemplate {
             $locked = ReportTemplate::query()->whereKey($template->getKey())->lockForUpdate()->firstOrFail();
-            $project = Project::query()->whereKey($locked->project_id)->lockForUpdate()->firstOrFail();
-            $locked->setRelation('project', $project);
+            $project = $this->places->legacyProjectFor($locked, lock: true);
 
             Gate::authorize('manage', $locked);
 
-            if (! in_array($project->status, [ProjectStatus::Approved, ProjectStatus::Active], true)) {
+            if ($project !== null && ! in_array($project->status, [ProjectStatus::Approved, ProjectStatus::Active], true)) {
                 throw ValidationException::withMessages(['template' => __('projects.activate_not_approved')]);
             }
 
@@ -99,10 +98,10 @@ final class ConfirmReportTemplate
                 ])->save();
             }
 
-            if ($project->status === ProjectStatus::Approved) {
+            if ($project?->status === ProjectStatus::Approved) {
                 $this->activateProject->handle($project, 'template_confirmation');
             } elseif ($lines->isNotEmpty()) {
-                $this->recordLinesAdded($locked, $lines);
+                $this->recordLinesAdded($locked, $lines, $project?->id, $project?->end_date);
             }
 
             return $locked;
@@ -172,8 +171,10 @@ final class ConfirmReportTemplate
      * from and the months they cover (`report_template.lines_added`).
      *
      * @param  Collection<int, ReportTemplateLine>  $lines
+     * @param  int|null  $projectId  the template's legacy project, when it has one
+     * @param  CarbonImmutable|null  $projectEnd  that project's end date
      */
-    private function recordLinesAdded(ReportTemplate $template, Collection $lines): void
+    private function recordLinesAdded(ReportTemplate $template, Collection $lines, ?int $projectId, ?CarbonImmutable $projectEnd): void
     {
         $proposalIds = $lines
             ->map(fn (ReportTemplateLine $line): ?int => $line->planIndicator?->source_type === 'proposal' ? $line->planIndicator->source_id : null)
@@ -192,26 +193,16 @@ final class ConfirmReportTemplate
 
         $from = $lines->min(fn (ReportTemplateLine $line): string => $line->effective_from->format('Y-m'));
         $to = $lines->contains(fn (ReportTemplateLine $line): bool => $line->effective_to === null)
-            ? $this->projectEndMonth($template) ?? $from
+            ? $projectEnd?->format('Y-m') ?? $from
             : $lines->max(fn (ReportTemplateLine $line): string => $line->effective_to?->format('Y-m') ?? '');
 
         $template->recordActivity('report_template.lines_added', properties: [
-            'project_id' => $template->project_id,
+            'project_id' => $projectId,
             'line_ids' => $lines->modelKeys(),
             'proposal_ids' => array_values(array_map(intval(...), $proposalIds)),
             'proposals' => array_values($proposalNames),
             'from_month' => $from,
             'to_month' => $to,
         ]);
-    }
-
-    /**
-     * The project's last month, for a line with no end of its own.
-     */
-    private function projectEndMonth(ReportTemplate $template): ?string
-    {
-        $end = $template->project?->end_date;
-
-        return $end === null ? null : CarbonImmutable::parse($end->toDateString())->format('Y-m');
     }
 }

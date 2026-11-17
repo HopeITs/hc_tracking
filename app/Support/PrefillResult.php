@@ -21,6 +21,7 @@ final readonly class PrefillResult
      * @param  list<int>  $unlinkedPlanIndicatorIds
      * @param  list<int>  $missingFixedDenominatorLineIds
      * @param  list<int>  $refreshedLineIds
+     * @param  list<int>  $sharedFixedPlanIndicatorIds  shared targets (D-90) on a `fixed` basis: lined in each center, denominator pooled once per target (Dev 1, 17 Nov)
      */
     public function __construct(
         public array $createdTemplateIds = [],
@@ -28,6 +29,7 @@ final readonly class PrefillResult
         public array $unlinkedPlanIndicatorIds = [],
         public array $missingFixedDenominatorLineIds = [],
         public array $refreshedLineIds = [],
+        public array $sharedFixedPlanIndicatorIds = [],
     ) {}
 
     /**
@@ -41,6 +43,7 @@ final readonly class PrefillResult
             self::union($this->unlinkedPlanIndicatorIds, $other->unlinkedPlanIndicatorIds),
             self::union($this->missingFixedDenominatorLineIds, $other->missingFixedDenominatorLineIds),
             self::union($this->refreshedLineIds, $other->refreshedLineIds),
+            self::union($this->sharedFixedPlanIndicatorIds, $other->sharedFixedPlanIndicatorIds),
         );
     }
 

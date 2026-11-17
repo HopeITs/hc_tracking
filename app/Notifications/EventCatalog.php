@@ -9,6 +9,9 @@ use App\Enums\OversightMode;
 use App\Events\FundingAgreementRecorded;
 use App\Events\ProjectActivated;
 use App\Events\ProjectPeriodChanged;
+use App\Events\ProposalChangeDecided;
+use App\Events\ProposalChangeRequested;
+use App\Events\ProposalChangeReviewed;
 use App\Events\ProposalLocationsChanged;
 use App\Events\ProposalStatusChanged;
 use App\Notifications\Alerts\NotificationSettings;
@@ -176,6 +179,11 @@ final class EventCatalog
                 'proposal.responsible_inactive' => self::entry('proposals', $now, 'scanner', $all),
                 'proposal.final_report_accepted' => self::entry('proposals', $now, 'module_map', $all, activity: 'proposal.final_report_accepted'),
                 'proposal.beneficiaries_changed' => self::entry('proposals', $now, 'module_map', $all, activity: 'proposal.beneficiaries_changed'),
+                // Y-09 (D-89, D-89a): a change request on an approved proposal, its reviews and its decision.
+                'proposal.change_requested' => self::entry('proposals', $now, 'module_map', $all, critical: true, activity: 'proposal.change_requested', event: ProposalChangeRequested::class),
+                'proposal.change_reviewed' => self::entry('proposals', $now, 'module_map', $all, activity: 'proposal.change_reviewed', event: ProposalChangeReviewed::class),
+                'proposal.change_approved' => self::entry('proposals', $now, 'module_map', $all, activity: 'proposal.change_approved', event: ProposalChangeDecided::class),
+                'proposal.change_rejected' => self::entry('proposals', $now, 'module_map', $all, activity: 'proposal.change_rejected', event: ProposalChangeDecided::class),
                 // W-24: the concept note changed. A movement worth recording, not worth interrupting anyone for.
                 'proposal.concept_note_updated' => self::entry('proposals', $digest, 'module_map', $all, activity: 'proposal.concept_note_updated'),
                 'proposal.targets_saved' => self::entry('proposals', $digest, 'module_map', $all, activity: 'proposal.targets_saved'),

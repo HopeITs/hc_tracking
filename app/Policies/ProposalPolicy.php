@@ -6,8 +6,10 @@ namespace App\Policies;
 
 use App\Enums\ProposalStatus;
 use App\Models\Proposal;
+use App\Models\ProposalChangeRequest;
 use App\Models\ProposalReviewer;
 use App\Models\User;
+use App\Support\Slots;
 
 class ProposalPolicy
 {
@@ -91,6 +93,46 @@ class ProposalPolicy
     public function approve(User $user, Proposal $proposal): bool
     {
         return $user->can('proposals.approve');
+    }
+
+    /**
+     * Determine whether the user can ask for a change to an approved
+     * proposal (Y-09, D-89): holders of proposals.update, and only once the
+     * donor has approved it. No new permission.
+     */
+    public function requestChange(User $user, Proposal $proposal): bool
+    {
+        return $user->can('proposals.update') && $proposal->status->isApprovedByDonor();
+    }
+
+    /**
+     * Determine whether the user can review a change request in a slot
+     * (Y-09, D-89a): their HR employee holds that slot right now (Slots).
+     * Holding the slot is the right; no permission grants it.
+     */
+    public function reviewChange(User $user, Proposal $proposal, string $slot): bool
+    {
+        return in_array($slot, ProposalChangeRequest::ReviewSlots, true)
+            && $user->employee_id !== null
+            && (int) $user->employee_id === Slots::holderOf($slot);
+    }
+
+    /**
+     * Determine whether the user can approve or reject a change request
+     * (Y-09, D-89a, D-70): the holders of proposals.approve, the PR Manager.
+     */
+    public function decideChange(User $user, Proposal $proposal): bool
+    {
+        return $user->can('proposals.approve');
+    }
+
+    /**
+     * Determine whether the user can withdraw a change request: only the
+     * person who asked for it (Y-09).
+     */
+    public function withdrawChange(User $user, Proposal $proposal, ProposalChangeRequest $changeRequest): bool
+    {
+        return $changeRequest->proposal_id === $proposal->id && $changeRequest->requested_by === $user->id;
     }
 
     /**

@@ -173,6 +173,7 @@ return [
     'no_questions' => 'No questions this month',
     'no_questions_body' => 'MEAL sets the questions in the project\'s report template.',
     'no_answer' => 'No answer.',
+    'no_stored_answers' => 'No answers were given this month',
     'grid_files' => 'Evidence',
     'attach_file' => 'Attach',
     'attach_file_to' => 'Attach evidence to :name',

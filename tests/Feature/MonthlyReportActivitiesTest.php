@@ -20,6 +20,7 @@ use App\Models\Program;
 use App\Models\Project;
 use App\Models\ProjectActivityStatus;
 use App\Models\Proposal;
+use App\Models\ReportTemplate;
 use App\Models\Result;
 use App\Support\MonthlyReportActivities;
 use Illuminate\Auth\Access\AuthorizationException;
@@ -50,10 +51,36 @@ beforeEach(function () {
         'start_date' => '2026-10-01',
         'end_date' => '2026-12-31',
     ]));
-    $this->proposal = Activity::withoutRecording(fn (): Proposal => Proposal::factory()->create(['status' => ProposalStatus::Approved]));
+    $this->proposal = Activity::withoutRecording(fn (): Proposal => Proposal::factory()->create(['status' => ProposalStatus::Approved, 'name' => 'Proposal Alpha', 'planned_date_begin' => '2026-10-01', 'planned_date_end' => '2027-03-31']));
     $this->project->proposals()->attach($this->proposal->id, ['target_beneficiaries' => 100]);
     $this->output = Activity::withoutRecording(fn (): Result => Result::factory()->type(ResultType::Output)->create(['proposal_id' => $this->proposal->id]));
 });
+
+/**
+ * A template at the project's place that carries the given proposals (Y-02, D-76).
+ */
+function mraTemplate(Proposal ...$proposals): ReportTemplate
+{
+    return Activity::withoutRecording(function () use ($proposals): ReportTemplate {
+        $template = ReportTemplate::factory()->create(['project_id' => test()->project->id]);
+
+        foreach ($proposals as $proposal) {
+            $template->proposals()->attach($proposal->id, ['joined_at' => now()]);
+        }
+
+        return $template;
+    });
+}
+
+function mraProposal(string $name, string $begin = '2026-10-01', string $end = '2027-03-31'): Proposal
+{
+    return Activity::withoutRecording(fn (): Proposal => Proposal::factory()->create([
+        'status' => ProposalStatus::Approved,
+        'name' => $name,
+        'planned_date_begin' => $begin,
+        'planned_date_end' => $end,
+    ]));
+}
 
 function mraActivity(ActivityKind $kind = ActivityKind::Continuous, ?int $proposalId = null): Result
 {
@@ -133,6 +160,65 @@ it('lists the activities scheduled this month with their planned weeks', functio
         ->and($rows[$scheduled->id]['planned_weeks'])->toBe([2, 3])
         ->and($rows[$wholeMonth->id]['planned_weeks'])->toBeNull()
         ->and($rows[$scheduled->id]['carried_from'])->toBeNull();
+});
+
+it('lists the activities of every proposal of a joined template, each labelled with its proposal', function () {
+    $beta = mraProposal('Proposal Beta');
+    mraTemplate($this->proposal, $beta);
+    $alphaActivity = mraActivity();
+    $betaActivity = mraActivity(proposalId: $beta->id);
+    mraSchedule($alphaActivity, '2026-12-01');
+    mraSchedule($betaActivity, '2026-12-01', [1, 2]);
+
+    $rows = mraRows(mraReport('2026-12-01'));
+
+    expect(array_keys($rows))->toEqualCanonicalizing([$alphaActivity->id, $betaActivity->id])
+        ->and($rows[$alphaActivity->id]['proposal_name'])->toBe('Proposal Alpha')
+        ->and($rows[$betaActivity->id]['proposal_name'])->toBe('Proposal Beta')
+        ->and($rows[$betaActivity->id]['planned_weeks'])->toBe([1, 2]);
+});
+
+it('does not label an activity when the template has one proposal', function () {
+    mraTemplate($this->proposal);
+    $activity = mraActivity();
+    mraSchedule($activity, '2026-12-01');
+
+    expect(mraRows(mraReport('2026-12-01'))[$activity->id]['proposal_name'])->toBeNull();
+});
+
+it('leaves out an activity scheduled in a month its proposal window does not cover', function () {
+    $ended = mraProposal('Proposal Ended', '2026-06-01', '2026-11-30');
+    mraTemplate($this->proposal, $ended);
+    $outside = mraActivity(proposalId: $ended->id);
+    mraSchedule($outside, '2026-12-01');
+    $inside = mraActivity();
+    mraSchedule($inside, '2026-12-01');
+
+    expect(array_keys(mraRows(mraReport('2026-12-01'))))->toBe([$inside->id]);
+});
+
+it('lets a center override win over the proposal calendar of a joined proposal', function () {
+    $beta = mraProposal('Proposal Beta');
+    mraTemplate($this->proposal, $beta);
+    $activity = mraActivity(proposalId: $beta->id);
+    mraSchedule($activity, '2026-12-01');
+    mraSchedule($activity, '2027-01-01', projectId: test()->project->id);
+
+    expect(mraRows(mraReport('2026-12-01')))->toBeEmpty()
+        ->and(mraRows(mraReport('2027-01-01')))->toHaveKey($activity->id);
+});
+
+it('still lists a continuing activity of a joined proposal with its carry-over', function () {
+    $beta = mraProposal('Proposal Beta');
+    mraTemplate($this->proposal, $beta);
+    $activity = mraActivity(proposalId: $beta->id);
+    $october = mraReport('2026-10-01', MonthlyReportStatus::Validated);
+    ProjectActivityStatus::query()->create(['project_id' => test()->project->id, 'result_id' => $activity->id, 'status' => ActivityStatus::Ongoing, 'monthly_report_id' => $october->id]);
+
+    $row = mraRows(mraReport('2026-12-01'))[$activity->id];
+
+    expect($row['carried_from']->format('Y-m'))->toBe('2026-10')
+        ->and($row['proposal_name'])->toBe('Proposal Beta');
 });
 
 it('uses the project override calendar instead of the proposal calendar', function () {

@@ -38,8 +38,8 @@ use Livewire\Features\SupportFileUploads\TemporaryUploadedFile;
  * beneficiaries. Every save goes through SaveProposal, so the form writes no
  * status and no links of its own: a new proposal starts at the concept note
  * (or skips it with a reason), and an edit leaves links to the proposal
- * page's Projects tab. The one project a create may carry is the one the
- * project page opened it from (New Concept Note).
+ * page's Projects tab. A create opened from a project (New Concept Note)
+ * starts with a row taken from that project's place; no project is linked.
  *
  * The property names are SaveProposal's `$data` keys, so a refusal from the
  * action lands under the field that caused it.
@@ -68,14 +68,6 @@ trait ManagesProposalForm
     public string $internalProjectNumber = '';
 
     public string $donorId = '';
-
-    /**
-     * The project a create was opened from (New Concept Note on the project
-     * page), linked on save. There is no picker any more: places are rows.
-     *
-     * @var list<string>
-     */
-    public array $projectIds = [];
 
     /** @var array<int|string, int|string|null> */
     public array $beneficiaries = [];
@@ -189,21 +181,6 @@ trait ManagesProposalForm
     public function proposalFormShowsMoney(): bool
     {
         return SaveProposal::canSeeMoney($this->proposalActor());
-    }
-
-    /**
-     * The project a create was opened from, with its beneficiaries input.
-     *
-     * @return list<array{id: int, name: string, place: string, hosted: ?string, centerInactive: bool}>
-     */
-    #[Computed]
-    public function proposalChosenProjects(): array
-    {
-        if (! $this->showProposalModal || $this->editingProposalId !== null) {
-            return [];
-        }
-
-        return $this->projectRows($this->chosenProjects());
     }
 
     /**
@@ -362,10 +339,14 @@ trait ManagesProposalForm
 
         $this->resetProposalForm();
 
-        if ($projectId !== null && $this->proposalActor()->can('projects.view') && $this->linkableProjectQuery()->whereKey($projectId)->exists()) {
-            $this->projectIds = [(string) $projectId];
+        $project = $projectId !== null && $this->proposalActor()->can('projects.view')
+            ? $this->linkableProjectQuery()->whereKey($projectId)->first()
+            : null;
+
+        if ($project !== null) {
+            $this->seedLocationRowFromProject($project);
         } else {
-            $this->addLocationRow();
+            $this->startLocationRows();
         }
 
         $this->showProposalModal = true;
@@ -418,16 +399,6 @@ trait ManagesProposalForm
     }
 
     /**
-     * Keep the chosen ids distinct and drop the beneficiaries of a project
-     * that was unticked, so the save never sends a stale key.
-     */
-    public function updatedProjectIds(): void
-    {
-        $this->projectIds = array_values(array_unique(array_map('strval', array_filter($this->projectIds, 'is_scalar'))));
-        $this->beneficiaries = array_intersect_key($this->beneficiaries, array_flip($this->projectIds));
-    }
-
-    /**
      * Choosing payroll on create drops the projects, rows, beneficiaries,
      * renewal and skip choices a project proposal had: payroll takes none of
      * them. Choosing project again starts with one empty row.
@@ -448,14 +419,13 @@ trait ManagesProposalForm
         $this->resetValidation();
 
         if ($this->kind === ProposalKind::Payroll->value) {
-            $this->projectIds = [];
             $this->beneficiaries = [];
             $this->previousProposalId = '';
             $this->startingStage = ProposalStatus::ConceptNote->value;
             $this->skipReason = '';
             $this->resetLocationRows();
-        } elseif ($this->locations === [] && $this->projectIds === []) {
-            $this->addLocationRow();
+        } elseif ($this->locations === []) {
+            $this->startLocationRows();
         }
     }
 
@@ -465,12 +435,6 @@ trait ManagesProposalForm
     public function isPayrollForm(): bool
     {
         return $this->kind === ProposalKind::Payroll->value;
-    }
-
-    public function removeChosenProject(int $projectId): void
-    {
-        $this->projectIds = array_values(array_filter($this->projectIds, fn (string $id): bool => $id !== (string) $projectId));
-        unset($this->beneficiaries[$projectId]);
     }
 
     /**
@@ -627,7 +591,6 @@ trait ManagesProposalForm
         $this->name = '';
         $this->internalProjectNumber = '';
         $this->donorId = '';
-        $this->projectIds = [];
         $this->resetLocationRows();
         $this->beneficiaries = [];
         $this->beneficiariesReason = '';
@@ -646,21 +609,18 @@ trait ManagesProposalForm
     }
 
     /**
-     * The form as SaveProposal's `$data`. Create sends the location rows, the
-     * project it was opened from with its beneficiaries, and the starting
-     * stage; edit sends the rows (once the proposal has any) and the linked
+     * The form as SaveProposal's `$data`. Create sends the location rows and the
+     * starting stage; edit sends the rows (once the proposal has any) and the linked
      * projects' beneficiaries. The budget is sent only by a money holder.
      *
      * A payroll proposal (W-32) sends its narrative and, on create, its kind;
      * it never sends projects, beneficiaries or a starting stage.
      *
-     * @return array{name: string, internalProjectNumber: string, donorId: string|null, beneficiaries: array<int|string, int|string|null>, beneficiariesReason: string|null, plannedDateBegin: string|null, plannedDateEnd: string|null, notes: string, conceptNote: string|null, narrative?: string|null, kind?: string, projectIds?: list<string>, locations?: list<array{city_id: string, program_id: string|null, responsible_employee_id: string|null, center_ids: list<string>, is_new: bool, new_program_name_en: string, new_program_name_ar: string}>, startingStage?: string, skipReason?: string|null, requestedBudget?: string|null, requestedCurrency?: string|null}
+     * @return array{name: string, internalProjectNumber: string, donorId: string|null, beneficiaries: array<int|string, int|string|null>, beneficiariesReason: string|null, plannedDateBegin: string|null, plannedDateEnd: string|null, notes: string, conceptNote: string|null, narrative?: string|null, kind?: string, locations?: list<array{city_id: string, program_id: string|null, responsible_employee_id: string|null, center_ids: list<string>, city_wide: bool, is_new: bool, new_program_name_en: string, new_program_name_ar: string}>, startingStage?: string, skipReason?: string|null, requestedBudget?: string|null, requestedCurrency?: string|null}
      */
     private function proposalFormData(bool $isCreate): array
     {
-        $beneficiaries = $isCreate
-            ? array_intersect_key($this->beneficiaries, array_flip($this->projectIds))
-            : $this->beneficiaries;
+        $beneficiaries = $isCreate ? [] : $this->beneficiaries;
 
         $data = [
             'name' => $this->name,
@@ -687,14 +647,8 @@ trait ManagesProposalForm
         }
 
         if ($isCreate && ! $isPayroll) {
-            if ($this->projectIds !== []) {
-                $data['projectIds'] = $this->projectIds;
-            }
-
-            // Rows are sent even when empty without a project, so the refusal names the missing place.
-            if ($this->hasLocationRows() || $this->projectIds === []) {
-                $data['locations'] = $this->locationPayload();
-            }
+            // Rows are sent even when empty, so the refusal names the missing place.
+            $data['locations'] = $this->locationPayload();
 
             $data['startingStage'] = $this->startingStage;
             $data['skipReason'] = $this->startingStage === ProposalStatus::ProposalDraft->value ? $this->skipReason : null;
@@ -722,27 +676,10 @@ trait ManagesProposalForm
     {
         return Project::query()
             ->linkableToProposals()
-            ->select(['id', 'name', 'center_id', 'host_center_id', 'program_id', 'city_id'])
+            ->select(['id', 'name', 'center_id', 'host_center_id', 'program_id', 'city_id', 'user_id'])
             ->with('city:id,name_en,name_ar')
             ->orderBy('name')
             ->orderBy('id');
-    }
-
-    /**
-     * The chosen projects that are still linkable. One that is no longer
-     * linkable drops out of the list; the save refuses it by name.
-     *
-     * @return Collection<int, Project>
-     */
-    private function chosenProjects(): Collection
-    {
-        $ids = array_map('intval', array_filter($this->projectIds, 'ctype_digit'));
-
-        if ($ids === [] || ! $this->proposalActor()->can('projects.view')) {
-            return new Collection;
-        }
-
-        return $this->linkableProjectQuery()->whereKey($ids)->get();
     }
 
     /**

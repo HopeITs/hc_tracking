@@ -7,6 +7,7 @@ namespace App\Livewire\Concerns\Proposals;
 use App\Models\HrCenter;
 use App\Models\HrCity;
 use App\Models\Program;
+use App\Models\Project;
 use App\Models\ProposalLocation;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Support\Str;
@@ -37,7 +38,7 @@ trait EditsProposalLocations
      * `project` names the linked project of a row that has one; neither is
      * sent.
      *
-     * @var list<array{key: string, city_id: string, program_id: string, responsible_employee_id: string, center_ids: list<string>, new_program_name_en: string, new_program_name_ar: string, project: string|null}>
+     * @var list<array{key: string, city_id: string, program_id: string, responsible_employee_id: string, center_ids: list<string>, city_wide: bool, new_program_name_en: string, new_program_name_ar: string, project: string|null}>
      */
     public array $locations = [];
 
@@ -103,9 +104,14 @@ trait EditsProposalLocations
         return $byCity;
     }
 
+    /**
+     * Append an empty row and move focus to it.
+     */
     public function addLocationRow(): void
     {
         $this->locations[] = $this->blankLocationRow();
+
+        $this->dispatch('proposal-location-focus', index: count($this->locations) - 1);
     }
 
     /**
@@ -120,6 +126,9 @@ trait EditsProposalLocations
 
         $this->locations = array_values(array_filter($this->locations, fn (int $key): bool => $key !== $index, ARRAY_FILTER_USE_KEY));
         $this->resetValidation();
+
+        // Focus lands on the row above, or on the first row when the first one went.
+        $this->dispatch('proposal-location-focus', index: max(0, $index - 1));
     }
 
     /**
@@ -141,6 +150,14 @@ trait EditsProposalLocations
         if ($field === 'city_id') {
             $allowed = array_map('strval', array_column($this->locationCentersByCity()[(int) $row['city_id']] ?? [], 'id'));
             $row['center_ids'] = array_values(array_intersect($row['center_ids'], $allowed));
+        }
+
+        if ($field === 'city_wide') {
+            $row['city_wide'] = (bool) $row['city_wide'];
+
+            if ($row['city_wide']) {
+                $row['center_ids'] = [];
+            }
         }
 
         if ($field === 'program_id' && $row['program_id'] !== self::NewProgramValue) {
@@ -177,12 +194,21 @@ trait EditsProposalLocations
             'program_id' => $row->program_id !== null ? (string) $row->program_id : ($row->is_new ? self::NewProgramValue : ''),
             'responsible_employee_id' => $row->responsible_employee_id !== null ? (string) $row->responsible_employee_id : '',
             'center_ids' => array_map('strval', $row->centerIds()),
+            'city_wide' => (bool) $row->city_wide,
             'new_program_name_en' => $row->programRequest->name_en ?? '',
             'new_program_name_ar' => $row->programRequest->name_ar ?? '',
             'project' => $row->project?->name,
         ])->all());
 
         $this->hadLocationRows = $this->locations !== [];
+    }
+
+    /**
+     * Start a form with one empty row, without moving focus off the first field.
+     */
+    protected function startLocationRows(): void
+    {
+        $this->locations = [$this->blankLocationRow()];
     }
 
     protected function resetLocationRows(): void
@@ -195,7 +221,7 @@ trait EditsProposalLocations
      * The rows as SaveProposal's `locations`. A row left completely empty
      * (the one a create starts with, say) is not a place and is not sent.
      *
-     * @return list<array{city_id: string, program_id: string|null, responsible_employee_id: string|null, center_ids: list<string>, is_new: bool, new_program_name_en: string, new_program_name_ar: string}>
+     * @return list<array{city_id: string, program_id: string|null, responsible_employee_id: string|null, center_ids: list<string>, city_wide: bool, is_new: bool, new_program_name_en: string, new_program_name_ar: string}>
      */
     protected function locationPayload(): array
     {
@@ -203,7 +229,8 @@ trait EditsProposalLocations
             'city_id' => $row['city_id'],
             'program_id' => $row['program_id'] === '' || $row['program_id'] === self::NewProgramValue ? null : $row['program_id'],
             'responsible_employee_id' => $row['responsible_employee_id'] === '' ? null : $row['responsible_employee_id'],
-            'center_ids' => $row['center_ids'],
+            'center_ids' => $row['city_wide'] ? [] : $row['center_ids'],
+            'city_wide' => $row['city_wide'],
             'is_new' => $row['program_id'] === self::NewProgramValue,
             'new_program_name_en' => $row['program_id'] === self::NewProgramValue ? $row['new_program_name_en'] : '',
             'new_program_name_ar' => $row['program_id'] === self::NewProgramValue ? $row['new_program_name_ar'] : '',
@@ -219,7 +246,7 @@ trait EditsProposalLocations
     }
 
     /**
-     * @param  array{city_id: string, program_id: string, responsible_employee_id: string, center_ids: list<string>, new_program_name_en: string, new_program_name_ar: string, project: string|null}  $row
+     * @param  array{city_id: string, program_id: string, responsible_employee_id: string, center_ids: list<string>, city_wide: bool, new_program_name_en: string, new_program_name_ar: string, project: string|null}  $row
      */
     private function isBlankLocationRow(array $row): bool
     {
@@ -227,11 +254,12 @@ trait EditsProposalLocations
             && $row['city_id'] === ''
             && $row['program_id'] === ''
             && $row['responsible_employee_id'] === ''
-            && $row['center_ids'] === [];
+            && $row['center_ids'] === []
+            && ! $row['city_wide'];
     }
 
     /**
-     * @return array{key: string, city_id: string, program_id: string, responsible_employee_id: string, center_ids: list<string>, new_program_name_en: string, new_program_name_ar: string, project: null}
+     * @return array{key: string, city_id: string, program_id: string, responsible_employee_id: string, center_ids: list<string>, city_wide: bool, new_program_name_en: string, new_program_name_ar: string, project: null}
      */
     private function blankLocationRow(): array
     {
@@ -241,9 +269,26 @@ trait EditsProposalLocations
             'program_id' => '',
             'responsible_employee_id' => '',
             'center_ids' => [],
+            'city_wide' => false,
             'new_program_name_en' => '',
             'new_program_name_ar' => '',
             'project' => null,
         ];
+    }
+
+    /**
+     * Start the form with one row taken from a project (New Concept Note on
+     * the project page): its city, program, responsible and center. The
+     * project is not linked; the row is a place like any other.
+     */
+    protected function seedLocationRowFromProject(Project $project): void
+    {
+        $row = $this->blankLocationRow();
+        $row['city_id'] = (string) $project->city_id;
+        $row['program_id'] = (string) $project->program_id;
+        $row['responsible_employee_id'] = $project->user_id !== null ? (string) $project->user_id : '';
+        $row['center_ids'] = $project->center_id !== null ? [(string) $project->center_id] : [];
+
+        $this->locations = [$row];
     }
 }

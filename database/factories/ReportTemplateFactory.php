@@ -6,8 +6,10 @@ namespace Database\Factories;
 
 use App\Enums\ReportTemplateStatus;
 use App\Models\Project;
+use App\Models\Proposal;
 use App\Models\ReportTemplate;
 use App\Models\User;
+use App\Support\Reporting\ReportPlace;
 use Illuminate\Database\Eloquent\Factories\Factory;
 
 /**
@@ -28,7 +30,24 @@ class ReportTemplateFactory extends Factory
     {
         return [
             'project_id' => Project::factory()->approved(),
+            'city_id' => fn (array $attributes): int => (int) Project::query()->whereKey($attributes['project_id'])->value('city_id'),
+            'program_id' => fn (array $attributes): int => (int) Project::query()->whereKey($attributes['project_id'])->value('program_id'),
         ];
+    }
+
+    /**
+     * A template of the Y-02 kind: at the place, carried by the proposal,
+     * with no legacy project.
+     */
+    public function forPlace(ReportPlace $place, Proposal $proposal): static
+    {
+        return $this->state([
+            'project_id' => null,
+            'city_id' => $place->cityId,
+            'program_id' => $place->programId,
+            'center_id' => $place->centerId,
+            'city_wide' => $place->cityWide,
+        ])->afterCreating(fn (ReportTemplate $template) => $template->proposals()->attach($proposal->id, ['joined_at' => now()]));
     }
 
     /**

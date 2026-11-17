@@ -7,6 +7,7 @@ namespace App\Notifications\Recipients;
 use App\Enums\NotificationPriority;
 use App\Models\Activity;
 use App\Models\Project;
+use App\Models\ProposalChangeRequest;
 use App\Models\ProposalReviewer;
 use App\Models\Role;
 use App\Models\User;
@@ -85,6 +86,25 @@ final class ProposalRecipients extends WatcherRecipients
 
     private const ProjectLinked = 'proposal.project_linked';
 
+    /**
+     * Change requests (Y-09, D-89a, contracts §15.2): opened → the two
+     * review slot holders and the deciders other than the requester; ready
+     * (the review that completes the set, `ready` in the activity) → the
+     * deciders; decided → the requester and the reviewers, and on approve
+     * the MEAL officer of each changed place (else the MEAL Manager slot)
+     * and the responsibles of the changed rows. They all skip the
+     * permission check for these events.
+     */
+    private const ChangeRequested = 'proposal.change_requested';
+
+    private const ChangeReviewed = 'proposal.change_reviewed';
+
+    private const ChangeApproved = 'proposal.change_approved';
+
+    private const ChangeRejected = 'proposal.change_rejected';
+
+    private const ChangeEvents = [self::ChangeRequested, self::ChangeReviewed, self::ChangeApproved, self::ChangeRejected];
+
     protected function roles(): array
     {
         return ['Financial', 'Public Relations Manager'];
@@ -95,6 +115,8 @@ final class ProposalRecipients extends WatcherRecipients
         return match ($activity->event) {
             self::BeneficiariesChanged => [...$this->roles(), 'MEAL'],
             self::PlanRebased => [],
+            // Y-09: only the people §15.2 names hear of a change request, never the watchers.
+            self::ChangeRequested, self::ChangeReviewed, self::ChangeApproved, self::ChangeRejected => [],
             default => $this->roles(),
         };
     }
@@ -116,6 +138,18 @@ final class ProposalRecipients extends WatcherRecipients
             self::ProgramRequestOpened => $this->uniqueIds([Slots::holderOf(Slots::HrLiaison)]),
             self::ProgramRequestLinked => $this->projectOwnerIds($activity),
             self::StatusChanged, self::ProjectLinked => $this->projectOwnerIds($activity),
+            self::ChangeRequested => $this->uniqueIds([Slots::holderOf('finance_manager'), Slots::holderOf('meal_manager')]),
+            self::ChangeApproved => $this->changedPlaceEmployeeIds($activity),
+            default => [],
+        };
+    }
+
+    public function directUserIds(Activity $activity): array
+    {
+        return match ($activity->event) {
+            self::ChangeRequested => array_values(array_diff($this->deciderUserIds(), [(int) $activity->actor_id])),
+            self::ChangeReviewed => ($activity->properties['ready'] ?? false) === true ? $this->deciderUserIds() : [],
+            self::ChangeApproved, self::ChangeRejected => $this->requesterAndReviewerUserIds($activity),
             default => [],
         };
     }
@@ -158,6 +192,13 @@ final class ProposalRecipients extends WatcherRecipients
 
         if (in_array($activity->event, [self::StatusChanged, self::ProjectLinked], true)) {
             return $this->uniqueIds(array_values(app(EmployeeRecipients::class)->usersFor($this->projectOwnerIds($activity))));
+        }
+
+        if (in_array($activity->event, self::ChangeEvents, true)) {
+            return $this->uniqueIds([
+                ...$this->directUserIds($activity),
+                ...array_values(app(EmployeeRecipients::class)->usersFor($this->directEmployeeIds($activity))),
+            ]);
         }
 
         if (in_array($activity->event, [self::ProgramRequestOpened, self::ProgramRequestLinked], true)) {
@@ -216,6 +257,75 @@ final class ProposalRecipients extends WatcherRecipients
             ->all();
 
         return $this->uniqueIds($officerIds);
+    }
+
+    /**
+     * The users who decide change requests: holders of proposals.approve
+     * (D-70), never Super Admin (D-20a).
+     *
+     * @return list<int>
+     */
+    private function deciderUserIds(): array
+    {
+        return $this->uniqueIds(User::permission('proposals.approve')
+            ->whereDoesntHave('roles', fn ($query) => $query->where('name', 'Super Admin'))
+            ->pluck('users.id')
+            ->all());
+    }
+
+    /**
+     * The requester of the decided change request and the people who
+     * reviewed it.
+     *
+     * @return list<int>
+     */
+    private function requesterAndReviewerUserIds(Activity $activity): array
+    {
+        $request = ProposalChangeRequest::query()
+            ->with('reviews:id,proposal_change_request_id,reviewed_by')
+            ->where('proposal_id', $activity->subject_id)
+            ->find($activity->properties['change_request_id'] ?? null);
+
+        if ($request === null) {
+            return [];
+        }
+
+        return $this->uniqueIds([$request->requested_by, ...$request->reviews->pluck('reviewed_by')->all()]);
+    }
+
+    /**
+     * On an approved change: for each location row it changed, the active
+     * MEAL officer of the row's city (else the MEAL Manager slot holder) and
+     * the row's responsible, before and after.
+     *
+     * @return list<int>
+     */
+    private function changedPlaceEmployeeIds(Activity $activity): array
+    {
+        $request = ProposalChangeRequest::query()
+            ->where('proposal_id', $activity->subject_id)
+            ->find($activity->properties['change_request_id'] ?? null);
+
+        if ($request === null) {
+            return [];
+        }
+
+        $ids = [];
+        $locationChanged = false;
+
+        foreach ($request->changes as $change) {
+            if ($change['field'] !== 'locations' || ! isset($change['row'])) {
+                continue;
+            }
+
+            $locationChanged = true;
+            $officer = MealCoverage::officerOfCity((int) $change['row']['city_id']);
+            $ids[] = $officer !== null && MealCoverage::activeEmployeeIds([$officer]) !== [] ? $officer : Slots::holderOf('meal_manager');
+            $ids[] = is_array($change['from']) ? $change['from']['responsible_employee_id'] : null;
+            $ids[] = is_array($change['to']) ? $change['to']['responsible_employee_id'] : null;
+        }
+
+        return $locationChanged ? $this->uniqueIds($ids) : [];
     }
 
     /**

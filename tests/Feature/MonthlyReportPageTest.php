@@ -593,7 +593,7 @@ function mrsActivity(Project $project, ActivityKind $kind = ActivityKind::Contin
         $proposal = $project->proposals()->first();
 
         if ($proposal === null) {
-            $proposal = Proposal::factory()->create(['status' => ProposalStatus::Approved]);
+            $proposal = Proposal::factory()->create(['status' => ProposalStatus::Approved, 'planned_date_begin' => '2026-01-01', 'planned_date_end' => '2027-12-31']);
             $project->proposals()->attach($proposal->id, ['target_beneficiaries' => 100]);
         }
 

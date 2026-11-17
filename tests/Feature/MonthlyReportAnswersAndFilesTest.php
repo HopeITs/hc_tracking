@@ -5,6 +5,8 @@ use App\Actions\MonthlyReports\DeleteMonthlyReportFile;
 use App\Actions\MonthlyReports\SaveMonthlyReportAnswers;
 use App\Actions\MonthlyReports\SaveMonthlyReportFile;
 use App\Actions\MonthlyReports\SubmitMonthlyReport;
+use App\Actions\ReportTemplates\SaveReportTemplateQuestion;
+use App\Actions\ReportTemplates\SetReportTemplateQuestionActive;
 use App\Enums\IndicatorCollector;
 use App\Enums\MonthlyReportStatus;
 use App\Models\Activity;
@@ -22,11 +24,14 @@ use App\Models\Project;
 use App\Models\ReportTemplate;
 use App\Models\ReportTemplateLine;
 use App\Models\ReportTemplateQuestion;
+use App\Models\User;
 use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Database\Eloquent\ModelNotFoundException;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Validation\ValidationException;
+use Livewire\Features\SupportTesting\Testable;
+use Livewire\Livewire;
 
 /*
 | Narrative answers and typed evidence files of a monthly report (contracts
@@ -143,6 +148,73 @@ it('rejects a question of another project and refuses a user outside the prepare
     $this->actingAs($this->officer);
     expect(fn () => app(SaveMonthlyReportAnswers::class)->handle($report, MonthlyReportStatus::Draft, []))->toThrow(AuthorizationException::class);
 });
+
+/**
+ * The monthly report page as the given user (the owner by default).
+ */
+function mafPage(MonthlyReport $report, ?User $as = null): Testable
+{
+    return Livewire::actingAs($as ?? test()->owner)->test('pages::monthly-reports.show', ['monthlyReport' => $report->fresh()]);
+}
+
+it('asks a new question in a draft at once and hides a switched-off one', function () {
+    $kept = ReportTemplateQuestion::factory()->create(['report_template_id' => $this->template->id, 'text_ar' => 'سؤال باقٍ']);
+    $switched = ReportTemplateQuestion::factory()->create(['report_template_id' => $this->template->id, 'text_ar' => 'سؤال سيتوقف']);
+    $report = mafReport();
+
+    $switched->forceFill(['is_active' => false])->save();
+    $added = ReportTemplateQuestion::factory()->create(['report_template_id' => $this->template->id, 'text_ar' => 'سؤال جديد', 'sort_order' => 9]);
+
+    mafPage($report)
+        ->assertSeeTextInOrder(['سؤال باقٍ', 'سؤال جديد'])
+        ->assertDontSeeText('سؤال سيتوقف')
+        ->assertSet('answers', [$kept->id => '', $added->id => '']);
+});
+
+it('keeps a typed draft answer while its question is off and shows it again when switched on', function () {
+    $question = ReportTemplateQuestion::factory()->create(['report_template_id' => $this->template->id, 'text_ar' => 'سؤال يتوقف ثم يعود']);
+    $report = mafReport();
+    $this->actingAs($this->owner);
+    app(SaveMonthlyReportAnswers::class)->handle($report, MonthlyReportStatus::Draft, [['question_id' => $question->id, 'answer' => 'Two groups started.']]);
+
+    $question->forceFill(['is_active' => false])->save();
+    mafPage($report)->assertDontSeeText('سؤال يتوقف ثم يعود')->assertSet('answers', []);
+    expect(MonthlyReportAnswer::query()->sole()->answer)->toBe('Two groups started.');
+
+    $question->forceFill(['is_active' => true])->save();
+    mafPage($report)->assertSeeText('سؤال يتوقف ثم يعود')->assertSet('answers.'.$question->id, 'Two groups started.');
+});
+
+it('asks a new quarter-end question in a draft only in a quarter-end month', function () {
+    ReportTemplateQuestion::factory()->quarterEnd()->create(['report_template_id' => $this->template->id, 'text_ar' => 'سؤال نهاية الربع']);
+
+    mafPage(mafReport('2026-11-01'))->assertDontSeeText('سؤال نهاية الربع');
+    mafPage(mafReport('2026-12-01'))->assertSeeText('سؤال نهاية الربع')->assertSeeText(__('monthly_reports.quarter_end_question'));
+});
+
+it('keeps the stored answers and question text of a submitted or validated report when the template changes', function (string $state) {
+    $first = ReportTemplateQuestion::factory()->create(['report_template_id' => $this->template->id, 'text_ar' => 'السؤال الأول كما أُجيب', 'sort_order' => 1]);
+    $second = ReportTemplateQuestion::factory()->create(['report_template_id' => $this->template->id, 'text_ar' => 'السؤال الثاني كما أُجيب', 'sort_order' => 2]);
+    ReportTemplateQuestion::factory()->create(['report_template_id' => $this->template->id, 'text_ar' => 'سؤال بلا جواب', 'sort_order' => 3]);
+    $report = Activity::withoutRecording(fn (): MonthlyReport => MonthlyReport::factory()->{$state}()->create(['project_id' => $this->project->id, 'period' => '2026-12-01']));
+    MonthlyReportAnswer::factory()->create(['monthly_report_id' => $report->id, 'report_template_question_id' => null, 'question_text' => 'سؤال حُذف لاحقاً', 'answer' => 'Answer to a removed question.']);
+    MonthlyReportAnswer::factory()->create(['monthly_report_id' => $report->id, 'report_template_question_id' => $second->id, 'question_text' => 'السؤال الثاني كما أُجيب', 'answer' => 'Second answer.']);
+    MonthlyReportAnswer::factory()->create(['monthly_report_id' => $report->id, 'report_template_question_id' => $first->id, 'question_text' => 'السؤال الأول كما أُجيب', 'answer' => 'First answer.']);
+
+    $this->actingAs($this->officer);
+    app(SaveReportTemplateQuestion::class)->handle($this->template, $first->id, ['text_ar' => 'نص معدَّل بعد الإرسال', 'frequency' => 'monthly']);
+    app(SetReportTemplateQuestionActive::class)->handle($this->template, $second->id, false);
+    app(SaveReportTemplateQuestion::class)->handle($this->template, null, ['text_ar' => 'سؤال أُضيف بعد الإرسال', 'frequency' => 'monthly']);
+    expect($first->fresh()->text_ar)->toBe('نص معدَّل بعد الإرسال')
+        ->and($second->fresh()->is_active)->toBeFalse();
+
+    mafPage($report, $this->officer)
+        ->assertSeeTextInOrder(['السؤال الأول كما أُجيب', 'First answer.', 'السؤال الثاني كما أُجيب', 'Second answer.', 'سؤال حُذف لاحقاً', 'Answer to a removed question.'])
+        ->assertDontSeeText('نص معدَّل بعد الإرسال')
+        ->assertDontSeeText('سؤال أُضيف بعد الإرسال')
+        ->assertDontSeeText('سؤال بلا جواب')
+        ->assertDontSeeHtml('wire:model.live.blur="answers.');
+})->with(['submitted', 'validated']);
 
 it('stores an evidence file on a line', function () {
     $report = mafReport();
