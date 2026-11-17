@@ -71,6 +71,7 @@
     </x-ui.modal>
 
     <x-ui.confirm-modal
+        permanent
         wire:model="showDeleteModal"
         :title="__('milestones.delete_this_milestone')"
         :message="__('milestones.only_a_milestone_with_no_nested_milestones_and_no_tasks_can')"

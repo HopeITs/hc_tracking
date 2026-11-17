@@ -288,6 +288,30 @@ describe('the Logical Framework tab', function () {
         $tab->assertDontSeeHtml('data-test="copy-source-option-'.$source->id.'"');
     });
 
+    it('keeps the chosen root when Review closes the picker and its close hook runs', function () {
+        $source = programFrameworkTree($this->program, 2);
+
+        // In the browser, hiding the picker fires its wire:close (closeCopyModal) right after Review.
+        Livewire::actingAs($this->editor)->test('proposals.logframe', ['proposalId' => $this->proposal->id])
+            ->call('openCopyModal')
+            ->set('copySourceId', $source->id)
+            ->call('askCopyConfirmation')
+            ->call('closeCopyModal')
+            ->assertSet('showCopyConfirmModal', true)
+            ->assertSet('copySourceId', $source->id)
+            ->call('copyFramework')
+            ->assertHasNoErrors();
+
+        expect($this->proposal->results()->count())->toBe(5);
+    });
+
+    it('reopens the picker with the error when no root is chosen at copy time', function () {
+        Livewire::actingAs($this->editor)->test('proposals.logframe', ['proposalId' => $this->proposal->id])
+            ->call('copyFramework')
+            ->assertHasErrors('copySourceId')
+            ->assertSet('showCopyModal', true);
+    });
+
     it('offers only the roots of the proposal programs and rejects any other id', function () {
         $own = programFrameworkTree($this->program);
         $foreign = programFrameworkTree(Program::factory()->create());

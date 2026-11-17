@@ -55,6 +55,9 @@ class HrEmployee extends HrModel
      */
     public const NameColumns = ['id', 'first_name_en', 'last_name_en', 'first_name_ar', 'last_name_ar'];
 
+    /** Bumped whenever the picker list's shape changes, so browsers drop the copy they cached for five minutes. */
+    public const int PickerListVersion = 2;
+
     private const PickerCacheKeyPrefix = 'hr.employees.picker.';
 
     private const PickerCacheSeconds = 300;
@@ -208,7 +211,8 @@ class HrEmployee extends HrModel
     /**
      * The picker list as plain `{value, label, detail, photo, inactive}` rows,
      * label being the main and secondary name together, detail the person's
-     * current position and photo their picture (HR's default without one), in
+     * current position and photo their picture (HR's default without one; a
+     * host-less URL, as the list is cached for everyone), in
      * the order pickerOptions() sorts them. Someone with no active contract
      * (or inactive in HR) is flagged inactive.
      *
@@ -225,10 +229,24 @@ class HrEmployee extends HrModel
                 'value' => (string) $employee->id,
                 'label' => $employee->name.' · '.$employee->secondary_name,
                 'detail' => static::positionSummary($employee->id) ?? (string) __('common.no_active_position'),
-                'photo' => static::avatarUrl($employee->id),
+                'photo' => static::pathOnly(static::avatarUrl($employee->id)),
                 'inactive' => ! (EmployeeProfile::for($employee->id)['is_active'] ?? false),
             ])->all(),
         ));
+    }
+
+    /**
+     * A same-site URL without its scheme and host. The picker list is cached
+     * for every visitor, so an absolute photo URL would carry the host of
+     * whoever built it (localhost vs 127.0.0.1, or another domain) and the
+     * browser would send no sign-in cookie to it.
+     */
+    private static function pathOnly(string $url): string
+    {
+        $path = parse_url($url, PHP_URL_PATH) ?? '/';
+        $query = parse_url($url, PHP_URL_QUERY);
+
+        return $query === null ? $path : $path.'?'.$query;
     }
 
     /**

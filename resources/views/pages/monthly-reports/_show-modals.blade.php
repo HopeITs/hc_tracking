@@ -89,6 +89,7 @@
 </x-ui.modal>
 
 <x-ui.confirm-modal
+    permanent
     wire:model="showDeleteModal"
     :title="__('monthly_reports.delete_title')"
     :message="__('monthly_reports.delete_message')"

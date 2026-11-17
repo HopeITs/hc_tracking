@@ -122,7 +122,7 @@
             'multiple' => $multiple,
             'placeholder' => (string) $placeholder,
             'countTemplate' => __('common.count_selected', ['count' => '__COUNT__']),
-            'employeesUrl' => $employees ? route('employees.picker-options', ['l' => app()->getLocale()]) : null,
+            'employeesUrl' => $employees ? route('employees.picker-options', ['l' => app()->getLocale(), 'v' => \App\Models\HrEmployee::PickerListVersion]) : null,
             'knownLabels' => $employees ? $employeeLabels->only($currentValues)->all() : [],
         ]))"
         x-modelable="value"

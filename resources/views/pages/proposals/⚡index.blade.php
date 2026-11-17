@@ -343,10 +343,14 @@ new #[Layout('layouts::desk'), Title('titles.proposals')] class extends Componen
     @include('pages.proposals._status-modals')
 
     <x-ui.confirm-modal
+        permanent
         wire:model="showDeleteModal"
         close="cancelDelete"
         :title="__('proposals.delete_this_proposal')"
         :message="__('proposals.its_tasks_project_links_and_status_history_are_removed_with')"
+        :record="$this->deletingProposal?->name"
+        :record-meta="$this->deletingProposal?->internal_project_number"
+        :confirm-text="$this->deletingProposal?->internal_project_number"
         confirm="deleteProposal"
         :confirm-label="__('proposals.delete_proposal')"
         confirm-test="confirm-delete-proposal"

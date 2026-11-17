@@ -330,6 +330,7 @@ new #[Layout('layouts::desk'), Title('titles.funding_agreement')] class extends 
     <x-donor-reports.submit-modal :open="$showSubmitModal" :needs-file="$submissionNeedsFile" :file-count="$submissionFileCount" />
 
     <x-ui.confirm-modal
+        permanent
         wire:model="showReportDeleteModal"
         close="closeReportDeleteModal"
         :title="__('funding_agreements.delete_this_report')"

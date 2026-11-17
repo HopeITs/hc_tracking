@@ -157,13 +157,18 @@ test('a reference-only attachment record can still be deleted', function () {
 });
 
 test('a user without update permission cannot open the upload, edit or delete actions', function (string $method, array $args) {
-    // An assignee sees the task but holds no right to change its files.
+    // A department colleague sees the task but, not being assigned to it, holds no right to change its files.
     $employeeId = insertHrEmployee();
-    $assignee = User::factory()->role('Team Member')->create(['employee_id' => $employeeId]);
+    $colleagueEmployee = insertHrEmployee();
+    $department = insertHrDepartment();
+    insertHrContract($employeeId, insertHrPosition($department));
+    insertHrContract($colleagueEmployee, insertHrPosition($department));
+    $colleague = User::factory()->role('Team Member')->create(['employee_id' => $employeeId]);
     $task = Task::factory()->create();
-    $task->taskAssignees()->create(['employee_id' => $employeeId]);
+    $task->taskAssignees()->delete();
+    $task->taskAssignees()->create(['employee_id' => $colleagueEmployee]);
 
-    Livewire::actingAs($assignee)
+    Livewire::actingAs($colleague)
         ->test('pages::tasks.show', ['task' => $task])
         ->call($method, ...$args)
         ->assertForbidden();

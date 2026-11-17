@@ -637,6 +637,7 @@ new class extends Component {
     </div>
 
     <x-ui.confirm-modal
+        icon="arrow-uturn-left"
         wire:model="showResetModal"
         close="cancelReset"
         tone="neutral"

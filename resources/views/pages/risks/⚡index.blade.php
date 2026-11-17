@@ -705,6 +705,7 @@ new #[Layout('layouts::desk'), Title('titles.risks')] class extends Component {
     </x-ui.modal>
 
     <x-ui.confirm-modal
+        permanent
         wire:model="showDeleteModal"
         close="cancelDelete"
         :title="__('risks.delete_this_risk')"

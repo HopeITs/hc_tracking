@@ -417,6 +417,7 @@ new #[Layout('layouts::desk'), Title('titles.dashboard')] class extends Componen
         <span x-text="applied ? {{ \Illuminate\Support\Js::from(__('desk.ready.applied', ['layout' => '__L__'])) }}.replace('__L__', applied.title) : ''"></span>
         <button type="button" class="dk-btn dk-sm" x-on:click="$wire.saveLayout(applied.previous); applied = null" data-desk-layout-undo><x-desk.icon name="undo" />{{ __('desk.undo') }}</button>
         <button type="button" class="dk-iconbtn dk-sm" x-on:click="applied = null" aria-label="{{ __('common.close') }}"><x-desk.icon name="x" /></button>
+        <span class="dk-undo-timer" style="--dk-undo-ms: 8s" x-effect="applied; $el.style.animation = 'none'; $el.offsetWidth; $el.style.animation = ''" aria-hidden="true"></span>
     </div>
 
     {{-- Something was put on the Desk (dragged in from the sidebar, or added from the Ask bar or a page), or a button into Quick access: say what, with Undo. --}}
@@ -424,6 +425,7 @@ new #[Layout('layouts::desk'), Title('titles.dashboard')] class extends Componen
         <span x-text="placed ? (placed.quick ? {{ \Illuminate\Support\Js::from(__('desk-workspace.quick.placed', ['item' => '__I__'])) }} : {{ \Illuminate\Support\Js::from(__('desk-workspace.placed', ['item' => '__I__'])) }}).replace('__I__', placed.title) : ''"></span>
         <button type="button" class="dk-btn dk-sm" x-on:click="placed.quick ? $wire.removeQuickItem(placed.panel) : $wire.removePanel(placed.panel); placed = null"><x-desk.icon name="undo" />{{ __('desk.undo') }}</button>
         <button type="button" class="dk-iconbtn dk-sm" x-on:click="placed = null" aria-label="{{ __('common.close') }}"><x-desk.icon name="x" /></button>
+        <span class="dk-undo-timer" style="--dk-undo-ms: 5s" x-effect="placed; $el.style.animation = 'none'; $el.offsetWidth; $el.style.animation = ''" aria-hidden="true"></span>
     </div>
 
     {{-- Undo for a removed panel, for ~6 seconds (undoRemove puts it back where it was). --}}
@@ -431,5 +433,6 @@ new #[Layout('layouts::desk'), Title('titles.dashboard')] class extends Componen
         <span x-text="removed ? {{ \Illuminate\Support\Js::from(__('desk.panel_removed', ['panel' => '__P__'])) }}.replace('__P__', removed.title) : ''"></span>
         <button type="button" class="dk-btn dk-sm" x-on:click="$wire.undoRemove(removed.panel, removed.position, removed.size, removed.cols ?? null, removed.rows ?? null); removed = null"><x-desk.icon name="undo" />{{ __('desk.undo') }}</button>
         <button type="button" class="dk-iconbtn dk-sm" x-on:click="removed = null" aria-label="{{ __('common.close') }}"><x-desk.icon name="x" /></button>
+        <span class="dk-undo-timer" style="--dk-undo-ms: 6s" x-effect="removed; $el.style.animation = 'none'; $el.offsetWidth; $el.style.animation = ''" aria-hidden="true"></span>
     </div>
 </div>

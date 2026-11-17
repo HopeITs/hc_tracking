@@ -434,6 +434,7 @@ new #[Layout('layouts::desk'), Title('titles.donors')] class extends Component {
     <x-donors.form-modal :open="$showDonorModal" :editing="$editingDonorId !== null" :type-options="$this->donorTypeOptions" />
 
     <x-ui.confirm-modal
+        icon="x-circle"
         wire:model="showDeclineModal"
         close="cancelDecline"
         tone="neutral"
@@ -447,6 +448,7 @@ new #[Layout('layouts::desk'), Title('titles.donors')] class extends Component {
     </x-ui.confirm-modal>
 
     <x-ui.confirm-modal
+        permanent
         wire:model="showDeleteModal"
         close="cancelDelete"
         :title="__('donors.delete_this_donor')"

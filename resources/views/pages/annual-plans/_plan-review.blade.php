@@ -68,6 +68,7 @@
 
 {{-- The app's own confirmation, never the browser's (user report 2026-11-12). --}}
 <x-ui.confirm-modal
+    icon="check-badge"
     wire:model="confirmingApproval"
     tone="neutral"
     :title="__('annual_plans.wf.approve_button')"

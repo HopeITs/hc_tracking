@@ -280,6 +280,7 @@ new class extends Component {
     @endif
 
     <x-ui.confirm-modal
+        permanent
         wire:model="showDeleteModal"
         close="cancelDelete"
         :title="__('results_framework.delete_this_result')"

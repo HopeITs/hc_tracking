@@ -74,9 +74,12 @@ test('an assignee on the task page changes status but not the title', function (
 
     $page = Livewire::actingAs($this->assignee)->test('pages::tasks.show', ['task' => $this->task])
         ->assertSeeHtml('data-test="task-edit-status-done"')
-        ->assertSeeHtml('data-test="task-edit-progress-input"')
-        ->assertSeeHtml('data-test="task-edit-completed-date-input"')
         ->assertSeeHtml('data-test="task-edit-form"')
+        ->assertSee('title="Only the task creator can mark it done."', false)
+        ->assertSeeHtml('data-test="task-priority-text"')
+        ->assertSeeHtml('data-test="task-evidence-required-text"')
+        ->assertDontSeeHtml('data-test="task-evidence-required"')
+        ->assertDontSeeHtml('data-record-activity')
         ->assertDontSeeHtml('data-test="task-edit-due-date-input"')
         ->assertDontSeeHtml('data-test="task-edit-title-input"')
         ->assertDontSeeHtml('data-test="task-edit-priority-high"')
@@ -108,7 +111,6 @@ test('someone who can see a task but has no rights on it cannot change it from t
     Livewire::actingAs($manager)->test('pages::tasks.show', ['task' => $visible])
         ->assertSeeHtml('data-test="task-edit-title-input"')
         ->assertSeeHtml('data-test="task-edit-priority-high"')
-        ->assertSeeHtml('data-test="task-edit-progress-input"')
         ->set('title', 'Renamed by manager')
         ->call('updateTask')
         ->assertHasNoErrors();
@@ -125,7 +127,6 @@ test('someone who can see a task but has no rights on it cannot change it from t
         ->assertDontSeeHtml('data-test="task-edit-form"')
         ->assertDontSeeHtml('data-test="task-edit-title-input"')
         ->assertDontSeeHtml('data-test="task-edit-status-done"')
-        ->assertDontSeeHtml('data-test="task-edit-progress-input"')
         ->set('title', 'Renamed by viewer')
         ->call('updateTask')
         ->assertForbidden();

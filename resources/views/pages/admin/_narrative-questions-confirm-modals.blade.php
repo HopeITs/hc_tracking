@@ -5,6 +5,7 @@
     instead.
 --}}
 <x-ui.confirm-modal
+    icon="no-symbol"
     wire:model="showDeactivateModal"
     close="cancelDeactivate"
     tone="neutral"
@@ -17,6 +18,8 @@
 
 {{-- One dialog whose text follows $deletingQuestionInUse: two dialogs swapped behind an @if would replace the open <dialog> element mid-request. --}}
 <x-ui.confirm-modal
+    :icon="$deletingQuestionInUse ? 'no-symbol' : 'trash'"
+    :permanent="! $deletingQuestionInUse"
     wire:model="showDeleteModal"
     close="cancelDelete"
     :tone="$deletingQuestionInUse ? 'neutral' : 'danger'"

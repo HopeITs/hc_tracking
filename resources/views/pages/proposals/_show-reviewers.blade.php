@@ -129,6 +129,7 @@
     </div>
 
     <x-ui.confirm-modal
+        icon="user-minus"
         wire:model="showRemoveReviewerModal"
         close="closeRemoveReviewerModal"
         :title="__('proposals.remove_reviewer')"

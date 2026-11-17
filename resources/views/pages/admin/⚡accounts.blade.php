@@ -225,6 +225,7 @@ new #[Layout('layouts::desk'), Title('titles.accounts')] class extends Component
     @include('pages.admin._accounts-modal')
 
     <x-ui.confirm-modal
+        icon="lock-closed"
         wire:model="showCloseModal"
         close="cancelClose"
         tone="neutral"

@@ -31,6 +31,7 @@
     </x-ui.modal>
 
     <x-ui.confirm-modal
+        permanent
         wire:model="confirmingFileDelete"
         :title="__('projects.delete_this_file')"
         :message="$deletingFileId !== null && ($deletingMedia = $this->project->media->firstWhere('id', $deletingFileId)) !== null ? __('projects.deleting_the_file_also_removes_it_from_storage', ['name' => $deletingMedia->original_name]) : null"

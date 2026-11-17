@@ -163,6 +163,7 @@
     </x-ui.modal>
 
     <x-ui.confirm-modal
+        permanent
         wire:model="showDeletePillarModal"
         close="cancelDeletePillar"
         :title="__('strategies.delete_pillar')"

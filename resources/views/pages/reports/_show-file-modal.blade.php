@@ -55,6 +55,7 @@
         :count="$this->files->count()"
     />
     <x-ui.confirm-modal
+        permanent
         wire:model="showDeleteFileModal"
         close="closeDeleteFileModal"
         :title="__('reports.delete_this_file')"

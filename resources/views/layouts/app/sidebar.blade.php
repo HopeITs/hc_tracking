@@ -50,7 +50,7 @@
         @endunless
 
         @persist('toast')
-            <flux:toast.group position="center">
+            <flux:toast.group position="bottom center">
                 <flux:toast />
             </flux:toast.group>
         @endpersist

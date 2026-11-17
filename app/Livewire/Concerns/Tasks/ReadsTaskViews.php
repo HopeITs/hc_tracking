@@ -32,7 +32,7 @@ use Livewire\Attributes\Computed;
 trait ReadsTaskViews
 {
     /** Cards a board column draws before "Show more": the board stays light however long a column is. */
-    public const int BoardCardsPerStep = 25;
+    public const int BoardCardsPerStep = 12;
 
     /**
      * How many cards each board column draws, keyed by status value; a

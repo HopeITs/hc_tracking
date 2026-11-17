@@ -48,7 +48,7 @@
     $id ??= 'header-filter-'.substr(md5($model.'|'.$label), 0, 12);
     $searchable ??= $employees || count($options) > 7;
     $searchLabel ??= $label;
-    $employeesUrl = $employees ? route('employees.picker-options', ['l' => app()->getLocale()]) : null;
+    $employeesUrl = $employees ? route('employees.picker-options', ['l' => app()->getLocale(), 'v' => \App\Models\HrEmployee::PickerListVersion]) : null;
 
     /* flux:menu.item's own default-variant classes (vendor/livewire/flux/stubs/resources/views/flux/menu/item.blade.php). */
     $menuItemClasses = 'flex items-center px-2 py-1.5 w-full focus:outline-hidden select-none rounded-md text-start text-sm font-medium [&[disabled]]:opacity-50 text-zinc-800 data-active:bg-zinc-50 dark:text-white dark:data-active:bg-white/6 **:data-flux-menu-item-icon:text-zinc-400 dark:**:data-flux-menu-item-icon:text-white/60 [&[data-active]_[data-flux-menu-item-icon]]:text-current';

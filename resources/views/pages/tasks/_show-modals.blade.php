@@ -55,6 +55,7 @@
         :count="$this->attachments->count()"
     />
     <x-ui.confirm-modal
+        permanent
         wire:model="showDeleteFileModal"
         close="closeDeleteFileModal"
         :title="$showDeleteFileModal && $deletingFileId !== null && ($deletingAttachment = $this->attachments->firstWhere('id', $deletingFileId)) !== null ? __('common.delete_name', ['name' => $deletingAttachment->displayName()]) : __('common.delete')"

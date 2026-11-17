@@ -3,6 +3,7 @@
     Included by ⚡index.blade.php.
 --}}
 <x-ui.confirm-modal
+    icon="no-symbol"
     wire:model="showDeactivateModal"
     close="cancelDeactivate"
     tone="neutral"
@@ -14,6 +15,7 @@
 />
 
 <x-ui.confirm-modal
+    permanent
     wire:model="showDeleteModal"
     close="cancelDelete"
     :title="__('indicator_library.delete_title', ['name' => $deletingEntryName])"

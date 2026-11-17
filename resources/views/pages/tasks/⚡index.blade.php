@@ -232,12 +232,13 @@ new #[Layout('layouts::desk'), Title('titles.tasks')] class extends Component
     @include('pages.tasks._index-drawer')
 
     <x-ui.confirm-modal
+        permanent
         wire:model="showDeleteModal"
         close="cancelDelete"
         :title="__('tasks.delete_this_task')"
-        :message="$this->deletingTask !== null
-            ? __('tasks.are_you_sure_you_want_to_delete_this_task', ['title' => $this->deletingTask->title])
-            : __('tasks.its_attachment_records_are_removed_with_it_nothing_outside')"
+        :message="__('tasks.its_attachment_records_are_removed_with_it_nothing_outside')"
+        :record="$this->deletingTask?->title"
+        record-icon="clipboard-document-check"
         confirm="deleteTask"
         :confirm-label="__('tasks.delete_task')"
         confirm-test="confirm-delete-task"
