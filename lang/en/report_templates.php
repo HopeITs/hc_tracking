@@ -94,6 +94,7 @@ return [
         'line_missing' => 'This line is no longer on this template. Reload the page.',
     ],
     'console' => [
+        'shared_fixed_targets' => 'Shared fixed-basis targets, lined in each center (count their denominator once per target): :ids.',
         'backfill_templates' => 'Templates to place: :count.',
         'backfill_with_center' => 'With a center: :count.',
         'backfill_city_wide' => 'City-wide (field work): :count.',

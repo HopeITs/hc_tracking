@@ -94,6 +94,7 @@ return [
         'line_missing' => 'لم يعد هذا السطر في هذا القالب، أعد تحميل الصفحة.',
     ],
     'console' => [
+        'shared_fixed_targets' => 'مستهدفات مشتركة بمقام ثابت، لها سطر في كل مركز (يُحسب مقامها مرة واحدة لكل مستهدف): :ids',
         'backfill_templates' => 'القوالب المطلوب تحديد مكانها: :count',
         'backfill_with_center' => 'لها مركز: :count',
         'backfill_city_wide' => 'على مستوى المدينة (عمل ميداني): :count',

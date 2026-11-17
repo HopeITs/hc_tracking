@@ -27,6 +27,7 @@ use App\Models\UserNotification;
 use App\Support\Reporting\PlaceBridge;
 use App\Support\ReportTemplatePrefiller;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
 
 beforeEach(function () {
     $this->travelTo('2026-10-16 10:00:00');
@@ -198,14 +199,18 @@ test('a proposal with two centers gets a template per center and a shared target
     $output = Result::factory()->create(['type' => ResultType::Output, 'program_id' => $this->program->id, 'proposal_id' => $proposal->id]);
     $shared = prefillTarget($proposal, $output, $project);
     $sharedFixed = prefillTarget($proposal, $output, $project, ['denominator_basis' => 'fixed', 'measure' => 'percentage', 'unit' => null]);
+    Log::spy();
 
     $result = app(ReportTemplatePrefiller::class)->prefillForProposal($proposal);
+
+    Log::shouldHaveReceived('warning')->withArgs(fn (string $message, array $context): bool => str_contains($message, 'once per target') && $context['plan_indicator_ids'] === [$sharedFixed->id]);
 
     $templates = ReportTemplate::query()->where('program_id', $this->program->id)->whereHas('proposals', fn ($query) => $query->whereKey($proposal->id))->get();
     expect($templates)->toHaveCount(2)
         ->and($templates->pluck('center_id')->sort()->values()->all())->toBe(collect($row->centers()->pluck('center_id')->all())->sort()->values()->all())
         ->and(ReportTemplateLine::query()->where('plan_indicator_id', $shared->id)->pluck('report_template_id')->sort()->values()->all())->toBe($templates->pluck('id')->sort()->values()->all())
-        ->and(ReportTemplateLine::query()->where('plan_indicator_id', $sharedFixed->id)->exists())->toBeFalse()
+        ->and(ReportTemplateLine::query()->where('plan_indicator_id', $sharedFixed->id)->pluck('report_template_id')->sort()->values()->all())->toBe($templates->pluck('id')->sort()->values()->all())
+        ->and(ReportTemplateLine::query()->where('plan_indicator_id', $sharedFixed->id)->pluck('fixed_denominator')->unique()->values()->all())->toBe([40])
         ->and($result->sharedFixedPlanIndicatorIds)->toBe([$sharedFixed->id]);
 });
 

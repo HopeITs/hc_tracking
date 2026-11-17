@@ -46,11 +46,13 @@ class PrefillActiveReportTemplates extends Command
             ->get();
         $missingTargetIds = [];
         $refreshedLineIds = [];
+        $sharedFixedTargetIds = [];
 
         foreach ($projects as $project) {
             $row = $dryRun ? $this->preview($prefiller, $project) : $this->apply($prefiller, $project);
             $missingTargetIds = [...$missingTargetIds, ...$row['missingTargets']];
             $refreshedLineIds = [...$refreshedLineIds, ...$row['refreshed']];
+            $sharedFixedTargetIds = [...$sharedFixedTargetIds, ...$row['sharedFixed']];
 
             $this->line(__('report_templates.console.prefill_row', [
                 'project' => $project->id,
@@ -69,6 +71,10 @@ class PrefillActiveReportTemplates extends Command
             $this->line(__('report_templates.console.refreshed_lines', ['ids' => $this->ids($refreshedLineIds)]));
         }
 
+        if ($sharedFixedTargetIds !== []) {
+            $this->warn(__('report_templates.console.shared_fixed_targets', ['ids' => $this->ids(array_values(array_unique($sharedFixedTargetIds)))]));
+        }
+
         $this->reportMissingDenominators(array_values(array_diff($this->missingDenominatorLineIds(), $refreshedLineIds)), $missingTargetIds);
 
         if ($dryRun) {
@@ -79,7 +85,7 @@ class PrefillActiveReportTemplates extends Command
     }
 
     /**
-     * @return array{hasTemplate: bool, templateCreated: bool, created: int, skipped: int, refreshed: list<int>, unlinked: list<int>, missingTargets: list<int>}
+     * @return array{hasTemplate: bool, templateCreated: bool, created: int, skipped: int, refreshed: list<int>, unlinked: list<int>, missingTargets: list<int>, sharedFixed: list<int>}
      */
     private function apply(ReportTemplatePrefiller $prefiller, Project $project): array
     {
@@ -95,13 +101,14 @@ class PrefillActiveReportTemplates extends Command
             'refreshed' => $result->refreshedLineIds,
             'unlinked' => $result->unlinkedPlanIndicatorIds,
             'missingTargets' => [],
+            'sharedFixed' => $result->sharedFixedPlanIndicatorIds,
         ];
     }
 
     /**
      * The same row as apply(), read-only.
      *
-     * @return array{hasTemplate: bool, templateCreated: bool, created: int, skipped: int, refreshed: list<int>, unlinked: list<int>, missingTargets: list<int>}
+     * @return array{hasTemplate: bool, templateCreated: bool, created: int, skipped: int, refreshed: list<int>, unlinked: list<int>, missingTargets: list<int>, sharedFixed: list<int>}
      */
     private function preview(ReportTemplatePrefiller $prefiller, Project $project): array
     {
@@ -115,6 +122,7 @@ class PrefillActiveReportTemplates extends Command
             'refreshed' => $preview['refreshedLineIds'],
             'unlinked' => $preview['unlinkedPlanIndicatorIds'],
             'missingTargets' => $preview['missingFixedDenominatorPlanIndicatorIds'],
+            'sharedFixed' => $preview['sharedFixedPlanIndicatorIds'],
         ];
     }
 

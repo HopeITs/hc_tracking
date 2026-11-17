@@ -119,7 +119,7 @@ final class ReportTemplatePrefiller
      * ids, since no line exists yet). Writes nothing
      * (`report-templates:prefill-active --dry-run`).
      *
-     * @return array{hasTemplate: bool, createsTemplate: bool, existingLineCount: int, newLinePlanIndicatorIds: list<int>, refreshedLineIds: list<int>, unlinkedPlanIndicatorIds: list<int>, missingFixedDenominatorPlanIndicatorIds: list<int>}
+     * @return array{hasTemplate: bool, createsTemplate: bool, existingLineCount: int, newLinePlanIndicatorIds: list<int>, refreshedLineIds: list<int>, unlinkedPlanIndicatorIds: list<int>, missingFixedDenominatorPlanIndicatorIds: list<int>, sharedFixedPlanIndicatorIds: list<int>}
      */
     public function previewProject(int $projectId): array
     {
@@ -131,11 +131,13 @@ final class ReportTemplatePrefiller
             'refreshedLineIds' => [],
             'unlinkedPlanIndicatorIds' => [],
             'missingFixedDenominatorPlanIndicatorIds' => [],
+            'sharedFixedPlanIndicatorIds' => [],
         ];
 
         foreach ($this->approvedProposals($projectId) as $proposal) {
             foreach ($this->places->placesOfProject($proposal, $projectId) as $place) {
-                ['lines' => $lines, 'unlinked' => $unlinked] = $this->plannedLines($proposal, $place);
+                ['lines' => $lines, 'unlinked' => $unlinked, 'sharedFixed' => $sharedFixed] = $this->plannedLines($proposal, $place);
+                $preview['sharedFixedPlanIndicatorIds'] = [...$preview['sharedFixedPlanIndicatorIds'], ...$sharedFixed];
 
                 $template = $this->existingTemplate($proposal, $place);
                 $existing = $template === null ? new Collection : $template->lines()->get()->keyBy(fn (ReportTemplateLine $line): int => (int) $line->plan_indicator_id);
@@ -168,6 +170,7 @@ final class ReportTemplatePrefiller
         }
 
         $preview['newLinePlanIndicatorIds'] = array_values(array_unique($preview['newLinePlanIndicatorIds']));
+        $preview['sharedFixedPlanIndicatorIds'] = array_values(array_unique($preview['sharedFixedPlanIndicatorIds']));
         $preview['unlinkedPlanIndicatorIds'] = array_values(array_unique($preview['unlinkedPlanIndicatorIds']));
 
         return $preview;
@@ -250,6 +253,13 @@ final class ReportTemplatePrefiller
             ]);
         }
 
+        if ($result->sharedFixedPlanIndicatorIds !== []) {
+            Log::warning('Shared fixed-basis targets have a line in each center: count their denominator once per target when pooling (D-90).', [
+                'report_template_id' => $templateId,
+                'plan_indicator_ids' => $result->sharedFixedPlanIndicatorIds,
+            ]);
+        }
+
         if ($result->createdLineIds !== []) {
             DB::afterCommit(fn () => $this->notifyPending(ReportTemplate::query()->findOrFail($templateId)));
         }
@@ -276,7 +286,9 @@ final class ReportTemplatePrefiller
     /**
      * The pending line wanted per target (plan_indicator id => attributes)
      * at the place, the proposal targets whose indicator has no library link,
-     * and the shared `fixed`-basis targets that get no line.
+     * and the shared `fixed`-basis targets (D-90): they get a line in each
+     * center's template with the row's one denominator, which aggregation
+     * must count once per target, never once per center (Dev 1, 17 Nov).
      *
      * @return array{lines: array<int, array{values: array<string, mixed>, fixed: bool}>, unlinked: list<int>, sharedFixed: list<int>}
      */
@@ -315,8 +327,6 @@ final class ReportTemplatePrefiller
 
             if ($fixed && $this->places->placeOfTarget($target) === null) {
                 $sharedFixed[] = $target->id;
-
-                continue;
             }
 
             $lines[$target->id] = [
@@ -342,8 +352,6 @@ final class ReportTemplatePrefiller
 
             if ($library->denominator_basis === DenominatorBasis::Fixed && $this->places->placeOfTarget($target) === null) {
                 $sharedFixed[] = $target->id;
-
-                continue;
             }
 
             $lines[$target->id] = ['values' => $this->lineValues($library, $window[0], $window[1], null), 'fixed' => $library->denominator_basis === DenominatorBasis::Fixed];

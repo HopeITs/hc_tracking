@@ -21,7 +21,7 @@ final readonly class PrefillResult
      * @param  list<int>  $unlinkedPlanIndicatorIds
      * @param  list<int>  $missingFixedDenominatorLineIds
      * @param  list<int>  $refreshedLineIds
-     * @param  list<int>  $sharedFixedPlanIndicatorIds  shared targets (D-90) on a `fixed` basis, left without a line (Dev 1 to rule)
+     * @param  list<int>  $sharedFixedPlanIndicatorIds  shared targets (D-90) on a `fixed` basis: lined in each center, denominator pooled once per target (Dev 1, 17 Nov)
      */
     public function __construct(
         public array $createdTemplateIds = [],
