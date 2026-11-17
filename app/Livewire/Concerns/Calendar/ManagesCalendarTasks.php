@@ -11,7 +11,6 @@ use App\Livewire\Concerns\SavesTaskForm;
 use App\Models\Donor;
 use App\Models\DonorReport;
 use App\Models\HrDepartment;
-use App\Models\Milestone;
 use App\Models\MonthlyReport;
 use App\Models\Program;
 use App\Models\Project;
@@ -37,7 +36,7 @@ use Livewire\Attributes\Locked;
  * ScopesCalendarPeople; the #[Computed] calendar() it refreshes from
  * BuildsCalendarGrid.
  *
- * @property-read array{month: CarbonImmutable, weeks: ?array<int, array<int, CarbonImmutable>>, days: ?array<int, CarbonImmutable>, milestonesByDay: \Illuminate\Support\Collection<string, Collection<int, Milestone>>, tasksByDay: \Illuminate\Support\Collection<string, Collection<int, Task>>, reportsByDay: \Illuminate\Support\Collection<string, Collection<int, Report>>, monthlyReportsByDay: \Illuminate\Support\Collection<string, Collection<int, MonthlyReport>>, proposalsByDay: \Illuminate\Support\Collection<string, Collection<int, Proposal>>, transfersByDay: \Illuminate\Support\Collection<string, Collection<int, TransfersTracking>>, donorFollowUpsByDay: \Illuminate\Support\Collection<string, Collection<int, Donor>>, donorReportsByDay: \Illuminate\Support\Collection<string, Collection<int, DonorReport>>, projectStartsByDay: \Illuminate\Support\Collection<string, Collection<int, Project>>, projectEndsByDay: \Illuminate\Support\Collection<string, Collection<int, Project>>, reviewMeetingsByDay: \Illuminate\Support\Collection<string, Collection<int, ProposalStatusNote>>, unscheduledTasks: Collection<int, Task>, nowOffsetPercent: float} $calendar  #[Computed] calendar()
+ * @property-read array{month: CarbonImmutable, weeks: ?array<int, array<int, CarbonImmutable>>, days: ?array<int, CarbonImmutable>, tasksByDay: \Illuminate\Support\Collection<string, Collection<int, Task>>, reportsByDay: \Illuminate\Support\Collection<string, Collection<int, Report>>, monthlyReportsByDay: \Illuminate\Support\Collection<string, Collection<int, MonthlyReport>>, proposalsByDay: \Illuminate\Support\Collection<string, Collection<int, Proposal>>, transfersByDay: \Illuminate\Support\Collection<string, Collection<int, TransfersTracking>>, donorFollowUpsByDay: \Illuminate\Support\Collection<string, Collection<int, Donor>>, donorReportsByDay: \Illuminate\Support\Collection<string, Collection<int, DonorReport>>, projectStartsByDay: \Illuminate\Support\Collection<string, Collection<int, Project>>, projectEndsByDay: \Illuminate\Support\Collection<string, Collection<int, Project>>, reviewMeetingsByDay: \Illuminate\Support\Collection<string, Collection<int, ProposalStatusNote>>, unscheduledTasks: Collection<int, Task>, nowOffsetPercent: float} $calendar  #[Computed] calendar()
  */
 trait ManagesCalendarTasks
 {
@@ -86,7 +85,6 @@ trait ManagesCalendarTasks
     public function sourceTypeOptions(): array
     {
         return [
-            'milestone' => __('tasks.source_type_milestone'),
             'proposal' => __('tasks.source_type_proposal'),
             'project' => __('tasks.source_type_project'),
             'program' => __('tasks.source_type_program'),
@@ -97,18 +95,12 @@ trait ManagesCalendarTasks
     /**
      * The pickable sources for the currently selected source type.
      *
-     * @return Collection<int, Milestone>|Collection<int, Proposal>|Collection<int, Project>|Collection<int, Program>|Collection<int, HrDepartment>
+     * @return Collection<int, Proposal>|Collection<int, Project>|Collection<int, Program>|Collection<int, HrDepartment>
      */
     #[Computed]
     public function sourceOptions(): Collection
     {
         return match ($this->taskSourceType) {
-            'milestone' => Milestone::query()
-                ->select(['id', 'name', 'project_id', 'proposal_id'])
-                ->with(['project:id,name', 'proposal:id,name'])
-                ->orderBy('name')
-                ->orderBy('id')
-                ->get(),
             'project' => Project::query()->select(['id', 'name'])->orderBy('name')->orderBy('id')->get(),
             'program' => Program::options(),
             'department' => HrDepartment::query()->select(['id', 'name'])->orderBy('name')->orderBy('id')->get(),

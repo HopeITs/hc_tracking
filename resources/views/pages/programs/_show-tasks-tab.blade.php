@@ -257,7 +257,7 @@
     @endif
 
     {{-- The one "more" panel every row's ⋯ button opens: open and delete (subtasks have their own + by the title;
-         moving a task to another project or milestone is not offered here).
+         moving a task to another project is not offered here).
          Teleported to <body>, so it carries dk-scope itself or the Desk icons lose their line style. --}}
     <template x-teleport="body">
         <div class="dk-scope dk-ptk-menu" x-show="more.open" x-cloak x-transition.opacity.duration.100ms

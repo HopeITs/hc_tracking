@@ -2,10 +2,9 @@
     The timeline view of projects/index: every project's window plotted against
     the shared date axis. Included by ⚡index.blade.php, whose top PHP block
     defines $projects, $today, $scheduleOf and $elapsedOf. Each row is the
-    project, its health word, its bar and its milestones; money and links stay
+    project, its health word and its bar; money and links stay
     on the list view's preview and the project page.
 --}}
-@use('App\Enums\MilestoneStatus')
 @use('App\Enums\ProjectStatus')
 @use('Carbon\CarbonImmutable')
                 @php
@@ -29,12 +28,7 @@
                 @endphp
 
                 <x-ui.panel>
-                    {{-- Same legend grammar as the milestones timeline. --}}
                     <div class="flex flex-wrap items-center gap-x-5 gap-y-2 border-b border-secondary-soft px-4 py-3 text-xs text-secondary-medium dark:border-line dark:text-ink-muted" aria-hidden="true">
-                        <span class="inline-flex items-center gap-1.5"><span class="size-2.5 rotate-45 rounded-[2px] border-2 border-secondary-dark bg-secondary-dark dark:border-ink-muted dark:bg-ink-muted"></span>{{ MilestoneStatus::Reached->label() }}</span>
-                        <span class="inline-flex items-center gap-1.5"><span class="size-2.5 rotate-45 rounded-[2px] border-2 border-secondary-dark bg-white dark:border-ink-muted dark:bg-surface-1"></span>{{ MilestoneStatus::Planned->label() }}</span>
-                        <span class="inline-flex items-center gap-1.5"><span class="size-2.5 rotate-45 rounded-[2px] border-2 border-primary bg-white dark:bg-surface-1"></span>{{ __('programs.timeline_overdue') }}</span>
-                        <span class="inline-flex items-center gap-1.5"><span class="size-2.5 rotate-45 rounded-[2px] border-2 border-primary bg-primary dark:bg-status-critical dark:border-status-critical"></span>{{ __('milestones.missed') }}</span>
                         <span class="inline-flex items-center gap-1.5"><span class="h-3.5 w-0.5 bg-primary dark:bg-ink"></span>{{ __('programs.timeline_today') }}</span>
                     </div>
 
@@ -109,29 +103,6 @@
                                                     <span aria-hidden="true" class="absolute top-1/2 h-8 w-0.5 -translate-x-1/2 -translate-y-1/2 bg-secondary-dark/40 rtl:translate-x-1/2 dark:bg-white/40" style="inset-inline-start: {{ round($barStart + ($barWidth * $elapsed / 100), 3) }}%"></span>
                                                 @endif
 
-                                                @foreach ($project->milestones as $milestone)
-                                                    @php
-                                                        $isMissedMarker = $milestone->isMissed();
-                                                        $markerTone = match (true) {
-                                                            $milestone->status === MilestoneStatus::Reached => 'border-secondary-dark bg-secondary-dark dark:border-ink-muted dark:bg-ink-muted',
-                                                            $isMissedMarker || $milestone->isOverdue() => 'border-primary bg-primary dark:bg-status-critical dark:border-status-critical',
-                                                            default => 'border-secondary-dark bg-white dark:border-ink-muted dark:bg-surface-1',
-                                                        };
-                                                        $markerLabel = __('programs.timeline_marker', [
-                                                            'name' => $milestone->name,
-                                                            'date' => $milestone->planned_start_date->translatedFormat(__('formats.date')),
-                                                            'status' => $isMissedMarker ? __('milestones.missed') : $milestone->status->label(),
-                                                        ]);
-                                                    @endphp
-
-                                                    <span
-                                                        class="absolute top-1/2 z-20 block size-3 -translate-x-1/2 -translate-y-1/2 rotate-45 rounded-[2px] border-2 shadow-sm ring-2 ring-white rtl:translate-x-1/2 dark:ring-surface-1 {{ $markerTone }}"
-                                                        style="inset-inline-start: {{ $position($milestone->planned_start_date) }}%"
-                                                        role="img"
-                                                        aria-label="{{ $markerLabel }}"
-                                                        wire:key="timeline-marker-{{ $milestone->id }}"
-                                                    ></span>
-                                                @endforeach
                                             @else
                                                 <span class="absolute inset-x-0 top-1/2 flex h-7 -translate-y-1/2 items-center justify-center rounded-full border border-dashed border-secondary-light bg-white text-xs text-secondary-medium dark:bg-surface-1 dark:text-ink-muted">{{ __('projects.unscheduled') }}</span>
                                             @endif
@@ -149,7 +120,7 @@
                                     <div class="text-end">
                                         <p class="type-figure">{{ $progress === null ? '—' : round($progress).'%' }}</p>
                                         <p class="text-xs tabular-nums text-secondary-medium dark:text-ink-muted">
-                                            {{ $progress === null ? __('projects.no_weighted_milestones') : __('projects.milestones_reached', ['reached' => $project->reached_milestones_count, 'total' => $project->milestones_count]) }}
+                                            {{ __('projects.progress_not_measured') }}
                                         </p>
                                     </div>
                                 </div>

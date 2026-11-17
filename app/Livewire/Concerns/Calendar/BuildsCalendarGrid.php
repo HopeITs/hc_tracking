@@ -8,13 +8,11 @@ use App\Enums\ProposalStatus;
 use App\Enums\ReviewStage;
 use App\Models\Donor;
 use App\Models\DonorReport;
-use App\Models\Milestone;
 use App\Models\MonthlyReport;
 use App\Models\Project;
 use App\Models\Proposal;
 use App\Models\ProposalStatusNote;
 use App\Models\Report;
-use App\Models\Scopes\TaskVisibilityScope;
 use App\Models\Task;
 use App\Models\TransfersTracking;
 use App\Models\User;
@@ -36,7 +34,6 @@ use Livewire\Attributes\Computed;
  * ChecksFinanceVisibility.
  *
  * @property string $viewMode
- * @property bool $showMilestones
  * @property bool $showTasks
  * @property bool $showReports
  * @property bool $showDonors
@@ -50,7 +47,7 @@ trait BuildsCalendarGrid
      * view, the plain list of visible days instead — `weeks` is null then
      * and `days` is populated, and vice versa in month view.
      *
-     * @return array{month: CarbonImmutable, weeks: ?array<int, array<int, CarbonImmutable>>, days: ?array<int, CarbonImmutable>, milestonesByDay: \Illuminate\Support\Collection<string, Collection<int, Milestone>>, tasksByDay: \Illuminate\Support\Collection<string, Collection<int, Task>>, reportsByDay: \Illuminate\Support\Collection<string, Collection<int, Report>>, monthlyReportsByDay: \Illuminate\Support\Collection<string, Collection<int, MonthlyReport>>, proposalsByDay: \Illuminate\Support\Collection<string, Collection<int, Proposal>>, transfersByDay: \Illuminate\Support\Collection<string, Collection<int, TransfersTracking>>, donorFollowUpsByDay: \Illuminate\Support\Collection<string, Collection<int, Donor>>, donorReportsByDay: \Illuminate\Support\Collection<string, Collection<int, DonorReport>>, projectStartsByDay: \Illuminate\Support\Collection<string, Collection<int, Project>>, projectEndsByDay: \Illuminate\Support\Collection<string, Collection<int, Project>>, reviewMeetingsByDay: \Illuminate\Support\Collection<string, Collection<int, ProposalStatusNote>>, unscheduledTasks: Collection<int, Task>, nowOffsetPercent: float}
+     * @return array{month: CarbonImmutable, weeks: ?array<int, array<int, CarbonImmutable>>, days: ?array<int, CarbonImmutable>, tasksByDay: \Illuminate\Support\Collection<string, Collection<int, Task>>, reportsByDay: \Illuminate\Support\Collection<string, Collection<int, Report>>, monthlyReportsByDay: \Illuminate\Support\Collection<string, Collection<int, MonthlyReport>>, proposalsByDay: \Illuminate\Support\Collection<string, Collection<int, Proposal>>, transfersByDay: \Illuminate\Support\Collection<string, Collection<int, TransfersTracking>>, donorFollowUpsByDay: \Illuminate\Support\Collection<string, Collection<int, Donor>>, donorReportsByDay: \Illuminate\Support\Collection<string, Collection<int, DonorReport>>, projectStartsByDay: \Illuminate\Support\Collection<string, Collection<int, Project>>, projectEndsByDay: \Illuminate\Support\Collection<string, Collection<int, Project>>, reviewMeetingsByDay: \Illuminate\Support\Collection<string, Collection<int, ProposalStatusNote>>, unscheduledTasks: Collection<int, Task>, nowOffsetPercent: float}
      */
     #[Computed]
     public function calendar(): array
@@ -83,19 +80,6 @@ trait BuildsCalendarGrid
         $now = CarbonImmutable::now();
 
         $employeeIds = $this->scopedEmployeeIds();
-
-        $milestonesByDay = $employeeIds === [] || ! $this->showMilestones
-            ? new Collection
-            : Milestone::query()
-                ->select(['id', 'project_id', 'proposal_id', 'name', 'planned_start_date', 'planned_end_date', 'actual_end_date', 'status', 'weight_percentage', 'responsible_user_id'])
-                ->whereIn('responsible_user_id', $employeeIds)
-                ->whereBetween('planned_start_date', [$gridStart->toDateString(), $gridEnd->toDateString()])
-                ->with(['project:id,name', 'proposal:id,name'])
-                ->withCount(['children', 'tasks' => fn ($query) => $query->withoutGlobalScope(TaskVisibilityScope::class)])
-                ->orderBy('planned_start_date')
-                ->orderBy('sequence')
-                ->get()
-                ->groupBy(fn (Milestone $milestone): string => $milestone->planned_start_date->toDateString());
 
         $tasksByDay = $employeeIds === [] || ! $this->showTasks
             ? new Collection
@@ -249,7 +233,6 @@ trait BuildsCalendarGrid
             'month' => $month,
             'weeks' => $weeks,
             'days' => $days,
-            'milestonesByDay' => $milestonesByDay,
             'tasksByDay' => $tasksByDay,
             'reportsByDay' => $reportsByDay,
             'monthlyReportsByDay' => $monthlyReportsByDay,

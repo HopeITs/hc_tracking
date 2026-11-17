@@ -10,7 +10,6 @@ use App\Enums\TaskPriority;
 use App\Enums\TaskStatus;
 use App\Models\HrDepartment;
 use App\Models\HrEmployee;
-use App\Models\Milestone;
 use App\Models\Program;
 use App\Models\Project;
 use App\Models\Proposal;
@@ -47,7 +46,6 @@ trait SavesTaskForm
 {
     /** The model behind each task source type. */
     protected const TASK_SOURCE_MODELS = [
-        'milestone' => Milestone::class,
         'proposal' => Proposal::class,
         'project' => Project::class,
         'program' => Program::class,

@@ -13,7 +13,6 @@ use App\Models\Indicator;
 use App\Models\IndicatorProgress;
 use App\Models\LibraryIndicator;
 use App\Models\Media;
-use App\Models\Milestone;
 use App\Models\MonthlyReport;
 use App\Models\MonthlyReportLine;
 use App\Models\MonthlyReportLineShare;
@@ -236,34 +235,18 @@ function insertDonorProposal(int $donorId, int $proposalId, string $budget = '50
 }
 
 /**
- * Insert a milestone, optionally nested under a parent milestone.
- */
-function insertMilestone(int $projectId, int $responsibleUserId, ?int $parentId = null, string $name = 'Baseline assessment'): int
-{
-    return Milestone::factory()->create([
-        'project_id' => $projectId,
-        'name' => $name,
-        'description' => null,
-        'planned_start_date' => '2026-03-31',
-        'responsible_user_id' => $responsibleUserId,
-        'parent_milestone_id' => $parentId,
-    ])->id;
-}
-
-/**
- * Insert a task against a proposal, or against a milestone under it when
- * $milestoneId is given.
+ * Insert a task against a proposal.
  *
  * `source_type`/`source_id` are polymorphic and carry no foreign key. This
- * wrapper keeps the proposal/milestone-shaped call sites that predate the
- * morph working unchanged; use Task::factory()->create(['source_type' =>
+ * wrapper keeps the proposal-shaped call sites that predate the morph working
+ * unchanged; use Task::factory()->create(['source_type' =>
  * ..., 'source_id' => ...]) directly for the other source types.
  */
-function insertTask(int $proposalId, int $assignedTo, int $createdBy, ?int $milestoneId = null, string $title = 'Draft the distribution plan'): int
+function insertTask(int $proposalId, int $assignedTo, int $createdBy, string $title = 'Draft the distribution plan'): int
 {
     $taskId = Task::factory()->create([
-        'source_type' => $milestoneId !== null ? 'milestone' : 'proposal',
-        'source_id' => $milestoneId ?? $proposalId,
+        'source_type' => 'proposal',
+        'source_id' => $proposalId,
         'title' => $title,
         'description' => null,
         'created_by' => $createdBy,
@@ -345,7 +328,7 @@ function insertAccount(string $name = 'Operations USD'): int
 }
 
 /**
- * Insert a file against a project or a milestone, and return its id.
+ * Insert a file against a project, and return its id.
  *
  * `collection`, `disk` and `uploaded_at` are omitted so the column defaults
  * stay under test. `mediableType` takes the morph map KEY, matching what the
@@ -932,8 +915,7 @@ function overdueTaskFor(User $assignee, string $due, ?int $programId = null): Ta
 {
     return Activity::withoutRecording(function () use ($assignee, $due, $programId): Task {
         $project = Project::factory()->create(['end_date' => '2027-12-31', ...($programId === null ? [] : ['program_id' => $programId])]);
-        $milestone = Milestone::factory()->create(['project_id' => $project->id, 'planned_end_date' => '2027-12-31']);
-        $task = Task::factory()->create(['due_date' => $due, 'title' => 'Plan', 'source_type' => 'milestone', 'source_id' => $milestone->id]);
+        $task = Task::factory()->create(['due_date' => $due, 'title' => 'Plan', 'source_type' => 'project', 'source_id' => $project->id]);
         $task->taskAssignees()->delete();
         $task->taskAssignees()->create(['employee_id' => $assignee->employee_id]);
 

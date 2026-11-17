@@ -1,12 +1,10 @@
-{{-- A chain gap marker (T16) as a text badge, never colour alone: no_indicators, no_target, no_milestone, unlinked_milestone. --}}
+{{-- A chain gap marker (T16) as a text badge, never colour alone: no_indicators, no_target. --}}
 @props(['gap'])
 
 @php
     $label = match ($gap) {
         'no_indicators' => __('results_framework.chain_gap_no_indicators'),
         'no_target' => __('results_framework.chain_gap_no_target'),
-        'no_milestone' => __('results_framework.chain_gap_no_milestone'),
-        'unlinked_milestone' => __('results_framework.chain_gap_unlinked_milestone'),
     };
 @endphp
 

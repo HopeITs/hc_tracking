@@ -4,14 +4,11 @@ declare(strict_types=1);
 
 namespace App\Livewire\Concerns\Programs;
 
-use App\Enums\MilestoneStatus;
 use App\Enums\ReportStatus;
 use App\Enums\ResultType;
 use App\Models\AnnualPlan;
-use App\Models\Milestone;
 use App\Models\PlanIndicator;
 use App\Models\Program;
-use App\Models\Project;
 use App\Models\Report;
 use App\Support\ResultsChain;
 use Illuminate\Database\Eloquent\Collection;
@@ -19,7 +16,7 @@ use Livewire\Attributes\Computed;
 
 /**
  * The read-only figures on programs/show: annual plans and their year
- * slots, the logframe roots and summary, and milestone progress.
+ * slots and the logframe roots and summary.
  *
  * Used by programs/show only. The page provides the locked $programId and the
  * program() computed (planYears() reads $this->program->strategy).
@@ -148,29 +145,5 @@ trait ReadsProgramDelivery
     public function resultSummary(): array
     {
         return $this->chain['summary'];
-    }
-
-    /** @return array{percentage: float|null, reached: float, total: float} */
-    #[Computed]
-    public function milestoneProgress(): array
-    {
-        $weights = Milestone::query()
-            ->whereIn('project_id', Project::query()->select('id')->where('program_id', $this->programId))
-            ->where('status', '!=', MilestoneStatus::Cancelled->value)
-            ->selectRaw(
-                'coalesce(sum(case when status = ? then weight_percentage else 0 end), 0) as reached_weight, coalesce(sum(weight_percentage), 0) as total_weight',
-                [MilestoneStatus::Reached->value],
-            )
-            ->toBase()
-            ->first();
-
-        $reached = (float) ($weights->reached_weight ?? 0);
-        $total = (float) ($weights->total_weight ?? 0);
-
-        return [
-            'percentage' => $total > 0 ? round(($reached / $total) * 100, 1) : null,
-            'reached' => $reached,
-            'total' => $total,
-        ];
     }
 }

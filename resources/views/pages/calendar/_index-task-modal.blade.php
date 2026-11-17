@@ -8,7 +8,7 @@
         close="closeTaskModal"
         :editing="$editingTaskId !== null"
         :source-type-options="$showTaskModal ? $this->sourceTypeOptions : []"
-        :source-options="$showTaskModal ? collect($this->sourceOptions)->mapWithKeys(fn ($sourceOption) => [$sourceOption->id => $sourceOption->name.($taskSourceType === 'milestone' ? ' · '.$sourceOption->ownerName() : '')])->all() : []"
+        :source-options="$showTaskModal ? collect($this->sourceOptions)->mapWithKeys(fn ($sourceOption) => [$sourceOption->id => $sourceOption->name])->all() : []"
         test-prefix="calendar-task-form"
         save-test="calendar-save-task-button"
     />

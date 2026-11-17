@@ -5,7 +5,6 @@ use App\Enums\ResultType;
 use App\Models\Activity;
 use App\Models\DonorProposal;
 use App\Models\Indicator;
-use App\Models\Milestone;
 use App\Models\PlanIndicator;
 use App\Models\Proposal;
 use App\Models\Report;
@@ -53,12 +52,10 @@ function proposalDeleteRefusal(Closure $call): array
     throw new RuntimeException('The call was not refused.');
 }
 
-test('deleting a proposal removes its framework, targets and milestone links, with one activity', function () {
+test('deleting a proposal removes its framework and targets, with one activity', function () {
     $framework = proposalFrameworkOnFile($this->proposal);
     $indicator = Indicator::factory()->create(['result_id' => $framework['output']->id]);
     $target = PlanIndicator::factory()->forProposal($this->proposal)->create(['indicator_id' => $indicator->id]);
-    $milestone = Milestone::factory()->create();
-    $milestone->forceFill(['result_id' => $framework['activity']->id])->save();
     $activitiesBefore = Activity::query()->count();
 
     app(DeleteProposal::class)->handle($this->proposal);
@@ -67,7 +64,6 @@ test('deleting a proposal removes its framework, targets and milestone links, wi
     expect(Result::query()->where('proposal_id', $this->proposal->id)->count())->toBe(0)
         ->and(Indicator::query()->whereKey($indicator->id)->exists())->toBeFalse()
         ->and(PlanIndicator::query()->whereKey($target->id)->exists())->toBeFalse()
-        ->and($milestone->refresh()->result_id)->toBeNull()
         ->and(Activity::query()->count() - $activitiesBefore)->toBe(1)
         ->and(Activity::query()->latest('id')->value('event'))->toBe('proposal.deleted');
 });

@@ -69,7 +69,6 @@ final class Panels
     private const array RoutePanels = [
         'reviews.index' => 'reviews',
         'projects.index' => 'projects',
-        'milestones.index' => 'milestones',
         'targets.index' => 'targets',
         'reports.monthly-matrix' => 'matrix',
         'monthly-reports.index' => 'validate',
@@ -91,12 +90,12 @@ final class Panels
     private const array RoleLayouts = [
         'General Manager' => [['needs', 'L'], ['overdue', 'L'], ['flow', 'XL'], ['glance', 'XL'], ['reviews', 'L'], ['pipeline', 'L'], ['money', 'L']],
         'Public Relations Manager' => [['needs', 'L'], ['overdue', 'L'], ['flow', 'XL'], ['coming', 'L'], ['waiting', 'L'], ['pipeline', 'L'], ['money', 'L'], ['projects', 'XL']],
-        'Public Relations' => [['needs', 'L'], ['overdue', 'L'], ['flow', 'XL'], ['coming', 'L'], ['tasks', 'L'], ['milestones', 'XL'], ['projects', 'XL']],
+        'Public Relations' => [['needs', 'L'], ['overdue', 'L'], ['flow', 'XL'], ['coming', 'L'], ['tasks', 'L'], ['projects', 'XL']],
         'MEAL' => [['needs', 'L'], ['overdue', 'L'], ['flow', 'XL'], ['validate', 'L'], ['templates', 'L'], ['matrix', 'XL'], ['targets', 'XL'], ['projects', 'XL']],
         'Financial' => [['needs', 'L'], ['overdue', 'L'], ['flow', 'XL'], ['money', 'L'], ['transfers', 'L'], ['deliverables', 'L'], ['duties', 'L'], ['projects', 'XL']],
         'Managers' => [['needs', 'L'], ['overdue', 'L'], ['flow', 'XL'], ['coming', 'L'], ['matrix', 'XL'], ['tasks', 'L'], ['myteam', 'L']],
         'Media Team' => [['needs', 'L'], ['overdue', 'L'], ['flow', 'XL'], ['deliverables', 'L'], ['coming', 'L'], ['tasks', 'XL'], ['projects', 'XL']],
-        'Team Member' => [['needs', 'L'], ['overdue', 'L'], ['flow', 'XL'], ['tasks', 'L'], ['coming', 'L'], ['milestones', 'L'], ['projects', 'XL']],
+        'Team Member' => [['needs', 'L'], ['overdue', 'L'], ['flow', 'XL'], ['tasks', 'L'], ['coming', 'L'], ['projects', 'XL']],
     ];
 
     /**
@@ -112,7 +111,6 @@ final class Panels
         ['key' => 'proposal', 'route' => 'proposals.index', 'ability' => 'proposals.create', 'icon' => 'document-plus'],
         ['key' => 'donor', 'route' => 'donors.index', 'ability' => 'donors.create', 'icon' => 'gift'],
         ['key' => 'project', 'route' => 'projects.index', 'ability' => 'projects.create', 'icon' => 'folder-plus'],
-        ['key' => 'milestone', 'route' => 'milestones.index', 'ability' => 'milestones.create', 'icon' => 'flag'],
         ['key' => 'agreement', 'route' => 'funding-agreements.index', 'ability' => 'funding-agreements.create', 'icon' => 'document-currency-dollar'],
         ['key' => 'transfer', 'route' => 'transfers.index', 'ability' => 'transfers.create', 'icon' => 'banknotes'],
     ];
@@ -135,11 +133,10 @@ final class Panels
      * @var array<string, list<array{0: string, 1: string}>>
      */
     private const array PageLayouts = [
-        'projects' => [['milestones', 'L'], ['tasks', 'L'], ['coming', 'L']],
+        'projects' => [['tasks', 'L'], ['coming', 'L']],
         'programs' => [['projects', 'XL'], ['targets', 'L']],
         'strategies' => [['glance', 'XL'], ['targets', 'L']],
         'annual-plans' => [['targets', 'L'], ['matrix', 'XL']],
-        'milestones' => [['milestones', 'L'], ['coming', 'L'], ['tasks', 'L']],
         'risks' => [['needs', 'L'], ['projects', 'XL']],
         'results' => [['targets', 'L'], ['validate', 'L'], ['matrix', 'XL']],
         'indicators' => [['targets', 'L'], ['validate', 'L'], ['matrix', 'XL']],
@@ -156,7 +153,7 @@ final class Panels
         'admin.accounts.index' => [['transfers', 'L'], ['money', 'L']],
         'tasks' => [['tasks', 'L'], ['coming', 'L'], ['waiting', 'L'], ['deliverables', 'L']],
         'department-tasks' => [['deliverables', 'L'], ['tasks', 'L'], ['myteam', 'L']],
-        'calendar' => [['coming', 'L'], ['tasks', 'L'], ['milestones', 'L']],
+        'calendar' => [['coming', 'L'], ['tasks', 'L']],
         'notifications' => [['needs', 'L'], ['coming', 'L']],
         'activity' => [['needs', 'L'], ['coming', 'L']],
         '*' => [['needs', 'L'], ['tasks', 'L'], ['coming', 'L']],
@@ -178,7 +175,7 @@ final class Panels
     private const array ReadyLayouts = [
         'today' => ['core' => 'needs', 'rows' => [
             [['needs', 7, 4], ['coming', 5, 4]],
-            [['tasks', 8, 4], ['milestones', 4, 4]],
+            [['tasks', 12, 4]],
             [['overdue', 6, 3], ['waiting', 6, 3]],
         ]],
         'money' => ['core' => 'money', 'rows' => [
@@ -197,7 +194,7 @@ final class Panels
         ]],
         'delivery' => ['core' => 'projects', 'rows' => [
             [['flow', 12, 2]],
-            [['projects', 8, 5], ['milestones', 4, 5]],
+            [['projects', 12, 5]],
             [['tasks', 6, 4], ['targets', 6, 4]],
             [['p-annual-plans', 6, 3], ['p-programs', 6, 3]],
         ]],
@@ -213,7 +210,7 @@ final class Panels
         'team' => ['core' => 'myteam', 'rows' => [
             [['myteam', 7, 5], ['waiting', 5, 5]],
             [['tasks', 8, 4], ['needs', 4, 4]],
-            [['milestones', 6, 3], ['deliverables', 6, 3]],
+            [['coming', 6, 3], ['deliverables', 6, 3]],
         ]],
         'overview' => ['core' => 'glance', 'rows' => [
             [['glance', 12, 2]],
@@ -231,7 +228,7 @@ final class Panels
     private const array ReadyKinds = [
         'money' => 'money', 'transfers' => 'money', 'pipeline' => 'money', 'donors' => 'money',
         'myteam' => 'people', 'waiting' => 'people', 'reviews' => 'people',
-        'needs' => 'work', 'coming' => 'work', 'overdue' => 'work', 'tasks' => 'work', 'deliverables' => 'work', 'projects' => 'work', 'flow' => 'work', 'milestones' => 'work', 'todo' => 'work',
+        'needs' => 'work', 'coming' => 'work', 'overdue' => 'work', 'tasks' => 'work', 'deliverables' => 'work', 'projects' => 'work', 'flow' => 'work', 'todo' => 'work',
         'targets' => 'results', 'validate' => 'results', 'matrix' => 'results', 'templates' => 'results', 'duties' => 'results', 'glance' => 'results',
     ];
 
@@ -972,7 +969,6 @@ final class Panels
             'myteam' => ['icon' => 'users', 'size' => 'M', 'register' => null, 'allows' => fn (User $user): bool => $user->employee_id !== null || $user->isAdministrator()],
             'targets' => ['icon' => 'chart', 'size' => 'L', 'register' => 'targets.index', 'allows' => $can('targets.view')],
             'duties' => ['icon' => 'file', 'size' => 'M', 'register' => 'donor-reports.index', 'allows' => fn (User $user): bool => $user->can('reports.aggregate') || $user->can('funding-agreements.update') || $user->hasReportingDuties()],
-            'milestones' => ['icon' => 'flag', 'size' => 'M', 'register' => 'milestones.index', 'allows' => $can('milestones.view')],
             'donors' => ['icon' => 'users', 'size' => 'L', 'register' => 'donors.index', 'allows' => $can('donors.view')],
         ];
     }

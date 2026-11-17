@@ -360,16 +360,6 @@ class HrEmployee extends HrModel
     }
 
     /**
-     * The milestones this employee is accountable for.
-     *
-     * @return HasMany<Milestone, $this>
-     */
-    public function responsibleMilestones(): HasMany
-    {
-        return $this->hasMany(Milestone::class, 'responsible_user_id');
-    }
-
-    /**
      * The tasks assigned to this employee (a task may have several assignees).
      *
      * A task and its task_assignees pivot both live on the default connection,

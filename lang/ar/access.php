@@ -14,7 +14,6 @@ return [
         'access-management' => 'إدارة الصلاحيات',
         'programs' => 'البرامج',
         'projects' => 'المشاريع',
-        'milestones' => 'المراحل الرئيسية',
         'indicators' => 'المؤشرات',
         'indicator-library' => 'مكتبة المؤشرات',
         'results' => 'النتائج',

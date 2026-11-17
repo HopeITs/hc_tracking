@@ -129,7 +129,6 @@
                                 <option value="status">{{ __('common.status') }}</option>
                                 <option value="priority">{{ __('tasks.priority') }}</option>
                                 <option value="assignee">{{ __('tasks.assignee') }}</option>
-                                <option value="milestone">{{ __('tasks.milestone') }}</option>
                             </x-ui.header-filter-select>
                             <div class="dk-tk-sort">
                                 <x-ui.header-filter-select :label="__('tasks.sort_by')" wire:model.live="sortField" :value="$sortField" data-test="task-sort-select">

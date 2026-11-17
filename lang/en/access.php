@@ -14,7 +14,6 @@ return [
         'access-management' => 'Access management',
         'programs' => 'Programs',
         'projects' => 'Projects',
-        'milestones' => 'Milestones',
         'indicators' => 'Indicators',
         'indicator-library' => 'Indicator library',
         'results' => 'Results',

@@ -10,7 +10,7 @@ use Livewire\Attributes\Computed;
 
 /**
  * Past the deadline: every item of the viewer's agenda (ReadsDeskAgenda:
- * their tasks, milestones, monthly and indicator reports, donor reports and
+ * their tasks, monthly and indicator reports, donor reports and
  * the pending tranches they may see) whose date has passed, most late
  * first. The same rules as Coming up, read backwards, so both cards always
  * agree on what is the viewer's. The host also uses ReadsDeskAgenda,

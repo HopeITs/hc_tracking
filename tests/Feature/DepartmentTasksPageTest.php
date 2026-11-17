@@ -6,8 +6,6 @@ use App\Enums\DeliveryState;
 use App\Enums\TaskStatus;
 use App\Models\Donor;
 use App\Models\DonorProposal;
-use App\Models\Milestone;
-use App\Models\Project;
 use App\Models\Proposal;
 use App\Models\Task;
 use App\Models\User;
@@ -236,19 +234,4 @@ test('the page holds a flat query count whatever the number of tasks', function 
     }
 
     expect($countQueries())->toBe($small);
-});
-
-test('a department task on a milestone of a paused project wears the Paused chip', function () {
-    $city = insertHrCity('Idlib', 'إدلب');
-    $closed = insertHrCenter($city, 'Closed Center', 'مركز مغلق', isActive: false);
-    $paused = Project::factory()->create(['center_id' => $closed, 'city_id' => $city]);
-    $milestone = Milestone::factory()->create(['proposal_id' => $this->proposal->id, 'project_id' => $paused->id]);
-    departmentPageDeliverable(attributes: ['title' => 'Film the paused center', 'source_type' => 'milestone', 'source_id' => $milestone->id]);
-    departmentPageDeliverable(attributes: ['title' => 'Film the plan']);
-
-    $page = Livewire::actingAs($this->mediaUser)->test('pages::department-tasks.index')
-        ->assertSeeText('Film the paused center')
-        ->assertSeeText('Film the plan');
-
-    expect(substr_count($page->html(), 'data-test="task-paused-chip"'))->toBe(1);
 });

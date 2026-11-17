@@ -3,7 +3,6 @@
 use App\Enums\ResultType;
 use App\Models\AnnualPlan;
 use App\Models\Indicator;
-use App\Models\Milestone;
 use App\Models\PlanIndicator;
 use App\Models\Program;
 use App\Models\Project;
@@ -129,21 +128,4 @@ test('a card lists five indicators and shows more a page at a time', function ()
     $component->call('showFewerResultIndicators', $impact->id);
 
     expect(substr_count($component->html(), 'data-chain-indicator='))->toBe(5);
-});
-
-test('milestones without an activity load in pages', function () {
-    Result::factory()->type(ResultType::Impact)->create(['program_id' => $this->program->id]);
-    Milestone::factory()->count(12)->create(['project_id' => $this->project->id])
-        ->each(fn (Milestone $milestone) => $milestone->forceFill(['result_id' => null])->saveQuietly());
-
-    $component = resultsTab($this->program)
-        ->assertSee('12 milestones without an activity')
-        ->assertSeeHtml('data-test="results-unlinked-more"');
-
-    expect(substr_count($component->html(), 'chain-unlinked-'))->toBe(10);
-
-    $component->call('showMoreUnlinkedMilestones')
-        ->assertDontSeeHtml('data-test="results-unlinked-more"');
-
-    expect(substr_count($component->html(), 'chain-unlinked-'))->toBe(12);
 });

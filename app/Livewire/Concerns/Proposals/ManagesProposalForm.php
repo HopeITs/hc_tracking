@@ -14,7 +14,6 @@ use App\Enums\ProposalStatus;
 use App\Models\Donor;
 use App\Models\HrCenter;
 use App\Models\HrProgram;
-use App\Models\Milestone;
 use App\Models\Project;
 use App\Models\Proposal;
 use App\Models\Result;
@@ -279,10 +278,10 @@ trait ManagesProposalForm
 
     /**
      * What choosing the previous proposal will and will not copy (T10): its
-     * projects and the counts of framework nodes, milestones and tasks, plus
+     * projects and the counts of framework nodes and tasks, plus
      * the number of a renewal draft that already exists. Counts only.
      *
-     * @return array{projects: list<array{id: int, name: string, place: string, hosted: ?string, centerInactive: bool}>, results: int, milestones: int, tasks: int, existingDraft: ?string}|null
+     * @return array{projects: list<array{id: int, name: string, place: string, hosted: ?string, centerInactive: bool}>, results: int, tasks: int, existingDraft: ?string}|null
      */
     #[Computed]
     public function renewalPreview(): ?array
@@ -302,7 +301,6 @@ trait ManagesProposalForm
         return [
             'projects' => $this->projectRows($projects),
             'results' => Result::query()->where('proposal_id', $previous->id)->count(),
-            'milestones' => Milestone::query()->where('proposal_id', $previous->id)->count(),
             'tasks' => Task::query()->withoutGlobalScopes()->where('source_type', 'proposal')->where('source_id', $previous->id)->count(),
             'existingDraft' => CloneProposalForRenewal::existingDraftFor($previous)?->internal_project_number,
         ];

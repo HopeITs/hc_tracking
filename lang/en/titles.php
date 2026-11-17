@@ -17,8 +17,6 @@ return [
     'risk_library' => 'Risk library',
     'evidence_types' => 'Evidence types',
     'narrative_questions' => 'Narrative questions',
-    'milestone' => 'Milestone',
-    'milestones' => 'Milestones',
     'program' => 'Program',
     'programs' => 'Programs',
     'project' => 'Project',

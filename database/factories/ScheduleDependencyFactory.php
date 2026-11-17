@@ -2,8 +2,9 @@
 
 namespace Database\Factories;
 
-use App\Models\Milestone;
+use App\Models\Project;
 use App\Models\ScheduleDependency;
+use App\Models\Task;
 use Illuminate\Database\Eloquent\Factories\Factory;
 
 /**
@@ -12,7 +13,7 @@ use Illuminate\Database\Eloquent\Factories\Factory;
 class ScheduleDependencyFactory extends Factory
 {
     /**
-     * A finish-to-start link between two milestones of one project. `type` and
+     * A finish-to-start link between two tasks of one project. `type` and
      * `lag_days` are left to their column defaults.
      *
      * @return array<string, mixed>
@@ -20,11 +21,11 @@ class ScheduleDependencyFactory extends Factory
     public function definition(): array
     {
         return [
-            'project_id' => fn (): int => Milestone::factory()->create()->project_id,
-            'predecessor_type' => 'milestone',
-            'predecessor_id' => fn (array $attributes): int => Milestone::factory()->create(['project_id' => $attributes['project_id']])->id,
-            'successor_type' => 'milestone',
-            'successor_id' => fn (array $attributes): int => Milestone::factory()->create(['project_id' => $attributes['project_id']])->id,
+            'project_id' => Project::factory(),
+            'predecessor_type' => 'task',
+            'predecessor_id' => fn (array $attributes): int => Task::factory()->create(['source_type' => 'project', 'source_id' => $attributes['project_id']])->id,
+            'successor_type' => 'task',
+            'successor_id' => fn (array $attributes): int => Task::factory()->create(['source_type' => 'project', 'source_id' => $attributes['project_id']])->id,
         ];
     }
 }

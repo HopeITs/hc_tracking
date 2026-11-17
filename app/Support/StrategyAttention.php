@@ -37,7 +37,6 @@ final class StrategyAttention
 
         $items = [];
         $lateReports = $rollup['late']['reports'] ?? null;
-        $lateMilestones = $rollup['late']['milestones'] ?? null;
 
         if ($lateReports !== null && $lateReports > 0) {
             $items[] = ['text' => $sentence('strategies.attention_late_reports', $lateReports), 'label' => __('strategies.see_late_reports'), 'href' => $narrowed('reports.index', ['overdue' => 1]), 'tone' => 'critical'];
@@ -45,10 +44,6 @@ final class StrategyAttention
 
         if ($rollup['risks'] !== null && $rollup['risks'] > 0) {
             $items[] = ['text' => $sentence('strategies.attention_high_risks', $rollup['risks']), 'label' => __('strategies.see_high_risks'), 'href' => $narrowed('risks.index', ['high' => 1]), 'tone' => 'critical'];
-        }
-
-        if ($lateMilestones !== null && $lateMilestones > 0) {
-            $items[] = ['text' => $sentence('strategies.attention_missed_milestones', $lateMilestones), 'label' => __('strategies.see_milestones'), 'href' => $narrowed('milestones.index', ['status' => 'missed', 'view' => 'list']), 'tone' => 'warn'];
         }
 
         if ($readiness !== null && $readiness['missing'] > 0) {

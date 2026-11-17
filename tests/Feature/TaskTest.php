@@ -20,21 +20,6 @@ test('a new task starts as todo at medium priority with no progress', function (
         ->and($task->completed_date)->toBeNull();
 });
 
-test('deleting a milestone leaves tasks sourced from it orphaned', function () {
-    // source_type/source_id carry no foreign key (same as plan_indicators'
-    // own polymorphic source), so unlike the old milestone_id column this
-    // no longer cascades or nulls out — the task keeps pointing at the
-    // deleted id, and Task::sourceLabel() falls back to "No source" for it.
-    $user = User::factory()->create();
-    $projectId = insertProject(insertCity(), insertProgram(insertStrategy(), $user->id), $user->id);
-    $milestoneId = insertMilestone($projectId, $user->id);
-    $taskId = insertTask(insertProposal(), $user->id, $user->id, $milestoneId);
-
-    DB::table('milestones')->where('id', $milestoneId)->delete();
-
-    $this->assertDatabaseHas('tasks', ['id' => $taskId, 'source_type' => 'milestone', 'source_id' => $milestoneId]);
-});
-
 test('deleting a proposal leaves tasks sourced from it in place', function () {
     // Same reasoning as the milestone case above: no foreign key means no
     // cascade delete anymore.

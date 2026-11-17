@@ -112,7 +112,7 @@
         placeholder="{{ __('tasks.add_task') }}"
         class="dk-tc-add-input"
         x-on:keydown.escape="addOpen[{{ Js::from($dayKey) }}] = false"
-        wire:keydown.enter="quickCreateTask($event.target.value, null, null, {{ Js::from($dayRowKey) }}, {{ Js::from($day->toDateString()) }}); $event.target.value = ''"
+        wire:keydown.enter="quickCreateTask($event.target.value, null, {{ Js::from($dayRowKey) }}, {{ Js::from($day->toDateString()) }}); $event.target.value = ''"
         data-test="task-calendar-quick-add-{{ $day->toDateString() }}"
     />
     <div class="flex items-center gap-1">

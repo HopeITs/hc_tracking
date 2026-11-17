@@ -4,8 +4,7 @@
      * The program's Results tab: title, search and filters on top, stat cards
      * that filter the indicators, a level switch (the whole chain as a tree,
      * or one level as a flat list), then one card per result that folds open
-     * to list its indicators a page at a time. Milestones not linked to an
-     * activity wait in a fold at the bottom and load in pages.
+     * to list its indicators a page at a time.
      */
     $chain = $this->chain;
     $summary = $this->resultSummary;
@@ -14,7 +13,6 @@
     $options = $chain['options'];
     $filters = $chain['filters'];
     $gapCounts = array_filter($chain['gaps']);
-    $unlinked = $chain['unlinkedMilestones'];
     $hasCenterFilter = $options['centers'] !== [];
     $hasDonorFilter = count($options['donors']) > 1;
     $chainFiltered = $filters['center'] !== '' || $filters['donor'] !== '' || $filters['indicator'] !== '';
@@ -35,14 +33,11 @@
         ['key' => 'not_started', 'tone' => null],
         ['key' => 'no_target', 'tone' => $counts['no_target'] > 0 ? 'warn' : null],
     ];
-    $canOpenMilestones = auth()->user()?->can('milestones.view') === true;
     $canOpenTargets = auth()->user()?->can('targets.view') === true;
     $busyTargets = 'pickResultFilter, pickResultLevel, resultSearch, chainCenter, chainDonor, resetChainFilters';
 @endphp
 
-<section class="dk-ptk dk-prs" data-test="program-results" data-chain-view
-    x-data="{ unlinkedOpen: false }"
-    x-on:results-open-unlinked.window="unlinkedOpen = true; $nextTick(() => $refs.unlinked?.scrollIntoView({ behavior: 'smooth', block: 'start' }))">
+<section class="dk-ptk dk-prs" data-test="program-results" data-chain-view>
 
     {{-- 1. Title, search and the way to the full framework. --}}
     <header class="dk-ptk-h">
@@ -88,16 +83,8 @@
             <span @class(['dk-warn' => $summary['unmeasured'] > 0, 'dk-good' => $summary['unmeasured'] === 0])>
                 <x-desk.icon :name="$summary['unmeasured'] > 0 ? 'info' : 'check'" />{{ trans_choice('programs.logframe_count_unmeasured', $summary['unmeasured'], ['count' => $summary['unmeasured']]) }}
             </span>
-            @isset($gapCounts['no_milestone'])
-                <span class="dk-warn" data-chain-gap-count="no_milestone"><x-desk.icon name="info" />{{ trans_choice('results_framework.chain_gap_count_no_milestone', $gapCounts['no_milestone'], ['count' => $gapCounts['no_milestone']]) }}</span>
-            @endisset
             @if ($board['notLinked'] > 0)
                 <span data-result-not-linked><x-desk.icon name="info" />{{ trans_choice('programs.results_not_linked', $board['notLinked'], ['count' => $board['notLinked']]) }}</span>
-            @endif
-            @if ($unlinked !== [])
-                <button type="button" class="dk-warn" x-on:click="$dispatch('results-open-unlinked')" data-chain-gap-count="unlinked_milestone">
-                    <x-desk.icon name="milestone" />{{ trans_choice('results_framework.chain_gap_count_unlinked_milestone', count($unlinked), ['count' => count($unlinked)]) }}
-                </button>
             @endif
         </p>
 
@@ -153,47 +140,5 @@
                 <p class="dk-prog-clear dk-ppl-note dk-ppl-nothing">{{ $board['narrowed'] || $chainFiltered ? __('programs.results_none_match') : __('results_framework.chain_no_match') }}</p>
             @endforelse
         </div>
-
-        {{-- 6. Milestones not linked to any activity: folded, loaded in pages. --}}
-        @if ($unlinked !== [])
-            @php
-                $shownUnlinked = array_slice($unlinked, 0, $this->unlinkedMilestoneLimit);
-                $unlinkedLeft = count($unlinked) - count($shownUnlinked);
-            @endphp
-            <section class="dk-prog-fold" x-ref="unlinked" :class="{ 'dk-prog-fold-on': unlinkedOpen }" data-chain-unlinked>
-                <button type="button" class="dk-prog-fold-h" x-on:click="unlinkedOpen = ! unlinkedOpen" :aria-expanded="unlinkedOpen.toString()" aria-controls="program-results-unlinked">
-                    <h3 class="dk-prs-fold-t">{{ __('results_framework.chain_unlinked_milestones') }}</h3>
-                    <span class="dk-prog-count">{{ count($unlinked) }}</span>
-                    <x-desk.icon name="chev" class="dk-prog-fold-i" />
-                </button>
-                <div id="program-results-unlinked" class="dk-prog-fold-b dk-prs-fold-body" x-show="unlinkedOpen" x-collapse x-cloak>
-                    <p class="dk-prs-help">{{ __('results_framework.chain_unlinked_milestones_help') }}</p>
-                    <ul class="dk-prs-ms">
-                        @foreach ($shownUnlinked as $milestone)
-                            <li wire:key="chain-unlinked-{{ $milestone->id }}">
-                                <x-desk.icon name="milestone" />
-                                @if ($canOpenMilestones)
-                                    <a href="{{ route('milestones.show', $milestone) }}" wire:navigate class="dk-prs-ms-t" dir="auto">{{ $milestone->name }}</a>
-                                @else
-                                    <span class="dk-prs-ms-t" dir="auto">{{ $milestone->name }}</span>
-                                @endif
-                                @if ($milestone->project !== null)
-                                    <span class="dk-prs-ms-c" dir="auto">{{ $milestone->project->center()?->name ?? $milestone->project->name }}</span>
-                                @endif
-                                <x-ui.enum-badge :case="$milestone->status" />
-                            </li>
-                        @endforeach
-                    </ul>
-                    <div class="dk-prog-more-row">
-                        <span class="dk-prs-help dk-num">{{ __('programs.results_shown_of', ['shown' => count($shownUnlinked), 'total' => count($unlinked)]) }}</span>
-                        @if ($unlinkedLeft > 0)
-                            <button type="button" class="dk-prog-more" wire:click="showMoreUnlinkedMilestones" wire:loading.attr="disabled" wire:target="showMoreUnlinkedMilestones" data-test="results-unlinked-more">
-                                {{ __('programs.results_load_more', ['count' => min($unlinkedLeft, $this::RESULT_MILESTONE_PAGE * 2)]) }}
-                            </button>
-                        @endif
-                    </div>
-                </div>
-            </section>
-        @endif
     @endif
 </section>

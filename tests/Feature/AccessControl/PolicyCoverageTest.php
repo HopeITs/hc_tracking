@@ -94,7 +94,7 @@ function modelsGuardedWithoutPolicy(): array
         Indicator::class => ['indicators', 'indicators.* permissions on the indicators page.'],
         IndicatorProgress::class => ['indicators', 'Readings are recorded under indicators.* permissions.'],
         KnownDevice::class => [null, 'The signed-in user\'s own sign-in devices only.'],
-        Media::class => [null, 'Files follow their owner\'s policy (project, proposal, milestone) and the download controllers check it.'],
+        Media::class => [null, 'Files follow their owner\'s policy (project, proposal) and the download controllers check it.'],
         MonthlyReportActivityEntry::class => ['reports', 'Part of its monthly report (MonthlyReportPolicy::update); written only by SaveMonthlyReportActivities.'],
         MonthlyReportAnswer::class => ['reports', 'Part of its monthly report (MonthlyReportPolicy::update); written only by SaveMonthlyReportAnswers.'],
         MonthlyReportFile::class => ['reports', 'Part of its monthly report (MonthlyReportPolicy::update, fillMealLines); loaded through the report and downloaded through T17B\'s protected route.'],

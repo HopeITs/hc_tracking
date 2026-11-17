@@ -10,7 +10,6 @@
         <div class="dk-benrow">
             <div class="dk-fig"><strong class="dk-num">{{ $plan['indicators'] }}</strong><span>{{ __('story.plan.indicators') }}</span></div>
             <div class="dk-fig"><strong class="dk-num">{{ $plan['targets'] }}</strong><span>{{ __('story.plan.targets') }}</span></div>
-            <div class="dk-fig"><strong class="dk-num">{{ $plan['milestones'] }}</strong><span>{{ __('common.milestones') }}</span></div>
             <div class="dk-fig"><strong class="dk-num">{{ $plan['tasks'] }}</strong><span>{{ __('common.tasks') }}</span></div>
         </div>
         @if ($plan['budget'] !== null && $plan['budget'] !== [])

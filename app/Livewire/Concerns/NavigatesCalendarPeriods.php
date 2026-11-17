@@ -7,12 +7,12 @@ namespace App\Livewire\Concerns;
 use Carbon\CarbonImmutable;
 
 /**
- * Month and day / 4-days / week navigation shared by the calendar, the
- * milestones directory and the tasks directory, so the three grids step
+ * Month and day / 4-days / week navigation shared by the calendar and the
+ * tasks directory, so both grids step
  * through time the same way.
  *
  * The page declares the three properties itself, because each names them
- * differently in the URL (milestones and tasks map viewMode to ?period=).
+ * differently in the URL (tasks maps viewMode to ?period=).
  *
  * @property string $month 'Y-m', or '' for the current month
  * @property string $anchorDate 'Y-m-d', or '' for today

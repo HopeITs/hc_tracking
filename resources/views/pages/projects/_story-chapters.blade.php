@@ -3,7 +3,7 @@
     are drawn; picking one shows its story in the Overview), then four tabs
     that switch in the browser (no round trip). Each tab is a grid of cards:
       Overview  - about, people, the picked stage, coming up, monthly reports;
-      Work      - milestones, tasks, risks, targets, report template;
+      Work      - tasks, risks, targets, report template;
       Funding   - _show-funding: figures, donors, proposals, history, the proposal;
       Files     - files, then what happened.
     Every tab is rendered, so a deep link or a test reads it all; only the
@@ -25,7 +25,7 @@
     $openSection = $section;
     $sections = [
         'overview' => ['label' => __('story.sections.overview'), 'count' => null],
-        'work' => ['label' => __('story.sections.work'), 'count' => $project->milestones_count ?: null],
+        'work' => ['label' => __('story.sections.work'), 'count' => $this->tasks->count() ?: null],
         'funding' => ['label' => __('story.sections.funding'), 'count' => $project->proposals_count ?: null],
         'files' => ['label' => __('story.sections.files'), 'count' => $project->media_count ?: null],
     ];
@@ -149,18 +149,15 @@
                     <h3>{{ __('story.coming_up') }}</h3>
                     <button type="button" class="dk-link" x-on:click="section = 'work'">{{ __('story.see_all_work') }}</button>
                 </div>
-                @if ($this->upcomingMilestones->isEmpty())
+                @if ($this->upcomingTasks->isEmpty())
                     <p class="dk-card-b dk-muted dk-small">{{ __('story.nothing_coming_up') }}</p>
                 @else
                     <ul class="dk-rows">
-                        @foreach ($this->upcomingMilestones as $upcoming)
-                            @php
-                                $upcomingLate = $upcoming->planned_end_date !== null && $upcoming->planned_end_date->isPast();
-                            @endphp
+                        @foreach ($this->upcomingTasks as $upcoming)
                             <li class="dk-pjup" wire:key="upcoming-{{ $upcoming->id }}">
-                                <span @class(['dk-pjup-d dk-num', 'dk-bad' => $upcomingLate])>{{ $upcoming->planned_end_date?->translatedFormat(__('formats.date')) ?? '—' }}</span>
-                                <span class="dk-pjup-n" dir="auto">{{ $upcoming->name }}</span>
-                                <span class="dk-muted dk-small">{{ $upcoming->responsibleUser?->name }}</span>
+                                <span @class(['dk-pjup-d dk-num', 'dk-bad' => $upcoming->due_date->isPast()])>{{ $upcoming->due_date->translatedFormat(__('formats.date')) }}</span>
+                                <a class="dk-pjup-n" href="{{ route('tasks.show', $upcoming) }}" wire:navigate dir="auto">{{ $upcoming->title }}</a>
+                                <span class="dk-muted dk-small">{{ $upcoming->taskAssignees->map(fn ($assignee) => $assignee->employee?->name)->filter()->implode(', ') }}</span>
                             </li>
                         @endforeach
                     </ul>
@@ -195,19 +192,9 @@
         <div data-test="story-delivery">
             <div class="dk-pjwork-h">
                 <x-ui.relation-tabs :tabs="$this->tabs" :active="$this->deliveryTab" wire-target="tab" class="dk-subtabs" />
-                <span class="dk-meta" data-test="story-milestone-progress">
-                    @if ($this->milestoneProgressPercent === null)
-                        {{ __('projects.no_weighted_milestones') }}
-                    @else
-                        <strong class="dk-num">{{ $this->milestoneProgressPercent }}%</strong> · {{ __('projects.milestones_reached', ['reached' => $project->reached_milestones_count, 'total' => $project->milestones_count]) }}
-                    @endif
-                </span>
             </div>
             <div class="dk-pjwork">
                 @switch($this->deliveryTab)
-                    @case('tasks')
-                        @include('pages.projects._show-tasks-tab')
-                        @break
                     @case('targets')
                         @include('pages.projects._show-targets-tab')
                         @break
@@ -215,7 +202,7 @@
                         @include('pages.projects._show-template-tab')
                         @break
                     @default
-                        @include('pages.projects._show-milestones-tab')
+                        @include('pages.projects._show-tasks-tab')
                 @endswitch
             </div>
         </div>

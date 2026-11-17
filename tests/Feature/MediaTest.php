@@ -35,17 +35,6 @@ test('the morph column stores the map key rather than a class name', function ()
         ->and($media->mediable_type)->not->toContain('App\\Models');
 });
 
-test('a file can be attached to a milestone as well as a project', function () {
-    $user = User::factory()->create();
-    $projectId = insertMediaOwningProject();
-    $milestoneId = insertMilestone($projectId, $user->id);
-
-    $media = DB::table('media')->find(insertMedia('milestone', $milestoneId, $user->id));
-
-    expect($media->mediable_type)->toBe('milestone')
-        ->and((int) $media->mediable_id)->toBe($milestoneId);
-});
-
 test('an uploader is not deletable while their files remain', function () {
     $user = User::factory()->create();
     insertMedia('project', insertMediaOwningProject(), $user->id);

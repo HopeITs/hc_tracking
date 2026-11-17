@@ -115,7 +115,6 @@
     .dk-od > li:last-child { border-bottom: 0; }
     .dk-od-kind { justify-self: start; padding: 2px 8px; border-radius: 6px; background: var(--sunk); color: var(--ink-2); font-size: 11.5px; font-weight: 700; white-space: nowrap; }
     .dk-od-kind[data-kind="transfer"] { background: var(--money-soft); color: var(--money); }
-    .dk-od-kind[data-kind="milestone"] { background: var(--active-soft); color: var(--active); }
     .dk-od-main { min-width: 0; display: grid; }
     .dk-od-t { font-size: 14px; font-weight: 700; color: var(--ink); text-decoration: none; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
     .dk-od-t:hover { text-decoration: underline; }
@@ -267,7 +266,7 @@
 
     /* ── Arabic: a truncating name takes its direction from its own text, so a
      * Latin name keeps its start and loses its end, still aligned to the right. */
-    [dir="rtl"] .dk-panel :is(.dk-fp-n, .dk-dn-n, .dk-dn-m, .dk-dr-n, .dk-dr-m, .dk-tg-n, .dk-rv-n, .dk-tp-n, .dk-tp-m, .dk-pl-n, .dk-pl-d, .dk-ms-n, .dk-ms-p, .dk-mx-ln, .dk-mx2-n a, .dk-od-t, .dk-focus-ctx, .dk-it, .dk-tk-t, .dk-tk-p, .dk-tr-m, .dk-ag-m a, .dk-tm-who strong, .dk-pl-sum),
+    [dir="rtl"] .dk-panel :is(.dk-fp-n, .dk-dn-n, .dk-dn-m, .dk-dr-n, .dk-dr-m, .dk-tg-n, .dk-rv-n, .dk-tp-n, .dk-tp-m, .dk-pl-n, .dk-pl-d, .dk-mx-ln, .dk-mx2-n a, .dk-od-t, .dk-focus-ctx, .dk-it, .dk-tk-t, .dk-tk-p, .dk-tr-m, .dk-ag-m a, .dk-tm-who strong, .dk-pl-sum),
     [dir="rtl"] .dk-panel:not(.dk-needs) .dk-is:not(.dk-rv-m) { unicode-bidi: plaintext; text-align: right; }
     /* Line-clamped text stays out of that rule: plaintext (and dir="auto") drops the clamp's "...". Wrapped in the page's direction a Latin name still starts the first line.
      * Where a short card clamps a title to one line, a true single line keeps both the name's start and the "...". */
@@ -334,7 +333,6 @@
 
     .dk-panel[data-rows="2"] .dk-load { display: none; }
     .dk-panel[data-rows="3"] .dk-ld { grid-template-rows: 16px auto; }
-    .dk-panel[data-rows="2"] .dk-pb .dk-ms-meta { flex-wrap: nowrap; }
 
     .dk-panel:is([data-rows="2"], [data-rows="3"]) .dk-focus { gap: 4px; }
     .dk-panel:is([data-rows="2"], [data-rows="3"]) .dk-focus-track { padding-block-end: 0; }

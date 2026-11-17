@@ -198,10 +198,6 @@ class Task extends Model implements TracksActivity
         $programId = match ($this->activityAttribute('source_type')) {
             'program' => $sourceId,
             'project' => Project::query()->whereKey($sourceId)->value('program_id'),
-            'milestone' => Milestone::query()
-                ->join('projects', 'projects.id', '=', 'milestones.project_id')
-                ->where('milestones.id', $sourceId)
-                ->value('projects.program_id'),
             default => null,
         };
 
@@ -232,7 +228,7 @@ class Task extends Model implements TracksActivity
     }
 
     /**
-     * The milestone, proposal, project, program or department this task is
+     * The proposal, project, program or department this task is
      * raised against.
      *
      * There is no foreign key behind source_id, so a source can be deleted
@@ -286,20 +282,8 @@ class Task extends Model implements TracksActivity
     }
 
     /**
-     * The project this task's source sits under, when its source is a
-     * milestone. Used to bucket tasks under a project card (e.g. on a
-     * proposal's Tasks tab).
-     */
-    public function sourceProjectId(): ?int
-    {
-        $source = $this->loadedSource();
-
-        return $source instanceof Milestone ? $source->project_id : null;
-    }
-
-    /**
      * Whether this task belongs to a paused project (D-66, W-02): its source
-     * is that project, or a milestone of it. The chip on a task only says so;
+     * is that project. The chip on a task only says so;
      * the due date and status stay. Pass the paused ids once per render.
      *
      * @param  list<int>|null  $pausedProjectIds  from Project::pausedIds()
@@ -307,18 +291,14 @@ class Task extends Model implements TracksActivity
     public function isPaused(?array $pausedProjectIds = null): bool
     {
         $source = $this->loadedSource();
-        $projectId = match (true) {
-            $source instanceof Project => $source->id,
-            $source instanceof Milestone => $source->project_id,
-            default => null,
-        };
+        $projectId = $source instanceof Project ? $source->id : null;
 
         return $projectId !== null && in_array($projectId, $pausedProjectIds ?? Project::pausedIds(), true);
     }
 
     /**
      * Leaves out the tasks of a paused project: those whose source is the
-     * project, or one of its milestones. Program-, proposal- and
+     * project. Program-, proposal- and
      * annual-plan-level tasks are never paused.
      *
      * @param  Builder<Task>  $query
@@ -328,10 +308,7 @@ class Task extends Model implements TracksActivity
     {
         $paused = Project::query()->paused()->select('projects.id');
 
-        $query
-            ->where(fn (Builder $inner) => $inner->where('tasks.source_type', '!=', 'project')->orWhereNotIn('tasks.source_id', $paused))
-            ->where(fn (Builder $inner) => $inner->where('tasks.source_type', '!=', 'milestone')
-                ->orWhereNotIn('tasks.source_id', Milestone::query()->select('milestones.id')->whereIn('milestones.project_id', $paused)));
+        $query->where(fn (Builder $inner) => $inner->where('tasks.source_type', '!=', 'project')->orWhereNotIn('tasks.source_id', $paused));
     }
 
     /**

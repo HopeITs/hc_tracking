@@ -1,6 +1,5 @@
 <?php
 
-use App\Enums\MilestoneStatus;
 use App\Enums\ProjectStatus;
 use App\Enums\RagStatus;
 use App\Livewire\Concerns\Projects\ArchivesProjects;
@@ -118,25 +117,14 @@ new #[Layout('layouts::desk'), Title('titles.projects')] class extends Component
             ->when($this->view === 'list', fn (Builder $query) => $query->with([
                 'sectors' => fn ($query) => $query->select(['sectors.id', 'sectors.name_ar', 'sectors.name_en', 'sectors.is_active'])->ordered(),
             ]))
-            ->when($this->view === 'timeline', fn (Builder $query) => $query->with([
-                'milestones' => fn ($query) => $query
-                    ->select(['id', 'project_id', 'name', 'planned_start_date', 'planned_end_date', 'actual_end_date', 'status'])
-                    ->where('status', '!=', MilestoneStatus::Cancelled->value)
-                    ->reorder()
-                    ->orderBy('planned_start_date'),
-            ]))
             ->withCount([
                 'risks',
-                'milestones',
                 'planIndicators',
                 'proposals',
                 'indicators',
                 'media' => fn ($query) => $query->whereNotIn('collection', $this->hiddenCollections()),
                 'risks as materialised_risks_count' => fn ($query) => $query->where('happened', true),
-                'milestones as reached_milestones_count' => fn ($query) => $query->where('status', MilestoneStatus::Reached->value),
-            ])
-            ->withSum(['milestones as reached_weight' => fn ($query) => $query->where('status', MilestoneStatus::Reached->value)], 'weight_percentage')
-            ->withSum(['milestones as planned_weight' => fn ($query) => $query->where('status', '!=', MilestoneStatus::Cancelled->value)], 'weight_percentage');
+            ]);
 
         return $this->applySort($this->applyFilters($query))
             ->paginate($this->view === 'list' ? self::LIST_PAGE_SIZE : self::TIMELINE_PAGE_SIZE);
@@ -242,7 +230,6 @@ new #[Layout('layouts::desk'), Title('titles.projects')] class extends Component
     $lensTiles = [
         'unfunded' => ['label' => __('projects.lens_unfunded'), 'hint' => __('projects.lens_unfunded_hint')],
         'overdue' => ['label' => __('projects.lens_overdue'), 'hint' => __('projects.lens_overdue_hint')],
-        'slipping' => ['label' => __('projects.lens_slipping'), 'hint' => __('projects.lens_slipping_hint')],
         'risks' => ['label' => __('projects.lens_risks'), 'hint' => __('projects.lens_risks_hint')],
     ];
 

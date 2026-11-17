@@ -48,7 +48,7 @@
             ['tab' => 'files', 'label' => __('navigation.section_files'), 'icon' => 'nav-paperclip'],
         ])->map(fn (array $section): array => $section + [
             'href' => route('projects.show', $section['tab'] === '' ? [$project] : [$project, 'tab' => $section['tab']]),
-            'current' => $section['tab'] === $tab || ($section['tab'] === '' && in_array($tab, ['', 'milestones'], true)),
+            'current' => $section['tab'] === $tab || ($section['tab'] === '' && $tab === ''),
         ])->all();
     }
 @endphp

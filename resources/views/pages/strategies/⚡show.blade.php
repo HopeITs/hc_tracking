@@ -112,7 +112,7 @@ new #[Layout('layouts::desk'), Title('titles.strategy')] class extends Component
      *     results: array{on: int, total: int, tone: 'good'|'warn'|'critical'|null, by_program: array<int, array{on: int, total: int}>}|null,
      *     funding: array{lines: list<array{currency: string, requested: float, agreed: float, percent: int|null}>, percent: int|null, tone: 'good'|'warn'|'critical'|null}|null,
      *     risks: int|null,
-     *     late: array{milestones: int|null, reports: int|null, total: int}|null
+     *     late: array{reports: int|null, total: int}|null
      * }
      */
     #[Computed]

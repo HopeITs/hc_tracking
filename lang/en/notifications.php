@@ -135,7 +135,6 @@ return [
 
     'modules' => [
         'tasks' => 'Tasks',
-        'milestones' => 'Milestones',
         'projects' => 'Projects',
         'programs' => 'Programs',
         'annual-plans' => 'Annual plans',
@@ -189,7 +188,6 @@ return [
             'project' => '“:subject” is still owned by :person, who has left — reassign it',
         ],
         'data_gap' => [
-            'no_milestones' => 'The active project “:subject” has no milestones',
             'no_indicators' => 'The active project “:subject” has no indicators',
             'past_end' => 'The project “:subject” is past its end date but still active',
             'report_without_files' => 'The approved report on “:subject” has no files attached',
@@ -351,16 +349,6 @@ return [
             'subtask_added' => ':actor added the subtask “:subtask” to “:subject”',
             'subtask_completed' => ':actor completed the subtask “:subtask” of “:subject”',
             'deleted' => ':actor deleted the task “:subject”',
-        ],
-        'milestone' => [
-            'created' => ':actor created the milestone “:subject”',
-            'created_you' => ':actor made you responsible for the new milestone “:subject”',
-            'responsible_changed' => ':actor made :to responsible for “:subject”',
-            'responsible_changed_you' => ':actor made you responsible for “:subject”',
-            'status_changed' => ':actor moved “:subject” from :from to :to',
-            'dates_changed' => ':actor changed the dates of “:subject”',
-            'updated' => ':actor updated the milestone “:subject”',
-            'deleted' => ':actor deleted the milestone “:subject”',
         ],
         'project' => [
             'created' => [
@@ -747,7 +735,7 @@ return [
             ],
             'plan_rebased' => [
                 'title' => 'Plan moved to the grant period',
-                'body' => 'The plan of “:subject” moved to the grant period; milestones and tasks cut at the grant end: :value',
+                'body' => 'The plan of “:subject” moved to the grant period; tasks cut at the grant end: :value',
             ],
         ],
         'donor_proposal' => [

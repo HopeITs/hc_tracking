@@ -24,8 +24,7 @@ use Illuminate\Validation\ValidationException;
  *   protecting the money trail) or while any indicator of its framework has a
  *   target with reports.
  * - results.proposal_id RESTRICTs, so the framework goes first: leaf-first
- *   through Eloquent (indicators, their targets and milestone links follow by
- *   foreign key), then the proposal itself, whose observer removes the targets
+ *   through Eloquent (indicators and their targets follow by foreign key), then the proposal itself, whose observer removes the targets
  *   committed in it.
  * - All in one transaction on the locked proposal row, without per-row
  *   activity, and one `proposal.deleted` entry. A second call for a proposal

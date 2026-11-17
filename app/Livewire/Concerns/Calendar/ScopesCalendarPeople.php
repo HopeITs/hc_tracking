@@ -9,7 +9,7 @@ use App\Models\HrEmployee;
 /**
  * Whose items the calendar shows: the employees checked in the responsible
  * filter, or the signed-in user's own HR employee record when none are, and
- * who a new milestone or task defaults to.
+ * who a new task defaults to.
  *
  * Used by calendar/index only. The page provides the #[Url]
  * filterEmployeeIds property.
@@ -20,8 +20,8 @@ trait ScopesCalendarPeople
 {
     /**
      * The employee record for the signed-in user, if their account is linked
-     * to one. `Milestone::responsible_user_id` holds an HR employee id, not a
-     * `users.id`, so this is the bridge between "me" and "my milestones".
+     * to one. Task assignees hold HR employee ids, not
+     * `users.id`, so this is the bridge between "me" and "my tasks".
      */
     protected function employeeId(): ?int
     {
@@ -47,7 +47,7 @@ trait ScopesCalendarPeople
     }
 
     /**
-     * The employee a newly created milestone/task defaults to: the one
+     * The employee a newly created task defaults to: the one
      * employee the filter is narrowed to, or the signed-in user's own record
      * when the filter covers several people (or none) and there is no single
      * obvious owner to default to.

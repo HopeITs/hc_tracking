@@ -98,7 +98,6 @@ trait ReadsTaskViews
         return match ($this->group) {
             'status' => $this->countFilteredTasksBy('status'),
             'priority' => $this->countFilteredTasksBy('priority'),
-            'milestone' => $this->countFilteredTasksBy("coalesce(case when source_type = 'milestone' then cast(source_id as char) end, '')"),
             'assignee' => $this->assigneeGroupKeys($this->filteredTasksQuery())->countBy()->all(),
             default => [],
         };
@@ -140,7 +139,7 @@ trait ReadsTaskViews
     /**
      * Delivery health across the currently filtered tasks, computed as a
      * single aggregate query rather than hydrating every matching task (and
-     * its milestone/proposal/assignee relations) just to count them — this
+     * its source/assignee relations) just to count them — this
      * ran on every list-view page load via boardTasks() before, which is a
      * full board/calendar-sized query the list view never otherwise needs.
      *

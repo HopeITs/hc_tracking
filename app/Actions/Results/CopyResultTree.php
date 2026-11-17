@@ -22,8 +22,7 @@ use Illuminate\Validation\ValidationException;
  * There is no second copy routine.
  *
  * Results and their indicators are copied with `copied_from_id` set on every
- * row; targets (`plan_indicators`), reports, schedules and milestone links
- * are not. A copied indicator's `target` stays NULL: its default target is
+ * row; targets (`plan_indicators`), reports and schedules are not. A copied indicator's `target` stays NULL: its default target is
  * the source's `indicators.target`, read through `copied_from_id`.
  *
  * The rows are written with batched inserts, one level at a time, so the

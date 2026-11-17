@@ -17,7 +17,7 @@
         ? (int) $this->task->due_date->copy()->startOfDay()->diffInDays(today())
         : 0;
     $source = $this->task->source;
-    $sourceUrl = $source instanceof \App\Models\Milestone && auth()->user()->can('view', $source) ? route('milestones.show', $source) : null;
+    $sourceUrl = $source instanceof \App\Models\Project && auth()->user()->can('view', $source) ? route('projects.show', $source) : null;
 @endphp
 
 <x-ui.panel :clip="false">

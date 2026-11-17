@@ -630,22 +630,8 @@ button.dk-step.dk-go:hover,button.dk-step.dk-go:focus-visible{ background:var(--
 @container pb (max-width: 479px){ .dk-panel .dk-pb .dk-tk-av{ grid-column:1;justify-content:flex-start } }
 @container pb (max-width: 479px){ .dk-panel .dk-pb .dk-tk-steps{ grid-column:2;grid-row:1 } }
 @container pb (max-width: 479px){ .dk-panel .dk-pb .dk-tk-review{ justify-content:flex-start } }
-/* Milestones: name + health on line 1, project · due + progress on line 2; one line at W/XL */
-.dk-ms-rows>li{ display:grid;grid-template-columns:minmax(0,1fr) auto;grid-template-areas:"n h" "m b";align-items:center;gap:3px 12px;padding-block:9px;border-bottom:1px solid var(--line) }
-.dk-ms-rows>li:last-child{ border-bottom:0 }
-.dk-ms-n{ grid-area:n;min-width:0;font-size:14px;font-weight:700;color:var(--ink);overflow:hidden;text-overflow:ellipsis;white-space:nowrap }
-.dk-ms-n:hover{ text-decoration:underline }
-.dk-ms-h{ grid-area:h;justify-self:end }
-.dk-ms-meta{ grid-area:m;display:flex;min-width:0;margin:0;font-size:12.5px;white-space:nowrap }
-.dk-ms-p{ overflow:hidden;text-overflow:ellipsis;min-width:0 }
-.dk-ms-bar{ grid-area:b;display:grid;grid-template-columns:72px 36px;align-items:center;gap:8px;justify-self:end;font-size:12.5px;color:var(--ink-2);text-align:end }
-.dk-ms-bar .dk-meter{ margin:0 }
-.dk-ms-bar .dk-meter b{ background:var(--ink-2) }
-[data-health="bad"] .dk-ms-bar .dk-meter b{ background:var(--bad) }
-[data-health="warn"] .dk-ms-bar .dk-meter b{ background:var(--warn) }
-@container pb (min-width: 820px){ .dk-panel .dk-pb .dk-ms-rows>li{ grid-template-columns:minmax(0,1.4fr) minmax(0,1fr) 116px 110px;grid-template-areas:"n m b h" } }
 /* My agenda: type colours, 14-day load strip, grouped list, month grid + day popover */
-.dk-k-ms{ --k:var(--active) } .dk-k-task{ --k:var(--ink-2) } .dk-k-rep{ --k:var(--warn) } .dk-k-money{ --k:var(--money) } .dk-k-donor{ --k:var(--brand) }
+.dk-k-task{ --k:var(--ink-2) } .dk-k-rep{ --k:var(--warn) } .dk-k-money{ --k:var(--money) } .dk-k-donor{ --k:var(--brand) }
 .dk-kdot{ display:inline-block;width:8px;height:8px;flex:none;border-radius:50%;background:var(--k,var(--ink-3)) }
 .dk-load{ display:grid;grid-template-columns:repeat(14,minmax(0,1fr));gap:3px;margin-bottom:8px }
 .dk-ld{ display:grid;grid-template-rows:34px auto;gap:2px;padding:3px 0 2px;border:0;border-radius:7px;background:none;cursor:pointer;color:var(--ink-3) }
@@ -1346,7 +1332,7 @@ button.dk-step.dk-go:hover,button.dk-step.dk-go:focus-visible{ background:var(--
 .dk-adm li.dk-lockd .dk-adm-row{ cursor:help }
 /* Meta lines that carry a date or a late flag wrap to a second line instead of clipping it */
 .dk-panel .dk-needs .dk-is,.dk-panel.dk-needs .dk-is,.dk-panel .dk-rv-m{ display:-webkit-box!important;-webkit-line-clamp:2;-webkit-box-orient:vertical;white-space:normal!important }
-.dk-ms-meta>span:last-child,.dk-tk .dk-is>span:last-child,.dk-pj-v>span{ flex:none }
+.dk-tk .dk-is>span:last-child,.dk-pj-v>span{ flex:none }
 .dk-pl-m:empty{ display:none }
 /* Targets at S/M: the values take their own line so the name keeps the width */
 @container pb (max-width: 479px){ .dk-panel .dk-pb .dk-tg>li{ grid-template-areas:"n s" "b b" "v v" } }

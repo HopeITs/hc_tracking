@@ -5,7 +5,6 @@ declare(strict_types=1);
 namespace App\Models\Scopes;
 
 use App\Enums\TaskKind;
-use App\Models\Milestone;
 use App\Models\Task;
 use App\Models\User;
 use Illuminate\Database\Eloquent\Builder;
@@ -98,8 +97,7 @@ class TaskVisibilityScope implements Scope
             }
 
             if ($ownedProjectIds !== []) {
-                $query->orWhere(fn (Builder $query) => $query->where($sourceType, 'project')->whereIn($sourceId, $ownedProjectIds))
-                    ->orWhere(fn (Builder $query) => $query->where($sourceType, 'milestone')->whereIn($sourceId, Milestone::query()->select('id')->whereIn('project_id', $ownedProjectIds)));
+                $query->orWhere(fn (Builder $query) => $query->where($sourceType, 'project')->whereIn($sourceId, $ownedProjectIds));
             }
 
             if ($managedProgramIds !== []) {

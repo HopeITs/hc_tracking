@@ -2,7 +2,6 @@
 
 use App\Models\HrCity;
 use App\Models\HrEmployee;
-use App\Models\Milestone;
 use App\Models\PlanIndicator;
 use App\Models\Program;
 use App\Models\Project;
@@ -50,14 +49,12 @@ test('a project keeps timestamps on its proposal links', function () {
     expect($project->proposals()->sole()->pivot->created_at)->not->toBeNull();
 });
 
-test('a project has its risks, milestones and targets', function () {
+test('a project has its risks and targets', function () {
     $project = Project::factory()->create();
 
     Risk::factory(2)->create(['project_id' => $project->id]);
-    Milestone::factory()->create(['project_id' => $project->id]);
     PlanIndicator::factory()->create(['project_id' => $project->id]);
 
     expect($project->risks)->toHaveCount(2)
-        ->and($project->milestones)->toHaveCount(1)
         ->and($project->planIndicators)->toHaveCount(1);
 });

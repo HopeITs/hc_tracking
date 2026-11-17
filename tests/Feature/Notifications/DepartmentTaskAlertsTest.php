@@ -9,7 +9,6 @@ use App\Enums\ProposalStatus;
 use App\Enums\TaskKind;
 use App\Enums\TaskStatus;
 use App\Models\Activity;
-use App\Models\Milestone;
 use App\Models\Project;
 use App\Models\Proposal;
 use App\Models\Task;
@@ -138,46 +137,15 @@ test('a department removed from HR hands its alerts to the proposal owners', fun
         ->and(UserNotification::query()->forUser($this->member)->count())->toBe(0);
 });
 
-test('tasks and milestones of a rejected proposal stop alerting', function () {
+test('tasks of a rejected proposal stop alerting', function () {
     $task = departmentAlertTask('2026-09-28');
-    Activity::withoutRecording(fn () => Milestone::factory()->create([
-        'proposal_id' => $this->proposal->id,
-        'project_id' => null,
-        'name' => 'Plan milestone',
-        'planned_start_date' => '2026-09-01',
-        'planned_end_date' => '2026-09-28',
-    ]));
     Proposal::query()->whereKey($this->proposal->id)->update(['status' => ProposalStatus::Rejected->value]);
 
     $items = app(DeadlineCatalog::class)->items(CarbonImmutable::parse('2026-10-15'));
 
     expect($items->where('subjectType', 'task')->where('subjectId', $task->id))->toHaveCount(0)
-        ->and($items->where('label', 'Plan milestone'))->toHaveCount(0)
         ->and(scanDepartmentDue('2026-09-21 09:00'))->toBe(0)
         ->and(scanDepartmentOverdue('2026-09-29 09:00'))->toBe(0);
-});
-
-test('a proposal-only milestone alerts its responsible person and the proposal owners', function () {
-    $ownerEmployee = insertHrEmployee();
-    $owner = userWithRole('Managers', $ownerEmployee);
-    $responsible = userWithRole('Team Member', insertHrEmployee());
-    Activity::withoutRecording(function () use ($ownerEmployee, $responsible): void {
-        $project = Project::factory()->create(['user_id' => $ownerEmployee]);
-        $project->proposals()->attach($this->proposal);
-        Milestone::factory()->create([
-            'proposal_id' => $this->proposal->id,
-            'project_id' => null,
-            'name' => 'Plan milestone',
-            'responsible_user_id' => $responsible->employee_id,
-            'planned_start_date' => '2026-09-01',
-            'planned_end_date' => '2026-09-28',
-        ]);
-    });
-
-    $item = app(DeadlineCatalog::class)->items(CarbonImmutable::parse('2026-10-15'))->firstWhere('label', 'Plan milestone');
-
-    expect($item)->not->toBeNull()
-        ->and($item->directUserIds)->toEqualCanonicalizing([$responsible->id, $owner->id]);
 });
 
 test('a switched-off department task event sends nothing', function () {

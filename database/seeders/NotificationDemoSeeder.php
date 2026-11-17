@@ -3,11 +3,9 @@
 namespace Database\Seeders;
 
 use App\Enums\ArStatus;
-use App\Enums\MilestoneStatus;
 use App\Enums\ProposalStatus;
 use App\Enums\TaskPriority;
 use App\Enums\TaskStatus;
-use App\Models\Milestone;
 use App\Models\Project;
 use App\Models\Proposal;
 use App\Models\Risk;
@@ -32,7 +30,7 @@ use Illuminate\Support\Facades\Date;
  * a recipient. Another user performs real actions through the models, so the
  * normal pipeline records the activity and fans it out: an assignment, status
  * changes, a risk that happened, an approved and a rejected proposal, a failed
- * tranche, a postponed milestone, a new project owner and a burst of edits
+ * tranche, a new project owner and a burst of edits
  * that groups into one row. The actions are spread over the last two weeks;
  * everything older than two days is marked read. It changes the records it
  * acts on, and running it again adds another round.
@@ -106,10 +104,6 @@ class NotificationDemoSeeder extends Seeder
 
         $tranche = TransfersTracking::query()->where('ar_status', ArStatus::Pending->value)->inRandomOrder()->first();
         $this->at($now->subDay(), fn () => $tranche?->update(['ar_status' => ArStatus::Failed]));
-
-        $milestone = Milestone::query()->whereNotIn('status', [MilestoneStatus::Reached->value, MilestoneStatus::Cancelled->value])->inRandomOrder()->first();
-        $this->at($now->subHours(5), fn () => $milestone?->update(['responsible_user_id' => $employeeId]));
-        $this->at($now->subHours(3), fn () => $milestone?->update(['status' => MilestoneStatus::Postponed]));
 
         $project = Project::query()->where('user_id', '!=', $employeeId)->inRandomOrder()->first();
         $this->at($now->subMinutes(40), fn () => $project?->update(['user_id' => $employeeId]));

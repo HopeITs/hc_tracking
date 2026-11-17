@@ -90,8 +90,7 @@ test('a hidden type cannot be switched on, focused or reached from the browser',
         ->assertDontSee('data-test="calendar-focused-banner"', false);
 
     // Hiding every visible type must not leave a hidden one "focused".
-    $component->set('showMilestones', false)
-        ->set('showTasks', false)
+    $component->set('showTasks', false)
         ->set('showReports', false)
         ->set('showProposals', true)
         ->set('showTransfers', true)

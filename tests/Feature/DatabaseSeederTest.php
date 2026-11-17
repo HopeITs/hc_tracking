@@ -11,7 +11,6 @@ use App\Models\IndicatorProgress;
 use App\Models\LibraryIndicator;
 use App\Models\MealCoverageAssignment;
 use App\Models\Media;
-use App\Models\Milestone;
 use App\Models\MonthlyReport;
 use App\Models\MonthlyReportAnswer;
 use App\Models\NarrativeQuestion;
@@ -54,7 +53,6 @@ test('the seeders populate every table in the schema', function () {
         DonorProposal::class,
         Risk::class,
         RiskLibrary::class,
-        Milestone::class,
         Task::class,
         TaskAssignee::class,
         TaskAttachment::class,

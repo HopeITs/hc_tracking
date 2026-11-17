@@ -135,7 +135,6 @@ return [
 
     'modules' => [
         'tasks' => 'المهام',
-        'milestones' => 'المراحل',
         'projects' => 'المشاريع',
         'programs' => 'البرامج',
         'annual-plans' => 'الخطط السنوية',
@@ -189,7 +188,6 @@ return [
             'project' => 'المشروع «:subject» ما زال باسم :person وقد غادر — أعد تعيينه',
         ],
         'data_gap' => [
-            'no_milestones' => 'المشروع النشط «:subject» بلا مراحل',
             'no_indicators' => 'المشروع النشط «:subject» بلا مؤشرات',
             'past_end' => 'تجاوز المشروع «:subject» تاريخ انتهائه وما زال نشطًا',
             'report_without_files' => 'التقرير المعتمد عن «:subject» بلا ملفات مرفقة',
@@ -351,16 +349,6 @@ return [
             'subtask_added' => 'أضاف :actor المهمة الفرعية «:subtask» إلى «:subject»',
             'subtask_completed' => 'أنجز :actor المهمة الفرعية «:subtask» ضمن «:subject»',
             'deleted' => 'حذف :actor المهمة «:subject»',
-        ],
-        'milestone' => [
-            'created' => 'أنشأ :actor المرحلة «:subject»',
-            'created_you' => 'جعلك :actor مسؤولًا عن المرحلة الجديدة «:subject»',
-            'responsible_changed' => 'جعل :actor :to مسؤولًا عن المرحلة «:subject»',
-            'responsible_changed_you' => 'جعلك :actor مسؤولًا عن المرحلة «:subject»',
-            'status_changed' => 'نقل :actor المرحلة «:subject» من :from إلى :to',
-            'dates_changed' => 'غيّر :actor تواريخ المرحلة «:subject»',
-            'updated' => 'حدّث :actor المرحلة «:subject»',
-            'deleted' => 'حذف :actor المرحلة «:subject»',
         ],
         'project' => [
             'created' => [
@@ -747,7 +735,7 @@ return [
             ],
             'plan_rebased' => [
                 'title' => 'نقل الخطة إلى مدة المنحة',
-                'body' => 'نُقلت خطة المقترح «:subject» إلى مدة المنحة، وعدد المراحل الرئيسية والمهام التي قُصّرت إلى نهاية المنحة: :value',
+                'body' => 'نُقلت خطة المقترح «:subject» إلى مدة المنحة، وعدد المهام التي قُصّرت إلى نهاية المنحة: :value',
             ],
         ],
         'donor_proposal' => [

@@ -6,7 +6,6 @@ use App\Enums\TaskKind;
 use App\Enums\TaskPriority;
 use App\Enums\TaskStatus;
 use App\Models\DonorReport;
-use App\Models\Milestone;
 use App\Models\Program;
 use App\Models\Project;
 use App\Models\Task;
@@ -16,22 +15,20 @@ use App\Notifications\NotificationPayload;
 use Livewire\Livewire;
 
 /**
- * A program with one project and one milestone, and a manager who may do
- * everything on its tasks.
+ * A program with one project, and a manager who may do everything on its
+ * tasks.
  *
- * @return array{program: Program, project: Project, milestone: Milestone, manager: User, employeeId: int}
+ * @return array{program: Program, project: Project, manager: User, employeeId: int}
  */
 function programTaskSetup(): array
 {
     $employeeId = insertHrEmployee();
     $program = Program::factory()->create();
     $project = Project::factory()->create(['program_id' => $program->id, 'name' => 'Wells Project']);
-    $milestone = Milestone::factory()->create(['project_id' => $project->id, 'name' => 'Pumps installed']);
 
     return [
         'program' => $program,
         'project' => $project,
-        'milestone' => $milestone,
         'manager' => userWithRole('General Manager', $employeeId),
         'employeeId' => $employeeId,
     ];
@@ -439,17 +436,6 @@ test('someone who cannot edit a task cannot rename it', function () {
     expect($task->fresh()->title)->toBe('Kept name');
 });
 
-test('a milestone task names its milestone under the title', function () {
-    ['program' => $program, 'milestone' => $milestone, 'manager' => $manager] = programTaskSetup();
-    $task = Task::factory()->create(['source_type' => 'milestone', 'source_id' => $milestone->id]);
-
-    Livewire::actingAs($manager)
-        ->test('pages::programs.show', ['program' => $program])
-        ->set('tab', 'tasks')
-        ->assertSeeHtml('data-task-milestone="'.$task->id.'"')
-        ->assertSeeHtml('title="Milestone: Pumps installed"');
-});
-
 test('the task menu no longer offers to move a task', function () {
     ['program' => $program, 'project' => $project, 'manager' => $manager] = programTaskSetup();
     projectTask($project);
@@ -479,25 +465,25 @@ test('the Add task dialog shows where the task goes, starting on the project bei
         ->toBe(['source_type' => 'project', 'source_id' => $project->id]);
 });
 
-test('the Add task dialog sends the task to the picked milestone, and never outside the program', function () {
-    ['program' => $program, 'milestone' => $milestone, 'manager' => $manager] = programTaskSetup();
-    $foreignMilestone = Milestone::factory()->create();
+test('the Add task dialog sends the task to the picked project, and never outside the program', function () {
+    ['program' => $program, 'project' => $project, 'manager' => $manager] = programTaskSetup();
+    $foreignProject = Project::factory()->create();
 
     $page = Livewire::actingAs($manager)
         ->test('pages::programs.show', ['program' => $program])
         ->call('openAddTaskModal')
         ->assertSet('newTaskTarget', 'program')
         ->set('newTaskTitle', 'Test the pumps')
-        ->set('newTaskTarget', 'milestone:'.$foreignMilestone->id)
+        ->set('newTaskTarget', 'project:'.$foreignProject->id)
         ->call('addTask')
         ->assertHasErrors(['newTaskTarget']);
 
     expect(Task::query()->where('title', 'Test the pumps')->exists())->toBeFalse();
 
-    $page->set('newTaskTarget', 'milestone:'.$milestone->id)
+    $page->set('newTaskTarget', 'project:'.$project->id)
         ->call('addTask')
         ->assertHasNoErrors();
 
     expect(Task::query()->where('title', 'Test the pumps')->sole()->only(['source_type', 'source_id']))
-        ->toBe(['source_type' => 'milestone', 'source_id' => $milestone->id]);
+        ->toBe(['source_type' => 'project', 'source_id' => $project->id]);
 });

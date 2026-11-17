@@ -13,7 +13,7 @@ function deskPanelIds(User $user): array
 }
 
 test('each role starts from its own layout, and a Super Admin from the General Manager one', function () {
-    expect(deskPanelIds(User::factory()->role('Team Member')->create()))->toBe(['needs', 'overdue', 'flow', 'tasks', 'coming', 'milestones', 'projects'])
+    expect(deskPanelIds(User::factory()->role('Team Member')->create()))->toBe(['needs', 'overdue', 'flow', 'tasks', 'coming', 'projects'])
         ->and(deskPanelIds(User::factory()->role('Super Admin')->create()))->toContain('glance', 'money', 'pipeline')
         /* A department manager, so the deliverables panel is still offered (W-14, D-65). */
         ->and(deskPanelIds(User::factory()->role('Financial')->create(['employee_id' => insertHrDepartmentManager()])))->toBe(['needs', 'overdue', 'flow', 'money', 'transfers', 'deliverables', 'duties', 'projects']);
@@ -101,8 +101,7 @@ test('a card dropped into a full row is saved there, and the card it pushed open
         ['panel' => 'overdue', 'cols' => 3, 'rows' => 4],
         ['panel' => 'tasks', 'cols' => 3, 'rows' => 4],
         ['panel' => 'flow', 'cols' => 3, 'rows' => 4],
-        ['panel' => 'coming', 'cols' => 6, 'rows' => 5],
-        ['panel' => 'milestones', 'cols' => 6, 'rows' => 5],
+        ['panel' => 'coming', 'cols' => 12, 'rows' => 5],
         ['panel' => 'projects', 'cols' => 12, 'rows' => 4],
     ];
 
@@ -120,8 +119,7 @@ test('a card grown past its neighbours is saved wider, with them wrapped to the 
         ['panel' => 'flow', 'cols' => 4, 'rows' => 4],
         ['panel' => 'tasks', 'cols' => 4, 'rows' => 4],
         ['panel' => 'coming', 'cols' => 4, 'rows' => 4],
-        ['panel' => 'milestones', 'cols' => 6, 'rows' => 4],
-        ['panel' => 'projects', 'cols' => 6, 'rows' => 4],
+        ['panel' => 'projects', 'cols' => 12, 'rows' => 4],
     ];
 
     Livewire::actingAs($user)->test('pages::desk.index')->call('arrangePanels', $grown);

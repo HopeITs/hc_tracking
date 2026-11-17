@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace App\Livewire\Concerns\Programs;
 
-use App\Enums\MilestoneStatus;
 use App\Enums\MonthlyReportStatus;
 use App\Enums\ProjectStatus;
 use App\Enums\TaskStatus;
@@ -23,8 +22,8 @@ use Illuminate\Support\Facades\DB;
 use Livewire\Attributes\Computed;
 
 /**
- * The tracking view of programs/show: one ledger row per project (pace, next
- * milestone, tasks, last month's report, targets and money), the ranked
+ * The tracking view of programs/show: one ledger row per project (pace,
+ * tasks, last month's report, targets and money), the ranked
  * "needs your attention" list built from it, and the one-word health verdict.
  *
  * Every figure comes from a fixed number of grouped reads, so the project
@@ -81,8 +80,6 @@ trait TracksProgramHealth
      *     progress: int|null,
      *     elapsed: float|null,
      *     pace: string,
-     *     lateMilestones: int,
-     *     nextMilestone: CarbonImmutable|null,
      *     openTasks: int,
      *     pastDueTasks: int,
      *     report: MonthlyReportStatus|null,
@@ -98,19 +95,14 @@ trait TracksProgramHealth
     public function projectLedger(): array
     {
         $today = CarbonImmutable::today();
-        $openMilestone = fn ($query) => $query->whereNotIn('status', [MilestoneStatus::Reached->value, MilestoneStatus::Cancelled->value]);
 
         $projects = Project::query()
             ->select(['id', 'slug', 'name', 'status', 'start_date', 'end_date', 'program_id', 'user_id', 'city_id'])
             ->where('program_id', $this->programId)
             ->with(['user:id,first_name_en,last_name_en,first_name_ar,last_name_ar', 'city'])
-            ->withSum(['milestones as weight_total' => fn ($query) => $query->where('status', '!=', MilestoneStatus::Cancelled->value)], 'weight_percentage')
-            ->withSum(['milestones as weight_reached' => fn ($query) => $query->where('status', MilestoneStatus::Reached->value)], 'weight_percentage')
             ->withCount([
-                'milestones as late_milestones_count' => fn ($query) => $openMilestone($query)->whereDate('planned_end_date', '<', $today->toDateString()),
                 'risks as happened_risks_count' => fn ($query) => $query->where('happened', true),
             ])
-            ->withMin(['milestones as next_milestone_date' => fn ($query) => $openMilestone($query)->whereDate('planned_end_date', '>=', $today->toDateString())], 'planned_end_date')
             ->orderBy('name')
             ->orderBy('id')
             ->get();
@@ -123,15 +115,13 @@ trait TracksProgramHealth
 
         return $projects
             ->map(function (Project $project) use ($taskCounts, $reports, $targets, $funding, $lateTransfers, $today): array {
-                $progress = ProjectPace::progress($project->getAttribute('weight_reached'), $project->getAttribute('weight_total'));
+                $progress = null;
 
                 return [
                     'project' => $project,
                     'progress' => $progress,
                     'elapsed' => ProjectPace::elapsed($project->start_date, $project->end_date, $today),
                     'pace' => ProjectPace::rate($project->status, $project->start_date, $project->end_date, $progress, $today),
-                    'lateMilestones' => (int) $project->getAttribute('late_milestones_count'),
-                    'nextMilestone' => $project->getAttribute('next_milestone_date') === null ? null : CarbonImmutable::parse($project->getAttribute('next_milestone_date')),
                     'openTasks' => $taskCounts[$project->id]['open'] ?? 0,
                     'pastDueTasks' => $taskCounts[$project->id]['pastDue'] ?? 0,
                     'report' => $reports === null ? null : ($reports[$project->id] ?? null),
@@ -152,8 +142,7 @@ trait TracksProgramHealth
 
     /**
      * Whether a ledger row belongs in the "Needs attention" group: behind or
-     * past its end date or slipping, a late milestone, a missing monthly
-     * report, or a pile of past-due tasks.
+     * past its end date or slipping, a missing monthly report, or a pile of past-due tasks.
      *
      * A late transfer is the donor's delay, shared by every project the
      * agreement funds and not something the project team can act on, so it
@@ -164,7 +153,6 @@ trait TracksProgramHealth
     protected function rowNeedsAttention(array $row): bool
     {
         return in_array($row['pace'], [...ProjectPace::CRITICAL, ...ProjectPace::WARNING], true)
-            || $row['lateMilestones'] > 0
             || ($row['reportExpected'] && $row['report'] === null)
             || $row['pastDueTasks'] >= self::PAST_DUE_TASKS_THRESHOLD;
     }
@@ -412,11 +400,6 @@ trait TracksProgramHealth
             } elseif ($row['pace'] === 'slipping') {
                 $items[] = ['key' => 'slipping', 'tone' => 'warn', 'mine' => $isMine, 'href' => $projectHref, 'label' => __('programs.attention_open_project'),
                     'text' => __('programs.attention_slipping', ['project' => $project->name])];
-            }
-
-            if ($row['lateMilestones'] > 0) {
-                $items[] = ['key' => 'milestones', 'tone' => 'critical', 'mine' => $isMine, 'href' => route('projects.show', ['project' => $project, 'tab' => 'milestones']), 'label' => __('programs.attention_open_milestones'),
-                    'text' => trans_choice('programs.attention_late_milestones', $row['lateMilestones'], ['count' => $row['lateMilestones'], 'project' => $project->name])];
             }
 
             if ($row['lateTransfers'] > 0) {

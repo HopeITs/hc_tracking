@@ -8,7 +8,6 @@ use App\Enums\TaskPriority;
 use App\Enums\TaskStatus;
 use App\Models\HrDepartment;
 use App\Models\HrEmployee;
-use App\Models\Milestone;
 use App\Models\Task;
 use App\Models\User;
 use Carbon\CarbonImmutable;
@@ -66,10 +65,8 @@ trait ComposesInlineTasks
      * A group's inline "+ Add task" row only captures a title, but a task
      * always needs a source and usually an assignee. Both are inferred from context
      * so the row can create the task directly, with no drawer:
-     *  - source: the row's own milestone (its own milestoneId, when the row
-     *    is grouped or scheduled under one), falling back to the active
-     *    source-type/source-id filter, then the viewer's own department —
-     *    only a viewer with none of these is genuinely ambiguous.
+     *  - source: the active source-type/source-id filter, then the viewer's
+     *    own department — only a viewer with neither is genuinely ambiguous.
      *  - assignee: whichever employees the row's own draft (see taskDraft())
      *    has picked — none when they were all removed — falling back to the
      *    signed-in user's own HR employee record when the row hasn't been
@@ -79,7 +76,7 @@ trait ComposesInlineTasks
      * this falls back to the drawer exactly as before, pre-filled with the title and whatever the row's own context and
      * draft already had, so nothing is ever silently dropped.
      */
-    public function quickCreateTask(string $title, ?string $status = null, ?string $milestoneId = null, ?string $rowKey = null, ?string $dueDate = null): void
+    public function quickCreateTask(string $title, ?string $status = null, ?string $rowKey = null, ?string $dueDate = null): void
     {
         Gate::authorize('create', Task::class);
 
@@ -91,14 +88,14 @@ trait ComposesInlineTasks
 
         $draft = $rowKey !== null ? $this->taskDraft($rowKey, $status) : null;
 
-        $source = $this->resolveInlineSource($milestoneId);
+        $source = $this->resolveInlineSource();
         $pickedAssignees = $rowKey !== null && isset($this->taskDrafts[$rowKey]['assignees']);
         $employeeIds = $pickedAssignees
             ? HrEmployee::query()->whereIn('id', collect($draft['assignees'])->map(fn (string $id): int => (int) $id))->pluck('id')
             : collect(array_filter([$this->resolveInlineAssigneeId()]));
 
         if ($source === null) {
-            $this->openDrawerFromInlineRow($title, $status, $milestoneId, $draft, $dueDate);
+            $this->openDrawerFromInlineRow($title, $status, $draft, $dueDate);
 
             return;
         }
@@ -141,26 +138,26 @@ trait ComposesInlineTasks
 
     /**
      * The inline row's "More fields" button: the full drawer, pre-filled with
-     * whatever the row already has (title, status, milestone, draft), for
+     * whatever the row already has (title, status, draft), for
      * anything the row itself doesn't offer — a description, start date or
      * another "Related to".
      */
-    public function openQuickTaskInDrawer(string $title, ?string $status = null, ?string $milestoneId = null, ?string $rowKey = null): void
+    public function openQuickTaskInDrawer(string $title, ?string $status = null, ?string $rowKey = null): void
     {
         Gate::authorize('create', Task::class);
 
-        $this->openDrawerFromInlineRow(trim($title), $status, $milestoneId, $rowKey !== null ? $this->taskDraft($rowKey, $status) : null, null);
+        $this->openDrawerFromInlineRow(trim($title), $status, $rowKey !== null ? $this->taskDraft($rowKey, $status) : null, null);
     }
 
     /**
-     * What an inline row with no milestone of its own files a new task
-     * under, for its "Related to" chip: the filter bar's single record, else
+     * What an inline row files a new task under, for its "Related to"
+     * chip: the filter bar's single record, else
      * the viewer's department, else null (the row then opens the drawer).
      */
     #[Computed]
     public function inlineDefaultSourceLabel(): ?string
     {
-        $source = $this->resolveInlineSource(null);
+        $source = $this->resolveInlineSource();
 
         if ($source === null) {
             return null;
@@ -176,12 +173,12 @@ trait ComposesInlineTasks
     /**
      * @param  array{status: string, priority: string, due_date: string, assignees: array<int, string>}|null  $draft
      */
-    protected function openDrawerFromInlineRow(string $title, ?string $status, ?string $milestoneId, ?array $draft, ?string $dueDate): void
+    protected function openDrawerFromInlineRow(string $title, ?string $status, ?array $draft, ?string $dueDate): void
     {
-        $this->openCreateDrawer(dueDate: $dueDate, status: $draft !== null ? $draft['status'] : $status, milestoneId: $milestoneId);
+        $this->openCreateDrawer(dueDate: $dueDate, status: $draft !== null ? $draft['status'] : $status);
         $this->title = $title;
 
-        if ($milestoneId === null && ($source = $this->resolveInlineSource(null)) !== null) {
+        if (($source = $this->resolveInlineSource()) !== null) {
             $this->taskSourceType = $source['type'];
             $this->taskSourceId = (string) $source['id'];
         }
@@ -239,21 +236,14 @@ trait ComposesInlineTasks
 
     /**
      * Resolves the source a group's inline "+ Add task" row can safely
-     * default to, or null when that would be a guess: its own milestone
-     * context when given (the row is grouped or scheduled under one),
-     * otherwise the active filter bar's source type/id pair when it names
-     * a single record.
+     * default to, or null when that would be a guess: the active filter
+     * bar's source type/id pair when it names a single record, else the
+     * viewer's department.
      *
      * @return array{type: string, id: int}|null
      */
-    protected function resolveInlineSource(?string $milestoneId): ?array
+    protected function resolveInlineSource(): ?array
     {
-        if ($milestoneId !== null) {
-            return Milestone::query()->whereKey((int) $milestoneId)->exists()
-                ? ['type' => 'milestone', 'id' => (int) $milestoneId]
-                : null;
-        }
-
         if ($this->sourceType !== '' && $this->sourceId !== '') {
             return ['type' => $this->sourceType, 'id' => (int) $this->sourceId];
         }
@@ -320,8 +310,8 @@ trait ComposesInlineTasks
 
     /**
      * Adds a one-line subtask under an already-visible parent task, from the
-     * inline row in its expanded panel — no drawer. Proposal and milestone
-     * always match the parent (a subtask delivers the same thing its parent
+     * inline row in its expanded panel — no drawer. The source always
+     * matches the parent (a subtask delivers the same thing its parent
      * does), while due date, priority, status and assignees come from the
      * row's own draft fields; the assignees start as the parent's own, and
      * removing them all adds the subtask unassigned. Mirrors the show page's own addSubtask(), kept

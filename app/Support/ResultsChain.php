@@ -5,25 +5,19 @@ declare(strict_types=1);
 namespace App\Support;
 
 use App\Enums\ActivityStatus;
-use App\Enums\MilestoneStatus;
 use App\Enums\ResultType;
 use App\Models\ActivitySchedule;
 use App\Models\AnnualPlan;
 use App\Models\Donor;
-use App\Models\HrDepartment;
 use App\Models\Indicator;
-use App\Models\Milestone;
 use App\Models\PlanIndicator;
 use App\Models\Project;
 use App\Models\ProjectActivityStatus;
 use App\Models\Proposal;
 use App\Models\Result;
-use App\Models\Task;
-use Carbon\CarbonImmutable;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Database\Eloquent\Relations\HasMany;
-use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Validation\Rule;
@@ -35,38 +29,29 @@ use Illuminate\Validation\Rule;
  *
  * One builder for the proposal Logical Framework tab, the program page and
  * the annual plan page. Each loader reads a fixed set of queries (results with
- * indicators, library entries, targets and reports; the target sources; the
- * milestones of the scope), then the tree, the filters, the gaps and the
- * options are resolved in memory, so the count never grows with the chain.
- * Achievement is read only through PlanIndicator::achievedValue() /
- * percentAchieved() (approved reports), milestone progress only through
- * Milestone::weightedProgress() and link flags through
- * Milestone::activityLinkIssuesFor(). No money is read.
+ * indicators, library entries, targets and reports; the target sources),
+ * then the tree, the filters, the gaps and the options are resolved in
+ * memory, so the count never grows with the chain. Achievement is read only
+ * through PlanIndicator::achievedValue() / percentAchieved() (approved
+ * reports). No money is read.
  *
  * Activities also carry each center's confirmed status (T17's
- * project_activity_statuses, D-51) and the department tasks planned on their
- * milestones (T31), read through TaskVisibilityScope so financial tasks stay
- * with the people allowed to see them: title, department, status and due date
- * only. Both are one query each for the whole chain.
+ * project_activity_statuses, D-51), one query for the whole chain.
  *
  * @phpstan-type ChainTarget array{id: int, center: string, centerId: int|null, source: string|null, target: float, achieved: float, percent: float|null, status: string, issues: list<string>}
  * @phpstan-type ChainIndicator array{indicator: Indicator, code: string|null, name: string, linked: bool, inactive: bool, gaps: list<string>, targets: list<ChainTarget>}
  * @phpstan-type ChainProposal array{name: string, url: string|null, donor: string|null, donorUrl: string|null}
- * @phpstan-type ChainMilestone array{milestone: Milestone, issues: list<string>, cancelled: bool}
- * @phpstan-type ChainMilestoneGroup array{centerId: int|null, center: string|null, progress: float|null, hasCancelled: bool, milestones: list<ChainMilestone>}
  * @phpstan-type ChainActivityStatus array{centerId: int, center: string, status: ActivityStatus}
- * @phpstan-type ChainDepartmentTask array{task: Task, department: string}
- * @phpstan-type ChainNode array{result: Result, depth: int, gaps: list<string>, indicators: list<ChainIndicator>, lineage: list<Result>, proposal: ChainProposal|null, milestoneGroups: list<ChainMilestoneGroup>, schedule: array<string, list<int>|null>, activityStatuses: list<ChainActivityStatus>, departmentTasks: list<ChainDepartmentTask>, children: list<array<string, mixed>>, contributions: list<array<string, mixed>>}
+ * @phpstan-type ChainNode array{result: Result, depth: int, gaps: list<string>, indicators: list<ChainIndicator>, lineage: list<Result>, proposal: ChainProposal|null, schedule: array<string, list<int>|null>, activityStatuses: list<ChainActivityStatus>, children: list<array<string, mixed>>, contributions: list<array<string, mixed>>}
  * @phpstan-type ChainOption array{value: string, label: string}
  * @phpstan-type ChainFilters array{indicator: string, center: string, donor: string}
  * @phpstan-type Chain array{
  *     tree: list<ChainNode>,
  *     crossCutting: list<ChainNode>,
- *     unlinkedMilestones: list<Milestone>,
  *     options: array{indicators: list<ChainOption>, centers: list<ChainOption>, donors: list<ChainOption>},
  *     filters: ChainFilters,
  *     summary: array{levels: array<string, int>, indicators: int, unmeasured: int},
- *     gaps: array{no_indicators: int, no_target: int, no_milestone: int, unlinked_milestone: int},
+ *     gaps: array{no_indicators: int, no_target: int},
  *     isEmpty: bool,
  * }
  */
@@ -74,23 +59,14 @@ final class ResultsChain
 {
     /**
      * @param  Collection<int, Result>  $results
-     * @param  Collection<int, Milestone>  $milestones
      * @param  array<int, true>  $ownResultIds  the scope's own framework (summary counts)
      * @param  array<string, string>  $filters
      */
     private function __construct(
         private readonly Collection $results,
-        private readonly Collection $milestones,
         private readonly array $ownResultIds,
         private array $filters,
     ) {}
-
-    /**
-     * Activity-link flags of every milestone in scope, keyed by milestone id.
-     *
-     * @var array<int, list<string>>
-     */
-    private array $linkIssues = [];
 
     /**
      * Confirmed activity statuses, keyed by activity id.
@@ -100,14 +76,7 @@ final class ResultsChain
     private array $statusesByActivity = [];
 
     /**
-     * Visible department tasks, keyed by the id of the milestone they sit on.
-     *
-     * @var array<int, list<Task>>
-     */
-    private array $tasksByMilestone = [];
-
-    /**
-     * The proposal's own framework, its milestones and those of its centers.
+     * The proposal's own framework.
      *
      * @param  array<string, string>  $filters
      * @return Chain
@@ -116,13 +85,7 @@ final class ResultsChain
     {
         $results = self::resultsQuery()->proposalFramework($proposal->id)->get();
 
-        $milestones = self::milestonesQuery()
-            ->where(fn (Builder $query) => $query
-                ->where('proposal_id', $proposal->id)
-                ->orWhereIn('project_id', DB::table('project_proposal')->select('project_id')->where('proposal_id', $proposal->id)))
-            ->get();
-
-        return (new self($results, $milestones, self::idSet($results), $filters))->build();
+        return (new self($results, self::idSet($results), $filters))->build();
     }
 
     /**
@@ -145,15 +108,9 @@ final class ResultsChain
 
         $results = self::contributingToProgram($results);
 
-        $milestones = self::milestonesQuery()
-            ->where(fn (Builder $query) => $query
-                ->whereIn('project_id', Project::query()->select('id')->where('program_id', $programId))
-                ->orWhereIn('result_id', $results->modelKeys()))
-            ->get();
-
         $own = $results->filter(fn (Result $result): bool => $result->proposal_id === null);
 
-        return (new self($results, $milestones, self::idSet($own), $filters))->build();
+        return (new self($results, self::idSet($own), $filters))->build();
     }
 
     /**
@@ -190,35 +147,19 @@ final class ResultsChain
 
     /**
      * The annual plan's program framework, measured by this plan's targets
-     * only, with the activities whose linked milestones are planned in the
-     * plan year (no annual_plan_activities table before T24, D-18).
+     * only.
      *
      * @param  array<string, string>  $filters
      * @return Chain
      */
     public static function forAnnualPlan(AnnualPlan $plan, array $filters): array
     {
-        $yearStart = CarbonImmutable::create($plan->year)->startOfYear()->toDateString();
-        $yearEnd = CarbonImmutable::create($plan->year)->endOfYear()->toDateString();
-
         $results = self::resultsQuery(fn (HasMany $query) => $query->where('source_type', 'annual_plan')->where('source_id', $plan->id))
             ->programFramework()
             ->where('program_id', $plan->program_id)
             ->get();
 
-        $milestones = self::milestonesQuery()
-            ->whereIn('project_id', Project::query()->select('id')->where('program_id', $plan->program_id))
-            ->where(fn (Builder $query) => $query
-                ->whereRaw('coalesce(planned_start_date, planned_end_date) <= ?', [$yearEnd])
-                ->whereRaw('coalesce(planned_end_date, planned_start_date) >= ?', [$yearStart]))
-            ->get();
-
-        $linkedActivityIds = $milestones->pluck('result_id')->filter()->flip();
-        $results = $results
-            ->reject(fn (Result $result): bool => $result->type === ResultType::Activity && ! $linkedActivityIds->has($result->id))
-            ->values();
-
-        return (new self($results, $milestones, self::idSet($results), $filters))->build();
+        return (new self($results, self::idSet($results), $filters))->build();
     }
 
     /**
@@ -260,18 +201,6 @@ final class ResultsChain
     }
 
     /**
-     * @return Builder<Milestone>
-     */
-    private static function milestonesQuery(): Builder
-    {
-        return Milestone::query()
-            ->select(['id', 'slug', 'name', 'status', 'project_id', 'proposal_id', 'result_id', 'planned_start_date', 'planned_end_date', 'sequence', 'weight_percentage'])
-            ->with('project:id,name,center_id')
-            ->orderBy('planned_start_date')
-            ->orderBy('id');
-    }
-
-    /**
      * @param  Collection<int, Result>  $results
      * @return array<int, true>
      */
@@ -289,22 +218,13 @@ final class ResultsChain
 
         $options = $this->options();
         $this->filters = $this->validFilters($options);
-        $this->linkIssues = Milestone::activityLinkIssuesFor($this->milestones);
-        $this->loadActivityDelivery();
+        $this->loadActivityStatuses();
 
         $resultsById = $this->results->keyBy('id')->all();
-        $milestonesByActivity = [];
-
-        foreach ($this->milestones as $milestone) {
-            if ($milestone->result_id !== null) {
-                $milestonesByActivity[$milestone->result_id][] = $milestone;
-            }
-        }
-
         $visibleIds = [];
 
         foreach ($this->results as $result) {
-            if ($this->matchesFilters($result, $milestonesByActivity[$result->id] ?? [])) {
+            if ($this->matchesFilters($result)) {
                 $visibleIds[$result->id] = true;
             }
         }
@@ -329,18 +249,16 @@ final class ResultsChain
         }
 
         $nodes = array_map(
-            fn (Result $root): array => $this->node($root, 0, $childrenOf, $resultsById, $visibleIds, $milestonesByActivity),
+            fn (Result $root): array => $this->node($root, 0, $childrenOf, $resultsById, $visibleIds),
             $roots,
         );
 
         $tree = array_values(array_filter($nodes, fn (array $node): bool => $node['result']->type !== ResultType::CrossCutting));
         $crossCutting = array_values(array_filter($nodes, fn (array $node): bool => $node['result']->type === ResultType::CrossCutting));
-        $unlinked = $this->milestones->whereNull('result_id')->values();
 
         return [
             'tree' => $tree,
             'crossCutting' => $crossCutting,
-            'unlinkedMilestones' => array_values($unlinked->all()),
             'options' => $options,
             'filters' => [
                 'indicator' => $this->filters['indicator'],
@@ -348,7 +266,7 @@ final class ResultsChain
                 'donor' => $this->filters['donor'],
             ],
             'summary' => $this->summary(),
-            'gaps' => $this->gapCounts($milestonesByActivity, $unlinked->count()),
+            'gaps' => $this->gapCounts(),
             'isEmpty' => $this->results->isEmpty(),
         ];
     }
@@ -411,10 +329,8 @@ final class ResultsChain
     /**
      * Whether one statement survives the filters, decided per node, never per
      * subtree (.ai/rules/results.md).
-     *
-     * @param  list<Milestone>  $milestones  the milestones linked to this result
      */
-    private function matchesFilters(Result $result, array $milestones): bool
+    private function matchesFilters(Result $result): bool
     {
         ['indicator' => $indicator, 'center' => $center, 'donor' => $donor] = $this->filters;
 
@@ -422,13 +338,8 @@ final class ResultsChain
             return false;
         }
 
-        if ($center !== '') {
-            $hasTarget = $result->indicators->contains(fn (Indicator $row): bool => $row->planIndicators->contains(fn (PlanIndicator $target): bool => (string) $target->project_id === $center));
-            $hasMilestone = collect($milestones)->contains(fn (Milestone $milestone): bool => (string) $milestone->project_id === $center);
-
-            if (! $hasTarget && ! $hasMilestone) {
-                return false;
-            }
+        if ($center !== '' && ! $result->indicators->contains(fn (Indicator $row): bool => $row->planIndicators->contains(fn (PlanIndicator $target): bool => (string) $target->project_id === $center))) {
+            return false;
         }
 
         if ($donor !== '') {
@@ -454,16 +365,15 @@ final class ResultsChain
      * @param  array<int, list<Result>>  $childrenOf
      * @param  array<int, Result>  $resultsById
      * @param  array<int, true>  $visibleIds
-     * @param  array<int, list<Milestone>>  $milestonesByActivity
      * @return ChainNode
      */
-    private function node(Result $result, int $depth, array $childrenOf, array $resultsById, array $visibleIds, array $milestonesByActivity): array
+    private function node(Result $result, int $depth, array $childrenOf, array $resultsById, array $visibleIds): array
     {
         $children = [];
         $contributions = [];
 
         foreach ($childrenOf[$result->id] ?? [] as $child) {
-            $node = $this->node($child, $depth + 1, $childrenOf, $resultsById, $visibleIds, $milestonesByActivity);
+            $node = $this->node($child, $depth + 1, $childrenOf, $resultsById, $visibleIds);
 
             if ($child->parent_id === $result->id) {
                 $children[] = $node;
@@ -478,10 +388,6 @@ final class ResultsChain
             $gaps[] = 'no_indicators';
         }
 
-        if ($result->type === ResultType::Activity && ! isset($milestonesByActivity[$result->id])) {
-            $gaps[] = 'no_milestone';
-        }
-
         return [
             'result' => $result,
             'depth' => $depth,
@@ -489,72 +395,19 @@ final class ResultsChain
             'indicators' => $this->indicatorRows($result),
             'lineage' => $depth === 0 ? $this->hiddenLineage($result, $resultsById, $visibleIds) : [],
             'proposal' => $this->proposalTag($result, $resultsById),
-            'milestoneGroups' => $result->type === ResultType::Activity ? $this->milestoneGroups($milestonesByActivity[$result->id] ?? []) : [],
             'schedule' => $result->type === ResultType::Activity ? $this->scheduleOf($result) : [],
             'activityStatuses' => $result->type === ResultType::Activity ? $this->activityStatuses($result) : [],
-            'departmentTasks' => $result->type === ResultType::Activity ? $this->departmentTasks($milestonesByActivity[$result->id] ?? []) : [],
             'children' => $children,
             'contributions' => $contributions,
         ];
     }
 
     /**
-     * An activity's milestones grouped by center in delivery order, each
-     * group with its weighted progress (cancelled milestones listed but not
-     * counted). A proposal-level milestone without a project (T31) forms
-     * a proposal-wide group, first. A center filter keeps that center's
-     * group and the proposal-wide one.
-     *
-     * @param  list<Milestone>  $milestones
-     * @return list<ChainMilestoneGroup>
+     * One query for the confirmed statuses of the chain's activities.
      */
-    private function milestoneGroups(array $milestones): array
-    {
-        $center = $this->filters['center'];
-        $groups = [];
-
-        foreach ($milestones as $milestone) {
-            if ($center !== '' && $milestone->project_id !== null && (string) $milestone->project_id !== $center) {
-                continue;
-            }
-
-            $key = $milestone->project_id === null ? 'proposal' : (string) $milestone->project_id;
-
-            $groups[$key] ??= [
-                'centerId' => $milestone->project_id,
-                'center' => $milestone->project === null ? null : ($milestone->project->center()->name ?? $milestone->project->name),
-                'items' => [],
-            ];
-            $groups[$key]['items'][] = $milestone;
-        }
-
-        if (isset($groups['proposal'])) {
-            $groups = ['proposal' => $groups['proposal']] + $groups;
-        }
-
-        return array_values(array_map(fn (array $group): array => [
-            'center' => $group['center'],
-            'centerId' => $group['centerId'],
-            'progress' => Milestone::weightedProgress($group['items']),
-            'hasCancelled' => collect($group['items'])->contains(fn (Milestone $milestone): bool => $milestone->status === MilestoneStatus::Cancelled),
-            'milestones' => array_map(fn (Milestone $milestone): array => [
-                'milestone' => $milestone,
-                'issues' => $this->linkIssues[$milestone->id] ?? [],
-                'cancelled' => $milestone->status === MilestoneStatus::Cancelled,
-            ], $group['items']),
-        ], $groups));
-    }
-
-    /**
-     * One query each for the confirmed statuses of the chain's activities and
-     * the department tasks on its activity milestones. Tasks go through
-     * TaskVisibilityScope (the Task global scope), so a viewer never gets a
-     * financial task they may not see; only the summary columns are read.
-     */
-    private function loadActivityDelivery(): void
+    private function loadActivityStatuses(): void
     {
         $activityIds = $this->results->where('type', ResultType::Activity)->modelKeys();
-        $milestoneIds = $this->milestones->whereNotNull('result_id')->modelKeys();
 
         if ($activityIds !== []) {
             $statuses = ProjectActivityStatus::query()
@@ -566,22 +419,6 @@ final class ResultsChain
 
             foreach ($statuses as $status) {
                 $this->statusesByActivity[$status->result_id][] = $status;
-            }
-        }
-
-        if ($milestoneIds !== []) {
-            $tasks = Task::query()
-                ->select(['id', 'title', 'department_id', 'kind', 'status', 'due_date', 'source_type', 'source_id'])
-                ->where('source_type', 'milestone')
-                ->whereIn('source_id', $milestoneIds)
-                ->whereNotNull('department_id')
-                ->whereNull('parent_task_id')
-                ->orderByRaw('due_date is null, due_date')
-                ->orderBy('id')
-                ->get();
-
-            foreach ($tasks as $task) {
-                $this->tasksByMilestone[$task->source_id][] = $task;
             }
         }
     }
@@ -610,34 +447,6 @@ final class ResultsChain
         }
 
         return $rows;
-    }
-
-    /**
-     * The department tasks on an activity's milestones, soonest due first,
-     * following the center filter the milestone groups use.
-     *
-     * @param  list<Milestone>  $milestones
-     * @return list<ChainDepartmentTask>
-     */
-    private function departmentTasks(array $milestones): array
-    {
-        $center = $this->filters['center'];
-        $tasks = [];
-
-        foreach ($milestones as $milestone) {
-            if ($center !== '' && $milestone->project_id !== null && (string) $milestone->project_id !== $center) {
-                continue;
-            }
-
-            array_push($tasks, ...($this->tasksByMilestone[$milestone->id] ?? []));
-        }
-
-        usort($tasks, fn (Task $a, Task $b): int => [$a->due_date === null, $a->due_date?->getTimestamp(), $a->id] <=> [$b->due_date === null, $b->due_date?->getTimestamp(), $b->id]);
-
-        return array_map(fn (Task $task): array => [
-            'task' => $task,
-            'department' => HrDepartment::nameOf((int) $task->department_id) ?: __('department_tasks.department_unavailable'),
-        ], $tasks);
     }
 
     /**
@@ -816,12 +625,6 @@ final class ResultsChain
             }
         }
 
-        foreach ($this->milestones as $milestone) {
-            if ($milestone->project !== null) {
-                $centers[$milestone->project->id] = $milestone->project->center()->name ?? $milestone->project->name;
-            }
-        }
-
         return [
             'indicators' => self::sortedOptions($indicators),
             'centers' => self::sortedOptions($centers),
@@ -895,16 +698,13 @@ final class ResultsChain
     }
 
     /**
-     * @param  array<int, list<Milestone>>  $milestonesByActivity
-     * @return array{no_indicators: int, no_target: int, no_milestone: int, unlinked_milestone: int}
+     * @return array{no_indicators: int, no_target: int}
      */
-    private function gapCounts(array $milestonesByActivity, int $unlinked): array
+    private function gapCounts(): array
     {
         return [
             'no_indicators' => $this->results->filter(fn (Result $result): bool => $result->indicators->isEmpty())->count(),
             'no_target' => $this->results->sum(fn (Result $result): int => $result->indicators->filter(fn (Indicator $indicator): bool => $indicator->planIndicators->isEmpty())->count()),
-            'no_milestone' => $this->results->filter(fn (Result $result): bool => $result->type === ResultType::Activity && ! isset($milestonesByActivity[$result->id]))->count(),
-            'unlinked_milestone' => $unlinked,
         ];
     }
 }

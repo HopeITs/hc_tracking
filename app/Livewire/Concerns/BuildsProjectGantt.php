@@ -4,13 +4,10 @@ declare(strict_types=1);
 
 namespace App\Livewire\Concerns;
 
-use App\Enums\MilestoneStatus;
 use App\Enums\ResultType;
 use App\Enums\TaskStatus;
 use App\Models\ActivitySchedule;
 use App\Models\DonorReport;
-use App\Models\HrEmployee;
-use App\Models\Milestone;
 use App\Models\Project;
 use App\Models\Proposal;
 use App\Models\Result;
@@ -23,8 +20,8 @@ use Illuminate\Support\Collection;
 
 /**
  * Builds the flat, ordered row list the x-ui.gantt engine renders for one
- * project: the fundraising phase of every linked proposal, the milestone tree
- * with its tasks and subtasks, and the donor obligations (transfers and
+ * project: the fundraising phase of every linked proposal, the project's own
+ * tasks and subtasks, each linked proposal's plan, and the donor obligations (transfers and
  * reports) that fall due while the project runs.
  *
  * Every row is plain data — the engine never queries — and summary rows carry
@@ -148,41 +145,27 @@ trait BuildsProjectGantt
     }
 
     /**
-     * A proposal's plan as one read-only group: its milestone tree with the
-     * plan tasks under each milestone, the department tasks raised on the
-     * proposal itself, and its logframe activities across their scheduled
-     * months (planned weeks named beside them). With a $projectId, only the
-     * shared milestones and that center's own are drawn, and an activity
-     * follows the center's calendar when it has one.
+     * A proposal's plan as one read-only group: the tasks raised on the
+     * proposal itself and its logframe activities across their scheduled
+     * months (planned weeks named beside them). With a $projectId, an
+     * activity follows the center's calendar when it has one.
      *
      * Rows carry a `plan-` id prefix and are never editable: the plan moves
-     * only through the plan window (SaveProposalMilestone, SaveDepartmentTask).
+     * only through the plan window (SaveDepartmentTask).
      *
      * @param  Collection<int, GanttRow>  $rows
      */
     private function pushProposalPlanRows(Proposal $proposal, Collection $rows, ?int $projectId = null, ?int $series = null): void
     {
-        $milestones = Milestone::query()
-            ->select(['id', 'slug', 'proposal_id', 'project_id', 'parent_milestone_id', 'name', 'planned_start_date', 'planned_end_date', 'actual_start_date', 'actual_end_date', 'status', 'sequence', 'responsible_user_id'])
-            ->where('proposal_id', $proposal->id)
-            ->when($projectId !== null, fn ($query) => $query->where(fn ($query) => $query->whereNull('project_id')->orWhere('project_id', $projectId)))
-            ->with('responsibleUser:id,first_name_en,last_name_en,first_name_ar,last_name_ar')
-            ->orderBy('planned_start_date')
-            ->orderBy('id')
-            ->get();
-        $milestoneIds = $milestones->modelKeys();
-
         $tasks = $proposal->planTasks()
             ->select(['id', 'slug', 'parent_task_id', 'source_type', 'source_id', 'title', 'status', 'start_date', 'due_date', 'completed_date', 'progress_percentage'])
             ->orderBy('start_date')
             ->orderBy('id')
-            ->get()
-            ->filter(fn (Task $task): bool => $task->source_type === 'proposal' || in_array($task->source_id, $milestoneIds, true))
-            ->values();
+            ->get();
 
         $activities = $this->planActivities($proposal, $projectId);
 
-        if ($milestones->isEmpty() && $tasks->isEmpty() && $activities === []) {
+        if ($tasks->isEmpty() && $activities === []) {
             return;
         }
 
@@ -191,14 +174,9 @@ trait BuildsProjectGantt
         $groupId = 'plan-'.$proposal->id;
         $rows->push($this->ganttGroupRow($groupId, (string) $groupIndex, $proposal->name));
 
-        // A parent drawn in another center's plan leaves its child at the top here.
-        $milestonesByParent = $milestones->toBase()->groupBy(fn (Milestone $milestone): int => in_array($milestone->parent_milestone_id, $milestoneIds, true) ? (int) $milestone->parent_milestone_id : 0);
-        $tasksByMilestone = $tasks->where('source_type', 'milestone')->whereNull('parent_task_id')->toBase()->groupBy('source_id');
         $subtasksByParent = $tasks->whereNotNull('parent_task_id')->toBase()->groupBy('parent_task_id');
 
-        $this->pushMilestoneBranch($milestonesByParent, $tasksByMilestone, $subtasksByParent, 0, $groupId, 1, (string) $groupIndex, 0, $rows, 'plan-', false);
-
-        $index = ($milestonesByParent->get(0) ?? collect())->count();
+        $index = 0;
         foreach ($tasks->where('source_type', 'proposal')->whereNull('parent_task_id')->values() as $task) {
             $this->pushTaskBranch($task, $subtasksByParent, $groupId, 1, $groupIndex.'.'.(++$index), $rows, 'plan-', false);
         }
@@ -296,7 +274,7 @@ trait BuildsProjectGantt
 
         $items = [];
         foreach ($rows as $row) {
-            if (in_array($row['kind'], ['milestone', 'task'], true) && $row['start'] !== null && $row['end'] !== null) {
+            if ($row['kind'] === 'task' && $row['start'] !== null && $row['end'] !== null) {
                 $items[$row['id']] = ['start' => $this->dayNumber($row['start']), 'end' => $this->dayNumber($row['end'])];
             }
         }
@@ -392,98 +370,36 @@ trait BuildsProjectGantt
     }
 
     /**
-     * The milestone tree in sequence order, each milestone followed by its
-     * tasks (and their subtasks) and then its child milestones.
+     * The project's own tasks in start order, each followed by its subtasks.
      *
      * @param  Collection<int, GanttRow>  $rows
      */
     private function pushDeliveryRows(Project $project, Collection $rows): void
     {
-        $milestones = Milestone::query()
-            ->select(['id', 'project_id', 'parent_milestone_id', 'name', 'planned_start_date', 'planned_end_date', 'actual_start_date', 'actual_end_date', 'status', 'sequence', 'responsible_user_id'])
-            ->where('project_id', $project->id)
-            ->whereNull('proposal_id')
-            ->with('responsibleUser:id,first_name_en,last_name_en,first_name_ar,last_name_ar')
-            ->orderBy('sequence')
-            ->orderBy('id')
-            ->get();
-
-        if ($milestones->isEmpty()) {
-            return;
-        }
-
         $tasks = Task::query()
-            ->select(['id', 'parent_task_id', 'source_type', 'source_id', 'title', 'status', 'start_date', 'due_date', 'completed_date', 'progress_percentage'])
-            ->where('source_type', 'milestone')
-            ->whereIn('source_id', $milestones->modelKeys())
+            ->select(['id', 'slug', 'parent_task_id', 'source_type', 'source_id', 'title', 'status', 'start_date', 'due_date', 'completed_date', 'progress_percentage'])
+            ->where('source_type', 'project')
+            ->where('source_id', $project->id)
             ->orderBy('start_date')
             ->orderBy('id')
             ->get();
 
+        if ($tasks->isEmpty()) {
+            return;
+        }
+
         // Plain collections: grouped, these hold collections, not models.
-        $milestonesByParent = $milestones->toBase()->groupBy(fn (Milestone $milestone): int => (int) $milestone->parent_milestone_id);
-        $tasksByMilestone = $tasks->whereNull('parent_task_id')->toBase()->groupBy('source_id');
         $subtasksByParent = $tasks->whereNotNull('parent_task_id')->toBase()->groupBy('parent_task_id');
 
         $groupIndex = count($rows->where('depth', 0)) + 1;
         $groupAt = $rows->count();
         $rows->push($this->ganttGroupRow('delivery', (string) $groupIndex, __('gantt.delivery')));
 
-        $this->pushMilestoneBranch($milestonesByParent, $tasksByMilestone, $subtasksByParent, 0, 'delivery', 1, (string) $groupIndex, 0, $rows);
+        foreach ($tasks->whereNull('parent_task_id')->values() as $index => $task) {
+            $this->pushTaskBranch($task, $subtasksByParent, 'delivery', 1, $groupIndex.'.'.($index + 1), $rows);
+        }
 
         $this->rollUp($rows, $groupAt);
-    }
-
-    /**
-     * @param  Collection<array-key, Collection<int, Milestone>>  $milestonesByParent
-     * @param  Collection<array-key, Collection<int, Task>>  $tasksByMilestone
-     * @param  Collection<array-key, Collection<int, Task>>  $subtasksByParent
-     * @param  Collection<int, GanttRow>  $rows
-     */
-    private function pushMilestoneBranch(Collection $milestonesByParent, Collection $tasksByMilestone, Collection $subtasksByParent, int $parentId, string $parentRowId, int $depth, string $wbsPrefix, int $indexOffset, Collection $rows, string $rowPrefix = '', bool $editable = true): void
-    {
-        foreach (($milestonesByParent->get($parentId) ?? collect())->values() as $index => $milestone) {
-            /** @var Milestone $milestone */
-            $wbs = $wbsPrefix.'.'.($indexOffset + $index + 1);
-            $at = $rows->count();
-            $rowId = $rowPrefix.'milestone-'.$milestone->id;
-            $childTasks = $tasksByMilestone->get($milestone->id) ?? collect();
-            $hasChildren = $childTasks->isNotEmpty() || $milestonesByParent->has($milestone->id);
-
-            $rows->push($this->ganttRow(
-                id: $rowId,
-                parent: $parentRowId,
-                depth: $depth,
-                kind: 'milestone',
-                wbs: $wbs,
-                name: $milestone->name,
-                start: $milestone->planned_start_date,
-                end: $milestone->planned_end_date ?? $milestone->planned_start_date,
-                actualStart: $milestone->actual_start_date,
-                actualEnd: $milestone->actual_end_date,
-                progress: $milestone->status === MilestoneStatus::Reached ? 100 : 0,
-                status: $milestone->status->value,
-                statusLabel: $milestone->status->label(),
-                tone: $this->milestoneTone($milestone),
-                owner: $milestone->responsibleUser?->name,
-                ownerAvatar: $milestone->responsibleUser === null ? null : HrEmployee::avatarUrl($milestone->responsibleUser->id),
-                summary: $hasChildren,
-                diamond: ! $hasChildren && ($milestone->planned_end_date === null || $milestone->planned_end_date->equalTo($milestone->planned_start_date)),
-                url: route('milestones.show', $milestone),
-                editable: $editable,
-            ));
-
-            $childIndex = 0;
-            foreach ($childTasks as $task) {
-                $this->pushTaskBranch($task, $subtasksByParent, $rowId, $depth + 1, $wbs.'.'.(++$childIndex), $rows, $rowPrefix, $editable);
-            }
-
-            $this->pushMilestoneBranch($milestonesByParent, $tasksByMilestone, $subtasksByParent, $milestone->id, $rowId, $depth + 1, $wbs, $childIndex, $rows, $rowPrefix, $editable);
-
-            if ($hasChildren) {
-                $this->rollUp($rows, $at, keepProgress: $milestone->status === MilestoneStatus::Reached);
-            }
-        }
     }
 
     /**
@@ -803,17 +719,6 @@ trait BuildsProjectGantt
         return collect($totals)
             ->map(fn (float $total, string $currency): string => number_format($total, fmod($total, 1.0) === 0.0 ? 0 : 2).' '.$currency)
             ->implode(' · ');
-    }
-
-    private function milestoneTone(Milestone $milestone): string
-    {
-        return match (true) {
-            $milestone->status === MilestoneStatus::Reached => 'good',
-            $milestone->status === MilestoneStatus::Cancelled => 'muted',
-            $milestone->isMissed() || $milestone->isOverdue() => 'critical',
-            $milestone->status === MilestoneStatus::Ongoing => 'warn',
-            default => 'neutral',
-        };
     }
 
     private function taskTone(Task $task): string

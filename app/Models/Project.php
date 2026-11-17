@@ -393,16 +393,6 @@ class Project extends Model implements TracksActivity
     }
 
     /**
-     * The milestones planned for this project.
-     *
-     * @return HasMany<Milestone, $this>
-     */
-    public function milestones(): HasMany
-    {
-        return $this->hasMany(Milestone::class);
-    }
-
-    /**
      * The indicator targets attributed to this project.
      *
      * @return HasMany<PlanIndicator, $this>

@@ -8,7 +8,7 @@ use DomainException;
 
 /**
  * Thrown when a self-referencing tree is asked to accept a parent that would
- * corrupt it — a cycle, a milestone reaching across projects, or a result
+ * corrupt it — a cycle, or a result
  * breaking the logframe chain or its framework.
  *
  * These are programming errors rather than user typos, so they are raised
@@ -22,14 +22,6 @@ final class InvalidParentException extends DomainException
     public static function cycle(string $model): self
     {
         return new self("A {$model} cannot be nested under itself or one of its own descendants.");
-    }
-
-    /**
-     * The milestone was pointed at a parent belonging to a different project.
-     */
-    public static function crossProject(): self
-    {
-        return new self('A milestone cannot be nested under a milestone from another project.');
     }
 
     /**

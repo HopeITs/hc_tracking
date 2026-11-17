@@ -4,12 +4,10 @@ declare(strict_types=1);
 
 namespace App\Support;
 
-use App\Enums\MilestoneStatus;
 use App\Enums\RagStatus;
 use App\Models\AnnualPlan;
 use App\Models\DonorProposal;
 use App\Models\Indicator;
-use App\Models\Milestone;
 use App\Models\Program;
 use App\Models\Project;
 use App\Models\Proposal;
@@ -29,8 +27,7 @@ use Illuminate\Support\Facades\DB;
  * indicators belong through their result's program, everything else through
  * its project's program; targets are rated by Indicator::ragStatus() over this calendar year (as the
  * Desk rates them), a high risk scores 6 or more on the heat map
- * (Risk::heatScore()), a late milestone is Milestone::isMissed() and a late
- * report is Report::overdue(). Currencies are never added together.
+ * (Risk::heatScore()) and a late report is Report::overdue(). Currencies are never added together.
  *
  * A figure the viewer may not open is null, and its query never runs.
  *
@@ -39,7 +36,7 @@ use Illuminate\Support\Facades\DB;
  *     results: array{on: int, total: int, unrated: int, tone: 'good'|'warn'|'critical'|null, by_program: array<int, array{on: int, total: int}>}|null,
  *     funding: array{lines: list<FundingLine>, percent: int|null, tone: 'good'|'warn'|'critical'|null}|null,
  *     risks: int|null,
- *     late: array{milestones: int|null, reports: int|null, total: int}|null
+ *     late: array{reports: int|null, total: int}|null
  * }
  */
 final class StrategyRollup
@@ -77,23 +74,20 @@ final class StrategyRollup
         $results = $canView('indicators') && $canView('targets') ? self::results($strategyIds) : null;
         $funding = $canView('funding-agreements') ? self::funding($projectIds, $projectStrategy) : null;
         $risks = $canView('risks') ? self::risks($projectIds, $projectStrategy) : null;
-        $milestones = $canView('milestones') ? self::lateMilestones($projectIds, $projectStrategy) : null;
         $reports = $canView('reports') ? self::lateReports($projectIds, $projectStrategy) : null;
 
         $rollups = [];
 
         foreach ($strategyIds as $id) {
-            $lateMilestones = $milestones === null ? null : (int) ($milestones[$id] ?? 0);
             $lateReports = $reports === null ? null : (int) ($reports[$id] ?? 0);
 
             $rollups[$id] = [
                 'results' => $results === null ? null : ($results[$id] ?? ['on' => 0, 'total' => 0, 'unrated' => 0, 'tone' => null, 'by_program' => []]),
                 'funding' => $funding === null ? null : ($funding[$id] ?? ['lines' => [], 'percent' => null, 'tone' => null]),
                 'risks' => $risks === null ? null : (int) ($risks[$id] ?? 0),
-                'late' => $lateMilestones === null && $lateReports === null ? null : [
-                    'milestones' => $lateMilestones,
+                'late' => $lateReports === null ? null : [
                     'reports' => $lateReports,
-                    'total' => ($lateMilestones ?? 0) + ($lateReports ?? 0),
+                    'total' => $lateReports,
                 ],
             ];
         }
@@ -332,23 +326,6 @@ final class StrategyRollup
     {
         return self::countByStrategy(
             Risk::query()->whereIn('project_id', $projectIds)->whereRaw('likelihood * severity >= ?', [self::HighRiskScore])->pluck('project_id'),
-            $projectStrategy,
-        );
-    }
-
-    /**
-     * @param  list<int>  $projectIds
-     * @param  Collection<int, int>  $projectStrategy
-     * @return array<int, int>
-     */
-    private static function lateMilestones(array $projectIds, Collection $projectStrategy): array
-    {
-        return self::countByStrategy(
-            Milestone::query()
-                ->whereIn('project_id', $projectIds)
-                ->where('status', MilestoneStatus::Planned)
-                ->whereDate('planned_end_date', '<', CarbonImmutable::today())
-                ->pluck('project_id'),
             $projectStrategy,
         );
     }

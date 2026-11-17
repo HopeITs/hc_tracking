@@ -8,7 +8,6 @@ use App\Models\AnnualPlan;
 use App\Models\Donor;
 use App\Models\DonorProposal;
 use App\Models\DonorReport;
-use App\Models\Milestone;
 use App\Models\MonthlyReport;
 use App\Models\Program;
 use App\Models\Project;
@@ -60,7 +59,6 @@ final class SubjectLinks
     {
         return match ($type) {
             'task' => $this->showRoute('tasks.show', Task::class, $id),
-            'milestone' => $this->showRoute('milestones.show', Milestone::class, $id),
             'project' => $this->showRoute('projects.show', Project::class, $id),
             'program' => $this->showRoute('programs.show', Program::class, $id),
             'annual_plan' => $this->showRoute('annual-plans.show', AnnualPlan::class, $id),

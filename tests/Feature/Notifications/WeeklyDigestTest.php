@@ -2,7 +2,6 @@
 
 use App\Jobs\RunScanner;
 use App\Models\Activity;
-use App\Models\Milestone;
 use App\Models\Program;
 use App\Models\Project;
 use App\Models\Risk;
@@ -21,9 +20,8 @@ test('program managers get their program digest and the general manager the whol
     Activity::withoutRecording(function () use ($managerEmployee): void {
         $program = Program::factory()->create(['manager_id' => $managerEmployee, 'name' => 'WASH']);
         $project = Project::factory()->create(['program_id' => $program->id, 'end_date' => '2027-12-31']);
-        $milestone = Milestone::factory()->create(['project_id' => $project->id, 'planned_end_date' => '2027-12-31']);
-        Task::factory()->create(['source_type' => 'milestone', 'source_id' => $milestone->id, 'due_date' => '2026-09-15']);
-        Task::factory()->create(['source_type' => 'milestone', 'source_id' => $milestone->id, 'due_date' => '2026-09-25']);
+        Task::factory()->create(['source_type' => 'project', 'source_id' => $project->id, 'due_date' => '2026-09-15']);
+        Task::factory()->create(['source_type' => 'project', 'source_id' => $project->id, 'due_date' => '2026-09-25']);
         Risk::factory()->create(['project_id' => $project->id, 'happened' => true, 'solution' => null]);
     });
 
@@ -59,8 +57,7 @@ test('the weekly digest day does not depend on the app language', function () {
     Activity::withoutRecording(function () use ($managerEmployee): void {
         $program = Program::factory()->create(['manager_id' => $managerEmployee]);
         $project = Project::factory()->create(['program_id' => $program->id, 'end_date' => '2027-12-31']);
-        $milestone = Milestone::factory()->create(['project_id' => $project->id, 'planned_end_date' => '2027-12-31']);
-        Task::factory()->create(['source_type' => 'milestone', 'source_id' => $milestone->id, 'due_date' => '2026-09-15']);
+        Task::factory()->create(['source_type' => 'project', 'source_id' => $project->id, 'due_date' => '2026-09-15']);
     });
     app()->setLocale('ar'); // Carbon starts an Arabic week on Saturday
 

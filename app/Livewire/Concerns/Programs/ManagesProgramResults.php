@@ -31,9 +31,6 @@ trait ManagesProgramResults
     /** Indicators each "Show more" adds. */
     public const RESULT_INDICATOR_STEP = 10;
 
-    /** Unlinked milestones listed before "Load more", and how many each click adds. */
-    public const RESULT_MILESTONE_PAGE = 10;
-
     #[Url(as: 'indicators', except: 'all')]
     public string $resultFilter = 'all';
 
@@ -49,8 +46,6 @@ trait ManagesProgramResults
      * @var array<int, int>
      */
     public array $resultIndicatorLimits = [];
-
-    public int $unlinkedMilestoneLimit = self::RESULT_MILESTONE_PAGE;
 
     /**
      * Pick an indicator filter, or go back to every indicator when the
@@ -93,11 +88,6 @@ trait ManagesProgramResults
     public function showFewerResultIndicators(int $resultId): void
     {
         unset($this->resultIndicatorLimits[$resultId]);
-    }
-
-    public function showMoreUnlinkedMilestones(): void
-    {
-        $this->unlinkedMilestoneLimit += self::RESULT_MILESTONE_PAGE * 2;
     }
 
     public function resultIndicatorLimit(int $resultId): int

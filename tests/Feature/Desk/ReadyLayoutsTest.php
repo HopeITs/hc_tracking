@@ -1,7 +1,6 @@
 <?php
 
 use App\Enums\ArStatus;
-use App\Enums\MilestoneStatus;
 use App\Enums\ProjectStatus;
 use App\Enums\ProposalStatus;
 use App\Enums\TaskStatus;
@@ -11,7 +10,6 @@ use App\Models\DonorProposal;
 use App\Models\DonorReport;
 use App\Models\Indicator;
 use App\Models\IndicatorProgress;
-use App\Models\Milestone;
 use App\Models\Project;
 use App\Models\Proposal;
 use App\Models\Task;
@@ -401,12 +399,9 @@ function readyTargets(int $red, int $onPace = 0): void
 test('the fundraising signal states the pipeline card\'s count, and the next deadline of an open proposal as the card shows it', function () {
     $viewer = userWithRole('General Manager', insertHrEmployee());
     Proposal::factory()->create(['status' => ProposalStatus::ConceptNote]);
-    $open = Proposal::factory()->create(['status' => ProposalStatus::Approved]);
-    Milestone::factory()->create(['proposal_id' => $open->id, 'planned_end_date' => '2026-10-12', 'status' => MilestoneStatus::Ongoing]);
-    $rejected = Proposal::factory()->create(['status' => ProposalStatus::Rejected]);
-    Milestone::factory()->create(['proposal_id' => $rejected->id, 'planned_end_date' => '2026-09-20', 'status' => MilestoneStatus::Ongoing]);
-    $completed = Proposal::factory()->create(['status' => ProposalStatus::Completed]);
-    Milestone::factory()->create(['proposal_id' => $completed->id, 'planned_end_date' => '2026-08-01', 'status' => MilestoneStatus::Ongoing]);
+    Proposal::factory()->create(['status' => ProposalStatus::Approved, 'status_remind_on' => '2026-10-12']);
+    Proposal::factory()->create(['status' => ProposalStatus::Rejected, 'status_remind_on' => '2026-09-20']);
+    Proposal::factory()->create(['status' => ProposalStatus::Completed, 'status_remind_on' => '2026-08-01']);
 
     $signal = readySignalsFor($viewer)['fundraising'];
 
@@ -418,8 +413,7 @@ test('the fundraising signal states the pipeline card\'s count, and the next dea
 });
 
 test('passed deadlines are the fundraising role\'s to answer for: red for it, amber for anyone else', function () {
-    $proposal = Proposal::factory()->create(['status' => ProposalStatus::ProposalDraft]);
-    Milestone::factory()->create(['proposal_id' => $proposal->id, 'planned_end_date' => '2026-09-01', 'status' => MilestoneStatus::Ongoing]);
+    Proposal::factory()->create(['status' => ProposalStatus::ProposalDraft, 'status_remind_on' => '2026-09-01']);
 
     expect(readySignalsFor(userWithRole('General Manager', insertHrEmployee()))['fundraising'])
         ->toBe(['text' => '1 in the pipeline · 1 deadline passed', 'tone' => 'warn', 'count' => 1])
@@ -440,9 +434,8 @@ test('the delivery signal states what the projects card shows by default: every 
 
 test('a late project is critical only for the person who owns it', function () {
     $owner = userWithRole('Managers', insertHrEmployee());
-    $project = Project::factory()->create(['user_id' => $owner->employee_id, 'status' => ProjectStatus::Active]);
+    Project::factory()->create(['user_id' => $owner->employee_id, 'status' => ProjectStatus::Active, 'end_date' => '2026-09-01']);
     Project::factory()->create(['status' => ProjectStatus::Active]);
-    Milestone::factory()->create(['project_id' => $project->id, 'proposal_id' => null, 'planned_end_date' => '2026-09-01', 'status' => MilestoneStatus::Ongoing]);
 
     expect(readySignalsFor($owner)['delivery'])->toMatchArray(['tone' => 'critical', 'count' => 1])
         ->and(readySignalsFor(userWithRole('General Manager', insertHrEmployee()))['delivery'])->toMatchArray(['tone' => 'warn', 'count' => 1]);
@@ -504,7 +497,7 @@ test('for a leader, red stays on their own late work and the suggestion keeps it
     $admin = userWithRole('Super Admin', insertHrEmployee());
     readyTargets(red: 11, onPace: 1);
     TransfersTracking::factory()->count(4)->create(['scheduled_date' => '2026-09-01']);
-    Milestone::factory()->create(['project_id' => Project::factory()->create(['status' => ProjectStatus::Active])->id, 'proposal_id' => null, 'planned_end_date' => '2026-09-01', 'status' => MilestoneStatus::Ongoing]);
+    Project::factory()->create(['status' => ProjectStatus::Active, 'end_date' => '2026-09-01']);
     Project::factory()->create(['status' => ProjectStatus::Active]);
     readyTask($admin, $admin->employee_id, '2026-09-01');
 

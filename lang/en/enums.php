@@ -127,13 +127,6 @@ return [
         'ff' => 'Finish to finish',
         'sf' => 'Start to finish',
     ],
-    'milestone_status' => [
-        'planned' => 'Planned',
-        'ongoing' => 'Ongoing',
-        'reached' => 'Reached',
-        'postponed' => 'Postponed',
-        'cancelled' => 'Cancelled',
-    ],
     'period' => [
         'monthly' => 'Monthly',
         'quarterly' => 'Quarterly',

@@ -283,10 +283,6 @@ class Proposal extends Model implements TracksActivity
     /**
      * The tasks sourced directly from this proposal.
      *
-     * Does not include tasks sourced from one of this proposal's funded
-     * projects' milestones — see the Tasks tab query in
-     * proposals/⚡show.blade.php for that broader listing.
-     *
      * @return MorphMany<Task, $this>
      */
     public function tasks(): MorphMany
@@ -295,29 +291,14 @@ class Proposal extends Model implements TracksActivity
     }
 
     /**
-     * The milestones on this proposal's plan (contracts.md §12.2): shared at
-     * proposal level, or center-specific when they also carry a project_id.
-     *
-     * @return HasMany<Milestone, $this>
-     */
-    public function milestones(): HasMany
-    {
-        return $this->hasMany(Milestone::class);
-    }
-
-    /**
-     * Every task on this proposal's plan: raised on the proposal itself or on
-     * one of its milestones. Goes through the task visibility scope like any
-     * other task query.
+     * Every task on this proposal's plan: raised on the proposal itself. Goes
+     * through the task visibility scope like any other task query.
      *
      * @return Builder<Task>
      */
     public function planTasks(): Builder
     {
-        return Task::query()->where(fn (Builder $query) => $query
-            ->where(fn (Builder $query) => $query->where('source_type', 'proposal')->where('source_id', $this->id))
-            ->orWhere(fn (Builder $query) => $query->where('source_type', 'milestone')
-                ->whereIn('source_id', Milestone::query()->select('id')->where('proposal_id', $this->id))));
+        return Task::query()->where('source_type', 'proposal')->where('source_id', $this->id);
     }
 
     /**

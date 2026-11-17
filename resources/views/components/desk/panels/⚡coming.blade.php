@@ -125,7 +125,7 @@ new class extends Component {
     $shown = $this->filtered($events);
     $load = $shown->countBy(fn (array $event): string => $event['date']->toDateString());
     $peak = max(1, (int) $load->max());
-    $tones = ['milestone' => 'dk-k-ms', 'task' => 'dk-k-task', 'monthly-report' => 'dk-k-rep', 'report' => 'dk-k-rep', 'transfer' => 'dk-k-money', 'donor-report' => 'dk-k-donor'];
+    $tones = ['task' => 'dk-k-task', 'monthly-report' => 'dk-k-rep', 'report' => 'dk-k-rep', 'transfer' => 'dk-k-money', 'donor-report' => 'dk-k-donor'];
 @endphp
 
 <x-desk.panel :empty="$events->isEmpty()" :facets="$pg['facets']" id="coming" register="calendar.index" :size="$size" :cols="$gridCols" :height="$gridRows" :index="$index" :total="$total" :count="$events->count()">

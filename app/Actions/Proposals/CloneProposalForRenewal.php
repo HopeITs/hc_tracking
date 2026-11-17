@@ -10,7 +10,6 @@ use App\Models\HrCenter;
 use App\Models\HrCity;
 use App\Models\HrEmployee;
 use App\Models\Indicator;
-use App\Models\Milestone;
 use App\Models\Project;
 use App\Models\Proposal;
 use App\Models\Result;
@@ -32,8 +31,8 @@ use Illuminate\Validation\ValidationException;
  * donor, the notes, the linked projects with their beneficiaries, the
  * location rows that still stand in HR (W-34a slice 3), the planned
  * duration (as editable planned dates), the framework (through
- * CopyResultTree, the one tree-copy routine) and the plan (milestones and
- * department tasks with planned dates only). It never copies a status,
+ * CopyResultTree, the one tree-copy routine) and the plan (department
+ * tasks with planned dates only). It never copies a status,
  * actual dates, files, the agreement, reports, reviewers, deliveries or
  * targets. Last year's achievement is read beside a new target by
  * PlanIndicator::previousYearReference(), not copied.
@@ -43,7 +42,7 @@ use Illuminate\Validation\ValidationException;
  * whole clone runs in one transaction. A double click returns the draft the
  * same user just made.
  *
- * @phpstan-type CloneResult array{proposal: Proposal, skippedProjects: list<string>, replacedProjects: list<string>, skippedIndicators: list<string>, skippedParts: list<string>, copied: array{results: int, indicators: int, milestones: int, tasks: int}}
+ * @phpstan-type CloneResult array{proposal: Proposal, skippedProjects: list<string>, replacedProjects: list<string>, skippedIndicators: list<string>, skippedParts: list<string>, copied: array{results: int, indicators: int, tasks: int}}
  */
 final class CloneProposalForRenewal
 {
@@ -158,7 +157,7 @@ final class CloneProposalForRenewal
 
         $skippedParts = [];
         $skippedIndicators = [];
-        $plan = ['milestones' => 0, 'tasks' => 0];
+        $plan = ['tasks' => 0];
 
         if ($user->can('results.create')) {
             $skippedIndicators = $this->copyFramework($previous, $renewal);
@@ -166,10 +165,9 @@ final class CloneProposalForRenewal
             $skippedParts[] = 'framework';
         }
 
-        if (($user->can('milestones.create') && $user->can('tasks.create')) || $user->can('proposals.update')) {
+        if ($user->can('tasks.create') || $user->can('proposals.update')) {
             $deltaDays = (int) $previous->planned_date_begin->diffInDays($begin, false);
             $plan = [
-                'milestones' => $this->copyMilestones($previous, $renewal, $projects['map'], $deltaDays),
                 'tasks' => $this->copyTasks($previous, $renewal, $user, $deltaDays),
             ];
         } else {
@@ -352,47 +350,6 @@ final class CloneProposalForRenewal
         return array_values($inactive->map(fn (Indicator $indicator): string => (string) $indicator->name)->all());
     }
 
-    /**
-     * @param  array<int, int>  $projectMap  previous project id => renewal project id
-     */
-    private function copyMilestones(Proposal $previous, Proposal $renewal, array $projectMap, int $deltaDays): int
-    {
-        $pending = Milestone::query()->where('proposal_id', $previous->id)->orderBy('id')->get()
-            ->filter(fn (Milestone $milestone): bool => isset($projectMap[$milestone->project_id]));
-
-        $created = [];
-
-        while ($pending->isNotEmpty()) {
-            $ready = $pending->filter(fn (Milestone $milestone): bool => $milestone->parent_milestone_id === null || isset($created[$milestone->parent_milestone_id]));
-
-            if ($ready->isEmpty()) {
-                break;
-            }
-
-            foreach ($ready as $milestone) {
-                $copy = Milestone::query()->create([
-                    'project_id' => $projectMap[$milestone->project_id],
-                    'name' => $milestone->name,
-                    'description' => $milestone->description,
-                    'planned_start_date' => $milestone->planned_start_date->addDays($deltaDays)->toDateString(),
-                    'planned_end_date' => $milestone->planned_end_date?->addDays($deltaDays)->toDateString(),
-                    'sequence' => $milestone->sequence,
-                    'weight_percentage' => $milestone->weight_percentage,
-                    'responsible_user_id' => $milestone->responsible_user_id,
-                    'parent_milestone_id' => $milestone->parent_milestone_id === null ? null : $created[$milestone->parent_milestone_id],
-                    'proposal_id' => $renewal->id,
-                    'copied_from_id' => $milestone->id,
-                ]);
-
-                $created[$milestone->id] = $copy->id;
-            }
-
-            $pending = $pending->reject(fn (Milestone $milestone): bool => isset($created[$milestone->id]));
-        }
-
-        return count($created);
-    }
-
     private function copyTasks(Proposal $previous, Proposal $renewal, User $user, int $deltaDays): int
     {
         /** @var Collection<int, Task> $pending */
@@ -441,7 +398,7 @@ final class CloneProposalForRenewal
      * @param  list<string>  $replacedProjects
      * @param  list<string>  $skippedIndicators
      * @param  list<string>  $skippedParts
-     * @param  array{milestones: int, tasks: int}|null  $plan
+     * @param  array{tasks: int}|null  $plan
      * @return CloneResult
      */
     private function result(Proposal $proposal, array $skippedProjects = [], array $replacedProjects = [], array $skippedIndicators = [], array $skippedParts = [], ?array $plan = null): array
@@ -457,7 +414,6 @@ final class CloneProposalForRenewal
             'copied' => [
                 'results' => $resultIds->count(),
                 'indicators' => Indicator::query()->whereIn('result_id', $resultIds)->count(),
-                'milestones' => $plan['milestones'] ?? 0,
                 'tasks' => $plan['tasks'] ?? 0,
             ],
         ];

@@ -14,7 +14,7 @@ use Livewire\Attributes\Computed;
 /**
  * The money and schedule readings of the project directory: who may see
  * committed budgets, the funding totals, the per-card funding envelope, the
- * timeline window and weighted milestone progress.
+ * timeline window and delivery progress.
  *
  * Used by projects/index only. It needs applyFilters() from
  * FiltersProjectDirectory, and the page's `projects()` list.
@@ -52,16 +52,13 @@ trait SummarisesProjectFunding
     }
 
     /**
-     * Weighted milestone progress, or null when nothing carries a weight.
-     *
-     * Weights that add up to more than 100 are capped rather than rejected:
-     * the figure is a reading of the record, not a validation of it.
+     * The project's delivery progress, or null when nothing measures it.
+     * Projects carry no progress measure since milestones were removed, so
+     * every project reads as unmeasured.
      */
     protected function progressFor(Project $project): ?float
     {
-        $planned = (float) ($project->planned_weight ?? 0);
-
-        return $planned > 0 ? round(min(100, ((float) ($project->reached_weight ?? 0) / $planned) * 100), 1) : null;
+        return null;
     }
 
     /**

@@ -159,7 +159,7 @@
                                 <ul class="mt-1 list-disc space-y-0.5 ps-5 {{ $mutedText }}">
                                     <li>{{ __('proposals.renewal_copy_basics') }}</li>
                                     <li>{{ __('proposals.renewal_copy_framework') }} ({{ $renewal['results'] }})</li>
-                                    <li>{{ __('proposals.renewal_copy_plan') }} ({{ $renewal['milestones'] }} / {{ $renewal['tasks'] }})</li>
+                                    <li>{{ __('proposals.renewal_copy_plan') }} ({{ $renewal['tasks'] }})</li>
                                 </ul>
                             </div>
                             <div>

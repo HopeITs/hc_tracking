@@ -94,7 +94,6 @@ return [
     'late' => 'متأخرة',
     'left_of_the_promise' => 'المتبقي من الالتزام',
     'mark_submitted' => 'تسجيل كمُسلَّم',
-    'milestones_reached' => ':reached/:total مراحل',
     'month_inflow_label' => ':month: متوقع :total :currency. واصل :received، معلّق :pending، متأخر :late، فاشل :failed. إبراز دفعاته.',
     'most_urgent_first' => 'الأكثر إلحاحًا أولًا',
     'name_the_report' => 'أدخل اسم التقرير.',

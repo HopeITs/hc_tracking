@@ -11,13 +11,13 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Gate;
 
 /**
- * Raise a task straight against one record (a program, project, proposal or
- * milestone) and assign it, in one transaction.
+ * Raise a task straight against one record (a program, project or proposal)
+ * and assign it, in one transaction.
  */
 class CreateTask
 {
     /**
-     * @param  string  $sourceType  the morph map key: 'program', 'project', 'proposal' or 'milestone'
+     * @param  string  $sourceType  the morph map key: 'program', 'project' or 'proposal'
      * @param  array{newTaskTitle: string, newTaskDescription?: string|null, newTaskStatus: string, newTaskPriority: string, newTaskDueDate: string, newTaskAssignedTo: array<int, int|string>}  $validated  keyed by the add-task form's property names
      */
     public function handle(string $sourceType, int $sourceId, array $validated, int $createdBy): Task

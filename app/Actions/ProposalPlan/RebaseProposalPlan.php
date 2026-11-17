@@ -7,7 +7,6 @@ namespace App\Actions\ProposalPlan;
 use App\Enums\ProposalStatus;
 use App\Jobs\FanOutActivity;
 use App\Models\Activity;
-use App\Models\Milestone;
 use App\Models\Proposal;
 use App\Models\ProposalPlanShift;
 use App\Models\ProposalStatusNote;
@@ -27,9 +26,8 @@ use InvalidArgumentException;
  * Gate::authorize() here. Do not call it from a page.
  *
  * One transaction: the proposal row is locked and reloaded, and the
- * `proposal_plan_shifts` ledger is checked for the approval note. The planned
- * dates of the proposal's milestones and the start/due dates of its plan
- * tasks move by the delta (days from the plan's current start to the grant
+ * `proposal_plan_shifts` ledger is checked for the approval note. The
+ * start/due dates of the proposal's plan tasks move by the delta (days from the plan's current start to the grant
  * start); a moved date past the grant end is cut to it. Rows a user re-dated
  * (`planned_dates_edited_at`) are left alone, and dates are written through
  * the query builder, which fires no model events and so never stamps that
@@ -50,8 +48,7 @@ final class RebaseProposalPlan
     public const ActivityEvent = 'proposal.plan_rebased';
 
     /**
-     * `clipped` lists the cut milestone ids, then the cut task ids; the
-     * activity keeps the two apart.
+     * `clipped` lists the cut task ids.
      *
      * @return array{shifted: int, clipped: list<int>, skipped: bool}
      */
@@ -95,9 +92,8 @@ final class RebaseProposalPlan
         $alreadyShifted = (int) ProposalPlanShift::query()->where('proposal_id', $proposal->id)->sum('delta_days');
         $deltaDays = (int) $proposal->planned_date_begin->diffInDays($grantBegin) - $alreadyShifted;
 
-        $milestones = $this->milestoneMoves($proposal, $deltaDays, $grantEnd);
         $tasks = $this->taskMoves($proposal, $deltaDays, $grantEnd);
-        $shifted = count($milestones) + count($tasks);
+        $shifted = count($tasks);
 
         ProposalPlanShift::query()->create([
             'proposal_id' => $proposal->id,
@@ -106,63 +102,30 @@ final class RebaseProposalPlan
             'shifted' => $shifted,
         ]);
 
-        foreach ($milestones as $id => $move) {
-            Milestone::query()->whereKey($id)->update(['planned_start_date' => $move['start'], 'planned_end_date' => $move['end']]);
-        }
-
         foreach ($tasks as $id => $move) {
             Task::query()->withoutGlobalScope(TaskVisibilityScope::class)->whereKey($id)->update(['start_date' => $move['start'], 'due_date' => $move['end']]);
         }
 
-        $clippedMilestones = $this->clipped($milestones);
         $clippedTasks = $this->clipped($tasks);
 
         $this->recordSystemActivity($proposal, [
             'delta_days' => $deltaDays,
             'shifted' => $shifted,
-            'clipped_milestones' => $clippedMilestones,
             'clipped_tasks' => $clippedTasks,
             // The sentence's count (ActivityParameters passes `value` through).
-            'value' => (string) (count($clippedMilestones) + count($clippedTasks)),
+            'value' => (string) count($clippedTasks),
             'project_id' => $this->firstProjectId($proposal),
         ]);
 
         return [
             'shifted' => $shifted,
-            'clipped' => [...array_column($clippedMilestones, 'id'), ...array_column($clippedTasks, 'id')],
+            'clipped' => array_column($clippedTasks, 'id'),
             'skipped' => false,
         ];
     }
 
     /**
-     * The proposal's milestones whose planned dates the rebase changes.
-     *
-     * @return array<int, array{start: string|null, end: string|null, clipped: bool, label: string}> milestone id => move
-     */
-    private function milestoneMoves(Proposal $proposal, int $deltaDays, CarbonImmutable $grantEnd): array
-    {
-        $moves = [];
-
-        $milestones = Milestone::query()
-            ->where('proposal_id', $proposal->id)
-            ->whereNull('planned_dates_edited_at')
-            ->orderBy('id')
-            ->get(['id', 'name', 'planned_start_date', 'planned_end_date']);
-
-        foreach ($milestones as $milestone) {
-            $move = $this->move($milestone->planned_start_date, $milestone->planned_end_date, $deltaDays, $grantEnd);
-
-            if ($move !== null) {
-                $moves[$milestone->id] = [...$move, 'label' => $milestone->name];
-            }
-        }
-
-        return $moves;
-    }
-
-    /**
-     * The plan tasks (raised on the proposal or on one of its milestones)
-     * whose dates the rebase changes. Read past the task visibility scope: a
+     * The plan tasks (raised on the proposal) whose dates the rebase changes. Read past the task visibility scope: a
      * sync queue runs this while the approver is still signed in.
      *
      * @return array<int, array{start: string|null, end: string|null, clipped: bool, label: string}> task id => move

@@ -7,7 +7,6 @@ namespace App\Livewire\Concerns\Calendar;
 use App\Enums\ProposalStatus;
 use App\Models\Donor;
 use App\Models\DonorReport;
-use App\Models\Milestone;
 use App\Models\MonthlyReport;
 use App\Models\Project;
 use App\Models\Proposal;
@@ -49,7 +48,6 @@ trait FindsFocusedTypeDates
     protected function typeDayGroups(): array
     {
         return [
-            'milestone' => ['milestonesByDay'],
             'task' => ['tasksByDay'],
             'report' => ['reportsByDay'],
             'monthly_report' => ['monthlyReportsByDay'],
@@ -126,10 +124,6 @@ trait FindsFocusedTypeDates
         }
 
         return match ($type) {
-            'milestone' => $this->nearestOrLatestDate(
-                Milestone::query()->whereIn('responsible_user_id', $employeeIds),
-                'planned_start_date'
-            ),
             'task' => $this->nearestOrLatestDate(
                 Task::query()->whereHas('taskAssignees', fn (Builder $query) => $query->whereIn('employee_id', $employeeIds))->whereNotNull('due_date'),
                 'due_date'
@@ -325,8 +319,8 @@ trait FindsFocusedTypeDates
     /**
      * The related-dates list for the currently focused type: title, date,
      * an optional sub-label (which of a composite type's two sources this
-     * row came from) and how to open it — a modal action for milestones and
-     * tasks (they have no show page of their own), a link for everything
+     * row came from) and how to open it — a modal action for tasks
+     * (they have no show page of their own), a link for everything
      * else, matching the same click-through the grid chips use.
      *
      * Returns the base Support Collection, not the Eloquent one aliased as
@@ -352,17 +346,6 @@ trait FindsFocusedTypeDates
         }
 
         return match ($type) {
-            'milestone' => $this->upcomingOrRecent(
-                Milestone::query()->whereIn('responsible_user_id', $employeeIds)->with(['project:id,name', 'proposal:id,name']),
-                'planned_start_date'
-            )->map(fn (Milestone $milestone): array => [
-                'kind' => 'modal-milestone',
-                'id' => $milestone->id,
-                'url' => null,
-                'title' => $milestone->name,
-                'subLabel' => $milestone->ownerName(),
-                'date' => $milestone->planned_start_date,
-            ]),
             'task' => $this->upcomingOrRecent(
                 Task::query()->whereHas('taskAssignees', fn (Builder $query) => $query->whereIn('employee_id', $employeeIds))->whereNotNull('due_date'),
                 'due_date'

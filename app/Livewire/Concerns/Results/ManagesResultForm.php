@@ -139,7 +139,7 @@ trait ManagesResultForm
      * under an outcome, an outcome under an impact.
      *
      * Excludes the node and its descendants so ResultObserver's
-     * InvalidParentException stays a backstop. Unlike milestones there is no
+     * InvalidParentException stays a backstop. There is no
      * project constraint.
      *
      * @return Collection<int, Result>

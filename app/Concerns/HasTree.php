@@ -16,7 +16,7 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
  *
  * The using model declares the column with parentKeyName(). Traversal is plain
  * Eloquent rather than a recursive CTE: the trees here are shallow — three
- * levels for a logframe, two for milestones — so one query per level is
+ * levels for a logframe — so one query per level is
  * cheaper to own than driver-specific SQL.
  *
  * Integrity is enforced by an observer per model, not here; this trait only

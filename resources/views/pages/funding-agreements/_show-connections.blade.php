@@ -110,14 +110,6 @@
                                 <span class="shrink-0 text-[11px] {{ $mutedText }}">{{ $project->status->label() }}</span>
                             </div>
                             <p class="truncate text-xs {{ $mutedText }}">{{ collect([$project->program?->name, $project->city?->name ?? __('common.unknown_city')])->filter()->implode(' · ') }}</p>
-                            @if ($project->milestones_count > 0)
-                                <div class="mt-1.5 flex items-center gap-2">
-                                    <span class="flex h-1 flex-1 overflow-hidden rounded-full bg-secondary-soft dark:bg-surface-2" aria-hidden="true">
-                                        <span class="money-grow h-full rounded-full bg-secondary-dark dark:bg-ink-muted" style="width: {{ round($project->reached_milestones_count / $project->milestones_count * 100, 2) }}%"></span>
-                                    </span>
-                                    <span class="shrink-0 text-[11px] tabular-nums {{ $mutedText }}">{{ __('funding_agreements.milestones_reached', ['reached' => $project->reached_milestones_count, 'total' => $project->milestones_count]) }}</span>
-                                </div>
-                            @endif
                         </div>
                     @empty
                         <p class="mt-1.5 text-xs {{ $mutedText }}">{{ __('funding_agreements.no_projects_linked_yet') }}</p>

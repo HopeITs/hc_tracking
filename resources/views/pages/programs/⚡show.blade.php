@@ -11,7 +11,6 @@ use App\Livewire\Concerns\Programs\ManagesProgramTasks;
 use App\Livewire\Concerns\Programs\ReadsProgramDelivery;
 use App\Livewire\Concerns\Programs\TracksProgramHealth;
 use App\Livewire\Concerns\Results\FiltersResultsChain;
-use App\Models\Milestone;
 use App\Models\MonthlyReport;
 use App\Models\Program;
 use App\Models\Project;
@@ -19,7 +18,6 @@ use App\Models\Risk;
 use App\Models\Task;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Collection;
-use Illuminate\Database\Eloquent\Relations\MorphTo;
 use Livewire\Attributes\Computed;
 use Livewire\Attributes\Locked;
 use Livewire\Attributes\Layout;
@@ -149,8 +147,7 @@ new #[Layout('layouts::desk'), Title('titles.program')] class extends Component 
 
     /**
      * Tasks reachable from this program: raised straight against the
-     * program, against one of its projects, or against a milestone belonging
-     * to one of those projects.
+     * program or against one of its projects.
      *
      * @return Collection<int, Task>
      */
@@ -161,7 +158,6 @@ new #[Layout('layouts::desk'), Title('titles.program')] class extends Component 
             ->select(['id', 'parent_task_id', 'source_type', 'source_id', 'title', 'status', 'priority', 'due_date', 'created_by', 'kind', 'reportable_type', 'reportable_id'])
             ->with([
                 'taskAssignees.employee:id,first_name_en,last_name_en,first_name_ar,last_name_ar',
-                'source' => fn (MorphTo $morphTo) => $morphTo->morphWith([Milestone::class => ['project:id']]),
             ])
             ->orderByRaw('due_date is null, due_date')
             ->orderBy('id')
@@ -170,24 +166,18 @@ new #[Layout('layouts::desk'), Title('titles.program')] class extends Component 
 
     /**
      * The project a task lands on, for grouping on the Tasks tab: a
-     * project-sourced task names itself, a milestone-sourced task names its
-     * milestone's project. A program-direct task has no project and groups
-     * separately.
+     * project-sourced task names itself. A program-direct task has no project
+     * and groups separately.
      */
     protected function taskProjectId(Task $task): ?int
     {
-        return match ($task->source_type) {
-            'project' => $task->source_id,
-            'milestone' => $task->source?->project_id,
-            default => null,
-        };
+        return $task->source_type === 'project' ? $task->source_id : null;
     }
 
     /**
      * Raise a task straight against this program — the source is always this
-     * program, never one of its projects or milestones: a task tied to a
-     * project's or milestone's own delivery is added from that record's page
-     * instead.
+     * program, never one of its projects: a task tied to a project's own
+     * delivery is added from that project's page instead.
      *
      * @return array{type: string, id: int}
      */
@@ -241,7 +231,6 @@ new #[Layout('layouts::desk'), Title('titles.program')] class extends Component 
         $attention = $this->attention;
         $alarms = count(array_filter($attention, fn (array $item): bool => $item['tone'] === 'critical'));
         $warnings = count($attention) - $alarms;
-        $progress = $this->milestoneProgress;
         $funding = $this->programFunding;
         $openTaskCount = $this->tasks->where('status', '!=', \App\Enums\TaskStatus::Done)->count();
     @endphp
@@ -336,13 +325,6 @@ new #[Layout('layouts::desk'), Title('titles.program')] class extends Component 
 
     {{-- The stat cards: one card per figure, the number first; a card that leads somewhere is a button. --}}
     <div class="dk-prog-stats" role="group" aria-label="{{ __('programs.delivery_health') }}">
-        <div class="dk-prog-stat">
-            <span class="dk-prog-stat-k"><x-desk.icon name="flag" />{{ __('programs.milestone_progress') }}</span>
-            <span class="dk-prog-stat-n dk-num">{{ $progress['percentage'] === null ? '—' : number_format($progress['percentage'], 0).'%' }}</span>
-            <span class="dk-prog-bar" aria-hidden="true"><i style="width: {{ $progress['percentage'] ?? 0 }}%"></i></span>
-            <span class="dk-prog-stat-s">{{ $progress['percentage'] === null ? __('programs.no_weighted_milestones') : __('programs.weighted_progress_of_total', ['reached' => number_format($progress['reached'], 0), 'total' => number_format($progress['total'], 0)]) }}</span>
-        </div>
-
         <div class="dk-prog-stat">
             <span class="dk-prog-stat-k"><x-desk.icon name="folder" />{{ __('programs.figure_active_projects') }}</span>
             <span class="dk-prog-stat-n dk-num">{{ $figures['active'] }}</span>

@@ -13,7 +13,6 @@
             'status' => TaskStatus::tryFrom($key)?->label() ?? $key,
             'priority' => TaskPriority::tryFrom($key)?->label() ?? $key,
             'assignee' => $key === '' ? __('common.not_assigned') : $groupTasks->first()->taskAssignees->pluck('employee')->filter()->map->name->implode(', '),
-            'milestone' => $key === '' ? __('tasks.no_milestone') : $groupTasks->first()->sourceLabel(),
             default => '',
         };
     };
@@ -45,7 +44,6 @@
         'status' => $paginator->getCollection()->groupBy(fn ($task) => $task->status->value),
         'priority' => $paginator->getCollection()->groupBy(fn ($task) => $task->priority->value),
         'assignee' => $paginator->getCollection()->groupBy(fn ($task) => $task->taskAssignees->pluck('employee_id')->sort()->implode(',')),
-        'milestone' => $paginator->getCollection()->groupBy(fn ($task) => $task->source_type === 'milestone' ? (string) $task->source_id : ''),
         default => new Collection(['' => $paginator->getCollection()]),
     };
 @endphp

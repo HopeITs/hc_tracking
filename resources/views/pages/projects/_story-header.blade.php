@@ -1,6 +1,6 @@
 {{--
     The project page's head: back to Projects, the path, the name, one meta
-    line (owner, dates, status, proposal, donor), the health and progress with
+    line (owner, dates, status, proposal, donor), the health with
     the project's actions, four headline figures, and the next step as one
     banner across the page.
 --}}
@@ -12,7 +12,6 @@
     $project = $this->project;
     $beneficiaries = $project->targetDemographicTotal() ?? $project->target_beneficiaries;
     $money = $this->canViewMoney() ? $this->fundingByCurrency->first() : null;
-    $progress = $this->milestoneProgressPercent;
     $isArchived = $project->status === \App\Enums\ProjectStatus::Archived;
     $isClosed = $project->status === \App\Enums\ProjectStatus::Closed;
     $canEditProject = ! $isArchived && (auth()->user()?->can('update', $project) ?? false);
@@ -115,14 +114,12 @@
     </div>
 </header>
 
-{{-- Four figures that answer "how is it going": progress, people, money, reports. --}}
+{{-- Four figures that answer "how is it going": health, people, money, reports. --}}
 <dl class="dk-pjh-figs" data-test="story-facts">
     <div>
         <dt>{{ __('story.facts.health') }}</dt>
         <dd>
             <span class="dk-health dk-{{ $health }}" data-test="story-health">{{ __('desk.health.'.$health) }}</span>
-            <span class="dk-pjh-bar" role="img" aria-label="{{ $progress === null ? __('projects.no_weighted_milestones') : __('projects.milestones_reached', ['reached' => $project->reached_milestones_count, 'total' => $project->milestones_count]) }}"><i style="width: {{ $progress ?? 0 }}%"></i></span>
-            <strong class="dk-num">{{ $progress === null ? '—' : round($progress).'%' }}</strong>
         </dd>
     </div>
     <div>

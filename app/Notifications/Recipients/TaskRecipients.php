@@ -6,7 +6,6 @@ namespace App\Notifications\Recipients;
 
 use App\Models\Activity;
 use App\Models\HrDepartment;
-use App\Models\Milestone;
 use App\Models\Proposal;
 use App\Models\Task;
 use App\Models\TaskAssignee;
@@ -70,11 +69,7 @@ final class TaskRecipients extends ModuleRecipients
             return EmployeeProfile::employeeIdsInDepartment((int) $task->department_id);
         }
 
-        $proposalId = match ($task->source_type) {
-            'proposal' => (int) $task->source_id,
-            'milestone' => (int) Milestone::query()->whereKey($task->source_id)->value('proposal_id'),
-            default => 0,
-        };
+        $proposalId = $task->source_type === 'proposal' ? (int) $task->source_id : 0;
 
         return Proposal::ownerEmployeeIdsFor($proposalId === 0 ? [] : [$proposalId])[$proposalId] ?? [];
     }

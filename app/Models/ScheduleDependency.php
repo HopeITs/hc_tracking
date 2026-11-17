@@ -13,7 +13,7 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 /**
- * A link between two schedule items (milestones or tasks) of one project.
+ * A link between two schedule items (tasks) of one project.
  *
  * @property int $id
  * @property int $project_id
@@ -59,7 +59,7 @@ class ScheduleDependency extends Model
     }
 
     /**
-     * The successor's chart row id, e.g. "milestone-4".
+     * The successor's chart row id, e.g. "task-4".
      */
     public function successorRowId(): string
     {

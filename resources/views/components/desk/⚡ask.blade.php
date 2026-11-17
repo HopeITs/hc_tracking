@@ -8,7 +8,6 @@ use App\Models\AnnualPlan;
 use App\Models\Donor;
 use App\Models\HrProgram;
 use App\Models\Indicator;
-use App\Models\Milestone;
 use App\Models\Program;
 use App\Models\Project;
 use App\Models\Proposal;
@@ -61,7 +60,7 @@ new class extends Component {
      *
      * @var array<string, string>
      */
-    private const KeyPrefixes = ['tasks' => 'task-', 'milestones' => 'milestone-', 'transfers' => 'transfer-', 'risks' => 'risk-', 'reports' => 'report-', 'proposals' => 'review-'];
+    private const KeyPrefixes = ['tasks' => 'task-', 'transfers' => 'transfer-', 'risks' => 'risk-', 'reports' => 'report-', 'proposals' => 'review-'];
 
     public string $query = '';
 
@@ -287,7 +286,6 @@ new class extends Component {
             'donors' => Donor::query(),
             'tasks' => Task::query()->whereNull('parent_task_id')->where('status', '!=', TaskStatus::Done)
                 ->when($mine, fn (Builder $query) => $query->whereHas('taskAssignees', fn (Builder $assignee) => $assignee->where('employee_id', auth()->user()->employee_id ?? 0))),
-            'milestones' => Milestone::query(),
             'risks' => Risk::query(),
             'transfers' => TransfersTracking::query(),
             'indicators' => Indicator::query(),
@@ -312,7 +310,6 @@ new class extends Component {
             'proposals' => [Proposal::query(), 'name', 'file', __('common.proposals'), fn (Proposal $proposal): array => ['label' => $proposal->name, 'sub' => $proposal->status->label(), 'href' => route('proposals.show', $proposal)]],
             'donors' => [Donor::query(), 'name', 'users', __('common.donors'), fn (Donor $donor): array => ['label' => $donor->name, 'sub' => __('common.donors'), 'href' => route('donors.show', $donor)]],
             'tasks' => [Task::query()->whereNull('parent_task_id'), 'title', 'check', __('common.tasks'), fn (Task $task): array => ['label' => $task->title, 'sub' => $task->status->label(), 'href' => route('tasks.show', $task)]],
-            'milestones' => [Milestone::query(), 'name', 'flag', __('common.milestones'), fn (Milestone $milestone): array => ['label' => $milestone->name, 'sub' => __('common.milestones'), 'href' => route('milestones.show', $milestone)]],
             'risks' => [Risk::query(), 'name', 'info', __('common.risks'), fn (Risk $risk): array => ['label' => $risk->name, 'sub' => __('common.risks'), 'href' => route('risks.index')]],
         ];
 

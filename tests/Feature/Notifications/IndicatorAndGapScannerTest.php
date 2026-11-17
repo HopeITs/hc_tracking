@@ -68,9 +68,9 @@ test('data gaps fire at most once a week', function () {
     $sameWeek = $scanner->scan(CarbonImmutable::parse('2026-09-23 06:00'));
     $nextWeek = $scanner->scan(CarbonImmutable::parse('2026-09-28 06:00'));
 
-    expect($first)->toBe(3) // no milestones, no indicators, past end date
+    expect($first)->toBe(2) // no indicators, past end date
         ->and($sameWeek)->toBe(0)
-        ->and($nextWeek)->toBe(3)
+        ->and($nextWeek)->toBe(2)
         ->and(UserNotification::query()->forUser($owner)->pluck('priority')->unique()->map->value->all())->toBe(['info']);
 });
 

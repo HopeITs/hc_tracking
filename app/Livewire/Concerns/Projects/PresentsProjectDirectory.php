@@ -58,7 +58,6 @@ trait PresentsProjectDirectory
 
         /* An empty relation says nothing worth a chip; a materialised risk always does. */
         return array_values(array_filter([
-            ['icon' => 'flag', 'count' => $project->milestones_count, 'label' => trans_choice('common.count_milestone', $project->milestones_count, ['count' => $project->milestones_count]), 'alert' => false],
             ['icon' => 'chart-bar', 'count' => $project->plan_indicators_count, 'label' => trans_choice('common.count_target', $project->plan_indicators_count, ['count' => $project->plan_indicators_count]), 'alert' => false],
             ['icon' => 'presentation-chart-line', 'count' => $project->indicators_count, 'label' => trans_choice('projects.count_indicator', $project->indicators_count, ['count' => $project->indicators_count]), 'alert' => false],
             ['icon' => 'document-text', 'count' => $project->proposals_count, 'label' => trans_choice('projects.count_proposal', $project->proposals_count, ['count' => $project->proposals_count]), 'alert' => false],

@@ -30,9 +30,7 @@ trait FiltersCalendarTypes
      *
      * @var array<int, string>
      */
-    protected const array CALENDAR_TYPES = ['milestone', 'task', 'report', 'monthly_report', 'proposal', 'transfer', 'donor', 'project'];
-
-    public bool $showMilestones = true;
+    protected const array CALENDAR_TYPES = ['task', 'report', 'monthly_report', 'proposal', 'transfer', 'donor', 'project'];
 
     public bool $showTasks = true;
 
@@ -157,7 +155,7 @@ trait FiltersCalendarTypes
             'transfer' => $this->canViewTransfers(),
             'donor' => $this->canViewDonors() || $this->canViewAgreements(),
             'monthly_report' => auth()->user()?->can('viewAny', MonthlyReport::class) ?? false,
-            'milestone', 'task', 'report', 'project' => true,
+            'task', 'report', 'project' => true,
             default => false,
         };
     }
@@ -174,7 +172,6 @@ trait FiltersCalendarTypes
     protected function typeProperty(string $type): string
     {
         return match ($type) {
-            'milestone' => 'showMilestones',
             'task' => 'showTasks',
             'report' => 'showReports',
             'monthly_report' => 'showMonthlyReports',
@@ -186,8 +183,8 @@ trait FiltersCalendarTypes
     }
 
     /**
-     * The single type key ('milestone', 'task', …) when exactly one of the
-     * eight show* toggles is on, otherwise null. Drives the "focused" banner,
+     * The single type key ('task', 'report', …) when exactly one of the
+     * seven show* toggles is on, otherwise null. Drives the "focused" banner,
      * grid highlighting and related-dates panel — all three stay off while
      * more than one type (or none) is visible, since "filtered to one thing"
      * only means something when it is actually just one thing.

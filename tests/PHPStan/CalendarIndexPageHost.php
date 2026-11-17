@@ -7,7 +7,6 @@ namespace Tests\PHPStan;
 use App\Livewire\Concerns\Calendar\BuildsCalendarGrid;
 use App\Livewire\Concerns\Calendar\FiltersCalendarTypes;
 use App\Livewire\Concerns\Calendar\FindsFocusedTypeDates;
-use App\Livewire\Concerns\Calendar\ManagesCalendarMilestones;
 use App\Livewire\Concerns\Calendar\ManagesCalendarTasks;
 use App\Livewire\Concerns\Calendar\PresentsCalendarItems;
 use App\Livewire\Concerns\Calendar\ScopesCalendarPeople;
@@ -30,7 +29,6 @@ abstract class CalendarIndexPageHost extends Component
     use ChecksFinanceVisibility;
     use FiltersCalendarTypes;
     use FindsFocusedTypeDates;
-    use ManagesCalendarMilestones;
     use ManagesCalendarTasks;
     use NavigatesCalendarPeriods;
     use PresentsCalendarItems;

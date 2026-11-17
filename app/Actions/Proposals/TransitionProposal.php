@@ -5,14 +5,12 @@ declare(strict_types=1);
 namespace App\Actions\Proposals;
 
 use App\Enums\MediaCollection;
-use App\Enums\MilestoneStatus;
 use App\Enums\ProjectStatus;
 use App\Enums\ProposalStatus;
 use App\Enums\ReviewStage;
 use App\Enums\StatusNoteKind;
 use App\Events\ProposalStatusChanged;
 use App\Models\Donor;
-use App\Models\Milestone;
 use App\Models\Proposal;
 use App\Models\ProposalStatusNote;
 use App\Support\ProposalLocationRows;
@@ -193,20 +191,13 @@ final class TransitionProposal
     }
 
     /**
-     * D-02c: the final-report milestone is reached, the final report file is
-     * filed, and (unless the proposal is self-funded) the donor's acceptance
-     * is recorded. The acceptance email is optional. A payroll proposal has
-     * no milestone (W-32): the file and the acceptance close it.
+     * D-02c: the final report file is filed and (unless the proposal is
+     * self-funded) the donor's acceptance is recorded. The acceptance email
+     * is optional.
      */
     private function hasFinalReport(Proposal $proposal): bool
     {
-        $milestoneReached = $proposal->isPayroll() || Milestone::query()
-            ->where('proposal_id', $proposal->id)
-            ->where('is_final_report', true)
-            ->where('status', MilestoneStatus::Reached)
-            ->exists();
-
-        if (! $milestoneReached || ! $proposal->media()->where('collection', MediaCollection::FinalReport)->exists()) {
+        if (! $proposal->media()->where('collection', MediaCollection::FinalReport)->exists()) {
             return false;
         }
 

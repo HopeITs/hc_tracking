@@ -64,7 +64,7 @@
                         <span @class(['inline-flex items-center gap-1', 'text-status-warn' => $summary['unmeasured'] > 0, 'text-status-good' => $summary['unmeasured'] === 0])>
                             <flux:icon :name="$summary['unmeasured'] > 0 ? 'exclamation-triangle' : 'check-circle'" variant="micro" class="size-3.5" aria-hidden="true" />{{ trans_choice('programs.logframe_count_unmeasured', $summary['unmeasured'], ['count' => $summary['unmeasured']]) }}
                         </span>
-                        @foreach (['no_target' => 'results_framework.chain_gap_count_no_target', 'no_milestone' => 'results_framework.chain_gap_count_no_milestone', 'unlinked_milestone' => 'results_framework.chain_gap_count_unlinked_milestone'] as $gap => $countKey)
+                        @foreach (['no_target' => 'results_framework.chain_gap_count_no_target'] as $gap => $countKey)
                             @isset($gapCounts[$gap])
                                 <span class="inline-flex items-center gap-1 text-status-warn" data-chain-gap-count="{{ $gap }}">
                                     <flux:icon.exclamation-triangle variant="micro" class="size-3.5" aria-hidden="true" />{{ trans_choice($countKey, $gapCounts[$gap], ['count' => $gapCounts[$gap]]) }}
@@ -142,27 +142,6 @@
                         @foreach ($chain['crossCutting'] as $node)
                             <li wire:key="chain-cross-cutting-{{ $node['result']->id }}">
                                 <x-ui.logframe-node :node="$node" :depth="0" />
-                            </li>
-                        @endforeach
-                    </ul>
-                </section>
-            @endif
-
-            @if ($chain['unlinkedMilestones'] !== [])
-                <section class="space-y-3" aria-labelledby="{{ $headingId }}-unlinked" data-chain-unlinked>
-                    <div>
-                        <h3 id="{{ $headingId }}-unlinked" class="type-label text-secondary-medium dark:text-ink-muted">{{ __('results_framework.chain_unlinked_milestones') }}</h3>
-                        <p class="type-meta text-secondary-medium dark:text-ink-muted">{{ __('results_framework.chain_unlinked_milestones_help') }}</p>
-                    </div>
-                    <ul class="divide-y divide-board-line overflow-hidden rounded-md border border-board-line bg-board dark:divide-line">
-                        @foreach ($chain['unlinkedMilestones'] as $milestone)
-                            <li class="flex flex-wrap items-center gap-x-3 gap-y-1.5 px-4 py-2.5" wire:key="chain-unlinked-{{ $milestone->id }}">
-                                <span class="min-w-0 flex-1 text-sm font-medium" dir="auto">{{ $milestone->name }}</span>
-                                @if ($milestone->project !== null)
-                                    <span class="type-meta text-secondary-medium dark:text-ink-muted" dir="auto">{{ $milestone->project->center()?->name ?? $milestone->project->name }}</span>
-                                @endif
-                                <x-ui.enum-badge :case="$milestone->status" />
-                                <x-ui.logframe-gap gap="unlinked_milestone" />
                             </li>
                         @endforeach
                     </ul>

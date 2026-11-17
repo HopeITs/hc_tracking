@@ -11,7 +11,6 @@ use App\Enums\Gender;
 use App\Enums\IndicatorCollector;
 use App\Enums\IndicatorMeasure;
 use App\Enums\MediaCollection;
-use App\Enums\MilestoneStatus;
 use App\Enums\MonthlyReportStatus;
 use App\Enums\Period;
 use App\Enums\ProjectStatus;
@@ -29,7 +28,6 @@ use App\Models\DonorReport;
 use App\Models\Indicator;
 use App\Models\LibraryIndicator;
 use App\Models\Media;
-use App\Models\Milestone;
 use App\Models\MonthlyReport;
 use App\Models\MonthlyReportActivityEntry;
 use App\Models\MonthlyReportFile;
@@ -63,16 +61,6 @@ use Illuminate\Support\Facades\DB;
 function enumColumns(): array
 {
     return [
-        'milestones.status' => [[
-            'model' => Milestone::class,
-            'table' => 'milestones',
-            'column' => 'status',
-            'width' => 50,
-            'assign' => MilestoneStatus::Cancelled,
-            'stored' => 'cancelled',
-            'default' => MilestoneStatus::Planned,
-            'badCasing' => 'Planned',
-        ]],
         'tasks.status' => [[
             'model' => Task::class,
             'table' => 'tasks',

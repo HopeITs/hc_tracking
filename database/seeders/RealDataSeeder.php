@@ -18,8 +18,8 @@ use Illuminate\Database\Seeder;
  * an existing user as the tasks' creator.
  *
  * Donors and projects come before the proposals that fund them, projects
- * before their milestones, risks and results, proposals before the results
- * that target them, and milestones before their tasks. Each seeder is a no-op
+ * before their risks, results and tasks, and proposals before the results
+ * that target them. Each seeder is a no-op
  * for rows it already inserted, so re-running is safe. Runs with activity
  * recording off, same as DatabaseSeeder — see .ai/rules/database-seeders.md.
  */
@@ -35,7 +35,6 @@ class RealDataSeeder extends Seeder
                 RealAccountsSeeder::class,
                 RealDonorsSeeder::class,
                 RealProjectsSeeder::class,
-                RealMilestonesSeeder::class,
                 RealProposalsSeeder::class,
                 RealResultsSeeder::class,
                 RealRisksSeeder::class,

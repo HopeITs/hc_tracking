@@ -10,9 +10,6 @@
                         <div class="flex items-start gap-2 rounded-xl border border-secondary-soft bg-white p-2.5 shadow-hairline dark:border-line dark:bg-surface-1" wire:key="calendar-focused-item-{{ $item['kind'] }}-{{ $item['id'] }}-{{ $item['date']->toDateString() }}">
                             <span class="mt-0.5 flex size-6 shrink-0 items-center justify-center rounded-full bg-secondary-soft dark:bg-surface-2">
                                 @switch($focusedType)
-                                    @case('milestone')
-                                        <flux:icon.flag variant="micro" class="size-3.5 {{ $typeTextClasses[$focusedType] }}" />
-                                        @break
                                     @case('task')
                                         <flux:icon.clipboard-document-check variant="micro" class="size-3.5 {{ $typeTextClasses[$focusedType] }}" />
                                         @break
@@ -37,11 +34,7 @@
                                 @endswitch
                             </span>
                             <div class="min-w-0 flex-1">
-                                @if ($item['kind'] === 'modal-milestone')
-                                    <button type="button" wire:click="openEditModal({{ $item['id'] }})" class="block w-full min-w-0 truncate text-start text-xs font-semibold hover:text-primary hover:underline dark:hover:text-status-critical" data-test="calendar-focused-item-{{ $item['id'] }}">
-                                        {{ $item['title'] }}
-                                    </button>
-                                @elseif ($item['kind'] === 'modal-task')
+                                @if ($item['kind'] === 'modal-task')
                                     <button type="button" wire:click="openEditTaskModal({{ $item['id'] }})" class="block w-full min-w-0 truncate text-start text-xs font-semibold hover:text-primary hover:underline dark:hover:text-status-critical" data-test="calendar-focused-item-{{ $item['id'] }}">
                                         {{ $item['title'] }}
                                     </button>

@@ -2,7 +2,6 @@
 
 use App\Models\AnnualPlan;
 use App\Models\HrEmployee;
-use App\Models\Milestone;
 use App\Models\Program;
 use App\Models\Project;
 use App\Models\Report;
@@ -43,16 +42,13 @@ test('an hr employee has the programs and annual plans they manage', function ()
         ->and($employee->managedAnnualPlans)->toHaveCount(1);
 });
 
-test('an hr employee has the projects and milestones they are responsible for', function () {
+test('an hr employee has the projects they are responsible for', function () {
     $employee = HrEmployee::find(insertHrEmployee());
 
     Project::factory(2)->create(['user_id' => $employee->id]);
     Project::factory()->create();
-    Milestone::factory()->create(['responsible_user_id' => $employee->id]);
-    Milestone::factory()->create();
 
-    expect($employee->projects)->toHaveCount(2)
-        ->and($employee->responsibleMilestones)->toHaveCount(1);
+    expect($employee->projects)->toHaveCount(2);
 });
 
 test('tasks are assigned to hr employees but raised by users', function () {

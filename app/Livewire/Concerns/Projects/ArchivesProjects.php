@@ -59,7 +59,7 @@ trait ArchivesProjects
 
         $project = Project::query()
             ->select(['id', 'name', 'status'])
-            ->withCount(['milestones', 'risks', 'proposals'])
+            ->withCount(['risks', 'proposals'])
             ->find($this->archivingProjectId);
 
         if ($project === null) {
@@ -69,7 +69,6 @@ trait ArchivesProjects
         return [
             'project' => $project,
             'carries' => array_filter([
-                __('common.milestones') => $project->milestones_count,
                 __('common.risks') => $project->risks_count,
                 __('common.proposals') => $project->proposals_count,
             ]),

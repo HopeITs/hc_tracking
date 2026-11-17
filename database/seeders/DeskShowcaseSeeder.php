@@ -5,7 +5,6 @@ namespace Database\Seeders;
 use App\Enums\ArStatus;
 use App\Enums\DeliveryState;
 use App\Enums\MealCoverageScope;
-use App\Enums\MilestoneStatus;
 use App\Enums\MonthlyReportStatus;
 use App\Enums\ReviewerSlot;
 use App\Enums\ReviewStage;
@@ -19,7 +18,6 @@ use App\Models\HrDepartment;
 use App\Models\Indicator;
 use App\Models\IndicatorProgress;
 use App\Models\MealCoverageAssignment;
-use App\Models\Milestone;
 use App\Models\MonthlyReport;
 use App\Models\Program;
 use App\Models\Project;
@@ -40,7 +38,7 @@ use Illuminate\Support\Collection;
 /**
  * Fills the parts of the Desk the demo data leaves empty, so every page and
  * panel has something to show: reviews waiting on each administrator, tasks
- * of theirs due today / this week / late, milestones due this week, monthly
+ * of theirs due today / this week / late, monthly
  * reports waiting for validation, report templates, strategic pillars,
  * supervisions and agreement installments. It reuses existing projects,
  * proposals and HR employees (never creates HR people) and is safe to run
@@ -109,15 +107,6 @@ class DeskShowcaseSeeder extends Seeder
                 foreach (array_slice($employees, 0, 5) as $supervisee) {
                     Supervision::query()->firstOrCreate(['supervisor_employee_id' => $employeeId, 'supervisee_employee_id' => $supervisee]);
                 }
-            }
-
-            // Open milestones (the demo data has none): late, due this week, later.
-            foreach ($projects->take(6) as $i => $project) {
-                Milestone::query()->where('project_id', $project->id)->orderBy('id')->limit(1)
-                    ->update([
-                        'planned_end_date' => $today->addDays([-5, 1, 3, 6, 15, 30][$i])->toDateString(),
-                        'status' => $i % 2 === 0 ? MilestoneStatus::Ongoing : MilestoneStatus::Planned,
-                    ]);
             }
 
             // Monthly reports waiting for validation, by people other than the administrators.
@@ -231,7 +220,6 @@ class DeskShowcaseSeeder extends Seeder
                 }
 
                 $project = $owned->values()->get($i % max(1, $owned->count())) ?? $projects->first();
-                $milestone = Milestone::query()->where('project_id', $project->id)->value('id');
                 $department = $kind === null ? null : HrDepartment::query()->where('name', $kind === TaskKind::Financial ? 'Finance' : 'Communication')->value('id');
 
                 $task = Task::query()->create([
@@ -239,8 +227,8 @@ class DeskShowcaseSeeder extends Seeder
                     'description' => 'Seeded so Needs you, Waiting on others and Department deliverables have rows.',
                     'status' => $status,
                     'due_date' => $today->addDays($offset)->toDateString(),
-                    'source_type' => $milestone === null || $kind === null ? 'project' : 'milestone',
-                    'source_id' => $milestone === null || $kind === null ? $project->id : $milestone,
+                    'source_type' => 'project',
+                    'source_id' => $project->id,
                     'kind' => $kind ?? TaskKind::General,
                     'department_id' => $department,
                     'delivery_state' => $state,

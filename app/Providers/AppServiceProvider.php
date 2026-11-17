@@ -14,7 +14,6 @@ use App\Models\HrDepartment;
 use App\Models\Indicator;
 use App\Models\LibraryIndicator;
 use App\Models\MealCoverageAssignment;
-use App\Models\Milestone;
 use App\Models\MonthlyReport;
 use App\Models\PlanIndicator;
 use App\Models\Program;
@@ -303,8 +302,8 @@ class AppServiceProvider extends ServiceProvider
      * enforceMorphMap() is global: any model on either side of ANY morph must
      * appear here or getMorphClass() throws ClassMorphViolationException.
      * `annual_plan` and `proposal` are the sources a target can be committed
-     * in; `project` and `milestone` are also owners a file can be attached to;
-     * `milestone`, `proposal`, `project`, `program` and `department` are the
+     * in; `project` is also an owner a file can be attached to;
+     * `proposal`, `project`, `program` and `department` are the
      * sources a task can be raised against; `user` is the model side of
      * spatie/laravel-permission's `model_has_roles`/`model_has_permissions`
      * polymorphic pivots and the notifiable side of the inbox; `role` is the
@@ -320,7 +319,6 @@ class AppServiceProvider extends ServiceProvider
             'proposal' => Proposal::class,
             'proposal_status_note' => ProposalStatusNote::class,
             'project' => Project::class,
-            'milestone' => Milestone::class,
             'program' => Program::class,
             'department' => HrDepartment::class,
             'user' => User::class,

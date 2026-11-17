@@ -5,16 +5,16 @@ declare(strict_types=1);
 namespace App\Enums;
 
 /**
- * Who may add or edit a proposal's milestones and department tasks, by the
+ * Who may add or edit a proposal's department tasks, by the
  * proposal's status (T31). The one definition every plan action, policy and
  * page reads:
  *
  * - Planning (concept note … proposal review): plan rights, i.e.
- *   proposals.update, or milestones.create / tasks.create with sight of the
+ *   proposals.update, or tasks.create with sight of the
  *   proposal.
  * - Locked (submitted, on hold): the plan waits for the donor's answer.
  * - Execution (approved, active): normal execution rights,
- *   milestones.create/update and tasks.create/update.
+ *   tasks.create/update.
  * - Closed (rejected, completed, the deprecated final reports): read-only.
  */
 enum ProposalPlanWindow: string
@@ -49,8 +49,8 @@ enum ProposalPlanWindow: string
     public function denialMessage(): ?string
     {
         $message = match ($this) {
-            self::Locked => __('milestones.plan_window_locked'),
-            self::Closed => __('milestones.plan_window_closed'),
+            self::Locked => __('department_tasks.plan_window_locked'),
+            self::Closed => __('department_tasks.plan_window_closed'),
             self::Planning, self::Execution => null,
         };
 
@@ -58,7 +58,7 @@ enum ProposalPlanWindow: string
     }
 
     /**
-     * Whether milestones and tasks can be added or edited at all.
+     * Whether tasks can be added or edited at all.
      */
     public function isEditable(): bool
     {

@@ -2,7 +2,6 @@
 
 use App\Models\Activity;
 use App\Models\DonorProposal;
-use App\Models\Milestone;
 use App\Models\PlanIndicator;
 use App\Models\Project;
 use App\Models\Proposal;
@@ -36,8 +35,6 @@ test('the Al-Wadi showcase fills every section of the project and its proposal, 
     $this->seed(AlWadiShowcaseSeeder::class);
 
     $counts = fn (): array => [
-        'project milestones' => Milestone::query()->where('project_id', $project->id)->count(),
-        'proposal milestones' => Milestone::query()->where('proposal_id', $proposal->id)->count(),
         'framework' => Result::query()->where('proposal_id', $proposal->id)->count(),
         'targets' => PlanIndicator::query()->where('source_type', 'proposal')->where('source_id', $proposal->id)->count(),
         'reports' => Report::query()->whereIn('plan_indicator_id', PlanIndicator::query()->where('source_id', $proposal->id)->select('id'))->count(),
@@ -51,8 +48,6 @@ test('the Al-Wadi showcase fills every section of the project and its proposal, 
     ];
 
     expect($first = $counts())->toBe([
-        'project milestones' => 7,
-        'proposal milestones' => 4,
         'framework' => 8,
         'targets' => 9,
         'reports' => 18,
@@ -73,6 +68,5 @@ test('the Al-Wadi showcase fills every section of the project and its proposal, 
 test('the Al-Wadi showcase writes nothing when the project is missing', function () {
     $this->seed(AlWadiShowcaseSeeder::class);
 
-    expect(Milestone::query()->count())->toBe(0)
-        ->and(Result::query()->count())->toBe(0);
+    expect(Result::query()->count())->toBe(0);
 });

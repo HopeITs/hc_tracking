@@ -78,7 +78,6 @@
         'money' => ['currency-dollar', 'text-funding'],
         'calendar' => ['calendar-days', 'text-funding'],
         'project' => ['briefcase', 'text-secondary-dark dark:text-ink'],
-        'milestone' => ['flag', 'text-secondary-medium dark:text-ink-muted'],
         'task' => ['check-circle', 'text-secondary-light'],
         'activity' => ['squares-2x2', 'text-secondary-medium dark:text-ink-muted'],
         'proposal' => ['document-text', 'text-funding'],
@@ -132,7 +131,6 @@
         'kinds' => [
             'group' => __('gantt.kinds.group'),
             'proposal' => __('gantt.kinds.proposal'),
-            'milestone' => __('gantt.kinds.milestone'),
             'task' => __('gantt.kinds.task'),
             'activity' => __('gantt.kinds.activity'),
             'transfer' => __('gantt.kinds.transfer'),
@@ -295,7 +293,7 @@
                     ></button>
                 </template>
 
-                {{-- Milestones, transfers and reports as ticks --}}
+                {{-- Transfers and reports as ticks --}}
                 <template x-for="tick in horizon.ticks" :key="'tick-' + tick.id">
                     <span class="pointer-events-none absolute bottom-1 h-1.5 w-0.5 rounded-full" x-bind:class="tones.bar[tick.tone]" x-bind:style="`left:${tick.left}px`" aria-hidden="true"></span>
                 </template>
@@ -1129,7 +1127,7 @@
         <div class="ms-auto flex flex-wrap items-center gap-x-4 gap-y-1.5" aria-hidden="true">
             <span class="inline-flex items-center gap-1.5"><span class="relative h-2.5 w-6 overflow-hidden rounded-[3px] bg-secondary-soft/80 dark:bg-white/15"><span class="absolute inset-y-0 left-0 w-3 bg-secondary-medium dark:bg-ink-muted"></span></span>{{ __('gantt.legend.planned') }}</span>
             <span class="inline-flex items-center gap-1.5"><span class="h-1.5 w-6 rounded-sm bg-secondary-dark/80 dark:bg-white/80"></span>{{ __('gantt.legend.summary') }}</span>
-            <span class="inline-flex items-center gap-1.5"><span class="size-2.5 rotate-45 rounded-[2px] bg-secondary-medium"></span>{{ __('gantt.legend.milestone') }}</span>
+            <span class="inline-flex items-center gap-1.5"><span class="size-2.5 rotate-45 rounded-[2px] bg-secondary-medium"></span>{{ __('gantt.legend.deadline') }}</span>
             <span class="inline-flex items-center gap-1.5"><span class="h-2.5 w-4 rounded-[3px] bg-funding"></span>{{ __('gantt.legend.funding') }}</span>
             <span class="inline-flex items-center gap-1.5"><span class="h-2.5 w-4 rounded-[3px] ring-2 ring-status-critical"></span>{{ __('gantt.legend.critical') }}</span>
             <span class="inline-flex items-center gap-1.5"><span class="gantt-slip h-2 w-5 rounded-e-[3px]"></span>{{ __('gantt.legend.late') }}</span>

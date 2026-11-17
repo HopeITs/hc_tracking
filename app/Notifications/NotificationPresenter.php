@@ -88,7 +88,6 @@ final class NotificationPresenter
             'programs' => 'nav-layers',
             'annual-plans' => 'nav-calendar-range',
             'projects' => 'nav-folder-open',
-            'milestones' => 'nav-flag',
             'tasks' => 'nav-square-check-big',
             'risks' => 'nav-siren',
             'results' => 'nav-network',

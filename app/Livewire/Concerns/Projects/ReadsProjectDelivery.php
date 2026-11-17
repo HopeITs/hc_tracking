@@ -5,117 +5,66 @@ declare(strict_types=1);
 namespace App\Livewire\Concerns\Projects;
 
 use App\Enums\IndicatorMeasure;
+use App\Enums\TaskStatus;
 use App\Models\Indicator;
-use App\Models\Milestone;
 use App\Models\PlanIndicator;
 use App\Models\Project;
 use App\Models\Proposal;
 use App\Models\Result;
 use App\Models\Risk;
 use App\Models\Task;
-use Carbon\CarbonImmutable;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Support\Facades\DB;
 use Livewire\Attributes\Computed;
 
 /**
- * The delivery reads on projects/show: milestone progress and timeline, the
- * project's tasks, risks and indicator targets.
+ * The delivery reads on projects/show: the project's tasks, the next ones
+ * due, risks and indicator targets.
  *
  * Used by projects/show only. The page provides projectId and the #[Computed]
  * project().
  *
  * @property int $projectId
  * @property-read Project $project  #[Computed] project()
- * @property-read Collection<int, Milestone> $milestonesFlat  #[Computed] milestonesFlat()
+ * @property-read Collection<int, Task> $tasks  #[Computed] tasks()
  * @property-read Collection<int, PlanIndicator> $targets  #[Computed] targets()
  */
 trait ReadsProjectDelivery
 {
     /**
-     * Weighted milestone completion, the same formula used on the project
-     * directory and program detail pages: reached weight over every weight
-     * that still counts (cancelled milestones are excluded from both sides).
-     */
-    #[Computed]
-    public function milestoneProgressPercent(): ?float
-    {
-        $planned = (float) ($this->project->milestones_planned_weight ?? 0);
-
-        if ($planned <= 0) {
-            return null;
-        }
-
-        $reached = (float) ($this->project->milestones_reached_weight ?? 0);
-
-        return round(min(100, ($reached / $planned) * 100), 1);
-    }
-
-    /**
-     * Every milestone in the project, flattened and ordered by sequence, for
-     * the delivery timeline: the same reading as the program detail page's
-     * project timeline, one row per milestone instead of per project.
-     *
-     * @return Collection<int, Milestone>
-     */
-    #[Computed]
-    public function milestonesFlat(): Collection
-    {
-        return Milestone::query()
-            ->select(['id', 'project_id', 'name', 'planned_start_date', 'planned_end_date', 'actual_start_date', 'actual_end_date', 'status', 'sequence', 'weight_percentage', 'responsible_user_id'])
-            ->where('project_id', $this->projectId)
-            ->with('responsibleUser:id,first_name_en,last_name_en,first_name_ar,last_name_ar')
-            ->orderBy('sequence')
-            ->orderBy('id')
-            ->get();
-    }
-
-    /**
-     * The shared time axis for the milestone timeline: the project's own
-     * schedule, widened to fit every milestone's planned and actual date plus
-     * today, so nothing renders off-window.
-     *
-     * @return array{start: CarbonImmutable, end: CarbonImmutable}
-     */
-    #[Computed]
-    public function milestoneWindow(): array
-    {
-        $dates = collect([$this->project->start_date, $this->project->end_date])->filter();
-
-        foreach ($this->milestonesFlat as $milestone) {
-            $dates->push($milestone->planned_start_date);
-            $dates->push($milestone->planned_end_date);
-            $dates->push($milestone->actual_start_date);
-            $dates->push($milestone->actual_end_date);
-        }
-
-        $dates = $dates->filter()->push(CarbonImmutable::today());
-
-        return ['start' => $dates->min(), 'end' => $dates->max()];
-    }
-
-    /**
-     * Tasks raised straight against this project or against one of its
-     * milestones — a task has no project column, so a milestone-sourced task
-     * is reached through the milestone ids belonging to this project.
+     * Tasks raised straight against this project.
      *
      * @return Collection<int, Task>
      */
     #[Computed]
     public function tasks(): Collection
     {
-        $milestoneIds = Milestone::query()->where('project_id', $this->projectId)->pluck('id');
-
         return Task::query()
             ->select(['id', 'source_type', 'source_id', 'title', 'status', 'priority', 'due_date', 'progress_percentage'])
             ->with(['taskAssignees.employee:id,first_name_en,last_name_en,first_name_ar,last_name_ar', 'source'])
-            ->where(fn (Builder $query) => $query
-                ->where(fn (Builder $query) => $query->where('source_type', 'project')->where('source_id', $this->projectId))
-                ->orWhere(fn (Builder $query) => $query->where('source_type', 'milestone')->whereIn('source_id', $milestoneIds)))
+            ->where('source_type', 'project')
+            ->where('source_id', $this->projectId)
             ->orderByRaw('due_date is null, due_date')
             ->orderBy('id')
             ->get();
+    }
+
+    /**
+     * The next three open tasks with a due date, soonest first, for the
+     * Overview's Coming up card.
+     *
+     * @return \Illuminate\Support\Collection<int, Task>
+     */
+    #[Computed]
+    public function upcomingTasks(): \Illuminate\Support\Collection
+    {
+        return $this->tasks
+            ->toBase()
+            ->filter(fn (Task $task): bool => $task->due_date !== null && $task->status !== TaskStatus::Done)
+            ->sortBy(fn (Task $task): string => $task->due_date->toDateString())
+            ->take(3)
+            ->values();
     }
 
     /**

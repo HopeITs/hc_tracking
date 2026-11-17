@@ -29,7 +29,7 @@
                         x-ref="boardQuickAdd"
                         placeholder="{{ __('tasks.add_task') }}"
                         class="w-full min-w-0 border-0 bg-transparent p-0 text-sm text-secondary-dark placeholder:text-secondary-light focus:ring-0 focus:outline-none dark:text-ink"
-                        wire:keydown.enter="quickCreateTask($event.target.value, '{{ $case->value }}', null, {{ Js::from($boardRowKey) }}); $event.target.value = ''"
+                        wire:keydown.enter="quickCreateTask($event.target.value, '{{ $case->value }}', {{ Js::from($boardRowKey) }}); $event.target.value = ''"
                         data-test="task-board-quick-add-{{ $case->value }}"
                     />
                 </label>
@@ -79,7 +79,7 @@
                     <button type="button" x-data aria-haspopup="menu" x-on:click="$store.taskMenu.openFor('priority', {{ Js::from('taskDrafts.'.$boardRowKey.'.priority') }}, '{{ $boardDraftPriority->value }}', $el.getBoundingClientRect(), '$set', [{{ Js::from('taskDrafts.'.$boardRowKey.'.priority') }}])" aria-label="{{ __('tasks.priority') }}: {{ $boardDraftPriority->label() }}" class="inline-flex size-6 cursor-pointer items-center justify-center rounded hover:bg-secondary-soft dark:hover:bg-surface-2" data-test="task-board-add-priority-trigger-{{ $case->value }}">
                                 {{ FluxMarkup::icon('flag', $boardDraftPriority === TaskPriority::Low ? 'outline' : 'solid', 'size-3.5 '.$priorityIconClasses($boardDraftPriority)) }}
                             </button>
-                    @include('pages.tasks._quick-add-extras', ['defaultStatus' => $case->value, 'milestoneId' => null, 'rowKey' => $boardRowKey, 'testKey' => 'board-'.$case->value])
+                    @include('pages.tasks._quick-add-extras', ['defaultStatus' => $case->value, 'rowKey' => $boardRowKey, 'testKey' => 'board-'.$case->value])
                 </div>
             </div>
             @endcan
