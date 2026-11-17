@@ -81,6 +81,23 @@
                         @if (! $isRepeat && $proposal->isPayroll())
                             <x-ui.enum-badge :case="$proposal->kind" class="ms-1.5 align-middle" data-payroll-chip="{{ $proposal->id }}" />
                         @endif
+                        @if (! $isRepeat && $this->flag === 'no_center')
+                            {{-- The rows still without a center, and where to give them one: the editor opens for an approved proposal only. --}}
+                            <div class="mt-1.5 space-y-1 text-xs {{ $mutedText }}" data-test="missing-center-rows-{{ $proposal->id }}">
+                                <p class="font-semibold">{{ __('proposals.missing_center_rows') }}</p>
+                                <ul class="list-disc ps-4">
+                                    @foreach ($proposal->locations as $missingRow)
+                                        <li wire:key="missing-center-{{ $proposal->id }}-{{ $missingRow->id }}" dir="auto">{{ __('proposals.missing_center_row', ['city' => $missingRow->city?->name ?? '—', 'program' => $missingRow->program?->name ?? __('proposals.missing_center_no_program')]) }}</li>
+                                    @endforeach
+                                </ul>
+                                @if ($proposal->status->isApprovedByDonor())
+                                    <a href="{{ route('proposals.show', ['proposal' => $proposal, 'add-centers' => 1]) }}" wire:navigate class="inline-flex min-h-8 items-center gap-1 font-semibold underline underline-offset-2 hover:no-underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-secondary-medium" aria-label="{{ __('proposals.add_centers_link_name', ['name' => $proposal->name]) }}" data-test="add-centers-link-{{ $proposal->id }}">
+                                        <flux:icon.plus variant="micro" class="size-3.5" aria-hidden="true" />
+                                        {{ __('proposals.add_centers') }}
+                                    </a>
+                                @endif
+                            </div>
+                        @endif
                     </td>
                     <td data-label="{{ __('common.status') }}">
                         @unless ($isRepeat)
