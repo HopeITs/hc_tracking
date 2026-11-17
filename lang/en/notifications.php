@@ -665,6 +665,22 @@ return [
                 'title' => 'Beneficiaries changed',
                 'body' => ':actor changed the beneficiaries of “:subject”',
             ],
+            'change_requested' => [
+                'title' => 'Change request',
+                'body' => ':actor asked for a change to “:subject”',
+            ],
+            'change_reviewed' => [
+                'title' => 'Change request ready for your decision',
+                'body' => ':actor reviewed the change request on “:subject”',
+            ],
+            'change_approved' => [
+                'title' => 'Change request approved',
+                'body' => ':actor approved the change request on “:subject”',
+            ],
+            'change_rejected' => [
+                'title' => 'Change request rejected',
+                'body' => ':actor rejected the change request on “:subject”',
+            ],
             'project_linked' => [
                 'title' => 'Project linked',
                 'body' => ':actor linked a project to “:subject”',

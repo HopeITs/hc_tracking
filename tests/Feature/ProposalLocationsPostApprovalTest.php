@@ -6,6 +6,7 @@ use App\Models\Activity;
 use App\Models\Program;
 use App\Models\Project;
 use App\Models\Proposal;
+use App\Models\ProposalChangeRequest;
 use App\Models\ProposalLocation;
 use App\Models\User;
 use Database\Seeders\RolesAndPermissionsSeeder;
@@ -229,4 +230,44 @@ test('before approval the rows are still replaced as a set', function () {
 
     expect($proposal->locations()->count())->toBe(1)
         ->and($proposal->locations()->value('city_id'))->toBe($this->homs);
+});
+
+/*
+| Y-09 (D-89): after approval the center fill is the only direct edit; any
+| other difference needs an approved change request.
+*/
+
+test('a direct edit of any other field of an approved proposal needs a change request', function (string $field, mixed $value) {
+    $before = $this->proposal->fresh()->only(['name', 'planned_date_begin', 'planned_date_end', 'notes']);
+
+    try {
+        app(SaveProposal::class)->handle($this->proposal, [
+            'name' => $this->proposal->name,
+            'donorId' => $this->proposal->donor_id,
+            'plannedDateBegin' => $this->proposal->planned_date_begin->toDateString(),
+            'plannedDateEnd' => $this->proposal->planned_date_end->toDateString(),
+            'notes' => $this->proposal->notes,
+            $field => $value,
+        ], $this->user);
+
+        throw new RuntimeException('The save was not refused.');
+    } catch (ValidationException $exception) {
+        expect($exception->errors())->toHaveKey('changeRequest')
+            ->and($exception->errors()['changeRequest'][0])->toBe(__('proposals.change_request_required'));
+    }
+
+    expect($this->proposal->fresh()->only(['name', 'planned_date_begin', 'planned_date_end', 'notes']))->toEqual($before);
+})->with([
+    'name' => ['name', 'A different name'],
+    'planned end' => ['plannedDateEnd', '2030-12-31'],
+    'notes' => ['notes', 'A new note'],
+    'concept note' => ['conceptNote', 'A rewritten concept note'],
+]);
+
+test('the center fill still passes without a reason while a change request is pending', function () {
+    ProposalChangeRequest::factory()->withReviews()->create(['proposal_id' => $this->proposal->id, 'requested_by' => $this->user->id]);
+
+    saveApproved($this->proposal, storedAsSent($this->proposal, [0 => ['center_ids' => [$this->aleppoCenter]]]), $this->user);
+
+    expect($this->empty->fresh()->centerIds())->toBe([$this->aleppoCenter]);
 });

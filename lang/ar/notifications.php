@@ -665,6 +665,22 @@ return [
                 'title' => 'تغيير عدد المستفيدين',
                 'body' => 'غيّر :actor عدد المستفيدين في «:subject»',
             ],
+            'change_requested' => [
+                'title' => 'طلب تغيير',
+                'body' => 'طلب :actor تغييرًا على «:subject»',
+            ],
+            'change_reviewed' => [
+                'title' => 'طلب تغيير جاهز لقرارك',
+                'body' => 'راجع :actor طلب التغيير على «:subject»',
+            ],
+            'change_approved' => [
+                'title' => 'اعتُمد طلب التغيير',
+                'body' => 'اعتمد :actor طلب التغيير على «:subject»',
+            ],
+            'change_rejected' => [
+                'title' => 'رُفض طلب التغيير',
+                'body' => 'رفض :actor طلب التغيير على «:subject»',
+            ],
             'project_linked' => [
                 'title' => 'ربط مشروع',
                 'body' => 'ربط :actor مشروعًا بـ«:subject»',
