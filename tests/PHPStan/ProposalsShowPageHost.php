@@ -10,6 +10,7 @@ use App\Livewire\Concerns\ManagesAgreementForm;
 use App\Livewire\Concerns\ManagesTransferForm;
 use App\Livewire\Concerns\PreviewsFiles;
 use App\Livewire\Concerns\Proposals\ChartsProposalChronology;
+use App\Livewire\Concerns\Proposals\DecidesProposalChange;
 use App\Livewire\Concerns\Proposals\ManagesProposalApproval;
 use App\Livewire\Concerns\Proposals\ManagesProposalFiles;
 use App\Livewire\Concerns\Proposals\ManagesProposalForm;
@@ -20,6 +21,7 @@ use App\Livewire\Concerns\Proposals\ReadsProposalDelivery;
 use App\Livewire\Concerns\Proposals\ReadsProposalFunding;
 use App\Livewire\Concerns\Proposals\ReadsProposalHealth;
 use App\Livewire\Concerns\Proposals\ReadsProposalVitals;
+use App\Livewire\Concerns\Proposals\RequestsProposalChange;
 use App\Livewire\Concerns\SwitchesFundingView;
 use Livewire\Component;
 use Livewire\WithFileUploads;
@@ -37,6 +39,7 @@ abstract class ProposalsShowPageHost extends Component
     use AddsQuickTask;
     use ChartsProposalChronology;
     use ChecksFinanceVisibility;
+    use DecidesProposalChange;
     use ManagesAgreementForm;
     use ManagesProposalApproval;
     use ManagesProposalFiles;
@@ -50,6 +53,7 @@ abstract class ProposalsShowPageHost extends Component
     use ReadsProposalFunding;
     use ReadsProposalHealth;
     use ReadsProposalVitals;
+    use RequestsProposalChange;
     use SwitchesFundingView;
     use WithFileUploads;
 

@@ -13,6 +13,8 @@
 
     @include('pages.proposals._final-report-modal')
 
+    @include('pages.proposals._change-request-modal')
+
     {{-- W-06 (D-58): a hold keeps the status, so both dialogs state that in one
          sentence and neither offers a status picker. --}}
     <x-ui.confirm-modal

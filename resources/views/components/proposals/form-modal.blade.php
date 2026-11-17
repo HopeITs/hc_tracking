@@ -46,6 +46,10 @@
     'renewable' => [],
     'renewal' => null,
     'kind' => 'project',
+    /* Y-09: the form asks for a change to an approved proposal: a reason first, then a summary step. */
+    'changeRequest' => false,
+    /* The summary step's lines (App\Support\ProposalChangeLines), null while the form is shown. */
+    'changeSummary' => null,
 ])
 
 @php
@@ -62,6 +66,7 @@
      * a failure from the same map, so the two can never disagree.
      */
     $sectionFields = [
+        ...($changeRequest ? [__('proposals.change.reason_section') => ['changeReason']] : []),
         __('proposals.section_identity') => ['kind', 'previousProposalId', 'name', 'internalProjectNumber'],
         __('proposals.section_donor') => ['donorId'],
         ...($isPayroll
@@ -91,19 +96,43 @@
         $sectionFields,
         fn (array $fields): bool => collect($fields)->contains(fn (string $field): bool => $errors->has($field)),
     ));
+
+    /* What the submit button does: save, or (Y-09) check the change, or send it. */
+    $submitAction = match (true) {
+        ! $changeRequest => 'saveProposal',
+        $changeSummary === null => 'previewChangeRequest',
+        default => 'sendChangeRequest',
+    };
+
+    /* A change-request refusal that names no field (empty, already pending, stale) is shown at the top. */
+    $changeRefusal = $changeRequest ? ($errors->first('changeRequest') ?: $errors->first('status')) : '';
 @endphp
 
 <x-ui.modal
     wire:model="showProposalModal"
     size="xl"
-    :title="$editing ? __('proposals.edit_proposal') : __('proposals.add_proposal')"
-    :description="$editing ? __('proposals.status_moves_only_through_change_status') : ($isPayroll ? __('proposals.a_new_payroll_proposal_starts_as_a_draft') : __('proposals.a_new_proposal_starts_at_the_concept_note'))"
-    submit="saveProposal"
-    close="closeProposalModal"
-    required-note
+    :title="$changeRequest ? __('proposals.change.modal_title') : ($editing ? __('proposals.edit_proposal') : __('proposals.add_proposal'))"
+    :description="$changeRequest ? __('proposals.change.modal_description') : ($editing ? __('proposals.status_moves_only_through_change_status') : ($isPayroll ? __('proposals.a_new_payroll_proposal_starts_as_a_draft') : __('proposals.a_new_proposal_starts_at_the_concept_note')))"
+    :submit="$submitAction"
+    :close="$changeRequest ? 'closeChangeRequest' : 'closeProposalModal'"
+    :required-note="$changeSummary === null"
 >
-    @if ($open)
-        @if ($errors->any())
+    @if ($open && $changeRefusal !== '')
+        <p class="mb-4 flex items-start gap-2 rounded-lg border border-status-critical bg-status-critical-soft px-3 py-2 text-sm font-semibold text-status-critical" role="alert" data-test="change-request-refusal">
+            <flux:icon.exclamation-circle variant="micro" class="mt-0.5 size-4 shrink-0" aria-hidden="true" />
+            <span>{{ $changeRefusal }}</span>
+        </p>
+    @endif
+
+    @if ($open && $changeSummary !== null)
+        {{-- Y-09 summary step: exactly the list RequestProposalChange will store. --}}
+        <section aria-labelledby="change-summary-title" data-test="change-summary">
+            <h3 id="change-summary-title" class="text-base font-bold text-secondary-dark dark:text-ink">{{ __('proposals.change.summary_title') }}</h3>
+            <p class="mt-0.5 text-sm {{ $mutedText }}">{{ __('proposals.change.summary_help') }}</p>
+            <x-proposals.change-list :lines="$changeSummary" class="mt-3" />
+        </section>
+    @elseif ($open)
+        @if ($errors->any() && ! ($changeRefusal !== '' && $errors->count() === 1))
             <div class="mb-4 flex flex-wrap items-center gap-x-3 gap-y-2 rounded-lg border border-status-critical bg-status-critical-soft px-3 py-2 text-sm" role="alert" data-form-error-summary>
                 <flux:icon.exclamation-circle variant="micro" class="size-4 shrink-0 text-status-critical" aria-hidden="true" />
                 <div class="min-w-0 flex-1">
@@ -121,6 +150,13 @@
                     x-on:click="const field = $el.closest('form').querySelector('[aria-invalid=true]'); field?.scrollIntoView({ block: 'center' }); field?.focus({ preventScroll: true })"
                 >{{ __('proposals.go_to_the_first_problem') }}</button>
             </div>
+        @endif
+
+        {{-- 0 · Y-09: the reason a change request needs, before anything else. --}}
+        @if ($changeRequest)
+            <x-ui.form-section :title="__('proposals.change.reason_section')" :fields="$sectionFields[__('proposals.change.reason_section')]" data-test="change-reason-section">
+                <x-ui.form-textarea wire:model="changeReason" :label="__('proposals.change.reason_label')" :help="__('proposals.change.reason_help')" required rows="3" dir="auto" data-test="change-reason" />
+            </x-ui.form-section>
         @endif
 
         {{-- 1 · Identity: the renewal preset first, then the name and the number.
@@ -368,7 +404,7 @@
                     <p class="text-sm {{ $mutedText }}">{{ __('proposals.no_projects_linked') }}</p>
                 @endif
 
-                @if ($needsBeneficiariesReason)
+                @if ($needsBeneficiariesReason && ! $changeRequest)
                     <x-ui.form-textarea wire:model="beneficiariesReason" :label="__('proposals.beneficiaries_reason')" :help="__('proposals.beneficiaries_reason_help')" rows="2" dir="auto" />
                 @endif
             </div>
@@ -387,6 +423,7 @@
                     dir="auto"
                 />
 
+                @unless ($changeRequest)
                 <x-ui.form-file
                     wire:model="conceptNoteFile"
                     :label="__('proposals.concept_note.file_label')"
@@ -395,6 +432,7 @@
                     :types="Str::upper(implode(', ', FileType::values()))"
                     max-size="5 MB"
                 />
+                @endunless
             </div>
         </x-ui.form-section>
         @endunless
@@ -453,11 +491,18 @@
     @endif
 
     <x-slot:actions>
-        <x-ui.button type="submit" tone="primary" wire:loading.attr="disabled" wire:target="saveProposal" data-test="save-proposal-button">
-            <span wire:loading.remove wire:target="saveProposal">{{ $editing ? __('common.save_changes') : __('proposals.create_proposal') }}</span>
-            <span wire:loading wire:target="saveProposal" class="inline-flex items-center gap-1.5">
+        @if ($changeRequest && $changeSummary !== null)
+            <x-ui.button type="button" wire:click="backToChangeForm" wire:loading.attr="disabled" wire:target="sendChangeRequest" data-test="change-back-button">{{ __('proposals.change.back') }}</x-ui.button>
+        @endif
+        <x-ui.button type="submit" tone="primary" wire:loading.attr="disabled" :wire:target="$submitAction" data-test="save-proposal-button">
+            <span wire:loading.remove wire:target="{{ $submitAction }}">{{ match ($submitAction) {
+                'previewChangeRequest' => __('proposals.change.review_step'),
+                'sendChangeRequest' => __('proposals.change.send'),
+                default => $editing ? __('common.save_changes') : __('proposals.create_proposal'),
+            } }}</span>
+            <span wire:loading wire:target="{{ $submitAction }}" class="inline-flex items-center gap-1.5">
                 <flux:icon.loading variant="micro" class="size-4" aria-hidden="true" />
-                {{ __('proposals.saving') }}
+                {{ $submitAction === 'sendChangeRequest' ? __('proposals.change.sending') : __('proposals.saving') }}
             </span>
         </x-ui.button>
     </x-slot:actions>

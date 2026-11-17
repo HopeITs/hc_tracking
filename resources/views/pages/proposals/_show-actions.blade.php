@@ -9,7 +9,10 @@
         {{ $this->proposal->phase->label() }}
     </span>
     @can('update', $this->proposal)
+    {{-- Y-09: an approved proposal changes only through a change request, never a direct edit. --}}
+    @unless ($this->proposal->status->isApprovedByDonor())
     <x-ui.button size="sm" icon="pencil-square" class="min-h-10 touch-manipulation" wire:click="openEditModal({{ $this->proposal->id }})" data-test="open-details-modal">{{ __('proposals.edit_details') }}</x-ui.button>
+    @endunless
     @can('approve', $this->proposal)
     @if ($this->proposal->canBeApproved())
     <x-ui.button tone="primary" size="sm" icon="check-badge" class="min-h-10 touch-manipulation" wire:click="openApproveModal({{ $this->proposal->id }})" data-test="open-approve-modal">{{ __('proposals.approve_proposal') }}</x-ui.button>
@@ -35,6 +38,13 @@
     <x-ui.button tone="primary" size="sm" icon="document-check" class="min-h-10 touch-manipulation" wire:click="openAcceptanceModal" data-test="open-final-report-modal">{{ __('proposals.record_final_report_acceptance') }}</x-ui.button>
     @endif
     @endcan
+    @if ($this->pendingChangeRequestId !== null)
+    <x-ui.button size="sm" icon="document-magnifying-glass" class="min-h-10 touch-manipulation" wire:click="openChangeRequestModal" data-test="open-change-request">{{ __('proposals.change.open_button') }}</x-ui.button>
+    @else
+    @can('requestChange', $this->proposal)
+    <x-ui.button size="sm" icon="pencil-square" class="min-h-10 touch-manipulation" wire:click="openChangeRequest" data-test="request-change-button">{{ __('proposals.change.request_button') }}</x-ui.button>
+    @endcan
+    @endif
     @if ($this->canRecordAgreement)
     <x-ui.button size="sm" icon="banknotes" class="min-h-10 touch-manipulation" wire:click="openAgreementCreate" data-test="record-agreement-button">{{ __('funding_agreements.record_agreement') }}</x-ui.button>
     @endif
