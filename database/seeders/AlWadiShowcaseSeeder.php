@@ -44,6 +44,7 @@ use App\Models\Risk;
 use App\Models\Task;
 use App\Models\TransfersTracking;
 use App\Models\User;
+use App\Support\Reporting\PlaceBridge;
 use Carbon\CarbonImmutable;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Seeder;
@@ -291,7 +292,7 @@ class AlWadiShowcaseSeeder extends Seeder
 
             PlanIndicator::query()->firstOrCreate(
                 ['source_type' => 'proposal', 'source_id' => $proposal->id, 'indicator_id' => $indicator->id, 'project_id' => $project->id],
-                ['target' => $target, 'target_population' => $measure === 'numeric' ? $target : null, 'period' => $period],
+                ['target' => $target, 'target_population' => $measure === 'numeric' ? $target : null, 'period' => $period, ...app(PlaceBridge::class)->placeColumnsForTargets($proposal, [$project->id])[$project->id]],
             );
 
             IndicatorProgress::query()->firstOrCreate(
