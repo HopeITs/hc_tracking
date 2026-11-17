@@ -162,7 +162,7 @@ test('editing a proposal without rows saves its details without asking for a pla
         ->and($proposal->locations()->count())->toBe(0);
 });
 
-test('the without-a-center filter lists exactly the project proposals with a row lacking a center or no row at all', function () {
+test('the without-a-center filter lists exactly the project proposals with a row lacking a center', function () {
     $complete = Proposal::factory()->create(['name' => 'Complete Place']);
     ProposalLocation::factory()->complete()->create(['proposal_id' => $complete->id, 'city_id' => $this->aleppo])
         ->centers()->create(['center_id' => $this->aleppoCenter]);
@@ -175,13 +175,13 @@ test('the without-a-center filter lists exactly the project proposals with a row
     $empty = Proposal::factory()->create(['name' => 'No Place Yet']);
     $payroll = Proposal::factory()->payroll()->create(['name' => 'Payroll Line']);
 
-    expect(Proposal::query()->withoutCenter()->orderBy('id')->pluck('id')->all())->toBe([$partial->id, $empty->id]);
+    expect(Proposal::query()->withoutCenter()->orderBy('id')->pluck('id')->all())->toBe([$partial->id]);
 
     Livewire::actingAs($this->user)->test('pages::proposals.index')
         ->assertSeeText(__('finance_tables.flag_no_center'))
         ->set('flag', 'no_center')
         ->assertSeeText('Partial Place')
-        ->assertSeeText('No Place Yet')
+        ->assertDontSeeText('No Place Yet')
         ->assertDontSeeText('Complete Place')
         ->assertDontSeeText($payroll->name);
 });

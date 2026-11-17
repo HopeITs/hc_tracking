@@ -118,7 +118,7 @@ trait ReadsProposalRegister
             ->when($this->currency !== '' && $canAgreements, fn (Builder $query) => $query->whereHas('donorProposals', fn (Builder $query) => $query->where('currency', $this->currency)))
             // A hold is a flag, not a status (W-06, D-58), so it filters here and not in the status picker. Not money: no permission gate.
             ->when($this->flag === 'on_hold', fn (Builder $query) => $query->whereNotNull('proposals.on_hold_since'))
-            // Without a center (W-34a slice 3): a project proposal with a place row that names no center, or with no place at all. Not money: no permission gate.
+            // Missing a center (Y-01 slice 3): a live project proposal with a row that has no center and is not field work. Not money: no permission gate.
             ->when($this->flag === 'no_center', fn (Builder $query) => $query->withoutCenter())
             ->when($this->flag === 'no_agreement' && $canAgreements, fn (Builder $query) => $query->doesntHave('donorProposals'))
             ->when($this->flag === 'report_overdue' && $canAgreements, fn (Builder $query) => $query->whereHas('donorProposals.reports', fn (Builder $query) => $query->whereNull('submitted_on')->whereDate('due_on', '<', $today)))
@@ -323,6 +323,14 @@ trait ReadsProposalRegister
     {
         $query = $this->selectLine($this->joinedQuery());
 
+        // The rows missing a center show under each proposal on that flag: one query, never one per row.
+        if ($this->flag === 'no_center') {
+            $query->with(['locations' => fn ($rows) => $rows
+                ->where('city_wide', false)
+                ->doesntHave('centers')
+                ->with(['city', 'program'])]);
+        }
+
         if ($this->canViewAgreements()) {
             $query->with([
                 'donorProposals' => fn ($query) => $query->select(['id', 'proposal_id', 'donor_id', 'currency'])->orderBy('id'),
@@ -331,6 +339,16 @@ trait ReadsProposalRegister
         }
 
         return $this->applyRegisterSort($query)->paginate($this->registerPerPage());
+    }
+
+    /**
+     * How many proposals the "Missing a center" flag lists. It ignores the
+     * other filters, so with only that flag on it equals the list.
+     */
+    #[Computed]
+    public function missingCenterCount(): int
+    {
+        return Proposal::query()->withoutCenter()->count();
     }
 
     /**

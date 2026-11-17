@@ -6,7 +6,6 @@ use App\Enums\ProposalStatus;
 use App\Models\Donor;
 use App\Models\DonorProposal;
 use App\Models\DonorReport;
-use App\Models\Project;
 use App\Models\Proposal;
 use App\Models\ProposalStatusNote;
 use App\Models\TransfersTracking;
@@ -122,7 +121,7 @@ test('a new proposal opens its status history, and editing it never changes the 
     $component = Livewire::actingAs($user)->test('pages::proposals.index')
         ->call('openCreateModal')
         ->set('name', 'Winter response')
-        ->set('donorId', (string) insertDonor())->set('projectIds', [(string) Project::factory()->create()->id])->set('internalProjectNumber', 'HC-2026-051')
+        ->set('donorId', (string) insertDonor())->set('locations.0', proposalPlaceRow())->set('internalProjectNumber', 'HC-2026-051')
         ->set('plannedDateBegin', '2026-01-01')
         ->set('plannedDateEnd', '2026-12-31')
         ->call('saveProposal')

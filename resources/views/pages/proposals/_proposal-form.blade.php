@@ -13,7 +13,6 @@
         :cities="$showProposalModal ? $this->locationCityOptions : []"
         :programs="$showProposalModal ? $this->locationProgramOptions : []"
         :centers-by-city="$showProposalModal ? $this->locationCentersByCity : []"
-        :chosen-projects="$this->proposalChosenProjects"
         :linked-projects="$this->proposalLinkedProjects"
         :shows-money="$showProposalModal && $this->proposalFormShowsMoney"
         :locked-donor-name="$this->proposalEditFacts['donorLocked'] ? $this->proposalDonors->firstWhere('id', (int) $donorId)?->name : null"

@@ -6,6 +6,7 @@ namespace App\Livewire\Concerns\Proposals;
 
 use App\Actions\Proposals\ApproveProposal;
 use App\Actions\Proposals\DeleteProposalFile;
+use App\Actions\Proposals\MaterialiseProposalLocations;
 use App\Actions\Proposals\SaveProposalFile;
 use App\Enums\FileType;
 use App\Enums\MediaCollection;
@@ -33,6 +34,7 @@ use Livewire\Features\SupportFileUploads\TemporaryUploadedFile;
  *
  * @property-read Proposal|null $approvalSubject  #[Computed] approvalSubject()
  * @property-read array<int, array{name: string, outcome: string}> $approvalPreview  #[Computed] approvalPreview()
+ * @property-read array{create: int, link: int, wait: int, warnings: list<string>} $approvalLocations  #[Computed] approvalLocations()
  */
 trait ManagesProposalApproval
 {
@@ -128,6 +130,34 @@ trait ManagesProposalApproval
         }
 
         return $preview;
+    }
+
+    /**
+     * What approving would do with the location rows, from the same walk the
+     * approval runs (MaterialiseProposalLocations::preview): projects it will
+     * create, open projects it will link instead (with the
+     * `location_linked_existing` warning key), rows left waiting for a
+     * program. Nothing is written.
+     *
+     * @return array{create: int, link: int, wait: int, warnings: list<string>}
+     */
+    #[Computed]
+    public function approvalLocations(): array
+    {
+        $subject = $this->approveProposalId === null ? null : Proposal::query()->find($this->approveProposalId);
+
+        if ($subject === null || $subject->isPayroll()) {
+            return ['create' => 0, 'link' => 0, 'wait' => 0, 'warnings' => []];
+        }
+
+        $result = app(MaterialiseProposalLocations::class)->preview($subject);
+
+        return [
+            'create' => count($result->createdProjectIds),
+            'link' => count($result->linkedProjectIds),
+            'wait' => count($result->waitingLocationIds),
+            'warnings' => $result->warnings,
+        ];
     }
 
     public function approveProposal(): void
@@ -253,6 +283,6 @@ trait ManagesProposalApproval
         $this->approveEvidenceMode = 'file';
         $this->approveEvidenceNote = '';
         $this->approveFile = null;
-        unset($this->approvalSubject, $this->approvalPreview);
+        unset($this->approvalSubject, $this->approvalPreview, $this->approvalLocations);
     }
 }

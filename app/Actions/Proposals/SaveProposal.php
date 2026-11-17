@@ -15,6 +15,7 @@ use App\Models\HrEmployee;
 use App\Models\Program;
 use App\Models\Project;
 use App\Models\Proposal;
+use App\Models\ProposalLocation;
 use App\Models\ProposalStatusNote;
 use App\Models\User;
 use App\Support\ProposalLocationRows;
@@ -42,6 +43,11 @@ use Illuminate\Validation\Validator as ValidatorInstance;
  * is validated as a whole, then replaced under the proposal lock through
  * ProposalLocationRows, a new row without a program opens its program
  * request, and ProposalLocationsChanged fires after commit with the counts.
+ * Once the donor has approved (`isApprovedByDonor()`, D-83) `locations` is a
+ * fill only: a row with no center and not city-wide may gain centers or be
+ * marked city-wide through ProposalLocationRows::fillEmpty, anything else is
+ * refused as `proposals.location_locked_after_approval`; no project is
+ * created or linked by it (D-74).
  * On create, each `projectIds` entry (the project a create was opened
  * from, or a renewal's projects) becomes a row with `project_id` through
  * LinkProposalProject; a create that sends `locations` needs no project.
@@ -62,9 +68,9 @@ final class SaveProposal
      * `beneficiaries` is keyed by project id; payroll ignores it and
      * `projectIds`. `narrative` is read for payroll only. The budget fields
      * are ignored entirely for a user who may not see money. `locations`, when
-     * sent, replaces the rows; an edit that omits it leaves them alone.
+     * sent, replaces the rows (a fill only once approved); an edit that omits it leaves them alone.
      *
-     * @param  array{kind?: ?string, name: string, donorId: int|string|null, narrative?: ?string, projectIds?: list<int|string>, locations?: list<array{city_id: int|string|null, program_id?: int|string|null, responsible_employee_id?: int|string|null, center_ids?: list<int|string>, is_new?: bool|int|string|null, new_program_name_en?: ?string, new_program_name_ar?: ?string}>, beneficiaries?: array<int|string, int|string|null>, beneficiariesReason?: ?string, requestedBudget?: string|int|float|null, requestedCurrency?: ?string, plannedDateBegin: ?string, plannedDateEnd: ?string, notes?: ?string, conceptNote?: ?string, startingStage?: string, skipReason?: ?string, previousProposalId?: int|null}  $data
+     * @param  array{kind?: ?string, name: string, donorId: int|string|null, narrative?: ?string, projectIds?: list<int|string>, locations?: list<array{city_id: int|string|null, program_id?: int|string|null, responsible_employee_id?: int|string|null, center_ids?: list<int|string>, is_new?: bool|int|string|null, city_wide?: bool|int|string|null, new_program_name_en?: ?string, new_program_name_ar?: ?string}>, beneficiaries?: array<int|string, int|string|null>, beneficiariesReason?: ?string, requestedBudget?: string|int|float|null, requestedCurrency?: ?string, plannedDateBegin: ?string, plannedDateEnd: ?string, notes?: ?string, conceptNote?: ?string, startingStage?: string, skipReason?: ?string, previousProposalId?: int|null}  $data
      */
     public function handle(?Proposal $existing, array $data, User $actor): Proposal
     {
@@ -164,7 +170,11 @@ final class SaveProposal
             }
 
             if ($rows !== null) {
-                $this->announceLocations($locked, app(ProposalLocationRows::class)->replace($locked, $rows, $actor), $actor);
+                $counts = $isApproved
+                    ? app(ProposalLocationRows::class)->fillEmpty($locked, $rows)
+                    : app(ProposalLocationRows::class)->replace($locked, $rows, $actor);
+
+                $this->announceLocations($locked, $counts, $actor);
             }
 
             return $locked;
@@ -294,6 +304,11 @@ final class SaveProposal
             }
 
             $this->checkDonorApproved($validator, $input, $proposal);
+
+            if ($proposal !== null && $proposal->status->isApprovedByDonor()) {
+                $this->checkApprovedFill($validator, $input, $proposal);
+            }
+
             $this->checkLocations($validator, $input);
         });
 
@@ -304,7 +319,7 @@ final class SaveProposal
      * The location rows as a whole (contracts.md §6, W-34a): every row names
      * an active HR city; cities are distinct per program, with at most one
      * row per city still waiting for a program; a program exists in
-     * tracking; every center stands in the row's city; a responsible is an
+     * tracking; a city-wide row (D-88) holds no centers; every center stands in the row's city; a responsible is an
      * active HR employee; a new row without a program names it in both
      * languages. HR is read once per rule, never per row; the centers come
      * from the in-memory lookup.
@@ -347,7 +362,9 @@ final class SaveProposal
                 $validator->errors()->add("locations.{$index}.program_id", __('proposals.location_choose_the_program'));
             }
 
-            if ($cityOk) {
+            if ($row['city_wide'] && $row['center_ids'] !== []) {
+                $validator->errors()->add("locations.{$index}.center_ids", __('proposals.location_city_wide_has_centers'));
+            } elseif ($cityOk) {
                 foreach ($row['center_ids'] as $centerId) {
                     if (HrCenter::remembered($centerId)?->city_id !== $row['city_id']) {
                         $validator->errors()->add("locations.{$index}.center_ids", __('proposals.location_center_not_in_city'));
@@ -372,12 +389,72 @@ final class SaveProposal
     }
 
     /**
+     * After the donor's approval the rows are a fill only (D-83, D-88): the
+     * sent set must be the stored set, row for row, with the same city,
+     * program, responsible and `is_new`; a row that has a center or is
+     * city-wide comes back unchanged; a row with neither may gain centers or
+     * be marked city-wide. Anything else is refused on `locations`. $proposal
+     * is the locked row, so two editors cannot both fill the same row.
+     *
+     * @param  array<string, mixed>  $input
+     */
+    private function checkApprovedFill(ValidatorInstance $validator, array $input, Proposal $proposal): void
+    {
+        $rows = $this->locationRows($input);
+
+        if ($rows === null || $validator->errors()->has('locations')) {
+            return;
+        }
+
+        $stored = [];
+
+        /** @var ProposalLocation $row */
+        foreach ($proposal->locations()->with('centers')->get() as $row) {
+            $stored[$row->city_id.':'.($row->program_id ?? '')] = $row;
+        }
+
+        $isLocked = count($rows) !== count($stored);
+        $seen = [];
+
+        foreach ($rows as $sent) {
+            $key = $sent['city_id'].':'.($sent['program_id'] ?? '');
+            $row = $stored[$key] ?? null;
+
+            if ($row === null || isset($seen[$key])) {
+                $isLocked = true;
+
+                break;
+            }
+
+            $seen[$key] = true;
+
+            if ($sent['responsible_employee_id'] !== $row->responsible_employee_id || $sent['is_new'] !== $row->is_new) {
+                $isLocked = true;
+
+                break;
+            }
+
+            $hasPlace = $row->city_wide || $row->centerIds() !== [];
+
+            if ($hasPlace && ($sent['city_wide'] !== $row->city_wide || $sent['center_ids'] !== $row->centerIds())) {
+                $isLocked = true;
+
+                break;
+            }
+        }
+
+        if ($isLocked) {
+            $validator->errors()->add('locations', __('proposals.location_locked_after_approval'));
+        }
+    }
+
+    /**
      * The sent location rows in one shape: ids as positive integers or
      * null, centers distinct and ascending, names trimmed. Null when the
      * form sent no `locations` key at all.
      *
      * @param  array<string, mixed>  $input
-     * @return list<array{city_id: int|null, program_id: int|null, responsible_employee_id: int|null, center_ids: list<int>, is_new: bool, new_program_name_en: string, new_program_name_ar: string}>|null
+     * @return list<array{city_id: int|null, program_id: int|null, responsible_employee_id: int|null, center_ids: list<int>, is_new: bool, city_wide: bool, new_program_name_en: string, new_program_name_ar: string}>|null
      */
     private function locationRows(array $input): ?array
     {
@@ -399,6 +476,7 @@ final class SaveProposal
                 'responsible_employee_id' => $id($row['responsible_employee_id'] ?? null),
                 'center_ids' => $centerIds,
                 'is_new' => filter_var($row['is_new'] ?? false, FILTER_VALIDATE_BOOLEAN),
+                'city_wide' => filter_var($row['city_wide'] ?? false, FILTER_VALIDATE_BOOLEAN),
                 'new_program_name_en' => is_string($row['new_program_name_en'] ?? null) ? trim($row['new_program_name_en']) : '',
                 'new_program_name_ar' => is_string($row['new_program_name_ar'] ?? null) ? trim($row['new_program_name_ar']) : '',
             ];

@@ -12,8 +12,10 @@ use App\Models\Indicator;
 use App\Models\Media;
 use App\Models\Milestone;
 use App\Models\PlanIndicator;
+use App\Models\Program;
 use App\Models\Project;
 use App\Models\Proposal;
+use App\Models\ProposalLocation;
 use App\Models\ProposalStatusNote;
 use App\Models\Report;
 use App\Models\Task;
@@ -981,4 +983,34 @@ test('a payroll proposal reads money and time only, and time opens the status ta
 
     expect(array_column($vitals, 'key'))->toBe(['money', 'time'])
         ->and(collect($vitals)->firstWhere('key', 'time')['tab'])->toBe('status');
+});
+
+test('the Locations chapter lists each row with one status word, and field work is never missing a center', function () {
+    $city = insertHrCity('Idlib', 'إدلب');
+    $center = insertHrCenter($city, 'Hope Center Idlib', 'مركز الأمل إدلب');
+    $employee = insertHrEmployee($city);
+    $program = Program::factory()->create(['manager_id' => $employee]);
+    $proposal = Proposal::factory()->create();
+
+    $withCenter = ProposalLocation::factory()->create(['proposal_id' => $proposal->id, 'city_id' => $city, 'program_id' => $program->id, 'responsible_employee_id' => $employee, 'sort' => 0]);
+    $withCenter->centers()->create(['center_id' => $center]);
+    ProposalLocation::factory()->cityWide()->create(['proposal_id' => $proposal->id, 'city_id' => insertHrCity('Homs', 'حمص'), 'program_id' => $program->id, 'responsible_employee_id' => $employee, 'sort' => 1]);
+    ProposalLocation::factory()->create(['proposal_id' => $proposal->id, 'city_id' => insertHrCity('Hama', 'حماة'), 'program_id' => $program->id, 'responsible_employee_id' => $employee, 'sort' => 2]);
+    ProposalLocation::factory()->create(['proposal_id' => $proposal->id, 'city_id' => insertHrCity('Daraa', 'درعا'), 'program_id' => $program->id, 'responsible_employee_id' => null, 'sort' => 3]);
+    ProposalLocation::factory()->create(['proposal_id' => $proposal->id, 'city_id' => insertHrCity('Raqqa', 'الرقة'), 'program_id' => null, 'sort' => 4]);
+
+    $page = Livewire::actingAs(User::factory()->role('Financial')->create())
+        ->test('pages::proposals.show', ['proposal' => $proposal])
+        ->set('tab', 'projects')
+        ->assertSeeHtml('data-test="locations-chapter"');
+
+    expect(collect($page->instance()->locationRows)->pluck('status')->all())
+        ->toBe(['complete', 'complete', 'missing_center', 'missing_responsible', 'waiting_program']);
+
+    $page->assertSeeText('Hope Center Idlib')
+        ->assertSeeText(__('proposals.location_field_work'))
+        ->assertSeeText(__('proposals.location_status_complete'))
+        ->assertSeeText(__('proposals.location_status_missing_center'))
+        ->assertSeeText(__('proposals.location_status_missing_responsible'))
+        ->assertSeeText(__('proposals.location_status_waiting_program'));
 });

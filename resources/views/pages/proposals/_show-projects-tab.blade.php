@@ -5,6 +5,8 @@
     $term, $chronology and $arrivals.
 --}}
 @use('App\Enums\TaskStatus')
+            @include('pages.proposals._show-locations-chapter')
+
             @can('update', $this->proposal)
             <form wire:submit="linkProject" class="mb-6 flex flex-col gap-2 @xl/detail:flex-row @xl/detail:items-end" data-link-project>
                 <div class="min-w-0 flex-1">

@@ -13,6 +13,7 @@ use App\Models\Proposal;
 use App\Models\ProposalLocation;
 use App\Models\User;
 use App\Support\ProposalLocationBackfill;
+use App\Support\ProposalLocationRows;
 use Database\Seeders\RolesAndPermissionsSeeder;
 use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Support\Facades\DB;
@@ -541,4 +542,63 @@ test('the location models read back through their relations and casts', function
         ->and($location->proposal)->toBeInstanceOf(Proposal::class)
         ->and((new ProposalLocation)->getMorphClass())->toBe('proposal_location')
         ->and((new ProgramRequest)->getMorphClass())->toBe('program_request');
+});
+
+// ── Field work, no center (Y-01, D-88) ──────────────────────────────────
+
+test('a city-wide row is complete without a center, a row with neither is not', function () {
+    $proposal = Proposal::factory()->create();
+    $cityWide = ProposalLocation::factory()->for($proposal)->complete()->cityWide()->create(['city_id' => $this->aleppo]);
+    $neither = ProposalLocation::factory()->for($proposal)->complete()->create(['city_id' => $this->homs]);
+
+    expect(ProposalLocationRows::incompleteRowIds($proposal))->toBe([$neither->id])
+        ->and($cityWide->fresh()->city_wide)->toBeTrue();
+});
+
+test('a city-wide row is stored with the flag and no centers', function () {
+    $proposal = app(SaveProposal::class)->handle(null, locationFormData([
+        aleppoRow(['city_wide' => true, 'center_ids' => [], 'is_new' => false]),
+        aleppoRow(['city_id' => $this->homs, 'center_ids' => [$this->homsCenter]]),
+    ]), $this->user);
+
+    $rows = storedRows($proposal);
+
+    expect((bool) $rows[0]['city_wide'])->toBeTrue()
+        ->and($rows[0]['center_ids'])->toBe([])
+        ->and((bool) $rows[1]['city_wide'])->toBeFalse()
+        ->and($rows[1]['center_ids'])->toBe([$this->homsCenter])
+        ->and(ProposalLocationRows::incompleteRowIds($proposal))->toBe([]);
+});
+
+test('a row cannot be city-wide and hold centers', function () {
+    $errors = refusedLocations(fn () => app(SaveProposal::class)->handle(null, locationFormData([
+        aleppoRow(['city_wide' => true]),
+    ]), $this->user));
+
+    expect($errors['locations.0.center_ids'])->toBe([__('proposals.location_city_wide_has_centers')])
+        ->and(Proposal::query()->count())->toBe(0);
+});
+
+test('a center of another city is refused on its own row only', function () {
+    $errors = refusedLocations(fn () => app(SaveProposal::class)->handle(null, locationFormData([
+        aleppoRow(['city_wide' => true, 'center_ids' => [], 'is_new' => false]),
+        aleppoRow(['city_id' => $this->homs, 'center_ids' => [$this->aleppoCenter]]),
+    ]), $this->user));
+
+    expect($errors['locations.1.center_ids'])->toBe([__('proposals.location_center_not_in_city')])
+        ->and($errors)->not->toHaveKey('locations.0.center_ids');
+});
+
+test('editing a row to city-wide clears its centers and counts as a change', function () {
+    $proposal = app(SaveProposal::class)->handle(null, locationFormData([aleppoRow()]), $this->user);
+
+    $saved = app(SaveProposal::class)->handle($proposal, locationEditData($proposal, [
+        'locations' => [aleppoRow(['city_wide' => true, 'center_ids' => []])],
+    ]), $this->user);
+
+    $row = storedRows($saved)[0];
+
+    expect((bool) $row['city_wide'])->toBeTrue()
+        ->and($row['center_ids'])->toBe([])
+        ->and(Activity::query()->where('event', 'proposal.locations_changed')->latest('id')->first()->properties['changed'])->toBe(1);
 });

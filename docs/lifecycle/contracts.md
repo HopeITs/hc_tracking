@@ -53,7 +53,7 @@ The one place for every name, value, signature, payload, column and permission t
 Key meanings:
 - `linked_project`: at least 1 linked project. Kept for one release behind the rows (W-34a: linking a project = a row with `project_id`), then removed.
 - `locations` (W-34a, D-62): at least 1 `proposal_locations` row with a city. Message `proposals.locations_required`.
-- `locations_complete` (W-34a, D-62): every `proposal_locations` row has program **and** responsible **and** (center or `is_new`), and no `program_requests` row of the proposal is still `pending`. Checked by `ApproveProposal`. Message `proposals.locations_incomplete`.
+- `locations_complete` (W-34a, D-62): every `proposal_locations` row has program **and** responsible **and** (center or `city_wide` or `is_new`), and no `program_requests` row of the proposal is still `pending`. Checked by `ApproveProposal`. Message `proposals.locations_incomplete`.
 - `donor`: `donor_id` is set.
 - `planned_dates`: `planned_date_begin` and `planned_date_end` are set.
 - `reason`: required text.
@@ -139,7 +139,7 @@ ClearProposalOnHold::handle(Proposal $proposal, ProposalStatus $expectedStatus, 
 
 // W-34a (D-62): SaveProposal also accepts
 //   locations?: list<array{city_id: int|string, program_id?: int|string|null, responsible_employee_id?: int|string|null,
-//                          center_ids?: list<int|string>, is_new?: bool, new_program_name_en?: ?string, new_program_name_ar?: ?string}>
+//                          center_ids?: list<int|string>, is_new?: bool, new_program_name_en?: ?string, new_program_name_ar?: ?string, city_wide?: bool}>  (city_wide: Y-01, D-88, default false)
 //   Validation: city active in HR; centers belong to the city; program exists; responsible is an active HR employee;
 //   is_new + no program → both names required, creates/updates the program_requests row. Rows are replaced as a set
 //   inside the proposal transaction (diff by (city_id, program_id), delete removed); ProposalLocationsChanged after commit.
@@ -193,6 +193,8 @@ SyncReportTask::handle(DonorReport $report): ?Task
     // No Gate: the caller (the report action) has already authorised.
 ```
 
+**Post-approval center fill (Y-01, D-83).** On a proposal whose status `isApprovedByDonor()`, `SaveProposal` accepts `locations[]` only as a fill: a row that has **no center and is not city-wide** may gain centers **or** be marked `city_wide`; a row that already has a center or is city-wide is unchanged. Changing or removing a center, or changing a row's city, program or responsible, is refused (`proposals.location_locked_after_approval`). No reason is asked. The change is recorded as `proposal.locations_changed` with the counts; no project is created or linked by this edit (D-74).
+
 ## §7 Schema owned by Team A (frozen at CP1)
 **T03:**
 - `proposals`: `donor_id` (NOT NULL, FK `donors` restrictOnDelete), `requested_budget` decimal(14,2) null, `requested_currency` varchar(10) null (`Currency`), `status_remind_on` date null, `approval_note` text null (D-26), `final_report_accepted_on` date null, `final_report_accepted_by` FK `users` null nullOnDelete (D-02c), `previous_proposal_id` self FK null nullOnDelete, indexed (renewal chain, T10; cycle guard in T10). Unique `proposals(id, donor_id)`.
@@ -229,6 +231,7 @@ proposal_locations
   program_id         FK programs nullOnDelete, NULL allowed
   responsible_employee_id  unsigned big int, HR id, no FK, NULL allowed
   is_new             boolean default false   -- "no program/center exists yet for this row"
+  city_wide          boolean default false   -- Y-01, D-88: runs across the city with no center of its own; no proposal_location_centers rows (`proposals.location_city_wide_has_centers` otherwise)
   project_id         FK projects nullOnDelete, NULL  -- filled on approval (or when linked to an existing project)
   sort               unsigned small int
   timestamps

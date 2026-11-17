@@ -40,6 +40,14 @@ class ProposalLocationFactory extends Factory
     }
 
     /**
+     * Field work, no center (D-88): the row runs across the city.
+     */
+    public function cityWide(): static
+    {
+        return $this->state(['city_wide' => true]);
+    }
+
+    /**
      * A complete row under a program with a responsible employee.
      */
     public function complete(): static
