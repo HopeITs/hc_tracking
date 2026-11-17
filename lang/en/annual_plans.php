@@ -323,6 +323,7 @@ return [
         'accountability_required' => 'Write the Accountability & Feedback section first.',
         'add_files' => 'Add files',
         'add_one_file' => 'Add at least one file.',
+        'file_rejected' => 'That file was not added. Use PDF, Word (.docx), Excel (.xlsx), JPG or PNG, up to 5 MB.',
         'answer_title' => 'Answer the question',
         'approve' => 'Approve',
         'ask' => 'Ask a question',

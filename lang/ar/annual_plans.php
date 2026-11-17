@@ -324,6 +324,7 @@ return [
         'accountability_required' => 'اكتب قسم المساءلة والملاحظات أولاً.',
         'add_files' => 'إضافة ملفات',
         'add_one_file' => 'أضف ملفاً واحداً على الأقل.',
+        'file_rejected' => 'لم يُضَف الملف. استخدم PDF أو Word (.docx) أو Excel (.xlsx) أو JPG أو PNG، بحجم 5 ميغابايت كحد أقصى.',
         'answer_title' => 'الإجابة على السؤال',
         'approve' => 'موافقة',
         'ask' => 'طرح سؤال',

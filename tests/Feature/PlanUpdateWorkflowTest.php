@@ -259,3 +259,15 @@ test('the CEO does not open updates; others read them', function () {
     $this->actingAs($ceo)->get(route('plan-updates.show', [$this->plan, $this->centre, '2027-01']))->assertForbidden();
     $this->actingAs(userWithRole('Team Member'))->get(route('plan-updates.show', [$this->plan, $this->centre, '2027-01']))->assertOk();
 });
+
+test('a supporting file of a type that is not allowed says why it was not added', function () {
+    Livewire::actingAs($this->projectManager)->test('pages::annual-plans.update', ['activityPlan' => $this->plan, 'project' => $this->centre, 'month' => '2027-01'])
+        ->call('goToStep', 1)
+        ->assertDontSeeHtml('data-test="file-rejected"')
+        ->set('newFiles', [UploadedFile::fake()->create('notes.txt', 1, 'text/plain')])
+        ->assertHasErrors('newFiles.0')
+        ->assertSeeHtml('data-test="file-rejected"')
+        ->assertSee(__('annual_plans.up.file_rejected'));
+
+    expect(PlanUpdate::query()->first()?->files()->count() ?? 0)->toBe(0);
+});

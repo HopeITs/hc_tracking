@@ -41,9 +41,10 @@
             @endforelse
         </div>
         @unless ($readOnly)
-            <label class="ap-up {{ $this->isMissing('files') ? 'is-err' : '' }}" style="align-self: flex-start">+ {{ __('annual_plans.up.add_files') }}<input type="file" multiple wire:model="newFiles" aria-label="{{ __('annual_plans.up.add_files') }}" data-test="add-files"></label>
+            <label class="ap-up {{ $this->isMissing('files') ? 'is-err' : '' }}" style="align-self: flex-start">+ {{ __('annual_plans.up.add_files') }}<input type="file" multiple accept=".pdf,.docx,.xlsx,.jpg,.png" wire:model="newFiles" aria-label="{{ __('annual_plans.up.add_files') }}" data-test="add-files"></label>
             <span wire:loading wire:target="newFiles" class="ap-xs ap-faint">{{ __('common.updating') }}</span>
             @error('file') <p class="ap-err">{{ $message }}</p> @enderror
+            @if ($errors->has('newFiles.*'))<p class="ap-err" data-test="file-rejected">{{ __('annual_plans.up.file_rejected') }}</p>@endif
             @if ($this->isMissing('files'))<p class="ap-err">{{ __('annual_plans.up.add_one_file') }}</p>@endif
         @endunless
     </div>
