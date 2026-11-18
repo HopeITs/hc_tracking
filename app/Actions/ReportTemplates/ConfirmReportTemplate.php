@@ -10,6 +10,7 @@ use App\Enums\LineSchedule;
 use App\Enums\ProjectStatus;
 use App\Enums\ReportTemplateLineStatus;
 use App\Enums\ReportTemplateStatus;
+use App\Events\ReportTemplateConfirmed;
 use App\Models\Proposal;
 use App\Models\ReportTemplate;
 use App\Models\ReportTemplateLine;
@@ -35,8 +36,9 @@ use Illuminate\Validation\ValidationException;
  * ActivateProject in the same transaction (this action never writes a
  * project or proposal status); on an `active` project the newly confirmed
  * lines record `report_template.lines_added` (proposals and month range) for
- * the owner instead. Nothing is retroactive. Notifications and
- * ProjectActivated fire after the commit.
+ * the owner instead. Nothing is retroactive. Notifications,
+ * ProjectActivated and, on the first confirmation, ReportTemplateConfirmed
+ * (which generates the monthly reports) fire after the commit.
  */
 final class ConfirmReportTemplate
 {
@@ -96,6 +98,8 @@ final class ConfirmReportTemplate
                     'confirmed_at' => $now,
                     'confirmed_by' => $actorId,
                 ])->save();
+
+                ReportTemplateConfirmed::dispatch($locked->id);
             }
 
             if ($project?->status === ProjectStatus::Approved) {

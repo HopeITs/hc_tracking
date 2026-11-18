@@ -9,6 +9,8 @@ use App\Concerns\RecordsActivity;
 use App\Enums\MonthlyReportStatus;
 use App\Notifications\TracksActivity;
 use App\Support\MealCoverage;
+use App\Support\MonthlyReportNames;
+use App\Support\Reporting\PlaceBridge;
 use Carbon\CarbonImmutable;
 use Database\Factories\MonthlyReportFactory;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
@@ -20,14 +22,15 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 
 /**
- * One project's report for one month (contracts §13). Its lines come from
- * the project's confirmed report template; its figures reach `reports` as
+ * One template's report for one month (contracts §13, D-76). Its lines come
+ * from the confirmed report template; its figures reach `reports` as
  * mirrors, one per line share, so PlanIndicator::achievedValue() stays the
  * one achievement definition. Status moves only through the T17A actions.
  *
  * @property int $id
  * @property string $slug
- * @property int $project_id
+ * @property int $report_template_id
+ * @property int|null $project_id Only for reports that existed before Y-03, and the legacy mirror.
  * @property CarbonImmutable $period
  * @property MonthlyReportStatus $status
  * @property int|null $prepared_by
@@ -44,6 +47,7 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
  * @property CarbonImmutable|null $updated_at
  */
 #[Fillable([
+    'report_template_id',
     'project_id',
     'period',
     'status',
@@ -74,19 +78,26 @@ class MonthlyReport extends Model implements TracksActivity
     ];
 
     /**
-     * "project-slug-2026-10". The project is read by id rather than through
-     * the relation, so creating a report never lazy-loads it.
+     * "report-{template id}-2026-10" (Y-03 slice 3: no project in it). Slugs
+     * are set on create only, so the "project-slug-2026-10" of a report made
+     * before Y-03 never changes and its URL keeps working.
      */
     protected function slugSource(): string
     {
-        $projectSlug = $this->relationLoaded('project')
-            ? $this->project?->slug
-            : Project::query()->whereKey($this->project_id)->value('slug');
-
-        return $projectSlug.'-'.$this->period->format('Y-m');
+        return 'report-'.$this->report_template_id.'-'.$this->period->format('Y-m');
     }
 
     /**
+     * @return BelongsTo<ReportTemplate, $this>
+     */
+    public function template(): BelongsTo
+    {
+        return $this->belongsTo(ReportTemplate::class, 'report_template_id');
+    }
+
+    /**
+     * @deprecated Y-03 (D-76): a report belongs to its template; kept for the readers not moved yet.
+     *
      * @return BelongsTo<Project, $this>
      */
     public function project(): BelongsTo
@@ -179,7 +190,9 @@ class MonthlyReport extends Model implements TracksActivity
     }
 
     /**
-     * Reports of the projects this user validates (contracts §13.1 item 6),
+     * Reports of the templates this user validates (contracts §13.1 item 6),
+     * reached through each template's legacy project (PlaceBridge) until MEAL
+     * coverage moves to places,
      * minus the ones they prepared or submitted. Feeds T17B's "To validate"
      * queue (add `status = submitted`) and T18. Same rule as
      * MonthlyReportPolicy::validate(), without the status:
@@ -207,14 +220,18 @@ class MonthlyReport extends Model implements TracksActivity
         }
 
         $projectIds = $user->employee_id === null ? [] : MealCoverage::projectsCoveredBy($user->employee_id);
+        $bridge = app(PlaceBridge::class);
+        $legacy = $bridge->legacyProjectIdsFor(ReportTemplate::query()->whereIn('id', self::query()->select('report_template_id'))->get());
 
         if ($user->hasRole('MEAL')) {
-            $candidates = Project::query()->whereIn('id', self::query()->select('project_id'))->whereNotIn('id', $projectIds)->get();
-            $unassigned = $candidates->filter(fn (Project $project): bool => MealCoverage::responsibleFor($project) === null);
-            $projectIds = [...$projectIds, ...$unassigned->modelKeys()];
+            $candidateIds = array_values(array_diff(array_unique(array_filter($legacy, fn (?int $id): bool => $id !== null)), $projectIds));
+            $unassigned = $bridge->projectsByIds($candidateIds)->filter(fn (Project $project): bool => MealCoverage::responsibleFor($project) === null)->keys()->all();
+            $projectIds = [...$projectIds, ...$unassigned];
         }
 
-        $query->whereIn('project_id', $projectIds);
+        $templateIds = array_keys(array_filter($legacy, fn (?int $id): bool => $id !== null && in_array($id, $projectIds, true)));
+
+        $query->whereIn('report_template_id', $templateIds);
     }
 
     /**
@@ -233,6 +250,7 @@ class MonthlyReport extends Model implements TracksActivity
     protected function casts(): array
     {
         return [
+            'report_template_id' => 'integer',
             'project_id' => 'integer',
             'period' => 'date',
             'status' => MonthlyReportStatus::class,
@@ -253,20 +271,34 @@ class MonthlyReport extends Model implements TracksActivity
         return 'monthly-reports';
     }
 
+    /**
+     * The template's program, read by id so nothing is lazy-loaded; a report
+     * without a template falls back to its project.
+     */
     public function activityProgramId(): ?int
     {
+        $templateId = $this->activityAttribute('report_template_id');
+
+        if ($templateId !== null) {
+            $programId = ReportTemplate::query()->whereKey($templateId)->value('program_id');
+
+            return $programId === null ? null : (int) $programId;
+        }
+
         return Project::programIdFor($this->activityAttribute('project_id'));
     }
 
     /**
-     * "Project name · 2026-10", in English like every stored label.
+     * "Proposals · Place · 2026-10", in English like every stored label
+     * (MonthlyReportNames::label()): the proposals tell two reports of one
+     * place and month apart. Read by template id, so nothing is lazy-loaded.
      */
     public function activityLabel(): string
     {
-        $name = (string) Project::query()->whereKey($this->activityAttribute('project_id'))->value('name');
-        $period = $this->activityAttribute('period');
+        $period = CarbonImmutable::parse($this->activityAttribute('period'));
+        $template = ReportTemplate::query()->whereKey($this->activityAttribute('report_template_id'))->first();
 
-        return $name.' · '.CarbonImmutable::parse($period)->format('Y-m');
+        return $template === null ? $period->format('Y-m') : app(MonthlyReportNames::class)->label($template, $period);
     }
 
     /**

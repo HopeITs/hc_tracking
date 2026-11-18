@@ -31,11 +31,15 @@ use App\Models\Program;
 use App\Models\Project;
 use App\Models\ProjectActivityStatus;
 use App\Models\Proposal;
+use App\Models\ProposalLocation;
+use App\Models\Report;
 use App\Models\ReportTemplate;
 use App\Models\ReportTemplateLine;
 use App\Models\ReportTemplateQuestion;
 use App\Models\Result;
 use App\Models\User;
+use App\Support\MonthlyReportNames;
+use App\Support\Reporting\ReportPlace;
 use Carbon\CarbonImmutable;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
@@ -437,18 +441,34 @@ test('the preparer of a draft with no lines is still told it can be submitted, a
         ->assertSeeHtml('data-save-state');
 });
 
-test('the header links the project once and says "Not seen yet" only while the report waits for MEAL', function () {
+test('the header names the place and the proposals, not the project, and says "Not seen yet" only while the report waits for MEAL', function () {
     $project = mrsProject();
     $validated = mrsReport($project, '2026-09-01', MonthlyReportStatus::Validated);
     $submitted = mrsReport($project, '2026-10-01', MonthlyReportStatus::Submitted);
-    $projectLink = 'href="'.route('projects.show', $project).'"';
+    $place = app(MonthlyReportNames::class)->place($validated->template);
 
-    $html = mrsPage($validated, $this->officer)->html();
-
-    expect(substr_count($html, $projectLink))->toBe(1);
-
-    mrsPage($validated, $this->officer)->assertDontSeeText(__('monthly_reports.not_seen_yet'));
+    mrsPage($validated, $this->officer)
+        ->assertSeeText($place)
+        ->assertSeeHtml('data-covers-proposals')
+        ->assertSeeText('Hope Center Aleppo')
+        ->assertDontSeeHtml('href="'.route('projects.show', $project).'"')
+        ->assertDontSeeText(__('monthly_reports.not_seen_yet'));
     mrsPage($submitted, $this->officer)->assertSeeText(__('monthly_reports.not_seen_yet'));
+});
+
+test('the header place says the center, field work or that the center is not set', function () {
+    $project = mrsProject();
+    $report = mrsReport($project);
+    $template = $report->template;
+    $center = insertHrCenter($this->city, 'Zone Center Aleppo');
+
+    mrsPage($report)->assertSeeText(__('monthly_reports.place_center_not_set'));
+
+    Activity::withoutRecording(fn () => $template->forceFill(['center_id' => $center, 'city_wide' => false])->save());
+    mrsPage($report)->assertSeeText('Zone Center Aleppo')->assertDontSeeText(__('monthly_reports.place_center_not_set'));
+
+    Activity::withoutRecording(fn () => $template->forceFill(['center_id' => null, 'city_wide' => true])->save());
+    mrsPage($report)->assertSeeText(__('monthly_reports.place_field_work'));
 });
 
 test('a month with nothing in it reads as one line, not three empty boxes', function () {
@@ -476,10 +496,11 @@ test('an empty section next to filled ones is a single line', function () {
 test('Refresh Lines adds the line of a target confirmed after the month opened', function () {
     $project = mrsProject();
     $report = mrsReport($project);
-    Activity::withoutRecording(function () use ($project): void {
+    Activity::withoutRecording(function () use ($project, $report): void {
         $proposal = Proposal::factory()->create(['status' => ProposalStatus::Active, 'actual_date_begin' => '2026-10-01', 'actual_date_end' => '2026-12-31']);
         $proposal->projects()->attach($project->id, ['target_beneficiaries' => 100]);
-        $template = ReportTemplate::factory()->confirmed()->create(['project_id' => $project->id]);
+        // The report's own template: its lines are the template's (Y-03).
+        $template = $report->template;
         $library = LibraryIndicator::factory()->create(['frequency' => CollectionFrequency::Monthly, 'name_en' => 'Late indicator']);
         $target = PlanIndicator::factory()->forProposal($proposal)->create([
             'indicator_id' => Indicator::factory()->create(['library_indicator_id' => $library->id])->id,
@@ -585,7 +606,8 @@ test('the page renders in Arabic right to left', function () {
 */
 
 /**
- * An activity of a donor-approved proposal linked to the project.
+ * An activity of a donor-approved proposal linked to the project and to
+ * its template.
  */
 function mrsActivity(Project $project, ActivityKind $kind = ActivityKind::Continuous, string $statement = 'Run parenting sessions'): Result
 {
@@ -596,6 +618,10 @@ function mrsActivity(Project $project, ActivityKind $kind = ActivityKind::Contin
             $proposal = Proposal::factory()->create(['status' => ProposalStatus::Approved]);
             $project->proposals()->attach($proposal->id, ['target_beneficiaries' => 100]);
         }
+
+        // The report lists the activities of its template's proposals (Y-03).
+        ReportTemplate::query()->where('project_id', $project->id)->get()
+            ->each(fn (ReportTemplate $template) => $template->proposals()->syncWithoutDetaching([$proposal->id => ['joined_at' => now()]]));
 
         $output = Result::factory()->type(ResultType::Output)->create(['proposal_id' => $proposal->id]);
 
@@ -736,7 +762,7 @@ test('evidence uploads to a line, downloads through its report only, lists missi
     $report = mrsReport($project);
     $line = mrsLine($report);
     $type = EvidenceType::factory()->create(['name_en' => 'Attendance sheet']);
-    $template = Activity::withoutRecording(fn (): ReportTemplate => ReportTemplate::factory()->confirmed()->create(['project_id' => $project->id]));
+    $template = $report->template;
     $templateLine = Activity::withoutRecording(fn (): ReportTemplateLine => ReportTemplateLine::factory()->confirmed()->create(['report_template_id' => $template->id, 'plan_indicator_id' => $line->shares->first()->plan_indicator_id]));
     $templateLine->evidenceTypes()->attach($type->id);
 
@@ -819,4 +845,87 @@ test('the progress line counts what the preparer filled and lists what is still 
         ->assertSeeText(__('monthly_reports.progress_done', ['done' => 3, 'total' => 3]))
         ->assertSeeText(__('monthly_reports.all_done'))
         ->assertDontSeeHtml('data-still-needed');
+});
+
+/*
+| D-90 (Y-03 slice 3): a target shared by the centers of its row shows the
+| target, how many centers share it and, read only, what they reached
+| together from validated figures. A ratio pools the centers' counts (Dev 1,
+| 18 Nov 2026): 45/50 and 5/10 reach 50/60, not 70% nor 50%.
+*/
+
+/**
+ * A shared percentage target on a line of the report, carried by a row with
+ * two centers; the other center's report has its own template.
+ *
+ * @return array{line: MonthlyReportLine, target: PlanIndicator, other: MonthlyReport}
+ */
+function mrsSharedRatioLine(MonthlyReport $report): array
+{
+    return Activity::withoutRecording(function () use ($report): array {
+        $libraryIndicator = LibraryIndicator::factory()->create(['measure' => IndicatorMeasure::Percentage, 'denominator_basis' => DenominatorBasis::Entered]);
+        $indicator = Indicator::factory()->create(['library_indicator_id' => $libraryIndicator->id, 'measure' => IndicatorMeasure::Percentage]);
+        $proposal = Proposal::factory()->create();
+        $programId = $report->template->program_id;
+        $row = ProposalLocation::factory()->create(['proposal_id' => $proposal->id, 'city_id' => test()->city, 'program_id' => $programId]);
+        $first = insertHrCenter(test()->city, 'Zone One');
+        $second = insertHrCenter(test()->city, 'Zone Two');
+        $row->centers()->create(['center_id' => $first]);
+        $row->centers()->create(['center_id' => $second]);
+        $target = PlanIndicator::factory()->forProposal($proposal)->create([
+            'indicator_id' => $indicator->id, 'project_id' => null, 'city_id' => test()->city, 'program_id' => $programId, 'all_centers' => true, 'target' => 90,
+        ]);
+        $line = MonthlyReportLine::factory()->create(['monthly_report_id' => $report->id, 'library_indicator_id' => $libraryIndicator->id]);
+        MonthlyReportLineShare::factory()->create(['monthly_report_line_id' => $line->id, 'plan_indicator_id' => $target->id]);
+
+        $otherTemplate = ReportTemplate::factory()->confirmed()->forPlace(new ReportPlace(test()->city, $programId, $second, false), $proposal)->create();
+        $other = MonthlyReport::factory()->validated()->create(['project_id' => null, 'report_template_id' => $otherTemplate->id, 'period' => '2026-09-01']);
+
+        return ['line' => $line->load('shares'), 'target' => $target, 'other' => $other];
+    });
+}
+
+function mrsMirror(PlanIndicator $target, MonthlyReport $report, float $numerator, float $denominator): void
+{
+    Activity::withoutRecording(fn () => Report::factory()->approved()->create([
+        'plan_indicator_id' => $target->id,
+        'monthly_report_id' => $report->id,
+        'planned_date' => $report->period->endOfMonth()->toDateString(),
+        'numerator' => $numerator,
+        'denominator' => $denominator,
+        'value' => round($numerator / $denominator * 100, 2),
+    ]));
+}
+
+test('a shared target shows its centers and what they reached together, read only, before anything is validated', function () {
+    $report = mrsReport(mrsProject());
+    $shared = mrsSharedRatioLine($report);
+
+    mrsPage($report)
+        ->assertSeeHtml('data-shared-target="'.$shared['line']->id.'"')
+        ->assertSeeText(trans_choice('monthly_reports.shared_with_centers', 2, ['count' => 2]))
+        ->assertSeeText(__('monthly_reports.reached_together_none'));
+});
+
+test('a shared ratio target pools the centers\' validated counts', function () {
+    $project = mrsProject();
+    $validatedHere = mrsReport($project, '2026-09-01', MonthlyReportStatus::Validated);
+    $report = mrsReport($project, '2026-10-01');
+    $shared = mrsSharedRatioLine($report);
+    mrsMirror($shared['target'], $validatedHere, 45, 50);
+    mrsMirror($shared['target'], $shared['other'], 5, 10);
+
+    mrsPage($report)
+        ->assertSeeText('90%')
+        ->assertSeeText(__('monthly_reports.reached_together', ['value' => '83.33%']))
+        ->assertDontSeeText(__('monthly_reports.reached_together', ['value' => '70%']))
+        ->assertDontSeeText(__('monthly_reports.reached_together', ['value' => '50%']));
+});
+
+test('a target of one center shows no shared line', function () {
+    $report = mrsReport(mrsProject());
+    $line = mrsLine($report);
+
+    mrsPage($report)->assertDontSeeHtml('data-shared-target="'.$line->id.'"')
+        ->assertDontSeeText(__('monthly_reports.reached_together_none'));
 });

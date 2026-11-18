@@ -627,6 +627,8 @@ test('a question of another template is not found from this tab', function () us
 
 test('a template covering two or more proposals says so once above the questions', function () {
     ['project' => $project, 'template' => $template] = rtpProject();
+    // The factory carries a legacy template with a proposal of its own (Y-03); this test names its proposals.
+    $template->proposals()->detach();
     rtpQuestion($template, 'What went well?');
     $first = rtpProposal($project, 'Winter WASH');
     $template->proposals()->attach($first->id, ['joined_at' => now()]);

@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Support;
 
 use App\Models\Project;
+use App\Support\Reporting\ReportPlace;
 use Carbon\CarbonImmutable;
 use Carbon\CarbonInterface;
 use Closure;
@@ -31,11 +32,35 @@ final class HrHolidays
      */
     public static function forProject(Project $project): Closure
     {
-        $targets = array_filter([
+        return self::forTargets([
             'center' => $project->center_id,
             'city' => $project->city_id,
             'program' => $project->program_id,
-        ], fn (mixed $id): bool => $id !== null);
+        ]);
+    }
+
+    /**
+     * The test for the holidays of a place (Y-03): its center (none for a
+     * city-wide or unset place), city and program.
+     *
+     * @return Closure(CarbonInterface): bool
+     */
+    public static function forPlace(ReportPlace $place): Closure
+    {
+        return self::forTargets([
+            'center' => $place->centerId,
+            'city' => $place->cityId,
+            'program' => $place->programId,
+        ]);
+    }
+
+    /**
+     * @param  array<string, int|string|null>  $targets  HR record type => id
+     * @return Closure(CarbonInterface): bool
+     */
+    private static function forTargets(array $targets): Closure
+    {
+        $targets = array_filter($targets, fn (mixed $id): bool => $id !== null);
 
         $holidays = array_values(array_filter(
             self::all(),

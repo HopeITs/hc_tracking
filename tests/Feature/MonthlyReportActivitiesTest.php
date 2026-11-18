@@ -20,6 +20,7 @@ use App\Models\Program;
 use App\Models\Project;
 use App\Models\ProjectActivityStatus;
 use App\Models\Proposal;
+use App\Models\ReportTemplate;
 use App\Models\Result;
 use App\Support\MonthlyReportActivities;
 use Illuminate\Auth\Access\AuthorizationException;
@@ -52,6 +53,9 @@ beforeEach(function () {
     ]));
     $this->proposal = Activity::withoutRecording(fn (): Proposal => Proposal::factory()->create(['status' => ProposalStatus::Approved]));
     $this->project->proposals()->attach($this->proposal->id, ['target_beneficiaries' => 100]);
+    // The report's activities come from its template's proposals (D-76).
+    Activity::withoutRecording(fn () => ReportTemplate::factory()->create(['project_id' => $this->project->id]))
+        ->proposals()->attach($this->proposal->id, ['joined_at' => now()]);
     $this->output = Activity::withoutRecording(fn (): Result => Result::factory()->type(ResultType::Output)->create(['proposal_id' => $this->proposal->id]));
 });
 

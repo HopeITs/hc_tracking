@@ -6,8 +6,15 @@ use App\Models\MealCoverageAssignment;
 use App\Models\MonthlyReport;
 use App\Models\MonthlyReportLine;
 use App\Models\MonthlyReportReopenRequest;
+use App\Models\Program;
 use App\Models\Project;
+use App\Models\Proposal;
+use App\Models\ProposalLocation;
+use App\Models\ReportTemplate;
+use App\Models\Supervision;
 use App\Models\User;
+use App\Support\MonthlyReportNames;
+use App\Support\Reporting\ReportPlace;
 use Illuminate\Support\Facades\DB;
 use Livewire\Livewire;
 
@@ -257,14 +264,15 @@ test('active filters offer one way back, and an empty result does not mention a 
         ->assertDontSeeText(__('common.change_the_search_or_filters_and_try_again'));
 });
 
-test('each month\'s view link on "My reports" names its project', function () {
+test('each month\'s view link on "My reports" names its proposals and place', function () {
     $this->travelTo('2026-11-20 10:00:00');
-    mrpMonth(mrpProject($this->aleppo, name: 'Hope Center Aleppo'), '2026-09-01');
-    mrpMonth(mrpProject($this->aleppo, name: 'Micro Aleppo'), '2026-09-01');
+    $hope = mrpMonth(mrpProject($this->aleppo, name: 'Hope Center Aleppo'), '2026-09-01');
+    $micro = mrpMonth(mrpProject($this->aleppo, name: 'Micro Aleppo'), '2026-09-01');
+    $place = fn (MonthlyReport $report): string => app(MonthlyReportNames::class)->place($report->template);
 
     Livewire::actingAs($this->owner)->test('pages::monthly-reports.index')
-        ->assertSeeHtml('aria-label="'.e(__('common.view_name', ['name' => 'Hope Center Aleppo · September 2026'])).'"')
-        ->assertSeeHtml('aria-label="'.e(__('common.view_name', ['name' => 'Micro Aleppo · September 2026'])).'"');
+        ->assertSeeHtml('aria-label="'.e(__('common.view_name', ['name' => 'Hope Center Aleppo · '.$place($hope).' · September 2026'])).'"')
+        ->assertSeeHtml('aria-label="'.e(__('common.view_name', ['name' => 'Micro Aleppo · '.$place($micro).' · September 2026'])).'"');
 });
 
 test('someone who cannot validate is not offered an empty "To validate" tab', function () {
@@ -379,29 +387,18 @@ test('a submitted report in the queue says how long it has waited', function () 
 | anyway and its refusal was written to an error nobody displayed.
 */
 
-test('a month of a project with no start or end date offers no Fill and says why', function () {
-    $this->travelTo('2026-11-20 10:00:00');
-    $project = mrpProject($this->aleppo);
-    $november = mrpMonth($project, '2026-11-01');
-    DB::table('projects')->where('id', $project->id)->update(['start_date' => null, 'end_date' => null]);
-
-    Livewire::actingAs($this->owner)->test('pages::monthly-reports.index')
-        ->assertSeeHtml('data-month="2026-11"')
-        ->assertDontSeeHtml('data-fill="'.$november->id.'"')
-        ->assertSeeText(__('monthly_reports.project_has_no_period'))
-        ->assertDontSeeHtml('data-needs-you');
-});
-
 test('a Fill the server refuses says why instead of doing nothing', function () {
     $this->travelTo('2026-11-20 10:00:00');
     $project = mrpProject($this->aleppo);
     $november = mrpMonth($project, '2026-11-01');
     $page = Livewire::actingAs($this->owner)->test('pages::monthly-reports.index');
-    DB::table('projects')->where('id', $project->id)->update(['start_date' => null, 'end_date' => null]);
+    // Y-03: the period is the template's proposals' window; it now ends before the month.
+    DB::table('proposals')->whereIn('id', $november->template->proposals()->pluck('proposals.id'))
+        ->update(['planned_date_begin' => '2026-01-01', 'planned_date_end' => '2026-06-30', 'actual_date_begin' => null, 'actual_date_end' => null, 'extended_date_end' => null]);
 
     $page->call('fillMonth', $november->id)
         ->assertNoRedirect()
-        ->assertDispatched('toast-show', fn (string $event, array $params): bool => ($params['slots']['text'] ?? null) === __('monthly_reports.project_has_no_period'));
+        ->assertDispatched('toast-show', fn (string $event, array $params): bool => ($params['slots']['text'] ?? null) === __('monthly_reports.outside_period'));
 });
 
 /*
@@ -427,51 +424,165 @@ test('the big figures filter "My reports" to the months they count, and a second
         ->assertSeeHtml('data-month="2026-11"');
 });
 
-test('a project shows its months as a strip and folds the validated ones away', function () {
+test('a template shows its months as a strip and folds the validated ones away', function () {
     $project = mrpProject($this->aleppo);
-    mrpPreparerMonths($project);
+    $templateId = mrpPreparerMonths($project)['november']->report_template_id;
 
     Livewire::actingAs($this->owner)->test('pages::monthly-reports.index')
-        ->assertSeeHtml('data-month-strip="'.$project->id.'"')
+        ->assertSeeHtml('data-month-strip="'.$templateId.'"')
         ->assertSeeHtml('data-strip-month="2026-08" data-strip-state="validated"')
         ->assertSeeHtml('data-strip-month="2026-10" data-strip-state="overdue"')
-        ->assertSeeHtml('data-validated-fold="'.$project->id.'"')
+        ->assertSeeHtml('data-validated-fold="'.$templateId.'"')
         ->call('showOnly', 'validated')
-        ->assertDontSeeHtml('data-validated-fold="'.$project->id.'"')
+        ->assertDontSeeHtml('data-validated-fold="'.$templateId.'"')
         ->assertSeeHtml('data-month="2026-08"');
 });
 
-test('a project with no dates says so once, with a way to the project', function () {
+test('a template that lost its proposals has no preparer, so it leaves "My reports"', function () {
     $this->travelTo('2026-11-20 10:00:00');
-    $project = mrpProject($this->aleppo);
-    mrpMonth($project, '2026-10-01');
-    mrpMonth($project, '2026-11-01');
-    DB::table('projects')->where('id', $project->id)->update(['start_date' => null, 'end_date' => null]);
+    $november = mrpMonth(mrpProject($this->aleppo), '2026-11-01');
+    $november->template->proposals()->detach();
 
-    $html = Livewire::actingAs($this->owner)->test('pages::monthly-reports.index')
-        ->assertSeeHtml('data-project-notice="'.$project->id.'"')
-        ->assertSeeHtml('href="'.route('projects.show', $project).'"')
-        ->html();
-
-    expect(substr_count($html, e(__('monthly_reports.project_has_no_period'))))->toBe(1);
+    Livewire::actingAs($this->owner)->test('pages::monthly-reports.index')
+        ->assertDontSeeHtml('data-month="2026-11"')
+        ->assertSeeText(__('monthly_reports.empty_mine'));
 });
 
-test('the validation queue groups its rows by project, and its figures switch the status', function () {
+test('the validation queue groups its rows by template, and its figures switch the status', function () {
     $this->travelTo('2026-11-20 10:00:00');
     $first = mrpProject($this->aleppo, name: 'Aleppo Center');
     $second = mrpProject($this->aleppo, name: 'Micro Aleppo');
+    // One program for both, so the groups sort by their proposals within the one place.
+    DB::table('projects')->where('id', $second->id)->update(['program_id' => $first->program_id]);
     $firstReport = mrpMonth($first, '2026-10-01', MonthlyReportStatus::Submitted);
-    $secondReport = mrpMonth($second, '2026-10-01', MonthlyReportStatus::Submitted);
+    $secondReport = mrpMonth($second->fresh(), '2026-10-01', MonthlyReportStatus::Submitted);
     mrpMonth($first, '2026-09-01', MonthlyReportStatus::Validated);
 
     $page = Livewire::actingAs(userWithRole('MEAL', insertHrEmployee(firstNameEn: 'Huda', lastNameEn: 'Meal')))
         ->test('pages::monthly-reports.index');
     $html = $page->html();
 
-    expect(strpos($html, 'data-queue-project="'.$first->id.'"'))->toBeLessThan(strpos($html, 'data-validate-row="'.$firstReport->id.'"'))
-        ->and(strpos($html, 'data-validate-row="'.$firstReport->id.'"'))->toBeLessThan(strpos($html, 'data-queue-project="'.$second->id.'"'))
-        ->and(strpos($html, 'data-queue-project="'.$second->id.'"'))->toBeLessThan(strpos($html, 'data-validate-row="'.$secondReport->id.'"'));
+    expect(strpos($html, 'data-queue-template="'.$firstReport->report_template_id.'"'))->toBeLessThan(strpos($html, 'data-validate-row="'.$firstReport->id.'"'))
+        ->and(strpos($html, 'data-validate-row="'.$firstReport->id.'"'))->toBeLessThan(strpos($html, 'data-queue-template="'.$secondReport->report_template_id.'"'))
+        ->and(strpos($html, 'data-queue-template="'.$secondReport->report_template_id.'"'))->toBeLessThan(strpos($html, 'data-validate-row="'.$secondReport->id.'"'));
 
     $page->call('showOnly', 'validated')->assertSet('status', 'validated')
         ->call('showOnly', 'waiting')->assertSet('status', 'submitted');
+});
+
+/*
+| Y-03 slice 3 (D-76, D-84): "My reports" lists the templates the user
+| prepares, one group per template. Two templates of one place and month are
+| told apart by the proposals each one covers.
+*/
+
+/**
+ * A confirmed Y-02 template at the place, carried by a new proposal whose
+ * row there names the responsible, with a draft October and November.
+ *
+ * @return array{template: ReportTemplate, october: MonthlyReport, november: MonthlyReport}
+ */
+function mrpPlacedTemplate(ReportPlace $place, string $proposalName, int $responsibleEmployeeId, ?int $rowCityId = null): array
+{
+    return Activity::withoutRecording(function () use ($place, $proposalName, $responsibleEmployeeId, $rowCityId): array {
+        $proposal = Proposal::factory()->create(['name' => $proposalName, 'planned_date_begin' => '2026-07-01', 'planned_date_end' => '2027-01-31']);
+        $row = ProposalLocation::factory()->create([
+            'proposal_id' => $proposal->id,
+            'city_id' => $rowCityId ?? $place->cityId,
+            'program_id' => $place->programId,
+            'responsible_employee_id' => $responsibleEmployeeId,
+        ]);
+        $row->centers()->create(['center_id' => $place->centerId]);
+        $template = ReportTemplate::factory()->confirmed()->forPlace($place, $proposal)->create();
+        $months = [];
+
+        foreach (['october' => '2026-10-01', 'november' => '2026-11-01'] as $key => $period) {
+            $months[$key] = MonthlyReport::factory()->create(['project_id' => null, 'report_template_id' => $template->id, 'period' => $period]);
+            MonthlyReportLine::factory()->create(['monthly_report_id' => $months[$key]->id]);
+        }
+
+        return ['template' => $template, ...$months];
+    });
+}
+
+function mrpPlace(int $cityId, ?int $centerId = null): ReportPlace
+{
+    $programId = Activity::withoutRecording(fn (): int => Program::factory()->create()->id);
+
+    return new ReportPlace($cityId, $programId, $centerId ?? insertHrCenter($cityId, 'Zone Center'), false);
+}
+
+test('two templates of one place are two groups, each naming the proposals it covers', function () {
+    $this->travelTo('2026-11-20 10:00:00');
+    $place = mrpPlace($this->aleppo);
+    $education = mrpPlacedTemplate($place, 'Education for All', $this->ownerEmployee);
+    $protection = mrpPlacedTemplate($place, 'Child Protection', $this->ownerEmployee);
+
+    $html = Livewire::actingAs($this->owner)->test('pages::monthly-reports.index')
+        ->assertSeeHtml('data-template-group="'.$education['template']->id.'"')
+        ->assertSeeHtml('data-template-group="'.$protection['template']->id.'"')
+        ->assertSeeHtml('data-fill="'.$education['november']->id.'"')
+        ->assertSeeHtml('data-fill="'.$protection['november']->id.'"')
+        ->assertSeeText(['Education for All', 'Child Protection', 'Zone Center'])
+        ->html();
+
+    // Each "Needs you" row names its proposals, so the two Novembers are not confused.
+    $educationRow = strpos($html, 'data-row-place="'.$education['template']->id.'"');
+    $protectionRow = strpos($html, 'data-row-place="'.$protection['template']->id.'"');
+
+    expect($educationRow)->not->toBeFalse()
+        ->and($protectionRow)->not->toBeFalse()
+        ->and(substr($html, $educationRow, 1200))->toContain('Education for All')
+        ->and(substr($html, $protectionRow, 1200))->toContain('Child Protection');
+});
+
+test('a supervisor sees the templates of the people they supervise; a responsible elsewhere sees none of them', function () {
+    $this->travelTo('2026-11-20 10:00:00');
+    $place = mrpPlace($this->aleppo);
+    $report = mrpPlacedTemplate($place, 'Education for All', $this->ownerEmployee);
+    $supervisorEmployee = insertHrEmployee(firstNameEn: 'Sara', lastNameEn: 'Supervisor');
+    Activity::withoutRecording(fn () => Supervision::factory()->create(['supervisor_employee_id' => $supervisorEmployee, 'supervisee_employee_id' => $this->ownerEmployee]));
+    $elsewhere = insertHrEmployee(firstNameEn: 'Hadi', lastNameEn: 'Homs');
+    // The same proposal at another city: its responsible prepares nothing at this place.
+    Activity::withoutRecording(fn () => ProposalLocation::factory()->create(['proposal_id' => $report['template']->proposals()->value('proposals.id'), 'city_id' => insertHrCity('Homs'), 'program_id' => $place->programId, 'responsible_employee_id' => $elsewhere]));
+
+    Livewire::actingAs(userWithRole('Public Relations', $supervisorEmployee))->test('pages::monthly-reports.index')
+        ->assertSeeHtml('data-template-group="'.$report['template']->id.'"')
+        ->assertSeeHtml('data-fill="'.$report['november']->id.'"');
+
+    Livewire::actingAs(userWithRole('Public Relations', $elsewhere))->test('pages::monthly-reports.index')
+        ->assertDontSeeHtml('data-template-group="'.$report['template']->id.'"')
+        ->assertSeeText(__('monthly_reports.empty_mine'));
+});
+
+test('"My reports" takes a fixed number of queries whatever the number of templates per place', function () {
+    $this->travelTo('2026-11-20 10:00:00');
+    $render = function (): int {
+        DB::flushQueryLog();
+        DB::connection('hr')->flushQueryLog();
+        DB::enableQueryLog();
+        DB::connection('hr')->enableQueryLog();
+        Livewire::actingAs($this->owner)->test('pages::monthly-reports.index');
+        $count = count(DB::getQueryLog()) + count(DB::connection('hr')->getQueryLog());
+        DB::disableQueryLog();
+        DB::connection('hr')->disableQueryLog();
+
+        return $count;
+    };
+
+    $place = mrpPlace($this->aleppo);
+    mrpPlacedTemplate($place, 'Education for All', $this->ownerEmployee);
+    mrpPlacedTemplate($place, 'Child Protection', $this->ownerEmployee);
+    $render();
+    $one = $render();
+
+    foreach (range(1, 2) as $index) {
+        $more = mrpPlace($this->aleppo, insertHrCenter($this->aleppo, 'Center '.$index));
+        mrpPlacedTemplate($more, 'Education '.$index, $this->ownerEmployee);
+        mrpPlacedTemplate($more, 'Protection '.$index, $this->ownerEmployee);
+    }
+
+    $render();
+
+    expect($render())->toBe($one);
 });

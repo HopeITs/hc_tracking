@@ -1,5 +1,6 @@
 <?php
 
+use App\Actions\MonthlyReports\OpenMonthlyReport;
 use App\Actions\MonthlyReports\ValidateMonthlyReport;
 use App\Actions\Reports\DeleteReportFile;
 use App\Actions\Reports\SaveReportFile;
@@ -9,16 +10,25 @@ use App\Models\Activity;
 use App\Models\MealCoverageAssignment;
 use App\Models\MonthlyReport;
 use App\Models\MonthlyReportReopenRequest;
+use App\Models\Program;
 use App\Models\Project;
+use App\Models\Proposal;
+use App\Models\ProposalLocation;
 use App\Models\Report;
 use App\Models\ReportFile;
+use App\Models\ReportTemplate;
 use App\Models\Supervision;
 use App\Models\User;
+use App\Support\Reporting\ReportPlace;
+use Carbon\CarbonImmutable;
 use Illuminate\Auth\Access\AuthorizationException;
 
 /*
 | MonthlyReportPolicy (contracts §13.1 items 6 and 9, D-09a, D-12a, D-20a).
-| Preparer side = report writers who own the project or supervise its owner.
+| Preparer side (D-84) = report writers who are the responsible of a location
+| row of one of the template's proposals at its place, or supervise one. The
+| legacy template factory gives the project's template a row whose responsible
+| is the project manager (the owner here).
 | Validator = the responsible MEAL officer, the MEAL Manager slot holder, or
 | any MEAL role holder only when no one is responsible; never the preparer
 | or submitter, never the General Manager. Reopen decider = the MEAL Manager
@@ -50,6 +60,15 @@ function monthlyReportIn(Project $project, MonthlyReportStatus $status, ?User $p
 }
 
 /**
+ * The project's (legacy) template, the one its reports are filed against.
+ */
+function mrauTemplate(Project $project): ReportTemplate
+{
+    return ReportTemplate::query()->where('project_id', $project->id)->orderBy('id')->first()
+        ?? Activity::withoutRecording(fn (): ReportTemplate => ReportTemplate::factory()->create(['project_id' => $project->id]));
+}
+
+/**
  * A MEAL user who is the governorate officer of the given city.
  */
 function governorateOfficer(int $cityId): User
@@ -72,7 +91,7 @@ test('report viewers see monthly reports; others do not', function () {
 test('the project owner opens, edits, submits and deletes a never-submitted draft', function () {
     $draft = monthlyReportIn($this->project, MonthlyReportStatus::Draft, $this->owner);
 
-    expect($this->owner->can('open', [MonthlyReport::class, $this->project]))->toBeTrue()
+    expect($this->owner->can('open', [MonthlyReport::class, mrauTemplate($this->project)]))->toBeTrue()
         ->and($this->owner->can('update', $draft))->toBeTrue()
         ->and($this->owner->can('submit', $draft))->toBeTrue()
         ->and($this->owner->can('delete', $draft))->toBeTrue();
@@ -82,7 +101,7 @@ test('a report writer who neither owns nor supervises the project is refused', f
     $draft = monthlyReportIn($this->project, MonthlyReportStatus::Draft);
     $stranger = userWithRole('Public Relations', insertHrEmployee(firstNameEn: 'Sara', lastNameEn: 'Stranger'));
 
-    expect($stranger->can('open', [MonthlyReport::class, $this->project]))->toBeFalse()
+    expect($stranger->can('open', [MonthlyReport::class, mrauTemplate($this->project)]))->toBeFalse()
         ->and($stranger->can('update', $draft))->toBeFalse()
         ->and($stranger->can('submit', $draft))->toBeFalse();
 });
@@ -95,14 +114,14 @@ test('a supervisor of the owner prepares on their behalf', function () {
     ]));
     $supervisor = userWithRole('Public Relations', $supervisorEmployee);
 
-    expect($supervisor->can('open', [MonthlyReport::class, $this->project]))->toBeTrue()
+    expect($supervisor->can('open', [MonthlyReport::class, mrauTemplate($this->project)]))->toBeTrue()
         ->and($supervisor->can('update', $draft))->toBeTrue();
 });
 
 test('the owner without a report-writing permission is refused', function () {
     $viewer = userWithRole('Team Member', $this->ownerEmployee);
 
-    expect($viewer->can('open', [MonthlyReport::class, $this->project]))->toBeFalse();
+    expect($viewer->can('open', [MonthlyReport::class, mrauTemplate($this->project)]))->toBeFalse();
 });
 
 test('a submitted report is locked for the preparer and a returned one cannot be deleted', function () {
@@ -311,4 +330,141 @@ test('the Public Relations Manager cannot validate or return a submitted report'
 
     expect(fn () => app(ValidateMonthlyReport::class)->handle($submitted, MonthlyReportStatus::Submitted))->toThrow(AuthorizationException::class)
         ->and($submitted->fresh()->status)->toBe(MonthlyReportStatus::Submitted);
+});
+
+/**
+ * A Y-02 template at a new center of Aleppo in a new program, carried by a
+ * proposal whose row there names the given responsible.
+ *
+ * @return array{0: ReportTemplate, 1: Proposal, 2: int, 3: int} template, proposal, center, program
+ */
+function mrauPlacedTemplate(int $responsibleEmployeeId): array
+{
+    $center = insertHrCenter(test()->aleppo);
+    $program = Activity::withoutRecording(fn (): Program => Program::factory()->create());
+
+    return Activity::withoutRecording(function () use ($center, $program, $responsibleEmployeeId): array {
+        $proposal = Proposal::factory()->create(['planned_date_begin' => '2026-10-01', 'planned_date_end' => '2026-12-31']);
+        mrauRow($proposal, $program->id, $responsibleEmployeeId, $center);
+        $template = ReportTemplate::factory()->forPlace(new ReportPlace(test()->aleppo, $program->id, $center, false), $proposal)->create();
+
+        return [$template, $proposal, $center, $program->id];
+    });
+}
+
+/**
+ * A location row of the proposal (in Aleppo unless a city is given), at the
+ * center when one is given.
+ */
+function mrauRow(Proposal $proposal, int $programId, int $responsibleEmployeeId, ?int $centerId, ?int $cityId = null): ProposalLocation
+{
+    return Activity::withoutRecording(function () use ($proposal, $programId, $responsibleEmployeeId, $centerId, $cityId): ProposalLocation {
+        $row = ProposalLocation::factory()->create([
+            'proposal_id' => $proposal->id,
+            'city_id' => $cityId ?? test()->aleppo,
+            'program_id' => $programId,
+            'responsible_employee_id' => $responsibleEmployeeId,
+        ]);
+
+        if ($centerId !== null) {
+            $row->centers()->create(['center_id' => $centerId]);
+        }
+
+        return $row;
+    });
+}
+
+function mrauDraftOf(ReportTemplate $template, string $period = '2026-10-01'): MonthlyReport
+{
+    return Activity::withoutRecording(fn (): MonthlyReport => MonthlyReport::factory()->create([
+        'project_id' => null, 'report_template_id' => $template->id, 'period' => $period,
+    ]));
+}
+
+test('D-84: the responsible of the template row at its place prepares, and so does their supervisor', function () {
+    $responsibleEmployee = insertHrEmployee(firstNameEn: 'Rana', lastNameEn: 'Responsible');
+    [$template] = mrauPlacedTemplate($responsibleEmployee);
+    $draft = mrauDraftOf($template);
+    $responsible = userWithRole('Public Relations', $responsibleEmployee);
+    $supervisorEmployee = insertHrEmployee(firstNameEn: 'Hadi', lastNameEn: 'Supervisor');
+    Activity::withoutRecording(fn () => Supervision::factory()->create([
+        'supervisor_employee_id' => $supervisorEmployee, 'supervisee_employee_id' => $responsibleEmployee,
+    ]));
+    $supervisor = userWithRole('Public Relations', $supervisorEmployee);
+
+    expect($responsible->can('open', [MonthlyReport::class, $template]))->toBeTrue()
+        ->and($responsible->can('update', $draft))->toBeTrue()
+        ->and($supervisor->can('open', [MonthlyReport::class, $template]))->toBeTrue()
+        ->and($supervisor->can('update', $draft))->toBeTrue()
+        ->and($this->owner->can('open', [MonthlyReport::class, $template]))->toBeFalse();
+});
+
+test('D-84: on a joined template each proposal responsible at the place prepares', function () {
+    $first = insertHrEmployee(firstNameEn: 'Rana', lastNameEn: 'First');
+    $second = insertHrEmployee(firstNameEn: 'Sami', lastNameEn: 'Second');
+    [$template, , $center, $programId] = mrauPlacedTemplate($first);
+    $joined = Activity::withoutRecording(fn (): Proposal => Proposal::factory()->create());
+    mrauRow($joined, $programId, $second, $center);
+    $template->proposals()->attach($joined->id, ['joined_at' => now()]);
+    $draft = mrauDraftOf($template);
+
+    foreach ([$first, $second] as $employee) {
+        $user = userWithRole('Public Relations', $employee);
+
+        expect($user->can('open', [MonthlyReport::class, $template]))->toBeTrue()
+            ->and($user->can('update', $draft))->toBeTrue();
+    }
+});
+
+test('D-84: the responsible of the same proposal at another place, or of a proposal not on the template, is refused', function () {
+    $here = insertHrEmployee(firstNameEn: 'Rana', lastNameEn: 'Here');
+    [$template, $proposal, , $programId] = mrauPlacedTemplate($here);
+    $elsewhere = insertHrEmployee(firstNameEn: 'Ziad', lastNameEn: 'Elsewhere');
+    $homs = insertHrCity('Homs');
+    mrauRow($proposal, $programId, $elsewhere, insertHrCenter($homs), $homs);
+    $outsider = insertHrEmployee(firstNameEn: 'Lina', lastNameEn: 'Outsider');
+    mrauRow(Activity::withoutRecording(fn (): Proposal => Proposal::factory()->create()), $programId, $outsider, $template->center_id);
+    $draft = mrauDraftOf($template);
+
+    foreach ([$elsewhere, $outsider] as $employee) {
+        $user = userWithRole('Public Relations', $employee);
+
+        expect($user->can('open', [MonthlyReport::class, $template]))->toBeFalse()
+            ->and($user->can('update', $draft))->toBeFalse();
+    }
+
+    $this->actingAs(userWithRole('Public Relations', $elsewhere));
+
+    expect(fn () => app(OpenMonthlyReport::class)->handle($template, CarbonImmutable::parse('2026-10-01')))
+        ->toThrow(AuthorizationException::class);
+});
+
+test('D-84: the responsible without reports.create or reports.update is refused', function () {
+    $responsibleEmployee = insertHrEmployee(firstNameEn: 'Rana', lastNameEn: 'Responsible');
+    [$template] = mrauPlacedTemplate($responsibleEmployee);
+    $draft = mrauDraftOf($template);
+    $viewer = userWithRole('Team Member', $responsibleEmployee);
+
+    expect($viewer->can('open', [MonthlyReport::class, $template]))->toBeFalse()
+        ->and($viewer->can('update', $draft))->toBeFalse()
+        ->and($viewer->can('submit', $draft))->toBeFalse();
+});
+
+test('D-84: a migrated template with no center is prepared by its row responsible', function () {
+    $template = mrauTemplate($this->project);
+
+    expect($template->center_id)->toBeNull()
+        ->and($template->city_wide)->toBeFalse()
+        ->and($this->owner->can('open', [MonthlyReport::class, $template]))->toBeTrue();
+});
+
+test('BOLA: the preparer of one template cannot touch a report of another template', function () {
+    $responsibleEmployee = insertHrEmployee(firstNameEn: 'Rana', lastNameEn: 'Responsible');
+    [$template] = mrauPlacedTemplate($responsibleEmployee);
+    mrauDraftOf($template);
+    $foreign = monthlyReportIn($this->project, MonthlyReportStatus::Draft);
+    $responsible = userWithRole('Public Relations', $responsibleEmployee);
+
+    expect($responsible->can('update', $foreign))->toBeFalse()
+        ->and($responsible->can('delete', $foreign))->toBeFalse();
 });

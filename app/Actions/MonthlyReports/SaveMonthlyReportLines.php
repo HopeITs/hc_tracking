@@ -63,8 +63,7 @@ final class SaveMonthlyReportLines
         return DB::transaction(function () use ($report, $expectedStatus, $lines): MonthlyReport {
             $ability = $expectedStatus === MonthlyReportStatus::Submitted ? 'fillMealLines' : 'update';
             $locked = MonthlyReportGuard::lock($report, $expectedStatus, $ability);
-            $locked->project->loadMissing('program:id,donor_attribution');
-            $attribution = MonthlyReportLineBuilder::attributionOf($locked->project);
+            $attribution = MonthlyReportLineBuilder::attributionOf($locked->template);
             $actorId = (int) Auth::id();
 
             /** @var Collection<int, MonthlyReportLine> $models */

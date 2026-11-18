@@ -16,6 +16,16 @@ it('names the Project model only in the place bridge', function (): void {
         ...glob(dirname(__DIR__, 2).'/app/Actions/ReportTemplates/*.php'),
         // Y-09: the change-request actions.
         ...glob(dirname(__DIR__, 2).'/app/Actions/Proposals/*ProposalChange.php'),
+        // Y-03: monthly reports follow the template.
+        dirname(__DIR__, 2).'/app/Support/MonthlyReportGenerator.php',
+        dirname(__DIR__, 2).'/app/Console/Commands/TemplateBackfillMonthlyReports.php',
+        // Y-03 slice 2: every monthly-report action and support class, and the two commands.
+        ...glob(dirname(__DIR__, 2).'/app/Actions/MonthlyReports/*.php'),
+        ...glob(dirname(__DIR__, 2).'/app/Support/MonthlyReport*.php'),
+        dirname(__DIR__, 2).'/app/Console/Commands/PrepareMonthlyReports.php',
+        dirname(__DIR__, 2).'/app/Console/Commands/BackfillMonthlyReports.php',
+        // Y-03 slice 3: monthly-report notification recipients follow the template.
+        dirname(__DIR__, 2).'/app/Notifications/Recipients/MonthlyReportRecipients.php',
     ];
 
     $offenders = [];

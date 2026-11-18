@@ -26,8 +26,8 @@ use App\Models\ReportTemplateQuestion;
 use App\Support\MonthlyReportActivities;
 use App\Support\MonthlyReportLineBuilder;
 use App\Support\MonthlyReportPeriods;
+use App\Support\MonthlyReportSharedTargets;
 use Carbon\CarbonImmutable;
-use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Database\Eloquent\Relations\Relation;
 use Livewire\Attributes\Computed;
@@ -75,8 +75,8 @@ trait ReadsMonthlyReport
     {
         $report = MonthlyReport::query()
             ->with([
-                'project:id,slug,name,user_id,program_id,center_id,city_id,working_days,start_date,end_date',
-                'project.program:id,donor_attribution',
+                'template',
+                'template.program:id,donor_attribution',
                 'lines' => fn (Relation $query) => $query->orderBy('id'),
                 'lines.libraryIndicator',
                 'lines.shares' => fn (Relation $query) => $query->orderBy('id'),
@@ -111,13 +111,13 @@ trait ReadsMonthlyReport
     #[Computed]
     public function periods(): MonthlyReportPeriods
     {
-        return MonthlyReportPeriods::for($this->report->project);
+        return MonthlyReportPeriods::for($this->report->template);
     }
 
     #[Computed]
     public function attribution(): DonorAttribution
     {
-        return MonthlyReportLineBuilder::attributionOf($this->report->project);
+        return MonthlyReportLineBuilder::attributionOf($this->report->template);
     }
 
     /**
@@ -186,6 +186,7 @@ trait ReadsMonthlyReport
      *     note: ?string,
      *     filled: bool,
      *     shares: list<array{id: int, donor: ?string, proposal: ?Proposal, target: string, fixed_denominator: ?int, computed: string, filled: bool}>,
+     *     shared: array{centers: int, target: string, reached: ?string}|null,
      *     files: list<array{id: int, name: string, type: string, url: string}>,
      *     missing_evidence: list<string>,
      * }>
@@ -196,6 +197,8 @@ trait ReadsMonthlyReport
         $report = $this->report;
         $split = $this->attribution === DonorAttribution::Split;
         $abilities = $this->abilities;
+        // D-90: a target the centers of its row share; each center enters its own figure, the page only reads what they reached together.
+        $sharedTargets = app(MonthlyReportSharedTargets::class)->for($report);
         $rows = [];
 
         foreach ($report->lines as $line) {
@@ -207,6 +210,7 @@ trait ReadsMonthlyReport
             $other = $arabic ? $library->name_en : $library->name_ar;
             $targets = array_values($line->shares->map(fn (MonthlyReportLineShare $share): float => (float) $share->planIndicator->target)->all());
             $period = $line->shares->first()?->planIndicator->period;
+            $sharedTarget = $line->shares->map(fn (MonthlyReportLineShare $share): ?array => $sharedTargets[$share->plan_indicator_id] ?? null)->filter()->first();
 
             $shares = [];
 
@@ -251,6 +255,11 @@ trait ReadsMonthlyReport
                 'shares' => $shares,
                 'files' => $this->fileRows($line->id, null),
                 'missing_evidence' => $meal ? [] : ($this->missingEvidence[$line->id] ?? []),
+                'shared' => $sharedTarget === null ? null : [
+                    'centers' => $sharedTarget['centers'],
+                    'target' => self::figure($sharedTarget['target']).$unit,
+                    'reached' => $sharedTarget['reached'] === null ? null : self::figure($sharedTarget['reached']).$unit,
+                ],
             ];
         }
 
@@ -302,7 +311,7 @@ trait ReadsMonthlyReport
         }
 
         $requiredByTarget = ReportTemplateLine::query()
-            ->whereHas('template', fn (Builder $query) => $query->where('project_id', $report->project_id))
+            ->where('report_template_id', $report->report_template_id)
             ->whereIn('plan_indicator_id', $targetIds)
             ->with('evidenceTypes:id,name_ar,name_en')
             ->get(['id', 'report_template_id', 'plan_indicator_id'])

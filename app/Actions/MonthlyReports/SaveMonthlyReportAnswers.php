@@ -17,7 +17,7 @@ use Illuminate\Support\Facades\Validator;
 
 /**
  * Save the narrative answers of a draft (contracts §13, §13.1 item 3,
- * D-43a). Each answer names an active question of the project's template
+ * D-43a). Each answer names an active question of the report's template
  * asked in the report's month; one other id rejects the whole batch. The
  * question's text is copied at answer time. Answers are optional on submit.
  */
@@ -59,7 +59,7 @@ final class SaveMonthlyReportAnswers
     }
 
     /**
-     * The questions the report asks: active questions of its project's
+     * The questions the report asks: active questions of its
      * template asked in its month, in MEAL's order.
      *
      * @return Builder<ReportTemplateQuestion>
@@ -67,7 +67,7 @@ final class SaveMonthlyReportAnswers
     public static function questions(MonthlyReport $report): Builder
     {
         return ReportTemplateQuestion::query()
-            ->whereHas('template', fn (Builder $query) => $query->where('project_id', $report->project_id))
+            ->where('report_template_id', $report->report_template_id)
             ->active()
             ->askedIn(CarbonImmutable::parse($report->period)->startOfMonth())
             ->ordered();

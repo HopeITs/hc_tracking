@@ -2,21 +2,25 @@
 
 use App\Enums\Locale;
 use App\Enums\MonthlyReportStatus;
-use App\Enums\ProjectStatus;
 use App\Enums\ReopenRequestStatus;
 use App\Livewire\Concerns\Desk\IsDeskPanel;
 use App\Models\HrEmployee;
 use App\Models\MonthlyReport;
-use App\Models\Project;
+use App\Models\ReportTemplate;
 use App\Support\MealCoverage;
+use App\Support\MonthlyReportNames;
+use App\Support\MonthlyReportPreparers;
+use App\Support\Reporting\PlaceBridge;
 use Carbon\CarbonImmutable;
 use Illuminate\Support\Collection;
 use Livewire\Attributes\Computed;
 use Livewire\Component;
 
 /**
- * Monthly reports: which project has not submitted or not had validated
- * which month. At L, W and XL a project × month grid of twelve months, where
+ * Monthly reports: which report template (D-76) has not submitted or not had
+ * validated which month. A row is a template, named by its place and the
+ * proposals it covers, so two reports of one place are told apart (Y-03).
+ * At L, W and XL a template × month grid of twelve months, where
  * CSS shows only the newest that fit the card's rendered width (so a narrow
  * card keeps its names readable); at S and M a "late first" list of the reports that
  * need someone (late, sent back, with MEAL). The legend is a filter: one
@@ -63,7 +67,10 @@ new class extends Component {
     }
 
     /**
-     * @return Collection<int, Project>
+     * The templates that have monthly reports, each with its reports and
+     * program; sorted by place, then proposals.
+     *
+     * @return Collection<int, ReportTemplate>
      */
     #[Computed]
     public function rows(): Collection
@@ -72,51 +79,98 @@ new class extends Component {
             return new Collection;
         }
 
-        return $this->visible(Project::query(), 'projects')
-            ->select(['id', 'slug', 'name', 'user_id', 'city_id', 'center_id', 'program_id'])
-            ->whereIn('id', MonthlyReport::query()->select('project_id'))
-            ->where('status', '!=', ProjectStatus::Archived)
+        $templates = ReportTemplate::query()
+            ->select(['id', 'project_id', 'city_id', 'program_id', 'center_id', 'city_wide'])
+            ->whereIn('id', MonthlyReport::query()->select('report_template_id'))
             ->with([
                 'program:id',
-                'user:id,first_name_en,last_name_en,first_name_ar,last_name_ar',
-                'monthlyReports' => fn ($query) => $query->select(['id', 'slug', 'project_id', 'period', 'status', 'returned_at', 'revised_due_on'])
+                'monthlyReports' => fn ($query) => $query->select(['id', 'slug', 'report_template_id', 'period', 'status', 'returned_at', 'revised_due_on'])
                     ->withExists(['reopenRequests as has_pending_reopen' => fn ($reopen) => $reopen->where('status', ReopenRequestStatus::Pending)]),
             ])
-            ->orderBy('name')
             ->get();
+
+        $names = $this->names;
+
+        return $templates
+            ->sortBy(fn (ReportTemplate $template): string => mb_strtolower(($names[$template->id]['place'] ?? '').'|'.($names[$template->id]['proposalsText'] ?? '')))
+            ->values();
     }
 
     /**
-     * project id => responsible MEAL officer's name.
+     * template id => place and proposals (MonthlyReportNames), read once.
      *
-     * @return array<int, string>
+     * @return array<int, array{place: string, proposals: list<array{id: int, slug: string, name: string, number: string|null}>, proposalsText: string}>
      */
     #[Computed]
-    public function officers(): array
+    public function names(): array
     {
-        $byProject = $this->rows->mapWithKeys(fn (Project $project): array => [$project->id => MealCoverage::responsibleFor($project)]);
-        $names = HrEmployee::query()->whereKey($byProject->filter()->unique()->values()->all())->get(HrEmployee::NameColumns)
+        if (! $this->canView('reports')) {
+            return [];
+        }
+
+        return app(MonthlyReportNames::class)->forTemplates(
+            ReportTemplate::query()
+                ->select(['id', 'city_id', 'program_id', 'center_id', 'city_wide'])
+                ->whereIn('id', MonthlyReport::query()->select('report_template_id'))
+                ->get()
+        );
+    }
+
+    /**
+     * template id => who prepares (the first responsible, D-84) and the
+     * responsible MEAL officer (through the legacy project until coverage
+     * moves to places), as names. A fixed number of queries.
+     *
+     * @return array<int, array{owner: string, officer: string}>
+     */
+    #[Computed]
+    public function people(): array
+    {
+        $templates = $this->rows;
+
+        if ($templates->isEmpty()) {
+            return [];
+        }
+
+        $responsibles = app(MonthlyReportPreparers::class)->responsiblesByTemplate($templates);
+        $bridge = app(PlaceBridge::class);
+        $legacyIds = $bridge->legacyProjectIdsFor($templates);
+        $projects = $bridge->projectsByIds(array_values(array_unique(array_filter($legacyIds))));
+        $officers = array_map(fn (?int $projectId): ?int => $projectId === null || ! $projects->has($projectId) ? null : MealCoverage::responsibleFor($projects->get($projectId)), $legacyIds);
+        $owners = array_map(fn (array $ids): ?int => $ids[0] ?? null, $responsibles);
+        $names = HrEmployee::query()->whereKey(array_values(array_unique(array_filter([...array_values($owners), ...array_values($officers)]))))->get(HrEmployee::NameColumns)
             ->mapWithKeys(fn (HrEmployee $employee): array => [$employee->id => $employee->name]);
 
-        return $byProject->map(fn (?int $employeeId): string => $employeeId === null ? '' : (string) $names->get($employeeId, ''))->all();
+        $result = [];
+
+        foreach ($templates as $template) {
+            $owner = $owners[$template->id] ?? null;
+            $officer = $officers[$template->id] ?? null;
+            $result[$template->id] = [
+                'owner' => $owner === null ? '' : (string) $names->get($owner, ''),
+                'officer' => $officer === null ? '' : (string) $names->get($officer, ''),
+            ];
+        }
+
+        return $result;
     }
 
     /**
      * Every report in the shown months that needs someone (late, sent back,
      * with MEAL), late first then oldest month, for the S/M list.
      *
-     * @param  Collection<int, Project>  $projects
-     * @return Collection<int, array{project: Project, report: MonthlyReport, state: string}>
+     * @param  Collection<int, ReportTemplate>  $templates
+     * @return Collection<int, array{template: ReportTemplate, report: MonthlyReport, state: string}>
      */
-    public function attention(Collection $projects): Collection
+    public function attention(Collection $templates): Collection
     {
         $from = $this->months()[0];
         $states = $this->state === '' ? ['late', 'returned', 'submitted'] : [$this->state];
 
-        return $projects
-            ->flatMap(fn (Project $project): Collection => $project->monthlyReports
+        return $templates
+            ->flatMap(fn (ReportTemplate $template): Collection => $template->monthlyReports
                 ->filter(fn (MonthlyReport $report): bool => $report->period->greaterThanOrEqualTo($from) && in_array($this->stateOf($report), $states, true))
-                ->map(fn (MonthlyReport $report): array => ['project' => $project, 'report' => $report, 'state' => $this->stateOf($report)]))
+                ->map(fn (MonthlyReport $report): array => ['template' => $template, 'report' => $report, 'state' => $this->stateOf($report)]))
             ->sortBy([
                 fn (array $a, array $b): int => array_search($a['state'], self::States, true) <=> array_search($b['state'], self::States, true),
                 fn (array $a, array $b): int => $a['report']->period <=> $b['report']->period,
@@ -154,9 +208,9 @@ new class extends Component {
      */
     protected function facetsOf(mixed $row): array
     {
-        $project = $row instanceof Project ? $row : $row['project'];
+        $template = $row instanceof ReportTemplate ? $row : $row['template'];
 
-        return array_filter(['program' => $project->program?->name], fn (?string $name): bool => $name !== null && $name !== '');
+        return array_filter(['program' => $template->program?->name], fn (?string $name): bool => $name !== null && $name !== '');
     }
 };
 ?>
@@ -164,16 +218,18 @@ new class extends Component {
 @php
     $months = $this->months();
     $from = $months[0];
-    $projects = $this->rows;
-    $inWindow = $projects->flatMap(fn ($project) => $project->monthlyReports->filter(fn ($report) => $report->period->greaterThanOrEqualTo($from)));
+    $templates = $this->rows;
+    $names = $this->names;
+    $people = $this->people;
+    $inWindow = $templates->flatMap(fn ($template) => $template->monthlyReports->filter(fn ($report) => $report->period->greaterThanOrEqualTo($from)));
     $counts = $inWindow->countBy(fn ($report) => $this->stateOf($report));
     $wide = $this->isWide();
     $glyphs = ['validated' => '✓', 'submitted' => '•', 'late' => '!', 'returned' => '↺', 'draft' => ''];
 
     if ($wide) {
-        $list = $state === '' ? $projects : $projects->filter(fn ($project) => $project->monthlyReports->contains(fn ($report) => $report->period->greaterThanOrEqualTo($from) && $this->stateOf($report) === $state))->values();
+        $list = $state === '' ? $templates : $templates->filter(fn ($template) => $template->monthlyReports->contains(fn ($report) => $report->period->greaterThanOrEqualTo($from) && $this->stateOf($report) === $state))->values();
     } else {
-        $list = $this->attention($projects);
+        $list = $this->attention($templates);
     }
 
     $pg = $this->paginate($list, self::PerPage);
@@ -206,15 +262,18 @@ new class extends Component {
                 @endforeach
                 <span role="columnheader">{{ __('desk.validated') }}</span>
             </div>
-            @foreach ($pg['slice'] as $project)
+            @foreach ($pg['slice'] as $template)
                 @php
-                    $byMonth = $project->monthlyReports->keyBy(fn ($report) => $report->period->format('Y-m'));
-                    $owner = $project->user?->name;
-                    $officer = $this->officers[$project->id] ?? '';
-                    $lateHere = $project->monthlyReports->filter(fn ($report) => $report->period->greaterThanOrEqualTo($from) && $this->stateOf($report) === 'late')->count();
+                    $byMonth = $template->monthlyReports->keyBy(fn ($report) => $report->period->format('Y-m'));
+                    $place = $names[$template->id]['place'] ?? '';
+                    $covers = ($names[$template->id]['proposalsText'] ?? '') !== '' ? $names[$template->id]['proposalsText'] : __('monthly_reports.no_proposal');
+                    $owner = ($people[$template->id]['owner'] ?? '') !== '' ? $people[$template->id]['owner'] : '—';
+                    $officer = ($people[$template->id]['officer'] ?? '') !== '' ? $people[$template->id]['officer'] : '—';
+                    $lateHere = $template->monthlyReports->filter(fn ($report) => $report->period->greaterThanOrEqualTo($from) && $this->stateOf($report) === 'late')->count();
                 @endphp
-                <div class="dk-mx2-r" role="row" wire:key="mx-{{ $project->id }}">
-                    <span class="dk-mx2-n" role="rowheader"><a href="{{ route('projects.show', $project) }}" wire:navigate title="{{ $project->name }}">{{ $project->name }}</a><span class="dk-is" title="{{ __('desk.matrix_people', ['owner' => $owner ?? '—', 'officer' => $officer !== '' ? $officer : '—']) }}">@if ($lateHere > 0)<b class="dk-mx2-late dk-num">{{ trans_choice('desk.matrix_row_late', $lateHere, ['count' => $lateHere]) }}</b>@endif{{ $owner ?? '—' }} → {{ $officer !== '' ? $officer : '—' }}</span></span>
+                {{-- A row is a template: its place, then the proposals it covers, so two reports of one place are told apart. --}}
+                <div class="dk-mx2-r" role="row" wire:key="mx-{{ $template->id }}" data-matrix-template="{{ $template->id }}">
+                    <span class="dk-mx2-n" role="rowheader"><a href="{{ route('monthly-reports.index') }}" wire:navigate title="{{ $place }} · {{ $covers }}" dir="auto">{{ $place }}</a><span class="dk-is" title="{{ $covers }} · {{ __('desk.matrix_people', ['owner' => $owner, 'officer' => $officer]) }}"><span dir="auto" data-matrix-proposals>{{ $covers }}</span> · @if ($lateHere > 0)<b class="dk-mx2-late dk-num">{{ trans_choice('desk.matrix_row_late', $lateHere, ['count' => $lateHere]) }}</b>@endif{{ $owner }} → {{ $officer }}</span></span>
                     @foreach ($months as $month)
                         @php
                             $report = $byMonth->get($month->format('Y-m'));
@@ -228,7 +287,7 @@ new class extends Component {
                             @endif
                         </span>
                     @endforeach
-                    <span role="cell" class="dk-mx2-v dk-num">{{ $project->monthlyReports->where('status', MonthlyReportStatus::Validated)->count() }}/{{ $project->monthlyReports->count() }}</span>
+                    <span role="cell" class="dk-mx2-v dk-num">{{ $template->monthlyReports->where('status', MonthlyReportStatus::Validated)->count() }}/{{ $template->monthlyReports->count() }}</span>
                 </div>
             @endforeach
         </div>
@@ -236,9 +295,13 @@ new class extends Component {
         <ul class="dk-mx-list" {{ $this->fitAttributes($pg) }}>
             @foreach ($pg['slice'] as $row)
                 <li wire:key="mxl-{{ $row['report']->id }}">
-                    <a href="{{ route('monthly-reports.show', $row['report']) }}" wire:navigate class="dk-mx-ln" title="{{ $row['project']->name }}">{{ $row['project']->name }}</a>
+                    @php
+                        $rowNames = $names[$row['template']->id] ?? ['place' => '', 'proposalsText' => ''];
+                        $rowCovers = $rowNames['proposalsText'] !== '' ? $rowNames['proposalsText'] : __('monthly_reports.no_proposal');
+                    @endphp
+                    <a href="{{ route('monthly-reports.show', $row['report']) }}" wire:navigate class="dk-mx-ln" title="{{ $rowCovers }} · {{ $rowNames['place'] }}" dir="auto">{{ $rowCovers }}</a>
                     <span class="dk-pill dk-mxp-{{ $row['state'] }}">{{ __('desk.report_state.'.$row['state']) }}</span>
-                    <span class="dk-is">{{ $row['report']->period->translatedFormat('F Y') }} · {{ $row['project']->user?->name ?? '—' }}</span>
+                    <span class="dk-is">{{ $row['report']->period->translatedFormat('F Y') }} · <span dir="auto">{{ $rowNames['place'] }}</span> · {{ ($people[$row['template']->id]['owner'] ?? '') !== '' ? $people[$row['template']->id]['owner'] : '—' }}</span>
                 </li>
             @endforeach
         </ul>

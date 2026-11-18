@@ -9,6 +9,7 @@ use App\Models\MonthlyReport;
 use App\Models\MonthlyReportLine;
 use App\Models\MonthlyReportReopenRequest;
 use App\Models\Project;
+use App\Models\ReportTemplate;
 use App\Notifications\Alerts\DeadlineCatalog;
 use App\Support\MonthlyReportPeriods;
 use Carbon\CarbonImmutable;
@@ -171,7 +172,7 @@ test('the month\'s own deadline skips HR holidays', function () {
     insertHrHoliday('App\Models\Center', $this->center, '2026-11-03');
 
     // Five working days after 31 October without Tuesday 3 November: Monday 9 November.
-    expect(MonthlyReportPeriods::for($this->project)->dueDate(CarbonImmutable::parse('2026-10-01'))->toDateString())->toBe('2026-11-09');
+    expect(MonthlyReportPeriods::for(ReportTemplate::query()->where('project_id', $this->project->id)->orderBy('id')->firstOrFail())->dueDate(CarbonImmutable::parse('2026-10-01'))->toDateString())->toBe('2026-11-09');
 });
 
 test('a holiday on the month\'s last day moves its last working day, so the report may be submitted the day before', function (bool $holiday) {
@@ -182,5 +183,5 @@ test('a holiday on the month\'s last day moves its last working day, so the repo
     $this->travelTo('2026-11-27 10:00:00');
 
     // Friday 27 November; Monday 30 November is the month's last day.
-    expect(MonthlyReportPeriods::for($this->project)->canSubmit($november) === __('monthly_reports.submit_too_early'))->toBe(! $holiday);
+    expect(MonthlyReportPeriods::for(ReportTemplate::query()->where('project_id', $this->project->id)->orderBy('id')->firstOrFail())->canSubmit($november) === __('monthly_reports.submit_too_early'))->toBe(! $holiday);
 })->with(['a working Monday 30th' => false, 'a holiday on Monday 30th' => true]);

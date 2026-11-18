@@ -17,7 +17,6 @@ use App\Models\TransfersTracking;
 use App\Models\User;
 use App\Support\MonthlyReportPeriods;
 use Carbon\CarbonImmutable;
-use Illuminate\Database\Eloquent\Collection as EloquentCollection;
 use Illuminate\Support\Carbon;
 use Livewire\Livewire;
 
@@ -1006,7 +1005,7 @@ test('a monthly report appears on its due date and is marked late once that date
     MonthlyReportLine::factory()->for($draft)->create();
     MonthlyReportLine::factory()->for($validated)->create();
 
-    $periods = MonthlyReportPeriods::fromLoaded($project, new EloquentCollection);
+    $periods = MonthlyReportPeriods::for($draft->template);
     $draftDue = $periods->dueDate(CarbonImmutable::create(2026, 6, 1));
     $validatedDue = $periods->dueDate(CarbonImmutable::create(2026, 5, 1));
 
@@ -1041,7 +1040,7 @@ test('focusing on monthly reports lists their due dates in the related-dates pan
         ->focusedItems;
 
     expect($items->pluck('id')->all())->toBe([$report->id])
-        ->and($items->first()['date']->toDateString())->toBe(MonthlyReportPeriods::fromLoaded($project, new EloquentCollection)->dueDate(CarbonImmutable::create(2026, 7, 1))->toDateString());
+        ->and($items->first()['date']->toDateString())->toBe(MonthlyReportPeriods::for($report->template)->dueDate(CarbonImmutable::create(2026, 7, 1))->toDateString());
 });
 
 test('a busy day shows its item count for phone screens', function () {

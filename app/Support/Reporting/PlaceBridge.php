@@ -191,7 +191,8 @@ final class PlaceBridge
     }
 
     /**
-     * Projects by id with the columns the queue and the policy read.
+     * Projects by id with the columns the queue, the policy and the monthly
+     * report calendar (working days, Y-03) read.
      *
      * Removed by Y-17.
      *
@@ -205,7 +206,7 @@ final class PlaceBridge
         }
 
         return Project::query()
-            ->select(['id', 'name', 'slug', 'status', 'city_id', 'center_id', 'program_id'])
+            ->select(['id', 'name', 'slug', 'status', 'city_id', 'center_id', 'program_id', 'user_id', 'working_days'])
             ->whereKey($ids)
             ->get()
             ->keyBy('id')

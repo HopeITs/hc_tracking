@@ -5,9 +5,11 @@ use App\Enums\MonthlyReportStatus;
 use App\Enums\ReopenRequestStatus;
 use App\Models\HrCity;
 use App\Models\MonthlyReport;
-use App\Models\Project;
+use App\Models\ReportTemplate;
+use App\Support\MonthlyReportGenerator;
+use App\Support\MonthlyReportNames;
 use App\Support\MonthlyReportPeriods;
-use App\Support\SupervisionMap;
+use App\Support\MonthlyReportPreparers;
 use Carbon\CarbonImmutable;
 use Flux\Flux;
 use Illuminate\Database\Eloquent\Builder;
@@ -80,7 +82,7 @@ new #[Layout('layouts::desk'), Title('titles.monthly_reports')] class extends Co
         $offered = $this->canValidate() ? ['mine', 'validate'] : ['mine'];
 
         if (! in_array($this->tab, $offered, true)) {
-            $this->tab = $this->myProjectIds() === [] && $this->canValidate() ? 'validate' : 'mine';
+            $this->tab = $this->myTemplateIds() === [] && $this->canValidate() ? 'validate' : 'mine';
         }
     }
 
@@ -100,14 +102,14 @@ new #[Layout('layouts::desk'), Title('titles.monthly_reports')] class extends Co
 
     /**
      * Open (prepare) a generated month and go to it. OpenMonthlyReport
-     * authorizes `open` on the project and builds the month's lines.
+     * authorizes `open` on the template and builds the month's lines.
      */
     public function fillMonth(int $monthlyReportId): void
     {
-        $report = MonthlyReport::query()->with('project')->findOrFail($monthlyReportId);
+        $report = MonthlyReport::query()->with('template')->findOrFail($monthlyReportId);
 
         try {
-            $opened = app(OpenMonthlyReport::class)->handle($report->project, $report->period);
+            $opened = app(OpenMonthlyReport::class)->handle($report->template, $report->period);
         } catch (ValidationException $exception) {
             // The refusal used to land on a "month" error this page never shows, so Fill looked dead.
             Flux::toast(variant: 'danger', text: collect($exception->errors())->flatten()->first());
@@ -119,82 +121,73 @@ new #[Layout('layouts::desk'), Title('titles.monthly_reports')] class extends Co
     }
 
     /**
-     * The projects the user prepares: owned (owner or program manager) and,
-     * through SupervisionMap, the projects of the people they supervise.
+     * The templates the user prepares (D-84): a responsible of a row at the
+     * template's place, or a supervisor of one (MonthlyReportPreparers).
      *
      * @return list<int>
      */
-    protected function myProjectIds(): array
+    protected function myTemplateIds(): array
     {
-        $user = auth()->user();
-        $ids = $user->ownedProjectIds();
-
-        if ($user->employee_id !== null) {
-            $supervisees = SupervisionMap::superviseesOf($user->employee_id);
-
-            if ($supervisees !== []) {
-                $ids = [...$ids, ...Project::query()->whereIn('user_id', $supervisees)->pluck('id')->map(fn (mixed $id): int => (int) $id)->all()];
-            }
-        }
-
-        $ids = array_values(array_unique($ids));
-        sort($ids);
-
-        return $ids;
+        return once(fn (): array => app(MonthlyReportPreparers::class)->templateIdsFor(auth()->user()));
     }
 
     /**
-     * Every generated month of the user's projects, grouped by project, with
-     * its state, due date, overdue marker and submit blocker. Two queries
-     * (projects, reports); due-ness comes from MonthlyReportPeriods.
+     * Every generated month of the templates the user prepares, one group
+     * per template (D-76), named by its place and its proposals so two
+     * reports of one place are told apart. Each month carries its state,
+     * due date, overdue marker and submit blocker. A fixed number of
+     * queries: the templates and their proposals, the reports, the
+     * responsibles once for `can('open')`, the names, the working days.
      *
-     * `notice` is what holds the whole project back (no start or end date),
-     * said once over its months rather than under each of them;
-     * `hasIndicators` is false when no month has a line, so the "no
-     * indicators" sentence is said once for the project too.
+     * `hasIndicators` is false when no month has a line, so "no indicators"
+     * is said once for the template. A template with no proposal has no
+     * preparer (D-84), so it is never listed here.
      *
-     * @return list<array{project: Project, notice: ?string, hasIndicators: bool, months: list<array{report: MonthlyReport, key: string, state: string, due: ?CarbonImmutable, overdue: bool, blocked: ?string, can_fill: bool}>}>
+     * @return list<array{template: ReportTemplate, place: string, proposals: list<array{id: int, slug: string, name: string, number: string|null}>, title: string, hasIndicators: bool, months: list<array{report: MonthlyReport, key: string, state: string, due: ?CarbonImmutable, overdue: bool, blocked: ?string, can_fill: bool}>}>
      */
     #[Computed]
     public function myMonths(): array
     {
-        $projectIds = $this->myProjectIds();
+        $templateIds = $this->myTemplateIds();
 
-        if ($projectIds === []) {
+        if ($templateIds === []) {
             return [];
         }
 
-        $projects = Project::query()
-            ->whereIn('id', $projectIds)
-            ->orderBy('name')
-            ->get(['id', 'slug', 'name', 'user_id', 'program_id', 'center_id', 'city_id', 'working_days', 'start_date', 'end_date']);
-
         $reports = MonthlyReport::query()
-            ->whereIn('project_id', $projectIds)
+            ->whereIn('report_template_id', $templateIds)
             ->withCount('lines')
             ->withExists(['reopenRequests as reopen_pending' => fn (Builder $query) => $query->where('status', ReopenRequestStatus::Pending)])
             ->orderBy('period')
-            ->get(['id', 'slug', 'project_id', 'period', 'status', 'returned_at', 'revised_due_on'])
-            ->groupBy('project_id');
+            ->get(['id', 'slug', 'report_template_id', 'period', 'status', 'returned_at', 'revised_due_on'])
+            ->groupBy('report_template_id');
+
+        if ($reports->isEmpty()) {
+            return [];
+        }
+
+        // The month's unit is its template (D-76): its window, working days, preparers and names decide.
+        $templates = ReportTemplate::query()
+            ->whereKey($reports->keys()->all())
+            ->with(['proposals' => fn ($query) => $query->select([...MonthlyReportGenerator::WindowColumns, 'proposals.slug', 'proposals.name', 'proposals.internal_project_number'])])
+            ->get()
+            ->keyBy('id');
+        $workingDays = MonthlyReportPeriods::workingDaysOf($templates);
+        $responsibles = app(MonthlyReportPreparers::class)->responsiblesByTemplate($templates);
+        $names = app(MonthlyReportNames::class)->forTemplates($templates);
 
         $user = auth()->user();
         $groups = [];
 
-        foreach ($projects as $project) {
-            /** @var Collection<int, MonthlyReport> $projectReports */
-            $projectReports = $reports->get($project->id, new Collection);
-
-            if ($projectReports->isEmpty()) {
-                continue;
-            }
-
-            $periods = MonthlyReportPeriods::fromLoaded($project, $projectReports);
-            $mayOpen = $user->can('open', [MonthlyReport::class, $project]);
-            $notice = $project->start_date === null || $project->end_date === null ? __('monthly_reports.project_has_no_period') : null;
+        foreach ($templates as $templateId => $template) {
+            /** @var Collection<int, MonthlyReport> $templateReports */
+            $templateReports = new Collection($reports->get($templateId, new Collection)->all());
+            $periods = MonthlyReportPeriods::fromLoaded($template, $templateReports, $workingDays[$templateId] ?? null);
+            $mayOpen = $user->can('open', [MonthlyReport::class, $template, $responsibles[$templateId] ?? []]);
             $months = [];
 
-            foreach ($projectReports as $report) {
-                $report->setRelation('project', $project);
+            foreach ($templateReports as $report) {
+                $report->setRelation('template', $template);
                 $started = $periods->hasStarted($report->period);
                 $hasLines = (int) $report->getAttribute('lines_count') > 0;
                 $state = match (true) {
@@ -206,8 +199,8 @@ new #[Layout('layouts::desk'), Title('titles.monthly_reports')] class extends Co
                 };
                 $editable = in_array($state, ['draft', 'returned'], true);
                 $due = $hasLines ? $periods->effectiveDueDate($report) : null;
-                // A month OpenMonthlyReport would refuse (no project period, or outside it) gets its reason, not a Fill that silently fails.
-                $refusal = $editable ? OpenMonthlyReport::refusal($project, $report->period) : null;
+                // A month OpenMonthlyReport would refuse (no period, or outside it) gets its reason, not a Fill that silently fails.
+                $refusal = $editable ? OpenMonthlyReport::refusal($template, $report->period) : null;
 
                 $months[] = [
                     'report' => $report,
@@ -215,32 +208,34 @@ new #[Layout('layouts::desk'), Title('titles.monthly_reports')] class extends Co
                     'state' => $state,
                     'due' => $due,
                     'overdue' => $editable && $due !== null && CarbonImmutable::today()->greaterThan($due),
-                    // The project-wide notice is said once over the months, not again under each.
-                    'blocked' => match (true) {
-                        ! $editable, $refusal !== null && $refusal === $notice => null,
-                        default => $refusal ?? $periods->canSubmit($report),
-                    },
+                    'blocked' => $editable ? $refusal ?? $periods->canSubmit($report) : null,
                     'can_fill' => $editable && $mayOpen && $refusal === null,
                 ];
             }
 
             $groups[] = [
-                'project' => $project,
-                'notice' => $notice,
-                'hasIndicators' => $projectReports->contains(fn (MonthlyReport $report): bool => (int) $report->getAttribute('lines_count') > 0),
+                'template' => $template,
+                'place' => $names[$templateId]['place'],
+                'proposals' => $names[$templateId]['proposals'],
+                'title' => $names[$templateId]['proposalsText'] !== '' ? $names[$templateId]['proposalsText'] : __('monthly_reports.no_proposal'),
+                'hasIndicators' => $templateReports->contains(fn (MonthlyReport $report): bool => (int) $report->getAttribute('lines_count') > 0),
                 'months' => $months,
             ];
         }
+
+        // Two templates of one place sit together, told apart by their proposals.
+        usort($groups, fn (array $a, array $b): int => [mb_strtolower($a['place']), mb_strtolower($a['title']), $a['template']->id]
+            <=> [mb_strtolower($b['place']), mb_strtolower($b['title']), $b['template']->id]);
 
         return $groups;
     }
 
     /**
-     * The months waiting on the preparer, gathered from every project at the
-     * top of "My reports": the ones they can fill, overdue first, then oldest
-     * first. A reader who cannot fill gets none, so no list.
+     * The months waiting on the preparer, gathered from every template at
+     * the top of "My reports": the ones they can fill, overdue first, then
+     * oldest first. A reader who cannot fill gets none, so no list.
      *
-     * @return list<array{project: Project, row: array{report: MonthlyReport, key: string, state: string, due: ?CarbonImmutable, overdue: bool, blocked: ?string, can_fill: bool}}>
+     * @return list<array{group: array<string, mixed>, row: array{report: MonthlyReport, key: string, state: string, due: ?CarbonImmutable, overdue: bool, blocked: ?string, can_fill: bool}}>
      */
     #[Computed]
     public function needsYou(): array
@@ -255,7 +250,7 @@ new #[Layout('layouts::desk'), Title('titles.monthly_reports')] class extends Co
         foreach ($this->myMonths as $group) {
             foreach ($group['months'] as $row) {
                 if ($row['can_fill']) {
-                    $items[] = ['project' => $group['project'], 'row' => $row];
+                    $items[] = ['group' => $group, 'row' => $row];
                 }
             }
         }
@@ -307,12 +302,12 @@ new #[Layout('layouts::desk'), Title('titles.monthly_reports')] class extends Co
     }
 
     /**
-     * "My reports" as it is drawn: each project with its months narrowed to
-     * the big figure picked, the validated months set apart to fold away
+     * "My reports" as it is drawn: each template with its months narrowed
+     * to the big figure picked, the validated months set apart to fold away
      * (unless "validated" is the figure picked), and every month kept for
-     * the project's month strip. A project left with no month is dropped.
+     * the template's month strip. A template left with no month is dropped.
      *
-     * @return list<array{project: Project, notice: ?string, hasIndicators: bool, strip: list<array<string, mixed>>, open: list<array<string, mixed>>, folded: list<array<string, mixed>>}>
+     * @return list<array{template: ReportTemplate, place: string, proposals: list<array{id: int, slug: string, name: string, number: string|null}>, title: string, hasIndicators: bool, strip: list<array<string, mixed>>, open: list<array<string, mixed>>, folded: list<array<string, mixed>>}>
      */
     #[Computed]
     public function visibleGroups(): array
@@ -336,8 +331,10 @@ new #[Layout('layouts::desk'), Title('titles.monthly_reports')] class extends Co
             $fold = $this->show === '';
 
             $groups[] = [
-                'project' => $group['project'],
-                'notice' => $group['notice'],
+                'template' => $group['template'],
+                'place' => $group['place'],
+                'proposals' => $group['proposals'],
+                'title' => $group['title'],
                 'hasIndicators' => $group['hasIndicators'],
                 'strip' => $group['months'],
                 'open' => $fold ? array_values(array_filter($rows, fn (array $row): bool => $row['state'] !== 'validated')) : $rows,
@@ -367,10 +364,21 @@ new #[Layout('layouts::desk'), Title('titles.monthly_reports')] class extends Co
         return MonthlyReport::query()
             ->validatableBy(auth()->user())
             ->where('status', '!=', MonthlyReportStatus::Draft)
-            ->with(['project:id,slug,name,city_id', 'submitter:id,hr_user_id'])
+            ->with(['project:id,slug,name,city_id', 'template:id,city_id,program_id,center_id,city_wide', 'submitter:id,hr_user_id'])
             ->orderBy('period')
             ->orderBy('id')
-            ->get(['id', 'slug', 'project_id', 'period', 'status', 'submitted_at', 'submitted_by', 'seen_by_meal_at']);
+            ->get(['id', 'slug', 'project_id', 'report_template_id', 'period', 'status', 'submitted_at', 'submitted_by', 'seen_by_meal_at']);
+    }
+
+    /**
+     * The queue's templates named by place and proposals, read once.
+     *
+     * @return array<int, array{place: string, proposals: list<array{id: int, slug: string, name: string, number: string|null}>, proposalsText: string}>
+     */
+    #[Computed]
+    public function queueNames(): array
+    {
+        return app(MonthlyReportNames::class)->forTemplates($this->validatable->pluck('template')->filter());
     }
 
     /**
@@ -395,7 +403,7 @@ new #[Layout('layouts::desk'), Title('titles.monthly_reports')] class extends Co
     public function filteredQueue(): Collection
     {
         return $this->queue
-            ->when($this->city !== '', fn (Collection $rows) => $rows->filter(fn (MonthlyReport $report): bool => (string) $report->project->city_id === $this->city))
+            ->when($this->city !== '', fn (Collection $rows) => $rows->filter(fn (MonthlyReport $report): bool => (string) $report->template->city_id === $this->city))
             ->when($this->project !== '', fn (Collection $rows) => $rows->filter(fn (MonthlyReport $report): bool => (string) $report->project_id === $this->project))
             ->when($this->month !== '', fn (Collection $rows) => $rows->filter(fn (MonthlyReport $report): bool => $report->period->format('Y-m') === $this->month))
             ->when($this->show === 'not_seen', fn (Collection $rows) => $rows->filter(fn (MonthlyReport $report): bool => $report->seen_by_meal_at === null))
@@ -412,14 +420,14 @@ new #[Layout('layouts::desk'), Title('titles.monthly_reports')] class extends Co
     }
 
     /**
-     * City names of the queued projects, for the filter and the rows.
+     * City names of the queued templates' places, for the filter.
      *
      * @return array<int, string>
      */
     #[Computed]
     public function cityNames(): array
     {
-        $ids = $this->validatable->map(fn (MonthlyReport $report): ?int => $report->project->city_id === null ? null : (int) $report->project->city_id)->filter()->unique()->values()->all();
+        $ids = $this->validatable->map(fn (MonthlyReport $report): int => (int) $report->template->city_id)->unique()->values()->all();
 
         if ($ids === []) {
             return [];

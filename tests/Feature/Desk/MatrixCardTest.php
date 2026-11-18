@@ -4,7 +4,11 @@ use App\Enums\Locale;
 use App\Enums\MonthlyReportStatus;
 use App\Models\Activity;
 use App\Models\MonthlyReport;
+use App\Models\Program;
 use App\Models\Project;
+use App\Models\Proposal;
+use App\Models\ReportTemplate;
+use App\Support\Reporting\ReportPlace;
 use Carbon\CarbonImmutable;
 use Livewire\Livewire;
 
@@ -56,7 +60,8 @@ test('a late report in an old month marks its project row, so a narrow card that
 
     Livewire::actingAs(userWithRole('General Manager', insertHrEmployee()))->test('desk.panels.matrix', ['size' => 'L'])
         ->assertSeeHtml('<p class="dk-mx-recent">'.__('desk.matrix_latest_months').'</p>')
-        ->assertSeeInOrder(['Late Wells', '2 late', 'Old Late Farm', '1 late']);
+        ->assertSeeInOrder(['Late Wells', '2 late'])
+        ->assertSeeInOrder(['Old Late Farm', '1 late']);
 });
 
 test('a report late before the card\'s twelve months and a report that is not late get no marker', function () {
@@ -92,4 +97,74 @@ test('at S the card lists the reports that need someone, late first', function (
         ->assertDontSeeHtml('class="dk-mx2"')
         ->assertSeeInOrder(['Late Wells', 'July 2026', 'Late Wells', 'August 2026', 'Waiting School'])
         ->assertDontSee('Fine Clinic');
+});
+
+/*
+| Y-03 slice 3 (D-76): a row is a report template, named by its place and the
+| proposals it covers, so two reports of one place are told apart.
+*/
+
+function mxPlacedTemplate(ReportPlace $place, string $proposalName, string $status = 'draft'): ReportTemplate
+{
+    return Activity::withoutRecording(function () use ($place, $proposalName, $status): ReportTemplate {
+        $proposal = Proposal::factory()->create(['name' => $proposalName]);
+        $template = ReportTemplate::factory()->confirmed()->forPlace($place, $proposal)->create();
+        MonthlyReport::factory()->create(['project_id' => null, 'report_template_id' => $template->id, 'period' => '2026-08-01', 'status' => MonthlyReportStatus::from($status)]);
+
+        return $template;
+    });
+}
+
+test('two templates of one place are two rows, told apart by their proposals', function () {
+    $city = insertHrCity('Homs');
+    $place = new ReportPlace($city, Activity::withoutRecording(fn (): int => Program::factory()->create()->id), insertHrCenter($city, 'Zone Center'), false);
+    $education = mxPlacedTemplate($place, 'Education for All');
+    $protection = mxPlacedTemplate($place, 'Child Protection', 'submitted');
+
+    $html = Livewire::actingAs(userWithRole('General Manager', insertHrEmployee()))->test('desk.panels.matrix', ['size' => 'XL'])
+        ->assertSeeHtml('data-matrix-template="'.$education->id.'"')
+        ->assertSeeHtml('data-matrix-template="'.$protection->id.'"')
+        ->html();
+
+    $educationRow = strpos($html, 'data-matrix-template="'.$education->id.'"');
+    $protectionRow = strpos($html, 'data-matrix-template="'.$protection->id.'"');
+
+    expect(substr($html, $educationRow, 900))->toContain('Zone Center')->toContain('Education for All')->not->toContain('Child Protection')
+        ->and(substr($html, $protectionRow, 900))->toContain('Zone Center')->toContain('Child Protection')->not->toContain('Education for All');
+});
+
+test('the card takes a fixed number of queries whatever the number of templates', function () {
+    $viewer = userWithRole('General Manager', insertHrEmployee());
+    $count = function () use ($viewer): int {
+        DB::flushQueryLog();
+        DB::connection('hr')->flushQueryLog();
+        DB::enableQueryLog();
+        DB::connection('hr')->enableQueryLog();
+        Livewire::actingAs($viewer)->test('desk.panels.matrix', ['size' => 'XL']);
+        $queries = count(DB::getQueryLog()) + count(DB::connection('hr')->getQueryLog());
+        DB::disableQueryLog();
+        DB::connection('hr')->disableQueryLog();
+
+        return $queries;
+    };
+
+    // One placed pair first: a template without a legacy project adds the bridge's fixed lookup once.
+    $city = insertHrCity('Homs');
+    $programId = Activity::withoutRecording(fn (): int => Program::factory()->create()->id);
+    $first = new ReportPlace($city, $programId, insertHrCenter($city, 'Center 0'), false);
+    mxPlacedTemplate($first, 'Education 0');
+    mxPlacedTemplate($first, 'Protection 0');
+
+    $count();
+    $few = $count();
+
+    foreach (range(1, 3) as $index) {
+        $place = new ReportPlace($city, $programId, insertHrCenter($city, 'Center '.$index), false);
+        mxPlacedTemplate($place, 'Education '.$index);
+        mxPlacedTemplate($place, 'Protection '.$index);
+    }
+
+    $count();
+
+    expect($count())->toBe($few);
 });

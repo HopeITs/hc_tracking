@@ -116,6 +116,16 @@ class ReportTemplate extends Model implements TracksActivity
     }
 
     /**
+     * The monthly reports filed against this template, one per month (D-76).
+     *
+     * @return HasMany<MonthlyReport, $this>
+     */
+    public function monthlyReports(): HasMany
+    {
+        return $this->hasMany(MonthlyReport::class, 'report_template_id');
+    }
+
+    /**
      * The indicator lines, one per target.
      *
      * @return HasMany<ReportTemplateLine, $this>

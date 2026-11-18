@@ -5,27 +5,29 @@ declare(strict_types=1);
 namespace App\Console\Commands;
 
 use App\Enums\MonthlyReportStatus;
-use App\Enums\ProjectStatus;
+use App\Enums\ReportTemplateStatus;
 use App\Models\MonthlyReport;
-use App\Models\Project;
+use App\Models\ReportTemplate;
 use App\Notifications\Alerts\WorkingCalendar;
 use App\Support\MonthlyReportLineBuilder;
+use App\Support\MonthlyReportPeriods;
 use Carbon\CarbonImmutable;
 use Illuminate\Console\Command;
 
 /**
- * Runs daily at 05:00 (routes/console.php). On a project's first working day
- * of the month (its own working days) it builds the lines of that month's
- * draft report from the confirmed template (contracts §13 "Commands",
- * §13.1 item 5). Lines and shares only: no mirror, no actor. Idempotent;
- * --dry-run writes nothing.
+ * Runs daily at 05:00 (routes/console.php). On the first working day of the
+ * month it builds the lines of that month's draft reports of the confirmed
+ * report templates (contracts §13 "Commands", §13.1 item 5, Y-03). The day
+ * is counted on the template's working days
+ * (MonthlyReportPeriods::workingDaysOf()), or on the global days when it has
+ * none. Lines and shares only: no mirror, no actor. Idempotent; --dry-run writes nothing.
  */
 class PrepareMonthlyReports extends Command
 {
     protected $signature = 'monthly-reports:prepare
         {--dry-run : Count the lines without writing anything}';
 
-    protected $description = 'Build the lines of the current month\'s monthly reports on each project\'s first working day';
+    protected $description = 'Build the lines of the current month\'s monthly reports on the first working day';
 
     public function handle(MonthlyReportLineBuilder $builder, WorkingCalendar $calendar): int
     {
@@ -33,25 +35,33 @@ class PrepareMonthlyReports extends Command
         $month = $today->startOfMonth();
         $dryRun = (bool) $this->option('dry-run');
 
-        $projects = Project::query()->with('program:id,donor_attribution')->where('status', ProjectStatus::Active)->orderBy('id')->get()
-            ->filter(fn (Project $project): bool => $calendar->forProject($project)->firstWorkingDayOnOrAfter($month)->isSameDay($today));
-
         $reports = MonthlyReport::query()
-            ->whereIn('project_id', $projects->modelKeys())
+            ->whereIn('report_template_id', ReportTemplate::query()->select('id')->where('status', ReportTemplateStatus::Confirmed))
             ->where('period', $month->toDateString())
             ->where('status', MonthlyReportStatus::Draft)
-            ->with('lines:id,monthly_report_id,library_indicator_id')
-            ->orderBy('project_id')
+            ->with([
+                'lines:id,monthly_report_id,library_indicator_id',
+                'template',
+                'template.program:id,donor_attribution',
+                'template.proposals:proposals.id,proposals.name',
+            ])
+            ->orderBy('report_template_id')
             ->get();
 
+        $workingDays = MonthlyReportPeriods::workingDaysOf($reports->pluck('template')->unique('id')->values());
+
+        $reports = $reports->filter(fn (MonthlyReport $report): bool => $calendar
+            ->forDays($workingDays[$report->report_template_id] ?? null)
+            ->firstWorkingDayOnOrAfter($month)->isSameDay($today));
+
         foreach ($reports as $report) {
-            /** @var Project $project */
-            $project = $projects->find($report->project_id);
+            $template = $report->template;
+
             $lines = $dryRun
-                ? $builder->missingLineCount($project, $builder->templateLines($project), $report->period, $report)
+                ? $builder->missingLineCount($template, $builder->templateLines($template), $report->period, $report)
                 : $builder->build($report)['lines'];
 
-            $this->line(__('monthly_reports.console.prepare_row', ['project' => $report->project_id, 'lines' => $lines]));
+            $this->line(__('monthly_reports.console.prepare_template_row', ['template' => self::templateLabel($template), 'lines' => $lines]));
         }
 
         if ($dryRun) {
@@ -59,5 +69,14 @@ class PrepareMonthlyReports extends Command
         }
 
         return self::SUCCESS;
+    }
+
+    /**
+     * The template's id and the names of its proposals, joined with " · ".
+     * Load `proposals` (id, name) first.
+     */
+    public static function templateLabel(ReportTemplate $template): string
+    {
+        return implode(' · ', [(string) $template->id, ...$template->proposals->sortBy('id')->pluck('name')->map(fn (mixed $name): string => (string) $name)->all()]);
     }
 }

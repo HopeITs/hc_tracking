@@ -14,7 +14,6 @@ use App\Enums\MonthlyReportStatus;
 use App\Enums\ProposalStatus;
 use App\Enums\ReportStatus;
 use App\Enums\ReportTemplateLineStatus;
-use App\Enums\ReportTemplateStatus;
 use App\Enums\ResultType;
 use App\Enums\ReviewerSlot;
 use App\Enums\ReviewStage;
@@ -37,7 +36,6 @@ use App\Models\Proposal;
 use App\Models\ProposalReviewer;
 use App\Models\ProposalStatusNote;
 use App\Models\Report;
-use App\Models\ReportTemplate;
 use App\Models\ReportTemplateLine;
 use App\Models\Result;
 use App\Models\Risk;
@@ -46,6 +44,7 @@ use App\Models\TransfersTracking;
 use App\Models\User;
 use App\Support\Reporting\PlaceBridge;
 use Carbon\CarbonImmutable;
+use Database\Seeders\Concerns\SeedsReportTemplates;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Seeder;
 use Illuminate\Support\Collection;
@@ -67,6 +66,8 @@ use Illuminate\Support\Collection;
  */
 class AlWadiShowcaseSeeder extends Seeder
 {
+    use SeedsReportTemplates;
+
     private const PROJECT_SLUG = 'al-wadi-training-center';
 
     private CarbonImmutable $today;
@@ -185,11 +186,13 @@ class AlWadiShowcaseSeeder extends Seeder
     private function seedMonthlyReports(Project $project): void
     {
         $user = $this->user(0);
+        $template = $this->reportTemplateFor($project, $this->user(1)->id, $this->today->subMonths(6), legacyKind: true);
 
         foreach ([6 => 'validated', 5 => 'validated', 4 => 'validated', 3 => 'validated', 2 => 'returned', 1 => 'submitted'] as $monthsAgo => $state) {
             $period = $this->today->startOfMonth()->subMonths($monthsAgo);
 
-            MonthlyReport::query()->firstOrNew(['project_id' => $project->id, 'period' => $period->toDateString()])->forceFill([
+            MonthlyReport::query()->firstOrNew(['report_template_id' => $template->id, 'period' => $period->toDateString()])->forceFill([
+                'project_id' => $project->id,
                 'status' => match ($state) {
                     'validated' => MonthlyReportStatus::Validated,
                     'submitted' => MonthlyReportStatus::Submitted,
@@ -341,8 +344,7 @@ class AlWadiShowcaseSeeder extends Seeder
     private function seedReportTemplate(Project $project, Collection $targets): void
     {
         $confirmedBy = $this->user(1)->id;
-        $template = ReportTemplate::query()->firstOrCreate(['project_id' => $project->id]);
-        $template->forceFill(['status' => ReportTemplateStatus::Confirmed, 'confirmed_at' => $this->today->subMonths(6), 'confirmed_by' => $confirmedBy])->saveQuietly();
+        $template = $this->reportTemplateFor($project, $confirmedBy, $this->today->subMonths(6), legacyKind: true);
 
         foreach ($targets as $target) {
             ReportTemplateLine::query()->firstOrCreate(

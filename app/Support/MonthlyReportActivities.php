@@ -19,7 +19,7 @@ use Illuminate\Support\Collection;
  * month", D-49b, D-51): the one read helper used by the save action, Submit
  * and the T17B page.
  *
- * An activity of a donor-approved proposal linked to the project appears
+ * An activity of a donor-approved proposal of the report's template appears
  * when its calendar schedules it in the month (the project's override rows
  * when it has any, else the proposal calendar), when its last status
  * confirmed by an earlier month is not final (not started, started,
@@ -36,7 +36,9 @@ final class MonthlyReportActivities
         $month = CarbonImmutable::parse($report->period)->startOfMonth();
         $projectId = $report->project_id;
 
-        $proposalIds = $report->project()->firstOrFail()->proposals()
+        // The template's proposals (D-76); the schedule overrides and the confirmed statuses
+        // stay keyed by the report's legacy project until they move to places.
+        $proposalIds = $report->template()->firstOrFail()->proposals()
             ->whereIn('proposals.status', array_map(fn (ProposalStatus $status): string => $status->value, ProposalStatus::approvedByDonor()))
             ->pluck('proposals.id');
 

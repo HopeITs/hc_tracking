@@ -1,4 +1,4 @@
-{{-- "To validate" on ⚡index.blade.php: the MEAL queue (MonthlyReport::validatableBy()), filtered in memory and grouped by project, so a validator reads one project's months together. The filters' one way back is the register bar's Clear; this panel used to repeat it as "Reset filters". --}}
+{{-- "To validate" on ⚡index.blade.php: the MEAL queue (MonthlyReport::validatableBy()), filtered in memory and grouped by report template (D-76), named by its place and proposals, so a validator reads one template's months together and two reports of one place are told apart. The filters' one way back is the register bar's Clear; this panel used to repeat it as "Reset filters". --}}
 @use('App\Enums\MonthlyReportStatus')
 <x-ui.panel>
     @if ($this->filteredQueue->isEmpty())
@@ -9,18 +9,16 @@
         />
     @else
         <div class="divide-y divide-secondary-soft dark:divide-line">
-            @foreach ($this->filteredQueue->groupBy('project_id')->sortBy(fn ($projectRows) => mb_strtolower($projectRows->first()->project->name)) as $projectRows)
+            @foreach ($this->filteredQueue->groupBy('report_template_id')->sortBy(fn ($templateRows) => mb_strtolower(($this->queueNames[$templateRows->first()->report_template_id]['place'] ?? '').' '.($this->queueNames[$templateRows->first()->report_template_id]['proposalsText'] ?? ''))) as $templateId => $projectRows)
                 @php
-                    $queuedProject = $projectRows->first()->project;
-                    $queuedCity = $queuedProject->city_id === null ? null : ($this->cityNames[(int) $queuedProject->city_id] ?? null);
+                    $queuedNames = $this->queueNames[$templateId] ?? ['place' => '', 'proposals' => [], 'proposalsText' => ''];
+                    $queuedName = ($queuedNames['proposalsText'] !== '' ? $queuedNames['proposalsText'] : __('monthly_reports.no_proposal')).' · '.$queuedNames['place'];
                 @endphp
-                <section aria-labelledby="queue-project-{{ $queuedProject->id }}" data-queue-project="{{ $queuedProject->id }}" wire:key="queue-project-{{ $queuedProject->id }}">
-                    <h3 id="queue-project-{{ $queuedProject->id }}" class="flex flex-wrap items-baseline gap-x-3 px-4 pt-4 pb-1">
-                        <span class="text-base font-bold" dir="auto">{{ $queuedProject->name }}</span>
-                        @if ($queuedCity !== null)
-                            <span class="type-meta font-normal text-secondary-medium dark:text-ink-muted" dir="auto">{{ $queuedCity }}</span>
-                        @endif
-                    </h3>
+                <section aria-labelledby="queue-template-{{ $templateId }}" data-queue-template="{{ $templateId }}" wire:key="queue-template-{{ $templateId }}">
+                    <div class="px-4 pt-4 pb-1">
+                        <h3 id="queue-template-{{ $templateId }}" class="text-base font-bold" dir="auto">{{ $queuedNames['place'] }}</h3>
+                        @include('pages.monthly-reports._covers-proposals', ['proposals' => $queuedNames['proposals']])
+                    </div>
 
                     @foreach ($projectRows as $queued)
                         @php
@@ -57,7 +55,7 @@
                                 @endif
                             </div>
 
-                            <x-ui.button tone="ghost" size="sm" icon="eye" class="max-sm:size-11" :href="route('monthly-reports.show', $queued)" wire:navigate :aria-label="__('common.view_name', ['name' => $queuedProject->name.' · '.$queued->period->translatedFormat('F Y')])" />
+                            <x-ui.button tone="ghost" size="sm" icon="eye" class="max-sm:size-11" :href="route('monthly-reports.show', $queued)" wire:navigate :aria-label="__('common.view_name', ['name' => $queuedName.' · '.$queued->period->translatedFormat('F Y')])" />
                         </article>
                     @endforeach
                 </section>

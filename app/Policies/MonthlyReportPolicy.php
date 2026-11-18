@@ -8,19 +8,22 @@ use App\Enums\MonthlyReportStatus;
 use App\Enums\ReopenRequestStatus;
 use App\Models\MonthlyReport;
 use App\Models\MonthlyReportReopenRequest;
-use App\Models\Project;
+use App\Models\ReportTemplate;
 use App\Models\User;
 use App\Support\MealCoverage;
-use App\Support\SupervisionMap;
+use App\Support\MonthlyReportPreparers;
+use App\Support\Reporting\PlaceBridge;
 
 /**
  * Who does what on a monthly report (contracts §13.1 items 6 and 9).
  *
- * - Preparer side: a report writer who owns the project (User::ownedProjectIds())
- *   or supervises its owner (SupervisionMap). They open, fill, submit, delete
- *   a never-submitted draft and request a reopen.
+ * - Preparer side (D-84): a report writer who is the responsible employee of
+ *   a location row of one of the template's proposals at its place, or a
+ *   supervisor of one (MonthlyReportPreparers). They open, fill, submit,
+ *   delete a never-submitted draft and request a reopen.
  * - Validator: a reports.approve holder who is the responsible MEAL officer
- *   (MealCoverage::responsibleFor()), the MEAL Manager slot holder, or any
+ *   (MealCoverage::responsibleFor() of the template's legacy project, read
+ *   through PlaceBridge until coverage moves to places), the MEAL Manager slot holder, or any
  *   MEAL role holder when no one is responsible (D-12a). Never the preparer or
  *   submitter, never the General Manager.
  * - Reopen decider (D-09a): a reports.reopen holder who holds the MEAL
@@ -31,6 +34,11 @@ use App\Support\SupervisionMap;
  */
 class MonthlyReportPolicy
 {
+    public function __construct(
+        private MonthlyReportPreparers $preparers,
+        private PlaceBridge $bridge,
+    ) {}
+
     public function viewAny(User $user): bool
     {
         return $user->can('reports.view');
@@ -45,11 +53,18 @@ class MonthlyReportPolicy
     }
 
     /**
-     * Whether the user may open (prepare) a month of the project.
+     * Whether the user may open (prepare) a month of the template. A list
+     * that checks many templates passes their responsibles, read once with
+     * MonthlyReportPreparers::responsiblesByTemplate(), so the rule stays
+     * here and costs no query per template.
+     *
+     * @param  list<int>|null  $responsibles
      */
-    public function open(User $user, Project $project): bool
+    public function open(User $user, ReportTemplate $template, ?array $responsibles = null): bool
     {
-        return $user->can('reports.create') && $this->isPreparerSide($user, $project->id, $project->user_id);
+        return $user->can('reports.create') && ($responsibles === null
+            ? $this->preparers->isPreparer($user, $template)
+            : $this->preparers->isPreparerAmong($user, $responsibles));
     }
 
     /**
@@ -59,7 +74,7 @@ class MonthlyReportPolicy
     {
         return $monthlyReport->status === MonthlyReportStatus::Draft
             && $user->can('reports.update')
-            && $this->isPreparerSide($user, $monthlyReport->project_id);
+            && $this->isPreparerSide($user, $monthlyReport);
     }
 
     /**
@@ -93,7 +108,7 @@ class MonthlyReportPolicy
     {
         return $monthlyReport->status === MonthlyReportStatus::Validated
             && $user->can('reports.update')
-            && $this->isPreparerSide($user, $monthlyReport->project_id);
+            && $this->isPreparerSide($user, $monthlyReport);
     }
 
     /**
@@ -138,21 +153,15 @@ class MonthlyReportPolicy
     }
 
     /**
-     * Owns the project, or supervises its owner.
+     * A responsible of the template's rows at its place, or a supervisor of one (D-84).
      */
-    private function isPreparerSide(User $user, int $projectId, ?int $ownerEmployeeId = null): bool
+    private function isPreparerSide(User $user, MonthlyReport $monthlyReport): bool
     {
-        if (in_array($projectId, $user->ownedProjectIds(), true)) {
-            return true;
-        }
+        $template = $monthlyReport->relationLoaded('template')
+            ? $monthlyReport->template
+            : ReportTemplate::query()->findOrFail($monthlyReport->report_template_id);
 
-        $ownerEmployeeId ??= Project::ownerEmployeeIdFor($projectId);
-
-        if ($user->employee_id === null || $ownerEmployeeId === null) {
-            return false;
-        }
-
-        return SupervisionMap::supervises($user->employee_id, $ownerEmployeeId);
+        return $this->preparers->isPreparer($user, $template);
     }
 
     /**
@@ -168,10 +177,11 @@ class MonthlyReportPolicy
             return false;
         }
 
-        $project = $monthlyReport->relationLoaded('project')
-            ? $monthlyReport->project
-            : Project::query()->findOrFail($monthlyReport->project_id);
-        $responsible = MealCoverage::responsibleFor($project);
+        $template = $monthlyReport->relationLoaded('template')
+            ? $monthlyReport->template
+            : ReportTemplate::query()->findOrFail($monthlyReport->report_template_id);
+        $project = $this->bridge->legacyProjectFor($template);
+        $responsible = $project === null ? null : MealCoverage::responsibleFor($project);
 
         if ($user->employee_id !== null
             && ($user->employee_id === $responsible || $user->employee_id === MealCoverage::mealManagerEmployeeId())) {

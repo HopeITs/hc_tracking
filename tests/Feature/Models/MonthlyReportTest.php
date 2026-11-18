@@ -19,6 +19,7 @@ use App\Models\PlanIndicator;
 use App\Models\Project;
 use App\Models\ProjectActivityStatus;
 use App\Models\Report;
+use App\Models\ReportTemplate;
 use App\Models\Result;
 use App\Models\User;
 use Carbon\CarbonImmutable;
@@ -59,19 +60,42 @@ test('a monthly report casts its period, status and people', function () {
         ->and($fresh->seen_by_meal_at)->toBeNull();
 });
 
-test('the slug is the project slug and the month', function () {
+test('the slug is the template and the month, never the project (Y-03)', function () {
     $project = Activity::withoutRecording(fn () => Project::factory()->create(['name' => 'Water Network Expansion']));
     $report = Activity::withoutRecording(fn () => MonthlyReport::factory()->for($project)->create(['period' => '2026-10-01']));
 
-    expect($report->slug)->toBe($project->slug.'-2026-10')
+    expect($report->slug)->toBe('report-'.$report->report_template_id.'-2026-10')
         ->and($report->getRouteKeyName())->toBe('slug');
+});
+
+test('a slug made before Y-03 never changes, and its URL still finds the report', function () {
+    $report = Activity::withoutRecording(fn () => MonthlyReport::factory()->create(['period' => '2026-10-01']));
+    DB::table('monthly_reports')->where('id', $report->id)->update(['slug' => 'water-network-expansion-2026-10']);
+
+    $fresh = $report->fresh();
+    Activity::withoutRecording(fn () => $fresh->forceFill(['status' => MonthlyReportStatus::Submitted])->save());
+
+    expect($fresh->fresh()->slug)->toBe('water-network-expansion-2026-10')
+        ->and(MonthlyReport::query()->where('slug', 'water-network-expansion-2026-10')->value('id'))->toBe($report->id);
+});
+
+test('the activity label names the proposals and the place, not the project', function () {
+    $project = Activity::withoutRecording(fn () => Project::factory()->create(['name' => 'Water Network Expansion']));
+    $report = Activity::withoutRecording(fn () => MonthlyReport::factory()->for($project)->create(['period' => '2026-10-01']));
+    DB::table('projects')->where('id', $project->id)->update(['name' => 'Renamed Project']);
+    DB::table('proposals')->whereIn('id', $report->template->proposals()->pluck('proposals.id'))->update(['name' => 'Clean Water Proposal']);
+
+    expect($report->activityLabel())->toStartWith('Clean Water Proposal · ')
+        ->and($report->activityLabel())->toEndWith(' · 2026-10')
+        ->and($report->activityLabel())->not->toContain('Renamed Project');
 });
 
 test('a new monthly report defaults to draft at the database', function () {
     $projectId = Activity::withoutRecording(fn () => Project::factory()->create()->id);
+    $templateId = Activity::withoutRecording(fn () => ReportTemplate::factory()->create(['project_id' => $projectId])->id);
 
     $id = DB::table('monthly_reports')->insertGetId([
-        'slug' => 'raw-2026-10', 'project_id' => $projectId, 'period' => '2026-10-01',
+        'slug' => 'raw-2026-10', 'project_id' => $projectId, 'report_template_id' => $templateId, 'period' => '2026-10-01',
     ]);
 
     expect(DB::table('monthly_reports')->find($id)->status)->toBe('draft');
