@@ -6,7 +6,7 @@ use App\Models\User;
 use App\Notifications\ActivityPresenter;
 use App\Notifications\NotificationPresenter;
 use App\Notifications\SubjectLinks;
-use App\Support\Like;
+use App\Support\ActivitySearch;
 use Carbon\CarbonImmutable;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Pagination\LengthAwarePaginator;
@@ -134,9 +134,7 @@ new #[Layout('layouts::desk'), Title('titles.activity_log')] class extends Compo
             ->when($this->module !== '', fn (Builder $query) => $query->where('module', $this->module))
             ->when($this->actor === 'system', fn (Builder $query) => $query->whereNull('actor_id'))
             ->when(ctype_digit($this->actor), fn (Builder $query) => $query->where('actor_id', (int) $this->actor))
-            ->when($term !== '', fn (Builder $query) => $query->where(Like::everyWord($term, fn (Builder $query, string $word) => $query
-                ->where(Like::word('event', $word))
-                ->orWhere(Like::word('properties', $word)))))
+            ->when($term !== '', fn (Builder $query) => $query->where(ActivitySearch::matching($term)))
             ->when($from !== null, fn (Builder $query) => $query->where('created_at', '>=', $from->startOfDay()))
             ->when($to !== null, fn (Builder $query) => $query->where('created_at', '<=', $to->endOfDay()));
     }

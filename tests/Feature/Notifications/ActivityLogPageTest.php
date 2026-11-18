@@ -3,6 +3,7 @@
 use App\Models\Activity;
 use App\Models\Risk;
 use App\Models\Task;
+use App\Models\User;
 use Livewire\Livewire;
 
 test('only super admins and the general manager can open the activity log', function (string $role, int $status) {
@@ -30,6 +31,27 @@ test('the log filters by module, person, text and date range', function () {
     $page()->set('actor', (string) $sami->id)->assertSeeText('Water trucking')->assertDontSeeText('Road closure');
     $page()->set('search', 'trucking')->assertSeeText('Water trucking')->assertDontSeeText('Road closure');
     $page()->set('from', now()->toDateString())->assertSeeText('Road closure')->assertDontSeeText('Water trucking');
+});
+
+test('search finds what the row says: the person, the wording and the label in any case', function () {
+    $sami = Activity::withoutRecording(fn () => User::factory()->role('Managers')->create(['name' => 'Sami Haddad']));
+    $rana = Activity::withoutRecording(fn () => User::factory()->role('Managers')->create(['name' => 'Rana Khoury']));
+
+    $this->actingAs($sami);
+    Task::factory()->create(['title' => 'Water trucking']);
+    $this->actingAs($rana);
+    Risk::factory()->create(['name' => 'Road closure']);
+
+    $page = fn () => Livewire::actingAs(userWithRole('Super Admin'))->test('pages::activity.index');
+
+    $page()->set('search', 'Khoury')->assertSeeText('Road closure')->assertDontSeeText('Water trucking');
+    $page()->set('search', 'logged')->assertSeeText('Road closure')->assertDontSeeText('Water trucking');
+    $page()->set('search', 'WATER')->assertSeeText('Water trucking')->assertDontSeeText('Road closure');
+    $page()->set('search', 'sami trucking')->assertSeeText('Water trucking')->assertDontSeeText('Road closure');
+    $page()->set('search', 'sami closure')->assertDontSeeText('Water trucking')->assertDontSeeText('Road closure');
+
+    app()->setLocale('ar');
+    $page()->set('search', 'سجل')->assertSeeText('Road closure')->assertDontSeeText('Water trucking');
 });
 
 test('entries sort by time or module, toggling direction on repeat clicks', function () {
