@@ -86,7 +86,7 @@ test('a tranche received in another currency is left out of the agreement money 
 
 test('the details form edits name, dates and notes but never the status', function () {
     // Before donor approval: once approved, details change only through a change request (Y-09, D-89).
-    $this->proposal->update(['status' => ProposalStatus::ProposalDraft]);
+    $this->proposal->forceFill(['status' => ProposalStatus::ProposalDraft])->save();
 
     proposalPage()
         ->call('openEditModal', $this->proposal->id)
