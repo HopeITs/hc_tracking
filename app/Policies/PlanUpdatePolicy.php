@@ -30,12 +30,24 @@ class PlanUpdatePolicy
 {
     public function view(User $user, PlanUpdate $planUpdate): bool
     {
-        return self::canRead($user);
+        return self::canRead($user, $planUpdate->plan()->firstOrFail(), $planUpdate->project()->firstOrFail());
     }
 
-    public static function canRead(User $user): bool
+    /**
+     * Only the chain of this centre's update reads it: its project manager,
+     * its MEAL officer, the MEAL manager and the plan's program manager
+     * (Super Admin passes each check). Another centre's manager does not.
+     */
+    public static function canRead(User $user, ActivityPlan $plan, Project $project): bool
     {
-        return $user->can('annual-plans.view') && ! ($user->hasRole('General Manager') && ! $user->hasRole('Super Admin'));
+        if (! $user->can('annual-plans.view') || ($user->hasRole('General Manager') && ! $user->hasRole('Super Admin'))) {
+            return false;
+        }
+
+        return self::isProjectManager($user, $project)
+            || self::isOfficer($user, $project)
+            || ActivityPlanPolicy::isMealManager($user)
+            || self::isProgramManager($user, $plan);
     }
 
     /**
@@ -72,7 +84,7 @@ class PlanUpdatePolicy
 
     public function downloadFile(User $user, PlanUpdate $planUpdate): bool
     {
-        return self::canRead($user);
+        return $this->view($user, $planUpdate);
     }
 
     public static function isProjectManager(User $user, Project $project): bool

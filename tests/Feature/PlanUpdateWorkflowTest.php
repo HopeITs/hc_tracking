@@ -252,13 +252,28 @@ test('the project manager fills the update on its page and the officer sees the 
     expect($update->fresh()->status)->toBe(PlanUpdateStatus::OfficerApproved);
 });
 
-test('the CEO does not open updates; others read them', function () {
+test('the CEO does not open updates', function () {
     sentJanuary();
-    $ceo = userWithRole('General Manager');
 
-    $this->actingAs($ceo)->get(route('plan-updates.show', [$this->plan, $this->centre, '2027-01']))->assertForbidden();
-    $this->actingAs(userWithRole('Team Member'))->get(route('plan-updates.show', [$this->plan, $this->centre, '2027-01']))->assertOk();
+    $this->actingAs(userWithRole('General Manager'))->get(route('plan-updates.show', [$this->plan, $this->centre, '2027-01']))->assertForbidden();
 });
+
+test('only the chain of the centre reads its update, export and files', function (string $reader) {
+    $file = sentJanuary()->files()->firstOrFail();
+
+    $this->actingAs($this->{$reader})->get(route('plan-updates.show', [$this->plan, $this->centre, '2027-01']))->assertOk();
+    $this->actingAs($this->{$reader})->get(route('plan-updates.export', [$this->plan, $this->centre, '2027-01']))->assertOk();
+    $this->actingAs($this->{$reader})->get(route('plan-updates.files.download', $file))->assertOk();
+})->with(['projectManager', 'officer', 'mealManager', 'programManager']);
+
+test('another centre manager and a team member do not read the update, export or files', function (string $role) {
+    $file = sentJanuary()->files()->firstOrFail();
+    $outsider = userWithRole($role, insertHrEmployee(firstNameEn: 'Other', lastNameEn: 'Centre'));
+
+    $this->actingAs($outsider)->get(route('plan-updates.show', [$this->plan, $this->centre, '2027-01']))->assertForbidden();
+    $this->actingAs($outsider)->get(route('plan-updates.export', [$this->plan, $this->centre, '2027-01']))->assertForbidden();
+    $this->actingAs($outsider)->get(route('plan-updates.files.download', $file))->assertForbidden();
+})->with(['Managers', 'Team Member']);
 
 test('a supporting file of a type that is not allowed says why it was not added', function () {
     Livewire::actingAs($this->projectManager)->test('pages::annual-plans.update', ['activityPlan' => $this->plan, 'project' => $this->centre, 'month' => '2027-01'])

@@ -23,7 +23,7 @@ new #[Layout('layouts::desk'), Title('titles.annual_plan')] class extends Compon
 
     public function mount(ActivityPlan $activityPlan, Project $project, string $month): void
     {
-        abort_unless(PlanUpdatePolicy::canRead(auth()->user()), 403);
+        abort_unless(PlanUpdatePolicy::canRead(auth()->user(), $activityPlan, $project), 403);
         abort_unless(preg_match('/^\d{4}-\d{2}$/', $month) === 1, 404);
 
         $execution = PlanExecution::for($activityPlan);
