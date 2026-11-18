@@ -495,7 +495,7 @@ new class extends Component {
                 <div class="dk-pal-foot">
                     <span><kbd>↑</kbd> <kbd>↓</kbd> {{ __('desk.ask_move') }}</span>
                     <span><kbd><x-desk.icon name="enter" /></kbd> {{ __('desk.ask_open') }}</span>
-                    <span class="dk-pal-foot-more"><kbd>Alt</kbd> <kbd><x-desk.icon name="enter" /></kbd> {{ __('desk-workspace.ask.alt_enter') }}</span>
+                    <span class="dk-pal-foot-more"><kbd>{{ __('desk.key_alt') }}</kbd> <kbd><x-desk.icon name="enter" /></kbd> {{ __('desk-workspace.ask.alt_enter') }}</span>
                     <span class="dk-pal-foot-more"><kbd>&gt;</kbd> {{ __('desk-workspace.ask.commands_only') }}</span>
                     <span><kbd>{{ __('desk.key_esc') }}</kbd> {{ __('desk.ask_close') }}</span>
                 </div>

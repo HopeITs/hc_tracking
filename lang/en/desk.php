@@ -22,6 +22,7 @@ return [
     'ask_corrected' => 'Showing results for “:query”',
     'ask_nothing_title' => 'Nothing found',
     'ask_nothing_body' => 'Try a name, a page, a question like “what is due today?” or an action like “new task”.',
+    'key_alt' => 'Alt',
     'key_esc' => 'Esc',
     'ask_move' => 'move',
     'ask_open' => 'open',

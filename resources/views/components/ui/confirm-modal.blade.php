@@ -92,7 +92,7 @@
     @endif
 
     <x-slot:footer-meta>
-        <span class="confirm-hint" aria-hidden="true"><kbd>Esc</kbd> {{ __('common.to_cancel') }}</span>
+        <span class="confirm-hint" aria-hidden="true"><kbd>{{ __('common.key_esc') }}</kbd> {{ __('common.to_cancel') }}</span>
     </x-slot:footer-meta>
 
     <x-slot:actions>

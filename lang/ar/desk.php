@@ -22,6 +22,7 @@ return [
     'ask_corrected' => 'عرض نتائج «:query»',
     'ask_nothing_title' => 'لم يُعثر على شيء',
     'ask_nothing_body' => 'جرّب اسمًا، أو صفحة، أو سؤالًا مثل «ما المستحق اليوم؟» أو إجراءً مثل «مهمة جديدة».',
+    'key_alt' => 'Alt',
     'key_esc' => 'Esc',
     'ask_move' => 'تنقّل',
     'ask_open' => 'افتح',
