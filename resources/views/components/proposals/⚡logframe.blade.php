@@ -273,9 +273,9 @@ new class extends Component {
             </x-ui.empty-state>
         </x-ui.panel>
     @else
-        <div class="space-y-5" data-test="logframe-tree">
+        <div class="max-h-[75vh] space-y-5 overflow-y-auto" data-test="logframe-tree">
             @foreach ($roots['tree'] as $node)
-                <x-ui.framework-node :node="$node" :depth="0" :order="$loop->index" :editable="$editable" :risk-counts="$this->riskCounts" wire:key="logframe-root-{{ $node['result']->id }}" />
+                <x-ui.framework-node :node="$node" :depth="0" :order="$loop->index" :editable="$editable" :risk-counts="$this->riskCounts" :collapsed="true" wire:key="logframe-root-{{ $node['result']->id }}" />
             @endforeach
         </div>
 
@@ -291,7 +291,7 @@ new class extends Component {
                     <p class="type-meta text-secondary-medium dark:text-ink-muted">{{ __('results_framework.free_activities_empty') }}</p>
                 @endif
                 @foreach ($roots['activities'] as $node)
-                    <x-ui.framework-node :node="$node" :depth="0" :order="$loop->index" :editable="$editable" :risk-counts="$this->riskCounts" wire:key="logframe-free-activity-{{ $node['result']->id }}" />
+                    <x-ui.framework-node :node="$node" :depth="0" :order="$loop->index" :editable="$editable" :risk-counts="$this->riskCounts" :collapsed="true" wire:key="logframe-free-activity-{{ $node['result']->id }}" />
                 @endforeach
             </section>
         @endif
@@ -300,7 +300,7 @@ new class extends Component {
             <section class="space-y-3" aria-labelledby="logframe-cross-cutting-heading" data-test="logframe-cross-cutting">
                 <h3 id="logframe-cross-cutting-heading" class="type-label text-secondary-medium dark:text-ink-muted">{{ __('results_framework.cross_cutting_group') }}</h3>
                 @foreach ($roots['crossCutting'] as $node)
-                    <x-ui.framework-node :node="$node" :depth="0" :order="$loop->index" :editable="$editable" :risk-counts="$this->riskCounts" wire:key="logframe-cross-cutting-{{ $node['result']->id }}" />
+                    <x-ui.framework-node :node="$node" :depth="0" :order="$loop->index" :editable="$editable" :risk-counts="$this->riskCounts" :collapsed="true" wire:key="logframe-cross-cutting-{{ $node['result']->id }}" />
                 @endforeach
             </section>
         @endif

@@ -342,3 +342,13 @@ test('confirming the framework tells the person who opened the proposal', functi
     expect($confirmed($creator))->toBe(1)
         ->and($confirmed($meal))->toBe(0);
 });
+
+test('the logframe tab starts with every branch and indicator list collapsed', function () {
+    $meal = mealManager();
+    $impact = logframeNode($this->proposal, ResultType::Impact, programId: $this->program->id);
+    logframeNode($this->proposal, ResultType::Outcome, $impact);
+
+    logframeTab($meal, $this->proposal)
+        ->assertSeeHtml('branchOpen: false')
+        ->assertDontSeeHtml('branchOpen: true');
+});
