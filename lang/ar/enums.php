@@ -251,6 +251,7 @@ return [
         'media_deliverable' => 'تسليم إعلامي',
         'financial' => 'مالية',
         'report' => 'تقرير',
+        'logframe' => 'الإطار المنطقي',
     ],
     'deliverable_kind' => [
         'video' => 'فيديو',

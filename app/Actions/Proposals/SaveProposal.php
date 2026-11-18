@@ -130,6 +130,8 @@ final class SaveProposal
             return $proposal;
         });
 
+        app(SyncLogframeTask::class)->ensure($proposal);
+
         return $proposal->fresh() ?? $proposal;
     }
 

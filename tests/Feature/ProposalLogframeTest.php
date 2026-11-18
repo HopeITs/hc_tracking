@@ -1,10 +1,16 @@
 <?php
 
+use App\Actions\Proposals\SyncLogframeTask;
+use App\Enums\ProposalStatus;
 use App\Enums\ResultType;
+use App\Enums\TaskKind;
+use App\Enums\TaskStatus;
 use App\Models\Program;
 use App\Models\Project;
 use App\Models\Proposal;
+use App\Models\ProposalStatusNote;
 use App\Models\Result;
+use App\Models\Task;
 use App\Models\User;
 use Database\Seeders\RolesAndPermissionsSeeder;
 use Illuminate\Support\Facades\DB;
@@ -281,4 +287,58 @@ test('the tab holds a flat query count whatever the framework size', function ()
 
     expect(count($large))->toBe(count($small))
         ->and(collect($large)->filter(fn (string $sql): bool => str_contains($sql, 'amount'))->all())->toBe([]);
+});
+
+test('a project proposal gets one logframe task for the MEAL Manager', function () {
+    $employeeId = holdMealManagerSlot();
+    $actor = User::factory()->role('Financial')->create();
+    $this->actingAs($actor);
+
+    $task = app(SyncLogframeTask::class)->ensure($this->proposal);
+    app(SyncLogframeTask::class)->ensure($this->proposal);
+
+    expect($task->kind)->toBe(TaskKind::Logframe)
+        ->and($task->taskAssignees()->pluck('employee_id')->all())->toBe([$employeeId])
+        ->and(Task::query()->withoutGlobalScopes()->where('kind', 'logframe')->count())->toBe(1);
+});
+
+test('confirming the framework needs a result, then closes the task', function () {
+    $meal = mealManager();
+    $this->actingAs($meal);
+    $task = app(SyncLogframeTask::class)->ensure($this->proposal);
+
+    logframeTab($meal, $this->proposal)
+        ->call('confirmLogframe')
+        ->assertHasErrors('logframe')
+        ->assertDontSeeHtml('data-test="logframe-confirmed"');
+
+    logframeNode($this->proposal, ResultType::Impact, programId: $this->program->id);
+
+    logframeTab($meal, $this->proposal)
+        ->call('confirmLogframe')
+        ->assertHasNoErrors()
+        ->assertSeeHtml('data-test="logframe-confirmed"');
+
+    expect($task->fresh()->status)->toBe(TaskStatus::Done);
+});
+
+test('confirming the framework tells the person who opened the proposal', function () {
+    $meal = mealManager();
+    $creator = User::factory()->role('Financial')->create();
+    ProposalStatusNote::query()->create([
+        'proposal_id' => $this->proposal->id,
+        'status' => ProposalStatus::ConceptNote,
+        'context' => 'Recorded',
+        'date' => today()->toDateString(),
+        'changed_by' => $creator->id,
+        'is_correction' => false,
+    ]);
+    logframeNode($this->proposal, ResultType::Impact, programId: $this->program->id);
+
+    logframeTab($meal, $this->proposal)->call('confirmLogframe');
+
+    $confirmed = fn (User $user): int => $user->notifications->filter(fn ($note): bool => str_contains(json_encode($note->data), 'logframe_confirmed'))->count();
+
+    expect($confirmed($creator))->toBe(1)
+        ->and($confirmed($meal))->toBe(0);
 });

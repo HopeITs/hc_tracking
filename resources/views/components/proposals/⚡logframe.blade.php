@@ -8,10 +8,13 @@ use App\Livewire\Concerns\Results\FiltersResultsChain;
 use App\Livewire\Concerns\Results\ManagesResultForm;
 use App\Enums\ResultType;
 use App\Models\Proposal;
+use App\Actions\Proposals\SyncLogframeTask;
 use App\Models\Result;
+use App\Models\Task;
 use App\Support\ProposalFramework;
 use App\Support\ResultsChain;
 use Illuminate\Support\Facades\Gate;
+use Illuminate\Validation\ValidationException;
 use Livewire\Attributes\Computed;
 use Livewire\Attributes\Locked;
 use Livewire\Attributes\Url;
@@ -57,6 +60,32 @@ new class extends Component {
     protected function fixedProposalId(): ?int
     {
         return $this->proposalId;
+    }
+
+    /**
+     * "Framework is complete": closes the proposal's logframe task.
+     */
+    public function confirmLogframe(): void
+    {
+        try {
+            app(SyncLogframeTask::class)->confirm(Proposal::query()->findOrFail($this->proposalId));
+        } catch (ValidationException $exception) {
+            $this->addError('logframe', $exception->errors()['logframe'][0] ?? '');
+
+            return;
+        }
+
+        unset($this->logframeTask);
+        session()->flash('status', __('results_framework.logframe_confirm_done'));
+    }
+
+    /**
+     * The proposal's logframe task (open or done), null when it never had one.
+     */
+    #[Computed]
+    public function logframeTask(): ?Task
+    {
+        return app(SyncLogframeTask::class)->taskOf($this->proposal);
     }
 
     /**
@@ -167,6 +196,17 @@ new class extends Component {
             </span>
         @endif
 
+        @if ($this->logframeTask?->status === \App\Enums\TaskStatus::Done)
+            <span class="inline-flex items-center gap-1.5 rounded-full bg-secondary-soft px-2.5 py-1 type-meta font-semibold text-secondary-dark dark:bg-surface-2 dark:text-ink" data-test="logframe-confirmed">
+                <flux:icon.check-circle variant="micro" class="size-3.5" aria-hidden="true" />
+                {{ __('results_framework.logframe_confirmed') }}
+            </span>
+        @elseif ($canCreate)
+            <x-ui.button icon="check-circle" wire:click="confirmLogframe" wire:loading.attr="disabled" wire:target="confirmLogframe" data-test="confirm-logframe">
+                {{ __('results_framework.logframe_confirm') }}
+            </x-ui.button>
+        @endif
+
         @if ($canCreate)
             <x-ui.button icon="document-duplicate" wire:click="openCopyModal" wire:loading.attr="disabled" wire:target="openCopyModal" data-test="start-from-program-framework" data-tour="logframe-copy-framework">
                 {{ __('results_framework.start_from_program_framework') }}
@@ -193,6 +233,10 @@ new class extends Component {
             >{{ $label }}</button>
         @endforeach
     </div>
+
+    @error('logframe')
+        <p class="type-meta font-semibold text-danger" role="alert" data-test="logframe-confirm-error">{{ $message }}</p>
+    @enderror
 
     @if ($this->isLockedForMe)
         <p class="flex items-start gap-2 rounded-lg border border-secondary-soft bg-ground px-3 py-2.5 type-meta text-secondary-dark dark:border-line dark:bg-surface-2 dark:text-ink" data-test="logframe-locked">

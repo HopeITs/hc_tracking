@@ -197,6 +197,7 @@ return [
         'project_started' => 'بدأ المشروع «:subject» في :date',
         'project_ended' => 'انتهى المشروع «:subject» في :date',
         'on_hold_reminder' => 'المقترح «:subject» معلّق وقد حلّ موعد مراجعته (:date)',
+        'logframe_confirmed' => 'اكتمل الإطار المنطقي للمقترح «:subject» — يمكنك المتابعة بالمؤشرات المستهدفة والخطة',
         'logframe_missing' => [
             'single' => 'البرنامج «:subject» ليس له إطار برنامج بعد — إنشاء إطار البرنامج',
             'grouped' => 'برامج ليس لها إطار برنامج بعد: :count — إنشاء إطار البرنامج',

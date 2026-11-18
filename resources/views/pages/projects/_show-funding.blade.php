@@ -163,6 +163,9 @@
                                     @can('proposals.update')
                                         <button type="button" class="dk-iconbtn dk-sm" wire:click="detachProposal({{ $proposal->id }})" aria-label="{{ __('projects.unlink_name', ['name' => $proposal->name]) }}" title="{{ __('projects.unlink_name', ['name' => $proposal->name]) }}"><x-desk.icon name="x" /></button>
                                     @endcan
+                                    @if ($this->canViewProposals())
+                                        <a href="{{ $this->proposalStoryUrl($proposal->id, 'logframe') }}" wire:navigate class="dk-btn dk-sm" data-test="proposal-logframe-link">{{ __('story.open.logframe') }}</a>
+                                    @endif
                                     @if ($isEmbedded)
                                         <button type="button" class="dk-iconbtn dk-sm dk-fold-t" @click="openProposal = openProposal === {{ $proposal->id }} ? null : {{ $proposal->id }}" :aria-expanded="openProposal === {{ $proposal->id }}" aria-label="{{ __('story.show_details') }}" title="{{ __('story.show_details') }}"><x-desk.icon name="chev" class="dk-fold-i" /></button>
                                     @elseif ($this->canViewProposals())
