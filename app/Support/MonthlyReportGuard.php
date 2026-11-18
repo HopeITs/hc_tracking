@@ -22,7 +22,7 @@ final class MonthlyReportGuard
      */
     public static function lock(MonthlyReport $report, MonthlyReportStatus $expectedStatus, string $ability, array $extraArguments = []): MonthlyReport
     {
-        $locked = MonthlyReport::query()->with('project')->whereKey($report->id)->lockForUpdate()->firstOrFail();
+        $locked = MonthlyReport::query()->with('template.program:id,donor_attribution')->whereKey($report->id)->lockForUpdate()->firstOrFail();
 
         if ($locked->status !== $expectedStatus) {
             throw ValidationException::withMessages(['status' => __('monthly_reports.stale')]);

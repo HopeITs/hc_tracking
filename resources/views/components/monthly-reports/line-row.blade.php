@@ -30,6 +30,19 @@
                 <bdi dir="ltr" class="font-mono text-[11px]">{{ $row['code'] }}</bdi>
                 <span aria-hidden="true">·</span>
                 <span>{{ __('monthly_reports.grid_target') }} <bdi dir="ltr" class="font-semibold tabular-nums text-secondary-dark dark:text-ink" data-target="{{ $id }}">{{ $row['target'] }}</bdi></span>
+                @if (($row['shared'] ?? null) !== null)
+                    {{-- D-90: the target belongs to the row and its centers reach it together. Read only: this center's own figure is never set against the whole target. --}}
+                    <span class="inline-flex flex-wrap items-center gap-x-1" data-shared-target="{{ $id }}">
+                        <flux:icon.users variant="micro" class="size-3" aria-hidden="true" />
+                        <span>{{ trans_choice('monthly_reports.shared_with_centers', $row['shared']['centers'], ['count' => $row['shared']['centers']]) }}</span>
+                        <span aria-hidden="true">·</span>
+                        @if ($row['shared']['reached'] !== null)
+                            <span>{{ __('monthly_reports.reached_together', ['value' => '']) }}<bdi dir="ltr" class="font-semibold tabular-nums text-secondary-dark dark:text-ink">{{ $row['shared']['reached'] }}</bdi></span>
+                        @else
+                            <span>{{ __('monthly_reports.reached_together_none') }}</span>
+                        @endif
+                    </span>
+                @endif
                 @if ($row['meal'])
                     <span class="inline-flex items-center gap-1 font-semibold text-secondary-dark dark:text-ink">
                         <flux:icon.lock-closed variant="micro" class="size-3" aria-hidden="true" />

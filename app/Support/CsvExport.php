@@ -18,10 +18,11 @@ final class CsvExport
     /**
      * @param  list<string>  $headings
      * @param  iterable<array<int, mixed>>  $rows
+     * @param  list<list<string>>  $preamble  rows written before the heading row (e.g. the filters a file was cut with)
      */
-    public static function download(string $filename, array $headings, iterable $rows): StreamedResponse
+    public static function download(string $filename, array $headings, iterable $rows, array $preamble = []): StreamedResponse
     {
-        return response()->streamDownload(function () use ($headings, $rows): void {
+        return response()->streamDownload(function () use ($headings, $rows, $preamble): void {
             $output = fopen('php://output', 'wb');
 
             if ($output === false) {
@@ -29,6 +30,11 @@ final class CsvExport
             }
 
             fwrite($output, "\xEF\xBB\xBF");
+
+            foreach ($preamble as $line) {
+                fputcsv($output, array_map(self::cell(...), $line), ',', '"', '');
+            }
+
             fputcsv($output, array_map(self::cell(...), $headings), ',', '"', '');
 
             foreach ($rows as $row) {

@@ -6,7 +6,10 @@ use App\Models\MonthlyReport;
 use App\Models\MonthlyReportLine;
 use App\Models\Program;
 use App\Models\Project;
+use App\Models\Proposal;
+use App\Models\ProposalLocation;
 use App\Models\Report;
+use App\Models\ReportTemplate;
 use App\Models\User;
 use App\Models\UserNotification;
 use App\Notifications\Alerts\DeadlineCatalog;
@@ -15,7 +18,10 @@ use App\Notifications\Alerts\NotificationSettings;
 use App\Notifications\Alerts\OverdueScanner;
 use App\Notifications\EventCatalog;
 use App\Notifications\Recipients\OversightRecipients;
+use App\Support\MonthlyReportNames;
+use App\Support\Reporting\ReportPlace;
 use Carbon\CarbonImmutable;
+use Illuminate\Support\Facades\DB;
 
 /*
 | Monthly report deadlines (contracts §13, §13.1 item 2, §15.2): one item per
@@ -109,4 +115,87 @@ test('mirrors leave the generic report deadlines to the monthly report', functio
     Activity::withoutRecording(fn () => Report::factory()->create(['monthly_report_id' => $report->id, 'planned_date' => '2026-10-31', 'user_id' => $this->owner->id]));
 
     expect(app(DeadlineCatalog::class)->items(CarbonImmutable::parse('2027-06-30'))->where('subjectType', 'report')->count())->toBe(0);
+});
+
+/*
+| Y-03 slice 3 (D-76, D-84): the alert of a month goes to the template's
+| preparers, the responsibles of its rows at its place, and names its
+| proposals and place; the legacy project only scopes oversight.
+*/
+
+/**
+ * A Y-02 template at Aleppo's Zone Center in a new program, carried by a
+ * new proposal whose row there names the responsible, with a required
+ * October draft.
+ *
+ * @return array{template: ReportTemplate, report: MonthlyReport, proposal: Proposal}
+ */
+function mraPlacedReport(ReportPlace $place, string $proposalName, int $responsibleEmployeeId): array
+{
+    return Activity::withoutRecording(function () use ($place, $proposalName, $responsibleEmployeeId): array {
+        $proposal = Proposal::factory()->create(['name' => $proposalName, 'planned_date_begin' => '2026-10-01', 'planned_date_end' => '2026-12-31']);
+        $row = ProposalLocation::factory()->create(['proposal_id' => $proposal->id, 'city_id' => $place->cityId, 'program_id' => $place->programId, 'responsible_employee_id' => $responsibleEmployeeId]);
+        $row->centers()->create(['center_id' => $place->centerId]);
+        $template = ReportTemplate::factory()->confirmed()->forPlace($place, $proposal)->create();
+        $report = MonthlyReport::factory()->create(['project_id' => null, 'report_template_id' => $template->id, 'period' => '2026-10-01']);
+        MonthlyReportLine::factory()->create(['monthly_report_id' => $report->id]);
+
+        return ['template' => $template, 'report' => $report, 'proposal' => $proposal];
+    });
+}
+
+test('a month\'s alert goes to the row responsible and the preparer, not to the legacy project owner', function () {
+    $report = mraAlertReport('2026-10-01');
+    $responsibleEmployee = insertHrEmployee(firstNameEn: 'Rana', lastNameEn: 'Responsible');
+    $responsible = userWithRole('Managers', $responsibleEmployee);
+    $preparer = Activity::withoutRecording(fn (): User => User::factory()->create());
+    Activity::withoutRecording(fn () => $report->forceFill(['prepared_by' => $preparer->id])->save());
+    ProposalLocation::query()->whereIn('proposal_id', $report->template->proposals()->pluck('proposals.id'))->update(['responsible_employee_id' => $responsibleEmployee]);
+
+    $item = mraAlertItems()[0];
+
+    expect($item->directUserIds)->toEqualCanonicalizing([$responsible->id, $preparer->id])
+        ->and($item->directUserIds)->not->toContain($this->owner->id)
+        ->and($item->projectId)->toBe($this->project->id);
+});
+
+test('two templates of one place give two alerts told apart by their proposals', function () {
+    $city = insertHrCity('Aleppo');
+    $program = Activity::withoutRecording(fn (): Program => Program::factory()->create());
+    $place = new ReportPlace($city, $program->id, insertHrCenter($city, 'Zone Center'), false);
+    $education = mraPlacedReport($place, 'Education for All', $this->ownerEmployee);
+    $protection = mraPlacedReport($place, 'Child Protection', $this->ownerEmployee);
+
+    $items = collect(mraAlertItems())->keyBy('subjectId');
+
+    expect($items[$education['report']->id]->label)->toBe(app(MonthlyReportNames::class)->label($education['template'], CarbonImmutable::parse('2026-10-01')))
+        ->and($items[$education['report']->id]->label)->toStartWith('Education for All · Aleppo')
+        ->and($items[$protection['report']->id]->label)->toStartWith('Child Protection · Aleppo')
+        ->and($items[$education['report']->id]->label)->toEndWith('Zone Center · 2026-10')
+        ->and($items[$education['report']->id]->directUserIds)->toBe([$this->owner->id])
+        ->and($items[$protection['report']->id]->directUserIds)->toBe([$this->owner->id]);
+});
+
+test('the monthly report items take a fixed number of queries whatever the number of templates', function () {
+    $city = insertHrCity('Aleppo');
+    $count = function (): int {
+        DB::flushQueryLog();
+        DB::enableQueryLog();
+        mraAlertItems();
+        $queries = count(DB::getQueryLog());
+        DB::disableQueryLog();
+
+        return $queries;
+    };
+    $place = fn (): ReportPlace => new ReportPlace($city, Activity::withoutRecording(fn (): int => Program::factory()->create()->id), insertHrCenter($city, 'Zone Center'), false);
+
+    mraPlacedReport($place(), 'First', $this->ownerEmployee);
+    $count();
+    $one = $count();
+
+    mraPlacedReport($place(), 'Second', $this->ownerEmployee);
+    mraPlacedReport($place(), 'Third', $this->ownerEmployee);
+    $count();
+
+    expect($count())->toBe($one);
 });

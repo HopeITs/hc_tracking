@@ -16,13 +16,17 @@ use App\Models\MonthlyReport;
 use App\Models\Project;
 use App\Models\Proposal;
 use App\Models\Report;
+use App\Models\ReportTemplate;
 use App\Models\Task;
 use App\Models\TransfersTracking;
 use App\Notifications\EmployeeRecipients;
 use App\Notifications\Recipients\OversightRecipients;
 use App\Notifications\TracksActivity;
 use App\Support\DonorReportResponsibles;
+use App\Support\MonthlyReportNames;
 use App\Support\MonthlyReportPeriods;
+use App\Support\MonthlyReportPreparers;
+use App\Support\Reporting\PlaceBridge;
 use App\Support\Slots;
 use Carbon\CarbonImmutable;
 use Illuminate\Database\Eloquent\Builder;
@@ -187,9 +191,16 @@ final class DeadlineCatalog
      * One item per started, required (at least one line), unsubmitted
      * monthly report (contracts §13, §13.1 item 2), due on
      * MonthlyReportPeriods::dueDate(): the configured working days after the
-     * month's end on the project's calendar. Months not started raise
+     * month's end on the template's calendar. Months not started raise
      * nothing; the report's mirrors in `reports` are left out of reports().
-     * Three queries.
+     *
+     * The report's unit is its template (D-76): it tells the template's
+     * preparers, the responsibles of its rows at its place (D-84, read once
+     * through MonthlyReportPreparers), and whoever prepared it; its label
+     * names the proposals and the place, so two reports of one place and
+     * month are told apart. The legacy project id only scopes oversight,
+     * through PlaceBridge until coverage moves to places. A fixed number of
+     * queries.
      *
      * @return list<DeadlineItem>
      */
@@ -201,24 +212,29 @@ final class DeadlineCatalog
             ->has('lines')
             ->withCount('lines')
             ->orderBy('period')
-            ->get(['id', 'project_id', 'period', 'status', 'prepared_by', 'revised_due_on']);
+            ->get(['id', 'report_template_id', 'period', 'status', 'prepared_by', 'revised_due_on']);
 
         if ($reports->isEmpty()) {
             return [];
         }
 
-        $projects = Project::query()->whereKey($reports->pluck('project_id')->unique()->values())->get(['id', 'name', 'user_id', 'program_id', 'center_id', 'city_id', 'working_days'])->keyBy('id');
-        $owners = $this->employees->usersFor($projects->pluck('user_id')->filter()->map(fn ($id): int => (int) $id)->unique()->values()->all());
+        $templates = ReportTemplate::query()->whereKey($reports->pluck('report_template_id')->unique()->values())->get()->keyBy('id');
+        $workingDays = MonthlyReportPeriods::workingDaysOf($templates);
+        $responsibles = app(MonthlyReportPreparers::class)->responsiblesByTemplate($templates);
+        $users = $this->employees->usersFor(array_values(array_unique(array_merge([], ...array_values($responsibles)))));
+        $legacyProjectIds = app(PlaceBridge::class)->legacyProjectIdsFor($templates);
+        $names = $this->englishNames($templates);
         $items = [];
 
-        foreach ($reports->groupBy('project_id') as $projectId => $projectReports) {
-            $project = $projects->get($projectId);
+        foreach ($reports->groupBy('report_template_id') as $templateId => $templateReports) {
+            $template = $templates->get($templateId);
 
-            if ($project === null) {
+            if ($template === null) {
                 continue;
             }
 
-            $periods = MonthlyReportPeriods::fromLoaded($project, $projectReports);
+            $periods = MonthlyReportPeriods::fromLoaded($template, $templateReports, $workingDays[$templateId] ?? null);
+            $preparers = array_map(fn (int $employeeId): ?int => $users[$employeeId] ?? null, $responsibles[$templateId] ?? []);
 
             foreach ($periods->openRequiredReports() as $report) {
                 $due = $periods->effectiveDueDate($report);
@@ -227,14 +243,34 @@ final class DeadlineCatalog
                     continue;
                 }
 
+                $label = implode(' · ', array_filter([$names[$templateId]['proposalsText'] ?? '', $names[$templateId]['place'] ?? '', $report->period->format('Y-m')], fn (string $part): bool => $part !== ''));
+
                 $items[] = new DeadlineItem(
-                    'monthly_report', $report->id, 'monthly-reports', $project->name.' · '.$report->period->format('Y-m'), $due,
-                    $this->unique([$owners[(int) $project->user_id] ?? null, $report->prepared_by]), ['MEAL'], 'monthly_report', projectId: $project->id,
+                    'monthly_report', $report->id, 'monthly-reports', $label, $due,
+                    $this->unique([...$preparers, $report->prepared_by]), ['MEAL'], 'monthly_report', projectId: $legacyProjectIds[$templateId] ?? null,
                 );
             }
         }
 
         return $items;
+    }
+
+    /**
+     * Template names in English, like every stored label.
+     *
+     * @param  iterable<ReportTemplate>  $templates
+     * @return array<int, array{place: string, proposals: list<array{id: int, slug: string, name: string, number: string|null}>, proposalsText: string}>
+     */
+    private function englishNames(iterable $templates): array
+    {
+        $locale = app()->getLocale();
+        app()->setLocale('en');
+
+        try {
+            return app(MonthlyReportNames::class)->forTemplates($templates);
+        } finally {
+            app()->setLocale($locale);
+        }
     }
 
     /**

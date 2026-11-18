@@ -9,63 +9,93 @@ use App\Enums\DonorAttribution;
 use App\Enums\IndicatorMeasure;
 use App\Enums\MatrixCellState;
 use App\Enums\MonthlyReportStatus;
+use App\Livewire\Concerns\FiltersReportPlaces;
 use App\Models\Donor;
-use App\Models\HrCenter;
 use App\Models\HrCity;
 use App\Models\LibraryIndicator;
-use App\Models\PlanIndicator;
 use App\Models\Program;
-use App\Models\Project;
 use App\Models\Proposal;
 use App\Models\StrategicPillar;
 use App\Support\MealCoverage;
+use App\Support\Reporting\ExtractionFilter;
+use App\Support\Reporting\PlaceBridge;
+use App\Support\Reporting\ReportExtraction;
+use App\Support\Reporting\ReportPlace;
 use Carbon\CarbonImmutable;
-use Illuminate\Database\Eloquent\Model;
-use Illuminate\Database\Query\Builder;
 use Illuminate\Pagination\LengthAwarePaginator;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use Livewire\Attributes\Computed;
+use stdClass;
 
 /**
- * The Monthly Matrix's one read (T18, contracts §13, §14, §14.1): the rows a
- * viewer's filters select, their twelve month cells, and their targets,
- * totals and achieved percentages.
+ * The Monthly Matrix's one read (T18, Y-05, contracts §13, §14, §14.1): the
+ * rows a viewer's filters select, their month cells, and their targets,
+ * totals and achieved percentages, all read through ReportExtraction (D-79):
+ * nothing here builds its own `where`, so the screen and the file agree.
  *
- * Used by reports/monthly-matrix only. A flat set of queries, whatever the
- * row count: the target rows, the monthly reports of the window, the lines
- * (center view) or share mirrors (donor view) in them, and one pooled-ratio
- * aggregate. Nothing is computed from the visible cells: counts total the
- * validated cells' own figures and ratios pool only through
- * PlanIndicator::pooledRatioSql().
+ * Center view: one row per place (the template's city, program and center,
+ * or Field work, or Center not set) and library entry; two templates at one
+ * place are one row. Donor view: one row per target. Totals come from
+ * ReportExtraction::centerTotals() / targetTotals(); ratios pool only
+ * through PlanIndicator's pooled readers. A flat set of queries whatever
+ * the number of places, months and indicators.
  *
  * The page provides the #[Url] filters below and WithPagination's getPage().
  *
  * @property string $proposal #[Url] filter on the page
  * @property string $donor #[Url] filter on the page
- * @property string $center #[Url] filter on the page (a project id)
+ * @property string $center #[Url] filter on the page: c{hrCenterId}, field-{cityId} or unset
  * @property string $city #[Url] filter on the page
+ * @property string $program #[Url] filter on the page
  * @property string $indicator #[Url] filter on the page (a library entry id)
  * @property string $pillar #[Url] filter on the page
- * @property string $year #[Url] filter on the page
+ * @property string $from #[Url] first month on the page (Y-m)
+ * @property string $to #[Url] last month on the page (Y-m)
+ * @property string $year #[Url] legacy year, translated on mount
  * @property bool $mine #[Url] filter on the page
  * @property string $view #[Url] mode on the page: rows | grouped
  * @property string $tab #[Url] tab on the page: matrix | activities
  * @property bool $pwd #[Url] show the disability rows of a breakdown
- * @property-read array{proposal: ?int, donor: ?int, center: ?int, city: ?int, indicator: ?int, pillar: ?int} $resolvedFilters
+ * @property list<string> $filterOrder the filters in the order the viewer applied them
+ * @property-read array{proposal: ?int, donor: ?int, city: ?int, program: ?int, indicator: ?int, pillar: ?int} $resolvedFilters
+ * @property-read ExtractionFilter $extractionFilter
+ * @property-read list<CarbonImmutable> $months
  * @property-read array{months: list<CarbonImmutable>, rows: list<array<string, mixed>>, isDonorView: bool} $matrix
+ * @property-read array{begin: CarbonImmutable, end: CarbonImmutable}|null $proposalPeriod
+ * @property-read bool $hasWholeGrant
+ * @property-read string $resolvedView
+ * @property-read string $resolvedTab
+ * @property-read LengthAwarePaginator<int, array<string, mixed>> $pagedRows
+ * @property-read bool $hasNoAssignedProjects
+ * @property-read string|null $emptyReason
+ * @property-read Collection<int, stdClass> $proposalOptions
+ * @property-read Collection<int, stdClass> $donorOptions
+ * @property-read Collection<int, stdClass> $programOptions
+ * @property-read list<array{value: string, label: string}> $centerOptions
+ * @property-read Collection<int, stdClass> $indicatorOptions
+ * @property-read Collection<int, stdClass> $pillarOptions
+ * @property-read Collection<int, HrCity> $cityOptions
  */
 trait BuildsMonthlyMatrix
 {
+    use FiltersReportPlaces;
+
     /** How many matrix rows one page holds; the export holds them all. */
     private const PER_PAGE = 100;
 
+    /** The filters emptyReason() can name, in their default order. */
+    private const FILTER_NAMES = ['proposal', 'donor', 'city', 'program', 'center', 'indicator', 'pillar', 'window', 'mine'];
+
+    /** @var array<string, ReportExtraction> */
+    private array $extractionMemo = [];
+
     /**
-     * The filter values that name a record that exists, as ids; an unknown
-     * or malformed one resolves to null ("all").
+     * The id filters that name a record that exists; an unknown or
+     * malformed one resolves to null ("all").
      *
-     * @return array{proposal: ?int, donor: ?int, center: ?int, city: ?int, indicator: ?int, pillar: ?int}
+     * @return array{proposal: ?int, donor: ?int, city: ?int, program: ?int, indicator: ?int, pillar: ?int}
      */
     #[Computed]
     public function resolvedFilters(): array
@@ -73,17 +103,40 @@ trait BuildsMonthlyMatrix
         return [
             'proposal' => $this->existingId($this->proposal, Proposal::class),
             'donor' => $this->existingId($this->donor, Donor::class),
-            'center' => $this->existingId($this->center, Project::class),
-            'city' => $this->existingId($this->city, null, $this->cityOptions->pluck('id')->all()),
+            'city' => $this->existingId($this->city, null, array_values($this->allCities()->keys()->all())),
+            'program' => $this->existingId($this->program, Program::class),
             'indicator' => $this->existingId($this->indicator, LibraryIndicator::class),
             'pillar' => $this->existingId($this->pillar, StrategicPillar::class),
         ];
     }
 
     /**
-     * The proposal the window follows: the one filtered proposal's period.
+     * The page's filters as the extraction reads them. A Field work center
+     * brings its own city; an unknown center is ignored.
+     */
+    #[Computed]
+    public function extractionFilter(): ExtractionFilter
+    {
+        return new ExtractionFilter(...$this->filterArguments(self::FILTER_NAMES));
+    }
+
+    /**
+     * The months the columns show: the window, inclusive (it may run past
+     * twelve months). Empty while From is after To.
      *
-     * @return array{begin: CarbonImmutable, years: int}|null
+     * @return list<CarbonImmutable>
+     */
+    #[Computed]
+    public function months(): array
+    {
+        return $this->windowIsReversed() ? [] : $this->extraction()->months();
+    }
+
+    /**
+     * The one filtered proposal's period: actual begin (else planned) to its
+     * effective end (else planned).
+     *
+     * @return array{begin: CarbonImmutable, end: CarbonImmutable}|null
      */
     #[Computed]
     public function proposalPeriod(): ?array
@@ -96,10 +149,18 @@ trait BuildsMonthlyMatrix
             return null;
         }
 
-        $end = $proposal->effectiveDateEnd() ?? $proposal->planned_date_end ?? $begin->addYear();
-        $months = (int) $begin->startOfMonth()->diffInMonths($end->startOfMonth()) + 1;
+        $end = $proposal->effectiveDateEnd() ?? $proposal->planned_date_end ?? $begin->addYear()->subDay();
 
-        return ['begin' => CarbonImmutable::instance($begin)->startOfMonth(), 'years' => max(1, (int) ceil($months / 12))];
+        return ['begin' => CarbonImmutable::instance($begin)->startOfMonth(), 'end' => CarbonImmutable::instance($end)->startOfMonth()];
+    }
+
+    /**
+     * Whether exactly one proposal is filtered, so "Whole grant" applies.
+     */
+    #[Computed]
+    public function hasWholeGrant(): bool
+    {
+        return $this->proposalPeriod !== null;
     }
 
     /**
@@ -121,72 +182,6 @@ trait BuildsMonthlyMatrix
     }
 
     /**
-     * The year the twelve columns show, resolved: a grant year when one
-     * proposal is filtered, else a calendar year. A stray value falls back
-     * to the first grant year or the current calendar year.
-     */
-    #[Computed]
-    public function selectedYear(): int
-    {
-        $requested = ctype_digit($this->year) ? (int) $this->year : 0;
-        $period = $this->proposalPeriod;
-
-        if ($period !== null) {
-            return $requested >= 1 && $requested <= $period['years'] ? $requested : 1;
-        }
-
-        $current = CarbonImmutable::today()->year;
-
-        return $requested >= 2020 && $requested <= $current + 1 ? $requested : $current;
-    }
-
-    /**
-     * @return list<array{value: string, label: string}>
-     */
-    #[Computed]
-    public function yearOptions(): array
-    {
-        $period = $this->proposalPeriod;
-
-        if ($period !== null) {
-            return array_map(
-                fn (int $grantYear): array => ['value' => (string) $grantYear, 'label' => __('reports.matrix.grant_year', ['year' => $grantYear])],
-                range(1, $period['years']),
-            );
-        }
-
-        return array_map(
-            fn (int $year): array => ['value' => (string) $year, 'label' => (string) $year],
-            range(2020, CarbonImmutable::today()->year + 1),
-        );
-    }
-
-    /**
-     * The twelve month starts the columns show.
-     *
-     * @return list<CarbonImmutable>
-     */
-    #[Computed]
-    public function months(): array
-    {
-        $period = $this->proposalPeriod;
-        $start = $period !== null
-            ? $period['begin']->addMonths(($this->selectedYear - 1) * 12)
-            : CarbonImmutable::parse($this->selectedYear.'-01-01');
-
-        return array_map(fn (int $offset): CarbonImmutable => $start->addMonths($offset), range(0, 11));
-    }
-
-    /**
-     * Donor view when a donor or proposal is filtered, else the center view
-     * (contracts §14.1).
-     */
-    protected function isDonorView(): bool
-    {
-        return $this->resolvedFilters['donor'] !== null || $this->resolvedFilters['proposal'] !== null;
-    }
-
-    /**
      * The matrix: the months and every row the filters select, in display
      * order. Read once; the page pages it in memory and the export reads it
      * whole.
@@ -197,12 +192,12 @@ trait BuildsMonthlyMatrix
     public function matrix(): array
     {
         $months = $this->months;
-        $isDonorView = $this->isDonorView();
-        $rows = $this->matrixRows($months, $isDonorView);
+        $isDonorView = $this->extractionFilter->isDonorView();
+        $rows = $months === [] ? [] : $this->matrixRows($isDonorView);
 
         if ($rows !== []) {
             $rows = $this->withCells($rows, $months, $isDonorView);
-            $rows = $this->withTotals($rows, $months, $isDonorView);
+            $rows = $this->withTotals($rows, $isDonorView);
             $rows = $this->withBreakdowns($rows, $months, $isDonorView);
 
             if ($this->resolvedView === 'grouped') {
@@ -241,7 +236,46 @@ trait BuildsMonthlyMatrix
     }
 
     /**
-     * @return Collection<int, object{id: int, name: string}>
+     * The name of the filter that emptied the result (proposal, donor, city,
+     * program, center, indicator, pillar, window or mine), or null when the
+     * result is not empty or no single filter emptied it. The filters are
+     * added back one by one in the order the viewer applied them; the first
+     * one after which nothing is left is named.
+     */
+    #[Computed]
+    public function emptyReason(): ?string
+    {
+        if ($this->windowIsReversed()) {
+            return 'window';
+        }
+
+        $onActivities = $this->resolvedTab === 'activities';
+        $isEmpty = $onActivities
+            ? $this->activityBoard['outputs'] === []
+            : $this->matrix['rows'] === [];
+
+        if (! $isEmpty) {
+            return null;
+        }
+
+        $active = array_values(array_filter(self::FILTER_NAMES, fn (string $name): bool => $this->filterIsActive($name)));
+        $order = array_values(array_unique([...array_intersect($this->filterOrder, $active), ...$active]));
+        $applied = [];
+
+        foreach (array_values(array_unique(['window', ...$order])) as $name) {
+            $applied[] = $name;
+            $filter = new ExtractionFilter(...$this->filterArguments($applied));
+
+            if ($this->selectsNothing($filter, $onActivities)) {
+                return $name === 'window' && ! $this->filterIsActive('window') ? null : $name;
+            }
+        }
+
+        return null;
+    }
+
+    /**
+     * @return Collection<int, stdClass> rows of id, name
      */
     #[Computed]
     public function proposalOptions(): Collection
@@ -250,7 +284,7 @@ trait BuildsMonthlyMatrix
     }
 
     /**
-     * @return Collection<int, object{id: int, name: string}>
+     * @return Collection<int, stdClass> rows of id, name
      */
     #[Computed]
     public function donorOptions(): Collection
@@ -259,16 +293,46 @@ trait BuildsMonthlyMatrix
     }
 
     /**
-     * @return Collection<int, object{id: int, name: string}>
+     * Every program, by its HR name.
+     *
+     * @return Collection<int, stdClass> rows of id, name
      */
     #[Computed]
-    public function projectOptions(): Collection
+    public function programOptions(): Collection
     {
-        return DB::table('projects')->orderBy('name')->orderBy('id')->get(['id', 'name']);
+        return collect(Program::options()->all())->map(fn (Program $program): stdClass => self::programOption($program))->values();
     }
 
     /**
-     * @return Collection<int, object{id: int, code: string, name_ar: string, name_en: ?string}>
+     * A program as an option row (id, name), the shape of the other options.
+     */
+    private static function programOption(Program $program): stdClass
+    {
+        $option = new stdClass;
+        $option->id = $program->id;
+        $option->name = $program->name;
+
+        return $option;
+    }
+
+    /**
+     * The places a viewer can pick (D-79, D-82, D-88): each HR center that
+     * holds at least one report template ("center · city"), one Field work
+     * option per city with a city-wide template, and Center not set when a
+     * template has no center; narrowed by the City and Program filters.
+     *
+     * @return list<array{value: string, label: string}>
+     */
+    #[Computed]
+    public function centerOptions(): array
+    {
+        $filters = $this->resolvedFilters;
+
+        return $this->centerOptionsFor($filters['city'], $filters['program']);
+    }
+
+    /**
+     * @return Collection<int, stdClass> rows of id, code, name_ar, name_en
      */
     #[Computed]
     public function indicatorOptions(): Collection
@@ -277,7 +341,7 @@ trait BuildsMonthlyMatrix
     }
 
     /**
-     * @return Collection<int, object{id: int, name_ar: string, name_en: ?string}>
+     * @return Collection<int, stdClass> rows of id, name_ar, name_en
      */
     #[Computed]
     public function pillarOptions(): Collection
@@ -293,7 +357,50 @@ trait BuildsMonthlyMatrix
     #[Computed]
     public function cityOptions(): Collection
     {
-        return HrCity::query()->where('is_active', true)->orderBy(HrCity::nameColumn())->orderBy('id')->get(['id', 'name_en', 'name_ar']);
+        return $this->allCities()->filter(fn (HrCity $city): bool => $city->is_active)->values();
+    }
+
+    /**
+     * The monthly-reports list at one month of a row (Y-05): the page's
+     * proposal, the row's place (or the page's place filters when the row
+     * spans several places or has none) and every status; null when the cell
+     * shows no monthly report. Built from the row alone: no query.
+     *
+     * @param  array<string, mixed>  $row
+     */
+    protected function cellListUrl(array $row, CarbonImmutable $month): ?string
+    {
+        $state = $row['cells'][$month->format('Y-m')]['state'] ?? null;
+
+        if (! in_array($state, [MatrixCellState::Approved, MatrixCellState::Pending, MatrixCellState::NotDue], true)) {
+            return null;
+        }
+
+        $place = count($row['place_keys']) === 1 ? self::placeOfKey($row['place_keys'][0]) : null;
+        $place = $place === null
+            ? ['city' => $this->resolvedFilters['city'], 'program' => $this->resolvedFilters['program'], 'center' => $this->centerArguments() === [] ? null : $this->center]
+            : ['city' => $place->cityId, 'program' => $place->programId, 'center' => $this->centerValueOf($place)];
+
+        return route('monthly-reports.index', array_filter([
+            'proposal' => $this->resolvedFilters['proposal'],
+            ...$place,
+            'from' => $month->format('Y-m'),
+            'to' => $month->format('Y-m'),
+            'status' => 'all',
+        ], fn (mixed $value): bool => $value !== null && $value !== ''));
+    }
+
+    /**
+     * The place a ReportPlace::key() names: "city:program:c{id}",
+     * "city:program:city-wide" or "city:program:unset".
+     */
+    private static function placeOfKey(string $key): ?ReportPlace
+    {
+        if (preg_match('/^(\d+):(\d+):(c(\d+)|city-wide|unset)$/', $key, $match) !== 1) {
+            return null;
+        }
+
+        return new ReportPlace((int) $match[1], (int) $match[2], isset($match[4]) ? (int) $match[4] : null, $match[3] === 'city-wide');
     }
 
     /**
@@ -305,28 +412,70 @@ trait BuildsMonthlyMatrix
     }
 
     /**
-     * The id a filter value names when that record exists, else null.
-     *
-     * @param  class-string<Model>|null  $model
-     * @param  list<int>|null  $allowed  a fixed list to check against instead of a table
+     * Sets the window to January of this year → this month.
      */
-    protected function existingId(string $value, ?string $model, ?array $allowed = null): ?int
+    protected function setThisYearWindow(): void
     {
-        if ($value === '' || ! ctype_digit($value) || strlen($value) > 18) {
-            return null;
-        }
-
-        $id = (int) $value;
-
-        if ($allowed !== null) {
-            return in_array($id, array_map('intval', $allowed), true) ? $id : null;
-        }
-
-        return $model !== null && $model::query()->whereKey($id)->exists() ? $id : null;
+        $today = CarbonImmutable::today();
+        $this->from = $today->startOfYear()->format('Y-m');
+        $this->to = $today->format('Y-m');
     }
 
     /**
-     * The project ids "my projects" narrows to (contracts §12.3, D-12a).
+     * Refuses a From after To with a field error (never swapped).
+     */
+    protected function checkWindow(): void
+    {
+        $this->resetErrorBag('from');
+
+        if ($this->windowIsReversed()) {
+            $this->addError('from', __('reports.matrix.from_after_to'));
+        }
+    }
+
+    /**
+     * The old links still open (Y-05): `?center=<project id>` becomes that
+     * project's place (and its city and program), `?year=` becomes From/To
+     * (a calendar year, or grant year N of the one filtered proposal). Both
+     * are cleared, so the URL is rewritten.
+     */
+    protected function translateLegacyFilters(): void
+    {
+        if ($this->center !== '' && ctype_digit($this->center) && strlen($this->center) <= 18) {
+            $place = app(PlaceBridge::class)->placeOfProject((int) $this->center);
+            $this->center = $place === null ? '' : $this->centerValueOf($place);
+
+            if ($place !== null) {
+                $this->city = (string) $place->cityId;
+                $this->program = (string) $place->programId;
+            }
+        }
+
+        if ($this->year === '') {
+            return;
+        }
+
+        $year = ctype_digit($this->year) && strlen($this->year) <= 4 ? (int) $this->year : 0;
+        $period = $this->proposalPeriod;
+        $grantYears = $period === null ? 0 : (int) ceil(((int) $period['begin']->diffInMonths($period['end']) + 1) / 12);
+
+        if ($this->from === '' && $this->to === '') {
+            if ($period !== null && $year >= 1 && $year <= $grantYears) {
+                $start = $period['begin']->addMonths(($year - 1) * 12);
+                $this->from = $start->format('Y-m');
+                $this->to = $start->addMonths(11)->format('Y-m');
+            } elseif ($year >= 2000 && $year <= 2100) {
+                $this->from = $year.'-01';
+                $this->to = $year.'-12';
+            }
+        }
+
+        $this->year = '';
+    }
+
+    /**
+     * The project ids "my projects" narrows the Activities tab to
+     * (contracts §12.3, D-12a).
      *
      * @return list<int>
      */
@@ -338,60 +487,157 @@ trait BuildsMonthlyMatrix
     }
 
     /**
-     * The target rows the filters select, grouped into matrix rows (one per
-     * project and library entry in the center view, one per target in the
-     * donor view), each with its sources, target and display labels.
+     * The extraction of the page's filters, built once per request.
+     */
+    protected function extraction(): ReportExtraction
+    {
+        $filter = $this->extractionFilter;
+
+        return $this->extractionMemo[serialize($filter)] ??= ReportExtraction::for($filter);
+    }
+
+    /**
+     * Whether From and To are both set and From is after To.
+     */
+    protected function windowIsReversed(): bool
+    {
+        $from = $this->monthOf($this->from);
+        $to = $this->monthOf($this->to);
+
+        return $from !== null && $to !== null && $from->greaterThan($to);
+    }
+
+    /**
+     * The extraction filter's arguments for the given filters only.
      *
-     * @param  list<CarbonImmutable>  $months
+     * @param  list<string>  $names
+     * @return array<string, mixed>
+     */
+    private function filterArguments(array $names): array
+    {
+        $filters = $this->resolvedFilters;
+        $arguments = [];
+
+        foreach ($names as $name) {
+            $arguments = [...$arguments, ...match ($name) {
+                'proposal' => ['proposalId' => $filters['proposal']],
+                'donor' => ['donorId' => $filters['donor']],
+                'city' => ['cityId' => $arguments['cityId'] ?? $filters['city']],
+                'program' => ['programId' => $filters['program']],
+                'indicator' => ['indicatorId' => $filters['indicator']],
+                'pillar' => ['pillarId' => $filters['pillar']],
+                'window' => ['from' => $this->monthOf($this->from), 'to' => $this->monthOf($this->to)],
+                'mine' => ['mine' => $this->mine],
+                'center' => $this->centerArguments(),
+                default => [],
+            }];
+        }
+
+        return $arguments;
+    }
+
+    /**
+     * The center filter's arguments: c{id} (an HR center that exists),
+     * field-{city} (that city's Field work) or unset.
+     *
+     * @return array<string, mixed>
+     */
+    private function centerArguments(): array
+    {
+        return $this->centerArgumentsOf($this->center);
+    }
+
+    private function filterIsActive(string $name): bool
+    {
+        return match ($name) {
+            'window' => $this->monthOf($this->from) !== null || $this->monthOf($this->to) !== null,
+            'mine' => $this->mine,
+            'center' => $this->centerArguments() !== [],
+            default => ($this->resolvedFilters[$name] ?? null) !== null,
+        };
+    }
+
+    /**
+     * Whether a filter selects no matrix row (or, on the Activities tab, no
+     * proposal and project pair).
+     */
+    private function selectsNothing(ExtractionFilter $filter, bool $onActivities): bool
+    {
+        $extraction = ReportExtraction::for($filter);
+        $months = $extraction->months();
+
+        if ($months === []) {
+            return true;
+        }
+
+        if ($onActivities) {
+            return $this->activityLinksFor($filter, $months[0], $months[count($months) - 1]->endOfMonth())->isEmpty();
+        }
+
+        $query = $extraction->targets();
+
+        if (! $filter->isDonorView()) {
+            $query->whereNotNull('t.place_city_id')->whereNotNull('t.place_program_id');
+        }
+
+        return ! $query->exists();
+    }
+
+    private function placeOfRow(stdClass $row): ?ReportPlace
+    {
+        return $row->place_city_id === null || $row->place_program_id === null
+            ? null
+            : new ReportPlace((int) $row->place_city_id, (int) $row->place_program_id, $row->place_center_id === null ? null : (int) $row->place_center_id, (bool) $row->place_city_wide);
+    }
+
+    /**
+     * The target rows of the extraction, grouped into matrix rows: one per
+     * place and library entry (center view, targets without a place have no
+     * row) or one per target (donor view), each with its places, sources,
+     * target and labels.
+     *
      * @return list<array<string, mixed>>
      */
-    protected function matrixRows(array $months, bool $isDonorView): array
+    protected function matrixRows(bool $isDonorView): array
     {
-        $targets = $this->targetQuery($months[0], $months[11]->endOfMonth())->get();
+        $targets = $this->extraction()->targetRows();
+
+        if (! $isDonorView) {
+            $targets = $targets->filter(fn (stdClass $row): bool => $this->placeOfRow($row) !== null);
+        }
 
         if ($targets->isEmpty()) {
             return [];
         }
 
-        $centers = [];
-        foreach ($targets->pluck('center_id')->filter()->unique() as $centerId) {
-            $centers[(int) $centerId] = HrCenter::remembered((int) $centerId);
-        }
+        $grouped = $targets->groupBy(fn (stdClass $row): string => $isDonorView
+            ? 'target-'.$row->plan_id
+            : 'row-'.$this->placeOfRow($row)->key().'-'.$row->library_id);
 
-        $cityIds = $targets->map(fn (object $row): ?int => $this->cityIdOf($row, $centers))->filter()->unique()->values()->all();
-        $cities = $cityIds === [] ? collect() : HrCity::query()->whereIn('id', $cityIds)->get(['id', 'name_en', 'name_ar'])->keyBy('id');
-
-        $grouped = $targets->groupBy(fn (object $row): string => $isDonorView ? 'p'.$row->plan_id : $row->project_id.'|'.$row->library_id);
-
-        $rows = $grouped->map(function (Collection $group) use ($centers, $cities, $isDonorView): array {
+        $rows = $grouped->map(function (Collection $group, string $key): array {
             $first = $group->first();
-            $center = $first->center_id === null ? null : ($centers[(int) $first->center_id] ?? null);
-            $cityId = $this->cityIdOf($first, $centers);
+            $places = $group->map(fn (stdClass $row): ?ReportPlace => $this->placeOfRow($row))->filter()->unique(fn (ReportPlace $place): string => $place->key())->values();
+            $labels = $places->map(fn (ReportPlace $place): array => $this->placeLabel($place));
             $attribution = $first->donor_attribution === null ? DonorAttribution::Shared : DonorAttribution::from($first->donor_attribution);
-            $measure = IndicatorMeasure::from($first->measure);
-
-            // `shared`: one representative target (the highest, the lowest id on a tie); `split`: all.
-            $pooledIds = $isDonorView || $attribution === DonorAttribution::Split
-                ? $group->pluck('plan_id')->map(fn (mixed $id): int => (int) $id)->all()
-                : [(int) $group->sort(fn (object $a, object $b): int => [(float) $b->target, $a->plan_id] <=> [(float) $a->target, $b->plan_id])->first()->plan_id];
+            $shared = $group->filter(fn (stdClass $row): bool => (bool) $row->is_shared)->pluck('shared_centers')->filter()->map(fn (mixed $count): int => (int) $count);
 
             return [
-                'key' => $isDonorView ? 'target-'.$first->plan_id : 'row-'.$first->project_id.'-'.$first->library_id,
-                'project_id' => (int) $first->project_id,
-                'project_name' => $first->project_name,
-                'project_slug' => $first->project_slug,
-                'project_start' => $first->project_start,
-                'project_end' => $first->project_end,
-                'source_windows' => $group->map(fn (object $target): array => [
+                'key' => $key,
+                'place_key' => $places->first()?->key(),
+                'place_keys' => $places->map(fn (ReportPlace $place): string => $place->key())->all(),
+                'center' => $labels->isEmpty() ? __('reports.matrix.place_not_set') : $labels->pluck('center')->unique()->implode(', '),
+                'city' => $labels->pluck('city')->filter()->unique()->implode(', ') ?: null,
+                'shared_centers' => $shared->isEmpty() ? null : $shared->max(),
+                'source_windows' => $group->unique('plan_id')->map(fn (stdClass $target): array => [
                     'start' => $target->plan_year === null ? $target->proposal_start : $target->plan_year.'-01-01',
                     'end' => $target->plan_year === null ? $target->proposal_end : $target->plan_year.'-12-31',
-                ]),
+                ])->values()->all(),
                 'library_id' => (int) $first->library_id,
                 'code' => $first->code,
                 'name_en' => $first->name_en ?? $first->name_ar,
                 'name_ar' => $first->name_ar,
                 'is_active' => (bool) $first->is_active,
-                'measure' => $measure,
+                'measure' => IndicatorMeasure::from($first->measure),
                 'unit' => $first->unit,
                 'is_cumulative' => (bool) $first->is_cumulative,
                 'is_disaggregated' => (bool) $first->is_disaggregated,
@@ -402,17 +648,14 @@ trait BuildsMonthlyMatrix
                 'breakdown_kind' => null,
                 'breakdown_raw' => [],
                 'denominator_basis' => $first->denominator_basis === null ? null : DenominatorBasis::from($first->denominator_basis),
-                'center' => $center?->name ?? $first->project_name,
-                'city' => $center === null || $cityId === null ? null : ($cities[$cityId]->name ?? null),
-                'sources' => $group->map(fn (object $row): array => [
+                'sources' => $group->map(fn (stdClass $row): array => [
                     'proposal' => $row->proposal_name,
                     'proposal_slug' => $row->proposal_slug,
                     'donor' => $row->donor_name,
                     'donor_slug' => $row->donor_slug,
-                ])->unique(fn (array $source): string => json_encode($source))->values()->all(),
-                'target_ids' => $group->pluck('plan_id')->map(fn (mixed $id): int => (int) $id)->all(),
-                'pooled_ids' => $pooledIds,
-                'target' => $attribution->combine($group->map(fn (object $row): float => (float) $row->target)->all()),
+                ])->unique(fn (array $source): string => (string) json_encode($source))->values()->all(),
+                'target_ids' => $group->pluck('plan_id')->map(fn (mixed $id): int => (int) $id)->unique()->values()->all(),
+                'target' => $attribution->combine(array_values($group->unique('plan_id')->map(fn (stdClass $row): float => (float) $row->target)->all())),
                 'cells' => [],
                 'total' => null,
                 'excluded' => 0,
@@ -420,99 +663,20 @@ trait BuildsMonthlyMatrix
             ];
         });
 
-        return $rows->values()->all();
+        return array_values($rows->sortBy([
+            fn (array $a, array $b): int => strcmp(mb_strtolower((string) $a['city']), mb_strtolower((string) $b['city'])),
+            fn (array $a, array $b): int => strcmp(mb_strtolower($a['center']), mb_strtolower($b['center'])),
+            fn (array $a, array $b): int => strcmp((string) $a['code'], (string) $b['code']),
+            fn (array $a, array $b): int => $a['target_ids'][0] <=> $b['target_ids'][0],
+        ])->all());
     }
 
     /**
-     * The city a row's center sits in: the center's city, else the
-     * project's own.
-     *
-     * @param  array<int, ?HrCenter>  $centers
-     */
-    protected function cityIdOf(object $row, array $centers): ?int
-    {
-        $centerCity = $row->center_id === null ? null : ($centers[(int) $row->center_id]?->city_id ?? null);
-        $cityId = $centerCity ?? $row->city_id;
-
-        return $cityId === null ? null : (int) $cityId;
-    }
-
-    /**
-     * The proposal, donor, center, city, pillar and "my projects" filters on
-     * a query that joins `proposals as pp` and `projects as pr`; shared by
-     * the matrix and the Activities tab.
-     */
-    protected function applyMatrixFilters(Builder $query): Builder
-    {
-        $filters = $this->resolvedFilters;
-
-        $query
-            ->when($filters['proposal'] !== null, fn (Builder $q) => $q->where('pp.id', $filters['proposal']))
-            ->when($filters['donor'] !== null, fn (Builder $q) => $q->where('pp.donor_id', $filters['donor']))
-            ->when($filters['center'] !== null, fn (Builder $q) => $q->where('pr.id', $filters['center']))
-            ->when($filters['city'] !== null, fn (Builder $q) => $q->where('pr.city_id', $filters['city']))
-            ->when($filters['pillar'] !== null, fn (Builder $q) => $q->whereIn('pr.program_id', Program::query()->where('strategic_pillar_id', $filters['pillar'])->select('id')));
-
-        if ($this->mine) {
-            $covered = $this->coveredProjectIds();
-            $covered === [] ? $query->whereRaw('1 = 0') : $query->whereIn('pr.id', $covered);
-        }
-
-        return $query;
-    }
-
-    /**
-     * Every target the filters select whose source covers the window, with
-     * its library entry, project, proposal, donor and program joined in one
-     * read. Targets without a library entry carry no lines and so no row.
-     */
-    protected function targetQuery(CarbonImmutable $from, CarbonImmutable $to): Builder
-    {
-        $filters = $this->resolvedFilters;
-
-        $proposalStart = 'case when pp.actual_date_begin is not null and pp.actual_date_end is not null then pp.actual_date_begin else pp.planned_date_begin end';
-        $proposalEnd = 'case when pp.actual_date_begin is not null and pp.actual_date_end is not null then coalesce(pp.extended_date_end, pp.actual_date_end) else pp.planned_date_end end';
-
-        $query = DB::table('plan_indicators as p')
-            ->join('indicators as ind', 'ind.id', '=', 'p.indicator_id')
-            ->join('library_indicators as li', 'li.id', '=', 'ind.library_indicator_id')
-            ->join('projects as pr', 'pr.id', '=', 'p.project_id')
-            ->leftJoin('programs as pg', 'pg.id', '=', 'pr.program_id')
-            ->leftJoin('proposals as pp', fn ($join) => $join->on('pp.id', '=', 'p.source_id')->where('p.source_type', '=', 'proposal'))
-            ->leftJoin('donors as d', 'd.id', '=', 'pp.donor_id')
-            ->leftJoin('annual_plans as ap', fn ($join) => $join->on('ap.id', '=', 'p.source_id')->where('p.source_type', '=', 'annual_plan'))
-            ->where(function (Builder $covers) use ($from, $to, $proposalStart, $proposalEnd): void {
-                $covers->where(function (Builder $proposalTargets) use ($from, $to, $proposalStart, $proposalEnd): void {
-                    $proposalTargets->whereNotNull('pp.id')
-                        ->whereRaw("($proposalStart) <= ?", [$to->toDateString()])
-                        ->whereRaw("($proposalEnd) >= ?", [$from->toDateString()]);
-                })->orWhere(function (Builder $planTargets) use ($from, $to): void {
-                    $planTargets->whereNotNull('ap.id')->whereBetween('ap.year', [$from->year, $to->year]);
-                });
-            })
-            ->when($filters['indicator'] !== null, fn (Builder $q) => $q->where('li.id', $filters['indicator']));
-
-        return $this->applyMatrixFilters($query)
-            ->orderBy('pr.name')
-            ->orderBy('pr.id')
-            ->orderBy('li.code')
-            ->orderBy('p.id')
-            ->select([
-                'p.id as plan_id', 'p.target', 'p.project_id',
-                'li.id as library_id', 'li.code', 'li.name_ar', 'li.name_en', 'li.unit', 'li.is_cumulative', 'li.is_disaggregated', 'li.denominator_basis', 'li.is_active',
-                'ind.measure',
-                'pr.name as project_name', 'pr.slug as project_slug', 'pr.center_id', 'pr.city_id',
-                'pg.donor_attribution',
-                'pp.name as proposal_name', 'pp.slug as proposal_slug',
-                'd.name as donor_name', 'd.slug as donor_slug',
-                'pr.start_date as project_start', 'pr.end_date as project_end', 'ap.year as plan_year',
-            ])
-            ->selectRaw("($proposalStart) as proposal_start, ($proposalEnd) as proposal_end");
-    }
-
-    /**
-     * Fills each row's twelve cells from the monthly reports and their
-     * lines (center view) or share mirrors (donor view).
+     * Fills each row's month cells from the extraction's lines (center view)
+     * or share mirrors (donor view), of every status. Several templates in
+     * one month (two at one place, or a shared target's centers): the value
+     * is Σ their validated figures (Σ the submitted ones while nothing is
+     * validated), the state the lowest (NotSubmitted < Pending < Approved).
      *
      * @param  list<array<string, mixed>>  $rows
      * @param  list<CarbonImmutable>  $months
@@ -520,48 +684,35 @@ trait BuildsMonthlyMatrix
      */
     protected function withCells(array $rows, array $months, bool $isDonorView): array
     {
-        $from = $months[0]->toDateString();
-        $to = $months[11]->toDateString();
-        $projectIds = array_values(array_unique(array_column($rows, 'project_id')));
+        $extraction = $this->extraction();
 
-        /** @var array<int, array<string, string>> $reportStatus project id => Y-m => monthly report status */
-        $reportStatus = [];
-        foreach (DB::table('monthly_reports')->whereIn('project_id', $projectIds)->whereBetween('period', [$from, $to])->get(['project_id', 'period', 'status']) as $report) {
-            $reportStatus[(int) $report->project_id][substr((string) $report->period, 0, 7)] = (string) $report->status;
+        /** @var array<string, array<string, true>> $reported place key => Y-m => a monthly report exists */
+        $reported = [];
+        foreach ($extraction->reports()->get() as $report) {
+            $reported[ReportExtraction::placeKey((int) $report->place_city_id, (int) $report->place_program_id, $report->place_center_id === null ? null : (int) $report->place_center_id, (bool) $report->place_city_wide)][substr((string) $report->period, 0, 7)] = true;
         }
 
-        /** @var array<string, array<string, object>> $figures row key => Y-m => the line or mirror figures */
+        /** @var array<string, array<string, list<stdClass>>> $figures row key => Y-m => figures */
         $figures = [];
 
         if ($isDonorView) {
-            $targetKey = [];
-            foreach ($rows as $row) {
-                $targetKey[$row['target_ids'][0]] = $row['key'];
-            }
-
-            $shares = DB::table('monthly_report_line_shares as s')
-                ->join('monthly_report_lines as l', 'l.id', '=', 's.monthly_report_line_id')
-                ->join('monthly_reports as mr', 'mr.id', '=', 'l.monthly_report_id')
-                ->leftJoin('reports as r', 'r.monthly_report_line_share_id', '=', 's.id')
-                ->whereIn('s.plan_indicator_id', array_keys($targetKey))
-                ->whereBetween('mr.period', [$from, $to])
-                ->get(['s.plan_indicator_id', 'mr.period', 'r.value', 'r.numerator', 'r.denominator', 's.not_measured']);
+            $shares = $extraction->shares()->whereIn('s.plan_indicator_id', array_merge(...array_column($rows, 'target_ids')))->get();
 
             foreach ($shares as $share) {
-                $figures[$targetKey[(int) $share->plan_indicator_id]][substr((string) $share->period, 0, 7)] = $share;
+                $figures['target-'.$share->plan_indicator_id][substr((string) $share->period, 0, 7)][] = (object) [
+                    'status' => $share->status,
+                    'value' => $share->report_value,
+                    'numerator' => $share->report_numerator,
+                    'denominator' => $share->report_denominator,
+                    'not_measured' => $share->not_measured,
+                ];
             }
         } else {
-            $libraryIds = array_values(array_unique(array_column($rows, 'library_id')));
-
-            $lines = DB::table('monthly_report_lines as l')
-                ->join('monthly_reports as mr', 'mr.id', '=', 'l.monthly_report_id')
-                ->whereIn('mr.project_id', $projectIds)
-                ->whereIn('l.library_indicator_id', $libraryIds)
-                ->whereBetween('mr.period', [$from, $to])
-                ->get(['mr.project_id', 'mr.period', 'l.library_indicator_id', 'l.value', 'l.numerator', 'l.denominator', 'l.not_measured']);
+            $lines = $extraction->lines()->whereIn('l.library_indicator_id', array_values(array_unique(array_column($rows, 'library_id'))))->get();
 
             foreach ($lines as $line) {
-                $figures['row-'.$line->project_id.'-'.$line->library_indicator_id][substr((string) $line->period, 0, 7)] = $line;
+                $key = 'row-'.ReportExtraction::placeKey((int) $line->place_city_id, (int) $line->place_program_id, $line->place_center_id === null ? null : (int) $line->place_center_id, (bool) $line->place_city_wide).'-'.$line->library_indicator_id;
+                $figures[$key][substr((string) $line->period, 0, 7)][] = $line;
             }
         }
 
@@ -570,34 +721,8 @@ trait BuildsMonthlyMatrix
         foreach ($rows as $index => $row) {
             foreach ($months as $month) {
                 $ym = $month->format('Y-m');
-                $status = $reportStatus[$row['project_id']][$ym] ?? null;
-                $figure = $figures[$row['key']][$ym] ?? null;
-
-                $monthStart = $month->toDateString();
-                $monthEnd = $month->endOfMonth()->toDateString();
-                $outsidePeriod = ($row['project_start'] !== null && $row['project_start'] > $monthEnd)
-                    || ($row['project_end'] !== null && $row['project_end'] < $monthStart)
-                    || ! $row['source_windows']->contains(fn (array $window): bool => ($window['start'] === null || $window['start'] <= $monthEnd)
-                        && ($window['end'] === null || $window['end'] >= $monthStart));
-
-                $state = match (true) {
-                    $figure === null && $outsidePeriod => MatrixCellState::OutsidePeriod,
-                    $month->greaterThan($today) => MatrixCellState::Upcoming,
-                    $status === null => MatrixCellState::NotSubmitted,
-                    $figure === null => MatrixCellState::NotDue,
-                    $status === MonthlyReportStatus::Validated->value => MatrixCellState::Approved,
-                    $status === MonthlyReportStatus::Submitted->value => MatrixCellState::Pending,
-                    default => MatrixCellState::NotSubmitted,
-                };
-                $shown = $figure !== null && in_array($state, [MatrixCellState::Approved, MatrixCellState::Pending], true);
-
-                $rows[$index]['cells'][$ym] = [
-                    'state' => $state,
-                    'value' => $shown && $figure->value !== null ? (float) $figure->value : null,
-                    'numerator' => $shown && $figure->numerator !== null ? (float) $figure->numerator : null,
-                    'denominator' => $shown && $figure->denominator !== null ? (float) $figure->denominator : null,
-                    'not_measured' => $shown && (bool) $figure->not_measured,
-                ];
+                $hasReport = array_filter($row['place_keys'], fn (string $place): bool => isset($reported[$place][$ym])) !== [];
+                $rows[$index]['cells'][$ym] = $this->cellOf($figures[$row['key']][$ym] ?? [], $hasReport, $month, $today, $row['source_windows'], $row['measure']);
             }
         }
 
@@ -605,104 +730,112 @@ trait BuildsMonthlyMatrix
     }
 
     /**
-     * Fills each row's total, the ratios' excluded count and the achieved
-     * percentage. Counts total the validated cells' figures (the latest one
-     * when cumulative); ratios pool through PlanIndicator::pooledRatioSql().
+     * One month of one row.
      *
-     * @param  list<array<string, mixed>>  $rows
-     * @param  list<CarbonImmutable>  $months
-     * @return list<array<string, mixed>>
+     * @param  list<stdClass>  $figures  with status, value, numerator, denominator, not_measured
+     * @param  list<array{start: string|null, end: string|null}>  $sourceWindows  the row's target sources' periods
+     * @return array{state: MatrixCellState, value: ?float, numerator: ?float, denominator: ?float, not_measured: bool}
      */
-    protected function withTotals(array $rows, array $months, bool $isDonorView): array
+    private function cellOf(array $figures, bool $hasReport, CarbonImmutable $month, CarbonImmutable $today, array $sourceWindows, IndicatorMeasure $measure): array
     {
-        $pooled = $this->pooledRatios($rows, $months[0], $months[11]->endOfMonth(), $isDonorView);
+        $monthStart = $month->toDateString();
+        $monthEnd = $month->endOfMonth()->toDateString();
+        $outsidePeriod = array_filter($sourceWindows, fn (array $window): bool => ($window['start'] === null || $window['start'] <= $monthEnd)
+            && ($window['end'] === null || $window['end'] >= $monthStart)) === [];
+        $statuses = array_column($figures, 'status');
 
-        foreach ($rows as $index => $row) {
-            $total = null;
-            $excluded = 0;
+        $state = match (true) {
+            $figures === [] && $outsidePeriod => MatrixCellState::OutsidePeriod,
+            $month->greaterThan($today) => MatrixCellState::Upcoming,
+            $figures === [] && ! $hasReport => MatrixCellState::NotSubmitted,
+            $figures === [] => MatrixCellState::NotDue,
+            in_array(MonthlyReportStatus::Draft->value, $statuses, true) => MatrixCellState::NotSubmitted,
+            in_array(MonthlyReportStatus::Submitted->value, $statuses, true) => MatrixCellState::Pending,
+            default => MatrixCellState::Approved,
+        };
 
-            if ($row['measure'] === IndicatorMeasure::Numeric) {
-                $validated = collect($row['cells'])
-                    ->filter(fn (array $cell): bool => $cell['state'] === MatrixCellState::Approved && $cell['value'] !== null)
-                    ->pluck('value');
-                $total = (float) ($row['is_cumulative'] ? ($validated->last() ?? 0.0) : $validated->sum());
-            } elseif (isset($pooled[$row['key']])) {
-                $ratio = $pooled[$row['key']]['ratio'];
-                $total = $ratio === null ? null : round($ratio, 2);
-                $excluded = $pooled[$row['key']]['excluded'];
-            }
+        $validated = array_values(array_filter($figures, fn (stdClass $figure): bool => $figure->status === MonthlyReportStatus::Validated->value));
+        $used = $validated !== [] ? $validated : ($state === MatrixCellState::Pending
+            ? array_values(array_filter($figures, fn (stdClass $figure): bool => $figure->status === MonthlyReportStatus::Submitted->value))
+            : []);
 
-            $rows[$index]['total'] = $total;
-            $rows[$index]['excluded'] = $excluded;
-            $rows[$index]['achieved'] = $total === null || $row['target'] <= 0.0 ? null : round($total / $row['target'] * 100, 2);
-        }
-
-        return $rows;
+        return ['state' => $state, ...$this->figuresOf($used, $measure)];
     }
 
     /**
-     * The pooled level of every percentage or average row over the window,
-     * one aggregate over the rows' targets (contracts §13 Pooling): the
-     * representative target in a `shared` center row, every target in a
-     * `split` one, the single target in the donor view. `$byLibrary` pools all
-     * the targets of a library entry together (the grouped mode).
+     * The figures of one or more lines of a month: counts add up; one ratio
+     * line keeps its own value, several pool Σ numerator ÷ Σ denominator.
      *
-     * @param  list<array<string, mixed>>  $rows
-     * @return array<string, array{ratio: ?float, excluded: int}>
+     * @param  list<stdClass>  $used
+     * @return array{value: ?float, numerator: ?float, denominator: ?float, not_measured: bool}
      */
-    protected function pooledRatios(array $rows, CarbonImmutable $from, CarbonImmutable $to, bool $isDonorView, bool $byLibrary = false): array
+    private function figuresOf(array $used, IndicatorMeasure $measure): array
     {
-        $ratioRows = array_values(array_filter($rows, fn (array $row): bool => $row['measure'] !== IndicatorMeasure::Numeric));
+        $empty = ['value' => null, 'numerator' => null, 'denominator' => null, 'not_measured' => false];
 
-        if ($ratioRows === []) {
-            return [];
+        if ($used === []) {
+            return $empty;
         }
 
-        $rowKeyOfTarget = [];
-        foreach ($ratioRows as $row) {
-            foreach ($row['pooled_ids'] as $targetId) {
-                $rowKeyOfTarget[$targetId] = $row['key'];
-            }
-        }
+        $float = fn (mixed $value): ?float => $value === null ? null : (float) $value;
+        $notMeasured = array_filter($used, fn (stdClass $figure): bool => ! (bool) $figure->not_measured) === [];
 
-        $grammar = DB::connection()->getQueryGrammar();
-        $terms = PlanIndicator::query()
-            ->toBase()
-            ->from('plan_indicators')
-            ->whereIn('plan_indicators.id', array_keys($rowKeyOfTarget))
-            ->select(['plan_indicators.id', 'plan_indicators.project_id'])
-            ->selectRaw('(select i2.library_indicator_id from indicators i2 where i2.id = plan_indicators.indicator_id) as library_indicator_id, '.PlanIndicator::pooledTermsSelectSql($from, $to)->getValue($grammar));
-
-        $pooled = DB::query()
-            ->fromSub($terms, 'pooled')
-            ->groupBy(...$this->pooledGroupColumns($isDonorView, $byLibrary))
-            ->selectRaw('min(pooled.id) as first_target_id, '.PlanIndicator::pooledRatioSql()->getValue($grammar).' as ratio, '.PlanIndicator::pooledExcludedCountSql()->getValue($grammar).' as excluded')
-            ->get();
-
-        $result = [];
-        foreach ($pooled as $group) {
-            $result[$rowKeyOfTarget[(int) $group->first_target_id]] = [
-                'ratio' => $group->ratio === null ? null : (float) $group->ratio,
-                'excluded' => (int) $group->excluded,
+        if (count($used) === 1) {
+            return [
+                'value' => $float($used[0]->value),
+                'numerator' => $float($used[0]->numerator),
+                'denominator' => $float($used[0]->denominator),
+                'not_measured' => (bool) $used[0]->not_measured,
             ];
         }
 
-        return $result;
+        if ($measure === IndicatorMeasure::Numeric) {
+            $values = array_filter(array_map(fn (stdClass $figure): ?float => $float($figure->value), $used), fn (?float $value): bool => $value !== null);
+
+            return [...$empty, 'value' => $values === [] ? null : (float) array_sum($values), 'not_measured' => $values === [] && $notMeasured];
+        }
+
+        $measured = array_filter($used, fn (stdClass $figure): bool => (float) $figure->denominator > 0.0);
+        $numerator = (float) array_sum(array_map(fn (stdClass $figure): float => (float) $figure->numerator, $measured));
+        $denominator = (float) array_sum(array_map(fn (stdClass $figure): float => (float) $figure->denominator, $measured));
+
+        return [
+            'value' => $denominator > 0.0 ? round($numerator / $denominator * ($measure === IndicatorMeasure::Percentage ? 100 : 1), 2) : null,
+            'numerator' => $denominator > 0.0 ? $numerator : null,
+            'denominator' => $denominator > 0.0 ? $denominator : null,
+            'not_measured' => $measured === [] && $notMeasured,
+        ];
     }
 
     /**
-     * The columns one pooled ratio is grouped by: a target (donor view), a
-     * center's library entry (center view) or a library entry (grouped),
-     * named on the `pooled` derived table pooledRatios() aggregates.
+     * Fills each row's target, total, the ratios' excluded count and the
+     * achieved percentage from the extraction (contracts §14.1): a center
+     * row from centerTotals() (a shared target's whole value against that
+     * center's own figure), a donor row from targetTotals().
      *
-     * @return list<string>
+     * @param  list<array<string, mixed>>  $rows
+     * @return list<array<string, mixed>>
      */
-    protected function pooledGroupColumns(bool $isDonorView, bool $byLibrary): array
+    protected function withTotals(array $rows, bool $isDonorView): array
     {
-        return match (true) {
-            $byLibrary => ['pooled.library_indicator_id'],
-            $isDonorView => ['pooled.project_id', 'pooled.id'],
-            default => ['pooled.project_id', 'pooled.library_indicator_id'],
-        };
+        $extraction = $this->extraction();
+        $totals = $isDonorView ? $extraction->targetTotals() : $extraction->centerTotals();
+
+        foreach ($rows as $index => $row) {
+            $figures = $isDonorView
+                ? ($totals[$row['target_ids'][0]] ?? null)
+                : ($totals[$row['place_key'].'|'.$row['library_id']] ?? null);
+
+            if ($figures === null) {
+                continue;
+            }
+
+            $rows[$index]['target'] = $figures['target'];
+            $rows[$index]['total'] = $figures['total'];
+            $rows[$index]['excluded'] = $figures['excluded'];
+            $rows[$index]['achieved'] = $figures['achieved'];
+        }
+
+        return $rows;
     }
 }

@@ -15,10 +15,12 @@ use App\Models\PlanIndicator;
 use App\Models\Program;
 use App\Models\Project;
 use App\Models\Proposal;
+use App\Models\ProposalLocation;
 use App\Models\ReportTemplate;
 use App\Models\ReportTemplateLine;
 use App\Support\MonthlyReportLineBuilder;
 use App\Support\MonthlyReportPeriods;
+use App\Support\MonthlyReportPreparers;
 use Carbon\CarbonImmutable;
 use Illuminate\Support\Facades\DB;
 
@@ -109,6 +111,14 @@ function mrlReport(Project $project, string $month, MonthlyReportStatus $status 
         'period' => CarbonImmutable::parse($month)->startOfMonth()->toDateString(),
         'status' => $status,
     ]));
+}
+
+/**
+ * The periods of the project's (legacy) template, read afresh.
+ */
+function mrlPeriods(Project $project): MonthlyReportPeriods
+{
+    return MonthlyReportPeriods::for(ReportTemplate::query()->where('project_id', $project->id)->orderBy('id')->firstOrFail());
 }
 
 /**
@@ -259,7 +269,7 @@ test('required months are the generated months with at least one line', function
         mrlBuild(mrlReport($project, $month));
     }
 
-    $periods = MonthlyReportPeriods::for($project);
+    $periods = mrlPeriods($project);
     $format = fn (array $months): array => array_map(fn (CarbonImmutable $month): string => $month->format('Y-m'), $months);
 
     expect($format($periods->months()))->toBe(['2026-11', '2026-12', '2027-01'])
@@ -271,11 +281,11 @@ test('a report cannot be submitted before the last working day of its month', fu
     $november = mrlReport($project, '2026-11-01');
 
     $this->travelTo('2026-11-27 18:00:00');
-    expect(MonthlyReportPeriods::for($project)->canSubmit($november))->toBe(__('monthly_reports.submit_too_early'));
+    expect(mrlPeriods($project)->canSubmit($november))->toBe(__('monthly_reports.submit_too_early'));
 
     // Monday 30 November is the last working day of November.
     $this->travelTo('2026-11-30 08:00:00');
-    expect(MonthlyReportPeriods::for($project)->canSubmit($november))->toBeNull();
+    expect(mrlPeriods($project)->canSubmit($november))->toBeNull();
 });
 
 test('the nearest earlier month with lines must be submitted first; a line-less month in between does not count', function () {
@@ -288,12 +298,12 @@ test('the nearest earlier month with lines must be submitted first; a line-less 
     $january = MonthlyReport::query()->where('project_id', $project->id)->where('period', '2027-01-01')->sole();
     $this->travelTo('2027-01-29 08:00:00');
 
-    expect(MonthlyReportPeriods::for($project)->canSubmit($january))
+    expect(mrlPeriods($project)->canSubmit($january))
         ->toBe(__('monthly_reports.submit_previous_first', ['month' => CarbonImmutable::parse('2026-11-01')->translatedFormat('F Y')]));
 
     Activity::withoutRecording(fn () => $november->forceFill(['status' => MonthlyReportStatus::Submitted, 'submitted_at' => now()])->save());
 
-    expect(MonthlyReportPeriods::for($project)->canSubmit($january))->toBeNull();
+    expect(mrlPeriods($project)->canSubmit($january))->toBeNull();
 });
 
 test('the month after a line-less month can be submitted', function () {
@@ -303,12 +313,12 @@ test('the month after a line-less month can be submitted', function () {
     mrlBuild($december = mrlReport($project, '2026-12-01'));
     $this->travelTo('2026-12-31 08:00:00');
 
-    expect(MonthlyReportPeriods::for($project)->canSubmit($december))->toBeNull();
+    expect(mrlPeriods($project)->canSubmit($december))->toBeNull();
 });
 
 test('a month has started from its first day', function () {
     ['project' => $project] = mrlFixture();
-    $periods = MonthlyReportPeriods::for($project);
+    $periods = mrlPeriods($project);
 
     expect($periods->hasStarted(CarbonImmutable::parse('2026-09-01')))->toBeTrue()
         ->and($periods->hasStarted(CarbonImmutable::parse('2026-10-01')))->toBeTrue()
@@ -319,27 +329,80 @@ test('a month is due five working days after it ends, on the project\'s own work
     ['project' => $project] = mrlFixture();
     $november = CarbonImmutable::parse('2026-11-01');
 
-    expect(MonthlyReportPeriods::for($project)->dueDate($november)->toDateString())->toBe('2026-12-07');
+    expect(mrlPeriods($project)->dueDate($november)->toDateString())->toBe('2026-12-07');
 
     // A Saturday–Sunday project counts Dec 5, 6, 12, 13 and 19.
     Activity::withoutRecording(fn () => $project->forceFill(['working_days' => [6, 7]])->save());
 
-    expect(MonthlyReportPeriods::for($project->fresh())->dueDate($november)->toDateString())->toBe('2026-12-19');
+    expect(mrlPeriods($project)->dueDate($november)->toDateString())->toBe('2026-12-19');
 });
 
-test('an owner whose HR position is at another center is flagged, never refused', function () {
-    ['project' => $project] = mrlFixture();
+test('a responsible whose HR position is at another center than the template is flagged, never refused', function () {
+    ['project' => $project, 'template' => $template] = mrlFixture();
     $cityId = insertHrCity();
     $ownCenter = insertHrCenter($cityId);
     $otherCenter = insertHrCenter($cityId, 'Other');
     insertHrContract($project->user_id, insertHrPosition(insertHrDepartment(), centerId: $ownCenter));
+    $row = ProposalLocation::query()->where('project_id', $project->id)->sole();
+    $atCenter = function (?int $centerId) use ($template, $row): ReportTemplate {
+        $row->centers()->delete();
 
-    Activity::withoutRecording(fn () => $project->forceFill(['center_id' => $otherCenter])->save());
-    expect(MonthlyReportPeriods::ownerCenterMismatch($project))->toBeTrue();
+        if ($centerId !== null) {
+            $row->centers()->create(['center_id' => $centerId]);
+        }
 
-    Activity::withoutRecording(fn () => $project->forceFill(['center_id' => $ownCenter])->save());
-    expect(MonthlyReportPeriods::ownerCenterMismatch($project))->toBeFalse();
+        Activity::withoutRecording(fn () => $template->forceFill(['center_id' => $centerId])->save());
 
-    Activity::withoutRecording(fn () => $project->forceFill(['center_id' => null])->save());
-    expect(MonthlyReportPeriods::ownerCenterMismatch($project))->toBeFalse();
+        return $template->fresh();
+    };
+    $preparers = app(MonthlyReportPreparers::class);
+
+    expect($preparers->centerMismatch($atCenter($otherCenter)))->toBeTrue()
+        ->and($preparers->centerMismatch($atCenter($ownCenter)))->toBeFalse()
+        ->and($preparers->centerMismatch($atCenter(null)))->toBeFalse();
+});
+
+test('two templates at one place get their own lines and their own months (D-76)', function () {
+    ['project' => $project, 'proposal' => $proposal, 'template' => $first] = mrlFixture();
+    $second = Activity::withoutRecording(fn (): ReportTemplate => ReportTemplate::factory()->confirmed()->create([
+        'project_id' => null, 'city_id' => $first->city_id, 'program_id' => $first->program_id, 'center_id' => $first->center_id,
+    ]));
+    $second->proposals()->attach($proposal->id, ['joined_at' => now()]);
+    $firstLine = mrlLine($first, $proposal);
+    $secondLine = mrlLine($second, $proposal);
+    $reportOf = fn (ReportTemplate $template): MonthlyReport => Activity::withoutRecording(fn (): MonthlyReport => MonthlyReport::factory()->create([
+        'project_id' => $project->id, 'report_template_id' => $template->id, 'period' => '2026-11-01',
+    ]));
+    $firstReport = $reportOf($first);
+    $secondReport = $reportOf($second);
+
+    mrlBuild($firstReport);
+    mrlBuild($secondReport);
+
+    $libraryOf = fn (ReportTemplateLine $line): int => $line->planIndicator->indicator->library_indicator_id;
+
+    expect($firstReport->lines()->pluck('library_indicator_id')->all())->toBe([$libraryOf($firstLine)])
+        ->and($secondReport->lines()->pluck('library_indicator_id')->all())->toBe([$libraryOf($secondLine)]);
+});
+
+test('sequencing is per template: an unsubmitted month of one template never blocks another at the same place (D-08)', function () {
+    ['project' => $project, 'proposal' => $proposal, 'template' => $first] = mrlFixture();
+    $second = Activity::withoutRecording(fn (): ReportTemplate => ReportTemplate::factory()->confirmed()->create([
+        'project_id' => null, 'city_id' => $first->city_id, 'program_id' => $first->program_id, 'center_id' => $first->center_id,
+    ]));
+    $second->proposals()->attach($proposal->id, ['joined_at' => now()]);
+    mrlLine($first, $proposal);
+    mrlLine($second, $proposal);
+    $report = fn (ReportTemplate $template, string $month): MonthlyReport => Activity::withoutRecording(fn (): MonthlyReport => MonthlyReport::factory()->create([
+        'project_id' => $project->id, 'report_template_id' => $template->id, 'period' => $month,
+    ]));
+    mrlBuild($report($first, '2026-11-01'));
+    mrlBuild($report($second, '2026-11-01'));
+    mrlBuild($secondDecember = $report($second, '2026-12-01'));
+    $secondNovember = MonthlyReport::query()->where('report_template_id', $second->id)->where('period', '2026-11-01')->sole();
+    Activity::withoutRecording(fn () => $secondNovember->forceFill(['status' => MonthlyReportStatus::Submitted, 'submitted_at' => now()])->save());
+    $this->travelTo('2026-12-31 08:00:00');
+
+    expect(MonthlyReportPeriods::for($second)->canSubmit($secondDecember))->toBeNull()
+        ->and(MonthlyReportPeriods::for($first)->months())->toHaveCount(1);
 });

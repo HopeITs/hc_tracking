@@ -1,8 +1,11 @@
 {{--
-    The Monthly Matrix grid: sticky code and name columns, twelve months, then
-    target, total and achieved %. Included by ⚡monthly-matrix.blade.php, whose
-    top PHP block defines $matrix and $paged. Every figure arrives computed by
-    BuildsMonthlyMatrix: nothing here adds up cells.
+    The Monthly Matrix grid: a sticky heading row and code column (the name
+    column sticks too from sm up), the window's months, then target, total and
+    achieved %. A row is a place (center · city, Field work · city or Center
+    not set), never a project; a shared target (D-90) is marked as such.
+    Included by ⚡monthly-matrix.blade.php, whose top PHP block defines $windowMonths, $matrix
+    and $paged. Every figure arrives computed: nothing here adds up cells.
+    Numbers sit in a left-to-right isolate so Arabic keeps them readable.
 --}}
 @use('App\Enums\IndicatorMeasure')
 @use('App\Enums\MatrixCellState')
@@ -10,7 +13,7 @@
 @php
     $headCell = 'type-label border-b border-secondary-soft bg-board-head px-3 py-2 text-start text-secondary-medium dark:border-line dark:bg-surface-2 dark:text-ink-muted';
     $bodyCell = 'border-b border-secondary-soft px-3 py-2 align-top dark:border-line';
-    $stickyCode = 'sm:sticky sm:start-0 sm:z-10 w-28 min-w-28 max-w-28';
+    $stickyCode = 'sticky start-0 z-10 w-28 min-w-28 max-w-28';
     $stickyName = 'sm:sticky sm:start-28 sm:z-10 w-56 min-w-56 max-w-56 sm:border-e';
 @endphp
 
@@ -26,7 +29,7 @@
                     <th scope="col" class="{{ $headCell }} w-52">{{ __('reports.matrix.source') }}</th>
                     <th scope="col" class="{{ $headCell }} w-24">{{ __('reports.matrix.measure') }}</th>
                     <th scope="col" class="{{ $headCell }} w-24 text-end">{{ __('reports.matrix.target') }}</th>
-                    @foreach ($matrix['months'] as $month)
+                    @foreach ($windowMonths as $month)
                         <th scope="col" class="{{ $headCell }} w-24 text-end whitespace-nowrap" data-matrix-month="{{ $month->format('Y-m') }}">{{ $month->translatedFormat(__('formats.month_year')) }}</th>
                     @endforeach
                     <th scope="col" class="{{ $headCell }} w-28 text-end">{{ __('reports.matrix.total') }}</th>
@@ -40,7 +43,7 @@
                     @endphp
                     <tbody wire:key="{{ $row['key'] }}" class="bg-white dark:bg-surface-1" x-data="{ open: false }">
                     <tr data-matrix-row="{{ $row['key'] }}">
-                        <td class="{{ $bodyCell }} {{ $stickyCode }} bg-white font-mono text-xs dark:bg-surface-1" dir="ltr">{{ $row['code'] }}</td>
+                        <td class="{{ $bodyCell }} {{ $stickyCode }} bg-white font-mono text-xs dark:bg-surface-1"><span dir="ltr">{{ $row['code'] }}</span></td>
                         <td class="{{ $bodyCell }} {{ $stickyName }} bg-white dark:bg-surface-1">
                             <span dir="auto" class="block font-medium">{{ $row['name_en'] }}</span>
                             @if ($row['breakdown'] !== null)
@@ -58,11 +61,7 @@
                             @if ($row['is_group'])
                                 <span>{{ __('reports.matrix.centers_count', ['count' => $row['centers_count']]) }}</span>
                             @else
-                                @can('projects.view')
-                                    <a href="{{ route('projects.show', $row['project_slug']) }}" wire:navigate dir="auto" class="underline decoration-secondary-light underline-offset-2">{{ $row['center'] }}</a>
-                                @else
-                                    <span dir="auto">{{ $row['center'] }}</span>
-                                @endcan
+                                <span dir="auto" class="block" data-matrix-place>{{ $row['center'] }}</span>
                             @endif
                             @if ($row['city'] !== null)
                                 <span dir="auto" class="block text-xs text-secondary-medium dark:text-ink-muted">{{ $row['city'] }}</span>
@@ -101,19 +100,29 @@
                                 @endif
                             @endif
                         </td>
-                        <td class="{{ $bodyCell }} text-end tabular-nums" dir="ltr">
+                        <td class="{{ $bodyCell }} text-end tabular-nums" data-matrix-target>
                             @if ($row['target'] === null)
                                 <span aria-hidden="true">—</span><span class="sr-only">{{ __('reports.matrix.no_target') }}</span>
                             @else
-                                {{ $this->matrixNumber($row['target']) }}{{ $unit === '%' ? '%' : '' }}
+                                <span dir="ltr">{{ $this->matrixNumber($row['target']) }}{{ $unit === '%' ? '%' : '' }}</span>
+                            @endif
+                            @if (($row['shared_centers'] ?? null) !== null)
+                                <span class="mt-0.5 flex items-center justify-end gap-1 text-[11px] font-normal text-secondary-medium dark:text-ink-muted" data-matrix-shared>
+                                    <flux:icon.share variant="micro" class="size-3.5 shrink-0" aria-hidden="true" />
+                                    {{ __('reports.matrix.shared_with_centers', ['count' => $row['shared_centers']]) }}
+                                </span>
                             @endif
                         </td>
 
-                        @foreach ($matrix['months'] as $month)
+                        @foreach ($windowMonths as $month)
                             @php
                                 $cell = $row['cells'][$month->format('Y-m')];
+                                $cellUrl = $this->cellListUrl($row, $month);
                             @endphp
                             <td class="{{ $bodyCell }} text-end tabular-nums" data-matrix-cell="{{ $cell['state']->value }}">
+                                @if ($cellUrl !== null)
+                                    <a href="{{ $cellUrl }}" wire:navigate data-matrix-cell-link class="block rounded-sm text-end tabular-nums decoration-1 underline-offset-2 hover:underline focus-visible:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-secondary-medium">
+                                @endif
                                 @switch($cell['state'])
                                     @case(MatrixCellState::Approved)
                                         <span class="inline-flex items-center justify-end gap-1 font-semibold" title="{{ $cell['state']->label() }}">
@@ -122,7 +131,7 @@
                                             <span dir="ltr">{{ $cell['not_measured'] ? __('reports.matrix.not_measured') : $this->matrixNumber($cell['value']).($unit === '%' ? '%' : '') }}</span>
                                         </span>
                                         @if ($cell['numerator'] !== null && $row['measure'] === IndicatorMeasure::Percentage && $row['denominator_basis']?->value === 'fixed')
-                                            <span class="block text-[11px] font-normal text-secondary-medium dark:text-ink-muted" dir="ltr">{{ $this->matrixNumber($cell['numerator']) }}</span>
+                                            <span class="block text-[11px] font-normal text-secondary-medium dark:text-ink-muted"><span dir="ltr">{{ $this->matrixNumber($cell['numerator']) }}</span></span>
                                         @endif
                                         @break
                                     @case(MatrixCellState::Pending)
@@ -149,6 +158,11 @@
                                         <span class="text-secondary-medium dark:text-ink-muted" title="{{ $cell['state']->label() }}"><span aria-hidden="true">—</span><span class="sr-only">{{ $cell['state']->label() }}</span></span>
                                         @break
                                 @endswitch
+                                @if ($cellUrl !== null)
+                                        {{-- Added to the figure, not in place of it: an aria-label would hide the value from screen readers. --}}
+                                        <span class="sr-only">{{ __('reports.matrix.open_month_list', ['month' => $month->translatedFormat(__('formats.month_year'))]) }}</span>
+                                    </a>
+                                @endif
                             </td>
                         @endforeach
 

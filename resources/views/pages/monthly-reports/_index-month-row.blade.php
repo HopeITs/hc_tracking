@@ -1,7 +1,8 @@
-{{-- One generated month on "My reports": its state, due date or why it cannot be submitted yet, and its view and Fill buttons. On a project's thread ($inThread) it carries the thread's dot; in "Needs you" it names its project instead, since that list mixes projects. $projectHasIndicators: whether any month of the project has a line. --}}
+{{-- One generated month on "My reports": its state, due date or why it cannot be submitted yet, and its view and Fill buttons. On a template's thread ($inThread) it carries the thread's dot; in "Needs you" it names its place and proposals instead, since that list mixes templates. $rowGroup: the template's group from myMonths(). $projectHasIndicators: whether any month of the template has a line. --}}
 @php
     $rowReport = $row['report'];
     $monthLabel = $rowReport->period->translatedFormat('F Y');
+    $rowName = $rowGroup['title'].' · '.$rowGroup['place'];
 @endphp
 <li
     @class([
@@ -25,10 +26,6 @@
 
     <div class="min-w-36 flex-1">
         <p class="flex flex-wrap items-center gap-2">
-            @unless ($inThread)
-                <span class="text-base font-bold" dir="auto">{{ $rowProject->name }}</span>
-                <span class="text-secondary-medium dark:text-ink-muted" aria-hidden="true">·</span>
-            @endunless
             <span class="text-base font-bold">{{ $monthLabel }}</span>
             <x-monthly-reports.state-chip :state="$row['state']" />
             @if ($row['overdue'])
@@ -38,6 +35,11 @@
                 </span>
             @endif
         </p>
+        @unless ($inThread)
+            {{-- "Needs you" mixes templates: each row says where and for which proposals, so two reports of one place and month are not confused. --}}
+            <p class="mt-0.5 text-sm font-semibold text-secondary-dark dark:text-ink" dir="auto" data-row-place="{{ $rowGroup['template']->id }}">{{ $rowGroup['place'] }}</p>
+            @include('pages.monthly-reports._covers-proposals', ['proposals' => $rowGroup['proposals']])
+        @endunless
         <p class="mt-0.5 flex flex-wrap gap-x-3 type-meta text-secondary-medium dark:text-ink-muted">
             @if ($row['due'] !== null)
                 <span class="tabular-nums">{{ __('monthly_reports.due_on', ['date' => $row['due']->translatedFormat(__('formats.date'))]) }}</span>
@@ -55,8 +57,10 @@
     </div>
 
     <div class="flex shrink-0 items-center gap-2">
-        {{-- Named with its project: two projects share every month, and "View September 2026" twice told a screen reader nothing. --}}
-        <x-ui.button tone="ghost" size="sm" icon="eye" class="max-sm:size-11" :href="route('monthly-reports.show', $rowReport)" wire:navigate :aria-label="__('common.view_name', ['name' => $rowProject->name.' · '.$monthLabel])" />
+        {{-- Named with its proposals and place: two templates share every month, and "View September 2026" twice told a screen reader nothing. --}}
+        <x-ui.button tone="ghost" size="sm" icon="eye" class="max-sm:size-11" :href="route('monthly-reports.show', $rowReport)" wire:navigate :aria-label="__('common.view_name', ['name' => $rowName.' · '.$monthLabel])" />
+        {{-- Back to the monthly matrix for this template's place, with the list's proposal and window (Y-05). --}}
+        <x-ui.button tone="ghost" size="sm" icon="table-cells" class="max-sm:size-11" :href="$this->matrixUrlFor($rowGroup['template'])" wire:navigate :aria-label="__('monthly_reports.open_in_matrix', ['name' => $rowGroup['place']])" data-matrix-link="{{ $rowReport->id }}" />
         @if ($row['can_fill'])
             <x-ui.button
                 size="sm"

@@ -61,16 +61,18 @@ trait ReadsDeskAgenda
             ]);
 
         $monthlyReports = $this->visible(MonthlyReport::query(), 'reports')
-            ->select(['id', 'slug', 'project_id', 'period', 'prepared_by', 'revised_due_on'])
-            ->with('project')
+            ->select(['id', 'slug', 'project_id', 'report_template_id', 'period', 'prepared_by', 'revised_due_on'])
+            ->with(['project', 'template'])
             ->where('status', MonthlyReportStatus::Draft)
             ->where(fn (Builder $query) => $query->whereIn('project_id', $projectIds === [] ? [0] : $projectIds)->orWhere('prepared_by', $user->id))
             ->whereBetween('period', [$from->subMonths(2)->startOfMonth()->toDateString(), $to->toDateString()])
-            ->get()
+            ->get();
+        $workingDays = MonthlyReportPeriods::workingDaysOf($monthlyReports->pluck('template')->unique('id')->values());
+        $monthlyReports = $monthlyReports
             ->map(fn (MonthlyReport $report): array => [
                 'key' => 'monthly-report-'.$report->id,
                 'kind' => 'monthly-report',
-                'date' => MonthlyReportPeriods::fromLoaded($report->project, new EloquentCollection)->effectiveDueDate($report),
+                'date' => MonthlyReportPeriods::fromLoaded($report->template, new EloquentCollection, $workingDays[$report->report_template_id] ?? null)->effectiveDueDate($report),
                 'title' => (string) __('desk.agenda_monthly_report', ['month' => $report->period->translatedFormat('F Y')]),
                 'context' => $report->project?->name ?? '—',
                 'project' => $report->project?->name,

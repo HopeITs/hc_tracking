@@ -49,6 +49,7 @@ Before planning or editing, find the row whose globs match the file's path and r
 | resources/views/pages/tasks/** | .ai/rules/task-calendar.md |
 | {app/Models/Hr*.php,app/Support/EmployeeProfile.php,app/Models/Concerns/RemembersHrLookup.php} | .ai/rules/models-concerns.md |
 | app/Models/**, app/Models/Account.php, app/Models/Hr*.php, app/Models/Program.php, app/Models/User.php, app/Models/Task.php | .ai/rules/models.md |
+| resources/views/pages/monthly-reports/** | .ai/rules/monthly-reports.md |
 | resources/views/pages/admin/*narrative-questions* | .ai/rules/narrative-questions.md |
 | {app/Http/Middleware/SetLocale.php,app/Http/Controllers/SwitchLocaleController.php,resources/views/components/navigation/sidebar.blade.php,resources/css/*.css} | .ai/rules/navigation-css.md |
 | resources/views/components/{navigation/sidebar.blade.php,ui/panel.blade.php,ui/stat-tile.blade.php,ui/data-table.blade.php} | .ai/rules/navigation.md |
@@ -64,6 +65,7 @@ Before planning or editing, find the row whose globs match the file's path and r
 | {app/Models/Proposal.php,app/Models/DonorProposal.php,resources/views/pages/{proposals,funding-agreements,transfers,donors}/**} | .ai/rules/proposalsfunding-agreementstransfersdonors.md |
 | app/Providers/** | .ai/rules/providers.md |
 | app/Notifications/Recipients/** | .ai/rules/recipients.md |
+| {resources/views/pages/reports/**,app/Livewire/Concerns/Reports/**,app/Support/Reporting/ReportExtraction.php} | .ai/rules/reporting.md |
 | {app/Livewire/Concerns/ManagesReportForm.php,resources/views/pages/reports/**,resources/views/components/reports/**} | .ai/rules/reports.md |
 | resources/views/pages/results/** | .ai/rules/results.md |
 | {app/Models/PlanIndicator.php,resources/views/pages/{results,indicators,targets,reports}/**} | .ai/rules/resultsindicatorstargetsreports.md |

@@ -25,6 +25,7 @@ use App\Models\Report;
 use App\Models\Result;
 use App\Models\StrategicPillar;
 use App\Models\User;
+use App\Support\Reporting\ReportExtraction;
 use Carbon\CarbonImmutable;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\RateLimiter;
@@ -32,9 +33,10 @@ use Livewire\Features\SupportTesting\Testable;
 use Livewire\Livewire;
 
 /*
-| The Monthly Matrix (T18 slice 1, contracts §13, §14, §14.1): one row per
-| center and library indicator (center view) or per target (donor view),
-| twelve month columns, then target, total and achieved %. Read only.
+| The Monthly Matrix (T18 slice 1, Y-05, contracts §13, §14, §14.1): one row
+| per place and library indicator (center view) or per target (donor view),
+| one column per month of the From / To window, then target, total and
+| achieved %. Read only, through ReportExtraction.
 */
 
 beforeEach(fn () => $this->travelTo('2026-11-13 10:00:00'));
@@ -152,6 +154,28 @@ function mmLine(MonthlyReport $report, LibraryIndicator $library, array $targets
     });
 }
 
+/**
+ * The key of a legacy project's place: its report template follows the
+ * project's city, program and center (Y-02 backfill).
+ */
+function mmPlaceKey(Project $project): string
+{
+    return ReportExtraction::placeKey((int) $project->city_id, (int) $project->program_id, $project->center_id === null ? null : (int) $project->center_id, false);
+}
+
+/**
+ * The exported table without the filter block above its heading row.
+ *
+ * @return list<list<string|null>>
+ */
+function mmCsvTable(Testable $page): array
+{
+    $rows = downloadedCsv($page);
+    $blank = collect($rows)->search(fn (array $row): bool => array_filter($row, fn (mixed $cell): bool => $cell !== null && $cell !== '') === []);
+
+    return $blank === false ? $rows : array_values(array_slice($rows, $blank + 1));
+}
+
 function mmViewer(string $role = 'MEAL'): User
 {
     return userWithRole($role);
@@ -194,7 +218,7 @@ test('a month lands in its column and every state has its own cell', function ()
     mmLine(mmReport($project, '2026-03-01', MonthlyReportStatus::Draft), $library, [$target], 5);
     mmLine(mmReport($project, '2026-04-01'), $other, [$otherTarget], 1);
 
-    $rows = mmRows(Livewire::actingAs(mmViewer())->test('pages::reports.monthly-matrix'));
+    $rows = mmRows(Livewire::actingAs(mmViewer())->withQueryParams(['to' => '2026-12'])->test('pages::reports.monthly-matrix'));
     $cells = $rows[$library->code]['cells'];
 
     expect($cells['2026-01']['state'])->toBe(MatrixCellState::Approved)
@@ -207,11 +231,11 @@ test('a month lands in its column and every state has its own cell', function ()
         ->and($rows[$library->code]['total'])->toBe(12.0); // only the validated month counts
 });
 
-test('the center column shows the HR center and city, and falls back to the project name', function () {
+test('a row is a place: center · city, or Center not set, never a project', function () {
     $cityId = insertHrCity('Aleppo', 'حلب');
     $centerId = insertHrCenter($cityId, 'Hope Center Aleppo', 'مركز الأمل حلب');
     $withCenter = mmProject(attributes: ['center_id' => $centerId, 'city_id' => $cityId, 'name' => 'Named Project']);
-    $without = mmProject(attributes: ['name' => 'No Center Project']);
+    $without = mmProject(attributes: ['name' => 'No Center Project', 'city_id' => insertHrCity('Homs', 'حمص')]);
     $library = LibraryIndicator::factory()->create();
 
     foreach ([$withCenter, $without] as $project) {
@@ -219,12 +243,16 @@ test('the center column shows the HR center and city, and falls back to the proj
     }
 
     $rows = Livewire::actingAs(mmViewer())->test('pages::reports.monthly-matrix')->instance()->matrix['rows'];
-    $byProject = collect($rows)->keyBy('project_id');
+    $byPlace = collect($rows)->keyBy('place_key');
+    $named = $byPlace[mmPlaceKey($withCenter)];
 
-    expect($byProject[$withCenter->id]['center'])->toBe('Hope Center Aleppo')
-        ->and($byProject[$withCenter->id]['city'])->toBe('Aleppo')
-        ->and($byProject[$without->id]['center'])->toBe('No Center Project')
-        ->and($byProject[$without->id]['city'])->toBeNull();
+    expect($named['center'])->toBe(__('reports.matrix.place_center', ['center' => 'Hope Center Aleppo', 'city' => 'Aleppo']))
+        ->and($named['city'])->toBe('Aleppo')
+        ->and($named['key'])->toBe('row-'.mmPlaceKey($withCenter).'-'.$library->id)
+        ->and($named['shared_centers'])->toBeNull()
+        ->and($named)->not->toHaveKeys(['project_id', 'project_name', 'project_slug', 'project_start', 'project_end'])
+        ->and($byPlace[mmPlaceKey($without)]['center'])->toBe(__('reports.matrix.place_not_set'))
+        ->and($byPlace[mmPlaceKey($without)]['city'])->toBe('Homs');
 });
 
 test('counts total the validated months and a cumulative indicator takes the latest one', function () {
@@ -309,27 +337,31 @@ test('split sums the donors on a center and a donor filter shows only that donor
     mmLine(mmReport($sharedProject, '2026-01-01'), $library, [$sharedFirst, $sharedSecond], 30);
 
     $page = Livewire::actingAs(mmViewer())->test('pages::reports.monthly-matrix');
-    $byProject = collect($page->instance()->matrix['rows'])->keyBy('project_id');
+    $byPlace = collect($page->instance()->matrix['rows'])->keyBy('place_key');
 
-    expect($byProject[$splitProject->id]['total'])->toBe(10.0)
-        ->and($byProject[$splitProject->id]['target'])->toBe(10.0)
-        ->and($byProject[$sharedProject->id]['total'])->toBe(30.0)
-        ->and($byProject[$sharedProject->id]['target'])->toBe(30.0);
+    expect($byPlace[mmPlaceKey($splitProject)]['total'])->toBe(10.0)
+        ->and($byPlace[mmPlaceKey($splitProject)]['target'])->toBe(10.0)
+        ->and($byPlace[mmPlaceKey($sharedProject)]['total'])->toBe(30.0)
+        ->and($byPlace[mmPlaceKey($sharedProject)]['target'])->toBe(30.0);
 
-    $donorRows = collect($page->set('donor', (string) $firstDonor->id)->instance()->matrix['rows'])->keyBy('project_id');
+    $donorRows = collect($page->set('donor', (string) $firstDonor->id)->instance()->matrix['rows'])->keyBy('place_key');
 
     expect($donorRows)->toHaveCount(2)
-        ->and($donorRows[$splitProject->id]['total'])->toBe(6.0)
-        ->and($donorRows[$splitProject->id]['target'])->toBe(6.0)
-        ->and($donorRows[$sharedProject->id]['total'])->toBe(30.0);
+        ->and($donorRows[mmPlaceKey($splitProject)]['total'])->toBe(6.0)
+        ->and($donorRows[mmPlaceKey($splitProject)]['target'])->toBe(6.0)
+        ->and($donorRows[mmPlaceKey($sharedProject)]['total'])->toBe(30.0);
 });
 
-test('a proposal starting in November runs November to October', function () {
+test('Whole grant runs a proposal starting in November from November to October', function () {
     $project = mmProject();
     $proposal = mmProposal($project, '2026-11-01', '2027-10-31');
     mmTarget($proposal, $project, LibraryIndicator::factory()->create());
 
     $page = Livewire::actingAs(mmViewer())->test('pages::reports.monthly-matrix')->set('proposal', (string) $proposal->id);
+
+    expect($page->instance()->hasWholeGrant)->toBeTrue();
+
+    $page->call('wholeGrant')->assertSet('from', '2026-11')->assertSet('to', '2027-10');
     $months = collect($page->instance()->matrix['months'])->map->format('Y-m');
 
     expect($months->first())->toBe('2026-11')->and($months->last())->toBe('2027-10')->and($months)->toHaveCount(12);
@@ -339,9 +371,10 @@ test('a proposal starting in November runs November to October', function () {
 
 test('each filter narrows the rows and an unknown id is ignored', function () {
     $cityId = insertHrCity('Idlib', 'إدلب');
+    $centerId = insertHrCenter($cityId, 'Idlib Center');
     $pillar = StrategicPillar::factory()->create();
     $pillarProgram = Program::factory()->create(['strategic_pillar_id' => $pillar->id]);
-    $first = mmProject(attributes: ['program_id' => $pillarProgram->id, 'city_id' => $cityId]);
+    $first = mmProject(attributes: ['program_id' => $pillarProgram->id, 'city_id' => $cityId, 'center_id' => $centerId]);
     $second = mmProject();
     $firstLibrary = LibraryIndicator::factory()->create();
     $secondLibrary = LibraryIndicator::factory()->create();
@@ -360,20 +393,24 @@ test('each filter narrows the rows and an unknown id is ignored', function () {
     expect($codes([]))->toBe(collect([$firstLibrary->code, $secondLibrary->code])->sort()->values()->all())
         ->and($codes(['proposal' => (string) $firstProposal->id]))->toBe([$firstLibrary->code])
         ->and($codes(['donor' => (string) $secondProposal->donor_id]))->toBe([$secondLibrary->code])
-        ->and($codes(['center' => (string) $first->id]))->toBe([$firstLibrary->code])
+        ->and($codes(['center' => 'c'.$centerId]))->toBe([$firstLibrary->code])
+        ->and($codes(['center' => 'unset']))->toBe([$secondLibrary->code])
         ->and($codes(['city' => (string) $cityId]))->toBe([$firstLibrary->code])
+        ->and($codes(['program' => (string) $pillarProgram->id]))->toBe([$firstLibrary->code])
         ->and($codes(['indicator' => (string) $secondLibrary->id]))->toBe([$secondLibrary->code])
         ->and($codes(['pillar' => (string) $pillar->id]))->toBe([$firstLibrary->code])
         ->and($codes(['mine' => '1']))->toBe([$secondLibrary->code])
         ->and($codes(['year' => '2025']))->toHaveCount(1)
-        ->and($codes(['proposal' => '999999', 'donor' => '999999', 'indicator' => 'abc']))->toBe($codes([]));
+        ->and($codes(['proposal' => '999999', 'donor' => '999999', 'indicator' => 'abc', 'program' => '999999', 'center' => 'c999999']))->toBe($codes([]));
 });
 
-test('the header picker shows the resolved year', function () {
+test('a stray legacy year falls back to this year, January to this month', function () {
     Livewire::actingAs(mmViewer())
         ->withQueryParams(['year' => '1850'])
         ->test('pages::reports.monthly-matrix')
-        ->assertSeeHtml('<span class="truncate">2026</span>');
+        ->assertSet('year', '')
+        ->assertSet('from', '2026-01')
+        ->assertSet('to', '2026-11');
 });
 
 test('my projects without coverage is an empty result with a hint', function () {
@@ -411,7 +448,7 @@ test('the CSV carries the screen rows without money and a filtered-out target is
 
     $page = Livewire::actingAs(mmViewer())->test('pages::reports.monthly-matrix')->set('indicator', (string) $shown->id)->call('exportCsv');
     $page->assertFileDownloaded('monthly-matrix-2026-11-13.csv');
-    $csv = downloadedCsv($page);
+    $csv = mmCsvTable($page);
 
     expect($csv)->toHaveCount(2)
         ->and($csv[0])->toContain(__('reports.matrix.target'))
@@ -567,7 +604,9 @@ test('grouped mode sums counts across centers: target, cells and total', functio
 
 test('a grouped percentage pools numerators over denominators and counts what it left out', function () {
     $library = LibraryIndicator::factory()->percentage()->create();
-    $projects = [mmProject(), mmProject(), mmProject()];
+    $firstCity = insertHrCity('Hama');
+    $firstCenter = insertHrCenter($firstCity, 'Hama Center');
+    $projects = [mmProject(attributes: ['city_id' => $firstCity, 'center_id' => $firstCenter]), mmProject(), mmProject()];
     $targets = [];
 
     foreach ([[$projects[0], '80'], [$projects[1], '60'], [$projects[2], '60']] as $index => [$project, $target]) {
@@ -589,7 +628,7 @@ test('a grouped percentage pools numerators over denominators and counts what it
 
     $page->assertSee(__('reports.matrix.not_poolable', ['count' => 1]));
 
-    $single = $page->set('center', (string) $projects[0]->id)->instance()->matrix['rows'][0];
+    $single = $page->set('center', 'c'.$firstCenter)->instance()->matrix['rows'][0];
 
     expect($single['target'])->toBe(80.0)->and($single['total'])->toBe(30.0);
 });
@@ -742,7 +781,7 @@ test('the CSV carries the breakdown rows after their indicator, the pwd ones onl
     $export = function (bool $pwd) {
         $page = Livewire::actingAs(mmViewer())->test('pages::reports.monthly-matrix')->set('pwd', $pwd)->call('exportCsv');
 
-        return downloadedCsv($page);
+        return mmCsvTable($page);
     };
 
     $plain = $export(false);
@@ -763,7 +802,7 @@ test('the grouped CSV has one row per indicator', function () {
     }
 
     $page = Livewire::actingAs(mmViewer())->withQueryParams(['view' => 'grouped'])->test('pages::reports.monthly-matrix')->call('exportCsv');
-    $csv = downloadedCsv($page);
+    $csv = mmCsvTable($page);
 
     expect($csv)->toHaveCount(2)->and(implode(',', $csv[1]))->toContain($library->code)->toContain('20');
 });
@@ -816,7 +855,9 @@ test('an activity linked to no statement gets its own group after the outputs', 
 
 test('the Activities tab honours the same filters and the window', function () {
     $first = mmProject();
-    $second = mmProject();
+    $secondCity = insertHrCity('Raqqa');
+    $secondCenter = insertHrCenter($secondCity, 'Raqqa Center');
+    $second = mmProject(attributes: ['city_id' => $secondCity, 'center_id' => $secondCenter]);
     $firstProposal = mmProposal($first);
     $secondProposal = mmProposal($second, '2027-01-01', '2027-12-31', name: 'Next year');
     ['activities' => [$firstActivity]] = mmActivities($firstProposal, $first, 1, 'First output');
@@ -829,8 +870,10 @@ test('the Activities tab honours the same filters and the window', function () {
         ->and($ids(['year' => '2027']))->toBe([$secondActivity->id])
         ->and($ids(['proposal' => (string) $firstProposal->id]))->toBe([$firstActivity->id])
         ->and($ids(['donor' => (string) $firstProposal->donor_id]))->toBe([$firstActivity->id])
-        ->and($ids(['center' => (string) $second->id, 'year' => '2027']))->toBe([$secondActivity->id])
-        ->and($ids(['center' => (string) $second->id]))->toBe([])
+        ->and($ids(['center' => 'c'.$secondCenter, 'year' => '2027']))->toBe([$secondActivity->id])
+        ->and($ids(['center' => 'c'.$secondCenter]))->toBe([])
+        ->and($ids(['city' => (string) $secondCity, 'from' => '2027-01', 'to' => '2027-06']))->toBe([$secondActivity->id])
+        ->and($ids(['program' => (string) $first->program_id]))->toBe([$firstActivity->id])
         ->and($ids(['mine' => '1']))->toBe([]);
 });
 
@@ -845,7 +888,7 @@ test('the Activities export has the same permission, rate limit and no money', f
     RateLimiter::clear('monthly-matrix-export:'.$user->id);
     $page = Livewire::actingAs($user)->withQueryParams(['tab' => 'activities'])->test('pages::reports.monthly-matrix')->call('exportCsv');
     $page->assertFileDownloaded('monthly-matrix-activities-2026-11-13.csv');
-    $csv = downloadedCsv($page);
+    $csv = mmCsvTable($page);
 
     expect($csv)->toHaveCount(2)
         ->and(implode(',', $csv[1]))->toContain($activity->statement)->toContain(__('enums.activity_status.completed'))
@@ -914,18 +957,172 @@ test('an unknown view or tab falls back to the rows of the matrix', function () 
     expect($page->instance()->resolvedView)->toBe('rows')->and($page->instance()->resolvedTab)->toBe('matrix');
 });
 
-test('months outside a project or its indicator source do not count as missing reports', function () {
-    $project = mmProject(attributes: ['start_date' => '2026-03-15', 'end_date' => '2026-11-30']);
+test('months outside the indicator source do not count as missing reports', function () {
+    $project = mmProject(attributes: ['start_date' => '2026-01-01', 'end_date' => '2026-11-30']);
     $proposal = mmProposal($project, '2026-02-01', '2026-09-18');
     $library = LibraryIndicator::factory()->create();
     mmTarget($proposal, $project, $library);
 
-    $page = Livewire::actingAs(mmViewer())->test('pages::reports.monthly-matrix')
-        ->assertSee(__('reports.matrix.calendar_basis'));
+    $page = Livewire::actingAs(mmViewer())->test('pages::reports.monthly-matrix');
     $cells = mmRows($page)[$library->code]['cells'];
 
-    expect($cells['2026-02']['state'])->toBe(MatrixCellState::OutsidePeriod)
-        ->and($cells['2026-03']['state'])->toBe(MatrixCellState::NotSubmitted)
+    expect($cells['2026-01']['state'])->toBe(MatrixCellState::OutsidePeriod)
+        ->and($cells['2026-02']['state'])->toBe(MatrixCellState::NotSubmitted)
         ->and($cells['2026-09']['state'])->toBe(MatrixCellState::NotSubmitted)
         ->and($cells['2026-10']['state'])->toBe(MatrixCellState::OutsidePeriod);
+});
+
+/*
+| Y-05 (D-79): the page reads ReportExtraction, the window is From / To, and
+| the old ?year= and ?center=<project id> links still open.
+*/
+
+/**
+ * Three places (two centers of one city and program, one elsewhere) with a
+ * count and a percentage indicator reported in March and July 2026.
+ *
+ * @return array{city: int, centers: list<int>, projects: list<Project>}
+ */
+function mmPlaces(): array
+{
+    $city = insertHrCity('Latakia');
+    $centers = [insertHrCenter($city, 'Port Center'), insertHrCenter($city, 'Hill Center')];
+    $program = Activity::withoutRecording(fn (): Program => Program::factory()->create(['donor_attribution' => DonorAttribution::Split]));
+    $projects = [
+        mmProject(attributes: ['city_id' => $city, 'program_id' => $program->id, 'center_id' => $centers[0]]),
+        mmProject(attributes: ['city_id' => $city, 'program_id' => $program->id, 'center_id' => $centers[1]]),
+        mmProject(),
+    ];
+    $count = LibraryIndicator::factory()->create();
+    $percentage = LibraryIndicator::factory()->percentage()->create();
+
+    foreach ($projects as $index => $project) {
+        $proposal = mmProposal($project);
+        $countTarget = mmTarget($proposal, $project, $count, (string) (100 + $index));
+        $ratioTarget = mmTarget($proposal, $project, $percentage, '60');
+
+        foreach (['2026-03-01' => MonthlyReportStatus::Validated, '2026-07-01' => MonthlyReportStatus::Validated, '2026-08-01' => MonthlyReportStatus::Submitted] as $month => $status) {
+            $report = mmReport($project, $month, $status);
+            mmLine($report, $count, [$countTarget], 10 + $index);
+            mmLine($report, $percentage, [$ratioTarget], null, ['numerator' => 3 + $index, 'denominator' => 10, 'fixed_denominator' => 10]);
+        }
+    }
+
+    return ['city' => $city, 'centers' => $centers, 'projects' => $projects];
+}
+
+test('the page shows the same targets and totals as ReportExtraction', function (callable $filters) {
+    $places = mmPlaces();
+    $page = Livewire::actingAs(mmViewer())->withQueryParams($filters($places))->test('pages::reports.monthly-matrix');
+    $instance = $page->instance();
+
+    $screen = collect($instance->matrix['rows'])->mapWithKeys(fn (array $row): array => [$row['place_key'].'|'.$row['library_id'] => [$row['target'], $row['total']]])->all();
+    $extraction = collect(ReportExtraction::for($instance->extractionFilter)->centerTotals())->map(fn (array $row): array => [$row['target'], $row['total']])->all();
+
+    expect($screen)->not->toBe([])->and($screen)->toEqual($extraction);
+})->with([
+    'no filter' => [fn (array $places): array => []],
+    'city' => [fn (array $places): array => ['city' => (string) $places['city']]],
+    'center and a range' => [fn (array $places): array => ['center' => 'c'.$places['centers'][0], 'from' => '2026-06', 'to' => '2026-09']],
+]);
+
+test('the legacy ?center=<project id> and ?year= links resolve to the place and the window, then clear', function () {
+    $places = mmPlaces();
+    $project = $places['projects'][1];
+
+    Livewire::actingAs(mmViewer())
+        ->withQueryParams(['center' => (string) $project->id, 'year' => '2025'])
+        ->test('pages::reports.monthly-matrix')
+        ->assertSet('center', 'c'.$places['centers'][1])
+        ->assertSet('city', (string) $places['city'])
+        ->assertSet('program', (string) $project->program_id)
+        ->assertSet('from', '2025-01')
+        ->assertSet('to', '2025-12')
+        ->assertSet('year', '');
+
+    $proposal = mmProposal($project, '2026-11-01', '2028-10-31', name: 'Two years');
+
+    Livewire::actingAs(mmViewer())
+        ->withQueryParams(['proposal' => (string) $proposal->id, 'year' => '2'])
+        ->test('pages::reports.monthly-matrix')
+        ->assertSet('from', '2027-11')
+        ->assertSet('to', '2028-10')
+        ->assertSet('year', '');
+});
+
+test('picking a center selects its city, and a city elsewhere clears it', function () {
+    $places = mmPlaces();
+    $page = Livewire::actingAs(mmViewer())->test('pages::reports.monthly-matrix')->set('center', 'c'.$places['centers'][0]);
+
+    $page->assertSet('city', (string) $places['city']);
+    expect(collect($page->instance()->centerOptions)->pluck('value'))->toContain('c'.$places['centers'][0], 'c'.$places['centers'][1])->not->toContain('unset');
+
+    $page->set('city', (string) insertHrCity('Elsewhere'))->assertSet('center', '');
+});
+
+test('From after To is refused with a field error and builds no matrix', function () {
+    mmPlaces();
+
+    $page = Livewire::actingAs(mmViewer())->test('pages::reports.monthly-matrix')
+        ->set('from', '2026-09')
+        ->set('to', '2026-03')
+        ->assertHasErrors(['from'])
+        ->assertSee(__('reports.matrix.from_after_to'));
+
+    expect($page->instance()->matrix['rows'])->toBe([])
+        ->and($page->instance()->months)->toBe([])
+        ->and($page->instance()->emptyReason)->toBe('window');
+
+    $page->call('thisYear')->assertHasNoErrors()->assertSet('from', '2026-01')->assertSet('to', '2026-11');
+});
+
+test('an empty result names the filter that emptied it', function () {
+    mmPlaces();
+    $program = Activity::withoutRecording(fn (): Program => Program::factory()->create());
+
+    $page = Livewire::actingAs(mmViewer())->test('pages::reports.monthly-matrix');
+
+    expect($page->instance()->emptyReason)->toBeNull();
+
+    $page->set('program', (string) $program->id);
+
+    expect($page->instance()->matrix['rows'])->toBe([])->and($page->instance()->emptyReason)->toBe('program');
+});
+
+test('the query count is flat with three places, twelve months and five indicators', function () {
+    $count = function (int $places): int {
+        $libraries = [
+            ...LibraryIndicator::factory()->count(3)->create()->all(),
+            ...LibraryIndicator::factory()->percentage()->count(2)->create()->all(),
+        ];
+
+        foreach (range(1, $places) as $place) {
+            $project = mmProject(attributes: ['center_id' => insertHrCenter(insertHrCity('City '.$place.'-'.uniqid()), 'Center '.$place)]);
+            $proposal = mmProposal($project);
+            $targets = array_map(fn (LibraryIndicator $library): PlanIndicator => mmTarget($proposal, $project, $library), $libraries);
+
+            foreach (range(1, 12) as $month) {
+                $report = mmReport($project, sprintf('2026-%02d-01', $month));
+
+                foreach ($libraries as $index => $library) {
+                    $isRatio = $index >= 3;
+                    mmLine($report, $library, [$targets[$index]], $isRatio ? null : $month, $isRatio ? ['numerator' => $month, 'denominator' => 20, 'fixed_denominator' => 20] : []);
+                }
+            }
+        }
+
+        $queries = 0;
+        DB::listen(function () use (&$queries): void {
+            $queries++;
+        });
+        Livewire::actingAs(mmViewer())->withQueryParams(['from' => '2026-01', 'to' => '2026-12'])->test('pages::reports.monthly-matrix');
+
+        return $queries;
+    };
+
+    $count(1); // warm the per-process caches (permissions, HR lookups)
+    $fourPlaces = $count(3);
+    $sevenPlaces = $count(3); // the data adds up: 3 more places, 180 more lines
+
+    expect($sevenPlaces)->toBe($fourPlaces);
 });

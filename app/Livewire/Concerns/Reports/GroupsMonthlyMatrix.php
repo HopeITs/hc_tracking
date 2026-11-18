@@ -13,12 +13,13 @@ use Carbon\CarbonImmutable;
  * contracts §14.1): the rows of one library entry across centers and donors
  * folded into one row.
  *
- * Used by BuildsMonthlyMatrix. Counts add the rows' targets, cells and
- * totals; a percentage or average group takes its total from one pooled
- * aggregate over all its targets (Σ numerator ÷ Σ denominator, lines without
- * a denominator excluded and counted) and its month cells from the rows' own
- * numerators and denominators: never an average of percentages. A group of
- * ratio rows with different targets has no target (so no achieved %).
+ * Used by BuildsMonthlyMatrix. The target, total and achieved % come from
+ * ReportExtraction (libraryTotals() in the center view, a shared target
+ * counted once; targetLibraryTotals() in the donor view): counts add up,
+ * ratios pool (Σ numerator ÷ Σ denominator, lines without a denominator
+ * excluded and counted), never an average of percentages. The month cells
+ * fold the rows' own figures. A group of ratio rows with different targets
+ * has no target (so no achieved %). `centers_count` = distinct places.
  */
 trait GroupsMonthlyMatrix
 {
@@ -37,25 +38,27 @@ trait GroupsMonthlyMatrix
 
         usort($groups, fn (array $a, array $b): int => strcmp((string) $a['code'], (string) $b['code']));
 
-        $pooled = $this->pooledRatios($groups, $months[0], $months[11]->endOfMonth(), $isDonorView, true);
+        $extraction = $this->extraction();
+        $totals = $isDonorView ? $extraction->targetLibraryTotals() : $extraction->libraryTotals();
 
         foreach ($groups as $index => $group) {
-            if ($group['measure'] !== IndicatorMeasure::Numeric) {
-                $ratio = $pooled[$group['key']]['ratio'] ?? null;
-                $groups[$index]['total'] = $ratio === null ? null : round($ratio, 2);
-                $groups[$index]['excluded'] = $pooled[$group['key']]['excluded'] ?? 0;
+            $figures = $totals[$group['library_id']] ?? null;
+
+            if ($figures === null) {
+                continue;
             }
 
-            $total = $groups[$index]['total'];
-            $target = $group['target'];
-            $groups[$index]['achieved'] = $total === null || $target === null || $target <= 0.0 ? null : round($total / $target * 100, 2);
+            $groups[$index]['target'] = $figures['target'];
+            $groups[$index]['total'] = $figures['total'];
+            $groups[$index]['excluded'] = $figures['excluded'];
+            $groups[$index]['achieved'] = $figures['achieved'];
         }
 
         return $groups;
     }
 
     /**
-     * One group row from its (project, library) rows.
+     * One group row from its (place, library) or target rows.
      *
      * @param  list<array<string, mixed>>  $children
      * @param  list<CarbonImmutable>  $months
@@ -87,17 +90,16 @@ trait GroupsMonthlyMatrix
         return [
             ...$first,
             'key' => $key,
-            'project_id' => null,
-            'project_name' => null,
-            'project_slug' => null,
+            'place_key' => null,
+            'place_keys' => array_values(array_unique(array_merge(...array_column($children, 'place_keys')))),
             'center' => null,
             'city' => null,
+            'shared_centers' => null,
             'attribution' => null,
             'is_group' => true,
-            'centers_count' => count(array_unique(array_column($children, 'project_id'))),
+            'centers_count' => count(array_unique(array_merge(...array_column($children, 'place_keys')))),
             'sources' => array_values($sources),
-            'target_ids' => array_merge(...array_column($children, 'target_ids')),
-            'pooled_ids' => array_merge(...array_column($children, 'pooled_ids')),
+            'target_ids' => array_values(array_unique(array_merge(...array_column($children, 'target_ids')))),
             'target' => $isNumeric ? array_sum($targets) : (count(array_unique($targets)) === 1 ? $targets[0] : null),
             'cells' => $cells,
             'total' => $isNumeric ? (float) array_sum(array_filter(array_column($children, 'total'), fn (mixed $total): bool => $total !== null)) : null,

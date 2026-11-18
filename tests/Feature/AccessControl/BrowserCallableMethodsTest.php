@@ -18,4 +18,6 @@ test('the browser cannot call a page helper that returns data', function (string
     'agreement money' => ['pages::proposals.index', 'agreementMoney', [1]],
     'donor money' => ['pages::donors.index', 'donorMoney', [1]],
     'matrix figure' => ['pages::reports.monthly-matrix', 'matrixNumber', [1.0]],
+    'matrix cell link' => ['pages::reports.monthly-matrix', 'cellListUrl', [[], '2026-10']],
+    'list row matrix link' => ['pages::monthly-reports.index', 'matrixUrlFor', [1]],
 ]);

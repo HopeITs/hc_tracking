@@ -10,7 +10,6 @@ use App\Enums\MonthlyReportStatus;
 use App\Enums\ReportTemplateLineStatus;
 use App\Models\MonthlyReport;
 use App\Models\PlanIndicator;
-use App\Models\Project;
 use App\Models\ReportTemplate;
 use App\Models\ReportTemplateLine;
 use Carbon\CarbonImmutable;
@@ -18,8 +17,8 @@ use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Support\Facades\DB;
 
 /**
- * Builds the lines of a draft monthly report from the project's confirmed
- * report template (contracts §13 "Lines of month M", §13.1 item 1, D-38).
+ * Builds the lines of a draft monthly report from its template's confirmed
+ * lines (D-76, contracts §13 "Lines of month M", §13.1 item 1, D-38).
  *
  * The lines of month M are the confirmed template lines due in M
  * (ReportTemplateLine::isDueIn()) whose target's window covers M
@@ -48,29 +47,29 @@ final class MonthlyReportLineBuilder
     public function build(MonthlyReport $report): array
     {
         return DB::transaction(function () use ($report): array {
-            $locked = MonthlyReport::query()->whereKey($report->id)->lockForUpdate()->first(['id', 'project_id', 'period', 'status']);
+            $locked = MonthlyReport::query()->whereKey($report->id)->lockForUpdate()->first(['id', 'report_template_id', 'period', 'status']);
 
             if ($locked === null || $locked->status !== MonthlyReportStatus::Draft) {
                 return ['lines' => 0, 'shares' => 0];
             }
 
-            $project = Project::query()->with('program:id,donor_attribution')->findOrFail($locked->project_id);
-            $planned = $this->plannedLines($this->templateLines($project), $locked->period, self::attributionOf($project));
+            $template = ReportTemplate::query()->with('program:id,donor_attribution')->findOrFail($locked->report_template_id);
+            $planned = $this->plannedLines($this->templateLines($template), $locked->period, self::attributionOf($template));
 
             return $planned === [] ? ['lines' => 0, 'shares' => 0] : $this->insert($locked, $planned);
         });
     }
 
     /**
-     * The project's confirmed template lines, with what isDueIn() and the
-     * target window read eager-loaded. Load once, then plan many months.
+     * The template's confirmed lines, with what isDueIn() and the target
+     * window read eager-loaded. Load once, then plan many months.
      *
      * @return Collection<int, ReportTemplateLine>
      */
-    public function templateLines(Project $project): Collection
+    public function templateLines(ReportTemplate $template): Collection
     {
         return ReportTemplateLine::query()
-            ->whereIn('report_template_id', ReportTemplate::query()->select('id')->where('project_id', $project->id))
+            ->where('report_template_id', $template->id)
             ->where('status', ReportTemplateLineStatus::Confirmed)
             ->with(['planIndicator.indicator.libraryIndicator', 'planIndicator.source'])
             ->orderBy('id')
@@ -127,25 +126,25 @@ final class MonthlyReportLineBuilder
      * @param  Collection<int, ReportTemplateLine>  $templateLines  from templateLines()
      * @param  MonthlyReport|null  $report  null for a month not generated yet; with `lines` loaded
      */
-    public function missingLineCount(Project $project, Collection $templateLines, CarbonImmutable $month, ?MonthlyReport $report): int
+    public function missingLineCount(ReportTemplate $template, Collection $templateLines, CarbonImmutable $month, ?MonthlyReport $report): int
     {
         if ($report !== null && $report->status !== MonthlyReportStatus::Draft) {
             return 0;
         }
 
-        $planned = array_keys($this->plannedLines($templateLines, $month, self::attributionOf($project)));
+        $planned = array_keys($this->plannedLines($templateLines, $month, self::attributionOf($template)));
         $existing = $report === null ? [] : $report->lines->pluck('library_indicator_id')->map(fn (int|string $id): int => (int) $id)->all();
 
         return count(array_diff($planned, $existing));
     }
 
     /**
-     * The donor attribution mode of the project's program (D-46). Load
+     * The donor attribution mode of the template's program (D-46). Load
      * `program` first.
      */
-    public static function attributionOf(Project $project): DonorAttribution
+    public static function attributionOf(ReportTemplate $template): DonorAttribution
     {
-        return $project->program->donor_attribution;
+        return $template->program->donor_attribution;
     }
 
     /**

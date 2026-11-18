@@ -20,7 +20,6 @@ use App\Support\MonthlyReportLineBuilder;
 use App\Support\MonthlyReportMirrors;
 use App\Support\MonthlyReportPeriods;
 use Carbon\CarbonImmutable;
-use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
@@ -42,14 +41,12 @@ final class SubmitMonthlyReport
     {
         return DB::transaction(function () use ($report, $expectedStatus): MonthlyReport {
             $locked = MonthlyReportGuard::lock($report, $expectedStatus, 'submit');
-            $reason = MonthlyReportPeriods::for($locked->project)->canSubmit($locked);
+            $reason = MonthlyReportPeriods::for($locked->template)->canSubmit($locked);
 
             if ($reason !== null) {
                 throw ValidationException::withMessages(['status' => $reason]);
             }
-
-            $locked->project->loadMissing('program:id,donor_attribution');
-            $attribution = MonthlyReportLineBuilder::attributionOf($locked->project);
+            $attribution = MonthlyReportLineBuilder::attributionOf($locked->template);
             $lines = $locked->lines()->with(['libraryIndicator', 'shares.mirror', 'shares.planIndicator.indicator'])->get();
 
             $incomplete = $lines->contains(fn (MonthlyReportLine $line): bool => $line->entered_by !== IndicatorCollector::Meal
@@ -108,7 +105,7 @@ final class SubmitMonthlyReport
 
         /** @var Collection<int, list<int>> $requiredByTarget */
         $requiredByTarget = ReportTemplateLine::query()
-            ->whereHas('template', fn (Builder $query) => $query->where('project_id', $report->project_id))
+            ->where('report_template_id', $report->report_template_id)
             ->whereIn('plan_indicator_id', $targetIds)
             ->with('evidenceTypes:id')
             ->get(['id', 'report_template_id', 'plan_indicator_id'])

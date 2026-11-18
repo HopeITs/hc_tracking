@@ -21,19 +21,7 @@
 @endphp
 
 @if ($board['outputs'] === [])
-    <x-ui.panel>
-        <x-ui.empty-state
-            icon="clipboard-document-list"
-            :heading="$this->hasNoAssignedProjects ? __('reports.matrix.no_assigned_projects') : __('reports.matrix.no_activities')"
-            :body="$this->hasNoAssignedProjects ? __('reports.matrix.no_assigned_projects_hint') : __('reports.matrix.no_activities_hint')"
-        >
-            <x-slot:action>
-                @if ($filtersAreActive)
-                    <x-ui.button tone="primary" icon="arrow-path" wire:click="clearFilters">{{ __('common.reset_filters') }}</x-ui.button>
-                @endif
-            </x-slot:action>
-        </x-ui.empty-state>
-    </x-ui.panel>
+    @include('pages.reports._monthly-matrix-empty', ['emptyIcon' => 'clipboard-document-list', 'emptyHeading' => __('reports.matrix.no_activities'), 'emptyBody' => __('reports.matrix.no_activities_hint')])
 @else
     <p class="text-xs text-secondary-medium dark:text-ink-muted" data-matrix-legend>{{ __('reports.matrix.activities_legend') }}</p>
 
