@@ -74,6 +74,24 @@ test('entries sort by time or module, toggling direction on repeat clicks', func
         ->assertSeeInOrder(['Alpha risk', 'Beta task']);
 });
 
+test('sorting by area follows the area name the reader sees, not its key', function () {
+    $this->actingAs(userWithRole('Managers'));
+    Risk::factory()->create(['name' => 'A risk entry']);
+    $access = Activity::query()->first()->replicate();
+    $access->module = 'access-management';
+    $access->properties = [...$access->properties, 'label' => 'An access entry'];
+    $access->save();
+
+    expect(__('notifications.modules.risks'))->toBe('Risks')
+        ->and(__('notifications.modules.access-management'))->toBe('Users & roles');
+
+    Livewire::actingAs(userWithRole('Super Admin'))->test('pages::activity.index')
+        ->call('setSort', 'module')
+        ->assertSeeInOrder(['A risk entry', 'An access entry'])
+        ->call('setSort', 'module')
+        ->assertSeeInOrder(['An access entry', 'A risk entry']);
+});
+
 test('a deleted record shows as deleted instead of a link', function () {
     $task = Activity::withoutRecording(fn () => Task::factory()->create(['title' => 'Gone']));
     $this->actingAs(userWithRole('Managers'));

@@ -144,9 +144,15 @@ new #[Layout('layouts::desk'), Title('titles.activity_log')] class extends Compo
     {
         $sortingByModule = $this->sortField === 'module';
 
+        $areaOrder = $sortingByModule ? $this->areasInDisplayOrder() : [];
+        $areaPlaceholders = implode(', ', array_fill(0, max(1, count($areaOrder)), '?'));
+
         return $this->filteredQuery()
             ->with('actor:id,hr_user_id,employee_id')
-            ->when($sortingByModule, fn (Builder $query) => $query->orderBy('module', $this->sortDirection))
+            // Unknown areas (FIELD = 0) go last, then the order the reader sees.
+            ->when($sortingByModule && $areaOrder !== [], fn (Builder $query) => $query
+                ->orderByRaw("FIELD(module, {$areaPlaceholders}) = 0", $areaOrder)
+                ->orderByRaw("FIELD(module, {$areaPlaceholders})", $areaOrder))
             ->orderBy('created_at', $sortingByModule ? 'desc' : $this->sortDirection)
             ->orderBy('id', $sortingByModule ? 'desc' : $this->sortDirection)
             ->paginate(50);
@@ -264,6 +270,24 @@ new #[Layout('layouts::desk'), Title('titles.activity_log')] class extends Compo
             'risks' => 'warn',
             default => 'neutral',
         };
+    }
+
+    /**
+     * The area keys ordered by the name the reader sees ("Users & roles"
+     * for access-management), in the chosen direction, so sorting by Area
+     * reads alphabetically in either language.
+     *
+     * @return list<string>
+     */
+    private function areasInDisplayOrder(): array
+    {
+        $presenter = app(NotificationPresenter::class);
+
+        $areas = collect(array_keys(config('notifications.modules')))
+            ->sortBy(fn (string $module): string => mb_strtolower($presenter->moduleLabel($module)))
+            ->values();
+
+        return array_values(($this->sortDirection === 'desc' ? $areas->reverse() : $areas)->all());
     }
 
     private function parseDate(string $value): ?CarbonImmutable
