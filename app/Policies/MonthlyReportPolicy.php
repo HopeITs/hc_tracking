@@ -167,7 +167,8 @@ class MonthlyReportPolicy
     /**
      * The responsible officer, the MEAL Manager slot holder, or any MEAL role
      * holder when no one is responsible; never the preparer, the submitter or
-     * the General Manager.
+     * the General Manager. A template with no legacy project falls back to the
+     * report's own project_id mirror, as MonthlyReport::validatableBy() does.
      */
     private function isValidator(User $user, MonthlyReport $monthlyReport): bool
     {
@@ -180,7 +181,8 @@ class MonthlyReportPolicy
         $template = $monthlyReport->relationLoaded('template')
             ? $monthlyReport->template
             : ReportTemplate::query()->findOrFail($monthlyReport->report_template_id);
-        $project = $this->bridge->legacyProjectFor($template);
+        $project = $this->bridge->legacyProjectFor($template)
+            ?? ($monthlyReport->project_id === null ? null : $this->bridge->projectsByIds([$monthlyReport->project_id])->first());
         $responsible = $project === null ? null : MealCoverage::responsibleFor($project);
 
         if ($user->employee_id !== null

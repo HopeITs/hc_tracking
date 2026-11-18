@@ -65,6 +65,7 @@ Before planning or editing, find the row whose globs match the file's path and r
 | {app/Models/Proposal.php,app/Models/DonorProposal.php,resources/views/pages/{proposals,funding-agreements,transfers,donors}/**} | .ai/rules/proposalsfunding-agreementstransfersdonors.md |
 | app/Providers/** | .ai/rules/providers.md |
 | app/Notifications/Recipients/** | .ai/rules/recipients.md |
+| {resources/views/pages/reports/**,app/Livewire/Concerns/Reports/**,app/Support/Reporting/ReportExtraction.php} | .ai/rules/reporting.md |
 | {app/Livewire/Concerns/ManagesReportForm.php,resources/views/pages/reports/**,resources/views/components/reports/**} | .ai/rules/reports.md |
 | resources/views/pages/results/** | .ai/rules/results.md |
 | {app/Models/PlanIndicator.php,resources/views/pages/{results,indicators,targets,reports}/**} | .ai/rules/resultsindicatorstargetsreports.md |

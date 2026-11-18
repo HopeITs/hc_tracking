@@ -318,6 +318,42 @@ test('with nobody responsible any MEAL role holder sees the project in the queue
     expect(MonthlyReport::query()->validatableBy($meal)->pluck('id')->all())->toBe([$report->id]);
 });
 
+test('a report on a template with no project and no center reaches the queue through its own project', function () {
+    $template = Activity::withoutRecording(fn (): ReportTemplate => ReportTemplate::factory()->create([
+        'project_id' => null, 'city_id' => $this->aleppo, 'program_id' => $this->project->program_id, 'center_id' => null,
+    ]));
+    $report = Activity::withoutRecording(fn (): MonthlyReport => MonthlyReport::factory()->submitted()->create([
+        'report_template_id' => $template->id, 'project_id' => $this->project->id, 'period' => '2026-10-01',
+    ]));
+    $meal = userWithRole('MEAL', insertHrEmployee(firstNameEn: 'Huda', lastNameEn: 'Meal'));
+
+    expect($template->place()->isUnset())->toBeTrue()
+        ->and(MonthlyReport::query()->validatableBy($meal)->pluck('id')->all())->toBe([$report->id]);
+
+    $officer = governorateOfficer($this->aleppo);
+    $otherOfficer = governorateOfficer(insertHrCity('Homs'));
+
+    expect(MonthlyReport::query()->validatableBy($officer)->pluck('id')->all())->toBe([$report->id])
+        ->and(MonthlyReport::query()->validatableBy($otherOfficer)->count())->toBe(0)
+        ->and(MonthlyReport::query()->validatableBy($meal)->count())->toBe(0);
+});
+
+test('on a template with no project and no center only the officer responsible for the report\'s project validates', function () {
+    $template = Activity::withoutRecording(fn (): ReportTemplate => ReportTemplate::factory()->create([
+        'project_id' => null, 'city_id' => $this->aleppo, 'program_id' => $this->project->program_id, 'center_id' => null,
+    ]));
+    $report = Activity::withoutRecording(fn (): MonthlyReport => MonthlyReport::factory()->submitted()->create([
+        'report_template_id' => $template->id, 'project_id' => $this->project->id, 'period' => '2026-10-01',
+    ]));
+    $meal = userWithRole('MEAL', insertHrEmployee(firstNameEn: 'Huda', lastNameEn: 'Meal'));
+    $officer = governorateOfficer($this->aleppo);
+    $otherOfficer = governorateOfficer(insertHrCity('Homs'));
+
+    expect($officer->can('validate', $report))->toBeTrue()
+        ->and($meal->can('validate', $report))->toBeFalse()
+        ->and($otherOfficer->can('validate', $report))->toBeFalse();
+});
+
 test('the Public Relations Manager cannot validate or return a submitted report', function () {
     governorateOfficer($this->aleppo);
     $prManager = userWithRole('Public Relations Manager');

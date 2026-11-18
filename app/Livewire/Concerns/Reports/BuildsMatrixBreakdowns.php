@@ -8,8 +8,10 @@ use App\Enums\DenominatorBasis;
 use App\Enums\DonorAttribution;
 use App\Enums\IndicatorMeasure;
 use App\Enums\MonthlyReportStatus;
+use App\Support\Reporting\ReportExtraction;
 use Carbon\CarbonImmutable;
 use Illuminate\Support\Facades\DB;
+use stdClass;
 
 /**
  * The by-sex breakdown rows of the Monthly Matrix (T18 slice 2, D-50,
@@ -17,9 +19,10 @@ use Illuminate\Support\Facades\DB;
  * with disability", read from `monthly_report_line_breakdowns` of validated
  * monthly reports only.
  *
- * Used by BuildsMonthlyMatrix. Two flat reads whatever the row count: the
- * line-level rows (`shared` programs) and the share-level rows (`split`
- * programs). A ratio category is Σ numerator ÷ Σ denominator over the
+ * Used by BuildsMonthlyMatrix. Two flat reads whatever the row count, both
+ * over ReportExtraction's lines and shares (so the same filters and window):
+ * the line-level rows (`shared` programs, by place) and the share-level rows
+ * (`split` programs, by target and place). A ratio category is Σ numerator ÷ Σ denominator over the
  * window, never a sum or average of monthly percentages; a fixed-denominator
  * row shows counts only (D-25).
  *
@@ -50,26 +53,31 @@ trait BuildsMatrixBreakdowns
             return $rows;
         }
 
-        $from = $months[0]->toDateString();
-        $to = $months[11]->toDateString();
         $shared = array_values(array_filter($disaggregated, fn (array $row): bool => $row['attribution'] !== DonorAttribution::Split));
         $split = array_values(array_filter($disaggregated, fn (array $row): bool => $row['attribution'] === DonorAttribution::Split));
 
-        $lineLevel = $shared === [] ? [] : $this->lineLevelBreakdowns($shared, $from, $to);
-        $shareLevel = $split === [] ? [] : $this->shareLevelBreakdowns($split, $from, $to);
+        $lineLevel = $shared === [] ? [] : $this->lineLevelBreakdowns($shared);
+        $shareLevel = $split === [] ? [] : $this->shareLevelBreakdowns($split);
 
         foreach ($rows as $index => $row) {
             if (! $row['is_disaggregated']) {
                 continue;
             }
 
+            $raw = [];
+
             if ($row['attribution'] === DonorAttribution::Split) {
-                $raw = [];
                 foreach ($isDonorView ? [$row['target_ids'][0]] : $row['target_ids'] as $targetId) {
-                    $raw = $this->addBreakdownRaw($raw, $shareLevel[$targetId] ?? []);
+                    foreach ($shareLevel[$targetId] ?? [] as $placeKey => $byPlace) {
+                        if ($isDonorView || $placeKey === $row['place_key']) {
+                            $raw = $this->addBreakdownRaw($raw, $byPlace);
+                        }
+                    }
                 }
             } else {
-                $raw = $lineLevel[$row['project_id'].'|'.$row['library_id']] ?? [];
+                foreach ($row['place_keys'] as $placeKey) {
+                    $raw = $this->addBreakdownRaw($raw, $lineLevel[$placeKey.'|'.$row['library_id']] ?? []);
+                }
             }
 
             $kind = $this->breakdownKind($row);
@@ -97,58 +105,61 @@ trait BuildsMatrixBreakdowns
     }
 
     /**
-     * The line-level rows (share NULL) of the validated reports, by
-     * `project|library` then gender then month.
+     * The line-level rows (share NULL) of the validated lines the extraction
+     * selects, by `placeKey|library` then gender then month.
      *
      * @param  list<array<string, mixed>>  $rows
      * @return array<string, array<string, array<string, array<string, float>>>>
      */
-    private function lineLevelBreakdowns(array $rows, string $from, string $to): array
+    private function lineLevelBreakdowns(array $rows): array
     {
+        $lines = $this->extraction()->lines()
+            ->where('mr.status', MonthlyReportStatus::Validated->value)
+            ->whereIn('l.library_indicator_id', array_values(array_unique(array_column($rows, 'library_id'))));
+
+        $breakdowns = DB::table('monthly_report_line_breakdowns as b')
+            ->joinSub($lines, 'vl', 'vl.id', '=', 'b.monthly_report_line_id')
+            ->whereNull('b.monthly_report_line_share_id')
+            ->get(['vl.place_city_id', 'vl.place_program_id', 'vl.place_center_id', 'vl.place_city_wide', 'vl.period', 'vl.library_indicator_id', 'b.gender', ...$this->breakdownColumns()]);
+
         $result = [];
 
-        $query = DB::table('monthly_report_line_breakdowns as b')
-            ->join('monthly_report_lines as l', 'l.id', '=', 'b.monthly_report_line_id')
-            ->join('monthly_reports as mr', 'mr.id', '=', 'l.monthly_report_id')
-            ->whereNull('b.monthly_report_line_share_id')
-            ->where('mr.status', MonthlyReportStatus::Validated->value)
-            ->whereBetween('mr.period', [$from, $to])
-            ->whereIn('mr.project_id', array_values(array_unique(array_column($rows, 'project_id'))))
-            ->whereIn('l.library_indicator_id', array_values(array_unique(array_column($rows, 'library_id'))))
-            ->get(['mr.project_id', 'mr.period', 'l.library_indicator_id', 'b.gender', ...$this->breakdownColumns()]);
-
-        foreach ($query as $line) {
-            $this->foldBreakdown($result[$line->project_id.'|'.$line->library_indicator_id], $line);
+        foreach ($breakdowns as $line) {
+            $this->foldBreakdown($result[$this->breakdownPlaceKey($line).'|'.$line->library_indicator_id], $line);
         }
 
         return $result;
     }
 
     /**
-     * The share-level rows of the validated reports, by target then gender
-     * then month.
+     * The share-level rows of the validated shares the extraction selects,
+     * by target then place key then gender then month.
      *
      * @param  list<array<string, mixed>>  $rows
-     * @return array<int, array<string, array<string, array<string, float>>>>
+     * @return array<int, array<string, array<string, array<string, array<string, float>>>>>
      */
-    private function shareLevelBreakdowns(array $rows, string $from, string $to): array
+    private function shareLevelBreakdowns(array $rows): array
     {
+        $shares = $this->extraction()->shares()
+            ->where('mr.status', MonthlyReportStatus::Validated->value)
+            ->whereIn('s.plan_indicator_id', array_values(array_unique(array_merge(...array_column($rows, 'target_ids')))));
+
+        $breakdowns = DB::table('monthly_report_line_breakdowns as b')
+            ->joinSub($shares, 'vs', 'vs.share_id', '=', 'b.monthly_report_line_share_id')
+            ->get(['vs.plan_indicator_id', 'vs.place_city_id', 'vs.place_program_id', 'vs.place_center_id', 'vs.place_city_wide', 'vs.period', 'b.gender', ...$this->breakdownColumns()]);
+
         $result = [];
 
-        $query = DB::table('monthly_report_line_breakdowns as b')
-            ->join('monthly_report_line_shares as s', 's.id', '=', 'b.monthly_report_line_share_id')
-            ->join('monthly_report_lines as l', 'l.id', '=', 'b.monthly_report_line_id')
-            ->join('monthly_reports as mr', 'mr.id', '=', 'l.monthly_report_id')
-            ->where('mr.status', MonthlyReportStatus::Validated->value)
-            ->whereBetween('mr.period', [$from, $to])
-            ->whereIn('s.plan_indicator_id', array_merge(...array_column($rows, 'target_ids')))
-            ->get(['s.plan_indicator_id', 'mr.period', 'b.gender', ...$this->breakdownColumns()]);
-
-        foreach ($query as $share) {
-            $this->foldBreakdown($result[(int) $share->plan_indicator_id], $share);
+        foreach ($breakdowns as $share) {
+            $this->foldBreakdown($result[(int) $share->plan_indicator_id][$this->breakdownPlaceKey($share)], $share);
         }
 
         return $result;
+    }
+
+    private function breakdownPlaceKey(stdClass $row): string
+    {
+        return ReportExtraction::placeKey((int) $row->place_city_id, (int) $row->place_program_id, $row->place_center_id === null ? null : (int) $row->place_center_id, (bool) $row->place_city_wide);
     }
 
     /**

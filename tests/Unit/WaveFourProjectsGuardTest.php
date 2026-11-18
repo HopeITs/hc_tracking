@@ -26,6 +26,11 @@ it('names the Project model only in the place bridge', function (): void {
         dirname(__DIR__, 2).'/app/Console/Commands/BackfillMonthlyReports.php',
         // Y-03 slice 3: monthly-report notification recipients follow the template.
         dirname(__DIR__, 2).'/app/Notifications/Recipients/MonthlyReportRecipients.php',
+        // Y-05: the Monthly Matrix reads through ReportExtraction (its Activities tab through PlaceBridge).
+        dirname(__DIR__, 2).'/app/Livewire/Concerns/Reports/BuildsMonthlyMatrix.php',
+        dirname(__DIR__, 2).'/app/Livewire/Concerns/Reports/GroupsMonthlyMatrix.php',
+        dirname(__DIR__, 2).'/app/Livewire/Concerns/Reports/BuildsMatrixBreakdowns.php',
+        dirname(__DIR__, 2).'/app/Livewire/Concerns/Reports/BuildsMatrixActivities.php',
     ];
 
     $offenders = [];
