@@ -1114,3 +1114,16 @@ test('a change request reason under ten characters is refused in the form', func
 
     expect(ProposalChangeRequest::query()->where('proposal_id', $proposal->id)->exists())->toBeFalse();
 });
+
+test('the activity log under the tabs stays closed until asked for', function () {
+    $this->seed(RolesAndPermissionsSeeder::class);
+    $proposal = Proposal::factory()->create();
+    $user = User::factory()->role('General Manager')->create();
+
+    Livewire::actingAs($user)
+        ->test('pages::proposals.show', ['proposal' => $proposal])
+        ->assertSeeHtml('data-record-activity')
+        ->assertDontSeeLivewire('activity.timeline')
+        ->toggle('showActivity')
+        ->assertSeeLivewire('activity.timeline');
+});

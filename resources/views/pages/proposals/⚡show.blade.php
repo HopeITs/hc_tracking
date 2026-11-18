@@ -105,6 +105,12 @@ new #[Layout('layouts::desk'), Title('titles.proposal')] class extends Component
     public bool $embedded = false;
 
     /**
+     * The activity log under the tabs is closed until asked for, so no tab
+     * opens onto a long list.
+     */
+    public bool $showActivity = false;
+
+    /**
      * Embedded on the project's Funding tab: only the lifecycle, the
      * attention list and the vitals in a grid. Picking a tab (from a warning,
      * a vital or "Show all details") opens the full proposal in place.
@@ -493,8 +499,13 @@ new #[Layout('layouts::desk'), Title('titles.proposal')] class extends Component
         </div>
 
         <section aria-labelledby="record-activity-heading" class="grid gap-3 mt-10" data-record-activity>
-            <h2 id="record-activity-heading" class="text-base font-bold">{{ __('activity.title') }}</h2>
-            <livewire:activity.timeline :subjects="['proposal' => [$this->proposal->id]]" :key="'proposal-activity-'.$this->proposal->id" />
+            <div class="flex flex-wrap items-center justify-between gap-2">
+                <h2 id="record-activity-heading" class="text-base font-bold">{{ __('activity.title') }}</h2>
+                <button type="button" class="dk-btn dk-sm" wire:click="$toggle('showActivity')" aria-expanded="{{ $showActivity ? 'true' : 'false' }}" data-test="toggle-activity-log">{{ $showActivity ? __('activity.hide_log') : __('activity.show_log') }}</button>
+            </div>
+            @if ($showActivity)
+                <livewire:activity.timeline :subjects="['proposal' => [$this->proposal->id]]" :key="'proposal-activity-'.$this->proposal->id" />
+            @endif
         </section>
     @endif
 
