@@ -51,6 +51,7 @@ return [
         'manage-roles' => 'إدارة الأدوار',
         'manage-permissions' => 'إدارة الصلاحيات',
         'approve' => 'اعتماد',
+        'review' => 'مراجعة',
         'mark-seen' => 'تعليم كمطّلع عليه',
         'reopen' => 'إعادة فتح',
         'aggregate' => 'تجميع',

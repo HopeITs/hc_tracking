@@ -48,7 +48,7 @@
                 @endforeach
             </select>
             @if ($unit === CountUnit::Other)
-                <input class="ap-inp {{ ! $readOnly && $otherName === null ? 'is-err' : '' }}" style="max-width: 240px" {!! $readOnly ? '' : 'wire:model.blur="form.unit_other"' !!} value="{{ $data['unit_other'] }}" placeholder="{{ __('annual_plans.wf.unit_other_placeholder') }}" {{ $dis }} aria-label="{{ __('annual_plans.wf.unit_other_label') }}">
+                <input class="ap-inp {{ ! $readOnly && $otherName === null ? 'is-err' : '' }}" style="max-width: 240px" {!! $readOnly ? '' : 'wire:model.live.blur="form.unit_other"' !!} value="{{ $data['unit_other'] }}" placeholder="{{ __('annual_plans.wf.unit_other_placeholder') }}" {{ $dis }} aria-label="{{ __('annual_plans.wf.unit_other_label') }}">
             @endif
             <span class="ap-faint ap-xs">{{ $unit->needsHours() ? __('annual_plans.wf.hours_needed') : __('annual_plans.wf.no_hours') }}</span>
         </div>
@@ -127,9 +127,9 @@
 
     <div class="ap-row" style="align-items: flex-start">
         <label class="ap-grp" style="flex: 1; min-width: 180px"><span class="ap-lbl">{{ __('annual_plans.wf.expected_people') }}</span>
-            <input class="ap-inp" type="number" min="0" {!! $readOnly ? '' : 'wire:model.blur="form.expected_people"' !!} value="{{ $data['expected_people'] }}" placeholder="{{ $readOnly ? __('annual_plans.wf.not_set') : __('annual_plans.wf.whole_activity') }}" {{ $dis }}></label>
+            <input class="ap-inp" type="number" min="0" {!! $readOnly ? '' : 'wire:model.live.blur="form.expected_people"' !!} value="{{ $data['expected_people'] }}" placeholder="{{ $readOnly ? __('annual_plans.wf.not_set') : __('annual_plans.wf.whole_activity') }}" {{ $dis }}></label>
         <label class="ap-grp" style="flex: 2; min-width: 220px"><span class="ap-lbl">{{ __('annual_plans.wf.note') }}</span>
-            <input class="ap-inp" {!! $readOnly ? '' : 'wire:model.blur="form.note"' !!} value="{{ $data['note'] }}" placeholder="{{ $readOnly ? __('annual_plans.wf.no_note') : __('annual_plans.wf.note_placeholder') }}" {{ $dis }} dir="auto"></label>
+            <input class="ap-inp" {!! $readOnly ? '' : 'wire:model.live.blur="form.note"' !!} value="{{ $data['note'] }}" placeholder="{{ $readOnly ? __('annual_plans.wf.no_note') : __('annual_plans.wf.note_placeholder') }}" {{ $dis }} dir="auto"></label>
     </div>
 
     @unless ($readOnly)

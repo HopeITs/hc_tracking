@@ -12,7 +12,7 @@
     $inTab = \App\Support\Desk\DeskTab::current();
 @endphp
 <!DOCTYPE html>
-<html lang="{{ str_replace('_', '-', app()->getLocale()) }}" dir="{{ \App\Enums\Locale::current()->direction() }}" @class(['dk-in-tab' => $inTab])>
+<html lang="{{ str_replace('_', '-', app()->getLocale()) }}" dir="{{ \App\Enums\Locale::current()->direction() }}"@if ($inTab) class="dk-in-tab"@endif>
     <head>
         @include('partials.head')
     </head>

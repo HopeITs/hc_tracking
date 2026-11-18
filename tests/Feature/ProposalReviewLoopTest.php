@@ -142,8 +142,11 @@ test('entering concept note review invites the four slots, the project owner and
         ->and(DB::table('proposal_reviewers')->pluck('added_by')->unique()->all())->toBe([$actor->id])
         ->and(DB::table('proposal_reviewers')->whereNotNull('seen_at')->exists())->toBeFalse();
 
+    // The project owner also hears that collecting the reviews is now theirs (ProposalOwnerNotifier).
     foreach ($reviewerUsers as $user) {
-        expect(notificationKeysOf($user))->toBe([ReviewRequestedForYou]);
+        expect(notificationKeysOf($user))->toEqualCanonicalizing((int) $user->employee_id === $people['owner']
+            ? [ReviewRequestedForYou, 'notifications.events.proposal.waiting_on_you.collect_concept_reviews']
+            : [ReviewRequestedForYou]);
     }
 });
 
@@ -179,13 +182,14 @@ test('re-entering a review adds only newly linked people and re-notifies only th
     unset($asked[array_search($mealManager, $asked, true)]);
     $requests = Activity::query()->where('event', 'proposal.review_requested')->orderBy('id')->get();
 
-    // The second request merges into the owner's unread first one (NotificationGrouper).
+    // The second request merges into the owner's unread first one (NotificationGrouper),
+    // a row that also gathers the owner's status-change notices of the same proposal.
     expect(reviewerSlotsOf($proposal, ReviewStage::ConceptNote))->toBe($expected)
         ->and($expected)->not->toHaveKey($financeManager)
         ->and($requests)->toHaveCount(2)
         ->and($requests[1]->properties['employee_ids'])->toBe(array_values($asked))
         ->and(UserNotification::query()->forUser($mealUser)->sole()->data['count'])->toBe(1)
-        ->and(UserNotification::query()->forUser($ownerUser)->sole()->data['count'])->toBe(2);
+        ->and(array_values(array_intersect(UserNotification::query()->forUser($ownerUser)->where('data->key', ReviewRequestedForYou)->sole()->data['activity_ids'], $requests->pluck('id')->all())))->toBe($requests->pluck('id')->all());
 });
 
 test('the review rows of one stage never count for the other', function () {

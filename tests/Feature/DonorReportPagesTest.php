@@ -262,7 +262,8 @@ test('the saved report page runs a fixed number of queries however many centers 
 });
 
 test('MEAL can compose from an assigned duty without receiving finance access', function () {
-    $meal = mealManager();
+    // A MEAL officer: the MEAL Manager slot holder sees every proposal and the Funding tab (2026-11-16).
+    $meal = userWithRole('MEAL', insertHrEmployee(firstNameEn: 'Omar', lastNameEn: 'Officer'));
     $unassigned = donorReportProposal(['name' => 'Unassigned grant']);
     $duty = DonorReport::factory()->create([
         'donor_proposal_id' => $this->proposal->donorProposals()->value('id'),

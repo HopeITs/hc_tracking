@@ -305,7 +305,7 @@ class AlWadiShowcaseSeeder extends Seeder
     private function seedReportTemplate(Project $project, Collection $targets): void
     {
         $confirmedBy = $this->user(1)->id;
-        $template = ReportTemplate::query()->firstOrCreate(['project_id' => $project->id]);
+        $template = ReportTemplate::query()->firstOrCreate(['project_id' => $project->id], ['city_id' => $project->city_id, 'program_id' => $project->program_id, 'center_id' => $project->center_id]);
         $template->forceFill(['status' => ReportTemplateStatus::Confirmed, 'confirmed_at' => $this->today->subMonths(6), 'confirmed_by' => $confirmedBy])->saveQuietly();
 
         foreach ($targets as $target) {

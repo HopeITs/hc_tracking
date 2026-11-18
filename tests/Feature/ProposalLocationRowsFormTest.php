@@ -148,7 +148,7 @@ test('an approved proposal row of a linked project takes centers, keeping its ci
 });
 
 test('editing a proposal without rows saves its details without asking for a place', function () {
-    $proposal = Proposal::factory()->create(['status' => ProposalStatus::Approved, 'name' => 'Old name']);
+    $proposal = Proposal::factory()->create(['status' => ProposalStatus::ProposalDraft, 'name' => 'Old name']);
 
     Livewire::actingAs($this->user)->test('pages::proposals.index')
         ->call('openEditModal', $proposal->id)

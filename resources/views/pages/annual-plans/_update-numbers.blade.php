@@ -18,7 +18,7 @@
                         <tr wire:key="num-{{ $batch->id }}">
                             <td><b dir="auto">{{ $item->activity?->statement }}</b><span class="ap-xs ap-faint" style="display: block">{{ $item->is_single_week ? __('annual_plans.wf.week_n', ['n' => $row['index'] + 1]) : __('annual_plans.wf.batch_n', ['n' => $row['index'] + 1]) }} · {{ $batch->start_week->translatedFormat('j M') }}@unless ($item->is_single_week) – {{ $batch->end_week->translatedFormat('j M') }}@endunless</span></td>
                             <td class="ap-num">{{ $item->counted((int) $batch->planned_count) }}</td>
-                            <td><input class="ap-inp is-n {{ $this->isMissing('number:'.$batch->id) ? 'is-err' : '' }}" type="number" min="0" wire:model.blur="draft.numbers.{{ $batch->id }}" @disabled($readOnly) aria-label="{{ __('annual_plans.up.col_done', ['month' => $monthName]) }}" data-test="done-count"></td>
+                            <td><input class="ap-inp is-n {{ $this->isMissing('number:'.$batch->id) ? 'is-err' : '' }}" type="number" min="0" wire:model.live.blur="draft.numbers.{{ $batch->id }}" @disabled($readOnly) aria-label="{{ __('annual_plans.up.col_done', ['month' => $monthName]) }}" data-test="done-count"></td>
                             <td class="ap-num">{{ $item->unit->needsHours() && $batch->hours_each !== null ? rtrim(rtrim((string) $batch->hours_each, '0'), '.').' h' : '—' }}</td>
                         </tr>
                     @endforeach

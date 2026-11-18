@@ -51,6 +51,7 @@ return [
         'manage-roles' => 'Manage roles',
         'manage-permissions' => 'Manage permissions',
         'approve' => 'Approve',
+        'review' => 'Review',
         'mark-seen' => 'Mark seen',
         'reopen' => 'Reopen',
         'aggregate' => 'Aggregate',

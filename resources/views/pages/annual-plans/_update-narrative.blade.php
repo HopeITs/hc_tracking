@@ -13,12 +13,12 @@
         @endif
         <div class="ap-grp">
             <span class="ap-lbl">{{ __('annual_plans.up.section_'.$key) }}</span>
-            <textarea class="ap-inp {{ $this->isMissing($field) ? 'is-err' : '' }}" wire:model.blur="draft.{{ $field }}" @disabled($readOnly) placeholder="{{ __('annual_plans.up.section_'.$key.'_hint') }}" dir="auto"></textarea>
+            <textarea class="ap-inp {{ $this->isMissing($field) ? 'is-err' : '' }}" wire:model.live.blur="draft.{{ $field }}" @disabled($readOnly) placeholder="{{ __('annual_plans.up.section_'.$key.'_hint') }}" dir="auto"></textarea>
         </div>
     @endforeach
     <div class="ap-grp">
         <span class="ap-lbl">{{ __('annual_plans.up.section_next') }}</span>
-        <textarea class="ap-inp {{ $this->isMissing('next_month') ? 'is-err' : '' }}" wire:model.blur="draft.next_month" @disabled($readOnly) placeholder="{{ __('annual_plans.up.section_next_hint') }}" dir="auto"></textarea>
+        <textarea class="ap-inp {{ $this->isMissing('next_month') ? 'is-err' : '' }}" wire:model.live.blur="draft.next_month" @disabled($readOnly) placeholder="{{ __('annual_plans.up.section_next_hint') }}" dir="auto"></textarea>
     </div>
     <div class="ap-grp">
         <span class="ap-lbl">{{ __('annual_plans.up.section_accountability') }}</span>

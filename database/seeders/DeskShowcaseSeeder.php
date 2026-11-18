@@ -133,7 +133,7 @@ class DeskShowcaseSeeder extends Seeder
 
             // Report templates for MEAL to confirm.
             foreach ($projects->take(3) as $project) {
-                ReportTemplate::query()->firstOrCreate(['project_id' => $project->id]);
+                ReportTemplate::query()->firstOrCreate(['project_id' => $project->id], ['city_id' => $project->city_id, 'program_id' => $project->program_id, 'center_id' => $project->center_id]);
             }
 
             // Strategic pillars on every strategy.

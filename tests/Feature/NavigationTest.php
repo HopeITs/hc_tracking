@@ -87,12 +87,12 @@ test('the old My Reporting Duties address leads to Donor Reports', function () {
         ->assertRedirect(route('donor-reports.index'));
 });
 
-test('the donor reports register sits under monitoring and evaluation, labelled Donor reports, the builder labelled Reports', function () {
+test('the donor reports register sits under monitoring and evaluation, labelled Donor reports, the builder labelled Donor report builder', function () {
     $groups = collect(app(Destinations::class)->sidebarFor(User::factory()->role('Super Admin')->create()))->keyBy('group');
     $items = collect($groups->get('monitoring_evaluation')['items'])->keyBy('route');
 
     expect($items->get('donor-reports.index')['label'])->toBe('Donor reports')
-        ->and($items->get('donor-reports.compose')['label'])->toBe('Reports');
+        ->and($items->get('donor-reports.compose')['label'])->toBe('Donor report builder');
 });
 
 test('funding pages follow the module permissions of each role', function () {

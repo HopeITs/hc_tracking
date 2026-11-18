@@ -83,7 +83,7 @@ test('a received tranche with no net reads not recorded, and one in another curr
 
     $render = fn (TransfersTracking $tranche): string => Blade::render('<table><tbody><x-funding.tranche-row :transfer="$tranche" /></tbody></table>', ['tranche' => $tranche]);
 
-    expect($render($missing))->toContain('Not recorded yet')
+    expect($render($missing))->toContain(__('finance_tables.state_net_missing'))
         ->and($render($missing))->toContain('data-state="net-missing"')
         ->and($render($converted))->toContain('Converted')
         ->and($render($converted))->toContain('275.00')
