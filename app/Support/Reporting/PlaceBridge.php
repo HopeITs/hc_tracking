@@ -326,6 +326,57 @@ final class PlaceBridge
     }
 
     /**
+     * templateIdsOfProject() for many projects in a fixed number of queries
+     * (the Desk templates panel lists every running project).
+     *
+     * Removed by Y-17.
+     *
+     * @param  list<int>  $projectIds
+     * @return array<int, list<int>> project id => template ids, lowest first
+     */
+    public function templateIdsOfProjects(array $projectIds): array
+    {
+        if ($projectIds === []) {
+            return [];
+        }
+
+        $result = array_fill_keys($projectIds, []);
+
+        foreach (ReportTemplate::query()->whereIn('project_id', $projectIds)->get(['id', 'project_id']) as $template) {
+            $result[$template->project_id][] = $template->id;
+        }
+
+        $rows = ProposalLocation::query()->with('centers')->whereIn('project_id', $projectIds)->whereNotNull('program_id')->get();
+
+        if ($rows->isNotEmpty()) {
+            $links = DB::table('proposal_report_template')->whereIn('proposal_id', $rows->pluck('proposal_id')->unique()->all())->get(['proposal_id', 'report_template_id']);
+            $templates = ReportTemplate::query()
+                ->whereKey($links->pluck('report_template_id')->unique()->all())
+                ->get(['id', 'city_id', 'program_id', 'center_id', 'city_wide'])
+                ->keyBy('id');
+
+            foreach ($rows as $row) {
+                $placeKeys = array_map(fn (ReportPlace $place): string => $place->key(), $this->placesOfRows(collect([$row])));
+
+                foreach ($links->where('proposal_id', $row->proposal_id) as $link) {
+                    $template = $templates->get($link->report_template_id);
+
+                    if ($template !== null && in_array($template->place()->key(), $placeKeys, true)) {
+                        $result[$row->project_id][] = $template->id;
+                    }
+                }
+            }
+        }
+
+        return array_map(function (array $ids): array {
+            $ids = array_values(array_unique(array_map(intval(...), $ids)));
+            sort($ids);
+
+            return $ids;
+        }, $result);
+    }
+
+    /**
      * The place a new or re-pointed target gets (Y-08), by the backfill's
      * rule: the project's city and program; its center when it has one (left
      * unset when a row of the proposal names other centers); else, for a

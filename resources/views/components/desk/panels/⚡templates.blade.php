@@ -7,6 +7,7 @@ use App\Models\HrEmployee;
 use App\Models\Project;
 use App\Models\ReportTemplate;
 use App\Support\MealCoverage;
+use App\Support\Reporting\PlaceBridge;
 use App\Support\ReportTemplatePrefiller;
 use Flux\Flux;
 use Illuminate\Support\Collection;
@@ -40,21 +41,33 @@ new class extends Component {
             return new Collection;
         }
 
-        return Project::query()
+        $projects = Project::query()
             ->select(['id', 'slug', 'name', 'status', 'city_id', 'center_id', 'program_id', 'user_id'])
             ->whereIn('status', [ProjectStatus::Active, ProjectStatus::Approved])
-            ->with(['reportTemplate' => fn ($query) => $query->select(['id', 'project_id', 'status'])->withCount('lines')])
             ->orderBy('name')
+            ->get();
+        $templateIds = app(PlaceBridge::class)->templateIdsOfProjects($projects->modelKeys());
+        $templates = ReportTemplate::query()
+            ->select(['id', 'status'])
+            ->whereKey(array_merge(...array_values($templateIds)))
+            ->withCount('lines')
             ->get()
-            ->map(fn (Project $project): array => [
-                'project' => $project,
-                'state' => match ($project->reportTemplate?->status) {
-                    null => 'missing',
-                    ReportTemplateStatus::Pending => 'pending',
-                    default => 'approved',
-                },
-                'lines' => (int) ($project->reportTemplate?->lines_count ?? 0),
-            ])
+            ->keyBy('id');
+
+        return $projects
+            ->map(function (Project $project) use ($templateIds, $templates): array {
+                $template = $templates->get($templateIds[$project->id][0] ?? 0);
+
+                return [
+                    'project' => $project,
+                    'state' => match ($template?->status) {
+                        null => 'missing',
+                        ReportTemplateStatus::Pending => 'pending',
+                        default => 'approved',
+                    },
+                    'lines' => (int) ($template?->lines_count ?? 0),
+                ];
+            })
             ->sortBy(fn (array $row): int => array_search($row['state'], self::States, true))
             ->values();
     }
@@ -81,7 +94,7 @@ new class extends Component {
      * runs), then open the project's Report template tab. A project with no
      * target to plan gets no template, and the toast says so.
      */
-    public function createTemplate(int $projectId, ReportTemplatePrefiller $prefiller): void
+    public function createTemplate(int $projectId, ReportTemplatePrefiller $prefiller, PlaceBridge $places): void
     {
         Gate::authorize('report-templates.manage');
 
@@ -94,7 +107,7 @@ new class extends Component {
         $project = $row['project'];
         $prefiller->prefillProject($project->id);
 
-        if (! ReportTemplate::query()->where('project_id', $project->id)->exists()) {
+        if ($places->templateIdsOfProject($project->id) === []) {
             Flux::toast(variant: 'warning', text: __('desk.template_nothing_to_plan', ['project' => $project->name]));
 
             return;

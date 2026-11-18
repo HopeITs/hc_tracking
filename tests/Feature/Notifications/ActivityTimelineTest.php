@@ -79,10 +79,16 @@ test('each record page carries its activity', function (string $route, Closure $
         ->assertSeeLivewire('activity.timeline');
 })->with([
     'report' => ['reports.show', fn () => Report::factory()->create()],
-    'proposal' => ['proposals.show', fn () => Proposal::factory()->create()],
     'program' => ['programs.show', fn () => Program::factory()->create()],
     'funding agreement' => ['funding-agreements.show', fn () => DonorProposal::factory()->create()],
 ]);
+
+test('the proposal page folds its activity behind a toggle', function () {
+    $this->actingAs(userWithRole('Super Admin'))
+        ->get(route('proposals.show', Activity::withoutRecording(fn () => Proposal::factory()->create())))
+        ->assertSee('data-test="toggle-activity-log"', false)
+        ->assertDontSeeLivewire('activity.timeline');
+});
 
 test('the task page folds its activity and builds the timeline only when opened', function () {
     $task = Activity::withoutRecording(fn () => Task::factory()->create());

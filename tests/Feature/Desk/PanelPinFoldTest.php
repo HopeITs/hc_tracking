@@ -20,7 +20,7 @@ test('pinning a panel puts it first and every slot keeps its shape', function ()
 
     expect($after[0]['panel'])->toBe($last)
         ->and(deskShape($after))->toBe(deskShape($before))
-        ->and($user->fresh()->desk_panel_flags)->toBe(['pinned' => [$last], 'folded' => []]);
+        ->and($user->fresh()->desk_panel_flags)->toEqual(['pinned' => [$last], 'folded' => []]);
 });
 
 test('pinned panels stay first in the order they were pinned, even after a drag puts another ahead', function () {
@@ -51,7 +51,7 @@ test('unpinning a panel lets it fall back behind the panels still pinned', funct
         ->call('pinPanel', $first, false);
 
     expect(array_column($panels->layoutFor($user->fresh()), 'panel')[0])->toBe($second)
-        ->and($user->fresh()->desk_panel_flags)->toBe(['pinned' => [$second], 'folded' => []]);
+        ->and($user->fresh()->desk_panel_flags)->toEqual(['pinned' => [$second], 'folded' => []]);
 });
 
 test('a collapsed panel is kept folded until opened, and forgotten once it leaves the desk', function () {
@@ -59,7 +59,7 @@ test('a collapsed panel is kept folded until opened, and forgotten once it leave
     $panel = app(Panels::class)->layoutFor($user)[0]['panel'];
     $desk = Livewire::actingAs($user)->test('pages::desk.index')->call('foldPanel', $panel);
 
-    expect($user->fresh()->desk_panel_flags)->toBe(['pinned' => [], 'folded' => [$panel]]);
+    expect($user->fresh()->desk_panel_flags)->toEqual(['pinned' => [], 'folded' => [$panel]]);
 
     $desk->call('foldPanel', $panel, false);
 
@@ -156,6 +156,6 @@ test('pinning a collapsed panel opens it at the top as a full panel', function (
         ->call('foldPanel', $panel)
         ->call('pinPanel', $panel);
 
-    expect($user->fresh()->desk_panel_flags)->toBe(['pinned' => [$panel], 'folded' => []])
+    expect($user->fresh()->desk_panel_flags)->toEqual(['pinned' => [$panel], 'folded' => []])
         ->and(app(Panels::class)->layoutFor($user->fresh())[0]['panel'])->toBe($panel);
 });

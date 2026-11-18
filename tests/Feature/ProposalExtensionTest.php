@@ -218,13 +218,22 @@ test('a second extension must end later than the first and appends a note', func
 });
 
 /**
- * A confirmed monthly template line for a target of the proposal.
+ * A confirmed monthly template line for a target of the proposal. The
+ * template is carried by the proposal being extended, as Y-02's backfill
+ * carries a legacy template by its project's proposals, so the template's
+ * window (Y-03) follows the extension.
  */
 function extTemplateLine(Project $project, string $to, ?ReportTemplateLineStatus $status = null): ReportTemplateLine
 {
     return Activity::withoutRecording(function () use ($project, $to, $status): ReportTemplateLine {
-        $template = ReportTemplate::query()->where('project_id', $project->id)->first()
-            ?? ReportTemplate::factory()->confirmed()->create(['project_id' => $project->id]);
+        $template = ReportTemplate::query()->where('project_id', $project->id)->first();
+
+        if ($template === null) {
+            $template = ReportTemplate::factory()->confirmed()->create(['project_id' => $project->id]);
+            $template->proposals()->detach();
+            $template->proposals()->attach(test()->proposal->id, ['joined_at' => now()]);
+        }
+
         $indicator = Indicator::factory()->create(['library_indicator_id' => LibraryIndicator::factory()->create()->id]);
         $target = PlanIndicator::factory()->forProposal(test()->proposal)->create(['indicator_id' => $indicator->id, 'project_id' => $project->id]);
         $line = ReportTemplateLine::factory()->confirmed()->monthly()->create([
