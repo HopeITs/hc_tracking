@@ -12,6 +12,7 @@ use App\Models\PlanUpdate;
 use App\Models\Program;
 use App\Models\Project;
 use App\Models\User;
+use App\Notifications\Alerts\AlertLedger;
 use App\Notifications\AppNotification;
 use App\Notifications\NotificationPayload;
 use Illuminate\Support\Facades\Cache;
@@ -54,22 +55,28 @@ final class PlanNotifier
     }
 
     /**
-     * Notify once per key (reminders, late notices) within the given days.
+     * Notify each recipient once per stage (reminders, late notices). The
+     * claim is a row in notification_alert_ledger, so clearing the cache or
+     * a second run on the same day never sends it again.
      *
      * @param  list<string>  $to
      * @param  array<string, string>  $params
      */
-    public static function once(string $key, int $days, ActivityPlan $plan, Project $project, string $month, string $event, array $to, array $params): void
+    public static function once(string $stage, ActivityPlan $plan, Project $project, string $month, string $event, array $to, array $params): int
     {
-        if (! Cache::add('annual-plan-notice:'.$key, true, now()->addDays($days))) {
-            return;
-        }
+        $ledger = app(AlertLedger::class);
+        $users = array_values(array_filter(
+            self::recipients($plan, $project, $to),
+            fn (User $user): bool => $ledger->claim('annual_plan_notice', 'activity_plan', $plan->id, $stage, $user->id),
+        ));
 
-        self::send(self::recipients($plan, $project, $to), $event, [
+        self::send($users, $event, [
             'plan' => (string) $plan->proposal()->value('name'),
             'centre' => (string) $project->name,
             ...$params,
         ], ['route' => 'plan-updates.show', 'parameters' => [$plan->slug, $project->slug, $month]], null, $event === 'annual_plan.update_late');
+
+        return count($users);
     }
 
     /**

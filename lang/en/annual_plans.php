@@ -459,6 +459,7 @@ return [
         'stat_late' => 'Late 2+ weeks or cancelled',
         'stat_suspended' => 'Suspended now',
         'stat_people' => 'People reached in :month · :m male · :f female · of whom :d with a disability',
+        'stat_people_mixed' => 'People reached, latest update of each centre · :m male · :f female · of whom :d with a disability',
         'planned_week' => 'Planned week',
         'off_plan' => 'Different from plan',
         'this_week' => 'This week',

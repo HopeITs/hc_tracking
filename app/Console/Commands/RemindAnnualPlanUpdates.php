@@ -43,23 +43,21 @@ class RemindAnnualPlanUpdates extends Command
                     }
 
                     $due = PlanCalendar::dueDateOf($month);
-                    $key = $plan->id.':'.$centre->id.':'.$month->format('Y-m');
+                    $key = $centre->id.':'.$month->format('Y-m');
                     $params = ['month' => $month->translatedFormat('F Y'), 'date' => $due->translatedFormat(__('formats.date'))];
 
                     if ($today->gte($month->endOfMonth()->subDays(6)->startOfDay()) && $today->lte($due)) {
-                        PlanNotifier::once('remind:'.$key, 60, $plan, $centre, $month->format('Y-m'), 'annual_plan.update_due', ['project_manager'], $params);
-                        $sent++;
+                        $sent += PlanNotifier::once('remind:'.$key, $plan, $centre, $month->format('Y-m'), 'annual_plan.update_due', ['project_manager'], $params);
                     }
 
                     if ($today->gt($due) && $update?->status !== PlanUpdateStatus::Returned) {
-                        PlanNotifier::once('late:'.$key, 365, $plan, $centre, $month->format('Y-m'), 'annual_plan.update_late', ['project_manager', 'meal', 'program_manager'], $params);
-                        $sent++;
+                        $sent += PlanNotifier::once('late:'.$key, $plan, $centre, $month->format('Y-m'), 'annual_plan.update_late', ['project_manager', 'meal', 'program_manager'], $params);
                     }
                 }
             }
         }
 
-        $this->info("Checked plan updates; {$sent} notices considered.");
+        $this->info("Checked plan updates; {$sent} notices sent.");
 
         return self::SUCCESS;
     }

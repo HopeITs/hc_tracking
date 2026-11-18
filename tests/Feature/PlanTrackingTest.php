@@ -7,6 +7,7 @@ use App\Actions\AnnualPlans\SavePlanUpdate;
 use App\Actions\AnnualPlans\SendPlanUpdate;
 use App\Enums\FollowUpTrigger;
 use App\Enums\MealCoverageScope;
+use App\Enums\PlanWeekStatus;
 use App\Enums\ResultType;
 use App\Models\ActivityPlan;
 use App\Models\ActivityPlanBatch;
@@ -177,4 +178,109 @@ test('updates export as an Excel-readable sheet and a printable page', function 
 
     $this->actingAs($this->mealManager)->get(route('plan-updates.export', [$this->plan, $this->centre, '2027-01', 'format' => 'xlsx']))->assertOk()->assertDownload();
     $this->actingAs($this->mealManager)->get(route('plan-updates.export', [$this->plan, $this->centre, '2027-01', 'format' => 'pdf']))->assertOk()->assertSee('Sessions ran in the morning.');
+});
+
+function secondCentre(): Project
+{
+    $centre = Project::factory()->create(['program_id' => test()->program->id, 'city_id' => test()->centre->city_id, 'user_id' => insertHrEmployee(firstNameEn: 'Lina', lastNameEn: 'Haddad'), 'name' => 'Second centre']);
+    DB::table('project_proposal')->insert(['project_id' => $centre->id, 'proposal_id' => test()->proposal->id]);
+
+    return $centre;
+}
+
+test('the reminder skips a centre that sent and names the due date', function () {
+    $this->artisan('annual-plans:remind', ['--date' => '2027-01-27'])->assertSuccessful();
+
+    expect($this->projectManager->notifications()->where('data->key', 'notifications.events.annual_plan.update_due')->first()->data['params']['date'])
+        ->toBe(CarbonImmutable::parse('2027-02-03')->translatedFormat(__('formats.date')));
+
+    $this->projectManager->notifications()->delete();
+    sendJanuaryWith(plainWeeks());
+    $this->artisan('annual-plans:remind', ['--date' => '2027-02-04'])->assertSuccessful();
+
+    expect($this->projectManager->notifications()->whereIn('data->key', ['notifications.events.annual_plan.update_due', 'notifications.events.annual_plan.update_late'])->count())->toBe(0);
+});
+
+test('a second run on the same day sends nothing again, even after the cache is cleared', function () {
+    $this->artisan('annual-plans:remind', ['--date' => '2027-02-04'])->assertSuccessful();
+    Cache::flush();
+    $this->artisan('annual-plans:remind', ['--date' => '2027-02-04'])->assertSuccessful();
+
+    foreach ([$this->projectManager, $this->mealManager, $this->programManager] as $user) {
+        expect($user->notifications()->where('data->key', 'notifications.events.annual_plan.update_late')->count())->toBe(1);
+    }
+});
+
+test('a draft update colours nothing on the live plan', function () {
+    app(SavePlanUpdate::class)->handle($this->projectManager, $this->plan, $this->centre, CarbonImmutable::parse('2027-01-01'), [
+        'weeks' => [$this->batch->id.'|2027-01-04' => ['status' => 'started', 'reason' => '', 'new_week' => '']],
+    ]);
+
+    Livewire::actingAs($this->programManager)->test('pages::annual-plans.plan', ['activityPlan' => $this->plan])
+        ->assertSeeHtml('data-centre-status="not_started"')
+        ->assertDontSeeHtml('title="'.$this->centre->name.' · 4 Jan · '.PlanWeekStatus::Started->label().'"');
+});
+
+test('the done counter counts each centre the activity finished in', function () {
+    $this->batch->update(['end_week' => '2027-01-25']);
+    secondCentre();
+    sendJanuaryWith([...plainWeeks(), '2027-01-25' => ['status' => 'completed', 'reason' => '', 'new_week' => '']]);
+
+    $html = Livewire::actingAs($this->programManager)->test('pages::annual-plans.plan', ['activityPlan' => $this->plan])
+        ->assertSeeHtml('data-centre-status="done"')
+        ->html();
+
+    expect($html)->toMatch('/data-test="live-count-done"><b[^>]*>1<\/b>/');
+});
+
+test('people reached names the month only when every centre last reported the same one', function () {
+    sendJanuaryWith(plainWeeks());
+
+    Livewire::actingAs($this->programManager)->test('pages::annual-plans.plan', ['activityPlan' => $this->plan])
+        ->assertSee(__('annual_plans.live.stat_people', ['month' => 'January', 'm' => 30, 'f' => 35, 'd' => 3]));
+
+    PlanUpdate::factory()->create(['activity_plan_id' => $this->plan->id, 'project_id' => secondCentre()->id, 'month' => '2027-02-01', 'status' => 'sent', 'males' => 5, 'females' => 5, 'with_disability' => 0]);
+
+    Livewire::actingAs($this->programManager)->test('pages::annual-plans.plan', ['activityPlan' => $this->plan])
+        ->assertSee(__('annual_plans.live.stat_people_mixed', ['m' => 35, 'f' => 40, 'd' => 3]));
+});
+
+test('needs attention keeps only activities with a late, suspended or cancelled centre', function () {
+    sendJanuaryWith(plainWeeks());
+    Livewire::actingAs($this->programManager)->test('pages::annual-plans.plan', ['activityPlan' => $this->plan])
+        ->set('attentionOnly', true)
+        ->assertDontSeeHtml('data-live-item="'.$this->item->id.'"');
+
+    PlanUpdate::query()->firstOrFail()->weeks()->where('week', '2027-01-25')->update(['status' => 'suspended', 'reason' => 'Hall closed']);
+
+    Livewire::actingAs($this->programManager)->test('pages::annual-plans.plan', ['activityPlan' => $this->plan])
+        ->set('attentionOnly', true)
+        ->assertSeeHtml('data-live-item="'.$this->item->id.'"');
+});
+
+test('a centre manager sees only their centre, labelled, and the key shows every week status', function () {
+    $other = secondCentre();
+    $this->travelTo(CarbonImmutable::parse('2027-01-11'));
+
+    $component = Livewire::actingAs($this->projectManager)->test('pages::annual-plans.plan', ['activityPlan' => $this->plan])
+        ->assertSee(__('annual_plans.live.own_centre_only'))
+        ->assertDontSeeHtml('title="'.$other->name.'"')
+        ->assertSee(__('annual_plans.live.planned_week'))
+        ->assertSeeHtml('is-today');
+
+    foreach (PlanWeekStatus::cases() as $status) {
+        $component->assertSee($status->label());
+    }
+
+    Livewire::actingAs($this->programManager)->test('pages::annual-plans.plan', ['activityPlan' => $this->plan])
+        ->assertDontSee(__('annual_plans.live.own_centre_only'))
+        ->assertSeeHtml('title="'.$other->name.'"');
+});
+
+test('the update sheet carries the numbers the centre reported', function () {
+    sendJanuaryWith(plainWeeks());
+
+    $csv = $this->actingAs($this->mealManager)->get(route('plan-updates.export', [$this->plan, $this->centre, '2027-01', 'format' => 'xlsx']))->streamedContent();
+
+    expect($csv)->toContain('"Basic sessions",1,16,8')->toContain('30,35,65,3');
 });
