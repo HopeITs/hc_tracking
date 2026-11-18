@@ -97,6 +97,8 @@ return [
     'no_program_link' => 'No program link',
     'multi_program' => 'Multi-program',
     'locked_read_only' => 'The framework is locked after submission, so you can only read it. Ask MEAL to change its structure.',
+    'calendar_show' => 'Show the calendar (:count activities)',
+    'calendar_hide' => 'Hide the calendar',
     'logframe_tab_intro' => 'Impact, outcomes, outputs and the activities that deliver them.',
     'logframe_task_title' => 'Enter the logical framework: :proposal',
     'logframe_task_description' => 'Open the proposal\'s Logical Framework tab, add the results and activities, then press "Confirm framework is complete".',

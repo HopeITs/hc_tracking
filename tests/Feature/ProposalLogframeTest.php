@@ -352,3 +352,15 @@ test('the logframe tab starts with every branch and indicator list collapsed', f
         ->assertSeeHtml('branchOpen: false')
         ->assertDontSeeHtml('branchOpen: true');
 });
+
+test('the activity calendar starts closed behind a toggle', function () {
+    $meal = mealManager();
+    $impact = logframeNode($this->proposal, ResultType::Impact, programId: $this->program->id);
+    $output = logframeNode($this->proposal, ResultType::Output, logframeNode($this->proposal, ResultType::Outcome, $impact));
+    logframeNode($this->proposal, ResultType::Activity, $output);
+
+    Livewire::actingAs($meal)
+        ->test('proposals.activity-calendar', ['proposalId' => $this->proposal->id])
+        ->assertSeeHtml('calendarOpen: false')
+        ->assertSeeHtml('data-test="calendar-toggle"');
+});
