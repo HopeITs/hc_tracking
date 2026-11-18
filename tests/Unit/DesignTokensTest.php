@@ -175,8 +175,9 @@ test('arbitrary letter-spacing in views is a value the Arabic reset covers', fun
 
 test('views reference colours through design tokens rather than raw hex', function () {
     // Standalone documents that never load app.css: the notification image templates
-    // and the browser theme-color metas, which cannot read CSS variables.
-    $standalone = ['notifications/banner.blade.php', 'notifications/tile.blade.php', 'partials/head.blade.php'];
+    // the browser theme-color metas, and the annual plan print pages (their own
+    // document, no app.css), which cannot read CSS variables.
+    $standalone = ['notifications/banner.blade.php', 'notifications/tile.blade.php', 'partials/head.blade.php', 'pages/annual-plans/_plan-print.blade.php', 'pages/annual-plans/_update-print.blade.php'];
     $offenders = [];
 
     foreach (bladeViews() as $path => $source) {

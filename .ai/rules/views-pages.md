@@ -6,7 +6,7 @@ paths:
 # Views Pages
 
 ## Show routes bind by slug via HasSlug, not id
-Strategy, Project, Milestone, Task, Proposal, Donor, DonorProposal, Report and AnnualPlan use `App\Concerns\HasSlug` and route-bind on `slug`, not `id` — `projects/{project}` etc. resolve a readable slug. Program is the exception: its slug is read live from the HR database's own `programs.slug` column (`HrProgram::slugOf()`/`idBySlug()`), not a local column, since Program never copies HR data locally.
+Strategy, Project, Task, Proposal, Donor, DonorProposal, Report and AnnualPlan use `App\Concerns\HasSlug` and route-bind on `slug`, not `id` — `projects/{project}` etc. resolve a readable slug. Program is the exception: its slug is read live from the HR database's own `programs.slug` column (`HrProgram::slugOf()`/`idBySlug()`), not a local column, since Program never copies HR data locally.
 
 Consequences any new code touching these must respect:
 - Always pass the model instance to `route('x.show', $model)`, never a raw id/array key (`$model->id`, `$row['id']`, a foreign-key column like `->proposal_id`). A raw int is not `UrlRoutable`, so it gets written into the URL literally and 404s. If only an id is on hand and no relation is loaded, build a cheap unsaved instance: `tap(new Project, fn ($p) => $p->id = $id)` — `HasSlug::getRouteKey()` resolves the real slug lazily via one query, no eager load required.

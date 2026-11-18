@@ -193,15 +193,13 @@
     }
     [data-desk-register] [data-stat-tile]:hover { transform: none; box-shadow: none; }
 
-    /* The pages' own boards and calendars (tasks, milestones, projects, my calendar). */
-    [data-desk-register] [data-test^="task-board-column-"],
-    [data-desk-register] [data-test^="milestone-board-column-"] {
+    /* The pages' own boards and calendars (tasks, projects, my calendar). */
+    [data-desk-register] [data-test^="task-board-column-"] {
         border: 0;
         border-radius: 12px;
         background: var(--sunk);
     }
     [data-desk-register] [data-test^="task-calendar-day-"],
-    [data-desk-register] [data-test^="milestone-calendar-day-"],
     [data-desk-register] [data-test^="calendar-day-"] {
         border-color: var(--line);
         border-radius: 10px;

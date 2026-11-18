@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace App\Livewire\Concerns\Desk;
 
-use App\Enums\MilestoneStatus;
 use App\Enums\ProjectStatus;
 use App\Models\Project;
 use App\Support\Desk\ProjectStage;
@@ -45,7 +44,6 @@ trait ReadsDeskFlow
             ->whereNotIn('status', [ProjectStatus::Archived, ProjectStatus::Closed])
             ->with([
                 'proposals:id,status',
-                'milestones' => fn ($query) => $query->select(['id', 'project_id', 'planned_end_date', 'status'])->whereIn('status', [MilestoneStatus::Planned, MilestoneStatus::Ongoing]),
                 'monthlyReports:id,project_id,period,status',
                 ...($money ? ['proposals.donorProposals:id,proposal_id', 'proposals.donorProposals.transfers'] : []),
             ])

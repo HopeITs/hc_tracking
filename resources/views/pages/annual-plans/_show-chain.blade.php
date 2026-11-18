@@ -1,7 +1,6 @@
 {{--
     The plan's read-only results chain (T16): the program framework measured
-    by this plan's targets, with the activities whose linked milestones are
-    planned in the plan year. Included by ⚡show.blade.php.
+    by this plan's targets. Included by ⚡show.blade.php.
 --}}
 <div class="@container/detail">
     <x-ui.logframe

@@ -3,7 +3,6 @@
 use App\Enums\TaskStatus;
 use App\Models\Activity;
 use App\Models\DonorProposal;
-use App\Models\Milestone;
 use App\Models\Program;
 use App\Models\Project;
 use App\Models\Proposal;
@@ -79,7 +78,6 @@ test('each record page carries its activity', function (string $route, Closure $
         ->get(route($route, Activity::withoutRecording($record)))
         ->assertSeeLivewire('activity.timeline');
 })->with([
-    'milestone' => ['milestones.show', fn () => Milestone::factory()->create()],
     'report' => ['reports.show', fn () => Report::factory()->create()],
     'proposal' => ['proposals.show', fn () => Proposal::factory()->create()],
     'program' => ['programs.show', fn () => Program::factory()->create()],

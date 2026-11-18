@@ -1,4 +1,4 @@
-{{-- The details column on ⚡show.blade.php: assignees, priority, dates, proof and what the task is related to, one row each. Each field saves the moment it changes for whoever may change it (updated() in the page); everyone else reads it as text. Only the creator moves the due date; the start date fills itself when work starts; the completed date shows once the task is done. --}}
+{{-- The details column on ⚡show.blade.php: assignees, priority, dates, proof one row each (what the task is related to has its own card, _show-related). Each field saves the moment it changes for whoever may change it (updated() in the page); everyone else reads it as text. Only the creator moves the due date or switches proof needed; the start date fills itself when work starts; the completed date shows once the task is done. --}}
 @use('App\Enums\TaskPriority')
 @use('App\Enums\TaskStatus')
 @php
@@ -16,8 +16,6 @@
     $daysLate = $this->task->status !== TaskStatus::Done && $this->task->due_date?->isPast() && ! $this->task->due_date->isToday()
         ? (int) $this->task->due_date->copy()->startOfDay()->diffInDays(today())
         : 0;
-    $source = $this->task->source;
-    $sourceUrl = $source instanceof \App\Models\Milestone && auth()->user()->can('view', $source) ? route('milestones.show', $source) : null;
 @endphp
 
 <x-ui.panel :clip="false">
@@ -144,7 +142,7 @@
         <div class="{{ $rowClass }}">
             <dt class="{{ $rowLabelClass }}">{{ __('tasks.show.proof_needed') }}</dt>
             <dd>
-                @if ($canEditTask)
+                @if ($canRescheduleTask)
                     <button
                         type="button"
                         role="switch"
@@ -168,15 +166,5 @@
             </dd>
         </div>
 
-        <div class="{{ $rowClass }}">
-            <dt class="{{ $rowLabelClass }}">{{ __('tasks.source_type') }}</dt>
-            <dd class="min-w-0 text-end">
-                @if ($sourceUrl !== null)
-                    <a href="{{ $sourceUrl }}" wire:navigate class="block truncate {{ $readValueClass }} hover:underline" data-test="task-related-to">{{ $this->task->sourceLabel() }}</a>
-                @else
-                    <span class="block truncate {{ $readValueClass }}" data-test="task-related-to">{{ $this->task->sourceLabel() }}</span>
-                @endif
-            </dd>
-        </div>
     </dl>
 </x-ui.panel>

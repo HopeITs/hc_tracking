@@ -9,7 +9,6 @@ use App\Models\Activity;
 use App\Models\DonorProposal;
 use App\Models\Indicator;
 use App\Models\LibraryIndicator;
-use App\Models\Milestone;
 use App\Models\PlanIndicator;
 use App\Models\Program;
 use App\Models\Project;
@@ -31,7 +30,7 @@ beforeEach(function () {
 });
 
 /**
- * An approved proposal on one project with a framework, a milestone, a task,
+ * An approved proposal on one project with a framework, a task,
  * a target with an approved report, and the things a renewal must not copy.
  *
  * @return array{previous: Proposal, project: Project, root: Result, target: PlanIndicator}
@@ -64,9 +63,6 @@ function renewalSource(array $projectState = []): array
         $indicator = Indicator::factory()->create(['result_id' => $outcome->id, 'library_indicator_id' => $library->id, 'project_id' => $project->id]);
         $target = PlanIndicator::factory()->forProposal($previous)->create(['indicator_id' => $indicator->id, 'project_id' => $project->id, 'target' => 100]);
         Report::factory()->approved()->create(['plan_indicator_id' => $target->id, 'value' => 60]);
-
-        $parentMilestone = Milestone::factory()->create(['project_id' => $project->id, 'proposal_id' => $previous->id, 'planned_start_date' => '2026-03-01', 'planned_end_date' => '2026-04-01', 'name' => 'Baseline']);
-        Milestone::factory()->childOf($parentMilestone)->create(['proposal_id' => $previous->id, 'planned_start_date' => '2026-03-10', 'name' => 'Survey']);
 
         Task::factory()->create(['source_type' => 'proposal', 'source_id' => $previous->id, 'title' => 'Verify list', 'start_date' => '2026-03-01', 'due_date' => '2026-03-31', 'status' => 'done']);
 
@@ -168,26 +164,19 @@ test('the framework is copied with copied_from_id and remapped parents', functio
         ->and($child->copied_from_id)->not->toBe($child->id);
 });
 
-test('milestones and tasks are copied with planned dates only and a reset status', function () {
-    ['previous' => $previous, 'project' => $project] = renewalSource();
+test('tasks are copied with planned dates only and a reset status', function () {
+    ['previous' => $previous] = renewalSource();
 
     $result = app(CloneProposalForRenewal::class)->handle($previous, renewalData(), renewalActor());
     $renewal = $result['proposal'];
 
-    $milestones = Milestone::query()->where('proposal_id', $renewal->id)->orderBy('id')->get();
     $task = Task::query()->where('source_type', 'proposal')->where('source_id', $renewal->id)->sole();
 
-    expect($milestones)->toHaveCount(2)
-        ->and($milestones[0]->project_id)->toBe($project->id)
-        ->and($milestones[0]->planned_start_date->toDateString())->toBe('2027-03-01')
-        ->and($milestones[0]->actual_start_date)->toBeNull()
-        ->and($milestones[1]->parent_milestone_id)->toBe($milestones[0]->id)
-        ->and(DB::table('milestones')->where('proposal_id', $renewal->id)->whereNotNull('copied_from_id')->count())->toBe(2)
-        ->and($task->status->value)->toBe('todo')
+    expect($task->status->value)->toBe('todo')
         ->and($task->start_date->toDateString())->toBe('2027-03-01')
         ->and($task->completed_date)->toBeNull()
         ->and(DB::table('tasks')->where('id', $task->id)->value('copied_from_id'))->not->toBeNull()
-        ->and($result['copied'])->toMatchArray(['results' => 2, 'milestones' => 2, 'tasks' => 1]);
+        ->and($result['copied'])->toMatchArray(['results' => 2, 'tasks' => 1]);
 });
 
 test('without results.create the framework is skipped and the rest is created', function () {
@@ -196,7 +185,7 @@ test('without results.create the framework is skipped and the rest is created', 
 
     $result = app(CloneProposalForRenewal::class)->handle($previous, renewalData(), $actor);
 
-    expect($result['copied'])->toBe(['results' => 0, 'indicators' => 0, 'milestones' => 2, 'tasks' => 1])
+    expect($result['copied'])->toBe(['results' => 0, 'indicators' => 0, 'tasks' => 1])
         ->and($result['proposal']->exists)->toBeTrue()
         ->and($result['skippedParts'])->toBe(['framework']);
 });
@@ -253,7 +242,7 @@ test('a double click returns the same draft and a second user gets their own', f
 test('a failure rolls the whole clone back', function () {
     ['previous' => $previous] = renewalSource();
     $actor = renewalActor();
-    $before = [DB::table('proposals')->count(), DB::table('results')->count(), DB::table('milestones')->count()];
+    $before = [DB::table('proposals')->count(), DB::table('results')->count(), DB::table('tasks')->count()];
 
     app()->bind(RENEWAL_TREE_COPIER, fn () => new class
     {
@@ -266,7 +255,7 @@ test('a failure rolls the whole clone back', function () {
     });
 
     expect(fn () => app(CloneProposalForRenewal::class)->handle($previous, renewalData(), $actor))->toThrow(RuntimeException::class)
-        ->and([DB::table('proposals')->count(), DB::table('results')->count(), DB::table('milestones')->count()])->toBe($before);
+        ->and([DB::table('proposals')->count(), DB::table('results')->count(), DB::table('tasks')->count()])->toBe($before);
 });
 
 test('a renewal ignores a supplied number and generates its own', function () {

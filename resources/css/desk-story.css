@@ -560,6 +560,7 @@
     .dk-prog-card-o svg.dk-i { width: 14px; height: 14px; flex: none; }
     .dk-prog-cells { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); align-self: start; gap: 1px; overflow: hidden; border-radius: 12px; background: var(--line); }
     .dk-prog-cells-2 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    .dk-prog-cells-1 { grid-template-columns: minmax(0, 1fr); }
     .dk-prog-cells > div { display: grid; grid-template-rows: auto 1fr; gap: 4px; min-width: 0; padding: 10px; background: var(--ground); }
     .dk-prog-cells dt { display: flex; align-items: center; gap: 6px; min-width: 0; font-size: 12px; font-weight: 700; color: var(--ink-3); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
     .dk-prog-cells dt svg.dk-i { display: none; }
@@ -1049,16 +1050,6 @@
     .dk-prs-contrib-t:hover { color: var(--ink); }
     .dk-prs-contrib-t svg.dk-i:first-child { width: 15px; height: 15px; }
 
-    /* Unlinked milestones fold. */
-    .dk-prs-fold-t { font-size: 15px; font-weight: 800; }
-    .dk-prs-fold-body { display: grid; gap: 10px; }
-    .dk-prs-ms { display: grid; overflow: hidden; border: 1px solid var(--line); border-radius: 12px; background: var(--ground); }
-    .dk-prs-ms > li { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 12px; padding: 10px 20px; }
-    .dk-prs-ms > li + li { border-top: 1px solid var(--line); }
-    .dk-prs-ms svg.dk-i { width: 14px; height: 14px; flex: none; color: var(--faint); }
-    .dk-prs-ms-t { flex: 1 1 14rem; min-width: 0; font-size: 13.5px; font-weight: 600; color: var(--ink); text-decoration: none; }
-    a.dk-prs-ms-t:hover { text-decoration: underline; text-underline-offset: 3px; }
-    .dk-prs-ms-c { font-size: 12.5px; color: var(--ink-3); }
 
     @media (max-width: 1100px) {
         .dk-prs-ind-h { grid-template-columns: minmax(0, 1fr) 9rem auto 20px; grid-template-areas: "name prog state x" "centers centers centers centers"; row-gap: 2px; }

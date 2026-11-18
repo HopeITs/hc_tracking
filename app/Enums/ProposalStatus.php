@@ -38,7 +38,7 @@ enum ProposalStatus: string implements HasStatusTone
     case Active = 'active';
 
     /**
-     * @deprecated Retired by D-02: the final report is a milestone now. Kept
+     * @deprecated Retired by D-02: the final report is a filed file now. Kept
      *             only so old rows and notes still render; no transition
      *             leads in or out, and T04 moved its proposals to active.
      */

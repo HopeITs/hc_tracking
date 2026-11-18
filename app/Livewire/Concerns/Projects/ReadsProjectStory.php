@@ -7,7 +7,6 @@ namespace App\Livewire\Concerns\Projects;
 use App\Actions\Desk\SendNudge;
 use App\Enums\Currency;
 use App\Enums\MediaCollection;
-use App\Enums\MilestoneStatus;
 use App\Enums\MonthlyReportStatus;
 use App\Enums\ProjectStatus;
 use App\Enums\ProposalStatus;
@@ -131,7 +130,6 @@ trait ReadsProjectStory
             ->with([
                 'proposals:proposals.id,proposals.name,proposals.status,proposals.created_at',
                 'proposals.donorNames',
-                'milestones' => fn ($query) => $query->select(['id', 'project_id', 'name', 'planned_end_date', 'status'])->whereIn('status', [MilestoneStatus::Planned, MilestoneStatus::Ongoing]),
                 'monthlyReports:id,project_id,period,status,returned_at',
                 ...($this->canViewMoney() ? ['proposals.donorProposals:id,proposal_id,budget,currency', 'proposals.donorProposals.transfers'] : []),
             ])
@@ -286,12 +284,6 @@ trait ReadsProjectStory
             return [(string) __('story.next.validate_report', ['month' => $submitted->period->translatedFormat('F Y')]), null, $link($submitted), true];
         }
 
-        $milestone = $project->milestones->filter(fn ($milestone): bool => $milestone->planned_end_date !== null)->sortBy('planned_end_date')->first();
-
-        if ($milestone !== null) {
-            return [(string) __('story.next.reach_milestone', ['name' => $milestone->name, 'date' => $milestone->planned_end_date->translatedFormat(__('formats.date'))]), $project->user_id, auth()->user()?->can('milestones.view') ? route('milestones.show', $milestone) : null, false];
-        }
-
         return [(string) __('story.next.nothing_waiting'), null, null, false];
     }
 
@@ -366,7 +358,7 @@ trait ReadsProjectStory
      * The plan chapter's details (desk.js planBlock, read only): what the
      * lead proposal plans, its budget for money holders, and its reviewers.
      *
-     * @return array{indicators: int, targets: int, milestones: int, tasks: int, budget: list<string>|null, reviewers: list<array{name: string, slot: string, seen: bool}>}|null
+     * @return array{indicators: int, targets: int, tasks: int, budget: list<string>|null, reviewers: list<array{name: string, slot: string, seen: bool}>}|null
      */
     #[Computed]
     public function planSummary(): ?array
@@ -405,7 +397,6 @@ trait ReadsProjectStory
         return [
             'indicators' => $targets->pluck('indicator_id')->unique()->count(),
             'targets' => $targets->whereNotNull('target')->count(),
-            'milestones' => (int) $this->project->milestones_count,
             'tasks' => $this->tasks->count(),
             'budget' => $budget,
             'reviewers' => array_values($rows->map(fn (ProposalReviewer $row): array => [

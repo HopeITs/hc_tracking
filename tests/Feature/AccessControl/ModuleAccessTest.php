@@ -3,7 +3,6 @@
 use App\Models\AnnualPlan;
 use App\Models\Donor;
 use App\Models\DonorProposal;
-use App\Models\Milestone;
 use App\Models\Program;
 use App\Models\Project;
 use App\Models\Proposal;
@@ -23,8 +22,6 @@ dataset('module pages', [
     'projects' => [fn (): string => route('projects.index')],
     'project' => [fn (): string => route('projects.show', Project::factory()->create())],
     'risks' => [fn (): string => route('risks.index')],
-    'milestones' => [fn (): string => route('milestones.index')],
-    'milestone' => [fn (): string => route('milestones.show', Milestone::factory()->create())],
     'results' => [fn (): string => route('results.index')],
     'indicators' => [fn (): string => route('indicators.index')],
     'targets' => [fn (): string => route('targets.index')],

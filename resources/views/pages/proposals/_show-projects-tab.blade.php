@@ -1,6 +1,6 @@
 {{--
     The Projects tab of proposals/show: link a project, and each funded
-    project with its milestones and tasks. Included by ⚡show.blade.php,
+    project with its tasks. Included by ⚡show.blade.php,
     whose top PHP block defines $mutedText, $inkText, $hairline, $amount,
     $term, $chronology and $arrivals.
 --}}
@@ -27,7 +27,7 @@
                 <div class="flex flex-col gap-8">
                     @foreach ($this->projects as $project)
                         @php
-                            $projectTasks = $this->tasks->filter(fn (\App\Models\Task $task): bool => $task->sourceProjectId() === $project->id);
+                            $projectTasks = $this->tasks->filter(fn (\App\Models\Task $task): bool => $task->source_type === 'project' && $task->source_id === $project->id);
                             $projectDone = $projectTasks->where('status', TaskStatus::Done)->count();
                             // Work scheduled past the grant's own end has no funding behind it after that date.
                             $runsPastTheGrant = $project->end_date !== null
@@ -35,12 +35,12 @@
                                 && $project->end_date->gt($this->proposal->planned_date_end);
                         @endphp
                         <article class="relative min-w-0 ps-6" wire:key="project-{{ $project->id }}" data-project="{{ $project->id }}">
-                            {{-- The thread: one mark per funded project, filled once its milestones are all reached. --}}
+                            {{-- The thread: one mark per funded project, filled once its tasks are all done. --}}
                             <span class="absolute start-[0.1875rem] top-5 bottom-0 w-px bg-secondary-soft dark:bg-line-strong" aria-hidden="true"></span>
                             <span @class([
                                 'absolute start-0 top-1.5 size-2.5 rounded-full',
-                                'bg-secondary-dark dark:bg-ink-muted' => $project->milestones_count > 0 && $project->reached_milestones_count >= $project->milestones_count,
-                                'border-2 border-secondary-dark bg-white dark:border-ink-muted dark:bg-surface-1' => $project->milestones_count === 0 || $project->reached_milestones_count < $project->milestones_count,
+                                'bg-secondary-dark dark:bg-ink-muted' => $projectTasks->isNotEmpty() && $projectDone >= $projectTasks->count(),
+                                'border-2 border-secondary-dark bg-white dark:border-ink-muted dark:bg-surface-1' => $projectTasks->isEmpty() || $projectDone < $projectTasks->count(),
                             ]) aria-hidden="true"></span>
 
                             <div class="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
@@ -79,11 +79,9 @@
                                 </div>
                             </div>
 
-                            {{-- Two measures on one line: milestones reached, tasks done. --}}
+                            {{-- One measure: tasks done against tasks raised. --}}
                             <div class="mt-3 grid gap-x-8 gap-y-3 @2xl/detail:grid-cols-2">
-                                {{-- Both bars mean the same thing — finished against committed — so both fill in the same colour. --}}
                                 @foreach ([
-                                    ['key' => 'milestones', 'label' => __('common.milestones'), 'done' => $project->reached_milestones_count, 'total' => $project->milestones_count],
                                     ['key' => 'tasks', 'label' => __('common.tasks'), 'done' => $projectDone, 'total' => $projectTasks->count()],
                                 ] as $measure)
                                     <div class="min-w-0" data-measure="{{ $measure['key'] }}">

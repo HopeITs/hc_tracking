@@ -3,14 +3,12 @@
 use App\Enums\Currency;
 use App\Enums\FileType;
 use App\Enums\MediaCollection;
-use App\Enums\MilestoneStatus;
 use App\Enums\ProjectStatus;
 use App\Enums\ResultType;
 use App\Models\AnnualPlan;
 use App\Models\DonorProposal;
 use App\Models\Indicator;
 use App\Models\Media;
-use App\Models\Milestone;
 use App\Models\PlanIndicator;
 use App\Models\Project;
 use App\Models\Proposal;
@@ -83,59 +81,6 @@ test('project detail displays an em dash when no demographic breakdown exists', 
         ->assertSeeTextInOrder(['Headline target', '250', 'Demographic total', '—']);
 });
 
-test('project detail renders its milestones as a single delivery timeline', function () {
-    $user = User::factory()->role('General Manager')->create();
-    $project = Project::factory()->create();
-    $responsible = User::factory()->role('General Manager')->create();
-    Milestone::factory()->create([
-        'project_id' => $project->id,
-        'responsible_user_id' => $responsible->id,
-        'name' => 'Baseline assessment',
-        'status' => MilestoneStatus::Reached,
-        'sequence' => 1,
-    ]);
-    Milestone::factory()->create([
-        'project_id' => $project->id,
-        'responsible_user_id' => $responsible->id,
-        'name' => 'Household survey',
-        'status' => MilestoneStatus::Planned,
-        'sequence' => 2,
-    ]);
-
-    Livewire::actingAs($user)
-        ->test('pages::projects.show', ['project' => $project])
-        ->assertSet('tab', 'milestones')
-        ->assertSee('Baseline assessment')
-        ->assertSee('Household survey')
-        ->assertSee(MilestoneStatus::Reached->label())
-        ->assertSee(MilestoneStatus::Planned->label())
-        ->assertDontSee('data-tree-depth', false);
-});
-
-test('project detail shows weighted milestone progress in the header', function () {
-    $user = User::factory()->role('General Manager')->create();
-    $project = Project::factory()->create();
-    $responsible = User::factory()->role('General Manager')->create();
-    Milestone::factory()->create([
-        'project_id' => $project->id,
-        'responsible_user_id' => $responsible->id,
-        'status' => MilestoneStatus::Reached,
-        'weight_percentage' => 60,
-    ]);
-    Milestone::factory()->create([
-        'project_id' => $project->id,
-        'responsible_user_id' => $responsible->id,
-        'status' => MilestoneStatus::Planned,
-        'weight_percentage' => 40,
-    ]);
-
-    $this->actingAs($user)
-        ->get(route('projects.show', $project))
-        ->assertOk()
-        ->assertSeeText('60%')
-        ->assertSeeText('1 of 2 milestones reached');
-});
-
 test('project detail shows a not funded empty state with no linked proposals', function () {
     $user = User::factory()->role('General Manager')->create();
     $project = Project::factory()->create();
@@ -197,7 +142,7 @@ test('the project has no Risks tab; its risks show as a read-only awareness sect
     expect(collect($component->instance()->tabs)->pluck('key')->all())->not->toContain('risks');
 
     $component->set('tab', 'risks')->assertSet('tab', 'risks');
-    expect($component->instance()->deliveryTab)->toBe('milestones');
+    expect($component->instance()->deliveryTab)->toBe('tasks');
 });
 
 test('a project with no risks shows no awareness section', function () {
@@ -208,21 +153,18 @@ test('a project with no risks shows no awareness section', function () {
         ->assertDontSeeHtml('data-test="risk-awareness"');
 });
 
-test('project detail tasks tab shows tasks raised directly on the project and on its milestones, but not on other projects', function () {
+test('project detail tasks tab shows tasks raised directly on the project, but not on other projects', function () {
     $user = User::factory()->role('General Manager')->create();
     $project = Project::factory()->create();
-    $milestone = Milestone::factory()->create(['project_id' => $project->id]);
     $otherProject = Project::factory()->create();
 
     Task::factory()->create(['source_type' => 'project', 'source_id' => $project->id, 'title' => 'Sign the site access agreement']);
-    Task::factory()->create(['source_type' => 'milestone', 'source_id' => $milestone->id, 'title' => 'Deliver the milestone report']);
     Task::factory()->create(['source_type' => 'project', 'source_id' => $otherProject->id, 'title' => 'Unrelated project task']);
 
     Livewire::actingAs($user)
         ->test('pages::projects.show', ['project' => $project])
         ->set('tab', 'tasks')
         ->assertSee('Sign the site access agreement')
-        ->assertSee('Deliver the milestone report')
         ->assertDontSee('Unrelated project task');
 });
 
@@ -262,6 +204,30 @@ test('adding a task from the project show page requires a title but no assignee'
         ->call('addTask')
         ->assertHasErrors(['newTaskTitle'])
         ->assertHasNoErrors(['newTaskAssignedTo']);
+});
+
+test('a task added from the project page can ask for proof, off by default', function () {
+    $user = User::factory()->role('General Manager')->create();
+    $project = Project::factory()->create();
+
+    $page = Livewire::actingAs($user)
+        ->test('pages::projects.show', ['project' => $project])
+        ->set('tab', 'tasks')
+        ->call('openAddTaskModal')
+        ->assertSet('newTaskEvidenceRequired', false)
+        ->assertSeeHtml('data-test="new-project-task-proof-needed"')
+        ->set('newTaskTitle', 'Plain task')
+        ->call('addTask')
+        ->assertHasNoErrors();
+
+    $page->call('openAddTaskModal')
+        ->set('newTaskTitle', 'Distribution photos')
+        ->set('newTaskEvidenceRequired', true)
+        ->call('addTask')
+        ->assertHasNoErrors();
+
+    expect(Task::query()->where('title', 'Plain task')->sole()->evidence_required)->toBeFalse()
+        ->and(Task::query()->where('title', 'Distribution photos')->sole()->evidence_required)->toBeTrue();
 });
 
 test('project detail shows targets naming this project', function () {
@@ -453,7 +419,7 @@ test('project detail renders a project with nothing attached', function () {
         ->get(route('projects.show', $project))
         ->assertOk()
         ->assertSeeText('Bare Project')
-        ->assertSeeText('No milestones yet');
+        ->assertSeeText(__('projects.tasks_raised_against_this_project_will_appear_here'));
 });
 
 test('the project page shows a linked proposal\'s internal number and lists attachable ones by number', function () {

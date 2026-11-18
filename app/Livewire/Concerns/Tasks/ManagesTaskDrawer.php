@@ -11,7 +11,6 @@ use App\Enums\TaskPriority;
 use App\Enums\TaskStatus;
 use App\Livewire\Concerns\SavesTaskForm;
 use App\Models\HrEmployee;
-use App\Models\Milestone;
 use App\Models\Task;
 use Flux\Flux;
 use Illuminate\Support\Facades\Gate;
@@ -64,6 +63,9 @@ trait ManagesTaskDrawer
 
     public string $progressPercentage = '0';
 
+    /** Whether the task can only be marked done once a file is attached; only its creator changes it. */
+    public bool $evidenceRequired = false;
+
     /** @var array<int, string> */
     public array $assignedTo = [];
 
@@ -92,12 +94,11 @@ trait ManagesTaskDrawer
     }
 
     /**
-     * Opens the create drawer. With no milestone context, "Related to" is
-     * prefilled the same way the inline row resolves it (active source
+     * Opens the create drawer. "Related to" is prefilled the same way the inline row resolves it (active source
      * filter, else the viewer's department) and the viewer is the default
      * assignee, so a task can be saved after typing only a title.
      */
-    public function openCreateDrawer(?string $dueDate = null, ?string $status = null, ?string $milestoneId = null): void
+    public function openCreateDrawer(?string $dueDate = null, ?string $status = null): void
     {
         Gate::authorize('create', Task::class);
 
@@ -111,10 +112,7 @@ trait ManagesTaskDrawer
             $this->taskStatus = $status;
         }
 
-        if ($milestoneId !== null && Milestone::query()->whereKey((int) $milestoneId)->exists()) {
-            $this->taskSourceType = 'milestone';
-            $this->taskSourceId = $milestoneId;
-        } elseif ($milestoneId === null && ($source = $this->resolveInlineSource(null)) !== null) {
+        if (($source = $this->resolveInlineSource()) !== null) {
             $this->taskSourceType = $source['type'];
             $this->taskSourceId = (string) $source['id'];
         }
@@ -129,7 +127,7 @@ trait ManagesTaskDrawer
     public function openEditDrawer(int $taskId): void
     {
         $task = Task::query()
-            ->select(['id', 'parent_task_id', 'source_type', 'source_id', 'title', 'description', 'status', 'priority', 'start_date', 'due_date', 'completed_date', 'progress_percentage', 'created_by', 'department_id'])
+            ->select(['id', 'parent_task_id', 'source_type', 'source_id', 'title', 'description', 'status', 'priority', 'start_date', 'due_date', 'completed_date', 'progress_percentage', 'evidence_required', 'created_by', 'department_id'])
             ->with('taskAssignees:id,task_id,employee_id')
             ->findOrFail($taskId);
 
@@ -146,6 +144,7 @@ trait ManagesTaskDrawer
         $this->dueDate = $task->due_date?->toDateString() ?? '';
         $this->completedDate = $task->completed_date?->toDateString() ?? '';
         $this->progressPercentage = (string) $task->progress_percentage;
+        $this->evidenceRequired = $task->evidence_required;
         $this->assignedTo = $task->taskAssignees->pluck('employee_id')->map(fn (int $id): string => (string) $id)->all();
         $this->taskSourceType = $task->source_type;
         $this->taskSourceId = (string) $task->source_id;
@@ -358,6 +357,7 @@ trait ManagesTaskDrawer
         $this->dueDate = '';
         $this->completedDate = '';
         $this->progressPercentage = '0';
+        $this->evidenceRequired = false;
         $this->assignedTo = [];
         $this->taskSourceType = '';
         $this->taskSourceId = '';

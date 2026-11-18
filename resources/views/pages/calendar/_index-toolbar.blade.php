@@ -59,7 +59,6 @@
                         class="filter-menu absolute end-0 z-30 mt-1 min-w-44 rounded-lg border p-[.3125rem] shadow-xs"
                     >
                         @foreach ([
-                            ['milestone', 'showMilestones', 'tasks.milestone', 'calendar-filter-milestones'],
                             ['task', 'showTasks', 'tasks.task', 'calendar-filter-tasks'],
                             ['report', 'showReports', 'calendar.report_deadline', 'calendar-filter-reports'],
                             ['monthly_report', 'showMonthlyReports', 'calendar.monthly_report_due', 'calendar-filter-monthly-reports'],
@@ -140,12 +139,6 @@
             <flux:dropdown position="bottom-end" class="filter-picker">
                 <x-ui.button tone="primary" icon="plus" icon:trailing="chevron-down" data-test="calendar-add-button">{{ __('common.add') }}</x-ui.button>
                 <flux:menu class="filter-menu">
-                    @if ($canAddMilestone)
-                        <flux:menu.item wire:click="openCreateModal" data-test="calendar-add-milestone-button">
-                            <flux:icon.flag variant="micro" class="size-4" />
-                            {{ __('milestones.add_milestone') }}
-                        </flux:menu.item>
-                    @endif
                     @if ($canAddTask)
                         <flux:menu.item wire:click="openCreateTaskModal" data-test="calendar-add-task-button">
                             <flux:icon.clipboard-document-check variant="micro" class="size-4" />

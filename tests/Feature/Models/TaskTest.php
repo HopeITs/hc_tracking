@@ -2,44 +2,34 @@
 
 use App\Enums\TaskStatus;
 use App\Models\HrEmployee;
-use App\Models\Milestone;
-use App\Models\Proposal;
+use App\Models\Project;
 use App\Models\Task;
 use App\Models\TaskAttachment;
 use App\Models\User;
 use Carbon\CarbonImmutable;
 
 test('a task resolves its polymorphic source', function () {
-    $milestone = Milestone::factory()->create();
+    $sourceProject = Project::factory()->create();
 
     $task = Task::factory()->create([
-        'source_type' => 'milestone',
-        'source_id' => $milestone->id,
+        'source_type' => 'project',
+        'source_id' => $sourceProject->id,
     ]);
 
-    expect($task->source)->toBeInstanceOf(Milestone::class)
-        ->and($task->source->id)->toBe($milestone->id)
-        ->and($task->sourceLabel())->toBe($milestone->name);
+    expect($task->source)->toBeInstanceOf(Project::class)
+        ->and($task->source->id)->toBe($sourceProject->id)
+        ->and($task->sourceLabel())->toBe($sourceProject->name);
 });
 
 test('a task sourceLabel falls back to no source when the source no longer exists', function () {
-    $milestone = Milestone::factory()->create();
+    $sourceProject = Project::factory()->create();
     $task = Task::factory()->create([
-        'source_type' => 'milestone',
-        'source_id' => $milestone->id,
+        'source_type' => 'project',
+        'source_id' => $sourceProject->id,
     ]);
-    $milestone->delete();
+    $sourceProject->delete();
 
     expect($task->fresh()->sourceLabel())->toBe(__('tasks.no_source'));
-});
-
-test('sourceProjectId resolves the project only when the source is a milestone', function () {
-    $milestone = Milestone::factory()->create();
-    $milestoneTask = Task::factory()->create(['source_type' => 'milestone', 'source_id' => $milestone->id]);
-    $proposalTask = Task::factory()->create(['source_type' => 'proposal', 'source_id' => Proposal::factory()->create()->id]);
-
-    expect($milestoneTask->sourceProjectId())->toBe($milestone->project_id)
-        ->and($proposalTask->sourceProjectId())->toBeNull();
 });
 
 test('a task resolves its hr employee assignees and its user creator separately', function () {
@@ -83,14 +73,14 @@ test('a task can have subtasks and each resolves its parent', function () {
 });
 
 test('a subtask inherits its parent source through the factory helper', function () {
-    $milestone = Milestone::factory()->create();
-    $parent = Task::factory()->create(['source_type' => 'milestone', 'source_id' => $milestone->id]);
+    $sourceProject = Project::factory()->create();
+    $parent = Task::factory()->create(['source_type' => 'project', 'source_id' => $sourceProject->id]);
 
     $subtask = Task::factory()->subtaskOf($parent)->create();
 
     expect($subtask->parent_task_id)->toBe($parent->id)
-        ->and($subtask->source_type)->toBe('milestone')
-        ->and($subtask->source_id)->toBe($milestone->id);
+        ->and($subtask->source_type)->toBe('project')
+        ->and($subtask->source_id)->toBe($sourceProject->id);
 });
 
 test('a task assignee resolves its task and its hr employee', function () {

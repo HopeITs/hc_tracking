@@ -4,7 +4,6 @@ use App\Models\AnnualPlan;
 use App\Models\Donor;
 use App\Models\DonorProposal;
 use App\Models\DonorReport;
-use App\Models\Milestone;
 use App\Models\MonthlyReport;
 use App\Models\Program;
 use App\Models\Report;
@@ -28,7 +27,6 @@ test('every record opens as its own full page, not a sheet over its register', f
     'donor report compose' => fn () => route('donor-reports.compose'),
     'donor' => fn () => route('donors.show', Donor::factory()->create()),
     'funding agreement' => fn () => route('funding-agreements.show', DonorProposal::factory()->create()),
-    'milestone' => fn () => route('milestones.show', Milestone::factory()->create()),
     'monthly report' => fn () => route('monthly-reports.show', MonthlyReport::factory()->create()),
     'report' => fn () => route('reports.show', Report::factory()->create()),
     'task' => fn () => route('tasks.show', Task::factory()->create()),

@@ -9,8 +9,8 @@ use Livewire\Attributes\Computed;
 use Livewire\Component;
 
 /**
- * My to-do: a private list on user_todos. The viewer adds, ticks, drags and
- * removes their own lines; done ones sink below the open ones until "Clear
+ * My to-do: a private list on user_todos. The viewer adds, edits, ticks,
+ * drags and removes their own lines; done ones sink below the open ones until "Clear
  * done". Every action reads through auth()->user()->todos(), so another
  * user's id finds nothing. No sharing, no activity, no notifications.
  */
@@ -46,6 +46,31 @@ new class extends Component {
             'title' => $title,
             'sort_order' => (int) $user->todos()->open()->max('sort_order') + 1,
         ]);
+
+        unset($this->todos);
+
+        return true;
+    }
+
+    /**
+     * Rewrites a line's text in place; true once it is saved. The same rules
+     * as add() apply, minus the list-is-full check.
+     */
+    public function rename(int $id, string $title): bool
+    {
+        $title = trim($title);
+        $todo = auth()->user()->todos()->whereKey($id)->firstOrFail();
+
+        Validator::make(
+            ['title' => $title],
+            ['title' => ['required', 'string', 'max:'.self::MaxLength]],
+            [
+                'title.required' => __('desk-cards.todo.required'),
+                'title.max' => __('desk-cards.todo.too_long', ['max' => self::MaxLength]),
+            ],
+        )->validate();
+
+        $todo->forceFill(['title' => $title])->save();
 
         unset($this->todos);
 
@@ -136,6 +161,11 @@ new class extends Component {
 <x-desk.panel :empty="$empty" id="todo" class="dk-todo-panel" :filterable="false" :count="$open->count()" :size="$size" :cols="$gridCols" :height="$gridRows" :index="$index" :total="$total">
     <div class="dk-todo" x-data="{
         draft: '',
+        editing: null,
+        editDraft: '',
+        edit(id, title) { this.editing = id; this.editDraft = title; this.$nextTick(() => this.$root.querySelector(`[data-todo-edit='${id}']`)?.select()) },
+        cancelEdit() { this.editing = null; this.editDraft = '' },
+        saveEdit(id) { $wire.rename(id, this.editDraft).then((saved) => { if (saved === true) { this.cancelEdit() } }) },
         save() { $wire.add(this.draft).then((saved) => { if (saved === true) { this.draft = '' } }) },
         drop(event, id) {
             const rows = [...this.$root.querySelectorAll('[data-todo-row]')];
@@ -172,11 +202,16 @@ new class extends Component {
                     @foreach ($open as $todo)
                         <li class="dk-todo-row" wire:key="todo-{{ $todo->id }}" wire:sort:item="{{ $todo->id }}">
                             <span class="dk-todo-grip" wire:sort:handle title="{{ __('desk-cards.todo.drag') }}" aria-hidden="true"><x-desk.icon name="grip" /></span>
-                            <button type="button" class="dk-todo-check" role="checkbox" aria-checked="false" wire:click="toggle({{ $todo->id }})" x-on:keydown.delete.prevent="drop($event, {{ $todo->id }})" aria-keyshortcuts="Delete" data-todo-row>
+                            <form class="dk-todo-edit" x-show="editing === {{ $todo->id }}" x-cloak x-on:submit.prevent="saveEdit({{ $todo->id }})">
+                                <label for="dk-todo-edit-{{ $index }}-{{ $todo->id }}" class="sr-only">{{ __('desk-cards.todo.edit', ['title' => $todo->title]) }}</label>
+                                <input id="dk-todo-edit-{{ $index }}-{{ $todo->id }}" type="text" class="dk-todo-input" x-model="editDraft" maxlength="{{ $this::MaxLength }}" autocomplete="off" x-on:keydown.escape.prevent.stop="cancelEdit()" x-on:blur="editing === {{ $todo->id }} && saveEdit({{ $todo->id }})" data-todo-edit="{{ $todo->id }}">
+                            </form>
+                            <button type="button" class="dk-todo-check" role="checkbox" aria-checked="false" x-show="editing !== {{ $todo->id }}" wire:click="toggle({{ $todo->id }})" x-on:keydown.delete.prevent="drop($event, {{ $todo->id }})" x-on:keydown.f2.prevent="edit({{ $todo->id }}, @js($todo->title))" aria-keyshortcuts="Delete F2" data-todo-row>
                                 <i aria-hidden="true"></i>
-                                <span class="dk-todo-t">{{ $todo->title }}</span>
+                                <span class="dk-todo-t" x-on:dblclick.stop.prevent="edit({{ $todo->id }}, @js($todo->title))">{{ $todo->title }}</span>
                             </button>
-                            <button type="button" class="dk-iconbtn dk-sm dk-todo-x" wire:click="remove({{ $todo->id }})" tabindex="-1" aria-label="{{ __('desk-cards.todo.remove', ['title' => $todo->title]) }}"><x-desk.icon name="x" /></button>
+                            <button type="button" class="dk-iconbtn dk-sm dk-todo-x" x-show="editing !== {{ $todo->id }}" x-on:click="edit({{ $todo->id }}, @js($todo->title))" tabindex="-1" aria-label="{{ __('desk-cards.todo.edit', ['title' => $todo->title]) }}" title="{{ __('desk-cards.todo.edit_hint') }}" data-todo-edit-button><x-desk.icon name="edit" /></button>
+                            <button type="button" class="dk-iconbtn dk-sm dk-todo-x" x-show="editing !== {{ $todo->id }}" wire:click="remove({{ $todo->id }})" tabindex="-1" aria-label="{{ __('desk-cards.todo.remove', ['title' => $todo->title]) }}"><x-desk.icon name="x" /></button>
                         </li>
                     @endforeach
                 </ul>

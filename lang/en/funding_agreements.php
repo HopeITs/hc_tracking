@@ -94,7 +94,6 @@ return [
     'late' => 'Late',
     'left_of_the_promise' => 'Left of the promise',
     'mark_submitted' => 'Mark submitted',
-    'milestones_reached' => ':reached/:total milestones',
     'month_inflow_label' => ':month: :total :currency expected. :received received, :pending pending, :late late, :failed failed. Highlight its tranches.',
     'most_urgent_first' => 'most urgent first',
     'name_the_report' => 'Name the report.',

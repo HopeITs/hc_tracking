@@ -108,8 +108,6 @@
             <p class="dk-ptk-meta">
                 @if ($parentTitle !== null)
                     <span class="truncate">{{ __('programs.tasks_subtask_of', ['title' => $parentTitle]) }}</span>
-                @elseif ($task->source_type === 'milestone')
-                    <span class="truncate" title="{{ __('programs.tasks_milestone', ['name' => $task->sourceLabel()]) }}" data-task-milestone="{{ $task->id }}"><x-desk.icon name="milestone" />{{ $task->sourceLabel() }}</span>
                 @endif
             </p>
         </div>

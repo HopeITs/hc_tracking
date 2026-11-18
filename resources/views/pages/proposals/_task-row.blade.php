@@ -47,8 +47,8 @@
             $inkText => ! $isDone,
         ])>{{ $task->title }}</a>
         <p class="mt-0.5 flex flex-wrap items-center gap-x-1.5 gap-y-0.5 text-xs {{ $mutedText }}">
-            {{-- Redundant to name this proposal again on a proposal-scoped tab, so the source line only shows for milestone-sourced tasks. --}}
-            @if ($task->source_type === 'milestone')
+            {{-- Redundant to name this proposal again on a proposal-scoped tab, so the source line only shows for project-sourced tasks. --}}
+            @if ($task->source_type === 'project')
                 <span class="min-w-0 truncate">{{ $task->sourceLabel() }}</span>
             @endif
             @if ($isDepartmentTask)

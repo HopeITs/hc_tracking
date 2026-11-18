@@ -18,11 +18,7 @@
                         <span class="size-2 rounded-full {{ $typeDotClasses[$item['type']] }}"></span>
                     </span>
                     <div class="min-w-0 flex-1">
-                        @if ($item['kind'] === 'modal-milestone')
-                            <button type="button" wire:click="closeDayDetail(); openEditModal({{ $item['id'] }})" class="block w-full min-w-0 truncate text-start text-xs font-semibold hover:text-primary hover:underline dark:hover:text-status-critical" data-test="calendar-daydetail-item-{{ $item['id'] }}">
-                                {{ $item['title'] }}
-                            </button>
-                        @elseif ($item['kind'] === 'modal-task')
+                        @if ($item['kind'] === 'modal-task')
                             <button type="button" wire:click="closeDayDetail(); openEditTaskModal({{ $item['id'] }})" class="block w-full min-w-0 truncate text-start text-xs font-semibold hover:text-primary hover:underline dark:hover:text-status-critical" data-test="calendar-daydetail-item-{{ $item['id'] }}">
                                 {{ $item['title'] }}
                             </button>

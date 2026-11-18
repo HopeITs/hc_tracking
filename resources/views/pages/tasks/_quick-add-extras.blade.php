@@ -7,12 +7,11 @@
     first text input inside it.
 
     @var string|null $defaultStatus
-    @var string|null $milestoneId  The row's own milestone, when it has one.
     @var string $rowKey
     @var string $testKey
 --}}
 @php
-    $relatedToLabel = $milestoneId === null ? $this->inlineDefaultSourceLabel : null;
+    $relatedToLabel = $this->inlineDefaultSourceLabel;
     $typedTitle = "\$el.closest('[data-quick-add-row]').querySelector('input[type=text]').value";
 @endphp
 @if ($relatedToLabel !== null)
@@ -27,7 +26,7 @@
 @endif
 <button
     type="button"
-    x-on:click="$wire.openQuickTaskInDrawer({{ $typedTitle }}, {{ Js::from($defaultStatus) }}, {{ Js::from($milestoneId) }}, {{ Js::from($rowKey) }})"
+    x-on:click="$wire.openQuickTaskInDrawer({{ $typedTitle }}, {{ Js::from($defaultStatus) }}, {{ Js::from($rowKey) }})"
     class="inline-flex shrink-0 items-center gap-1 rounded px-1.5 py-0.5 text-[11px] font-semibold text-secondary-medium hover:bg-secondary-soft hover:text-secondary-dark dark:text-ink-muted dark:hover:bg-surface-2 dark:hover:text-ink"
     data-test="task-quick-add-more-{{ $testKey }}"
 >

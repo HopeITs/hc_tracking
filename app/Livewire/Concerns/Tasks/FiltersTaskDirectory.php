@@ -368,9 +368,6 @@ trait FiltersTaskDirectory
         return match ($this->group) {
             'status' => $this->orderByEnumSequence($query, 'status', ['todo', 'in progress', 'under review', 'done'], 'asc'),
             'priority' => $this->orderByEnumSequence($query, 'priority', ['high', 'medium', 'low'], 'asc'),
-            'milestone' => $query
-                ->orderByRaw("(case when source_type = 'milestone' then source_id end) is null")
-                ->orderByRaw("(case when source_type = 'milestone' then source_id end)"),
             'assignee' => $this->orderByAssigneeGroup($query),
             default => $query,
         };

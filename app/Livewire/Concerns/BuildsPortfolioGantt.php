@@ -10,10 +10,8 @@ use App\Enums\ProposalStatus;
 use App\Models\Donor;
 use App\Models\DonorProposal;
 use App\Models\HrEmployee;
-use App\Models\Milestone;
 use App\Models\Project;
 use App\Models\Proposal;
-use App\Models\ScheduleDependency;
 use Carbon\CarbonImmutable;
 use Illuminate\Database\Eloquent\Collection as EloquentCollection;
 use Illuminate\Support\Collection;
@@ -22,9 +20,7 @@ use Illuminate\Support\Collection;
  * Read-only Gantt payloads that look across projects, for the Timeline page
  * and the funding agreement page:
  *
- * - portfolio: project groups (by program, status or owner) → project →
- *   milestone tree, with each project's links, total float, critical path and
- *   MS-Project predecessors text;
+ * - portfolio: project groups (by program, status or owner) → project;
  * - connected: the portfolio with the money around it — the proposals that
  *   fund those projects on top, their transfers and donor reports below, and
  *   `relations` tying each proposal to the projects it funds and each
@@ -54,12 +50,11 @@ trait BuildsPortfolioGantt
     protected function portfolioGanttPayload(?int $programId = null, ?string $status = null, string $groupBy = 'program'): array
     {
         $projects = $this->timelineProjects($programId, $status);
-        $milestones = $this->timelineMilestones($projects);
 
         $rows = $this->newGanttRows();
-        $this->pushProjectGroups($projects, $milestones, $groupBy, $rows);
+        $this->pushProjectGroups($projects, $groupBy, $rows);
 
-        return $this->readOnlyPayload($rows, $this->decoratePortfolioSchedule($projects, $milestones, $rows));
+        return $this->readOnlyPayload($rows, []);
     }
 
     /**
@@ -74,7 +69,6 @@ trait BuildsPortfolioGantt
     protected function connectedGanttPayload(?int $programId = null, ?string $status = null, string $groupBy = 'program'): array
     {
         $projects = $this->timelineProjects($programId, $status);
-        $milestones = $this->timelineMilestones($projects);
         $projectIds = $projects->modelKeys();
 
         $proposals = ! $this->ganttViewerCan('proposals.view') ? new EloquentCollection : Proposal::query()
@@ -102,11 +96,10 @@ trait BuildsPortfolioGantt
             $this->rollUp($rows, 0);
         }
 
-        $this->pushProjectGroups($projects, $milestones, $groupBy, $rows);
-        $links = $this->decoratePortfolioSchedule($projects, $milestones, $rows);
+        $this->pushProjectGroups($projects, $groupBy, $rows);
         $this->pushObligationRows(array_values($proposals->map(fn (Proposal $proposal): int => $proposal->id)->all()), $rows, $relations);
 
-        return $this->readOnlyPayload($rows, $links, array_values($relations->all()));
+        return $this->readOnlyPayload($rows, [], array_values($relations->all()));
     }
 
     /**
@@ -210,13 +203,11 @@ trait BuildsPortfolioGantt
                 ->get();
 
             if ($projects->isNotEmpty()) {
-                $milestones = $this->timelineMilestones($projects);
-
                 $groupAt = $rows->count();
                 $rows->push($this->ganttGroupRow('delivery', '2', __('gantt.delivery')));
 
                 foreach ($projects->values() as $index => $project) {
-                    $this->pushProjectBranch($project, $milestones->get($project->id, collect()), 'delivery', 1, '2.'.($index + 1), $rows);
+                    $this->pushProjectBranch($project, 'delivery', 1, '2.'.($index + 1), $rows);
                 }
 
                 $this->rollUp($rows, $groupAt);
@@ -225,7 +216,7 @@ trait BuildsPortfolioGantt
 
         $this->pushObligationRows($agreement->id, $rows);
 
-        return $this->readOnlyPayload($rows, $this->linksBetween($rows));
+        return $this->readOnlyPayload($rows, []);
     }
 
     /**
@@ -246,34 +237,14 @@ trait BuildsPortfolioGantt
     }
 
     /**
-     * Every milestone of the given projects, grouped by project id.
-     *
-     * @param  EloquentCollection<int, Project>  $projects
-     * @return Collection<array-key, Collection<int, Milestone>>
-     */
-    private function timelineMilestones(EloquentCollection $projects): Collection
-    {
-        return Milestone::query()
-            ->select(['id', 'project_id', 'parent_milestone_id', 'name', 'planned_start_date', 'planned_end_date', 'actual_start_date', 'actual_end_date', 'status', 'sequence', 'responsible_user_id'])
-            ->whereIn('project_id', $projects->modelKeys())
-            ->with('responsibleUser:id,first_name_en,last_name_en,first_name_ar,last_name_ar')
-            ->orderBy('sequence')
-            ->orderBy('id')
-            ->get()
-            ->toBase()
-            ->groupBy(fn (Milestone $milestone): int => (int) $milestone->project_id);
-    }
-
-    /**
      * One group row per program, status or owner, each followed by its
-     * projects and their milestone trees. Group numbering continues after
+     * projects. Group numbering continues after
      * whatever top-level rows are already on the chart.
      *
      * @param  EloquentCollection<int, Project>  $projects
-     * @param  Collection<array-key, Collection<int, Milestone>>  $milestones
      * @param  Collection<int, GanttRow>  $rows
      */
-    private function pushProjectGroups(EloquentCollection $projects, Collection $milestones, string $groupBy, Collection $rows): void
+    private function pushProjectGroups(EloquentCollection $projects, string $groupBy, Collection $rows): void
     {
         $groupIndex = $rows->where('depth', 0)->count();
 
@@ -283,7 +254,7 @@ trait BuildsPortfolioGantt
             $rows->push($this->ganttGroupRow($group['id'], (string) $groupIndex, $group['name']));
 
             foreach ($group['projects']->values() as $index => $project) {
-                $this->pushProjectBranch($project, $milestones->get($project->id, collect()), $group['id'], 1, $groupIndex.'.'.($index + 1), $rows);
+                $this->pushProjectBranch($project, $group['id'], 1, $groupIndex.'.'.($index + 1), $rows);
             }
 
             $this->rollUp($rows, $groupAt);
@@ -342,14 +313,12 @@ trait BuildsPortfolioGantt
     }
 
     /**
-     * One project summary row followed by its milestone tree.
+     * One project summary row.
      *
-     * @param  Collection<int, Milestone>  $milestones
      * @param  Collection<int, GanttRow>  $rows
      */
-    private function pushProjectBranch(Project $project, Collection $milestones, string $parentRowId, int $depth, string $wbs, Collection $rows): void
+    private function pushProjectBranch(Project $project, string $parentRowId, int $depth, string $wbs, Collection $rows): void
     {
-        $at = $rows->count();
         $rowId = 'project-'.$project->id;
 
         $rows->push($this->ganttRow(
@@ -371,14 +340,6 @@ trait BuildsPortfolioGantt
             'planUrl' => route('projects.show', $project),
             'program' => $project->relationLoaded('program') ? $project->program?->name : null,
         ]);
-
-        if ($milestones->isEmpty()) {
-            return;
-        }
-
-        $byParent = $milestones->groupBy(fn (Milestone $milestone): int => (int) $milestone->parent_milestone_id);
-        $this->pushMilestoneBranch($byParent, collect(), collect(), 0, $rowId, $depth + 1, $wbs, 0, $rows);
-        $this->rollUp($rows, $at);
     }
 
     /**
@@ -437,108 +398,6 @@ trait BuildsPortfolioGantt
     private function newGanttRelations(): Collection
     {
         return new Collection;
-    }
-
-    /**
-     * Give each project's milestones the MS Project schedule reading the
-     * project Plan tab shows — total float, critical flag and predecessors
-     * text — worked on that project's own working week, and return the links
-     * whose two ends are both on the chart.
-     *
-     * @param  EloquentCollection<int, Project>  $projects
-     * @param  Collection<array-key, Collection<int, Milestone>>  $milestones
-     * @param  Collection<int, GanttRow>  $rows
-     * @return list<array<string, mixed>>
-     */
-    private function decoratePortfolioSchedule(EloquentCollection $projects, Collection $milestones, Collection $rows): array
-    {
-        if ($milestones->isEmpty()) {
-            return [];
-        }
-
-        $byId = $rows->keyBy('id');
-        $links = ScheduleDependency::query()
-            ->whereIn('project_id', $projects->modelKeys())
-            ->where('predecessor_type', 'milestone')
-            ->where('successor_type', 'milestone')
-            ->orderBy('id')
-            ->get()
-            ->filter(fn (ScheduleDependency $link): bool => $byId->has($link->predecessorRowId()) && $byId->has($link->successorRowId()));
-
-        $float = [];
-
-        foreach ($projects as $project) {
-            $items = [];
-
-            foreach ($milestones->get($project->id, collect()) as $milestone) {
-                $row = $byId->get('milestone-'.$milestone->id);
-
-                if ($row !== null && $row['start'] !== null && $row['end'] !== null) {
-                    $items[$row['id']] = ['start' => $this->dayNumber($row['start']), 'end' => $this->dayNumber($row['end'])];
-                }
-            }
-
-            $float += $this->totalFloat($items, $links->where('project_id', $project->id), $this->weekendDays($project));
-        }
-
-        $predecessors = [];
-
-        foreach ($links as $link) {
-            $lag = $link->lag_days === 0 ? '' : sprintf('%+dd', $link->lag_days);
-            $predecessors[$link->successorRowId()][] = $byId[$link->predecessorRowId()]['wbs'].$link->type->code().$lag;
-        }
-
-        $rows->transform(function (array $row) use ($float, $predecessors): array {
-            if ($row['kind'] !== 'milestone') {
-                return $row;
-            }
-
-            $row['float'] = $float[$row['id']] ?? null;
-            $row['critical'] = isset($float[$row['id']]) && $float[$row['id']] <= 0 && $row['progress'] < 100;
-            $row['predecessors'] = implode(', ', $predecessors[$row['id']] ?? []);
-
-            return $row;
-        });
-
-        return array_values($links->map(fn (ScheduleDependency $link): array => [
-            'id' => $link->id,
-            'from' => $link->predecessorRowId(),
-            'to' => $link->successorRowId(),
-            'type' => $link->type->value,
-            'lag' => $link->lag_days,
-            'label' => $link->type->label(),
-        ])->all());
-    }
-
-    /**
-     * Links whose two ends are both on the chart.
-     *
-     * @param  Collection<int, GanttRow>  $rows
-     * @return list<array<string, mixed>>
-     */
-    private function linksBetween(Collection $rows): array
-    {
-        $ids = $rows->pluck('id')->flip();
-        $milestoneIds = $rows->where('kind', 'milestone')->map(fn (array $row): int => (int) substr($row['id'], strlen('milestone-')))->values();
-
-        if ($milestoneIds->isEmpty()) {
-            return [];
-        }
-
-        return array_values(ScheduleDependency::query()
-            ->where('predecessor_type', 'milestone')->whereIn('predecessor_id', $milestoneIds)
-            ->where('successor_type', 'milestone')->whereIn('successor_id', $milestoneIds)
-            ->get()
-            ->filter(fn (ScheduleDependency $link): bool => $ids->has($link->predecessorRowId()) && $ids->has($link->successorRowId()))
-            ->map(fn (ScheduleDependency $link): array => [
-                'id' => $link->id,
-                'from' => $link->predecessorRowId(),
-                'to' => $link->successorRowId(),
-                'type' => $link->type->value,
-                'lag' => $link->lag_days,
-                'label' => $link->type->label(),
-            ])
-            ->all());
     }
 
     /**

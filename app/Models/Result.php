@@ -113,16 +113,6 @@ class Result extends Model implements TracksActivity
     }
 
     /**
-     * The milestones that deliver this activity.
-     *
-     * @return HasMany<Milestone, $this>
-     */
-    public function milestones(): HasMany
-    {
-        return $this->hasMany(Milestone::class, 'result_id');
-    }
-
-    /**
      * The months this activity is scheduled in: the proposal calendar and
      * every center override (see ActivitySchedule).
      *

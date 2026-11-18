@@ -6,7 +6,6 @@ use App\Enums\MediaCollection;
 use App\Enums\ProposalStatus;
 use App\Models\Donor;
 use App\Models\Media;
-use App\Models\Milestone;
 use App\Models\Proposal;
 use App\Models\User;
 use Carbon\CarbonImmutable;
@@ -14,15 +13,14 @@ use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Validation\ValidationException;
 
 /**
- * An active proposal whose final-report milestone is reached.
+ * An active proposal waiting for its final report.
  */
-function activeProposalWithFinalMilestone(bool $selfFunded = false): Proposal
+function activeProposalAwaitingFinalReport(bool $selfFunded = false): Proposal
 {
     $proposal = Proposal::factory()->create([
         'status' => ProposalStatus::Active,
         'donor_id' => Donor::factory()->create(['is_internal' => $selfFunded])->id,
     ]);
-    Milestone::factory()->reached()->create(['proposal_id' => $proposal->id, 'is_final_report' => true]);
 
     return $proposal;
 }
@@ -43,7 +41,7 @@ beforeEach(fn () => $this->travelTo('2026-10-13 10:00:00'));
 
 test('closing needs the final report file', function () {
     $actor = userWithRole('Financial');
-    $proposal = activeProposalWithFinalMilestone();
+    $proposal = activeProposalAwaitingFinalReport();
 
     expect(fn () => closeProposal($actor, $proposal))->toThrow(ValidationException::class, __('proposals.final_report_required'));
     expect($proposal->fresh()->status)->toBe(ProposalStatus::Active);
@@ -51,25 +49,16 @@ test('closing needs the final report file', function () {
 
 test('closing needs the donor acceptance when the donor is external', function () {
     $actor = userWithRole('Financial');
-    $proposal = activeProposalWithFinalMilestone();
+    $proposal = activeProposalAwaitingFinalReport();
     fileOnProposal($proposal, MediaCollection::FinalReport, $actor);
 
     expect(fn () => closeProposal($actor, $proposal))->toThrow(ValidationException::class, __('proposals.final_report_required'));
     expect($proposal->fresh()->status)->toBe(ProposalStatus::Active);
 });
 
-test('closing needs the final-report milestone reached', function () {
-    $actor = userWithRole('Financial');
-    $proposal = activeProposalWithFinalMilestone(selfFunded: true);
-    Milestone::query()->where('proposal_id', $proposal->id)->update(['status' => 'ongoing']);
-    fileOnProposal($proposal, MediaCollection::FinalReport, $actor);
-
-    expect(fn () => closeProposal($actor, $proposal))->toThrow(ValidationException::class, __('proposals.final_report_required'));
-});
-
 test('file and recorded acceptance close the proposal without the acceptance email', function () {
     $actor = userWithRole('Financial');
-    $proposal = activeProposalWithFinalMilestone();
+    $proposal = activeProposalAwaitingFinalReport();
     fileOnProposal($proposal, MediaCollection::FinalReport, $actor);
     $this->actingAs($actor);
     app(RecordFinalReportAcceptance::class)->handle($proposal, CarbonImmutable::parse('2026-10-10'));
@@ -79,9 +68,9 @@ test('file and recorded acceptance close the proposal without the acceptance ema
     expect($proposal->fresh()->status)->toBe(ProposalStatus::Completed);
 });
 
-test('a self-funded proposal closes with the milestone and the file only', function () {
+test('a self-funded proposal closes with the file only', function () {
     $actor = userWithRole('Financial');
-    $proposal = activeProposalWithFinalMilestone(selfFunded: true);
+    $proposal = activeProposalAwaitingFinalReport(selfFunded: true);
     fileOnProposal($proposal, MediaCollection::FinalReport, $actor);
 
     closeProposal($actor, $proposal);
@@ -91,7 +80,7 @@ test('a self-funded proposal closes with the milestone and the file only', funct
 
 test('recording the acceptance stores the date and the acceptor and logs it', function () {
     $actor = userWithRole('Public Relations Manager');
-    $proposal = activeProposalWithFinalMilestone();
+    $proposal = activeProposalAwaitingFinalReport();
     fileOnProposal($proposal, MediaCollection::FinalReport, $actor);
     $this->actingAs($actor);
 
@@ -106,7 +95,7 @@ test('recording the acceptance stores the date and the acceptor and logs it', fu
 
 test('the acceptance cannot be recorded before the final report is filed or in the future', function (bool $withFile, string $acceptedOn, string $message) {
     $actor = userWithRole('Financial');
-    $proposal = activeProposalWithFinalMilestone();
+    $proposal = activeProposalAwaitingFinalReport();
     if ($withFile) {
         fileOnProposal($proposal, MediaCollection::FinalReport, $actor);
     }
@@ -121,7 +110,7 @@ test('the acceptance cannot be recorded before the final report is filed or in t
 ]);
 
 test('a user without proposals.update cannot record the acceptance', function () {
-    $proposal = activeProposalWithFinalMilestone();
+    $proposal = activeProposalAwaitingFinalReport();
     fileOnProposal($proposal, MediaCollection::FinalReport, userWithRole('Financial'));
     $this->actingAs(userWithRole('Managers'));
 

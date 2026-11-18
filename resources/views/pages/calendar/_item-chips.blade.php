@@ -4,7 +4,6 @@
      * @var array<string, mixed> $calendar
      */
     $dateKey = $day->toDateString();
-    $dayMilestones = $calendar['milestonesByDay']->get($dateKey, new \Illuminate\Support\Collection);
     $dayTasks = $calendar['tasksByDay']->get($dateKey, new \Illuminate\Support\Collection);
     $dayReports = $calendar['reportsByDay']->get($dateKey, new \Illuminate\Support\Collection);
     $dayMonthlyReports = $calendar['monthlyReportsByDay']->get($dateKey, new \Illuminate\Support\Collection);
@@ -17,24 +16,6 @@
     $dayProjectEnds = $calendar['projectEndsByDay']->get($dateKey, new \Illuminate\Support\Collection);
     $canOpenAgreement = auth()->user()->can('funding-agreements.view');
 @endphp
-
-@foreach ($dayMilestones as $milestone)
-    <div wire:key="calendar-milestone-{{ $milestone->id }}" class="group flex items-center gap-1 rounded px-1.5 py-0.5 text-[10px] {{ $markerTone($milestone) }}">
-        <span class="size-1.5 shrink-0 rounded-full {{ $typeDotClasses['milestone'] }}"></span>
-        <flux:icon.flag variant="micro" class="size-3 shrink-0" />
-        <button type="button" wire:click.stop="openEditModal({{ $milestone->id }})" class="min-w-0 flex-1 cursor-pointer truncate text-start font-medium" data-test="calendar-milestone-{{ $milestone->id }}">
-            {{ $milestone->name }}
-        </button>
-        @if ($isLate($milestone))<span class="shrink-0 rounded border border-current px-1 text-[9px] font-semibold" data-test="calendar-late-milestone-{{ $milestone->id }}">{{ __('calendar.late') }}</span>@endif
-        @if ($milestone->children_count === 0 && $milestone->tasks_count === 0)
-            @can('milestones.delete')
-            <button type="button" wire:click.stop="confirmDelete({{ $milestone->id }})" class="hidden shrink-0 cursor-pointer group-focus-within:block group-hover:block" aria-label="{{ __('common.delete_name', ['name' => $milestone->name]) }}">
-                <flux:icon.x-mark variant="micro" class="size-3" />
-            </button>
-            @endcan
-        @endif
-    </div>
-@endforeach
 
 @foreach ($dayTasks as $task)
     <div wire:key="calendar-task-{{ $task->id }}" data-task-id="{{ $task->id }}" class="group flex cursor-grab items-center gap-1 rounded px-1.5 py-0.5 text-[10px] active:cursor-grabbing {{ $taskTone($task) }}">

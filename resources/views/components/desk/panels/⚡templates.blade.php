@@ -92,7 +92,7 @@ new class extends Component {
         }
 
         $project = $row['project'];
-        $prefiller->prefillProject($project);
+        $prefiller->prefillProject($project->id);
 
         if (! ReportTemplate::query()->where('project_id', $project->id)->exists()) {
             Flux::toast(variant: 'warning', text: __('desk.template_nothing_to_plan', ['project' => $project->name]));

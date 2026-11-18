@@ -23,7 +23,7 @@ class PlanUpdateExportController extends Controller
      */
     public function __invoke(Request $request, ActivityPlan $activityPlan, Project $project, string $month): View|StreamedResponse
     {
-        abort_unless(PlanUpdatePolicy::canRead($request->user()), 403);
+        abort_unless(PlanUpdatePolicy::canRead($request->user(), $activityPlan, $project), 403);
         abort_unless(preg_match('/^\d{4}-\d{2}$/', $month) === 1, 404);
 
         $monthStart = CarbonImmutable::createFromFormat('!Y-m', $month)->startOfMonth();

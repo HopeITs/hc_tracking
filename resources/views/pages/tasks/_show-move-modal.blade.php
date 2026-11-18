@@ -1,7 +1,6 @@
 {{--
     "Move to" on the task page (MovesTask): one list of every place inside the
-    task's program — the program itself, each project, and each project's
-    milestones under it — with a search box, the current place marked, and
+    task's program — the program itself and each project — with a search box, the current place marked, and
     the subtasks moving along. Only shown for a top-level task of a program.
 --}}
 @php
@@ -37,14 +36,13 @@
                     @endif
                 </label>
 
-                {{-- Each project, then its milestones under it. A project stays visible while any of its lines matches. --}}
+                {{-- Each project. A project stays visible while its name matches. --}}
                 @foreach ($destinations['projects'] as $project)
                     @php
                         $projectText = mb_strtolower($project['name']);
-                        $milestoneTexts = collect($project['milestones'])->map(fn (array $milestone): string => mb_strtolower($milestone['name']))->all();
                     @endphp
                     <div class="mt-2 grid gap-1" wire:key="move-project-{{ $project['id'] }}"
-                        x-show="find === '' || [{{ Js::from($projectText) }}, ...{{ Js::from($milestoneTexts) }}].some((text) => text.includes(find.trim().toLowerCase()))">
+                        x-show="find === '' || {{ Js::from($projectText) }}.includes(find.trim().toLowerCase())">
                         <p class="px-3 pt-1 text-[11px] font-bold tracking-wide text-secondary-medium uppercase dark:text-ink-muted">{{ $project['name'] }}</p>
 
                         <label class="{{ $optionClasses }}" data-move-target="project:{{ $project['id'] }}">
@@ -54,17 +52,6 @@
                                 {!! $currentBadge !!}
                             @endif
                         </label>
-
-                        @foreach ($project['milestones'] as $milestone)
-                            <label class="{{ $optionClasses }} ps-6" wire:key="move-milestone-{{ $milestone['id'] }}" data-move-target="milestone:{{ $milestone['id'] }}"
-                                x-show="find === '' || {{ Js::from($projectText) }}.includes(find.trim().toLowerCase()) || {{ Js::from(mb_strtolower($milestone['name'])) }}.includes(find.trim().toLowerCase())">
-                                <input type="radio" wire:model="moveTarget" value="milestone:{{ $milestone['id'] }}" class="{{ $radioClasses }}" />
-                                <span class="min-w-0 truncate" title="{{ $milestone['name'] }}">{{ $milestone['name'] }}</span>
-                                @if ($currentTarget === 'milestone:'.$milestone['id'])
-                                    {!! $currentBadge !!}
-                                @endif
-                            </label>
-                        @endforeach
                     </div>
                 @endforeach
             </div>

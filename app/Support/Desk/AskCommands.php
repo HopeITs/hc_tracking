@@ -28,7 +28,7 @@ final class AskCommands
      * @var array<string, string>
      */
     private const array ActionModules = [
-        'task' => 'tasks', 'proposal' => 'proposals', 'project' => 'projects', 'milestone' => 'milestones', 'report' => 'reports',
+        'task' => 'tasks', 'proposal' => 'proposals', 'project' => 'projects', 'report' => 'reports',
         'donor' => 'donors', 'agreement' => 'funding-agreements', 'transfer' => 'transfers', 'risk' => 'risks', 'indicator' => 'indicators',
         'target' => 'targets', 'result' => 'results', 'annual-plan' => 'annual-plans', 'strategy' => 'strategies', 'account' => 'accounts',
         'library-entry' => 'indicator-library',

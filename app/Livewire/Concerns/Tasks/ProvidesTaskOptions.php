@@ -6,7 +6,6 @@ namespace App\Livewire\Concerns\Tasks;
 
 use App\Models\HrDepartment;
 use App\Models\HrEmployee;
-use App\Models\Milestone;
 use App\Models\Program;
 use App\Models\Project;
 use App\Models\Proposal;
@@ -48,7 +47,7 @@ trait ProvidesTaskOptions
      * These three option lists back every filter, drawer field, and quick-set
      * popover, so without caching they were re-queried in full on every
      * single quick action (toggle complete, quick status, reschedule, …)
-     * even though nothing about the employees/proposals/milestones changed.
+     * even though nothing about the employees/proposals changed.
      * `persist` keys the cache to this component instance, so it never leaks
      * across users and expires with the page (5 minutes is just a safety
      * bound against an unusually long-lived tab, not a real staleness risk).
@@ -87,7 +86,6 @@ trait ProvidesTaskOptions
     public function sourceTypeOptions(): array
     {
         return [
-            ['value' => 'milestone', 'label' => __('tasks.source_type_milestone')],
             ['value' => 'proposal', 'label' => __('tasks.source_type_proposal')],
             ['value' => 'project', 'label' => __('tasks.source_type_project')],
             ['value' => 'program', 'label' => __('tasks.source_type_program')],
@@ -131,16 +129,6 @@ trait ProvidesTaskOptions
     protected function optionsForSourceType(string $type): Collection
     {
         return match ($type) {
-            'milestone' => Milestone::query()
-                ->select(['id', 'name', 'project_id', 'proposal_id'])
-                ->with(['project:id,name', 'proposal:id,name'])
-                ->orderBy('name')
-                ->orderBy('id')
-                ->get()
-                ->map(fn (Milestone $milestone): array => [
-                    'id' => $milestone->id,
-                    'name' => $milestone->name.' · '.$milestone->ownerName(),
-                ]),
             'proposal' => Proposal::query()->select(['id', 'name'])->orderBy('name')->orderBy('id')->get()
                 ->map(fn (Proposal $proposal): array => ['id' => $proposal->id, 'name' => $proposal->name]),
             'project' => Project::query()->select(['id', 'name'])->orderBy('name')->orderBy('id')->get()

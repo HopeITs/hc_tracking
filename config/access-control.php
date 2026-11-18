@@ -17,7 +17,6 @@ $groups = [
     'access-management' => ['manage-users', 'manage-roles', 'manage-permissions'],
     'programs' => ['view', 'update'],
     'projects' => ['view', 'create', 'update', 'delete'],
-    'milestones' => ['view', 'create', 'update', 'delete'],
     'indicators' => ['view', 'create', 'update', 'delete', 'record'],
     'indicator-library' => ['view', 'create', 'update', 'delete'],
     'results' => ['view', 'create', 'update', 'delete'],
@@ -259,7 +258,6 @@ return [
             'programs.update',
             'annual-plans.create', 'annual-plans.update', 'annual-plans.delete',
             'projects.update', 'projects.delete',
-            'milestones.create', 'milestones.update', 'milestones.delete',
             'risks.create', 'risks.update', 'risks.delete',
             // Building the logframe is the MEAL manager's alone (2026-11-13); managers still log readings.
             'indicators.record',

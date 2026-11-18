@@ -1,4 +1,4 @@
-{{-- Step 1 of the plan: the proposal it is for. Dates and governorates come from it. --}}
+{{-- Section 1 of the plan: the proposal it is for. Dates and governorates come from it. --}}
 @php
     $proposal = $plan->proposal;
 @endphp
@@ -19,7 +19,3 @@
     <div class="ap-info is-blue">{!! __('annual_plans.wf.own_program_only') !!}</div>
 </section>
 
-<div class="ap-foot">
-    <span class="ap-sp"></span>
-    <button type="button" class="dk-btn dk-primary" wire:click="goToStep(1)" data-test="plan-next">{{ __('annual_plans.wf.next_activities') }} ›</button>
-</div>

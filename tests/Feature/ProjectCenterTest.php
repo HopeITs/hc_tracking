@@ -2,9 +2,12 @@
 
 use App\Actions\Projects\SaveProject;
 use App\Enums\ProjectStatus;
+use App\Enums\ProposalStatus;
 use App\Models\MealCoverageAssignment;
 use App\Models\Program;
 use App\Models\Project;
+use App\Models\Proposal;
+use App\Models\ProposalLocation;
 use App\Models\User;
 use App\Support\MealCoverage;
 use Illuminate\Support\Facades\DB;
@@ -356,10 +359,16 @@ test('a project whose center HR has deactivated says so on the directory, the pr
         ->assertOk()
         ->assertSee('data-test="center-inactive-badge"', false);
 
+    // A new place cannot pick a closed center; a row that already holds one says it is closed.
+    $proposal = Proposal::factory()->create(['status' => ProposalStatus::ProposalDraft]);
+    ProposalLocation::factory()->complete()->create(['proposal_id' => $proposal->id, 'city_id' => $this->cityId])
+        ->centers()->create(['center_id' => $closedId]);
+
     Livewire::actingAs($this->user)->test('pages::proposals.index')
         ->call('openCreateModal')
-        ->assertSeeText('Closed Center Water')
-        ->assertSeeHtml('data-test="center-inactive-badge"');
+        ->assertDontSeeText('Closed Center')
+        ->call('openEditModal', $proposal->id)
+        ->assertSeeText('Closed Center · '.__('projects.center_inactive_badge'));
 });
 
 test('an active center, a hosted project and a project with no center carry no badge', function () {

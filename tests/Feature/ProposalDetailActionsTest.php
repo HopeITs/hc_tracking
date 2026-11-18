@@ -85,6 +85,9 @@ test('a tranche received in another currency is left out of the agreement money 
 });
 
 test('the details form edits name, dates and notes but never the status', function () {
+    // Before donor approval: once approved, details change only through a change request (Y-09, D-89).
+    $this->proposal->update(['status' => ProposalStatus::ProposalDraft]);
+
     proposalPage()
         ->call('openEditModal', $this->proposal->id)
         ->assertDontSeeHtml('wire:model="actualDateBegin"')
@@ -100,7 +103,7 @@ test('the details form edits name, dates and notes but never the status', functi
     expect($this->proposal->name)->toBe('Renamed grant')
         ->and($this->proposal->planned_date_end->toDateString())->toBe('2027-03-31')
         ->and($this->proposal->notes)->toBe('Extension agreed by phone')
-        ->and($this->proposal->status)->toBe(ProposalStatus::Active);
+        ->and($this->proposal->status)->toBe(ProposalStatus::ProposalDraft);
 });
 
 test('the details form rejects an end before its start', function () {

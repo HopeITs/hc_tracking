@@ -10,7 +10,7 @@ return [
     'filter_by_type' => 'Filter by type',
     'four_days' => '4 days',
     'items_count' => '{0} No related dates|{1} :count date|[2,*] :count dates',
-    'link_your_account_to_see_your_calendar' => 'Your account is not linked to an HR employee record, so we cannot tell which milestones are yours.',
+    'link_your_account_to_see_your_calendar' => 'Your account is not linked to an HR employee record, so we cannot tell which tasks are yours.',
     'me' => 'Me',
     'month' => 'Month',
     'no_linked_employee' => 'No linked employee record',

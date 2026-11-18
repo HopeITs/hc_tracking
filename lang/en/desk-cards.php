@@ -21,6 +21,8 @@ return [
         'clear_done' => 'Clear done',
         'drag' => 'Drag to reorder',
         'remove' => 'Remove “:title”',
+        'edit' => 'Edit “:title”',
+        'edit_hint' => 'Edit (or double-click the text)',
         'required' => 'Write the to-do first.',
         'too_long' => 'A to-do can hold at most :max characters.',
         'full' => 'Your list is full: clear some to-dos first.',
@@ -32,7 +34,6 @@ return [
         'kind' => [
             'proposal' => 'Your proposal',
             'task' => 'Task',
-            'milestone' => 'Milestone',
             'monthly-report' => 'Monthly report',
             'report' => 'Indicator report',
             'transfer' => 'Transfer',
@@ -109,7 +110,6 @@ return [
         'myteam' => 'Your people and what each has overdue.',
         'targets' => 'Indicators that are behind.',
         'duties' => 'Reports owed to donors, by due date.',
-        'milestones' => 'Checkpoints coming up soon.',
         'donors' => 'Each donor at a glance.',
     ],
 ];

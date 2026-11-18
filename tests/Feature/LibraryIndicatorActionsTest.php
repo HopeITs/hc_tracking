@@ -159,7 +159,7 @@ describe('deactivating, reactivating and deleting', function () {
         Indicator::factory()->create(['library_indicator_id' => $entry->id]);
 
         expect(fn () => app(DeleteLibraryIndicator::class)->handle($entry->id))
-            ->toThrow(ValidationException::class, 'This indicator is in use. Deactivate it instead.');
+            ->toThrow(ValidationException::class, 'This indicator is in use. Switch it off instead.');
 
         $this->assertModelExists($entry);
     });

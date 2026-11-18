@@ -1,6 +1,6 @@
 @use('App\Enums\TaskStatus')
 @use('App\Models\Task')
-        <x-ui.panel :title="__('common.tasks')" :count="$this->tasks->count()" :subtitle="__('projects.tasks_raised_against_this_project_or_its_milestones')">
+        <x-ui.panel :title="__('common.tasks')" :count="$this->tasks->count()" :subtitle="__('projects.tasks_raised_against_this_project')">
             <x-slot:toolbar>
                 @can('create', App\Models\Task::class)<x-ui.button tone="primary" size="sm" icon="plus" wire:click="openAddTaskModal" data-test="add-project-task-button">{{ __('tasks.add_task') }}</x-ui.button>@endcan
             </x-slot:toolbar>

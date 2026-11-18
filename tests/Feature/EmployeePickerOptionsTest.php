@@ -64,7 +64,7 @@ test('person dropdowns and filters on the task and calendar pages read the share
     expect($html)->toContain('picker-options')
         ->and($html)->not->toContain('@js(')
         ->and($html)->not->toContain('Olga Other');
-})->with(['pages::tasks.index', 'pages::calendar.index', 'pages::milestones.index', 'pages::projects.index']);
+})->with(['pages::tasks.index', 'pages::calendar.index', 'pages::projects.index']);
 
 test('a person filter hands its employee list url to the filter menu', function () {
     $user = User::factory()->role('General Manager')->create();

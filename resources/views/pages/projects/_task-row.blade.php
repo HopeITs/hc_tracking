@@ -41,14 +41,7 @@
             $inkText => ! $isDone,
         ])>{{ $task->title }}</a>
         <p class="mt-0.5 flex flex-wrap items-center gap-x-1.5 gap-y-0.5 text-xs {{ $mutedText }}">
-            {{-- Redundant to name this project again on a project-scoped tab, so the source line only shows for milestone-sourced tasks. --}}
-            @if ($task->source_type === 'milestone')
-                <span class="min-w-0 truncate">{{ $task->sourceLabel() }}</span>
-            @endif
             @if ($statusLags)
-                @if ($task->source_type === 'milestone')
-                    <span aria-hidden="true">·</span>
-                @endif
                 <span class="font-semibold text-status-warn" data-status-lags>{{ __('tasks.progress_complete_but_status_is', ['status' => $task->status->label()]) }}</span>
             @endif
         </p>

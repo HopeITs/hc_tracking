@@ -6,7 +6,6 @@ use Database\Seeders\NotificationDemoSeeder;
 use Database\Seeders\RealAccountsSeeder;
 use Database\Seeders\RealDataSeeder;
 use Database\Seeders\RealDonorsSeeder;
-use Database\Seeders\RealMilestonesSeeder;
 use Database\Seeders\RealProjectsSeeder;
 use Database\Seeders\RealProposalsSeeder;
 use Database\Seeders\RealResultsSeeder;
@@ -25,7 +24,6 @@ function realSeedersInDependencyOrder(): array
         RealAccountsSeeder::class,
         RealDonorsSeeder::class,
         RealProjectsSeeder::class,
-        RealMilestonesSeeder::class,
         RealProposalsSeeder::class,
         RealResultsSeeder::class,
         RealRisksSeeder::class,

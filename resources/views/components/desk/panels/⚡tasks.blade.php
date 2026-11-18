@@ -5,7 +5,6 @@ use App\Enums\TaskKind;
 use App\Enums\TaskStatus;
 use App\Livewire\Concerns\Dashboard\ReadsDashboardAttention;
 use App\Livewire\Concerns\Desk\IsDeskPanel;
-use App\Models\Milestone;
 use App\Models\Project;
 use App\Models\Task;
 use App\Support\Desk\DeskWork;
@@ -13,7 +12,6 @@ use App\Support\Desk\TeamScope;
 use App\Support\TaskWorkflow;
 use Flux\Flux;
 use Illuminate\Database\Eloquent\Builder;
-use Illuminate\Database\Eloquent\Relations\MorphTo;
 use Illuminate\Support\Collection;
 use Illuminate\Validation\ValidationException;
 use Livewire\Attributes\Computed;
@@ -144,7 +142,7 @@ new class extends Component {
     {
         return $this->base()
             ->with([
-                'source' => fn (MorphTo $morphTo) => $morphTo->morphWith([Milestone::class => ['project:id,name', 'proposal:id,name']]),
+                'source',
                 'taskAssignees.employee:id,first_name_en,last_name_en,first_name_ar,last_name_ar',
             ])
             ->orderByRaw('due_date is null, due_date')

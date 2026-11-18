@@ -80,9 +80,9 @@ test('every translation key used in the code exists in english and arabic', func
 
     $keys = [];
     foreach (array_unique($files) as $file) {
-        // A literal ending in "." is a prefix joined to a runtime value
-        // (__('access.actions.'.$action)), not a key of its own.
-        preg_match_all("/(?:__|trans_choice)\\('([a-z_]+\\.[a-z0-9_.]*[a-z0-9_])'/", file_get_contents($file), $matches);
+        // A literal ending in "." or "_" is a prefix joined to a runtime value
+        // (__('access.actions.'.$action), __('navigation.kind_'.$kind)), not a key of its own.
+        preg_match_all("/(?:__|trans_choice)\\('([a-z_]+\\.[a-z0-9_.]*[a-z0-9])'/", file_get_contents($file), $matches);
         foreach ($matches[1] as $key) {
             $keys[$key] = true;
         }
@@ -387,7 +387,8 @@ function physicalDirectionClasses(string $source): array
  */
 function literalUiTextAllowlist(): array
 {
-    return ['OP1.2', 'https://', 'email@example.com'];
+    // Keyboard key names, printed on the key itself in every language.
+    return ['OP1.2', 'https://', 'email@example.com', 'Alt', 'Esc'];
 }
 
 /**
@@ -434,7 +435,7 @@ function literalUiText(string $source): array
         if ($line === '' || str_starts_with($line, '@') || str_starts_with($line, '//') || str_starts_with($line, '*')) {
             continue;
         }
-        if (preg_match('/\p{L}/u', $line) === 1) {
+        if (preg_match('/\p{L}/u', $line) === 1 && ! in_array($line, literalUiTextAllowlist(), true)) {
             $found[] = $line;
         }
     }

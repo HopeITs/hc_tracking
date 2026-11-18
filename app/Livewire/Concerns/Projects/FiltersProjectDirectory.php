@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace App\Livewire\Concerns\Projects;
 
-use App\Enums\MilestoneStatus;
 use App\Enums\ProjectStatus;
 use App\Models\HrCity;
 use App\Models\HrEmployee;
@@ -48,7 +47,7 @@ trait FiltersProjectDirectory
     private const SORTS = ['name', 'start_date', 'end_date', 'updated_at'];
 
     /** The single-select triage lenses of the cockpit strip. */
-    private const LENSES = ['unfunded', 'overdue', 'slipping', 'risks'];
+    private const LENSES = ['unfunded', 'overdue', 'risks'];
 
     /**
      * The cities the directory can be filtered by.
@@ -286,9 +285,6 @@ trait FiltersProjectDirectory
         return match ($this->lens) {
             'unfunded' => $query->doesntHave('proposals'),
             'overdue' => $query->where('status', ProjectStatus::Active->value)->whereDate('end_date', '<', today()),
-            'slipping' => $query->whereHas('milestones', fn ($query) => $query
-                ->whereDate('planned_start_date', '<', today())
-                ->whereNotIn('status', [MilestoneStatus::Reached->value, MilestoneStatus::Cancelled->value])),
             'risks' => $query->whereHas('risks', fn ($query) => $query->where('happened', true)),
             default => $query,
         };
@@ -349,14 +345,10 @@ trait FiltersProjectDirectory
             ->selectRaw(
                 'sum(case when not exists (select 1 from project_proposal where project_proposal.project_id = projects.id) then 1 else 0 end) as unfunded_count, '
                 .'sum(case when projects.status = ? and projects.end_date < ? then 1 else 0 end) as overdue_count, '
-                .'sum(case when exists (select 1 from milestones where milestones.project_id = projects.id and milestones.planned_start_date < ? and milestones.status not in (?, ?)) then 1 else 0 end) as slipping_count, '
                 .'sum(case when exists (select 1 from risks where risks.project_id = projects.id and risks.happened = 1) then 1 else 0 end) as risks_count',
                 [
                     ProjectStatus::Active->value,
                     $today,
-                    $today,
-                    MilestoneStatus::Reached->value,
-                    MilestoneStatus::Cancelled->value,
                 ],
             )
             ->first();
@@ -364,7 +356,6 @@ trait FiltersProjectDirectory
         return [
             'unfunded' => (int) ($row->unfunded_count ?? 0),
             'overdue' => (int) ($row->overdue_count ?? 0),
-            'slipping' => (int) ($row->slipping_count ?? 0),
             'risks' => (int) ($row->risks_count ?? 0),
         ];
     }

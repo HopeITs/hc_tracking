@@ -12,7 +12,7 @@ use Illuminate\Database\Eloquent\Model;
  * the request.
  *
  * List pages load narrow `select()`s and link every row, so resolving one slug
- * at a time ran one query per link (140+ on the milestones and proposals
+ * at a time ran one query per link (140+ on the tasks and proposals
  * pages). Scoped in AppServiceProvider: one instance per request or job.
  */
 final class RouteSlugs

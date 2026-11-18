@@ -5,7 +5,6 @@ use App\Enums\MediaCollection;
 use App\Enums\ProposalStatus;
 use App\Models\Donor;
 use App\Models\Media;
-use App\Models\Milestone;
 use App\Models\Proposal;
 use App\Models\User;
 use Carbon\CarbonImmutable;
@@ -14,8 +13,7 @@ use Livewire\Livewire;
 beforeEach(fn () => $this->travelTo('2026-10-13 10:00:00'));
 
 /**
- * An active, donor-funded proposal whose final-report milestone is reached
- * and whose final report is filed: everything D-02c needs but the acceptance.
+ * An active, donor-funded proposal whose final report is filed: everything D-02c needs but the acceptance.
  */
 function proposalAwaitingFinalReportAcceptance(User $uploader): Proposal
 {
@@ -23,7 +21,6 @@ function proposalAwaitingFinalReportAcceptance(User $uploader): Proposal
         'status' => ProposalStatus::Active,
         'donor_id' => Donor::factory()->create(['is_internal' => false])->id,
     ]);
-    Milestone::factory()->reached()->create(['proposal_id' => $proposal->id, 'is_final_report' => true]);
     Media::query()->findOrFail(insertMedia('proposal', $proposal->id, $uploader->id))->update(['collection' => MediaCollection::FinalReport]);
 
     return $proposal;
@@ -117,7 +114,7 @@ test('once recorded from the page the proposal can close', function () {
     expect($proposal->fresh()->status)->toBe(ProposalStatus::Completed);
 });
 
-test('a payroll proposal offers the acceptance with the final report filed and no milestone', function () {
+test('a payroll proposal offers the acceptance once the final report is filed', function () {
     $actor = userWithRole('Financial');
     $proposal = Proposal::factory()->payroll()->create([
         'status' => ProposalStatus::Active,

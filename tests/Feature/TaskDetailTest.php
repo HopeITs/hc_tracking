@@ -3,12 +3,13 @@
 use App\Enums\FileType;
 use App\Enums\TaskPriority;
 use App\Enums\TaskStatus;
-use App\Models\Milestone;
+use App\Models\Donor;
 use App\Models\Project;
 use App\Models\Proposal;
 use App\Models\Task;
 use App\Models\TaskAttachment;
 use App\Models\User;
+use Carbon\CarbonImmutable;
 use Livewire\Livewire;
 use Spatie\Permission\Models\Role;
 
@@ -24,18 +25,14 @@ test('missing tasks return not found from task detail', function () {
     $this->actingAs($user)->get(route('tasks.show', 999999))->assertNotFound();
 });
 
-test('task detail shows the task milestone project assignees and creator', function () {
+test('task detail shows the task project assignees and creator', function () {
     $user = User::factory()->role('General Manager')->create();
     $assignee = insertHrEmployee(firstNameEn: 'Alice', lastNameEn: 'Nadir');
     $creator = User::factory()->create(['name' => 'Bob Rahman']);
     $project = Project::factory()->create(['name' => 'Winter Support']);
-    $milestone = Milestone::factory()->create([
-        'project_id' => $project->id,
-        'name' => 'Distribution ready',
-    ]);
     $task = Task::factory()->create([
-        'source_type' => 'milestone',
-        'source_id' => $milestone->id,
+        'source_type' => 'project',
+        'source_id' => $project->id,
         'title' => 'Draft distribution plan',
         'created_by' => $creator->id,
         'start_date' => '2026-09-01',
@@ -48,14 +45,13 @@ test('task detail shows the task milestone project assignees and creator', funct
         ->get(route('tasks.show', $task))
         ->assertOk()
         ->assertSeeText('Draft distribution plan')
-        ->assertSeeText('Distribution ready')
         ->assertSeeText('Winter Support')
         ->assertSeeText('Alice Nadir')
         ->assertSeeText('Bob Rahman')
         ->assertDontSeeText('35%');
 });
 
-test('task detail shows the task proposal as its source when it is not raised against a milestone', function () {
+test('task detail shows the task proposal as its source when it is raised against a proposal', function () {
     $user = User::factory()->role('General Manager')->create();
     $proposal = Proposal::factory()->create(['name' => 'Emergency Response']);
     $task = Task::factory()->create([
@@ -148,7 +144,7 @@ test('task detail escapes all user controlled content', function () {
         ->assertDontSeeHtml('<img src=x onerror=attachment()>.pdf');
 });
 
-test('task detail renders a task with no attachments and no project link when the source is not a milestone', function () {
+test('task detail renders a task with no attachments and no project link when the source is a proposal', function () {
     $user = User::factory()->role('General Manager')->create();
     $task = Task::factory()->create(['source_type' => 'proposal', 'source_id' => Proposal::factory()->create()->id, 'description' => null]);
 
@@ -160,9 +156,9 @@ test('task detail renders a task with no attachments and no project link when th
 
 test('a subtask can be added from the task detail page via the add subtask modal and inherits the parent source', function () {
     $user = User::factory()->role('General Manager')->create();
-    $milestone = Milestone::factory()->create();
+    $sourceProject = Project::factory()->create();
     $assignee = insertHrEmployee();
-    $parent = Task::factory()->create(['source_type' => 'milestone', 'source_id' => $milestone->id]);
+    $parent = Task::factory()->create(['source_type' => 'project', 'source_id' => $sourceProject->id]);
     $parent->taskAssignees()->delete();
     $parent->taskAssignees()->create(['employee_id' => $assignee]);
 
@@ -181,8 +177,8 @@ test('a subtask can be added from the task detail page via the add subtask modal
     $subtask = Task::query()->where('title', 'Confirm the delivery window')->sole();
 
     expect($subtask->parent_task_id)->toBe($parent->id)
-        ->and($subtask->source_type)->toBe('milestone')
-        ->and($subtask->source_id)->toBe($milestone->id)
+        ->and($subtask->source_type)->toBe('project')
+        ->and($subtask->source_id)->toBe($sourceProject->id)
         ->and($subtask->taskAssignees->pluck('employee_id')->all())->toBe([$assignee])
         ->and($subtask->status)->toBe(TaskStatus::InProgress)
         ->and($subtask->due_date->toDateString())->toBe('2026-10-01')
@@ -336,25 +332,6 @@ test('the add subtask form is rendered only while its modal is open', function (
         ->assertDontSeeHtml('data-test="new-subtask-title-input"')
         ->call('openAddSubtaskModal')
         ->assertSeeHtml('data-test="new-subtask-title-input"');
-});
-
-test('the milestone breadcrumb links only for viewers who may open the milestone', function () {
-    $milestone = Milestone::factory()->create(['name' => 'Distribution ready']);
-    $task = Task::factory()->create(['source_type' => 'milestone', 'source_id' => $milestone->id]);
-    $milestoneLink = 'href="'.route('milestones.show', $milestone).'"';
-
-    $this->actingAs(User::factory()->role('General Manager')->create())
-        ->get(route('tasks.show', $task))
-        ->assertOk()
-        ->assertSee($milestoneLink, false);
-
-    Role::create(['name' => 'Task Viewer', 'guard_name' => 'web'])->givePermissionTo('tasks.view');
-
-    $this->actingAs(User::factory()->role('Task Viewer')->create())
-        ->get(route('tasks.show', $task))
-        ->assertOk()
-        ->assertSeeText('Distribution ready')
-        ->assertDontSee($milestoneLink, false);
 });
 
 test('the properties column saves a priority change in place', function () {
@@ -561,6 +538,21 @@ test('the creator turns proof needed on from the details switch and it saves at 
     expect($task->fresh()->evidence_required)->toBeTrue();
 });
 
+test('an editor who did not create the task reads proof needed as text and cannot change it', function () {
+    $creator = User::factory()->role('General Manager')->create();
+    $editor = User::factory()->role('General Manager')->create();
+    $task = Task::factory()->create(['created_by' => $creator->id, 'evidence_required' => true]);
+
+    Livewire::actingAs($editor)
+        ->test('pages::tasks.show', ['task' => $task])
+        ->assertSeeHtml('data-test="task-evidence-required-text"')
+        ->assertDontSeeHtml('data-test="task-evidence-required"')
+        ->set('evidenceRequired', false)
+        ->assertSet('evidenceRequired', true);
+
+    expect($task->fresh()->evidence_required)->toBeTrue();
+});
+
 test('the activity history is only built once the creator opens it', function () {
     $creator = User::factory()->role('General Manager')->create();
     $task = Task::factory()->create(['created_by' => $creator->id]);
@@ -607,4 +599,93 @@ test('someone who may not edit the task sees no remove x and cannot drop an assi
         ->assertForbidden();
 
     expect($task->taskAssignees()->pluck('employee_id')->all())->toBe([$assignee]);
+});
+
+test('a proposal task shows its donor and dates in the related-to card', function () {
+    $user = User::factory()->role('General Manager')->create();
+    $donor = Donor::factory()->create(['name' => 'Aid Fund']);
+    $proposal = Proposal::factory()->create([
+        'name' => 'Emergency Response',
+        'donor_id' => $donor->id,
+        'planned_date_begin' => '2026-03-01',
+        'planned_date_end' => '2027-02-28',
+    ]);
+    $task = Task::factory()->create(['source_type' => 'proposal', 'source_id' => $proposal->id]);
+
+    $this->actingAs($user)
+        ->get(route('tasks.show', $task))
+        ->assertOk()
+        ->assertSeeHtml('data-test="task-related-card"')
+        ->assertSeeText('Aid Fund')
+        ->assertSeeText(CarbonImmutable::parse('2026-03-01')->translatedFormat(__('formats.date')))
+        ->assertSeeText(CarbonImmutable::parse('2027-02-28')->translatedFormat(__('formats.date')));
+});
+
+test('a project task shows its dates and program in the related-to card', function () {
+    $user = User::factory()->role('General Manager')->create();
+    $project = Project::factory()->create(['name' => 'Winter Support', 'start_date' => '2026-01-05', 'end_date' => '2026-12-20']);
+    $task = Task::factory()->create(['source_type' => 'project', 'source_id' => $project->id]);
+
+    $this->actingAs($user)
+        ->get(route('tasks.show', $task))
+        ->assertOk()
+        ->assertSeeText(__('tasks.related.program'))
+        ->assertSeeText(CarbonImmutable::parse('2026-12-20')->translatedFormat(__('formats.date')));
+});
+
+test('the approver returns an Under review task to To do with a reason the assignee sees', function () {
+    $creator = User::factory()->role('General Manager')->create();
+    $worker = userWithRole('Team Member', insertHrEmployee());
+    $task = Task::factory()->create(['created_by' => $creator->id, 'status' => TaskStatus::UnderReview]);
+    $task->taskAssignees()->delete();
+    $task->taskAssignees()->create(['employee_id' => $worker->employee_id]);
+
+    Livewire::actingAs($creator)
+        ->test('pages::tasks.show', ['task' => $task])
+        ->assertSeeHtml('data-test="task-return-button"')
+        ->call('startReturn')
+        ->assertSet('taskStatus', TaskStatus::Todo->value)
+        ->assertSeeHtml('data-test="task-send-back-form"')
+        ->call('sendBack')
+        ->assertHasErrors(['taskStatus'])
+        ->set('reviewNote', 'The signed list is missing')
+        ->call('sendBack')
+        ->assertHasNoErrors();
+
+    expect($task->fresh())
+        ->status->toBe(TaskStatus::Todo)
+        ->returned_reason->toBe('The signed list is missing');
+
+    Livewire::actingAs($worker)
+        ->test('pages::tasks.show', ['task' => $task])
+        ->assertSeeHtml('data-test="task-returned-reason"')
+        ->assertSeeText('The signed list is missing')
+        ->assertDontSeeHtml('data-test="task-return-button"');
+
+    expect(collect(sentencesFor($worker))->filter(fn (string $line): bool => str_contains($line, 'The signed list is missing')))->toHaveCount(1);
+});
+
+test('approving a returned task clears its return reason', function () {
+    $creator = User::factory()->role('General Manager')->create();
+    $task = Task::factory()->create(['created_by' => $creator->id, 'status' => TaskStatus::UnderReview, 'returned_reason' => 'Fix totals']);
+
+    Livewire::actingAs($creator)
+        ->test('pages::tasks.show', ['task' => $task])
+        ->call('changeStatus', TaskStatus::Done->value)
+        ->assertHasNoErrors();
+
+    expect($task->fresh())->status->toBe(TaskStatus::Done)->returned_reason->toBeNull();
+});
+
+test('only the approver of an Under review task can open the return box', function () {
+    $creator = User::factory()->role('General Manager')->create();
+    $worker = userWithRole('Team Member', insertHrEmployee());
+    $task = Task::factory()->create(['created_by' => $creator->id, 'status' => TaskStatus::UnderReview]);
+    $task->taskAssignees()->delete();
+    $task->taskAssignees()->create(['employee_id' => $worker->employee_id]);
+
+    Livewire::actingAs($worker)
+        ->test('pages::tasks.show', ['task' => $task])
+        ->call('startReturn')
+        ->assertSet('taskStatus', TaskStatus::UnderReview->value);
 });

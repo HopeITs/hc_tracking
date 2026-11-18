@@ -10,8 +10,8 @@ use Carbon\CarbonImmutable;
 use Carbon\CarbonInterface;
 
 /**
- * The one rule for how a project is pacing: its weighted milestone progress
- * set against how much of its own date window has elapsed.
+ * The one rule for how a project is pacing: its delivery progress set
+ * against how much of its own date window has elapsed.
  *
  * The program page's overview cards and attention list read it. Callers map
  * the key to their own label and tone.
@@ -25,8 +25,8 @@ final class ProjectPace
     public const WARNING = ['slipping'];
 
     /**
-     * Weighted milestone progress as a whole percentage, or null when the
-     * project has no weighted milestone to measure against.
+     * Weighted progress as a whole percentage, or null when nothing carries
+     * a weight to measure against.
      */
     public static function progress(float|int|string|null $weightReached, float|int|string|null $weightTotal): ?int
     {

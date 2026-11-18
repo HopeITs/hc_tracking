@@ -222,7 +222,7 @@ new #[Layout('layouts::desk'), Title('titles.proposal')] class extends Component
             ['key' => 'projects', 'label' => __('common.projects'), 'count' => $this->projects->count()],
             ['key' => 'logframe', 'label' => __('proposals.tab_logframe'), 'count' => null],
             ['key' => 'targets', 'label' => __('proposals.tab_targets'), 'count' => $this->targets->count()],
-            ['key' => 'plan', 'label' => __('proposals.tab_plan'), 'count' => count($this->planMilestones) + $this->planTaskRows->count()],
+            ['key' => 'plan', 'label' => __('proposals.tab_plan'), 'count' => $this->planTaskRows->count()],
             ['key' => 'reports', 'label' => __('proposals.donor_reports'), 'count' => $this->reports->count()],
             ['key' => 'documents', 'label' => __('proposals.documents'), 'count' => $this->proposalFiles->count() + $this->projectFiles->count()],
         ];
@@ -286,8 +286,7 @@ new #[Layout('layouts::desk'), Title('titles.proposal')] class extends Component
     }
 
     /**
-     * The Plan tab's read-only Gantt of this proposal's milestones, tasks
-     * and activities.
+     * The Plan tab's read-only Gantt of this proposal's tasks and activities.
      *
      * @return array{rows: list<array<string, mixed>>, links: list<array<string, mixed>>, from: string, to: string, today: string}
      */
@@ -366,7 +365,7 @@ new #[Layout('layouts::desk'), Title('titles.proposal')] class extends Component
         unset(
             $this->proposal, $this->canRecordAgreement, $this->statusNotes, $this->agreements, $this->agreementRows, $this->fundingTranches, $this->donorReports, $this->agreementMoney, $this->moneyByCurrency,
             $this->projects, $this->locationRows, $this->linkableProjects, $this->tasks, $this->targets, $this->reports,
-            $this->planMilestones, $this->planTaskRows, $this->planGroups, $this->planGanttPayload, $this->planWindow, $this->planProjectOptions,
+            $this->planTaskRows, $this->planGroups, $this->planGanttPayload, $this->planWindow,
             $this->projectFiles, $this->conceptNoteFiles, $this->documents, $this->deadlines, $this->warnings, $this->lifecycle, $this->chronology,
             $this->arrivals, $this->vitals, $this->term, $this->tabs, $this->proposalFiles, $this->reviewStages, $this->needAssessments, $this->approvalSubject, $this->approvalPreview, $this->approvalLocations,
             $this->canRecordFinalReportAcceptance, $this->finalReportAcceptance,

@@ -8,7 +8,7 @@ use App\Livewire\Concerns\NavigatesCalendarPeriods;
 use Livewire\Component;
 
 /**
- * Stands in for calendar/index, milestones/index and tasks/index, which
+ * Stands in for calendar/index and tasks/index, which
  * PHPStan cannot read. Never instantiated.
  */
 abstract class CalendarPeriodsHost extends Component

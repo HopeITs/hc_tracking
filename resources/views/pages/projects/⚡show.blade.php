@@ -2,7 +2,6 @@
 
 use App\Actions\Projects\CloseProject;
 use App\Actions\Targets\ScopeIndicatorToProject;
-use App\Enums\MilestoneStatus;
 use App\Enums\ProjectStatus;
 use App\Livewire\Concerns\AddsQuickTask;
 use App\Livewire\Concerns\ChecksFinanceVisibility;
@@ -49,8 +48,8 @@ new #[Layout('layouts::desk'), Title('titles.project')] class extends Component 
     #[Locked]
     public int $projectId;
 
-    #[Url(except: 'milestones')]
-    public string $tab = 'milestones';
+    #[Url(except: 'tasks')]
+    public string $tab = 'tasks';
 
     /**
      * The page's open section: overview, work, funding or files. Switched in
@@ -97,7 +96,7 @@ new #[Layout('layouts::desk'), Title('titles.project')] class extends Component 
         return match (true) {
             in_array($this->tab, ['files', 'activity'], true) => 'files',
             $this->tab === 'proposals', $this->storyProposal !== '', request()->query('ptab') !== null => 'funding',
-            $this->tab !== 'milestones' => 'work',
+            $this->tab !== 'tasks' => 'work',
             $project->status === ProjectStatus::Active => 'work',
             default => 'overview',
         };
@@ -223,21 +222,16 @@ new #[Layout('layouts::desk'), Title('titles.project')] class extends Component 
                     ->orderByDesc('id'),
             ])
             ->withCount([
-                'milestones',
                 'planIndicators',
                 'proposals',
                 'media' => fn ($query) => $query->whereNotIn('collection', $hiddenCollections),
-                'milestones as reached_milestones_count' => fn ($query) => $query->where('status', MilestoneStatus::Reached->value),
             ])
-            ->withSum(['milestones as milestones_reached_weight' => fn ($query) => $query->where('status', MilestoneStatus::Reached->value)], 'weight_percentage')
-            ->withSum(['milestones as milestones_planned_weight' => fn ($query) => $query->where('status', '!=', MilestoneStatus::Cancelled->value)], 'weight_percentage')
             ->findOrFail($this->projectId);
     }
 
     /**
      * Raise a task straight against this project — the source is always this
-     * project, never a milestone: a task tied to one milestone's delivery is
-     * added from the milestone's own page instead.
+     * project.
      *
      * @return array{type: string, id: int}
      */
@@ -277,7 +271,7 @@ new #[Layout('layouts::desk'), Title('titles.project')] class extends Component 
 
     /**
      * The delivery chapter's tab strip. Proposals, files and activity sit in
-     * the Story's side column, so an old `?tab=files` link shows milestones here.
+     * the Story's side column, so an old `?tab=files` link shows tasks here.
      *
      * @return array<int, array{key: string, label: string, count: int|null}>
      */
@@ -285,7 +279,6 @@ new #[Layout('layouts::desk'), Title('titles.project')] class extends Component 
     public function tabs(): array
     {
         $tabs = [
-            ['key' => 'milestones', 'label' => __('common.milestones'), 'count' => $this->project->milestones_count],
             ['key' => 'tasks', 'label' => __('common.tasks'), 'count' => $this->tasks->count()],
             ['key' => 'targets', 'label' => __('common.targets'), 'count' => $this->project->plan_indicators_count],
         ];
@@ -297,25 +290,10 @@ new #[Layout('layouts::desk'), Title('titles.project')] class extends Component 
         return $tabs;
     }
 
-    /**
-     * The next three milestones still to reach, for the Overview.
-     *
-     * @return \Illuminate\Support\Collection<int, \App\Models\Milestone>
-     */
-    #[Computed]
-    public function upcomingMilestones(): \Illuminate\Support\Collection
-    {
-        return $this->milestonesFlat
-            ->reject(fn ($milestone): bool => in_array($milestone->status, [MilestoneStatus::Reached, MilestoneStatus::Cancelled], true))
-            ->sortBy(fn ($milestone): string => $milestone->planned_end_date?->toDateString() ?? '9999-12-31')
-            ->take(3)
-            ->values();
-    }
-
     #[Computed]
     public function deliveryTab(): string
     {
-        return in_array($this->tab, ['milestones', 'tasks', 'targets', ...($this->canViewReportTemplate ? ['template'] : [])], true) ? $this->tab : 'milestones';
+        return in_array($this->tab, ['tasks', 'targets', ...($this->canViewReportTemplate ? ['template'] : [])], true) ? $this->tab : 'tasks';
     }
 };
 ?>

@@ -1,13 +1,11 @@
 <?php
 
 use App\Enums\DonorAttribution;
-use App\Enums\MilestoneStatus;
 use App\Enums\ProjectStatus;
 use App\Enums\ResultType;
 use App\Models\AnnualPlan;
 use App\Models\DonorProposal;
 use App\Models\Indicator;
-use App\Models\Milestone;
 use App\Models\PlanIndicator;
 use App\Models\Program;
 use App\Models\Project;
@@ -110,16 +108,14 @@ test('program detail switches to annual plans and results', function () {
         ->assertSee('Improved access to safe water.');
 });
 
-test('program detail tasks tab shows tasks raised on the program, its projects and their milestones, but not on another program', function () {
+test('program detail tasks tab shows tasks raised on the program and its projects, but not on another program', function () {
     $user = User::factory()->role('General Manager')->create();
     $program = Program::factory()->create();
     $project = Project::factory()->create(['program_id' => $program->id]);
-    $milestone = Milestone::factory()->create(['project_id' => $project->id]);
     $otherProgram = Program::factory()->create();
 
     Task::factory()->create(['source_type' => 'program', 'source_id' => $program->id, 'title' => 'Approve the annual workplan']);
     Task::factory()->create(['source_type' => 'project', 'source_id' => $project->id, 'title' => 'Sign the site access agreement']);
-    Task::factory()->create(['source_type' => 'milestone', 'source_id' => $milestone->id, 'title' => 'Deliver the milestone report']);
     Task::factory()->create(['source_type' => 'program', 'source_id' => $otherProgram->id, 'title' => 'Unrelated program task']);
 
     Livewire::actingAs($user)
@@ -127,7 +123,6 @@ test('program detail tasks tab shows tasks raised on the program, its projects a
         ->set('tab', 'tasks')
         ->assertSee('Approve the annual workplan')
         ->assertSee('Sign the site access agreement')
-        ->assertSee('Deliver the milestone report')
         ->assertDontSee('Unrelated program task');
 });
 
@@ -274,32 +269,6 @@ test('program detail renders a program with nothing attached', function () {
         ->assertSeeText('No projects yet');
 });
 
-test('program detail calculates milestone progress without cancelled milestones', function () {
-    $program = Program::factory()->create();
-    $project = Project::factory()->create(['program_id' => $program->id]);
-
-    Milestone::factory()->create([
-        'project_id' => $project->id,
-        'status' => MilestoneStatus::Reached,
-        'weight_percentage' => '40.00',
-    ]);
-    Milestone::factory()->create([
-        'project_id' => $project->id,
-        'status' => MilestoneStatus::Planned,
-        'weight_percentage' => '60.00',
-    ]);
-    Milestone::factory()->create([
-        'project_id' => $project->id,
-        'status' => MilestoneStatus::Cancelled,
-        'weight_percentage' => '100.00',
-    ]);
-
-    Livewire::actingAs(User::factory()->role('General Manager')->create())
-        ->test('pages::programs.show', ['program' => $program])
-        ->assertSee('40%')
-        ->assertSee('40 of 100 progress points reached');
-});
-
 test('program detail links each annual plan year to its plan', function () {
     $program = Program::factory()->create();
     $plan = AnnualPlan::factory()->create(['program_id' => $program->id, 'year' => 2026]);
@@ -438,16 +407,12 @@ test('the attention list shows three items first and loads more three at a time'
         ->assertSee('Load 3 more');
 });
 
-test('the program overview flags late milestones and a missing monthly report for its project', function () {
+test('the program overview flags a missing monthly report for its project', function () {
     $program = Program::factory()->create();
     $project = Project::factory()->create(['program_id' => $program->id, 'name' => 'Shelter Fix', 'status' => ProjectStatus::Active]);
-    Milestone::factory()->create(['project_id' => $project->id, 'status' => MilestoneStatus::Ongoing, 'planned_end_date' => now()->subWeek()]);
-    Milestone::factory()->create(['project_id' => $project->id, 'status' => MilestoneStatus::Reached, 'planned_end_date' => now()->subWeek()]);
 
     Livewire::actingAs(User::factory()->role('General Manager')->create())
         ->test('pages::programs.show', ['program' => $program])
-        ->assertSee('Shelter Fix has 1 late milestone')
-        ->assertSee(route('projects.show', ['project' => $project, 'tab' => 'milestones']), false)
         ->assertSee('1 active project has no '.now()->subMonthNoOverflow()->translatedFormat('F').' report yet')
         ->assertSeeHtml('data-ledger-report');
 });

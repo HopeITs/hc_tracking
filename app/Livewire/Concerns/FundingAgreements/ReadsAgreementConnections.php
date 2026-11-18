@@ -6,7 +6,6 @@ namespace App\Livewire\Concerns\FundingAgreements;
 
 use App\Enums\ArStatus;
 use App\Enums\MediaCollection;
-use App\Enums\MilestoneStatus;
 use App\Models\DonorProposal;
 use App\Models\DonorReport;
 use App\Models\HrEmployee;
@@ -45,10 +44,6 @@ trait ReadsAgreementConnections
         return $this->agreement->proposal->projects()
             ->select(['projects.id', 'projects.name', 'projects.city_id', 'projects.program_id', 'projects.status', 'projects.start_date', 'projects.end_date'])
             ->with(['city:id,name_en,name_ar', 'program:id'])
-            ->withCount([
-                'milestones',
-                'milestones as reached_milestones_count' => fn (Builder $query) => $query->where('status', MilestoneStatus::Reached),
-            ])
             ->orderBy('projects.name')
             ->get();
     }

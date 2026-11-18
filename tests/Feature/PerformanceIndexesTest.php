@@ -8,7 +8,6 @@ it('indexes the columns the visibility scope, alert scanners and phase filters q
     'task assignees by employee' => ['task_assignees', ['employee_id']],
     'tasks by status and due date' => ['tasks', ['status', 'due_date']],
     'proposals by status' => ['proposals', ['status']],
-    'milestones by status' => ['milestones', ['status']],
 ]);
 
 it('keeps the task assignee pair unique so an employee is never assigned twice', function () {

@@ -56,6 +56,46 @@ function chosenPlan(): ActivityPlan
     return app(ChooseActivityPlanActivities::class)->handle(test()->pm, $plan, [test()->basic->id, test()->english->id]);
 }
 
+test('a manager adds a checkpoint on the live plan and marks it complete', function () {
+    $plan = ActivityPlan::factory()->approved()->create(['proposal_id' => $this->proposal->id, 'program_id' => $this->program->id]);
+
+    Livewire::actingAs($this->pm)->test('pages::annual-plans.plan', ['activityPlan' => $plan])
+        ->call('openMilestoneModal')
+        ->set('milestoneForm.title', 'Baseline complete')
+        ->set('milestoneForm.due_date', '2027-06-15')
+        ->call('saveMilestone')
+        ->assertHasNoErrors()
+        ->assertSee('Baseline complete');
+
+    $milestone = $plan->milestones()->sole();
+    Livewire::actingAs($this->pm)->test('pages::annual-plans.plan', ['activityPlan' => $plan])
+        ->call('completeMilestone', $milestone->id, true);
+
+    expect($milestone->fresh()->completed_at)->not->toBeNull();
+
+    Livewire::actingAs($this->pm)->test('pages::annual-plans.plan', ['activityPlan' => $plan])
+        ->call('confirmDeleteMilestone', $milestone->id)
+        ->assertSet('showDeleteMilestoneModal', true)
+        ->call('deleteMilestone')
+        ->assertDontSee('Baseline complete');
+
+    $this->assertDatabaseMissing('activity_plan_milestones', ['id' => $milestone->id]);
+});
+
+test('milestone details are visible to MEAL but not other plan viewers', function () {
+    $plan = ActivityPlan::factory()->approved()->create(['proposal_id' => $this->proposal->id, 'program_id' => $this->program->id]);
+    $plan->milestones()->create([
+        'title' => 'Private management checkpoint', 'due_date' => '2027-06-15', 'measure' => 'checkpoint', 'created_by' => $this->pm->id,
+    ]);
+    $teamMember = userWithRole('Team Member', insertHrEmployee());
+
+    Livewire::actingAs($this->meal)->test('pages::annual-plans.plan', ['activityPlan' => $plan])
+        ->assertSee('Private management checkpoint')
+        ->assertDontSee(__('annual_plans.milestones.add'));
+    Livewire::actingAs($teamMember)->test('pages::annual-plans.plan', ['activityPlan' => $plan])
+        ->assertDontSee('Private management checkpoint');
+});
+
 /**
  * @param  array<string, mixed>  $overrides
  * @return array<string, mixed>
@@ -254,7 +294,7 @@ test('the MEAL manager sees every field of the plan read-only', function () {
         ->set('sendBackReason', 'Fix the English weeks')
         ->call('sendBackPlan');
 
-    expect($plan->fresh()->status)->toBe(ActivityPlanStatus::Draft);
+    expect($plan->fresh()->status->value)->toBe('draft');
 });
 
 test('other people read a plan without editing it', function () {
@@ -339,4 +379,26 @@ test('the plans register lists several plans, drafts and approved, without lazy 
     ActivityPlan::factory()->count(2)->create(['program_id' => $this->program->id, 'status' => ActivityPlanStatus::Approved, 'proposal_id' => fn () => Proposal::factory()->create(['planned_date_begin' => '2027-01-01', 'planned_date_end' => '2027-12-31'])->id]);
 
     Livewire::actingAs($this->pm)->test('pages::annual-plans.plans')->assertOk()->assertSee($other->name);
+});
+
+test('the plan page shows every section at once and keeps sending locked until the plan is ready', function () {
+    $plan = app(CreateActivityPlan::class)->handle($this->pm, $this->proposal->id, $this->program->id);
+
+    $page = Livewire::actingAs($this->pm)->test('pages::annual-plans.plan', ['activityPlan' => $plan])
+        ->assertSeeHtml('data-plan-index')
+        ->assertSeeHtml('data-plan-step="proposal"')
+        ->assertSeeHtml('data-plan-step="activities"')
+        ->assertSeeHtml('data-plan-step="dates"')
+        ->assertDontSeeHtml('data-test="plan-next"')
+        ->assertSeeText(__('annual_plans.wf.footer_pick_activities'))
+        ->set('picked', [(string) $this->basic->id])
+        ->assertSeeText(__('annual_plans.wf.footer_save_activities'))
+        ->call('saveActivities')
+        ->assertSeeHtml('data-plan-step="send"')
+        ->assertNotSet('openItemId', null);
+
+    expect($plan->fresh()->items()->count())->toBe(1);
+
+    $page->call('submitPlan');
+    expect($plan->fresh()->status->value)->toBe('draft');
 });

@@ -1,7 +1,6 @@
 <?php
 
 use App\Enums\ArStatus;
-use App\Enums\MilestoneStatus;
 use App\Enums\MonthlyReportStatus;
 use App\Enums\ProjectStatus;
 use App\Enums\ProposalStatus;
@@ -14,7 +13,6 @@ use App\Models\DonorProposal;
 use App\Models\DonorReport;
 use App\Models\Indicator;
 use App\Models\LibraryIndicator;
-use App\Models\Milestone;
 use App\Models\MonthlyReport;
 use App\Models\PlanIndicator;
 use App\Models\Project;
@@ -31,11 +29,11 @@ beforeEach(function () {
     $this->travelTo('2026-09-15 09:00:00');
 });
 
-test('a project with a late monthly report is off track, one with a milestone due this week needs a look', function () {
+test('a project with a late monthly report is off track, one with a report waiting for MEAL needs a look', function () {
     $late = Project::factory()->create(['name' => 'Late Wells']);
     MonthlyReport::factory()->create(['project_id' => $late->id, 'period' => '2026-07-01']);
     $soon = Project::factory()->create(['name' => 'Soon Clinic']);
-    Milestone::factory()->create(['project_id' => $soon->id, 'status' => MilestoneStatus::Planned, 'planned_start_date' => '2026-09-01', 'planned_end_date' => '2026-09-18']);
+    MonthlyReport::factory()->create(['project_id' => $soon->id, 'period' => '2026-08-01', 'status' => MonthlyReportStatus::Submitted]);
     $calm = Project::factory()->create(['name' => 'Calm School']);
 
     $panel = Livewire::actingAs(User::factory()->role('General Manager')->create())->test('desk.panels.projects', ['size' => 'XL'])->call('setScope', 'all');
@@ -74,7 +72,7 @@ test('an active project past its end date is off track on the panel and late in 
 
 test('the flow headline counts projects that need a look instead of calling them on track', function () {
     $soon = Project::factory()->status(ProjectStatus::Active)->create(['start_date' => '2025-01-01', 'end_date' => '2027-06-30']);
-    Milestone::factory()->create(['project_id' => $soon->id, 'status' => MilestoneStatus::Planned, 'planned_start_date' => '2026-09-01', 'planned_end_date' => '2026-09-18']);
+    MonthlyReport::factory()->create(['project_id' => $soon->id, 'period' => '2026-08-01', 'status' => MonthlyReportStatus::Submitted]);
 
     Livewire::actingAs(User::factory()->role('General Manager')->create())->test('desk.panels.flow', ['size' => 'XL'])
         ->assertSeeText(trans_choice('desk-cards.flow.watch', 1, ['count' => 1]))

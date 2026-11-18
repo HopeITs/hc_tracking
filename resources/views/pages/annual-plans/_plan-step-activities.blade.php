@@ -1,4 +1,4 @@
-{{-- Step 2 of the plan: the logframe activities it runs, grouped by outcome. --}}
+{{-- Section 2 of the plan: the logframe activities it runs, grouped by outcome. --}}
 @php
     $groups = $this->activityGroups;
 @endphp
@@ -29,7 +29,11 @@
     @if ($groups !== [])
         <div class="ap-row">
             <button type="button" class="dk-btn" wire:click="selectAllActivities" data-test="select-all-activities">{{ __('annual_plans.wf.select_all') }}</button>
-            <span class="ap-faint ap-sm">{{ trans_choice('annual_plans.wf.selected', count($picked), ['count' => count($picked)]) }}</span>
+            <span class="ap-faint ap-sm ap-sp">{{ trans_choice('annual_plans.wf.selected', count($picked), ['count' => count($picked)]) }}</span>
+            @if ($picksUnsaved ?? false)
+                <span class="ap-sm" data-picks-unsaved>{{ __('annual_plans.wf.activities_unsaved') }}</span>
+            @endif
+            <button type="button" class="dk-btn dk-primary" wire:click="saveActivities" wire:loading.attr="disabled" wire:target="saveActivities" @disabled($picked === [] || ! ($picksUnsaved ?? true)) data-test="save-activities">{{ __('annual_plans.wf.save_activities') }}</button>
         </div>
     @endif
     @error('activities') <p class="ap-err">{{ $message }}</p> @enderror
@@ -64,9 +68,3 @@
         </div>
     @endif
 </section>
-
-<div class="ap-foot">
-    <button type="button" class="dk-btn" wire:click="goToStep(0)">‹ {{ __('annual_plans.wf.back') }}</button>
-    <span class="ap-sp"></span>
-    <button type="button" class="dk-btn dk-primary" wire:click="saveActivities" @disabled($picked === []) data-test="plan-next">{{ __('annual_plans.wf.next_dates') }} ›</button>
-</div>

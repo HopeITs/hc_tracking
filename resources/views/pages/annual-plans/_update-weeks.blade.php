@@ -40,7 +40,7 @@
                             </select>
                         @endif
                         @if ($value?->needsReason() || filled($entry['reason'] ?? null))
-                            <input class="ap-inp {{ $this->isMissing('reason:'.$key) ? 'is-err' : '' }}" style="height: 34px; font-size: .8rem" wire:model.blur="draft.weeks.{{ $key }}.reason" placeholder="{{ $value?->needsReason() ? __('annual_plans.up.why_required') : __('annual_plans.wf.note') }}" @disabled($readOnly) dir="auto">
+                            <input class="ap-inp {{ $this->isMissing('reason:'.$key) ? 'is-err' : '' }}" style="height: 34px; font-size: .8rem" wire:model.live.blur="draft.weeks.{{ $key }}.reason" placeholder="{{ $value?->needsReason() ? __('annual_plans.up.why_required') : __('annual_plans.wf.note') }}" @disabled($readOnly) dir="auto">
                         @endif
                     </div>
                 @endforeach

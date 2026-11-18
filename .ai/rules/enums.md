@@ -16,9 +16,9 @@ Accounts are created with `php artisan user:create` (interactive, or fully scrip
 
 Policies do not exist yet. Authorization rules were deliberately deferred until the UI exists and the real per-role access rules are known.
 
-## Six workflow columns are backed enums; values are lower case
+## Workflow statuses are backed enums with lower-case values
 
-The workflow six are `ProposalStatus`, `ProposalPhase`, `MilestoneStatus`,
+The workflow types include `ProposalStatus`, `ProposalPhase`,
 `TaskStatus`, `TaskPriority` and `ArStatus`, alongside the pre-existing
 `UserRole`. Five more were added later for the M&E and finance columns — see
 "Every enum-shaped column is now a backed enum" below for the full inventory.

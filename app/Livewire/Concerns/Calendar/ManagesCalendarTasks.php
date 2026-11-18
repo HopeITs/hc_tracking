@@ -11,7 +11,6 @@ use App\Livewire\Concerns\SavesTaskForm;
 use App\Models\Donor;
 use App\Models\DonorReport;
 use App\Models\HrDepartment;
-use App\Models\Milestone;
 use App\Models\MonthlyReport;
 use App\Models\Program;
 use App\Models\Project;
@@ -37,7 +36,7 @@ use Livewire\Attributes\Locked;
  * ScopesCalendarPeople; the #[Computed] calendar() it refreshes from
  * BuildsCalendarGrid.
  *
- * @property-read array{month: CarbonImmutable, weeks: ?array<int, array<int, CarbonImmutable>>, days: ?array<int, CarbonImmutable>, milestonesByDay: \Illuminate\Support\Collection<string, Collection<int, Milestone>>, tasksByDay: \Illuminate\Support\Collection<string, Collection<int, Task>>, reportsByDay: \Illuminate\Support\Collection<string, Collection<int, Report>>, monthlyReportsByDay: \Illuminate\Support\Collection<string, Collection<int, MonthlyReport>>, proposalsByDay: \Illuminate\Support\Collection<string, Collection<int, Proposal>>, transfersByDay: \Illuminate\Support\Collection<string, Collection<int, TransfersTracking>>, donorFollowUpsByDay: \Illuminate\Support\Collection<string, Collection<int, Donor>>, donorReportsByDay: \Illuminate\Support\Collection<string, Collection<int, DonorReport>>, projectStartsByDay: \Illuminate\Support\Collection<string, Collection<int, Project>>, projectEndsByDay: \Illuminate\Support\Collection<string, Collection<int, Project>>, reviewMeetingsByDay: \Illuminate\Support\Collection<string, Collection<int, ProposalStatusNote>>, unscheduledTasks: Collection<int, Task>, nowOffsetPercent: float} $calendar  #[Computed] calendar()
+ * @property-read array{month: CarbonImmutable, weeks: ?array<int, array<int, CarbonImmutable>>, days: ?array<int, CarbonImmutable>, tasksByDay: \Illuminate\Support\Collection<string, Collection<int, Task>>, reportsByDay: \Illuminate\Support\Collection<string, Collection<int, Report>>, monthlyReportsByDay: \Illuminate\Support\Collection<string, Collection<int, MonthlyReport>>, proposalsByDay: \Illuminate\Support\Collection<string, Collection<int, Proposal>>, transfersByDay: \Illuminate\Support\Collection<string, Collection<int, TransfersTracking>>, donorFollowUpsByDay: \Illuminate\Support\Collection<string, Collection<int, Donor>>, donorReportsByDay: \Illuminate\Support\Collection<string, Collection<int, DonorReport>>, projectStartsByDay: \Illuminate\Support\Collection<string, Collection<int, Project>>, projectEndsByDay: \Illuminate\Support\Collection<string, Collection<int, Project>>, reviewMeetingsByDay: \Illuminate\Support\Collection<string, Collection<int, ProposalStatusNote>>, unscheduledTasks: Collection<int, Task>, nowOffsetPercent: float} $calendar  #[Computed] calendar()
  */
 trait ManagesCalendarTasks
 {
@@ -69,6 +68,12 @@ trait ManagesCalendarTasks
 
     public string $progressPercentage = '0';
 
+    /** Whether the task can only be marked done once a file is attached; only its creator changes it. */
+    public bool $evidenceRequired = false;
+
+    /** Who created the task being edited, so the form locks what only its creator may change. */
+    public ?int $editingTaskCreatedBy = null;
+
     /** @var array<int, string> */
     public array $assignedTo = [];
 
@@ -86,7 +91,6 @@ trait ManagesCalendarTasks
     public function sourceTypeOptions(): array
     {
         return [
-            'milestone' => __('tasks.source_type_milestone'),
             'proposal' => __('tasks.source_type_proposal'),
             'project' => __('tasks.source_type_project'),
             'program' => __('tasks.source_type_program'),
@@ -97,18 +101,12 @@ trait ManagesCalendarTasks
     /**
      * The pickable sources for the currently selected source type.
      *
-     * @return Collection<int, Milestone>|Collection<int, Proposal>|Collection<int, Project>|Collection<int, Program>|Collection<int, HrDepartment>
+     * @return Collection<int, Proposal>|Collection<int, Project>|Collection<int, Program>|Collection<int, HrDepartment>
      */
     #[Computed]
     public function sourceOptions(): Collection
     {
         return match ($this->taskSourceType) {
-            'milestone' => Milestone::query()
-                ->select(['id', 'name', 'project_id', 'proposal_id'])
-                ->with(['project:id,name', 'proposal:id,name'])
-                ->orderBy('name')
-                ->orderBy('id')
-                ->get(),
             'project' => Project::query()->select(['id', 'name'])->orderBy('name')->orderBy('id')->get(),
             'program' => Program::options(),
             'department' => HrDepartment::query()->select(['id', 'name'])->orderBy('name')->orderBy('id')->get(),
@@ -140,7 +138,7 @@ trait ManagesCalendarTasks
     public function openEditTaskModal(int $taskId): void
     {
         $task = Task::query()
-            ->select(['id', 'slug', 'source_type', 'source_id', 'title', 'description', 'status', 'priority', 'start_date', 'due_date', 'completed_date', 'progress_percentage', 'created_by'])
+            ->select(['id', 'slug', 'source_type', 'source_id', 'title', 'description', 'status', 'priority', 'start_date', 'due_date', 'completed_date', 'progress_percentage', 'evidence_required', 'created_by'])
             ->with('taskAssignees:id,task_id,employee_id')
             ->findOrFail($taskId);
 
@@ -154,6 +152,7 @@ trait ManagesCalendarTasks
 
         $this->resetValidation();
         $this->editingTaskId = $task->id;
+        $this->editingTaskCreatedBy = $task->created_by;
         $this->title = $task->title;
         $this->description = $task->description ?? '';
         $this->taskStatus = $task->status->value;
@@ -162,6 +161,7 @@ trait ManagesCalendarTasks
         $this->dueDate = $task->due_date?->toDateString() ?? '';
         $this->completedDate = $task->completed_date?->toDateString() ?? '';
         $this->progressPercentage = (string) $task->progress_percentage;
+        $this->evidenceRequired = $task->evidence_required;
         $this->assignedTo = $task->taskAssignees->pluck('employee_id')->map(fn (int $id): string => (string) $id)->all();
         $this->taskSourceType = $task->source_type;
         $this->taskSourceId = (string) $task->source_id;
@@ -222,6 +222,7 @@ trait ManagesCalendarTasks
     {
         $this->resetValidation();
         $this->editingTaskId = null;
+        $this->editingTaskCreatedBy = null;
         $this->title = '';
         $this->description = '';
         $this->taskStatus = TaskStatus::Todo->value;
@@ -230,6 +231,7 @@ trait ManagesCalendarTasks
         $this->dueDate = '';
         $this->completedDate = '';
         $this->progressPercentage = '0';
+        $this->evidenceRequired = false;
         $this->assignedTo = [];
         $this->taskSourceType = 'proposal';
         $this->taskSourceId = '';

@@ -4,7 +4,6 @@ namespace Database\Seeders;
 
 use App\Enums\MediaCollection;
 use App\Models\Media;
-use App\Models\Milestone;
 use App\Models\Project;
 use App\Models\Risk;
 use App\Models\Task;
@@ -16,7 +15,7 @@ use Illuminate\Database\Seeder;
 use Illuminate\Support\Collection;
 
 /**
- * The delivery layer: risks, milestones, tasks, task updates and attachments.
+ * The delivery layer: risks, tasks, task updates and attachments.
  *
  * Depends on DemoDeliverySeeder.
  */
@@ -41,24 +40,7 @@ class DeliverySeeder extends Seeder
                 'project_id' => $project->id,
             ]);
 
-            $parent = Milestone::factory()->create([
-                'project_id' => $project->id,
-                'name' => 'Inception phase',
-                'responsible_user_id' => $employeeIds->random(),
-                'sequence' => 1,
-                'weight_percentage' => 30,
-            ]);
-
-            $reached = Milestone::factory()->reached()->create([
-                'project_id' => $project->id,
-                'name' => 'Baseline assessment',
-                'responsible_user_id' => $employeeIds->random(),
-                'parent_milestone_id' => $parent->id,
-                'sequence' => 2,
-                'weight_percentage' => 70,
-            ]);
-
-            $this->seedMedia($project, $reached, $users);
+            $this->seedMedia($project, $users);
 
             $proposal = $project->proposals->first();
 
@@ -66,12 +48,12 @@ class DeliverySeeder extends Seeder
                 return;
             }
 
-            $this->seedTasks($parent, $users, $employeeIds);
+            $this->seedTasks($project, $users, $employeeIds);
         });
     }
 
     /**
-     * Attach a project's paperwork and a milestone's evidence.
+     * Attach a project's paperwork.
      *
      * These rows carry no file on disk: no cloud driver is installed and
      * storage/app is empty, so the paths describe files that do not exist yet.
@@ -79,7 +61,7 @@ class DeliverySeeder extends Seeder
      *
      * @param  Collection<int, User>  $users
      */
-    protected function seedMedia(Project $project, Milestone $milestone, Collection $users): void
+    protected function seedMedia(Project $project, Collection $users): void
     {
         foreach ([MediaCollection::Proposal, MediaCollection::Agreement, MediaCollection::Photo] as $collection) {
             Media::factory()->inCollection($collection)->create([
@@ -88,31 +70,27 @@ class DeliverySeeder extends Seeder
                 'uploaded_by' => $users->random()->id,
             ]);
         }
-
-        Media::factory(2)->forMilestone($milestone->id)->create([
-            'uploaded_by' => $users->random()->id,
-        ]);
     }
 
     /**
-     * Seed a small board of tasks under one proposal milestone.
+     * Seed a small board of tasks on a funded project.
      *
      * @param  Collection<int, User>  $users
      * @param  Collection<int, int>  $employeeIds
      */
-    protected function seedTasks(Milestone $milestone, $users, Collection $employeeIds): void
+    protected function seedTasks(Project $project, $users, Collection $employeeIds): void
     {
         $assignee = TaskAssignee::factory()->state(fn (): array => ['employee_id' => $employeeIds->random()]);
 
         $open = Task::factory(2)->has($assignee, 'taskAssignees')->create([
-            'source_type' => 'milestone',
-            'source_id' => $milestone->id,
+            'source_type' => 'project',
+            'source_id' => $project->id,
             'created_by' => fn (): int => $users->random()->id,
         ]);
 
         $done = Task::factory()->completed()->has($assignee, 'taskAssignees')->create([
-            'source_type' => 'milestone',
-            'source_id' => $milestone->id,
+            'source_type' => 'project',
+            'source_id' => $project->id,
             'created_by' => $users->random()->id,
         ]);
 

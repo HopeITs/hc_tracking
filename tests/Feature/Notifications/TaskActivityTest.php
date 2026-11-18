@@ -3,7 +3,6 @@
 use App\Enums\TaskStatus;
 use App\Jobs\FanOutActivity;
 use App\Models\Activity;
-use App\Models\Milestone;
 use App\Models\Program;
 use App\Models\Project;
 use App\Models\Task;
@@ -19,15 +18,14 @@ beforeEach(fn () => $this->seed(RolesAndPermissionsSeeder::class));
 
 test('creating a task records who created it, in which program', function () {
     $actor = Activity::withoutRecording(fn () => User::factory()->create());
-    [$program, $milestone] = Activity::withoutRecording(function (): array {
+    [$program, $project] = Activity::withoutRecording(function (): array {
         $program = Program::factory()->create();
-        $milestone = Milestone::factory()->create(['project_id' => Project::factory()->create(['program_id' => $program->id])->id]);
 
-        return [$program, $milestone];
+        return [$program, Project::factory()->create(['program_id' => $program->id])];
     });
 
     $this->actingAs($actor);
-    $task = Task::factory()->create(['source_type' => 'milestone', 'source_id' => $milestone->id, 'title' => 'Plan']);
+    $task = Task::factory()->create(['source_type' => 'project', 'source_id' => $project->id, 'title' => 'Plan']);
 
     $activity = Activity::query()->where('event', 'task.created')->sole();
 
@@ -108,11 +106,11 @@ test('attachments and subtasks are recorded on their parent task', function () {
     $parent = Activity::withoutRecording(fn () => Task::factory()->create());
 
     TaskAttachment::factory()->create(['task_id' => $parent->id]);
-    $subtask = Activity::withoutRecording(fn () => Task::factory()->create(['parent_task_id' => $parent->id]));
-    Task::factory()->create(['parent_task_id' => $parent->id, 'title' => 'Buy tanks']);
+    $subtask = Activity::withoutRecording(fn () => Task::factory()->subtaskOf($parent)->create());
+    Task::factory()->subtaskOf($parent)->create(['title' => 'Buy tanks']);
     $subtask->update(['status' => TaskStatus::Done]);
 
-    $onParent = Activity::query()->where('subject_id', $parent->id)->orderBy('id')->pluck('event')->all();
+    $onParent = Activity::query()->where('subject_type', 'task')->where('subject_id', $parent->id)->orderBy('id')->pluck('event')->all();
 
     expect($onParent)->toBe(['task.attachment_added', 'task.subtask_added', 'task.subtask_completed']);
 });

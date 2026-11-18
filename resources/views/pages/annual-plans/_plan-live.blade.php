@@ -36,11 +36,14 @@
             if (isset($counts[$key])) { $counts[$key]++; }
         }
     }
-    $people = ['m' => 0, 'f' => 0, 'd' => 0, 'month' => null];
+    $people = ['m' => 0, 'f' => 0, 'd' => 0, 'months' => []];
     foreach ($centres as $centre) {
         $latest = $execution->updates()->filter(fn ($u) => $u->project_id === $centre->id && $u->status->isOnThePlan())->sortByDesc('month')->first();
-        if ($latest) { $people['m'] += (int) $latest->males; $people['f'] += (int) $latest->females; $people['d'] += (int) $latest->with_disability; $people['month'] = $latest->month; }
+        if ($latest) { $people['m'] += (int) $latest->males; $people['f'] += (int) $latest->females; $people['d'] += (int) $latest->with_disability; $people['months'][$latest->month->format('Y-m')] = $latest->month; }
     }
+    $peopleText = count($people['months']) > 1
+        ? __('annual_plans.live.stat_people_mixed', ['m' => $people['m'], 'f' => $people['f'], 'd' => $people['d']])
+        : __('annual_plans.live.stat_people', ['month' => ($people['months'] === [] ? null : reset($people['months']))?->translatedFormat('F') ?? '—', 'm' => $people['m'], 'f' => $people['f'], 'd' => $people['d']]);
 @endphp
 
 <section class="ap-card" data-live-plan>
@@ -49,11 +52,11 @@
         @if (count($centres) < count($execution->projects()))<span class="dk-pill">{{ __('annual_plans.live.own_centre_only') }}</span>@endif
     </div>
     <div class="ap-stats">
-        <div class="ap-stat"><b style="color: var(--good)">{{ $plan->items->filter(fn ($item) => $execution->isDoneEverywhere($item))->count() }}</b><span>{{ __('annual_plans.live.stat_done') }}</span></div>
+        <div class="ap-stat" data-test="live-count-done"><b style="color: var(--good)">{{ $counts['done'] }}</b><span>{{ __('annual_plans.live.stat_done') }}</span></div>
         <div class="ap-stat"><b style="color: var(--active)">{{ $counts['on_track'] }}</b><span>{{ __('annual_plans.live.stat_on_track') }}</span></div>
         <div class="ap-stat"><b style="color: var(--bad)">{{ $counts['late'] }}</b><span>{{ __('annual_plans.live.stat_late') }}</span></div>
         <div class="ap-stat"><b style="color: var(--warn)">{{ $counts['suspended'] }}</b><span>{{ __('annual_plans.live.stat_suspended') }}</span></div>
-        <div class="ap-stat"><b>{{ $people['m'] + $people['f'] }}</b><span>{{ __('annual_plans.live.stat_people', ['month' => $people['month']?->translatedFormat('F') ?? '—', 'm' => $people['m'], 'f' => $people['f'], 'd' => $people['d']]) }}</span></div>
+        <div class="ap-stat"><b>{{ $people['m'] + $people['f'] }}</b><span data-test="live-people">{{ $peopleText }}</span></div>
     </div>
     <div class="ap-legend">
         <span><i class="ap-lg is-plan"></i>{{ __('annual_plans.live.planned_week') }}</span>

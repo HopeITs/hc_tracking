@@ -106,8 +106,8 @@
             <span class="dk-health {{ $healthClass }}" data-test="project-health" title="{{ $schedule['label'] }}">{{ $schedule['label'] }}</span>
 
             <div class="dk-pjl-prog">
-                <x-ui.progress-bar :value="$progress" :tone="$schedule['tone']" :label="__('projects.milestone_progress_for', ['name' => $project->name])" label-hidden />
-                <span class="dk-num" title="{{ $progress === null ? __('projects.no_weighted_milestones') : __('projects.milestones_reached', ['reached' => $project->reached_milestones_count, 'total' => $project->milestones_count]) }}">{{ $progress === null ? '—' : round($progress).'%' }}</span>
+                <x-ui.progress-bar :value="$progress" :tone="$schedule['tone']" :label="__('projects.progress_for', ['name' => $project->name])" label-hidden />
+                <span class="dk-num" title="{{ __('projects.progress_not_measured') }}">{{ $progress === null ? '—' : round($progress).'%' }}</span>
             </div>
 
             <p class="dk-pjl-end dk-num">

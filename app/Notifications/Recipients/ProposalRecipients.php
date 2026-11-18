@@ -41,7 +41,7 @@ use App\Support\Slots;
  * The activity carries names and dates only.
  *
  * The approval rebase (proposal.plan_rebased, T31) is the system's: it tells
- * the project owners, and only when a milestone or task date was cut at the
+ * the project owners, and only when a task date was cut at the
  * grant end, so they can re-plan it. No watcher hears of it, and the owners
  * (who hold no proposals.view) skip the permission check for it.
  *
@@ -329,13 +329,12 @@ final class ProposalRecipients extends WatcherRecipients
     }
 
     /**
-     * Whether the approval rebase cut a milestone or task date at the grant
+     * Whether the approval rebase cut a task date at the grant
      * end (RebaseProposalPlan's clipped lists).
      */
     private function hasClippedDates(Activity $activity): bool
     {
-        return ($activity->properties['clipped_milestones'] ?? []) !== []
-            || ($activity->properties['clipped_tasks'] ?? []) !== [];
+        return ($activity->properties['clipped_tasks'] ?? []) !== [];
     }
 
     /**

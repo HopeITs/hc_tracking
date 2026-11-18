@@ -1,7 +1,6 @@
 <?php
 
 use App\Enums\Concerns\HasStatusTone;
-use App\Enums\MilestoneStatus;
 use App\Enums\ProjectStatus;
 use App\Enums\RagStatus;
 use App\Enums\StatusTone;
@@ -35,7 +34,7 @@ test('every status enum answers a tone for every case', function (string $enum) 
 
 test('the status-like enums all declare a tone', function () {
     expect(array_keys(statusToneEnums()))->toContain(
-        'TaskStatus', 'MilestoneStatus', 'ProposalStatus', 'ProjectStatus', 'ArStatus', 'TaskPriority',
+        'TaskStatus', 'ProposalStatus', 'ProjectStatus', 'ArStatus', 'TaskPriority',
         'RagStatus', 'DeliveryState', 'ReportStatus', 'MonthlyReportStatus', 'ActivityStatus',
         'ReportTemplateStatus', 'ReportTemplateLineStatus', 'AssignmentStatus', 'ReopenRequestStatus',
     );
@@ -49,7 +48,6 @@ test('the W-28 inconsistencies map onto the unified tones', function (HasStatusT
     'done is good' => [TaskStatus::Done, StatusTone::Good],
     'in progress is active' => [TaskStatus::InProgress, StatusTone::Active],
     'under review is warn' => [TaskStatus::UnderReview, StatusTone::Warn],
-    'postponed is warn' => [MilestoneStatus::Postponed, StatusTone::Warn],
     'approved project is good' => [ProjectStatus::Approved, StatusTone::Good],
 ]);
 

@@ -177,3 +177,11 @@ test('a correct Arabic search that finds a record is never swapped for a page ma
 
     expect(askAs(User::factory()->role('Super Admin')->create(), 'حلب')['corrected'])->toBeNull();
 });
+
+test('server pages, actions and "nothing found" show only for the text they answered', function () {
+    Livewire::actingAs(User::factory()->role('Financial')->create())
+        ->test('desk.ask')
+        ->set('query', 'transfers')
+        ->assertSeeHtml("x-show=\"instant.length === 0 && typed.trim() === 'transfers'\"")
+        ->assertSeeHtml('wire:loading.delay.longer');
+});

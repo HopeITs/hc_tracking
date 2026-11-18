@@ -55,9 +55,23 @@ function systemActions(): array
     ];
 }
 
+/**
+ * Actions that refuse with a value instead of a 403: they check with
+ * Gate::denies() and return false, so the caller can quietly undo a gesture.
+ * The test below keeps each one honest: it must still call Gate::denies().
+ *
+ * @return list<string>
+ */
+function softRefusalActions(): array
+{
+    return [
+        'Tasks/RescheduleTask.php', // a refused calendar drop snaps the card back to its day
+    ];
+}
+
 it('authorizes inside every sensitive action', function (string $directory) {
     $files = File::files(app_path("Actions/{$directory}"));
-    $stubs = [...lifecycleActionStubs(), ...systemActions(), ...array_keys(callerAuthorizedActions())];
+    $stubs = [...lifecycleActionStubs(), ...systemActions(), ...array_keys(callerAuthorizedActions()), ...softRefusalActions()];
 
     expect($files)->not->toBeEmpty();
 
@@ -103,3 +117,9 @@ it('keeps deletes out of the Livewire form traits', function (string $file) {
     expect(File::get(app_path("Livewire/Concerns/{$file}")))
         ->not->toMatch('/->(delete|forceDelete)\(/');
 })->with(['ManagesReportForm.php', 'ManagesTransferForm.php', 'ManagesAgreementForm.php', 'ManagesDonorForm.php']);
+
+it('keeps every soft-refusal action checking the gate', function () {
+    foreach (softRefusalActions() as $action) {
+        expect(File::get(app_path("Actions/{$action}")))->toContain('Gate::denies(');
+    }
+});

@@ -38,7 +38,11 @@ test('quick access refuses what the viewer may not open, what is already there a
         ->and($quick->add($user, 'new:task'))->toBeFalse()
         ->and($user->fresh()->desk_quick_access)->toBe(['new:task']);
 
-    $offered = array_map(fn (array $page): string => 'go:'.$page['route'], app(AskCommands::class)->for($user)['pages']);
+    $index = app(AskCommands::class)->for($user);
+    $offered = [
+        ...array_map(fn (array $page): string => 'go:'.$page['route'], $index['pages']),
+        ...array_map(fn (array $action): string => 'new:'.$action['key'], $index['actions']),
+    ];
     $user->forceFill(['desk_quick_access' => array_slice($offered, 0, QuickAccess::MaxEntries)])->save();
 
     expect($quick->add($user, 'new:task'))->toBeFalse()

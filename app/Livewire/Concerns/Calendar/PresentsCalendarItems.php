@@ -5,13 +5,11 @@ declare(strict_types=1);
 namespace App\Livewire\Concerns\Calendar;
 
 use App\Enums\ArStatus;
-use App\Enums\MilestoneStatus;
 use App\Enums\MonthlyReportStatus;
 use App\Enums\ReportStatus;
 use App\Enums\TaskStatus;
 use App\Models\Donor;
 use App\Models\DonorReport;
-use App\Models\Milestone;
 use App\Models\MonthlyReport;
 use App\Models\Project;
 use App\Models\Report;
@@ -34,8 +32,7 @@ trait PresentsCalendarItems
      * Whether a calendar item's date has passed with its work unfinished,
      * reusing each model's own definition so the calendar never disagrees
      * with the item's page: a task overdue or missed, a report still a draft
-     * after its date, a milestone still Planned after its planned end, a
-     * donor follow-up or donor report past due, a project still open after
+     * after its date, a donor follow-up or donor report past due, a project still open after
      * its end date. Anything else (transfers, proposals, review meetings)
      * is never marked late here.
      */
@@ -44,7 +41,6 @@ trait PresentsCalendarItems
         return match (true) {
             $item instanceof Task => $item->isOverdue() || $item->isMissed(),
             $item instanceof Report => $item->isOverdue(),
-            $item instanceof Milestone => $item->isMissed(),
             $item instanceof Donor => $item->isFollowUpOverdue(),
             $item instanceof DonorReport => ! $item->isSubmitted() && $item->isOverdue(),
             $item instanceof Project => $item->end_date !== null
@@ -64,20 +60,6 @@ trait PresentsCalendarItems
         return $this->isLate($project)
             ? self::LATE_TONE
             : 'bg-secondary-soft text-secondary-dark dark:bg-surface-2 dark:text-ink';
-    }
-
-    protected function markerTone(Milestone $milestone): string
-    {
-        if ($milestone->isMissed() || $milestone->isOverdue()) {
-            return 'bg-status-critical-soft text-primary dark:text-brand-text';
-        }
-
-        return match ($milestone->status) {
-            MilestoneStatus::Reached => 'bg-status-good-soft text-status-good',
-            MilestoneStatus::Ongoing => 'bg-status-warn-soft text-status-warn',
-            MilestoneStatus::Postponed, MilestoneStatus::Cancelled => 'bg-secondary-soft text-secondary-medium dark:bg-surface-2 dark:text-ink-muted',
-            MilestoneStatus::Planned => 'bg-white text-secondary-dark ring-1 ring-secondary-soft dark:bg-surface-1 dark:text-ink dark:ring-line',
-        };
     }
 
     protected function taskTone(Task $task): string

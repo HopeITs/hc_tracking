@@ -20,7 +20,6 @@ use App\Notifications\Recipients\IndicatorRecipients;
 use App\Notifications\Recipients\LibraryIndicatorRecipients;
 use App\Notifications\Recipients\ManagedRecipients;
 use App\Notifications\Recipients\MealCoverageRecipients;
-use App\Notifications\Recipients\MilestoneRecipients;
 use App\Notifications\Recipients\MonthlyReportRecipients;
 use App\Notifications\Recipients\ProjectRecipients;
 use App\Notifications\Recipients\ProposalRecipients;
@@ -46,7 +45,6 @@ return [
     */
     'modules' => [
         'tasks' => TaskRecipients::class,
-        'milestones' => MilestoneRecipients::class,
         'projects' => ProjectRecipients::class,
         'programs' => ManagedRecipients::class,
         'annual-plans' => ManagedRecipients::class,
@@ -139,7 +137,6 @@ return [
     */
     'module_icons' => [
         'tasks' => 'clipboard-document-check',
-        'milestones' => 'flag',
         'projects' => 'rectangle-stack',
         'programs' => 'briefcase',
         'annual-plans' => 'calendar-days',

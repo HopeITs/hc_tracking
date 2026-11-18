@@ -19,7 +19,6 @@
             </div>
         @else
             <div class="flex flex-wrap items-center gap-4 text-xs text-secondary-medium dark:text-ink-muted">
-                <span class="flex items-center gap-1.5"><span class="size-2 shrink-0 rounded-full {{ $typeDotClasses['milestone'] }}"></span>{{ __('tasks.milestone') }}</span>
                 <span class="flex items-center gap-1.5"><span class="size-2 shrink-0 rounded-full {{ $typeDotClasses['task'] }}"></span>{{ __('tasks.task') }}</span>
                 <span class="flex items-center gap-1.5"><span class="size-2 shrink-0 rounded-full {{ $typeDotClasses['report'] }}"></span>{{ __('calendar.report_deadline') }}</span>
                 @if ($this->canSeeType('monthly_report'))

@@ -97,13 +97,20 @@ export function wordScore(typed, word) {
 
     const length = [...typed].length;
 
-    if (length >= 2 && word.startsWith(typed)) {
+    if (length >= 1 && word.startsWith(typed)) {
         return 2;
     }
 
     const allowed = length >= 7 ? 2 : length >= 4 ? 1 : 0;
 
-    return allowed > 0 && Math.abs([...word].length - length) <= allowed && distance(typed, word) <= allowed ? 1 : 0;
+    if (allowed > 0 && Math.abs([...word].length - length) <= allowed && distance(typed, word) <= allowed) {
+        return 1;
+    }
+
+    // A typo inside a half-typed word ("propas" → "proposals"): the list must not empty mid-word.
+    const letters = [...word];
+
+    return length >= 5 && letters.length > length && distance(typed, letters.slice(0, length).join('')) <= allowed ? 1 : 0;
 }
 
 /** The best score of a typed word against a list of words. */
@@ -269,7 +276,7 @@ function rowsFor(typed, context, commandsOnly) {
     const push = (row) => rows.push({ ...row, score: row.score + frecency(context.recent, row.key) });
 
     if (commandsOnly) {
-        return commandRows(tokens, context).sort((a, b) => b.score - a.score).map((row) => ({ ...row, html: highlight(row.label, tokens) }));
+        return commandRows(tokens, context).sort(byRank).map((row) => ({ ...row, html: highlight(row.label, tokens) }));
     }
 
     // Desk tabs: "close all tabs", "close <tab>", "switch to <tab>", or a tab's own name.
@@ -279,7 +286,8 @@ function rowsFor(typed, context, commandsOnly) {
         }
 
         context.tabs.forEach((tab) => {
-            const score = terms.length ? entryScore(terms, { label: tab.title, words: normalize(tab.url) }) : (wantsTab ? 1 : 0);
+            // By its title only: a record's address ("…/tasks/proposed-budget-file") matched unrelated words.
+            const score = terms.length ? entryScore(terms, { label: tab.title }) : (wantsTab ? 1 : 0);
 
             if (score > 0) {
                 push(wantsClose
@@ -346,12 +354,23 @@ function rowsFor(typed, context, commandsOnly) {
     return finish(rows, terms, tokens);
 }
 
+const layoutWords = ['layout', 'layouts', 'template', 'templates', 'تخطيط', 'قالب'];
+
+/** Equal scores keep one order, so the list never reshuffles between keys: pages, forms, tabs, then commands. */
+const kindOrder = { page: 0, action: 1, add: 2, remove: 2, tab: 3, 'close-tab': 3, 'close-all': 3, command: 4 };
+
+export function byRank(a, b) {
+    return (b.score - a.score)
+        || ((kindOrder[a.kind] ?? 5) - (kindOrder[b.kind] ?? 5))
+        || String(a.label).localeCompare(String(b.label));
+}
+
 /** Best first, each row once, its name marked where it matched. */
 function finish(rows, terms, tokens) {
     const seen = new Set();
 
     return rows
-        .sort((a, b) => b.score - a.score)
+        .sort(byRank)
         .filter((row) => ! seen.has(row.key) && seen.add(row.key))
         .map((row) => ({ ...row, html: highlight(row.label, terms.length ? terms : tokens) }));
 }
@@ -385,8 +404,11 @@ function commandRows(tokens, context, terms = tokens) {
             add('cmd:customize', texts.customize, 'edit', customize + 3, { command: 'customize' });
         }
 
+        // A layout's purpose words ("proposals", "donors") would match everyday searches: they count only after "layout".
+        const saysLayout = tokens.some((token) => layoutWords.includes(token));
+
         index.layouts.forEach((layout) => {
-            const score = terms.length ? entryScore(terms, layout) : 0;
+            const score = terms.length ? entryScore(terms, saysLayout ? layout : { label: layout.label }) : 0;
 
             if (score > 0) {
                 add(`layout:${layout.key}`, texts.layout.replace('__L__', layout.label), 'grid', score + 2, { command: 'layout', layout: layout.key });

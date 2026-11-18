@@ -46,15 +46,14 @@ Before planning or editing, find the row whose globs match the file's path and r
 | {resources/views/components/ui/gantt.blade.php,resources/js/gantt/**,app/Livewire/Concerns/*Gantt.php} | .ai/rules/livewire-concerns.md |
 | {app/Models/User.php,app/Console/Commands/**,app/Http/Middleware/**,app/Actions/Fortify/**} | .ai/rules/middleware-actions-fortify.md |
 | {config/database.php,.env.example,database/migrations/**} | .ai/rules/migrations.md |
-| resources/views/pages/milestones/** | .ai/rules/milestones.md |
-| resources/views/pages/{milestones,tasks}/** | .ai/rules/milestonestasks.md |
+| resources/views/pages/tasks/** | .ai/rules/task-calendar.md |
 | {app/Models/Hr*.php,app/Support/EmployeeProfile.php,app/Models/Concerns/RemembersHrLookup.php} | .ai/rules/models-concerns.md |
 | app/Models/**, app/Models/Account.php, app/Models/Hr*.php, app/Models/Program.php, app/Models/User.php, app/Models/Task.php | .ai/rules/models.md |
 | resources/views/pages/admin/*narrative-questions* | .ai/rules/narrative-questions.md |
 | {app/Http/Middleware/SetLocale.php,app/Http/Controllers/SwitchLocaleController.php,resources/views/components/navigation/sidebar.blade.php,resources/css/*.css} | .ai/rules/navigation-css.md |
 | resources/views/components/{navigation/sidebar.blade.php,ui/panel.blade.php,ui/stat-tile.blade.php,ui/data-table.blade.php} | .ai/rules/navigation.md |
 | resources/views/pages/notifications/** | .ai/rules/notifications.md |
-| app/Observers/**, app/Observers/{MilestoneObserver,ResultObserver}.php | .ai/rules/observers.md |
+| app/Observers/** | .ai/rules/observers.md |
 | tests/PHPStan/** | .ai/rules/p-h-p-stan.md |
 | {database/migrations/**,app/Models/DonorReport.php,resources/views/pages/funding-agreements/**} | .ai/rules/pages-funding-agreements.md |
 | resources/views/pages/** | .ai/rules/pages.md |

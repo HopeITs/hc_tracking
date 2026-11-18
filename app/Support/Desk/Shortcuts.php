@@ -40,7 +40,6 @@ final class Shortcuts
         'task' => ['route' => 'tasks.index', 'ability' => 'tasks.create', 'icon' => 'clipboard-document-check', 'label' => 'desk.ask_new.task'],
         'proposal' => ['route' => 'proposals.index', 'ability' => 'proposals.create', 'icon' => 'document-plus', 'label' => 'desk.ask_new.proposal'],
         'project' => ['route' => 'projects.index', 'ability' => 'projects.create', 'icon' => 'folder-plus', 'label' => 'desk.ask_new.project'],
-        'milestone' => ['route' => 'milestones.index', 'ability' => 'milestones.create', 'icon' => 'flag', 'label' => 'desk.ask_new.milestone'],
         'report' => ['route' => 'reports.index', 'ability' => 'reports.create', 'icon' => 'document-chart-bar', 'label' => 'desk.ask_new.report'],
         'donor' => ['route' => 'donors.index', 'ability' => 'donors.create', 'icon' => 'gift', 'label' => 'desk.ask_new.donor'],
         'agreement' => ['route' => 'funding-agreements.index', 'ability' => 'funding-agreements.create', 'icon' => 'document-currency-dollar', 'label' => 'desk.ask_new.agreement'],

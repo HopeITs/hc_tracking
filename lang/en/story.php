@@ -59,7 +59,6 @@ return [
         'submit_report' => 'Submit the :month report',
         'fix_report' => 'Fix and resubmit the :month report',
         'validate_report' => 'Validate the :month report',
-        'reach_milestone' => 'Reach “:name” by :date',
         'nothing_waiting' => 'Nothing is waiting. Delivery is on course.',
         'final_report' => 'Upload the final report and record the donor\'s acceptance',
         'closed' => 'Closed. A new proposal reopens it as a draft.',
@@ -78,11 +77,11 @@ return [
     'later' => [
         '0' => 'Created in a center for one program. No dates yet.',
         '1' => 'A short first note for one donor, reviewed, then sent. It can be skipped with a reason.',
-        '2' => 'The plan: logframe, indicators, MEAL targets, milestones, department tasks, budget. Reviewed before it goes out.',
+        '2' => 'The plan: logframe, indicators, MEAL targets, department tasks, budget. Reviewed before it goes out.',
         '3' => 'The donor approves, rejects or puts it on hold. Approval fixes the dates; the owner acknowledges them.',
         '4' => 'MEAL picks what gets reported, how often, by whom and with which evidence. Confirming starts the project.',
         '5' => 'A report opens every month. The center manager submits, MEAL validates. Only validated numbers count.',
-        '6' => 'Final report milestone, the file and the donor\'s acceptance close the proposal and the project.',
+        '6' => 'The final report file and the donor\'s acceptance close the proposal and the project.',
     ],
     'proposal_switch' => 'Proposals on this project',
     'acts' => [
@@ -135,7 +134,7 @@ return [
     'next_stage' => 'Next stage',
     'stage_done' => 'Done',
     'stage_later' => 'Later',
-    'nothing_coming_up' => 'No milestone is waiting. Everything planned is reached.',
+    'nothing_coming_up' => 'No open task has a due date coming up.',
     'no_reports_yet' => 'Monthly reports start once the project is running.',
     'donors' => 'Donors',
     'history' => [

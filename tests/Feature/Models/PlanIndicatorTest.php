@@ -11,6 +11,7 @@ use App\Models\ProposalLocation;
 use App\Models\Report;
 use App\Models\Result;
 use App\Support\Reporting\ReportPlace;
+use Carbon\CarbonImmutable;
 
 test('a target planned in a annual plan resolves that plan as its source', function () {
     $plan = AnnualPlan::factory()->create();
@@ -90,6 +91,25 @@ test('a percentage target takes the latest approved level rather than a sum', fu
         ->and($target->pendingValue())->toBe(0.0)
         ->and($target->achievementStatus())->toBe('in_progress');
 });
+
+test('achievement through a due date includes only approved reports dated on or before it', function (IndicatorMeasure $measure, float $expected) {
+    $indicator = Indicator::factory()->create(['measure' => $measure]);
+    $target = PlanIndicator::factory()->for($indicator)->create();
+    Report::factory()->approved()->for($target)->create(['value' => 10, 'planned_date' => '2026-06-01']);
+    $onDueDate = Report::factory()->approved()->for($target)->create(['value' => 30, 'planned_date' => '2026-06-15']);
+    Report::factory()->approved()->for($target)->create(['value' => 90, 'planned_date' => '2026-06-16']);
+    Report::factory()->reviewed()->for($target)->create(['value' => 100, 'planned_date' => '2026-06-10']);
+
+    $dueDate = CarbonImmutable::parse('2026-06-15');
+    expect($target->achievedValue($dueDate))->toBe($expected);
+
+    $onDueDate->update(['value' => 20]);
+    expect($target->fresh()->achievedValue($dueDate))->toBe($measure === IndicatorMeasure::Numeric ? 30.0 : 20.0);
+})->with([
+    'numeric counts' => [IndicatorMeasure::Numeric, 40.0],
+    'percentage levels' => [IndicatorMeasure::Percentage, 30.0],
+    'average levels' => [IndicatorMeasure::Average, 30.0],
+]);
 
 test('an average target takes the latest approved level, and the sql agrees', function () {
     $target = PlanIndicator::factory()

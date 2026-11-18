@@ -18,15 +18,14 @@ use Illuminate\Validation\Rules\Enum;
 use Livewire\Attributes\Computed;
 
 /**
- * The "Add task" dialog on the program, project, proposal and milestone
- * pages: a task raised straight against the record the page shows.
+ * The "Add task" dialog on the program, project and proposal pages: a task raised straight against the record the page shows.
  *
  * The page renders x-tasks.add-task-modal, names its record through
  * quickTaskSource() and forgets its memoised task list in quickTaskCreated().
  *
  * When that record sits inside a program, the dialog also shows a "Goes to"
- * field listing every place in the program (the program itself, its
- * projects, their milestones), pre-filled with quickTaskTarget(), so it is
+ * field listing every place in the program (the program itself and its
+ * projects), pre-filled with quickTaskTarget(), so it is
  * always visible where the new task will land.
  */
 trait AddsQuickTask
@@ -46,7 +45,10 @@ trait AddsQuickTask
     /** @var array<int, string> */
     public array $newTaskAssignedTo = [];
 
-    /** Where the new task goes: "program", "project:ID" or "milestone:ID". */
+    /** Whether the task can only be marked done once a file is attached. */
+    public bool $newTaskEvidenceRequired = false;
+
+    /** Where the new task goes: "program" or "project:ID". */
     public string $newTaskTarget = '';
 
     /**
@@ -76,7 +78,7 @@ trait AddsQuickTask
      * Every place in the page record's program, or null when it is not in one
      * (then the task simply goes to the page's record and the field is hidden).
      *
-     * @return array{program: array{id: int, name: string}, projects: list<array{id: int, name: string, milestones: list<array{id: int, name: string}>}>}|null
+     * @return array{program: array{id: int, name: string}, projects: list<array{id: int, name: string}>}|null
      */
     #[Computed]
     public function quickTaskPlaces(): ?array
@@ -116,6 +118,7 @@ trait AddsQuickTask
         $this->newTaskPriority = TaskPriority::Medium->value;
         $this->newTaskDueDate = '';
         $this->newTaskAssignedTo = [];
+        $this->newTaskEvidenceRequired = false;
         $this->newTaskTarget = $this->quickTaskTarget();
         $this->showAddTaskModal = true;
     }
@@ -139,6 +142,7 @@ trait AddsQuickTask
             'newTaskDueDate' => ['nullable', 'date'],
             'newTaskAssignedTo' => ['array'],
             'newTaskAssignedTo.*' => ['integer', Rule::exists(HrEmployee::class, 'id')],
+            'newTaskEvidenceRequired' => ['boolean'],
         ], [
             'newTaskTitle.required' => __('tasks.enter_a_task_title'),
             'newTaskAssignedTo.*.exists' => __('tasks.the_selected_assignee_is_no_longer_available'),

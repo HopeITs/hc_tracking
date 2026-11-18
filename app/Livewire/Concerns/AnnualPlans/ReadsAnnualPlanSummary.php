@@ -156,9 +156,7 @@ trait ReadsAnnualPlanSummary
 
     /**
      * The read-only results chain of the plan (T16): the program framework
-     * measured by this plan's targets only, plus the activities whose linked
-     * milestones are planned in the plan year. T24's annual_plan_activities
-     * replaces that milestone rule after October.
+     * measured by this plan's targets only.
      *
      * @return array<string, mixed>
      */

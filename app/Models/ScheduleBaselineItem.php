@@ -12,7 +12,7 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 /**
- * One milestone's or task's dates as they stood when a baseline was saved.
+ * One task's dates as they stood when a baseline was saved.
  *
  * @property int $id
  * @property int $schedule_baseline_id

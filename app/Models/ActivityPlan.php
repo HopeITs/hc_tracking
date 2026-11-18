@@ -103,6 +103,12 @@ class ActivityPlan extends Model
         return $this->hasMany(ActivityPlanItem::class)->orderBy('sort')->orderBy('id');
     }
 
+    /** @return HasMany<ActivityPlanMilestone, $this> */
+    public function milestones(): HasMany
+    {
+        return $this->hasMany(ActivityPlanMilestone::class)->orderBy('due_date')->orderBy('id');
+    }
+
     /**
      * @return HasMany<ActivityPlanFollowUp, $this>
      */

@@ -1,15 +1,11 @@
 <?php
 
 use App\Enums\ActivityStatus;
-use App\Enums\MilestoneStatus;
 use App\Enums\ResultType;
-use App\Enums\TaskKind;
-use App\Enums\TaskStatus;
 use App\Models\ActivitySchedule;
 use App\Models\AnnualPlan;
 use App\Models\Indicator;
 use App\Models\LibraryIndicator;
-use App\Models\Milestone;
 use App\Models\MonthlyReport;
 use App\Models\PlanIndicator;
 use App\Models\Program;
@@ -18,7 +14,6 @@ use App\Models\ProjectActivityStatus;
 use App\Models\Proposal;
 use App\Models\Report;
 use App\Models\Result;
-use App\Models\Task;
 use App\Models\User;
 use Database\Seeders\RolesAndPermissionsSeeder;
 use Illuminate\Support\Facades\DB;
@@ -80,20 +75,6 @@ function chainTarget(Indicator $indicator, $source, ?Project $project, float $ta
     ]);
 }
 
-function chainMilestone(Project $project, ?Result $activity, string $start = '2026-03-01', ?Proposal $proposal = null): Milestone
-{
-    $milestone = Milestone::factory()->create([
-        'project_id' => $project->id,
-        'proposal_id' => $proposal?->id,
-        'planned_start_date' => $start,
-        'planned_end_date' => $start,
-        'status' => MilestoneStatus::Planned,
-    ]);
-    $milestone->forceFill(['result_id' => $activity?->id])->saveQuietly();
-
-    return $milestone;
-}
-
 function chainTab(User $user, Proposal $proposal): Testable
 {
     return Livewire::actingAs($user)->test('proposals.logframe', ['proposalId' => $proposal->id])->set('view', 'chain');
@@ -153,27 +134,18 @@ test('achievement counts approved reports only, per target', function () {
         ->assertDontSeeHtml('data-percent="60"');
 });
 
-test('the four gap markers flag what is missing in the chain', function () {
+test('the gap markers flag what is missing in the chain', function () {
     $chain = chainProposalFramework($this->proposal, $this->centerA, $this->centerB);
     $bareIndicator = chainIndicator($chain['outcome'], 'Households served');
-    chainMilestone($this->centerA, null, proposal: $this->proposal)->forceFill(['name' => 'Handover ceremony'])->saveQuietly();
 
     $html = chainTab($this->viewer, $this->proposal)->html();
 
     expect($html)
         ->toContain('data-chain-gap="no_indicators"')
         ->toContain('data-chain-gap="no_target"')
-        ->toContain('data-chain-gap="no_milestone"')
-        ->toContain('data-chain-gap="unlinked_milestone"')
         ->toContain(__('results_framework.chain_gap_no_indicators'))
         ->toContain(__('results_framework.chain_gap_no_target'))
-        ->toContain(__('results_framework.chain_gap_no_milestone'))
-        ->toContain('Handover ceremony')
         ->and(substr_count($html, 'data-chain-gap="no_target"'))->toBe(1);
-
-    chainMilestone($this->centerA, $chain['activity']);
-
-    expect(chainTab($this->viewer, $this->proposal)->html())->not->toContain('data-chain-gap="no_milestone"');
 });
 
 test('an indicator filter narrows the chain and promotes a node with its hidden lineage', function () {
@@ -223,8 +195,6 @@ test('the chain reads a flat number of queries for 3 or 30 nodes', function (str
                 $activity = chainNode($proposal, ResultType::Activity, chainNode($proposal, ResultType::Output, $outcome));
                 $target = chainTarget(chainIndicator($outcome), $source, $this->centerA, 10);
                 Report::factory()->approved()->create(['plan_indicator_id' => $target->id, 'value' => 4]);
-                $milestone = chainMilestone($this->centerA, $activity);
-                Task::factory()->create(['source_type' => 'milestone', 'source_id' => $milestone->id, 'department_id' => 1, 'kind' => TaskKind::General]);
                 ProjectActivityStatus::factory()->create(['project_id' => $this->centerA->id, 'result_id' => $activity->id, 'monthly_report_id' => $report->id]);
                 ActivitySchedule::factory()->create(['result_id' => $activity->id, 'month' => '2026-03-01']);
             }
@@ -262,8 +232,7 @@ test('proposal and donor names render as text without links for a user without p
     $proposalImpact = chainNode($this->proposal, ResultType::Impact, programId: $this->program->id);
     $proposalImpact->forceFill(['contributes_to_result_id' => $programImpact->id])->saveQuietly();
     $donorName = $this->proposal->donor->name;
-    $meal = mealManager();
-
+    $meal = User::factory()->role('MEAL')->create();
     Livewire::actingAs($meal)->test('pages::programs.show', ['program' => $this->program])->set('tab', 'results')
         ->assertSee('Water Access Proposal')
         ->assertSee($donorName)
@@ -301,52 +270,14 @@ test('an empty framework offers Start Logical Framework only to results.create h
         ->assertDontSee(__('results_framework.chain_start'));
 });
 
-/**
- * A milestone with a status and a weight, linked to an activity.
- */
-function chainWeightedMilestone(Project $project, Result $activity, string $name, MilestoneStatus $status, string $weight, ?Proposal $proposal = null): Milestone
-{
-    $milestone = chainMilestone($project, $activity, proposal: $proposal);
-    $milestone->forceFill(['name' => $name, 'status' => $status, 'weight_percentage' => $weight])->saveQuietly();
-
-    return $milestone;
-}
-
-test('an activity shows its milestones per center with status and weighted progress, cancelled ones left out', function () {
-    $chain = chainProposalFramework($this->proposal, $this->centerA, $this->centerB);
-    chainWeightedMilestone($this->centerA, $chain['activity'], 'Drill well one', MilestoneStatus::Reached, '30');
-    chainWeightedMilestone($this->centerA, $chain['activity'], 'Drill well two', MilestoneStatus::Planned, '50');
-    chainWeightedMilestone($this->centerA, $chain['activity'], 'Soil survey', MilestoneStatus::Cancelled, '20');
-    chainWeightedMilestone($this->centerB, $chain['activity'], 'Pump installed', MilestoneStatus::Reached, '40', $this->proposal);
-
-    chainTab($this->viewer, $this->proposal)
-        ->assertSeeHtml('data-chain-milestones')
-        ->assertSeeInOrder(['Rehabilitate the village wells.', 'Hope Center Sarmada', 'Drill well one', 'Drill well two', 'Soil survey', 'Unmapped Water Project', 'Pump installed'])
-        ->assertSeeHtml('data-chain-milestone-progress="'.$this->centerA->id.'" data-percent="37.5"')
-        ->assertSeeHtml('data-chain-milestone-progress="'.$this->centerB->id.'" data-percent="100"')
-        ->assertSee(MilestoneStatus::Reached->label())
-        ->assertSee(MilestoneStatus::Cancelled->label())
-        ->assertSee(__('results_framework.chain_milestone_cancelled_excluded'))
-        ->assertDontSeeHtml('data-chain-gap="no_milestone"');
-});
-
-test('a milestone whose activity link no longer fits is shown with the flag', function () {
-    $chain = chainProposalFramework($this->proposal, $this->centerA, $this->centerB);
-    $milestone = chainWeightedMilestone($this->centerA, $chain['activity'], 'Borrowed delivery', MilestoneStatus::Planned, '10', Proposal::factory()->create());
-
-    chainTab($this->viewer, $this->proposal)
-        ->assertSee('Borrowed delivery')
-        ->assertSeeHtml('data-chain-milestone="'.$milestone->id.'"')
-        ->assertSee(__('milestones.activity_link_not_funding'));
-});
-
 test('an activity shows its planned months and the center calendar under a center filter', function () {
     $chain = chainProposalFramework($this->proposal, $this->centerA, $this->centerB);
     ActivitySchedule::factory()->create(['result_id' => $chain['activity']->id, 'month' => '2026-03-01']);
     ActivitySchedule::factory()->create(['result_id' => $chain['activity']->id, 'month' => '2026-04-01', 'weeks' => [1, 2]]);
     ActivitySchedule::factory()->create(['result_id' => $chain['activity']->id, 'project_id' => $this->centerB->id, 'month' => '2026-06-01']);
-    chainMilestone($this->centerA, $chain['activity']);
-    chainMilestone($this->centerB, $chain['activity']);
+    $activityIndicator = chainIndicator($chain['activity']);
+    chainTarget($activityIndicator, $this->proposal, $this->centerA, 10);
+    chainTarget($activityIndicator, $this->proposal, $this->centerB, 10);
 
     chainTab($this->viewer, $this->proposal)
         ->assertSeeHtml('data-chain-schedule-month="2026-03"')
@@ -362,40 +293,11 @@ test('an activity shows its planned months and the center calendar under a cente
         ->assertSeeHtml('data-chain-schedule-month="2026-03"');
 });
 
-test('a center filter keeps only that center\'s milestones under an activity', function () {
-    $chain = chainProposalFramework($this->proposal, $this->centerA, $this->centerB);
-    chainWeightedMilestone($this->centerA, $chain['activity'], 'Drill well one', MilestoneStatus::Reached, '30');
-    chainWeightedMilestone($this->centerB, $chain['activity'], 'Pump installed', MilestoneStatus::Reached, '40');
-
-    chainTab($this->viewer, $this->proposal)
-        ->set('chainCenter', (string) $this->centerB->id)
-        ->assertSee('Pump installed')
-        ->assertDontSee('Drill well one');
-});
-
-test('a proposal-wide milestone without a center shows in its own group, also under a center filter', function () {
-    $chain = chainProposalFramework($this->proposal, $this->centerA, $this->centerB);
-    chainWeightedMilestone($this->centerA, $chain['activity'], 'Drill well one', MilestoneStatus::Reached, '30');
-    $shared = chainWeightedMilestone($this->centerA, $chain['activity'], 'Final donor report', MilestoneStatus::Planned, '20', $this->proposal);
-    DB::table('milestones')->where('id', $shared->id)->update(['project_id' => null]);
-
-    chainTab($this->viewer, $this->proposal)
-        ->assertSeeInOrder([__('results_framework.chain_proposal_wide'), 'Final donor report', 'Hope Center Sarmada', 'Drill well one'])
-        ->assertSeeHtml('data-chain-milestone-progress="proposal" data-percent="0"')
-        ->set('chainCenter', (string) $this->centerB->id)
-        ->assertDontSee('Drill well one');
-
-    chainTab($this->viewer, $this->proposal)
-        ->set('chainCenter', (string) $this->centerA->id)
-        ->assertSee('Final donor report')
-        ->assertSee('Drill well one');
-});
-
 test('an activity shows each center\'s confirmed status as a text badge, only the selected center under a filter', function () {
     $chain = chainProposalFramework($this->proposal, $this->centerA, $this->centerB);
     ProjectActivityStatus::factory()->create(['project_id' => $this->centerA->id, 'result_id' => $chain['activity']->id, 'status' => ActivityStatus::Started]);
     ProjectActivityStatus::factory()->create(['project_id' => $this->centerB->id, 'result_id' => $chain['activity']->id, 'status' => ActivityStatus::Completed]);
-    chainMilestone($this->centerA, $chain['activity']); // the center filter keeps an activity with work in that center
+    chainTarget(chainIndicator($chain['activity']), $this->proposal, $this->centerA, 10); // the center filter keeps an activity with a target in that center
 
     chainTab($this->viewer, $this->proposal)
         ->assertSeeHtml('data-chain-activity-status="'.$this->centerA->id.'"')
@@ -410,32 +312,4 @@ test('an activity without a confirmed status shows no status badge', function ()
     chainProposalFramework($this->proposal, $this->centerA, $this->centerB);
 
     chainTab($this->viewer, $this->proposal)->assertDontSeeHtml('data-chain-activity-status=');
-});
-
-test('the department-tasks summary lists media tasks without money and hides financial tasks from others', function () {
-    $chain = chainProposalFramework($this->proposal, $this->centerA, $this->centerB);
-    $milestone = chainMilestone($this->centerA, $chain['activity'], proposal: $this->proposal);
-    $mediaDepartment = insertHrDepartment('Media');
-    $media = Task::factory()->create([
-        'source_type' => 'milestone', 'source_id' => $milestone->id, 'department_id' => $mediaDepartment,
-        'kind' => TaskKind::MediaDeliverable, 'media_kinds' => ['video'], 'title' => 'Film the well handover',
-        'status' => TaskStatus::Todo, 'due_date' => '2026-03-10',
-    ]);
-    $financial = Task::factory()->create([
-        'source_type' => 'milestone', 'source_id' => $milestone->id, 'department_id' => $mediaDepartment,
-        'kind' => TaskKind::Financial, 'title' => 'Settle the drilling invoice', 'status' => TaskStatus::Todo,
-    ]);
-    $employee = insertHrEmployee(firstNameEn: 'Rami');
-    insertHrContract($employee, insertHrPosition($mediaDepartment, 'Photographer'));
-    $mediaUser = userWithRole('Media Team', $employee);
-
-    chainTab($mediaUser, $this->proposal)
-        ->assertSeeHtml('data-chain-department-task="'.$media->id.'"')
-        ->assertSee(['Film the well handover', 'Media', '2026-03-10', TaskStatus::Todo->label()])
-        ->assertDontSee('Settle the drilling invoice')
-        ->assertDontSeeHtml('data-chain-department-task="'.$financial->id.'"');
-
-    chainTab($this->viewer, $this->proposal)
-        ->assertSeeHtml('data-chain-department-task="'.$financial->id.'"')
-        ->assertDontSee('987,654');
 });

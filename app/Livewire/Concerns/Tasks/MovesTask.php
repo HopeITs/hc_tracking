@@ -12,21 +12,21 @@ use Livewire\Attributes\Computed;
 
 /**
  * "Move to" on the task page: a small dialog that moves a top-level task,
- * with its subtasks, to the program itself, one of its projects or one of
- * their milestones (see MoveTask). Expects the page's own task() computed.
+ * with its subtasks, to the program itself or one of its projects (see
+ * MoveTask). Expects the page's own task() computed.
  *
  * @property-read Task $task
- * @property-read array{program: array{id: int, name: string}, projects: list<array{id: int, name: string, milestones: list<array{id: int, name: string}>}>}|null $moveDestinations
+ * @property-read array{program: array{id: int, name: string}, projects: list<array{id: int, name: string}>}|null $moveDestinations
  */
 trait MovesTask
 {
     public bool $showMoveModal = false;
 
-    /** The picked place, as "program", "project:ID" or "milestone:ID". */
+    /** The picked place, as "program" or "project:ID". */
     public string $moveTarget = '';
 
     /**
-     * @return array{program: array{id: int, name: string}, projects: list<array{id: int, name: string, milestones: list<array{id: int, name: string}>}>}|null
+     * @return array{program: array{id: int, name: string}, projects: list<array{id: int, name: string}>}|null
      */
     #[Computed]
     public function moveDestinations(): ?array

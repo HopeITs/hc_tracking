@@ -300,7 +300,7 @@ class ReadyLayoutSignals
     /**
      * Every proposal on the Pipeline panel (DeskWork), the figure its header
      * shows; deadlines from those still open, read as the panel reads them:
-     * the earliest open milestone, else the on-hold review date.
+     * the on-hold review date.
      *
      * @return Signal
      */
@@ -317,9 +317,8 @@ class ReadyLayoutSignals
         $deadlines = DeskWork::pipelineProposals($this->viewer)
             ->select(['id', 'status_remind_on'])
             ->whereNotIn('status', DeskWork::ClosedProposalStatuses)
-            ->withMin(['milestones' => fn (Builder $query) => DeskWork::deadlineMilestones($query)], 'planned_end_date')
             ->get()
-            ->map(fn (Proposal $proposal): ?CarbonImmutable => ($date = $proposal->getAttribute('milestones_min_planned_end_date') ?? $proposal->status_remind_on) === null ? null : CarbonImmutable::parse($date)->startOfDay())
+            ->map(fn (Proposal $proposal): ?CarbonImmutable => $proposal->status_remind_on === null ? null : CarbonImmutable::parse($proposal->status_remind_on)->startOfDay())
             ->filter();
         $passed = $deadlines->filter(fn (CarbonImmutable $date): bool => $date->lt($today))->count();
         $next = $deadlines->filter(fn (CarbonImmutable $date): bool => $date->gte($today))->min();

@@ -196,3 +196,14 @@ textarea.ap-inp { height: auto; min-height: 90px; padding: 10px 12px; }
     .ap-wrow { grid-template-columns: 110px minmax(430px, 1fr); }
 }
 }
+
+/* Sectioned plan page (replaces the step wizard): sticky index of the four sections. */
+.ap-sections { display: grid; gap: 16px; }
+.ap-sections [data-plan-section] { scroll-margin-top: 72px; }
+.ap-index { position: sticky; top: 0; z-index: 6; display: flex; gap: 6px; overflow-x: auto; scrollbar-width: none; padding: 8px; border: 1px solid var(--line); border-radius: 14px; background: var(--paper); }
+.ap-index-item { display: inline-flex; flex: none; align-items: center; gap: 8px; padding: 6px 12px; border-radius: 999px; font-size: .8rem; font-weight: 600; color: var(--ink-3); text-decoration: none; }
+.ap-index-item i { display: inline-grid; place-items: center; width: 20px; height: 20px; border-radius: 999px; font-style: normal; font-size: .7rem; background: var(--line-2); color: var(--ink-2); }
+.ap-index-item.is-done i { background: var(--ink-2); color: var(--paper); }
+.ap-index-item.is-attention i { background: var(--brand); color: #fff; }
+.ap-index-item.is-current { background: var(--sunk); color: var(--ink); }
+.ap-index-item:hover { color: var(--ink); }

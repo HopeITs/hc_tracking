@@ -12,7 +12,6 @@
      */
     $rowKey = $group.'|'.$groupKeyString;
     $defaultStatus = $group === 'status' && $groupKeyString !== '' ? $groupKeyString : null;
-    $milestoneId = $group === 'milestone' && $groupKeyString !== '' ? $groupKeyString : null;
     $taskDraft = $this->taskDraft($rowKey, $defaultStatus);
     $draftAssignees = collect($this->userOptions)->whereIn('id', collect($taskDraft['assignees'])->map(fn ($id) => (int) $id));
 @endphp
@@ -25,7 +24,7 @@
             type="text"
             placeholder="{{ __('tasks.add_task') }}"
             class="w-full min-w-0 border-0 bg-transparent p-1 text-sm text-secondary-dark placeholder:text-secondary-light focus:ring-0 focus:outline-none dark:text-ink"
-            wire:keydown.enter="quickCreateTask($event.target.value, {{ Illuminate\Support\Js::from($defaultStatus) }}, {{ Illuminate\Support\Js::from($group === 'milestone' && $groupKeyString !== '' ? $groupKeyString : null) }}, {{ Illuminate\Support\Js::from($rowKey) }}); $event.target.value = ''"
+            wire:keydown.enter="quickCreateTask($event.target.value, {{ Illuminate\Support\Js::from($defaultStatus) }}, {{ Illuminate\Support\Js::from($rowKey) }}); $event.target.value = ''"
             data-test="task-quick-add-mobile-{{ $group }}-{{ $groupKeyString }}"
         />
     </label>
@@ -91,6 +90,6 @@
                 <option value="{{ $statusCase->value }}" @selected($taskDraft['status'] === $statusCase->value)>{{ $statusCase->label() }}</option>
             @endforeach
         </select>
-        @include('pages.tasks._quick-add-extras', ['defaultStatus' => $defaultStatus, 'milestoneId' => $milestoneId, 'rowKey' => $rowKey, 'testKey' => 'mobile-'.$group.'-'.$groupKeyString])
+        @include('pages.tasks._quick-add-extras', ['defaultStatus' => $defaultStatus, 'rowKey' => $rowKey, 'testKey' => 'mobile-'.$group.'-'.$groupKeyString])
     </div>
 </div>

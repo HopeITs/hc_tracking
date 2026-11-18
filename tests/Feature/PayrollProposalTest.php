@@ -14,7 +14,6 @@ use App\Enums\ProposalStatus;
 use App\Events\ProposalStatusChanged;
 use App\Models\Donor;
 use App\Models\Media;
-use App\Models\Milestone;
 use App\Models\Project;
 use App\Models\Proposal;
 use App\Models\ProposalStatusNote;
@@ -352,7 +351,7 @@ test('a user without proposals.update cannot approve a payroll proposal', functi
     expect($proposal->fresh()->status)->toBe(ProposalStatus::Submitted);
 });
 
-test('a payroll proposal completes with the final report file and the acceptance, no milestone', function () {
+test('a payroll proposal completes with the final report file and the acceptance', function () {
     $actor = userWithRole('Financial');
     $this->actingAs($actor);
     $proposal = payrollProposal(ProposalStatus::Active);
@@ -364,8 +363,7 @@ test('a payroll proposal completes with the final report file and the acceptance
     app(RecordFinalReportAcceptance::class)->handle($proposal, CarbonImmutable::parse('2026-10-12'));
     movePayroll($actor, $proposal->fresh(), ProposalStatus::Completed, ['effective_date' => '2026-10-13']);
 
-    expect($proposal->fresh()->status)->toBe(ProposalStatus::Completed)
-        ->and(Milestone::query()->count())->toBe(0);
+    expect($proposal->fresh()->status)->toBe(ProposalStatus::Completed);
 });
 
 test('a payroll proposal without the final report file cannot complete', function () {
@@ -420,7 +418,7 @@ test('renewing a payroll proposal starts a payroll draft with the narrative and 
         ->and($renewal->narrative)->toBe(payrollNarrative())
         ->and($renewal->previous_proposal_id)->toBe($previous->id)
         ->and($renewal->projects()->count())->toBe(0)
-        ->and($result['copied'])->toBe(['results' => 0, 'indicators' => 0, 'milestones' => 0, 'tasks' => 0])
+        ->and($result['copied'])->toBe(['results' => 0, 'indicators' => 0, 'tasks' => 0])
         ->and(app(CloneProposalForRenewal::class)->handle($previous, ['internalProjectNumber' => 'HC-2026-963'], $actor)['proposal']->id)->toBe($renewal->id);
 });
 

@@ -40,7 +40,7 @@ final class SaveDepartmentTask
     private const CurrencySymbols = ['$', '€', 'ل.س'];
 
     /**
-     * @param  array{title?: string, description?: ?string, department_id?: int|string|null, kind?: string, media_kinds?: list<string>|null, requested_on?: ?string, start_date?: ?string, due_date?: ?string, milestone_id?: int|string|null, assignee_employee_id?: int|string|null}  $input
+     * @param  array{title?: string, description?: ?string, department_id?: int|string|null, kind?: string, media_kinds?: list<string>|null, requested_on?: ?string, start_date?: ?string, due_date?: ?string, assignee_employee_id?: int|string|null}  $input
      */
     public function handle(Proposal $proposal, ?int $taskId, array $input): Task
     {
@@ -49,9 +49,6 @@ final class SaveDepartmentTask
             $existing = $taskId === null ? null : $locked->planTasks()->whereKey($taskId)->firstOrFail();
 
             Gate::authorize('planDepartmentTask', [Task::class, $locked, $existing]);
-
-            $milestoneId = $this->nullableId($input['milestone_id'] ?? null);
-            $milestone = $milestoneId === null ? null : $locked->milestones()->whereKey($milestoneId)->firstOrFail();
 
             $validated = $this->validate($existing, [
                 ...$input,
@@ -65,8 +62,8 @@ final class SaveDepartmentTask
 
             $task = $existing ?? new Task;
             $task->fill([
-                'source_type' => $milestone === null ? 'proposal' : 'milestone',
-                'source_id' => $milestone === null ? $locked->id : $milestone->id,
+                'source_type' => 'proposal',
+                'source_id' => $locked->id,
                 'department_id' => (int) $validated['department_id'],
                 'kind' => $kind,
                 'media_kinds' => $isDeliverable ? array_values(array_unique($validated['media_kinds'] ?? [])) : null,

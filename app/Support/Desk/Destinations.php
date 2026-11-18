@@ -264,7 +264,6 @@ final class Destinations
             $page('annual-plans.index', 'common.annual_plans', 'cal', 'nav-calendar-range', 'strategy_planning', $can('annual-plans.view'), 'annual-plans'),
 
             $page('projects.index', 'common.projects', 'folder', 'nav-folder-open', 'projects_delivery', $can('projects.view'), 'projects'),
-            $page('milestones.index', 'common.milestones', 'flag', 'nav-flag', 'projects_delivery', $can('milestones.view'), 'milestones'),
 
             $page('results.index', 'common.results_framework', 'chart', 'nav-network', 'monitoring_evaluation', $can('results.view'), 'results'),
             $page('indicator-library.index', 'navigation.indicator_library', 'chart', 'nav-library-big', 'monitoring_evaluation', $can('indicator-library.view'), 'indicator-library'),

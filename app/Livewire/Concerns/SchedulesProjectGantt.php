@@ -5,7 +5,6 @@ declare(strict_types=1);
 namespace App\Livewire\Concerns;
 
 use App\Enums\DependencyType;
-use App\Models\Milestone;
 use App\Models\Project;
 use App\Models\ScheduleDependency;
 use App\Models\Task;
@@ -27,8 +26,8 @@ use InvalidArgumentException;
  * Dates are worked as integer day numbers (days since 1970-01-01 UTC), the
  * same unit the chart's JavaScript uses, so both sides agree to the day.
  *
- * Schedule items are milestones and tasks with both dates set. Their row ids
- * ("milestone-4", "task-12") are the keys used everywhere.
+ * Schedule items are the project's tasks with a date set. Their row ids
+ * ("task-12") are the keys used everywhere.
  */
 trait SchedulesProjectGantt
 {
@@ -50,27 +49,17 @@ trait SchedulesProjectGantt
     }
 
     /**
-     * Every dated milestone and task of the project, keyed by row id.
+     * Every dated task of the project, keyed by row id.
      *
-     * @return array<string, array{start: int, end: int, model: Milestone|Task}>
+     * @return array<string, array{start: int, end: int, model: Task}>
      */
     protected function scheduleItems(int $projectId): array
     {
         $items = [];
 
-        $milestones = Milestone::query()
-            ->where('project_id', $projectId)
-            ->whereNull('proposal_id')
-            ->get(['id', 'project_id', 'parent_milestone_id', 'planned_start_date', 'planned_end_date', 'status', 'sequence']);
-
-        foreach ($milestones as $milestone) {
-            $end = $milestone->planned_end_date ?? $milestone->planned_start_date;
-            $items['milestone-'.$milestone->id] = ['start' => $this->dayNumber($milestone->planned_start_date), 'end' => $this->dayNumber($end), 'model' => $milestone];
-        }
-
         $tasks = Task::query()
-            ->where('source_type', 'milestone')
-            ->whereIn('source_id', $milestones->modelKeys())
+            ->where('source_type', 'project')
+            ->where('source_id', $projectId)
             ->get(['id', 'parent_task_id', 'source_type', 'source_id', 'status', 'start_date', 'due_date', 'progress_percentage']);
 
         foreach ($tasks as $task) {
@@ -291,13 +280,9 @@ trait SchedulesProjectGantt
         return array_values(array_unique([...$order, ...$rowIds]));
     }
 
-    protected function writeDates(Milestone|Task $model, string $start, string $end): void
+    protected function writeDates(Task $model, string $start, string $end): void
     {
-        if ($model instanceof Milestone) {
-            $model->update(['planned_start_date' => $start, 'planned_end_date' => $end]);
-        } else {
-            $model->update(['start_date' => $start, 'due_date' => $end]);
-        }
+        $model->update(['start_date' => $start, 'due_date' => $end]);
     }
 
     /* Working-day calendar ---------------------------------------------- */

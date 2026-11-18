@@ -10,7 +10,7 @@ use Livewire\WithPagination;
 
 /**
  * Stands in for the registers that can be narrowed to one strategy (risks,
- * indicators, milestones, reports, funding agreements), which are single-file
+ * indicators, reports, funding agreements), which are single-file
  * Livewire pages PHPStan cannot read. Never instantiated.
  */
 abstract class StrategyFilterHost extends Component

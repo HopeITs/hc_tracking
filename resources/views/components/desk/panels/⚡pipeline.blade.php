@@ -15,8 +15,8 @@ use Livewire\Component;
  * Proposal pipeline: a one-line stage summary, then the proposals in fixed
  * columns — name, donor, status (always at the same x), amount (agreed, or
  * requested; money viewers only, .ai/rules/pages.md "Hide money"), next
- * deadline and owner. The next deadline is the proposal's earliest open
- * milestone, else its on-hold review date. The owner is whoever owns its
+ * deadline and owner. The next deadline is the proposal's on-hold review
+ * date. The owner is whoever owns its
  * first linked project (proposals carry no owner of their own). Status,
  * donor and owner are filter-popup dropdowns; the status options carry
  * their counts.
@@ -72,7 +72,6 @@ new class extends Component {
                 'donorProposals:id,proposal_id,donor_id,budget,currency',
                 'donorProposals.donor:id,name',
                 'projects:id,user_id',
-                'milestones' => fn ($query) => DeskWork::deadlineMilestones($query->select(['id', 'proposal_id', 'planned_end_date'])),
             ])
             ->when($this->status !== '', fn ($query) => $query->where('status', $this->status))
             ->latest('id')
@@ -116,7 +115,7 @@ new class extends Component {
 
     public function deadline(Proposal $proposal): ?CarbonImmutable
     {
-        return $proposal->milestones->min('planned_end_date') ?? $proposal->status_remind_on;
+        return $proposal->status_remind_on;
     }
 
     /**

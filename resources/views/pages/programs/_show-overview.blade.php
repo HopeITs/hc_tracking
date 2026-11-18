@@ -175,7 +175,7 @@
                                     @endif
                                     <span class="dk-prog-card-pct dk-num">{{ $row['progress'] === null ? '—' : $row['progress'].'%' }}</span>
                                 </div>
-                                <span class="dk-prog-bar" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-label="{{ __('programs.milestone_progress') }}" @if ($row['progress'] !== null) aria-valuenow="{{ $row['progress'] }}" @endif
+                                <span class="dk-prog-bar" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-label="{{ __('programs.delivery_progress') }}" @if ($row['progress'] !== null) aria-valuenow="{{ $row['progress'] }}" @endif
                                     @if ($row['elapsed'] !== null && $isActive) title="{{ __('programs.pace_expected', ['percent' => (int) round($row['elapsed'])]) }}" @endif>
                                     <i style="width: {{ $row['progress'] ?? 0 }}%"></i>
                                     @if ($row['elapsed'] !== null && $isActive)
@@ -185,11 +185,7 @@
                             </div>
 
                             {{-- 3. The three facts that most often need a hand, always in the same cells. --}}
-                            <dl @class(['dk-prog-cells', 'dk-prog-cells-2' => ! $showReports])>
-                                <div @class(['dk-bad' => $row['lateMilestones'] > 0])>
-                                    <dt><x-desk.icon name="flag" />{{ __('programs.ledger_milestones') }}</dt>
-                                    <dd>{{ $row['lateMilestones'] > 0 ? trans_choice('programs.ledger_late_milestones', $row['lateMilestones'], ['count' => $row['lateMilestones']]) : ($row['nextMilestone'] === null ? '—' : $row['nextMilestone']->translatedFormat('M j')) }}</dd>
-                                </div>
+                            <dl @class(['dk-prog-cells', 'dk-prog-cells-2' => $showReports, 'dk-prog-cells-1' => ! $showReports])>
                                 <div @class(['dk-bad' => $row['pastDueTasks'] > 0])>
                                     <dt><x-desk.icon name="check" />{{ __('common.tasks') }}</dt>
                                     <dd>{{ $row['pastDueTasks'] > 0 ? trans_choice('programs.ledger_past_due', $row['pastDueTasks'], ['count' => $row['pastDueTasks']]) : trans_choice('programs.ledger_open_tasks', $row['openTasks'], ['count' => $row['openTasks']]) }}</dd>

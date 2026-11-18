@@ -5,13 +5,11 @@ declare(strict_types=1);
 namespace App\Support\Desk;
 
 use App\Enums\DeliveryState;
-use App\Enums\MilestoneStatus;
 use App\Enums\MonthlyReportStatus;
 use App\Enums\ProjectStatus;
 use App\Enums\ProposalStatus;
 use App\Enums\TaskStatus;
 use App\Models\DonorReport;
-use App\Models\Milestone;
 use App\Models\MonthlyReport;
 use App\Models\Project;
 use App\Models\Proposal;
@@ -20,8 +18,6 @@ use App\Models\Task;
 use App\Models\User;
 use Carbon\CarbonImmutable;
 use Illuminate\Database\Eloquent\Builder;
-use Illuminate\Database\Eloquent\Model;
-use Illuminate\Database\Eloquent\Relations\Relation;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 
@@ -49,17 +45,6 @@ final class DeskWork
     public static function pipelineProposals(User $user): Builder
     {
         return $user->can('proposals.view') ? Proposal::query() : Proposal::query()->whereRaw('1 = 0');
-    }
-
-    /**
-     * Narrows a milestones query to those that set a proposal's deadline on
-     * the pipeline: open, with a planned end.
-     *
-     * @param  Builder<Model>|Relation<Model, Model, mixed>  $milestones
-     */
-    public static function deadlineMilestones(Builder|Relation $milestones): void
-    {
-        $milestones->whereIn('status', [MilestoneStatus::Planned, MilestoneStatus::Ongoing])->whereNotNull('planned_end_date');
     }
 
     /**
@@ -158,8 +143,8 @@ final class DeskWork
             ->whereNull('parent_task_id')
             ->where('status', '!=', TaskStatus::Done)
             ->where(fn (Builder $query) => $query->whereNull('delivery_state')->orWhereIn('delivery_state', [DeliveryState::Requested, DeliveryState::Returned]))
-            ->where('source_type', 'milestone')
-            ->whereIn('source_id', Milestone::query()->select('id')->whereIn('project_id', self::projectsOwnedBy($user)));
+            ->where('source_type', 'project')
+            ->whereIn('source_id', self::projectsOwnedBy($user));
     }
 
     /**

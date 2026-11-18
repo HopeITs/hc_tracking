@@ -97,7 +97,8 @@ trait EditsProposalLocations
                     continue;
                 }
 
-                $byCity[(int) $held->city_id][] = ['id' => (int) $centerId, 'name' => $held->name];
+                // Only a closed center lands here (options() lists active ones): say so (D-66).
+                $byCity[(int) $held->city_id][] = ['id' => (int) $centerId, 'name' => $held->is_active ? $held->name : $held->name.' · '.__('projects.center_inactive_badge')];
             }
         }
 

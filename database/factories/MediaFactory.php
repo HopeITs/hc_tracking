@@ -19,7 +19,7 @@ class MediaFactory extends Factory
      *
      * `collection`, `disk` and `uploaded_at` are left to the column defaults so
      * the schema tests keep exercising them. The owner defaults to a Project
-     * because that is the common case; use forMilestone() for the other.
+     * because that is the common case.
      *
      * `mediable_type` is set to the morph map KEY, not a class name, exactly as
      * the column stores it.
@@ -50,21 +50,6 @@ class MediaFactory extends Factory
             'type' => $type,
             'uploaded_by' => User::factory(),
         ];
-    }
-
-    /**
-     * Attach this file to a milestone rather than a project.
-     *
-     * Takes the id directly so the caller controls which milestone, and so the
-     * default Project factory above is not created and then discarded.
-     */
-    public function forMilestone(int $milestoneId): static
-    {
-        return $this->state([
-            'mediable_type' => 'milestone',
-            'mediable_id' => $milestoneId,
-            'collection' => MediaCollection::Evidence,
-        ]);
     }
 
     /**

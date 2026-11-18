@@ -178,7 +178,7 @@ function seedDashboardMoney(): array
 function fullDeskAs(string|User $role): TestResponse
 {
     $user = $role instanceof User ? $role : userWithRole($role);
-    $user->forceFill(['desk_layout' => array_map(fn (string $panel): array => ['panel' => $panel, 'size' => 'L'], ['glance', 'needs', 'waiting', 'coming', 'projects', 'pipeline', 'money', 'transfers', 'matrix', 'validate', 'templates', 'reviews', 'tasks', 'deliverables', 'myteam', 'targets', 'duties', 'milestones', 'plans', 'donors'])])->save();
+    $user->forceFill(['desk_layout' => array_map(fn (string $panel): array => ['panel' => $panel, 'size' => 'L'], ['glance', 'needs', 'waiting', 'coming', 'projects', 'pipeline', 'money', 'transfers', 'matrix', 'validate', 'templates', 'reviews', 'tasks', 'deliverables', 'myteam', 'targets', 'duties', 'plans', 'donors'])])->save();
 
     return test()->actingAs($user)->get(route('dashboard'))->assertOk();
 }

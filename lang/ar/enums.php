@@ -137,13 +137,6 @@ return [
         'ff' => 'من النهاية إلى النهاية',
         'sf' => 'من البداية إلى النهاية',
     ],
-    'milestone_status' => [
-        'planned' => 'مخطَّطة',
-        'ongoing' => 'قيد التنفيذ',
-        'reached' => 'تحققت',
-        'postponed' => 'مؤجَّلة',
-        'cancelled' => 'ملغاة',
-    ],
     'period' => [
         'monthly' => 'شهري',
         'quarterly' => 'ربع سنوي',

@@ -334,7 +334,7 @@ WHERE r.name = 'Super Admin';
 --       and sends `report_template.pending` to MEAL after commit. Its command
 --       does not exist yet (T33 slice 4, B4): expected behaviour, not verified.
 --   local, 2026-10-21: proposals 34, donor_proposal 34, donors 64, projects 28,
---   project_proposal 43, programs 9, milestones 37, tasks 20, results 51,
+--   project_proposal 43, programs 9, tasks 20, results 51,
 --   indicators 51, plan_indicators 45, reports 9, proposal_status_notes 34,
 --   transfers_tracking 0, annual_plans 0, users 1, role_has_permissions 367,
 --   activities 1, notifications 12, jobs 0, failed_jobs 0
@@ -344,7 +344,6 @@ UNION ALL SELECT 'donors', COUNT(*) FROM donors
 UNION ALL SELECT 'projects', COUNT(*) FROM projects
 UNION ALL SELECT 'project_proposal', COUNT(*) FROM project_proposal
 UNION ALL SELECT 'programs', COUNT(*) FROM programs
-UNION ALL SELECT 'milestones', COUNT(*) FROM milestones
 UNION ALL SELECT 'tasks', COUNT(*) FROM tasks
 UNION ALL SELECT 'results', COUNT(*) FROM results
 UNION ALL SELECT 'indicators', COUNT(*) FROM indicators
@@ -742,7 +741,7 @@ UNION ALL SELECT 'monthly_report_files', COALESCE(SUM(encryption_key_id IS NULL)
 --   `report_template.created` activities and `report_template.pending`
 --   notifications by design (PRE-20). Record them; they are not a failure.
 --   Untouched tables (proposals, donor_proposal, projects, project_proposal,
---   milestones, tasks, plan_indicators, reports, transfers_tracking, users)
+--   tasks, plan_indicators, reports, transfers_tracking, users)
 --   equal PRE-20 throughout.
 --   If not: a second run wrote: stop, defect for that command's owner.
 

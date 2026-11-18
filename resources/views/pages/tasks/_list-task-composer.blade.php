@@ -19,7 +19,6 @@
      */
     $rowKey = $group.'|'.$groupKeyString;
     $defaultStatus = $group === 'status' && $groupKeyString !== '' ? $groupKeyString : null;
-    $milestoneId = $group === 'milestone' && $groupKeyString !== '' ? $groupKeyString : null;
     $taskDraft = $this->taskDraft($rowKey, $defaultStatus);
     $draftPriority = TaskPriority::from($taskDraft['priority']);
     $draftStatus = TaskStatus::from($taskDraft['status']);
@@ -35,7 +34,7 @@
             type="text"
             placeholder="{{ __('tasks.add_task') }}"
             class="w-full min-w-0 border-0 bg-transparent p-1 text-sm text-secondary-dark placeholder:text-secondary-light focus:ring-0 focus:outline-none dark:text-ink"
-            wire:keydown.enter="quickCreateTask($event.target.value, {{ Js::from($defaultStatus) }}, {{ Js::from($milestoneId) }}, {{ Js::from($rowKey) }}); $event.target.value = ''"
+            wire:keydown.enter="quickCreateTask($event.target.value, {{ Js::from($defaultStatus) }}, {{ Js::from($rowKey) }}); $event.target.value = ''"
             data-test="task-quick-add-{{ $group }}-{{ $groupKeyString }}"
         />
     </td>
@@ -93,7 +92,7 @@
     </td>
     <td class="px-2">
         <div class="flex flex-wrap items-center justify-end gap-1">
-            @include('pages.tasks._quick-add-extras', ['defaultStatus' => $defaultStatus, 'milestoneId' => $milestoneId, 'rowKey' => $rowKey, 'testKey' => $group.'-'.$groupKeyString])
+            @include('pages.tasks._quick-add-extras', ['defaultStatus' => $defaultStatus, 'rowKey' => $rowKey, 'testKey' => $group.'-'.$groupKeyString])
         </div>
     </td>
 </tr>
