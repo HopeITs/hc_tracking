@@ -4,8 +4,14 @@
  * rules the real pages need on top of it live here instead.
  */
 @layer components {
-    .dk-reg-tools { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
-    .dk-reg-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+    /*
+     * The page's actions, its own wrapper (flex flex-wrap justify-end on the
+     * finance pages) and Add to desk wrap as one run of buttons, all to the
+     * end. Boxed separately they wrapped apart: two right-aligned rows over a
+     * left-aligned Add to desk.
+     */
+    .dk-reg-tools { display: flex; flex-wrap: wrap; align-items: center; justify-content: flex-end; gap: 8px; }
+    .dk-reg-actions { display: contents; }
     .dk-reg-h h1 { flex-wrap: wrap; }
 
     /* A line of figures under the title ("12 reached · 3 missed"), in place of stat tiles. */
@@ -208,6 +214,15 @@
         border-radius: 10px;
         background: var(--paper);
     }
+}
+
+/*
+ * The finance pages wrap their header actions in their own
+ * "flex flex-wrap justify-end" box. In utilities so it beats Tailwind's
+ * .flex: those buttons join the register's one run (see .dk-reg-tools).
+ */
+@layer utilities {
+    .dk-reg-actions > .flex.flex-wrap.justify-end { display: contents; }
 }
 
 /* The copyright line under every Desk page (user decision 2026-10-22: the footer stays). */
