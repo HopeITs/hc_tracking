@@ -14,6 +14,7 @@ use App\Models\Report;
 use App\Models\Result;
 use App\Models\User;
 use Carbon\CarbonImmutable;
+use Database\Seeders\RolesAndPermissionsSeeder;
 use Illuminate\Support\Facades\DB;
 use Livewire\Livewire;
 
@@ -782,4 +783,31 @@ test('the headline buttons say what each count means, and below target is named 
         ->assertSee('Below target')
         ->assertDontSee('Behind')
         ->assertSee('smaller share of its target than the share of the year that has passed');
+});
+
+test('a program framework with no proposal stays general and links the proposals of its projects to their logframe tab', function () {
+    $this->seed(RolesAndPermissionsSeeder::class);
+    $user = User::factory()->role('General Manager')->create();
+    $program = Program::factory()->create(['name' => 'Water Security']);
+    $project = Project::factory()->create(['program_id' => $program->id]);
+    $proposal = Proposal::factory()->create(['name' => 'Winter WASH']);
+    DB::table('project_proposal')->insert(['project_id' => $project->id, 'proposal_id' => $proposal->id]);
+    Result::factory()->type(ResultType::Impact)->create(['program_id' => $program->id, 'proposal_id' => null, 'statement' => 'Safe water for all.']);
+
+    Livewire::actingAs($user)
+        ->test('pages::results.index')
+        ->assertSee('Safe water for all.')
+        ->assertSeeHtml('data-test="program-proposal-link-'.$proposal->id.'"')
+        ->assertSeeHtml('ptab=logframe');
+});
+
+test('a program framework with no proposal says so instead of showing a link', function () {
+    $this->seed(RolesAndPermissionsSeeder::class);
+    $user = User::factory()->role('General Manager')->create();
+    $program = Program::factory()->create();
+    Result::factory()->type(ResultType::Impact)->create(['program_id' => $program->id, 'proposal_id' => null]);
+
+    Livewire::actingAs($user)
+        ->test('pages::results.index')
+        ->assertSee('No proposal under this program yet.');
 });

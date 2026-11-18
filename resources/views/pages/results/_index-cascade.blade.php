@@ -12,6 +12,38 @@
             }
         }
     }
+
+    /*
+     * A program's own framework stays general (no proposal needed). The proposals of the
+     * program's projects show beside it as links to their Logical Framework tab.
+     */
+    $programIds = collect($this->groupedRoots)
+        ->map(fn (array $nodes): ?int => $nodes[0]['result']->proposal_id === null ? $nodes[0]['result']->program_id : null)
+        ->filter()->unique()->values();
+    $programProposals = [];
+    $mayViewProposals = auth()->user()?->can('proposals.view') === true;
+    $mayViewProjects = auth()->user()?->can('projects.view') === true;
+    if ($programIds->isNotEmpty() && ($mayViewProposals || $mayViewProjects)) {
+        $linked = \App\Models\Proposal::query()
+            ->select(['proposals.id', 'proposals.slug', 'proposals.name'])
+            ->where('proposals.kind', \App\Enums\ProposalKind::Project)
+            ->whereHas('projects', fn ($projects) => $projects->whereIn('projects.program_id', $programIds))
+            ->with(['projects' => fn ($projects) => $projects->select(['projects.id', 'projects.slug', 'projects.program_id'])->whereIn('projects.program_id', $programIds)])
+            ->orderBy('proposals.name')
+            ->get();
+        foreach ($linked as $linkedProposal) {
+            $linkedProject = $linkedProposal->projects->first();
+            $href = $mayViewProjects && $linkedProject !== null && auth()->user()->can('view', $linkedProject)
+                ? route('projects.show', ['project' => $linkedProject, 'proposal' => $linkedProposal->id, 'ptab' => 'logframe']).'#proposal'
+                : ($mayViewProposals ? route('proposals.show', ['proposal' => $linkedProposal, 'ptab' => 'logframe']) : null);
+            if ($href === null) {
+                continue;
+            }
+            foreach ($linkedProposal->projects->pluck('program_id')->unique() as $linkedProgramId) {
+                $programProposals[$linkedProgramId][] = ['id' => $linkedProposal->id, 'name' => $linkedProposal->name, 'href' => $href];
+            }
+        }
+    }
 @endphp
         @foreach ($this->groupedRoots as $programName => $nodes)
             @php
@@ -57,6 +89,24 @@
                     $canAddFreeActivity = $groupProposal === null && auth()->user()->can('results.create');
                     $freeActivityHeadingShown = false;
                 @endphp
+                @if ($groupProposal === null && $groupProgram !== null)
+                    @php
+                        $proposalLinks = $programProposals[$groupProgram->id] ?? [];
+                    @endphp
+                    <div class="flex flex-wrap items-center gap-x-2 gap-y-1.5 border-b border-secondary-soft px-4 py-2.5 dark:border-line" x-data="{ all: false }" data-test="program-proposal-links-{{ $groupProgram->id }}">
+                        <span class="type-label text-secondary-medium dark:text-ink-muted">{{ __('results_framework.program_proposals') }}</span>
+                        @forelse ($proposalLinks as $proposalLink)
+                            <a href="{{ $proposalLink['href'] }}" wire:navigate @if ($loop->index >= 4) x-show="all" x-cloak @endif class="inline-flex items-center gap-1 rounded-full border border-secondary-light px-2.5 py-0.5 type-meta font-semibold text-secondary-dark hover:border-primary hover:text-primary dark:border-line-strong dark:text-ink dark:hover:text-brand-text" data-test="program-proposal-link-{{ $proposalLink['id'] }}" dir="auto">
+                                <flux:icon.arrow-top-right-on-square variant="micro" class="size-3 rtl:-scale-x-100" aria-hidden="true" />{{ $proposalLink['name'] }}
+                            </a>
+                        @empty
+                            <span class="type-meta text-secondary-medium dark:text-ink-muted">{{ __('results_framework.program_proposals_none') }}</span>
+                        @endforelse
+                        @if (count($proposalLinks) > 4)
+                            <button type="button" class="type-meta font-semibold text-secondary-medium hover:text-primary dark:text-ink-muted" x-on:click="all = ! all" x-text="all ? @js(__('results_framework.program_proposals_fewer')) : @js(__('results_framework.program_proposals_more', ['count' => count($proposalLinks) - 4]))"></button>
+                        @endif
+                    </div>
+                @endif
                 <div class="space-y-5 bg-ground px-3 py-5 @2xl/directory:px-5 @2xl/directory:py-6">
                     @foreach ($nodes as $node)
                         {{-- Free activities (no statement above them) follow the chain under their own heading. --}}
