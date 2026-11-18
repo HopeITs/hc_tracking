@@ -24,7 +24,7 @@ use Illuminate\Validation\ValidationException;
 
 beforeEach(fn () => $this->travelTo('2026-10-14 10:00:00'));
 
-function rtqTemplate(): ReportTemplate
+function questionsTemplate(): ReportTemplate
 {
     return Activity::withoutRecording(fn (): ReportTemplate => ReportTemplate::factory()->create());
 }
@@ -68,7 +68,7 @@ function rtqAnswer(ReportTemplateQuestion $question): void
 
 test('adding a question appends it last in its frequency as the template\'s own question', function () {
     $this->actingAs(mealManager());
-    $template = rtqTemplate();
+    $template = questionsTemplate();
     $first = rtqQuestion($template, ['sort_order' => 1]);
     $second = rtqQuestion($template, ['sort_order' => 2]);
     rtqQuestion($template, ['sort_order' => 5, 'frequency' => NarrativeQuestionFrequency::QuarterEnd]);
@@ -98,7 +98,7 @@ test('adding a question appends it last in its frequency as the template\'s own 
 
 test('adding a question needs its Arabic text and a known frequency', function () {
     $this->actingAs(mealManager());
-    $template = rtqTemplate();
+    $template = questionsTemplate();
 
     expect(rtqRefusal(fn () => app(SaveReportTemplateQuestion::class)->handle($template, null, ['text_ar' => ' ', 'frequency' => 'monthly'])))->toBe(__('narrative_questions.enter_arabic_text'))
         ->and(rtqRefusal(fn () => app(SaveReportTemplateQuestion::class)->handle($template, null, ['text_ar' => 'سؤال', 'frequency' => 'weekly'])))->toBe(__('narrative_questions.choose_frequency'))
@@ -107,7 +107,7 @@ test('adding a question needs its Arabic text and a known frequency', function (
 
 test('editing a question saves its texts and records the change', function () {
     $this->actingAs(mealManager());
-    $template = rtqTemplate();
+    $template = questionsTemplate();
     $question = rtqQuestion($template, ['sort_order' => 1]);
 
     app(SaveReportTemplateQuestion::class)->handle($template, $question->id, [
@@ -126,7 +126,7 @@ test('editing a question saves its texts and records the change', function () {
 
 test('a stale edit writes nothing', function () {
     $this->actingAs(mealManager());
-    $template = rtqTemplate();
+    $template = questionsTemplate();
     $question = rtqQuestion($template, ['text_ar' => 'السؤال الأصلي']);
 
     expect(rtqRefusal(fn () => app(SaveReportTemplateQuestion::class)->handle($template, $question->id, [
@@ -139,7 +139,7 @@ test('a stale edit writes nothing', function () {
 
 test('a question with answers keeps its frequency; one without moves last into the new frequency', function () {
     $this->actingAs(mealManager());
-    $template = rtqTemplate();
+    $template = questionsTemplate();
     $answered = rtqQuestion($template, ['sort_order' => 1]);
     $fresh = rtqQuestion($template, ['sort_order' => 2]);
     $quarterly = rtqQuestion($template, ['sort_order' => 4, 'frequency' => NarrativeQuestionFrequency::QuarterEnd]);
@@ -160,7 +160,7 @@ test('a question with answers keeps its frequency; one without moves last into t
 
 test('a question moves up and down inside its frequency only, and not past either end', function () {
     $this->actingAs(mealManager());
-    $template = rtqTemplate();
+    $template = questionsTemplate();
     $a = rtqQuestion($template, ['sort_order' => 1]);
     $b = rtqQuestion($template, ['sort_order' => 2]);
     $c = rtqQuestion($template, ['sort_order' => 3]);
@@ -185,7 +185,7 @@ test('a question moves up and down inside its frequency only, and not past eithe
 
 test('a question switches off and on, and switching to the state it has is stale', function () {
     $this->actingAs(mealManager());
-    $template = rtqTemplate();
+    $template = questionsTemplate();
     $question = rtqQuestion($template);
     $action = app(SetReportTemplateQuestionActive::class);
 
@@ -205,7 +205,7 @@ test('a question switches off and on, and switching to the state it has is stale
 
 test('a question without answers is deleted', function () {
     $this->actingAs(mealManager());
-    $template = rtqTemplate();
+    $template = questionsTemplate();
     $question = rtqQuestion($template);
 
     app(DeleteReportTemplateQuestion::class)->handle($template, $question->id);
@@ -216,7 +216,7 @@ test('a question without answers is deleted', function () {
 
 test('a question with answers cannot be deleted', function () {
     $this->actingAs(mealManager());
-    $template = rtqTemplate();
+    $template = questionsTemplate();
     $question = rtqQuestion($template);
     rtqAnswer($question);
 
@@ -227,7 +227,7 @@ test('a question with answers cannot be deleted', function () {
 
 test('every action is refused to a user without report-templates.manage and to a MEAL officer not responsible for the place', function (string $role) {
     holdMealManagerSlot();
-    $template = rtqTemplate();
+    $template = questionsTemplate();
     $question = rtqQuestion($template, ['text_ar' => 'السؤال الأصلي']);
     $this->actingAs(userWithRole($role, insertHrEmployee(firstNameEn: 'Rami')));
 
@@ -251,8 +251,8 @@ test('every action is refused to a user without report-templates.manage and to a
 
 test('a question of another template is not found and nothing is written', function () {
     $this->actingAs(mealManager());
-    $template = rtqTemplate();
-    $foreign = rtqQuestion(rtqTemplate(), ['text_ar' => 'سؤال قالب آخر', 'sort_order' => 1]);
+    $template = questionsTemplate();
+    $foreign = rtqQuestion(questionsTemplate(), ['text_ar' => 'سؤال قالب آخر', 'sort_order' => 1]);
     $before = (array) DB::table('report_template_questions')->find($foreign->id);
 
     $calls = [
@@ -272,7 +272,7 @@ test('a question of another template is not found and nothing is written', funct
 
 test('no action writes the bank question a template question was copied from', function () {
     $this->actingAs(mealManager());
-    $template = rtqTemplate();
+    $template = questionsTemplate();
     $bank = NarrativeQuestion::factory()->create(['text_ar' => 'سؤال البنك', 'sort_order' => 1]);
     $copy = rtqQuestion($template, ['narrative_question_id' => $bank->id, 'text_ar' => 'سؤال البنك', 'sort_order' => 1]);
     rtqQuestion($template, ['sort_order' => 2]);
@@ -291,7 +291,7 @@ test('no action writes the bank question a template question was copied from', f
 
 test('the recorded question activities carry the question id and no text', function () {
     $this->actingAs(mealManager());
-    $template = rtqTemplate();
+    $template = questionsTemplate();
     $question = app(SaveReportTemplateQuestion::class)->handle($template, null, ['text_ar' => 'نص سري للسؤال', 'frequency' => 'monthly']);
     app(SaveReportTemplateQuestion::class)->handle($template, $question->id, ['text_ar' => 'نص سري معدّل', 'frequency' => 'monthly']);
     app(SetReportTemplateQuestionActive::class)->handle($template, $question->id, false);
