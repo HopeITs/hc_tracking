@@ -106,7 +106,12 @@ function mraSchedule(Result $activity, string $month, ?array $weeks = null, ?int
 
 function mraReport(string $month, MonthlyReportStatus $status = MonthlyReportStatus::Draft): MonthlyReport
 {
-    $attributes = ['project_id' => test()->project->id, 'period' => $month];
+    // The report follows the project's newest template, so one made by mraTemplate() wins (Y-03).
+    $attributes = [
+        'project_id' => test()->project->id,
+        'report_template_id' => ReportTemplate::query()->where('project_id', test()->project->id)->max('id'),
+        'period' => $month,
+    ];
 
     return Activity::withoutRecording(fn (): MonthlyReport => match ($status) {
         MonthlyReportStatus::Draft => MonthlyReport::factory()->create($attributes),

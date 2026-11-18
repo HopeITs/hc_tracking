@@ -437,6 +437,8 @@ function rtpCalendar(ReportTemplate $template, Proposal $proposal, string $state
 
 test('the activity calendar panel shows the scheduled months with an accessible mark and the weeks', function () {
     ['project' => $project, 'template' => $template] = rtpProject();
+    // One proposal only: drop the one the factory carries a legacy template with (Y-03).
+    $template->proposals()->detach();
     $activity = rtpCalendar($template, rtpProposal($project), 'Run parenting sessions', ['2026-11-01' => [1, 2], '2026-12-01' => null]);
 
     $page = rtpPage(mealManager(), $project)
