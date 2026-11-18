@@ -31,6 +31,18 @@ return [
         'empty_heading' => 'No templates to confirm',
         'empty_body' => 'When a proposal is approved, the templates of the projects you cover appear here for you to confirm.',
     ],
+    'calendar' => [
+        'title' => 'Activity calendar',
+        'subtitle' => 'Read only. The monthly report asks about the activities scheduled each month.',
+        'where_edited' => 'The calendar is edited on the proposal.',
+        'edit_link' => 'Open the proposal calendar',
+        'empty' => 'No activity is scheduled yet. The calendar is set on the proposal.',
+        'col_activity' => 'Activity',
+        'scheduled' => 'Scheduled',
+        'scheduled_weeks' => 'Scheduled, weeks :weeks',
+        'adjusted_center' => 'Adjusted for this center',
+        'adjusted_field' => 'Adjusted for field work',
+    ],
     'tab' => [
         'proposals' => 'Proposals',
         'preparing_monthly_reports' => 'Preparing monthly reports. They will appear once generation finishes.',
