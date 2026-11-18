@@ -202,7 +202,8 @@
     }
     [data-desk-register] [data-test^="task-calendar-day-"],
     [data-desk-register] [data-test^="milestone-calendar-day-"],
-    [data-desk-register] [data-test^="calendar-day-"] {
+    /* :not(button): the day number (today's red dot) and the phone item count share the prefix. */
+    [data-desk-register] [data-test^="calendar-day-"]:not(button) {
         border-color: var(--line);
         border-radius: 10px;
         background: var(--paper);

@@ -520,10 +520,15 @@ test('the users tab offers add user, delete user and reset filters', function ()
         ->assertSeeHtml('data-test="delete-user-button"')
         ->call('selectUser', $admin->id)
         ->assertDontSeeHtml('data-test="delete-user-button"')
+        ->assertDontSeeHtml('data-test="clear-user-filters"')
+        ->set('status', 'active')
+        ->assertSeeHtml('data-test="clear-user-filters"')
         ->set('search', 'nobody-matches-this')
         ->assertSeeHtml('data-test="reset-user-filters"')
         ->call('clearFilters')
-        ->assertSet('search', '');
+        ->assertSet('search', '')
+        ->assertSet('status', '')
+        ->assertDontSeeHtml('data-test="clear-user-filters"');
 
     Livewire::actingAs($admin)
         ->test('pages::admin.users')

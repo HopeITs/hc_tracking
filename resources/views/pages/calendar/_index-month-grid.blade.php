@@ -57,7 +57,7 @@
 
                                 @if ($dayItemCount > 0)
                                     {{-- Phone cells are too narrow for chip names: a count opens the day list instead. --}}
-                                    <button type="button" wire:click.stop="openDayDetail('{{ $day->toDateString() }}')" class="w-fit cursor-pointer rounded bg-secondary-soft px-1 py-0.5 text-[10px] font-semibold text-secondary-dark sm:hidden dark:bg-surface-2 dark:text-ink" data-test="calendar-day-count-{{ $day->toDateString() }}">
+                                    <button type="button" wire:click.stop="openDayDetail('{{ $day->toDateString() }}')" class="flex min-h-9 w-full cursor-pointer items-center justify-center rounded bg-secondary-soft px-1 text-[11px] leading-tight font-semibold text-secondary-dark sm:hidden dark:bg-surface-2 dark:text-ink" data-test="calendar-day-count-{{ $day->toDateString() }}">
                                         {{ trans_choice('calendar.items_short', $dayItemCount, ['count' => $dayItemCount]) }}
                                     </button>
                                 @endif

@@ -448,7 +448,7 @@ new #[Layout('layouts::desk'), Title('titles.activity_log')] class extends Compo
 
                             <x-ui.data-table.cell class="@3xl:text-end">
                                 @if ($url !== null)
-                                    <a href="{{ $url }}" wire:navigate class="font-semibold text-status-critical hover:underline">{{ __('activity.open_record') }}</a>
+                                    <a href="{{ $url }}" wire:navigate class="font-semibold text-status-critical hover:underline max-sm:inline-flex max-sm:min-h-11 max-sm:items-center">{{ __('activity.open_record') }}</a>
                                 @elseif (! $exists)
                                     <span class="text-secondary-medium dark:text-ink-muted">{{ __('activity.record_gone') }}</span>
                                 @endif

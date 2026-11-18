@@ -864,6 +864,27 @@
         .rules-switch {
             align-items: center;
         }
+
+        .rules-segment span {
+            min-height: 2.75rem;
+            padding-inline: 1rem;
+        }
+
+        .rules-chip,
+        .rules-chip-add {
+            height: 2.75rem;
+        }
+
+        .rules-chip-remove,
+        .rules-chip-add button {
+            width: 2.75rem;
+            height: 2.75rem;
+        }
+
+        .rules-chip,
+        .rules-chip-add {
+            padding-inline-end: 0;
+        }
     }
 }
 
