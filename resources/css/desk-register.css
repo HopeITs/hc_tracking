@@ -10,7 +10,8 @@
      * end. Boxed separately they wrapped apart: two right-aligned rows over a
      * left-aligned Add to desk.
      */
-    .dk-reg-tools { display: flex; flex-wrap: wrap; align-items: center; justify-content: flex-end; gap: 8px; }
+    /* margin-inline-start: auto keeps the run at the end even when it drops below the title onto a line of its own. */
+    .dk-reg-tools { display: flex; flex-wrap: wrap; align-items: center; justify-content: flex-end; gap: 8px; margin-inline-start: auto; }
     .dk-reg-actions { display: contents; }
     .dk-reg-h h1 { flex-wrap: wrap; }
 

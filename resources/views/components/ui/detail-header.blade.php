@@ -38,7 +38,10 @@
                 <div class="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1.5 text-xs text-secondary-medium dark:text-ink-muted">{{ $meta }}</div>
             @endisset
         </div>
-        {{ $actions ?? '' }}
+        @isset($actions)
+            {{-- Actions sit at the end, also when a narrow screen drops them under the title. --}}
+            <div data-detail-header-actions class="flex min-w-0 flex-wrap items-center justify-end gap-2 [&>.flex]:justify-end">{{ $actions }}</div>
+        @endisset
     </div>
 
     @isset($summary)
