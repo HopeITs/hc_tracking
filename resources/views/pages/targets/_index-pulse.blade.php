@@ -34,6 +34,13 @@
             >
                 <span class="text-2xl font-bold leading-none tabular-nums {{ $meta['text'] }}">{{ number_format($meta['count']) }}</span>
                 <span class="text-sm font-semibold text-secondary-dark dark:text-ink">{{ $meta['label'] }}</span>
+                {{-- The pressed button says it can be pressed again to show everything. --}}
+                @if ($status === $statusKey)
+                    <span class="ms-auto inline-flex size-6 shrink-0 items-center justify-center rounded-full text-secondary-medium dark:text-ink-muted" title="{{ __('targets.status_press_again') }}" data-test="status-filter-clear-{{ $statusKey }}">
+                        <flux:icon.x-mark variant="micro" class="size-4" aria-hidden="true" />
+                        <span class="sr-only">{{ __('targets.status_press_again') }}</span>
+                    </span>
+                @endif
             </button>
         @endforeach
 
@@ -41,6 +48,13 @@
             <flux:button size="sm" variant="ghost" class="self-center text-secondary-medium! dark:text-ink-muted!" wire:click="clearFilters" data-test="reset-filters">{{ __('common.reset_filters') }}</flux:button>
         @endif
     </div>
+
+    @if (isset($statusMeta[$status]))
+        <p class="type-meta flex flex-wrap items-center gap-x-2 text-secondary-medium dark:text-ink-muted" aria-live="polite" data-test="status-showing">
+            <span>{{ __('targets.status_showing', ['shown' => number_format($statusMeta[$status]['count']), 'total' => number_format($pulse['total'])]) }}</span>
+            <button type="button" wire:click="filterStatus('{{ $status }}')" class="cursor-pointer font-semibold text-secondary-dark underline underline-offset-2 dark:text-ink" data-test="status-show-all">{{ __('targets.status_show_all') }}</button>
+        </p>
+    @endif
 
     @if ($pulse['reviewed'] > 0)
         <p class="type-meta text-secondary-medium dark:text-ink-muted">{{ trans_choice('targets.count_waiting_for_approval', $pulse['reviewed'], ['count' => number_format($pulse['reviewed'])]) }}</p>
