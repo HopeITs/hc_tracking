@@ -94,26 +94,27 @@
                         </div>
 
                         <div class="ms-auto flex shrink-0 flex-wrap items-center gap-1">
-                            <x-ui.button
-                                tone="ghost" size="sm" icon="arrow-up" class="min-h-11 min-w-11 md:size-9! md:min-h-0 md:min-w-0"
-                                wire:click="moveQuestion({{ $question->id }}, 'up')"
-                                wire:target="moveQuestion"
-                                wire:loading.attr="disabled"
-                                :disabled="$filtersAreActive || $position === 1"
-                                :title="$filtersAreActive ? __('narrative_questions.clear_to_reorder') : null"
-                                :aria-label="__('narrative_questions.move_up_name', ['text' => $shortText])"
-                                data-test="move-narrative-question-up"
-                            />
-                            <x-ui.button
-                                tone="ghost" size="sm" icon="arrow-down" class="min-h-11 min-w-11 md:size-9! md:min-h-0 md:min-w-0"
-                                wire:click="moveQuestion({{ $question->id }}, 'down')"
-                                wire:target="moveQuestion"
-                                wire:loading.attr="disabled"
-                                :disabled="$filtersAreActive || $position === $total"
-                                :title="$filtersAreActive ? __('narrative_questions.clear_to_reorder') : null"
-                                :aria-label="__('narrative_questions.move_down_name', ['text' => $shortText])"
-                                data-test="move-narrative-question-down"
-                            />
+                            {{-- A disabled button takes no pointer events, so the reason sits on this wrapper. --}}
+                            <span class="flex items-center gap-1" @if ($filtersAreActive) title="{{ __('narrative_questions.clear_to_reorder') }}" @endif data-test="move-narrative-question-arrows">
+                                <x-ui.button
+                                    tone="ghost" size="sm" icon="arrow-up" class="min-h-11 min-w-11 md:size-9! md:min-h-0 md:min-w-0"
+                                    wire:click="moveQuestion({{ $question->id }}, 'up')"
+                                    wire:target="moveQuestion"
+                                    wire:loading.attr="disabled"
+                                    :disabled="$filtersAreActive || $position === 1"
+                                    :aria-label="__('narrative_questions.move_up_name', ['text' => $shortText])"
+                                    data-test="move-narrative-question-up"
+                                />
+                                <x-ui.button
+                                    tone="ghost" size="sm" icon="arrow-down" class="min-h-11 min-w-11 md:size-9! md:min-h-0 md:min-w-0"
+                                    wire:click="moveQuestion({{ $question->id }}, 'down')"
+                                    wire:target="moveQuestion"
+                                    wire:loading.attr="disabled"
+                                    :disabled="$filtersAreActive || $position === $total"
+                                    :aria-label="__('narrative_questions.move_down_name', ['text' => $shortText])"
+                                    data-test="move-narrative-question-down"
+                                />
+                            </span>
                             <x-ui.button size="sm" icon="pencil-square" class="min-h-11 md:min-h-9" wire:click="openEditModal({{ $question->id }})" :aria-label="__('common.edit_name', ['name' => $shortText])" data-test="edit-narrative-question">
                                 {{ __('narrative_questions.edit') }}
                             </x-ui.button>

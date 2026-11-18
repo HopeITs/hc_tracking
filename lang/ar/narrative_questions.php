@@ -29,8 +29,11 @@ return [
     'empty_heading' => 'لا أسئلة بعد',
     'empty_body' => 'يجيب فريق المشروع عن هذه الأسئلة في تقاريره الشهرية، ويضيفها فريق المتابعة والتقييم هنا.',
     'list_label' => 'الأسئلة (:frequency)، بالترتيب الذي تطرحها به التقارير',
-    'status_on' => 'يعمل',
+    'status_on' => 'مُشغّل',
     'status_off' => 'متوقف',
+    'focus_showing' => 'الأسئلة المعروضة: :shown من :total.',
+    'focus_show_all' => 'عرض الكل',
+    'focus_press_again' => 'اضغط مرة أخرى لعرض كل الأسئلة',
     'position' => 'الترتيب :position',
 
     'move_up_name' => 'نقل «:text» إلى الأعلى',

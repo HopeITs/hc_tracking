@@ -31,6 +31,9 @@ return [
     'list_label' => ':frequency questions, in the order reports ask them',
     'status_on' => 'On',
     'status_off' => 'Switched off',
+    'focus_showing' => 'Showing :shown of :total questions.',
+    'focus_show_all' => 'Show all',
+    'focus_press_again' => 'Press again to show all questions',
     'position' => 'Position :position',
 
     'move_up_name' => 'Move “:text” up',

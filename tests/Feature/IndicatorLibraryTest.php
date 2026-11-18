@@ -264,11 +264,16 @@ describe('status buttons', function () {
         expect($page->instance()->focusCounts)->toBe(['inuse' => 1, 'unused' => 1, 'off' => 1]);
 
         $page->call('setFocus', 'unused')
+            ->assertSeeHtml('data-test="focus-tab-clear-unused"')
+            ->assertSeeText('Showing 1 of 3 library indicators.')
+            ->assertSeeHtml('wire:click="setFocus(&#039;unused&#039;)" class="cursor-pointer')
             ->assertSee('Fresh entry')
             ->assertDontSee('Used entry')
             ->assertDontSee('Old entry')
             ->call('setFocus', 'unused')
             ->assertSet('focus', '')
+            ->assertDontSeeHtml('data-test="focus-showing"')
+            ->assertDontSeeHtml('data-test="focus-tab-clear-unused"')
             ->assertSee('Old entry')
             ->call('setFocus', 'nonsense')
             ->assertSet('focus', '');

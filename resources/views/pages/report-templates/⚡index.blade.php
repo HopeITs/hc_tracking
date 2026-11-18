@@ -186,9 +186,22 @@ new #[Layout('layouts::desk'), Title('titles.report_templates')] class extends C
                 >
                     <span class="text-2xl font-bold leading-none tabular-nums {{ $tab['tone'] }}">{{ $focusCounts[$tab['key']] }}</span>
                     <span class="text-sm font-semibold text-secondary-dark dark:text-ink">{{ $tab['label'] }}</span>
+                    @if ($focus === $tab['key'])
+                        <x-ui.focus-clear-mark :label="__('report_templates.queue.focus_press_again')" data-test="focus-tab-clear-{{ $tab['key'] }}" />
+                    @endif
                 </button>
             @endforeach
         </div>
+
+        @if ($focus !== '' && isset($focusCounts[$focus]))
+            <x-ui.focus-showing
+                class="-mt-2 mb-4"
+                :text="__('report_templates.queue.focus_showing', ['shown' => $focusCounts[$focus], 'total' => $focusCounts['total']])"
+                action="setFocus('{{ $focus }}')"
+                :label="__('report_templates.queue.focus_show_all')"
+                data-test="focus-showing"
+            />
+        @endif
     @endif
 
     @if ($this->rows !== [] && $rows === [])
