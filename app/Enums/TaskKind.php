@@ -17,6 +17,7 @@ enum TaskKind: string
     case MediaDeliverable = 'media_deliverable';
     case Financial = 'financial';
     case Report = 'report';
+    case Logframe = 'logframe';
 
     /**
      * All values, for validation rules.
@@ -36,7 +37,7 @@ enum TaskKind: string
      */
     public static function department(): array
     {
-        return array_filter(self::cases(), fn (self $kind): bool => $kind !== self::Report);
+        return array_filter(self::cases(), fn (self $kind): bool => ! in_array($kind, [self::Report, self::Logframe], true));
     }
 
     /**

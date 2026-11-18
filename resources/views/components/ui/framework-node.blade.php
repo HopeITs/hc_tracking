@@ -1,4 +1,4 @@
-@props(['node', 'depth' => 0, 'order' => 0, 'editable' => true, 'riskCounts' => null])
+@props(['node', 'depth' => 0, 'order' => 0, 'editable' => true, 'riskCounts' => null, 'collapsed' => false])
 
 @php
     use App\Enums\RagStatus;
@@ -68,7 +68,7 @@
     id="framework-result-{{ $result->id }}"
     data-tree-depth="{{ $depth }}"
     data-result-type="{{ $result->type->value }}"
-    x-data="{ branchOpen: true, measuresOpen: {{ $indicatorCount > 0 && $indicatorCount <= 4 ? 'true' : 'false' }} }"
+    x-data="{ branchOpen: {{ $collapsed ? 'false' : 'true' }}, measuresOpen: {{ ! $collapsed && $indicatorCount > 0 && $indicatorCount <= 4 ? 'true' : 'false' }} }"
 >
     <article class="logframe-reveal overflow-hidden rounded-xl border border-secondary-soft bg-white shadow-card transition-colors hover:border-secondary-light dark:border-transparent dark:bg-surface-1 dark:shadow-raised dark:hover:border-field-line" style="--logframe-order: {{ $order }}">
         <span aria-hidden="true" class="block {{ $accent }}"></span>
@@ -461,7 +461,7 @@
                         ])></span>
                         <span aria-hidden="true" class="absolute start-0 top-7 h-px w-6 bg-secondary-soft dark:bg-line-strong"></span>
 
-                        <x-ui.framework-node :node="$child" :depth="$depth + 1" :order="$loop->index" :editable="$editable" :risk-counts="$riskCounts" />
+                        <x-ui.framework-node :node="$child" :depth="$depth + 1" :order="$loop->index" :editable="$editable" :risk-counts="$riskCounts" :collapsed="$collapsed" />
                     </li>
                 @endforeach
             </ol>

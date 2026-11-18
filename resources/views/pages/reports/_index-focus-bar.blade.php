@@ -30,6 +30,13 @@
         >
             <span class="text-2xl font-bold leading-none tabular-nums {{ $tab['tone'] }}">{{ $focusCounts[$tab['key']] }}</span>
             <span class="text-sm font-semibold text-secondary-dark dark:text-ink">{{ $tab['label'] }}</span>
+            {{-- The pressed button says it can be pressed again to show everything. --}}
+            @if ($focus === $tab['key'])
+                <span class="ms-auto inline-flex size-6 shrink-0 items-center justify-center rounded-full text-secondary-medium dark:text-ink-muted" title="{{ __('reports.focus_press_again') }}" data-test="focus-tab-clear-{{ $tab['key'] }}">
+                    <flux:icon.x-mark variant="micro" class="size-4" aria-hidden="true" />
+                    <span class="sr-only">{{ __('reports.focus_press_again') }}</span>
+                </span>
+            @endif
         </button>
     @endforeach
 
@@ -37,3 +44,10 @@
         <flux:button size="sm" variant="ghost" class="self-center text-secondary-medium! dark:text-ink-muted!" wire:click="clearFilters" data-test="reset-filters">{{ __('common.reset_filters') }}</flux:button>
     @endif
 </div>
+
+@if ($focus !== '' && isset($focusCounts[$focus]))
+    <p class="type-meta flex flex-wrap items-center gap-x-2 text-secondary-medium dark:text-ink-muted" aria-live="polite" data-test="focus-showing">
+        <span>{{ __('reports.focus_showing', ['shown' => $focusCounts[$focus], 'total' => $focusCounts['total']]) }}</span>
+        <button type="button" wire:click="setFocus('{{ $focus }}')" class="cursor-pointer font-semibold text-secondary-dark underline underline-offset-2 dark:text-ink" data-test="focus-show-all">{{ __('reports.focus_show_all') }}</button>
+    </p>
+@endif

@@ -339,6 +339,7 @@ new class extends Component {
     data-test="activity-calendar"
     data-tour="activity-calendar"
     x-data="{
+        calendarOpen: false,
         pop: null,
         rtl: document.documentElement.dir === 'rtl',
         open(cell) {
@@ -387,6 +388,11 @@ new class extends Component {
             <p class="type-meta text-secondary-medium dark:text-ink-muted">{{ __('results_framework.calendar_intro') }}</p>
         </div>
 
+        <button type="button" class="dk-btn dk-sm" x-on:click="calendarOpen = ! calendarOpen" x-bind:aria-expanded="calendarOpen.toString()" aria-controls="activity-calendar-body" data-test="calendar-toggle">
+            <span x-show="! calendarOpen">{{ __('results_framework.calendar_show', ['count' => collect($groups)->sum(fn (array $group): int => count($group['rows']))]) }}</span>
+            <span x-show="calendarOpen" x-cloak>{{ __('results_framework.calendar_hide') }}</span>
+        </button>
+
         <p class="type-meta text-secondary-medium dark:text-ink-muted" role="status" aria-live="polite" data-test="calendar-save-state">
             <span wire:loading wire:target="{{ $writeTargets }}">{{ __('results_framework.calendar_saving') }}</span>
             @if ($justSaved)
@@ -431,6 +437,7 @@ new class extends Component {
         </div>
     @endif
 
+    <div x-show="calendarOpen" x-collapse x-cloak id="activity-calendar-body">
     @if ($groups === [])
         <p class="type-meta text-secondary-medium dark:text-ink-muted" data-test="calendar-empty">{{ __('results_framework.calendar_empty') }}</p>
     @else
@@ -591,6 +598,7 @@ new class extends Component {
             </div>
         </x-ui.panel>
     @endif
+    </div>
 
     {{-- The weeks of one scheduled month: opened by a second click on its cell. --}}
     <div

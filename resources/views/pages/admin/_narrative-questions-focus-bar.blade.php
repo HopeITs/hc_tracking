@@ -30,6 +30,9 @@
         >
             <span class="text-2xl font-bold leading-none tabular-nums {{ $tab['tone'] }}">{{ $focusCounts[$tab['key']] }}</span>
             <span class="text-sm font-semibold text-secondary-dark dark:text-ink">{{ $tab['label'] }}</span>
+            @if ($focus === $tab['key'])
+                <x-ui.focus-clear-mark :label="__('narrative_questions.focus_press_again')" data-test="focus-tab-clear-{{ $tab['key'] }}" />
+            @endif
         </button>
     @endforeach
 
@@ -37,3 +40,12 @@
         <flux:button size="sm" variant="ghost" class="self-center text-secondary-medium! dark:text-ink-muted!" wire:click="clearFilters" data-test="reset-filters">{{ __('common.reset_filters') }}</flux:button>
     @endif
 </div>
+
+@if ($focus !== '' && isset($focusCounts[$focus]))
+    <x-ui.focus-showing
+        :text="__('narrative_questions.focus_showing', ['shown' => $focusCounts[$focus], 'total' => $focusCounts['total']])"
+        action="setFocus('{{ $focus }}')"
+        :label="__('narrative_questions.focus_show_all')"
+        data-test="focus-showing"
+    />
+@endif

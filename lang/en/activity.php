@@ -2,6 +2,8 @@
 
 return [
     'title' => 'Activity',
+    'show_log' => 'Show activity log',
+    'hide_log' => 'Hide activity log',
     'empty' => 'Nothing has happened here yet.',
     'load_count_more' => 'Load :count more',
     'load_more' => 'Show older activity',

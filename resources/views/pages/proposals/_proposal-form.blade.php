@@ -22,6 +22,9 @@
         :renewal="$this->renewalPreview"
         :kind="$kind"
         :stored-number="$editingProposalId !== null ? $internalProjectNumber : null"
+        {{-- Y-09: only proposals/show offers a change request (RequestsProposalChange). --}}
+        :change-request="$changeRequestMode ?? false"
+        :change-summary="$changeSummary ?? null"
     />
 
 @can('donors.create')

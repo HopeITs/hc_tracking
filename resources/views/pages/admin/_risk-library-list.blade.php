@@ -81,22 +81,23 @@
             </div>
 
             <div class="ms-auto flex shrink-0 flex-wrap items-center gap-1">
-                <x-ui.button
-                    tone="ghost" size="sm" icon="arrow-up" class="min-h-11 min-w-11 md:size-9! md:min-h-0 md:min-w-0"
-                    wire:click="moveEntry({{ $entry->id }}, 'up')"
-                    :disabled="$filtersAreActive || $position === 1"
-                    :title="$filtersAreActive ? __('risk_library.clear_to_reorder') : null"
-                    :aria-label="__('risk_library.move_up_name', ['name' => $displayTitle])"
-                    data-test="move-entry-up"
-                />
-                <x-ui.button
-                    tone="ghost" size="sm" icon="arrow-down" class="min-h-11 min-w-11 md:size-9! md:min-h-0 md:min-w-0"
-                    wire:click="moveEntry({{ $entry->id }}, 'down')"
-                    :disabled="$filtersAreActive || $position === $total"
-                    :title="$filtersAreActive ? __('risk_library.clear_to_reorder') : null"
-                    :aria-label="__('risk_library.move_down_name', ['name' => $displayTitle])"
-                    data-test="move-entry-down"
-                />
+                {{-- A disabled button takes no pointer events, so the reason sits on this wrapper. --}}
+                <span class="flex items-center gap-1" @if ($filtersAreActive) title="{{ __('risk_library.clear_to_reorder') }}" @endif data-test="move-entry-arrows">
+                    <x-ui.button
+                        tone="ghost" size="sm" icon="arrow-up" class="min-h-11 min-w-11 md:size-9! md:min-h-0 md:min-w-0"
+                        wire:click="moveEntry({{ $entry->id }}, 'up')"
+                        :disabled="$filtersAreActive || $position === 1"
+                        :aria-label="__('risk_library.move_up_name', ['name' => $displayTitle])"
+                        data-test="move-entry-up"
+                    />
+                    <x-ui.button
+                        tone="ghost" size="sm" icon="arrow-down" class="min-h-11 min-w-11 md:size-9! md:min-h-0 md:min-w-0"
+                        wire:click="moveEntry({{ $entry->id }}, 'down')"
+                        :disabled="$filtersAreActive || $position === $total"
+                        :aria-label="__('risk_library.move_down_name', ['name' => $displayTitle])"
+                        data-test="move-entry-down"
+                    />
+                </span>
                 <x-ui.button size="sm" icon="pencil-square" class="min-h-11 md:min-h-9" wire:click="openEditModal({{ $entry->id }})" :aria-label="__('common.edit_name', ['name' => $displayTitle])" data-test="edit-risk-library-entry">
                     {{ __('risk_library.edit') }}
                 </x-ui.button>

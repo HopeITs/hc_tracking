@@ -739,17 +739,20 @@ new class extends Component {
             </x-ui.empty-state>
         @else
             <div class="grid gap-0 @4xl/detail:grid-cols-[minmax(0,1fr)_minmax(0,24rem)]">
-                <ol class="divide-y divide-secondary-soft dark:divide-line">
+                <ol class="max-h-[36rem] divide-y divide-secondary-soft overflow-y-auto dark:divide-line">
                     @foreach ($this->results as $result)
-                        <li class="px-4 py-3" wire:key="node-{{ $result->id }}" data-node="{{ $result->id }}">
-                            <div class="flex items-start gap-2">
+                        @php
+                            $nodeInstances = $instancesByResult->get($result->id, collect());
+                        @endphp
+                        <li class="px-4 py-3" wire:key="node-{{ $result->id }}" data-node="{{ $result->id }}" x-data="{ open: false }">
+                            <button type="button" class="flex w-full cursor-pointer items-start gap-2 text-start" x-on:click="open = ! open" x-bind:aria-expanded="open" data-node-toggle>
                                 <x-ui.enum-badge :case="$result->type" />
-                                <p class="min-w-0 flex-1 text-sm font-semibold {{ $inkText }}" dir="auto">{{ $result->statement }}</p>
-                            </div>
+                                <span class="min-w-0 flex-1 text-sm font-semibold {{ $inkText }}" dir="auto">{{ $result->statement }}</span>
+                                <span class="shrink-0 rounded-full bg-secondary-soft px-2 py-0.5 text-[11px] font-semibold tabular-nums {{ $inkText }} dark:bg-surface-2" data-node-count>{{ $nodeInstances->count() }}</span>
+                                <flux:icon.chevron-down variant="micro" class="mt-0.5 size-4 shrink-0 transition-transform {{ $mutedText }}" x-bind:class="open ? 'rotate-180' : ''" aria-hidden="true" />
+                            </button>
 
-                            @php
-                                $nodeInstances = $instancesByResult->get($result->id, collect());
-                            @endphp
+                            <div x-show="open" x-collapse x-cloak>
                             @if ($nodeInstances->isEmpty())
                                 <p class="mt-1.5 ps-1 text-xs {{ $mutedText }}">{{ __('targets.node_has_no_indicators') }}</p>
                             @else
@@ -776,6 +779,7 @@ new class extends Component {
                                     @endforeach
                                 </ul>
                             @endif
+                            </div>
                         </li>
                     @endforeach
                 </ol>

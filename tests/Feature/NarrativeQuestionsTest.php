@@ -92,11 +92,16 @@ describe('the page', function () {
         expect($page->instance()->focusCounts)->toMatchArray(['monthly' => 1, 'quarter_end' => 1, 'off' => 1, 'total' => 3]);
 
         $page->call('setFocus', 'quarter_end')
+            ->assertSeeHtml('data-test="focus-tab-clear-quarter_end"')
+            ->assertSeeText('Showing 1 of 3 questions.')
+            ->assertSeeHtml('wire:click="setFocus(&#039;quarter_end&#039;)" class="cursor-pointer')
             ->assertSee('Asked at quarter end')
             ->assertDontSee('Asked every month')
             ->assertDontSee('Old monthly question')
             ->call('setFocus', 'quarter_end')
             ->assertSet('focus', '')
+            ->assertDontSeeHtml('data-test="focus-showing"')
+            ->assertDontSeeHtml('data-test="focus-tab-clear-quarter_end"')
             ->assertSee('Asked every month')
             ->call('setFocus', 'off')
             ->assertSee('Old monthly question')
@@ -121,7 +126,10 @@ describe('the page', function () {
         $arrows = (new DOMXPath($dom))->query('//*[@data-test="move-narrative-question-up" or @data-test="move-narrative-question-down"]');
         expect($arrows->length)->toBe(2);
         foreach ($arrows as $arrow) {
-            expect($arrow->hasAttribute('disabled'))->toBeTrue();
+            expect($arrow->hasAttribute('disabled'))->toBeTrue()
+                // A disabled button takes no pointer events, so the reason must sit on the wrapper the pointer reaches.
+                ->and($arrow->parentNode->getAttribute('data-test'))->toBe('move-narrative-question-arrows')
+                ->and($arrow->parentNode->getAttribute('title'))->toBe(__('narrative_questions.clear_to_reorder'));
         }
 
         $page->set('search', 'ثان')->assertSee('Second one')
@@ -130,6 +138,7 @@ describe('the page', function () {
             ->assertSeeHtml('data-test="empty-reset-filters"')
             ->call('clearFilters')
             ->assertSet('search', '')
+            ->assertDontSee(__('narrative_questions.clear_to_reorder'))
             ->assertSee('First one');
     });
 

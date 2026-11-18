@@ -10,6 +10,7 @@ use App\Enums\ResultType;
 use App\Models\ActivitySchedule;
 use App\Models\MonthlyReport;
 use App\Models\ProjectActivityStatus;
+use App\Models\Proposal;
 use App\Models\Result;
 use Carbon\CarbonImmutable;
 use Illuminate\Support\Collection;
@@ -19,28 +20,31 @@ use Illuminate\Support\Collection;
  * month", D-49b, D-51): the one read helper used by the save action, Submit
  * and the T17B page.
  *
- * An activity of a donor-approved proposal of the report's template appears
- * when its calendar schedules it in the month (the project's override rows
- * when it has any, else the proposal calendar), when its last status
- * confirmed by an earlier month is not final (not started, started,
- * ongoing, suspended), or when this report already has an entry for it.
- * Four queries, whatever the number of activities.
+ * An activity of a donor-approved proposal of the report's template (Y-06,
+ * D-78: every proposal a joined template carries) appears when its calendar
+ * schedules it in the month (the project's override rows when it has any,
+ * else the proposal calendar) and the month lies inside its proposal's
+ * schedule window, when its last status confirmed by an earlier month is not
+ * final (not started, started, ongoing, suspended), or when this report
+ * already has an entry for it. The proposals are those of the report's own
+ * template (D-76, Y-03); the schedule overrides and the confirmed statuses stay
+ * keyed by the report's legacy project until they move to places. Queries stay
+ * constant whatever the number of activities.
  */
 final class MonthlyReportActivities
 {
     /**
-     * @return Collection<int, array{activity: Result, scheduled: bool, planned_weeks: list<int>|null, carried_from: CarbonImmutable|null, late: bool, last_status: ActivityStatus|null}>
+     * `proposal_name` is set only when more than one proposal feeds the report.
+     *
+     * @return Collection<int, array{activity: Result, proposal_name: string|null, scheduled: bool, planned_weeks: list<int>|null, carried_from: CarbonImmutable|null, late: bool, last_status: ActivityStatus|null}>
      */
     public static function for(MonthlyReport $report): Collection
     {
         $month = CarbonImmutable::parse($report->period)->startOfMonth();
         $projectId = $report->project_id;
 
-        // The template's proposals (D-76); the schedule overrides and the confirmed statuses
-        // stay keyed by the report's legacy project until they move to places.
-        $proposalIds = $report->template()->firstOrFail()->proposals()
-            ->whereIn('proposals.status', array_map(fn (ProposalStatus $status): string => $status->value, ProposalStatus::approvedByDonor()))
-            ->pluck('proposals.id');
+        $proposals = self::proposalsOf($report);
+        $proposalIds = $proposals->keys()->all();
 
         $activities = Result::query()
             ->where('type', ResultType::Activity->value)
@@ -71,12 +75,19 @@ final class MonthlyReportActivities
 
         $entered = $report->activityEntries()->pluck('result_id')->all();
 
-        return $activities->map(function (Result $activity) use ($schedules, $statuses, $entered, $month, $report): ?array {
+        $windows = $proposals->mapWithKeys(fn (Proposal $proposal): array => [$proposal->id => ProposalFramework::scheduleWindow($proposal)]);
+        $labelled = $proposals->count() > 1;
+
+        return $activities->map(function (Result $activity) use ($schedules, $statuses, $entered, $month, $report, $proposals, $windows, $labelled): ?array {
             $rows = $schedules->get($activity->id, collect());
             $calendar = $rows->contains(fn (ActivitySchedule $row): bool => $row->project_id !== null)
                 ? $rows->whereNotNull('project_id')
                 : $rows->whereNull('project_id');
-            $scheduledRow = $calendar->first(fn (ActivitySchedule $row): bool => CarbonImmutable::parse($row->month)->isSameMonth($month));
+            [$from, $to] = $windows->get($activity->proposal_id);
+            $inWindow = $month->greaterThanOrEqualTo($from) && $month->lessThanOrEqualTo($to);
+            $scheduledRow = $inWindow
+                ? $calendar->first(fn (ActivitySchedule $row): bool => CarbonImmutable::parse($row->month)->isSameMonth($month))
+                : null;
 
             $status = $statuses->get($activity->id);
             $confirmedEarlier = $status !== null
@@ -99,6 +110,7 @@ final class MonthlyReportActivities
 
             return [
                 'activity' => $activity,
+                'proposal_name' => $labelled ? (string) $proposals->get($activity->proposal_id)?->name : null,
                 'scheduled' => $scheduledRow !== null,
                 'planned_weeks' => $weeks,
                 'carried_from' => $carried ? CarbonImmutable::parse($status->monthlyReport->period)->startOfMonth() : null,
@@ -106,5 +118,21 @@ final class MonthlyReportActivities
                 'last_status' => $confirmedEarlier ? $status->status : null,
             ];
         })->filter()->values();
+    }
+
+    /**
+     * The donor-approved proposals the report asks about, by id.
+     *
+     * @return Collection<int, Proposal>
+     */
+    private static function proposalsOf(MonthlyReport $report): Collection
+    {
+        $statuses = array_map(fn (ProposalStatus $status): string => $status->value, ProposalStatus::approvedByDonor());
+
+        return $report->template()->firstOrFail()->proposals()
+            ->whereIn('proposals.status', $statuses)
+            ->orderBy('proposals.id')
+            ->get(['proposals.*'])
+            ->keyBy('id');
     }
 }

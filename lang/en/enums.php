@@ -251,6 +251,7 @@ return [
         'media_deliverable' => 'Media deliverable',
         'financial' => 'Financial',
         'report' => 'Report',
+        'logframe' => 'Logical framework',
     ],
     'deliverable_kind' => [
         'video' => 'Video',

@@ -798,5 +798,11 @@ test('each indicator shows one plain status and what needs a hand comes first', 
 
     $component->call('setFocus', 'waiting')
         ->assertSee('BBB old reading')
-        ->assertDontSee('AAA on track');
+        ->assertDontSee('AAA on track')
+        ->assertSeeHtml('data-test="focus-tab-clear-waiting"')
+        ->assertSeeText('Showing 2 of 3 indicators.')
+        ->assertSeeHtml('wire:click="setFocus(&#039;waiting&#039;)" class="cursor-pointer')
+        ->call('setFocus', 'waiting')
+        ->assertDontSeeHtml('data-test="focus-showing"')
+        ->assertDontSeeHtml('data-test="focus-tab-clear-waiting"');
 });

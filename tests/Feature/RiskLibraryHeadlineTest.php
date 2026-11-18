@@ -28,11 +28,16 @@ it('counts in use, not used yet and switched off as three disjoint buttons that 
     expect($page->instance()->focusCounts)->toMatchArray(['inuse' => 1, 'unused' => 1, 'off' => 1, 'total' => 3]);
 
     $page->call('setFocus', 'unused')
+        ->assertSeeHtml('data-test="focus-tab-clear-unused"')
+        ->assertSeeText('Showing 1 of 3 risks.')
+        ->assertSeeHtml('wire:click="setFocus(&#039;unused&#039;)" class="cursor-pointer')
         ->assertSee('Fresh risk')
         ->assertDontSee('Used risk')
         ->assertDontSee('Old risk')
         ->call('setFocus', 'unused')
         ->assertSet('focus', '')
+        ->assertDontSeeHtml('data-test="focus-showing"')
+        ->assertDontSeeHtml('data-test="focus-tab-clear-unused"')
         ->assertSee('Old risk')
         ->call('setFocus', 'nonsense')
         ->assertSet('focus', '');
@@ -53,7 +58,10 @@ it('searches by title or category and keeps each entry\'s place in the whole lib
     $arrows = (new DOMXPath($dom))->query('//*[@data-test="move-entry-up" or @data-test="move-entry-down"]');
     expect($arrows->length)->toBe(2);
     foreach ($arrows as $arrow) {
-        expect($arrow->hasAttribute('disabled'))->toBeTrue();
+        expect($arrow->hasAttribute('disabled'))->toBeTrue()
+            // A disabled button takes no pointer events, so the reason must sit on the wrapper the pointer reaches.
+            ->and($arrow->parentNode->getAttribute('data-test'))->toBe('move-entry-arrows')
+            ->and($arrow->parentNode->getAttribute('title'))->toBe(__('risk_library.clear_to_reorder'));
     }
 
     $page->set('search', 'zzz-no-match')
@@ -61,6 +69,7 @@ it('searches by title or category and keeps each entry\'s place in the whole lib
         ->assertSeeHtml('data-test="empty-reset-filters"')
         ->call('clearFilters')
         ->assertSet('search', '')
+        ->assertDontSee(__('risk_library.clear_to_reorder'))
         ->assertSee('Fresh risk');
 });
 

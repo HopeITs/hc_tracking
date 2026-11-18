@@ -190,12 +190,17 @@ test('the two status buttons count what a click shows, and pressing one again cl
     expect($page->instance()->focusCounts)->toBe(['pending' => 1, 'lines' => 2, 'total' => 3]);
 
     $page->call('setFocus', 'lines')
+        ->assertSeeHtml('data-test="focus-tab-clear-lines"')
+        ->assertSeeText('Showing 2 of 3 templates.')
+        ->assertSeeHtml('wire:click="setFocus(&#039;lines&#039;)" class="cursor-pointer')
         ->assertSet('focus', 'lines')
         ->assertSee('Growing Project')
         ->assertSee('Growing Again')
         ->assertDontSee('Fresh Project')
         ->call('setFocus', 'lines')
         ->assertSet('focus', '')
+        ->assertDontSeeHtml('data-test="focus-showing"')
+        ->assertDontSeeHtml('data-test="focus-tab-clear-lines"')
         ->assertSee('Fresh Project')
         ->call('setFocus', 'bogus')
         ->assertSet('focus', '');

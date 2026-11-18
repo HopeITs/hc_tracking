@@ -30,7 +30,7 @@
 @endphp
 
 <div
-    class="overflow-x-auto"
+    class="max-h-[70vh] overflow-auto"
     data-targets-grid
     x-data="{
         isRtl() { return getComputedStyle(this.$root).direction === 'rtl'; },

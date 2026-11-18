@@ -6,6 +6,7 @@ use App\Livewire\Concerns\ManagesAgreementForm;
 use App\Livewire\Concerns\ManagesTransferForm;
 use App\Livewire\Concerns\PreviewsFiles;
 use App\Livewire\Concerns\Proposals\ChartsProposalChronology;
+use App\Livewire\Concerns\Proposals\DecidesProposalChange;
 use App\Livewire\Concerns\Proposals\FillsProposalCenters;
 use App\Livewire\Concerns\Proposals\ManagesFinalReportAcceptance;
 use App\Livewire\Concerns\Proposals\ManagesNegotiationNotes;
@@ -22,6 +23,7 @@ use App\Livewire\Concerns\Proposals\ReadsProposalDelivery;
 use App\Livewire\Concerns\Proposals\ReadsProposalFunding;
 use App\Livewire\Concerns\Proposals\ReadsProposalHealth;
 use App\Livewire\Concerns\Proposals\ReadsProposalVitals;
+use App\Livewire\Concerns\Proposals\RequestsProposalChange;
 use App\Livewire\Concerns\SwitchesFundingView;
 use App\Models\Activity;
 use App\Models\DonorProposal;
@@ -43,6 +45,7 @@ new #[Layout('layouts::desk'), Title('titles.proposal')] class extends Component
     use BuildsProposalPlanGantt;
     use ChartsProposalChronology;
     use ChecksFinanceVisibility;
+    use DecidesProposalChange;
     use FillsProposalCenters;
     use ManagesAgreementForm;
     use ManagesFinalReportAcceptance;
@@ -62,6 +65,7 @@ new #[Layout('layouts::desk'), Title('titles.proposal')] class extends Component
     use ReadsProposalFunding;
     use ReadsProposalHealth;
     use ReadsProposalVitals;
+    use RequestsProposalChange;
     use SwitchesFundingView;
     use WithFileUploads;
 
@@ -99,6 +103,12 @@ new #[Layout('layouts::desk'), Title('titles.proposal')] class extends Component
      */
     #[Locked]
     public bool $embedded = false;
+
+    /**
+     * The activity log under the tabs is closed until asked for, so no tab
+     * opens onto a long list.
+     */
+    public bool $showActivity = false;
 
     /**
      * Embedded on the project's Funding tab: only the lifecycle, the
@@ -147,6 +157,8 @@ new #[Layout('layouts::desk'), Title('titles.proposal')] class extends Component
         $this->addCentersLink = false;
 
         $this->openExtensionFromLink();
+
+        $this->openChangeRequestFromLink();
     }
 
     /**
@@ -359,6 +371,7 @@ new #[Layout('layouts::desk'), Title('titles.proposal')] class extends Component
             $this->arrivals, $this->vitals, $this->term, $this->tabs, $this->proposalFiles, $this->reviewStages, $this->needAssessments, $this->approvalSubject, $this->approvalPreview, $this->approvalLocations,
             $this->canRecordFinalReportAcceptance, $this->finalReportAcceptance,
             $this->canFillCenters, $this->centerFillRows, $this->centerFillCentersByCity,
+            $this->pendingChangeRequestId, $this->changeRequestHistory, $this->changeRequestHistoryLines, $this->decidingChangeRequest, $this->decidingChangeLines, $this->changeReviewSlot,
         );
     }
 };
@@ -439,6 +452,17 @@ new #[Layout('layouts::desk'), Title('titles.proposal')] class extends Component
     @else
         @include('pages.proposals._show-renewal-chain')
 
+        @if ($this->pendingChangeRequestId !== null)
+            {{-- Y-09: a change request is waiting; nothing changes until the PR Manager decides. --}}
+            <div class="mt-7 flex flex-wrap items-center justify-between gap-3 rounded-lg border border-status-warn bg-status-warn-soft px-4 py-3 text-sm" role="status" data-test="change-pending-notice">
+                <p class="flex min-w-0 flex-1 items-start gap-2 font-semibold text-status-warn">
+                    <flux:icon.clock variant="micro" class="mt-0.5 size-4 shrink-0" aria-hidden="true" />
+                    <span>{{ __('proposals.change.pending_notice') }}</span>
+                </p>
+                <x-ui.button size="sm" icon="document-magnifying-glass" class="min-h-10 touch-manipulation" wire:click="openChangeRequestModal" data-test="change-pending-open">{{ __('proposals.change.open_button') }}</x-ui.button>
+            </div>
+        @endif
+
         @include('pages.proposals._show-warnings')
 
         @include('pages.proposals._show-vitals')
@@ -475,8 +499,13 @@ new #[Layout('layouts::desk'), Title('titles.proposal')] class extends Component
         </div>
 
         <section aria-labelledby="record-activity-heading" class="grid gap-3 mt-10" data-record-activity>
-            <h2 id="record-activity-heading" class="text-base font-bold">{{ __('activity.title') }}</h2>
-            <livewire:activity.timeline :subjects="['proposal' => [$this->proposal->id]]" :key="'proposal-activity-'.$this->proposal->id" />
+            <div class="flex flex-wrap items-center justify-between gap-2">
+                <h2 id="record-activity-heading" class="text-base font-bold">{{ __('activity.title') }}</h2>
+                <button type="button" class="dk-btn dk-sm" wire:click="$toggle('showActivity')" aria-expanded="{{ $showActivity ? 'true' : 'false' }}" data-test="toggle-activity-log">{{ $showActivity ? __('activity.hide_log') : __('activity.show_log') }}</button>
+            </div>
+            @if ($showActivity)
+                <livewire:activity.timeline :subjects="['proposal' => [$this->proposal->id]]" :key="'proposal-activity-'.$this->proposal->id" />
+            @endif
         </section>
     @endif
 
