@@ -22,7 +22,8 @@ use App\Support\MealCoverage;
  *   Accountability & Feedback, approves, returns or asks.
  * - The MEAL manager (ActivityPlanPolicy::isMealManager) reviews, returns
  *   to the project manager or to the officer, or asks.
- * - The program manager marks it seen, with an optional note.
+ * - The program manager marks it seen, with an optional note, only after
+ *   the MEAL manager reviewed it.
  * - Everyone involved reads every part at every stage; the CEO (General
  *   Manager) sees the summary only.
  */
@@ -72,7 +73,7 @@ class PlanUpdatePolicy
 
     public function markSeen(User $user, PlanUpdate $planUpdate): bool
     {
-        return ($planUpdate->status === PlanUpdateStatus::Reviewed || ($planUpdate->status === PlanUpdateStatus::OfficerApproved && $planUpdate->seen_at === null))
+        return $planUpdate->status === PlanUpdateStatus::Reviewed
             && self::isProgramManager($user, $planUpdate->plan()->firstOrFail());
     }
 

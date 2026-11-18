@@ -74,7 +74,8 @@ final class ReviewPlanUpdate
     {
         Gate::forUser($user)->authorize('decideAsMealManager', $update);
 
-        // MEAL manager and program manager both mark it seen, in either order (Rami, 2026-11-12): complete once both have.
+        // The program manager marks it seen only after this review (AP-4, 2026-11-18). An update the program manager saw
+        // first under the earlier either-order rule completes here.
         $moved = $this->move($update, [PlanUpdateStatus::OfficerApproved], fn (PlanUpdate $locked): array => [
             'status' => $locked->seen_at !== null ? PlanUpdateStatus::Seen : PlanUpdateStatus::Reviewed,
             'reviewed_at' => now(),
@@ -112,8 +113,8 @@ final class ReviewPlanUpdate
         Gate::forUser($user)->authorize('markSeen', $update);
         $note = trim((string) $note);
 
-        $moved = $this->move($update, [PlanUpdateStatus::OfficerApproved, PlanUpdateStatus::Reviewed], fn (PlanUpdate $locked): array => [
-            'status' => $locked->status === PlanUpdateStatus::Reviewed ? PlanUpdateStatus::Seen : PlanUpdateStatus::OfficerApproved,
+        $moved = $this->move($update, [PlanUpdateStatus::Reviewed], [
+            'status' => PlanUpdateStatus::Seen,
             'seen_at' => now(),
             'seen_by' => $user->id,
             'program_manager_note' => $note === '' ? null : $note,
