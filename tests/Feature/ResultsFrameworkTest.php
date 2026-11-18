@@ -14,7 +14,6 @@ use App\Models\Report;
 use App\Models\Result;
 use App\Models\User;
 use Carbon\CarbonImmutable;
-use Database\Seeders\RolesAndPermissionsSeeder;
 use Illuminate\Support\Facades\DB;
 use Livewire\Livewire;
 
@@ -60,7 +59,7 @@ test('a result with no program still appears under unassigned', function () {
         ->assertSee('Orphaned statement.');
 });
 
-test('results can be filtered by program and type', function () {
+test('results can be filtered by program', function () {
     $user = User::factory()->role('General Manager')->create();
     $first = Program::factory()->create();
     $second = Program::factory()->create();
@@ -74,8 +73,7 @@ test('results can be filtered by program and type', function () {
         ->assertSee('First impact.')
         ->assertDontSee('Second output.')
         ->call('clearFilters')
-        ->set('type', ResultType::Output->value)
-        ->assertDontSee('First impact.')
+        ->assertSee('First impact.')
         ->assertSee('Second output.');
 });
 
@@ -183,33 +181,6 @@ test('the results framework renders with no results', function () {
     Livewire::actingAs($user)->test('pages::results.index')->assertSee('No results yet');
 });
 
-test('the overview counts statements, indicators, targets and measurement coverage', function () {
-    $user = User::factory()->role('General Manager')->create();
-    $program = Program::factory()->create();
-
-    $measured = Result::factory()->create(['program_id' => $program->id, 'type' => ResultType::Outcome]);
-    Result::factory()->create(['program_id' => $program->id, 'type' => ResultType::Output]);
-
-    $indicator = Indicator::factory()->create([
-        'result_id' => $measured->id,
-        'baseline' => 0,
-        'target' => 100,
-    ]);
-    IndicatorProgress::factory()->create(['indicator_id' => $indicator->id, 'value' => 100]);
-    PlanIndicator::factory()->create(['indicator_id' => $indicator->id]);
-
-    $overview = Livewire::actingAs($user)
-        ->test('pages::results.index')
-        ->instance()
-        ->overview();
-
-    expect($overview['statements'])->toBe(2)
-        ->and($overview['measured'])->toBe(1)
-        ->and($overview['indicators'])->toBe(1)
-        ->and($overview['targets'])->toBe(1)
-        ->and($overview['coverage'])->toBe(50.0);
-});
-
 test('the search matches an indicator name as well as a statement', function () {
     $user = User::factory()->role('General Manager')->create();
 
@@ -222,45 +193,6 @@ test('the search matches an indicator name as well as a statement', function () 
         ->set('search', 'litres of water')
         ->assertSee('Households reached with cash.')
         ->assertDontSee('Unrelated statement.');
-});
-
-test('the needs indicators chip keeps only statements carrying no indicator', function () {
-    $user = User::factory()->role('General Manager')->create();
-
-    $measured = Result::factory()->create(['statement' => 'Measured statement.']);
-    Result::factory()->create(['statement' => 'Unmeasured statement.']);
-    Indicator::factory()->create(['result_id' => $measured->id]);
-
-    Livewire::actingAs($user)
-        ->test('pages::results.index')
-        ->call('setFocus', 'unmeasured')
-        ->assertSet('focus', 'unmeasured')
-        ->assertSee('Unmeasured statement.')
-        ->assertDontSee('Measured statement.')
-        ->call('setFocus', 'unmeasured')
-        ->assertSet('focus', '')
-        ->assertSee('Measured statement.');
-});
-
-test('the off track chip keeps only statements whose indicators are rating amber or red', function () {
-    $this->travelTo(CarbonImmutable::parse('2026-06-30 12:00:00'));
-
-    $user = User::factory()->role('General Manager')->create();
-
-    $behind = Result::factory()->create(['statement' => 'Statement falling behind.']);
-    $ahead = Result::factory()->create(['statement' => 'Statement on track.']);
-
-    $behindIndicator = Indicator::factory()->create(['result_id' => $behind->id, 'baseline' => 0, 'target' => 100]);
-    IndicatorProgress::factory()->create(['indicator_id' => $behindIndicator->id, 'value' => 2]);
-
-    $aheadIndicator = Indicator::factory()->create(['result_id' => $ahead->id, 'baseline' => 0, 'target' => 100]);
-    IndicatorProgress::factory()->create(['indicator_id' => $aheadIndicator->id, 'value' => 100]);
-
-    Livewire::actingAs($user)
-        ->test('pages::results.index')
-        ->call('setFocus', 'offtrack')
-        ->assertSee('Statement falling behind.')
-        ->assertDontSee('Statement on track.');
 });
 
 test('a statement whose parent a filter hides is promoted to the top and keeps its lineage', function () {
@@ -362,23 +294,6 @@ test('a statement shows the plan, the proposal and the donor its targets were co
         ->assertSee($agreement->proposal->name)
         ->assertSee($agreement->donor->name)
         ->assertSee('1 reported · 1 approved');
-});
-
-test('the attention chips count under the other active filters, not the whole table', function () {
-    $user = User::factory()->role('General Manager')->create();
-    $first = Program::factory()->create();
-    $second = Program::factory()->create();
-
-    Result::factory()->create(['program_id' => $first->id, 'statement' => 'Unmeasured in first.']);
-    Result::factory()->create(['program_id' => $second->id, 'statement' => 'Unmeasured in second.']);
-
-    $component = Livewire::actingAs($user)->test('pages::results.index');
-
-    expect($component->instance()->focusCounts())->toBe(['unmeasured' => 2, 'offtrack' => 0, 'waiting' => 0]);
-
-    $scoped = $component->set('program', (string) $first->id);
-
-    expect($scoped->instance()->focusCounts())->toBe(['unmeasured' => 1, 'offtrack' => 0, 'waiting' => 0]);
 });
 
 test('the parent picker offers only statements one level up the chain', function () {
@@ -541,69 +456,76 @@ test('a target reads its achievement from approved reports only, and an unmeasur
         ->assertSeeHtml('data-test="add-indicator-for-result-'.$unmeasured->id.'"');
 });
 
-test('each proposal framework reads as its own group after the program groups', function () {
+test('proposal frameworks stay off the program logframes and show as cards after them', function () {
     $user = User::factory()->role('General Manager')->create();
     $program = Program::factory()->create(['name' => 'Water Security']);
     $proposal = Proposal::factory()->create(['name' => 'Dry Season Response']);
-    Result::factory()->type(ResultType::Impact)->create(['program_id' => $program->id, 'statement' => 'Program-level impact.']);
-    $proposalOutput = Result::factory()->type(ResultType::Output)->create(['program_id' => $program->id, 'proposal_id' => $proposal->id, 'statement' => 'Proposal-level output.']);
-    Result::factory()->activity($proposalOutput)->create(['statement' => 'Proposal-level activity.']);
+    Proposal::factory()->create(['name' => 'No Logframe Yet']);
+    $programImpact = Result::factory()->type(ResultType::Impact)->create(['program_id' => $program->id, 'statement' => 'Program-level impact.']);
+    Result::factory()->type(ResultType::Output)->create(['program_id' => $program->id, 'proposal_id' => $proposal->id, 'copied_from_id' => $programImpact->id, 'statement' => 'Proposal-level output.']);
 
-    $groups = Livewire::actingAs($user)
+    $component = Livewire::actingAs($user)
         ->test('pages::results.index')
-        ->assertSeeInOrder(['Water Security', 'Program-level impact.', __('results_framework.proposal_group', ['name' => 'Dry Season Response']), 'Proposal-level output.', 'Proposal-level activity.'])
-        ->assertSeeHtml('data-result-type="activity"')
-        ->instance()
-        ->groupedRoots
-        ->keys()
-        ->all();
+        ->assertSeeInOrder(['Water Security', 'Program-level impact.', __('results_framework.proposal_logframes'), 'Dry Season Response'])
+        ->assertDontSee('Proposal-level output.')
+        ->assertDontSee('No Logframe Yet')
+        ->assertSeeHtml('data-test="proposal-logframe-card-'.$proposal->id.'"')
+        ->assertSeeHtml('href="'.e(route('proposals.show', ['proposal' => $proposal, 'ptab' => 'logframe'])).'"');
 
-    expect($groups)->toBe(['Water Security', __('results_framework.proposal_group', ['name' => 'Dry Season Response'])]);
+    expect($component->instance()->groupedRoots->keys()->all())->toBe(['Water Security']);
 });
 
-test('the framework filter narrows to the program framework or to one proposal', function () {
+test('the program filter offers only programs with a logframe and narrows the proposal cards too', function () {
     $user = User::factory()->role('General Manager')->create();
-    $proposal = Proposal::factory()->create();
-    Result::factory()->type(ResultType::Impact)->create(['statement' => 'Program-level impact.']);
-    Result::factory()->type(ResultType::Impact)->create(['proposal_id' => $proposal->id, 'statement' => 'Proposal-level impact.']);
-    Result::factory()->type(ResultType::Impact)->create(['proposal_id' => Proposal::factory()->create()->id, 'statement' => 'Another proposal impact.']);
+    $water = Program::factory()->create(['name' => 'Water Security']);
+    $health = Program::factory()->create(['name' => 'Health Access']);
+    Program::factory()->create(['name' => 'Empty Program']);
+    Result::factory()->type(ResultType::Impact)->create(['program_id' => $water->id, 'statement' => 'Water impact.']);
+    Result::factory()->type(ResultType::Impact)->create(['program_id' => $health->id, 'statement' => 'Health impact.']);
+    $waterProposal = Proposal::factory()->create(['name' => 'Water Proposal']);
+    $healthProposal = Proposal::factory()->create(['name' => 'Health Proposal']);
+    Result::factory()->type(ResultType::Impact)->create(['program_id' => $water->id, 'proposal_id' => $waterProposal->id]);
+    Result::factory()->type(ResultType::Impact)->create(['program_id' => $health->id, 'proposal_id' => $healthProposal->id]);
 
-    Livewire::actingAs($user)
-        ->test('pages::results.index')
-        ->set('proposal', 'none')
-        ->assertSee('Program-level impact.')
-        ->assertDontSee('Proposal-level impact.')
-        ->set('proposal', (string) $proposal->id)
-        ->assertSee('Proposal-level impact.')
-        ->assertDontSee('Program-level impact.')
-        ->assertDontSee('Another proposal impact.')
-        ->set('type', ResultType::CrossCutting->value)
-        ->assertDontSee('Proposal-level impact.');
+    $component = Livewire::actingAs($user)->test('pages::results.index');
+
+    expect($component->instance()->frameworkProgramOptions->pluck('name')->all())->toBe(['Health Access', 'Water Security'])
+        ->and($component->instance()->hasUnassignedFramework)->toBeFalse();
+
+    $component->set('program', (string) $water->id)
+        ->assertSee('Water impact.')
+        ->assertDontSee('Health impact.')
+        ->assertSee('Water Proposal')
+        ->assertDontSee('Health Proposal');
 });
 
-test('a proposal node is edited in its own framework from the results page', function () {
-    $user = mealManager();
-    $proposal = Proposal::factory()->create();
-    $output = Result::factory()->type(ResultType::Output)->create(['proposal_id' => $proposal->id]);
-    $programOutcome = Result::factory()->type(ResultType::Outcome)->create();
+test('the search opens the matching path and narrows the proposal cards by title', function () {
+    $user = User::factory()->role('General Manager')->create();
+    $program = Program::factory()->create();
+    $impact = Result::factory()->type(ResultType::Impact)->create(['program_id' => $program->id, 'statement' => 'Healthier families.']);
+    Result::factory()->type(ResultType::Outcome)->create(['program_id' => $program->id, 'parent_id' => $impact->id, 'statement' => 'Clean water reaches homes.']);
+    Result::factory()->type(ResultType::Impact)->create(['program_id' => $program->id, 'statement' => 'Unrelated impact.']);
+    $winter = Proposal::factory()->create(['name' => 'Winter Clean Water']);
+    $summer = Proposal::factory()->create(['name' => 'Summer Schools']);
+    Result::factory()->create(['proposal_id' => $winter->id]);
+    Result::factory()->create(['proposal_id' => $summer->id]);
 
-    Livewire::actingAs($user)
+    Livewire::actingAs($user)->test('pages::results.index')
+        ->set('search', 'clean water')
+        ->assertSeeInOrder(['Healthier families.', 'Clean water reaches homes.'])
+        ->assertDontSee('Unrelated impact.')
+        ->assertSeeHtml('x-data="{ open: true }"')
+        ->assertSee('Winter Clean Water')
+        ->assertDontSee('Summer Schools');
+});
+
+test('a proposal node cannot be reached from the results page', function () {
+    $proposalOutput = Result::factory()->type(ResultType::Output)->create(['proposal_id' => Proposal::factory()->create()->id]);
+
+    Livewire::actingAs(mealManager())
         ->test('pages::results.index')
-        ->call('openCreateModal', $output->id)
-        ->assertSet('formProposalId', $proposal->id)
-        ->assertSet('resultType', ResultType::Activity->value)
-        ->set('statement', 'Run the distribution days.')
-        ->call('saveResult')
-        ->assertHasNoErrors()
-        ->call('openEditModal', $output->id)
-        ->set('resultType', ResultType::Output->value)
-        ->set('parentId', (string) $programOutcome->id)
-        ->call('saveResult')
-        ->assertHasErrors(['parentId' => __('results_framework.other_framework')]);
-
-    expect(Result::query()->where('statement', 'Run the distribution days.')->sole())
-        ->proposal_id->toBe($proposal->id)
-        ->parent_id->toBe($output->id);
+        ->call('openEditModal', $proposalOutput->id)
+        ->assertNotFound();
 });
 
 test('the results page holds a flat query count across both kinds of framework', function () {
@@ -689,13 +611,7 @@ test('a statement whose only reading is old is waiting for a measurement, never 
 
     expect($component->instance()->measurements()[$old->id]['status'])->toBe('waiting')
         ->and($component->instance()->measurements()[$fresh->id]['status'])->toBe('ontrack')
-        ->and($component->instance()->measurements()[$never->id]['status'])->toBe('waiting')
-        ->and($component->instance()->focusCounts())->toBe(['unmeasured' => 0, 'offtrack' => 0, 'waiting' => 2]);
-
-    $component->call('setFocus', 'waiting')
-        ->assertSee('Read long ago.')
-        ->assertSee('Never read.')
-        ->assertDontSee('Read this month.');
+        ->and($component->instance()->measurements()[$never->id]['status'])->toBe('waiting');
 });
 
 test('the average achievement caps one over-target indicator at 100 percent', function () {
@@ -713,101 +629,18 @@ test('the average achievement caps one over-target indicator at 100 percent', fu
     expect($component->instance()->measurements()[$result->id]['achieved'])->toBe(75.0);
 });
 
-test('the three headline buttons render inside the livewire root so they work', function () {
+test('every program logframe and every statement starts folded', function () {
     $user = User::factory()->role('General Manager')->create();
-    Result::factory()->create();
-
-    $html = Livewire::actingAs($user)->test('pages::results.index')->html();
-
-    $dom = new DOMDocument;
-    @$dom->loadHTML('<?xml encoding="utf-8"?>'.$html);
-    $xpath = new DOMXPath($dom);
-
-    foreach (['unmeasured', 'offtrack', 'waiting'] as $key) {
-        expect($xpath->query('//*[@*[name()="wire:id"]]//button[@data-test="focus-chip-'.$key.'"]')->length)->toBe(1);
-    }
-});
-
-test('framework and type filters sit behind more filters, open when one is active', function () {
-    $user = User::factory()->role('General Manager')->create();
-    Result::factory()->create();
+    $program = Program::factory()->create();
+    $impact = Result::factory()->type(ResultType::Impact)->create(['program_id' => $program->id]);
+    Result::factory()->type(ResultType::Outcome)->create(['program_id' => $program->id, 'parent_id' => $impact->id]);
 
     Livewire::actingAs($user)->test('pages::results.index')
-        ->assertSeeHtml('data-test="more-filters-button"')
+        ->assertSeeHtml('data-test="program-logframe-toggle-'.$program->id.'"')
         ->assertSeeHtml('x-data="{ open: false }"')
-        ->set('type', ResultType::Output->value)
-        ->assertSeeHtml('x-data="{ open: true }"');
-});
-
-test('the tree view draws each statement as a box under its parent, with its status and figures', function () {
-    $user = User::factory()->role('General Manager')->create();
-    $program = Program::factory()->create();
-    $impact = Result::factory()->create(['program_id' => $program->id, 'type' => ResultType::Impact]);
-    $outcome = Result::factory()->create(['program_id' => $program->id, 'type' => ResultType::Outcome, 'parent_id' => $impact->id]);
-
-    Livewire::actingAs($user)
-        ->test('pages::results.index')
-        ->assertSeeHtml('data-test="results-view-tree"')
-        ->assertDontSeeHtml('data-test="results-tree"')
-        ->set('view', 'tree')
-        ->assertSeeHtml('data-test="results-tree"')
-        ->assertSeeHtml('data-test="tree-box-'.$impact->id.'"')
-        ->assertSeeHtml('data-test="tree-fold-'.$impact->id.'"')
-        ->assertSeeHtml('data-test="tree-box-'.$outcome->id.'"')
-        ->assertSeeInOrder([$impact->statement, $outcome->statement, 'Needs an indicator', 'No indicators']);
-});
-
-test('the tree view follows the filters, and an old chart link shows the list', function () {
-    $user = User::factory()->role('General Manager')->create();
-    $shown = Result::factory()->create(['program_id' => Program::factory()->create()->id, 'type' => ResultType::Outcome]);
-    $hidden = Result::factory()->create(['program_id' => Program::factory()->create()->id, 'type' => ResultType::Outcome]);
-
-    Livewire::actingAs($user)
-        ->test('pages::results.index')
-        ->set('view', 'tree')
-        ->set('program', (string) $shown->program_id)
-        ->assertSeeHtml('data-test="tree-box-'.$shown->id.'"')
-        ->assertDontSeeHtml('data-test="tree-box-'.$hidden->id.'"');
-
-    Livewire::withQueryParams(['view' => 'chart'])
-        ->actingAs($user)
-        ->test('pages::results.index')
-        ->assertDontSeeHtml('data-test="results-tree"')
-        ->assertSeeHtml('id="framework-result-'.$shown->id.'"');
-});
-
-test('the headline buttons say what each count means, and below target is named plainly', function () {
-    $user = User::factory()->role('General Manager')->create();
-
-    Livewire::actingAs($user)->test('pages::results.index')
-        ->assertSee('Below target')
-        ->assertDontSee('Behind')
-        ->assertSee('smaller share of its target than the share of the year that has passed');
-});
-
-test('a program framework with no proposal stays general and links the proposals of its projects to their logframe tab', function () {
-    $this->seed(RolesAndPermissionsSeeder::class);
-    $user = User::factory()->role('General Manager')->create();
-    $program = Program::factory()->create(['name' => 'Water Security']);
-    $project = Project::factory()->create(['program_id' => $program->id]);
-    $proposal = Proposal::factory()->create(['name' => 'Winter WASH']);
-    DB::table('project_proposal')->insert(['project_id' => $project->id, 'proposal_id' => $proposal->id]);
-    Result::factory()->type(ResultType::Impact)->create(['program_id' => $program->id, 'proposal_id' => null, 'statement' => 'Safe water for all.']);
-
-    Livewire::actingAs($user)
-        ->test('pages::results.index')
-        ->assertSee('Safe water for all.')
-        ->assertSeeHtml('data-test="program-proposal-link-'.$proposal->id.'"')
-        ->assertSeeHtml('ptab=logframe');
-});
-
-test('a program framework with no proposal says so instead of showing a link', function () {
-    $this->seed(RolesAndPermissionsSeeder::class);
-    $user = User::factory()->role('General Manager')->create();
-    $program = Program::factory()->create();
-    Result::factory()->type(ResultType::Impact)->create(['program_id' => $program->id, 'proposal_id' => null]);
-
-    Livewire::actingAs($user)
-        ->test('pages::results.index')
-        ->assertSee('No proposal under this program yet.');
+        ->assertSeeHtml('branchOpen: false')
+        ->assertDontSeeHtml('branchOpen: true')
+        ->assertDontSeeHtml('data-test="focus-chip-')
+        ->assertDontSeeHtml('data-test="more-filters-button"')
+        ->assertDontSeeHtml('data-test="results-view-tree"');
 });

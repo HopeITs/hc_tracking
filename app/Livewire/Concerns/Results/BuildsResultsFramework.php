@@ -21,9 +21,9 @@ use Livewire\Attributes\Computed;
  * The one read of the results framework and the measurement attached to
  * every statement in it.
  *
- * Used by results/index (every framework) and the proposal Logical Framework
- * tab (one proposal's framework, see fixedProposalId()). The tree, the
- * filters and the headline figures (BuildsResultsTree, SummarisesResults)
+ * Used by results/index (program frameworks only) and the proposal Logical Framework
+ * tab (one proposal's framework, see fixedProposalId()). The tree and the
+ * filters (BuildsResultsTree)
  * resolve in memory from what is loaded here, so the page holds a fixed
  * query count however it is filtered.
  *

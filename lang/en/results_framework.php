@@ -201,4 +201,13 @@ return [
     'framework_copied' => 'Framework copied into the proposal.',
     'calendar_from_annual_plan' => "The weeks come from this proposal's annual plan.",
     'calendar_edit_in_plan' => 'Edit in the annual plan',
+    'search_programs_or_proposals' => 'Statement, indicator or proposal title',
+    'program_logframes_count' => '{0} No program logframes|{1} :count program logframe|[2,*] :count program logframes',
+    'open_logframe' => 'Show the logframe',
+    'hide_logframe' => 'Hide the logframe',
+    'proposal_logframes' => 'Proposal logframes',
+    'proposal_logframes_hint' => 'Logframes built for one proposal, often started from a program logframe. Open one to see it.',
+    'proposal_logframes_none' => 'No proposal logframe matches the search or program.',
+    'proposal_logframes_empty' => 'No proposal has its own logframe yet.',
+    'open_proposal_logframe' => "Open :name's logframe",
 ];
