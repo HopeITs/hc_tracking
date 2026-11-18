@@ -17,11 +17,13 @@ use App\Models\Program;
 use App\Models\Project;
 use App\Models\Proposal;
 use App\Models\Result;
+use App\Notifications\AppNotification;
 use App\Support\PlanExecution;
 use Carbon\CarbonImmutable;
 use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Notification;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Validation\ValidationException;
 use Livewire\Livewire;
@@ -173,6 +175,19 @@ test('the program manager page offers mark as seen with a note, never a return, 
 
     expect($update->fresh()->seen_at)->not->toBeNull()
         ->and($update->fresh()->program_manager_note)->toBe('Check attendance sheets.');
+});
+
+test('the program manager note notifies the centre manager, the officer and the MEAL manager', function () {
+    $update = app(ReviewPlanUpdate::class)->officerApprove($this->officer, sentJanuary(), 'Fine.');
+    Notification::fake();
+
+    app(ReviewPlanUpdate::class)->markSeen($this->programManager, $update, 'Add photos next time.');
+
+    $isNote = fn (AppNotification $notification): bool => $notification->payload->key === 'notifications.events.annual_plan.update_seen_note'
+        && $notification->payload->params['note'] === 'Add photos next time.';
+
+    Notification::assertSentTo([$this->projectManager, $this->officer, $this->mealManager], AppNotification::class, $isNote);
+    Notification::assertNotSentTo($this->programManager, AppNotification::class);
 });
 
 test('a MEAL return clears the program manager seen mark', function () {
