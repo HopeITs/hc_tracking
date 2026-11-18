@@ -3,17 +3,25 @@
 use App\Actions\MonthlyReports\OpenMonthlyReport;
 use App\Enums\MonthlyReportStatus;
 use App\Enums\ReopenRequestStatus;
+use App\Livewire\Concerns\FiltersReportPlaces;
 use App\Models\HrCity;
 use App\Models\MonthlyReport;
+use App\Models\Program;
+use App\Models\Proposal;
 use App\Models\ReportTemplate;
 use App\Support\MonthlyReportGenerator;
 use App\Support\MonthlyReportNames;
 use App\Support\MonthlyReportPeriods;
 use App\Support\MonthlyReportPreparers;
+use App\Support\Reporting\ExtractionFilter;
+use App\Support\Reporting\PlaceBridge;
+use App\Support\Reporting\ReportExtraction;
+use App\Support\Reporting\ReportPlace;
 use Carbon\CarbonImmutable;
 use Flux\Flux;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Collection;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
 use Livewire\Attributes\Computed;
 use Livewire\Attributes\Layout;
@@ -22,17 +30,40 @@ use Livewire\Attributes\Url;
 use Livewire\Component;
 
 new #[Layout('layouts::desk'), Title('titles.monthly_reports')] class extends Component {
+    use FiltersReportPlaces;
+
     #[Url(except: '')]
     public string $tab = '';
+
+    /** The D-79 filters (Y-05), on both tabs, read through ReportExtraction. */
+    #[Url(except: '')]
+    public string $proposal = '';
 
     #[Url(except: '')]
     public string $city = '';
 
     #[Url(except: '')]
-    public string $project = '';
+    public string $program = '';
 
+    /** A place: 'c{hrCenterId}', 'field-{cityId}' (Field work) or 'unset' (Center not set). */
+    #[Url(except: '')]
+    public string $center = '';
+
+    /** The first month listed, 'Y-m'. */
+    #[Url(except: '')]
+    public string $from = '';
+
+    /** The last month listed, 'Y-m'; open lists the months still to come too. */
+    #[Url(except: '')]
+    public string $to = '';
+
+    /** Legacy (before Y-05): one month, translated to From / To on mount. */
     #[Url(except: '')]
     public string $month = '';
+
+    /** Legacy (before Y-05): a project id, translated to its place on mount. */
+    #[Url(except: '')]
+    public string $project = '';
 
     #[Url(except: 'submitted')]
     public string $status = 'submitted';
@@ -72,18 +103,53 @@ new #[Layout('layouts::desk'), Title('titles.monthly_reports')] class extends Co
         $this->show = '';
     }
 
+    /** A center pre-selects its city. */
+    public function updatedCenter(string $value): void
+    {
+        $cityId = $this->cityOfCenter($value);
+
+        if ($cityId !== null) {
+            $this->city = (string) $cityId;
+        }
+    }
+
+    /** A city narrows the centers: a center elsewhere is cleared. */
+    public function updatedCity(string $value): void
+    {
+        $centerCity = $this->cityOfCenter($this->center);
+
+        if ($value !== '' && $centerCity !== null && (string) $centerCity !== $value) {
+            $this->center = '';
+        }
+    }
+
+    public function updatedFrom(): void
+    {
+        $this->checkWindow();
+    }
+
+    public function updatedTo(): void
+    {
+        $this->checkWindow();
+    }
+
     /**
      * MEAL lands on its queue when it prepares nothing itself (T17B Q3).
      * Someone who cannot validate never lands there, even from a link: the
-     * queue would only ever be empty for them.
+     * queue would only ever be empty for them. Old `?month=` and `?project=`
+     * links are translated once, then dropped from the URL.
      */
     public function mount(): void
     {
+        $this->translateLegacyFilters();
+
         $offered = $this->canValidate() ? ['mine', 'validate'] : ['mine'];
 
         if (! in_array($this->tab, $offered, true)) {
             $this->tab = $this->myTemplateIds() === [] && $this->canValidate() ? 'validate' : 'mine';
         }
+
+        $this->checkWindow();
     }
 
     /**
@@ -132,12 +198,78 @@ new #[Layout('layouts::desk'), Title('titles.monthly_reports')] class extends Co
     }
 
     /**
+     * Whether a Proposal, City, Program, Center, From or To filter is on.
+     */
+    #[Computed]
+    public function extractionFiltersAreActive(): bool
+    {
+        return $this->proposal !== '' || $this->city !== '' || $this->program !== '' || $this->center !== '' || $this->from !== '' || $this->to !== '';
+    }
+
+    /**
+     * The page's filters as ReportExtraction reads them (D-79). A Field work
+     * center brings its own city; an unknown value is no filter.
+     */
+    #[Computed]
+    public function extractionFilter(): ExtractionFilter
+    {
+        $center = $this->centerArgumentsOf($this->center);
+
+        return new ExtractionFilter(
+            proposalId: $this->existingId($this->proposal, Proposal::class),
+            cityId: $center['cityId'] ?? $this->existingId($this->city, null, array_values($this->allCities()->keys()->all())),
+            programId: $this->existingId($this->program, Program::class),
+            centerId: $center['centerId'] ?? null,
+            from: $this->monthOf($this->from),
+            to: $this->monthOf($this->to),
+            cityWide: $center['cityWide'] ?? false,
+            centerUnset: $center['centerUnset'] ?? false,
+        );
+    }
+
+    /**
+     * The monthly reports the filters select, as an id set, through the one
+     * extraction query (contracts §14.1): this page builds no `where` of its
+     * own. Null while no filter is on (nothing to narrow); empty while From
+     * is after To. An open To lists the months still to come (Y-05 Q1).
+     *
+     * @return array<int, true>|null
+     */
+    #[Computed]
+    public function extractedReportIds(): ?array
+    {
+        if (! $this->extractionFiltersAreActive) {
+            return null;
+        }
+
+        if ($this->windowIsReversed()) {
+            return [];
+        }
+
+        return ReportExtraction::for($this->extractionFilter)->reports(openEndUnbounded: true)
+            ->pluck('mr.id')
+            ->mapWithKeys(fn (mixed $id): array => [(int) $id => true])
+            ->all();
+    }
+
+    /**
+     * Whether the filters keep this report.
+     */
+    protected function isExtracted(int $monthlyReportId): bool
+    {
+        return $this->extractedReportIds === null || isset($this->extractedReportIds[$monthlyReportId]);
+    }
+
+    /**
      * Every generated month of the templates the user prepares, one group
      * per template (D-76), named by its place and its proposals so two
      * reports of one place are told apart. Each month carries its state,
      * due date, overdue marker and submit blocker. A fixed number of
      * queries: the templates and their proposals, the reports, the
      * responsibles once for `can('open')`, the names, the working days.
+     *
+     * Every month is read whatever the filters: the submit blocker reads the
+     * months before it (filteredMonths() narrows afterwards).
      *
      * `hasIndicators` is false when no month has a line, so "no indicators"
      * is said once for the template. A template with no proposal has no
@@ -231,6 +363,29 @@ new #[Layout('layouts::desk'), Title('titles.monthly_reports')] class extends Co
     }
 
     /**
+     * "My reports" narrowed by the extraction filters: each template keeps
+     * the months they select (`months`) and its whole run for the month
+     * strip (`strip`); a template left with no month is dropped.
+     *
+     * @return list<array{template: ReportTemplate, place: string, proposals: list<array{id: int, slug: string, name: string, number: string|null}>, title: string, hasIndicators: bool, strip: list<array<string, mixed>>, months: list<array{report: MonthlyReport, key: string, state: string, due: ?CarbonImmutable, overdue: bool, blocked: ?string, can_fill: bool}>}>
+     */
+    #[Computed]
+    public function filteredMonths(): array
+    {
+        $groups = [];
+
+        foreach ($this->myMonths as $group) {
+            $months = array_values(array_filter($group['months'], fn (array $row): bool => $this->isExtracted($row['report']->id)));
+
+            if ($months !== []) {
+                $groups[] = [...$group, 'strip' => $group['months'], 'months' => $months];
+            }
+        }
+
+        return $groups;
+    }
+
+    /**
      * The months waiting on the preparer, gathered from every template at
      * the top of "My reports": the ones they can fill, overdue first, then
      * oldest first. A reader who cannot fill gets none, so no list.
@@ -247,7 +402,7 @@ new #[Layout('layouts::desk'), Title('titles.monthly_reports')] class extends Co
             return [];
         }
 
-        foreach ($this->myMonths as $group) {
+        foreach ($this->filteredMonths as $group) {
             foreach ($group['months'] as $row) {
                 if ($row['can_fill']) {
                     $items[] = ['group' => $group, 'row' => $row];
@@ -262,9 +417,9 @@ new #[Layout('layouts::desk'), Title('titles.monthly_reports')] class extends Co
 
     /**
      * The big figures over the open tab, each one a button that narrows the
-     * list to what it counts (showOnly()). "To validate" counts the whole
-     * queue, not the filtered rows, so the figures keep the picture while the
-     * count badge follows the filters.
+     * list to what it counts (showOnly()). They read every filter except the
+     * figure itself (the status on "To validate", `show` on both), so a click
+     * lists exactly that many (Y-05, as the reports register does).
      *
      * @return list<array{key: string, value: int, label: string, tone: string, pressed: bool}>
      */
@@ -272,25 +427,24 @@ new #[Layout('layouts::desk'), Title('titles.monthly_reports')] class extends Co
     public function figures(): array
     {
         if ($this->tab === 'validate') {
-            $submitted = $this->validatable->filter(fn (MonthlyReport $report): bool => $report->status === MonthlyReportStatus::Submitted);
-
             if ($this->validatable->isEmpty()) {
                 return [];
             }
 
+            $submitted = $this->filteredValidatable->filter(fn (MonthlyReport $report): bool => $report->status === MonthlyReportStatus::Submitted);
+
             return [
                 ['key' => 'waiting', 'value' => $submitted->count(), 'label' => __('monthly_reports.figure_waiting'), 'tone' => $submitted->isNotEmpty() ? 'dk-warn' : '', 'pressed' => $this->status === 'submitted' && $this->show === ''],
                 ['key' => 'not_seen', 'value' => $submitted->whereNull('seen_by_meal_at')->count(), 'label' => __('monthly_reports.figure_not_seen'), 'tone' => '', 'pressed' => $this->show === 'not_seen'],
-                ['key' => 'validated', 'value' => $this->validatable->count() - $submitted->count(), 'label' => __('monthly_reports.figure_validated'), 'tone' => 'dk-good', 'pressed' => $this->status === 'validated'],
+                ['key' => 'validated', 'value' => $this->filteredValidatable->count() - $submitted->count(), 'label' => __('monthly_reports.figure_validated'), 'tone' => 'dk-good', 'pressed' => $this->status === 'validated'],
             ];
         }
 
-        $rows = collect($this->myMonths)->flatMap(fn (array $group): array => $group['months']);
-
-        if ($rows->isEmpty()) {
+        if ($this->myMonths === []) {
             return [];
         }
 
+        $rows = collect($this->filteredMonths)->flatMap(fn (array $group): array => $group['months']);
         $overdue = $rows->where('overdue', true)->count();
 
         return array_values(array_filter([
@@ -303,9 +457,10 @@ new #[Layout('layouts::desk'), Title('titles.monthly_reports')] class extends Co
 
     /**
      * "My reports" as it is drawn: each template with its months narrowed
-     * to the big figure picked, the validated months set apart to fold away
-     * (unless "validated" is the figure picked), and every month kept for
-     * the template's month strip. A template left with no month is dropped.
+     * to the filters and the big figure picked, the validated months set
+     * apart to fold away (unless "validated" is the figure picked), and
+     * every month kept for the template's month strip. A template left with
+     * no month is dropped.
      *
      * @return list<array{template: ReportTemplate, place: string, proposals: list<array{id: int, slug: string, name: string, number: string|null}>, title: string, hasIndicators: bool, strip: list<array<string, mixed>>, open: list<array<string, mixed>>, folded: list<array<string, mixed>>}>
      */
@@ -321,7 +476,7 @@ new #[Layout('layouts::desk'), Title('titles.monthly_reports')] class extends Co
         };
         $groups = [];
 
-        foreach ($this->myMonths as $group) {
+        foreach ($this->filteredMonths as $group) {
             $rows = array_values(array_filter($group['months'], $matches));
 
             if ($rows === []) {
@@ -336,7 +491,7 @@ new #[Layout('layouts::desk'), Title('titles.monthly_reports')] class extends Co
                 'proposals' => $group['proposals'],
                 'title' => $group['title'],
                 'hasIndicators' => $group['hasIndicators'],
-                'strip' => $group['months'],
+                'strip' => $group['strip'],
                 'open' => $fold ? array_values(array_filter($rows, fn (array $row): bool => $row['state'] !== 'validated')) : $rows,
                 'folded' => $fold ? array_values(array_filter($rows, fn (array $row): bool => $row['state'] === 'validated')) : [],
             ];
@@ -348,13 +503,9 @@ new #[Layout('layouts::desk'), Title('titles.monthly_reports')] class extends Co
     /**
      * Every report this validator may act on, in a status a validator deals
      * with: submitted or validated. A draft is still the preparer's and is
-     * never listed here, whichever status is chosen.
-     *
-     * The city, project and month options are built from this, not from the
-     * status-filtered queue: built from the queue, a month chosen before the
-     * status changed dropped out of its own list, so its trigger fell back to
-     * "Any month" while the rows were still narrowed to it (page review,
-     * 5 Nov 2026).
+     * never listed here, whichever status is chosen. The filters' options
+     * are built from this, not from the filtered queue, so a choice never
+     * drops out of its own list.
      *
      * @return Collection<int, MonthlyReport>
      */
@@ -364,10 +515,23 @@ new #[Layout('layouts::desk'), Title('titles.monthly_reports')] class extends Co
         return MonthlyReport::query()
             ->validatableBy(auth()->user())
             ->where('status', '!=', MonthlyReportStatus::Draft)
-            ->with(['project:id,slug,name,city_id', 'template:id,city_id,program_id,center_id,city_wide', 'submitter:id,hr_user_id'])
+            ->with(['template:id,city_id,program_id,center_id,city_wide', 'submitter:id,hr_user_id'])
             ->orderBy('period')
             ->orderBy('id')
-            ->get(['id', 'slug', 'project_id', 'report_template_id', 'period', 'status', 'submitted_at', 'submitted_by', 'seen_by_meal_at']);
+            ->get(['id', 'slug', 'report_template_id', 'period', 'status', 'submitted_at', 'submitted_by', 'seen_by_meal_at']);
+    }
+
+    /**
+     * The validator's reports the extraction filters keep (Y-05).
+     *
+     * @return Collection<int, MonthlyReport>
+     */
+    #[Computed]
+    public function filteredValidatable(): Collection
+    {
+        return $this->extractedReportIds === null
+            ? $this->validatable
+            : $this->validatable->filter(fn (MonthlyReport $report): bool => $this->isExtracted($report->id))->values();
     }
 
     /**
@@ -382,7 +546,8 @@ new #[Layout('layouts::desk'), Title('titles.monthly_reports')] class extends Co
     }
 
     /**
-     * The validator queue (contracts §13.1 item 6), submitted by default.
+     * The validator queue (contracts §13.1 item 6) after the extraction
+     * filters, submitted by default.
      *
      * @return Collection<int, MonthlyReport>
      */
@@ -390,12 +555,12 @@ new #[Layout('layouts::desk'), Title('titles.monthly_reports')] class extends Co
     public function queue(): Collection
     {
         return $this->selectedStatus === null
-            ? $this->validatable
-            : $this->validatable->filter(fn (MonthlyReport $report): bool => $report->status === $this->selectedStatus)->values();
+            ? $this->filteredValidatable
+            : $this->filteredValidatable->filter(fn (MonthlyReport $report): bool => $report->status === $this->selectedStatus)->values();
     }
 
     /**
-     * The queue after the city, project and month filters, in memory.
+     * The queue after the "Not seen yet" figure, in memory.
      *
      * @return Collection<int, MonthlyReport>
      */
@@ -403,9 +568,6 @@ new #[Layout('layouts::desk'), Title('titles.monthly_reports')] class extends Co
     public function filteredQueue(): Collection
     {
         return $this->queue
-            ->when($this->city !== '', fn (Collection $rows) => $rows->filter(fn (MonthlyReport $report): bool => (string) $report->template->city_id === $this->city))
-            ->when($this->project !== '', fn (Collection $rows) => $rows->filter(fn (MonthlyReport $report): bool => (string) $report->project_id === $this->project))
-            ->when($this->month !== '', fn (Collection $rows) => $rows->filter(fn (MonthlyReport $report): bool => $report->period->format('Y-m') === $this->month))
             ->when($this->show === 'not_seen', fn (Collection $rows) => $rows->filter(fn (MonthlyReport $report): bool => $report->seen_by_meal_at === null))
             ->values();
     }
@@ -420,40 +582,169 @@ new #[Layout('layouts::desk'), Title('titles.monthly_reports')] class extends Co
     }
 
     /**
-     * City names of the queued templates' places, for the filter.
+     * The templates the open tab can list (its scope before any filter),
+     * with their place columns: the options offer nothing that would list
+     * nothing.
+     *
+     * @return \Illuminate\Support\Collection<int, stdClass>
+     */
+    #[Computed]
+    public function scopeTemplates(): \Illuminate\Support\Collection
+    {
+        $ids = $this->tab === 'validate'
+            ? $this->validatable->pluck('report_template_id')->unique()->values()->all()
+            : $this->myTemplateIds();
+
+        return $ids === [] ? collect() : DB::table('report_templates')->whereIn('id', $ids)->get(['id', 'city_id', 'program_id']);
+    }
+
+    /**
+     * @return \Illuminate\Support\Collection<int, stdClass> rows of id, name
+     */
+    #[Computed]
+    public function proposalOptions(): \Illuminate\Support\Collection
+    {
+        $ids = $this->scopeTemplates->pluck('id')->all();
+
+        return $ids === [] ? collect() : DB::table('proposals')
+            ->whereIn('id', DB::table('proposal_report_template')->whereIn('report_template_id', $ids)->select('proposal_id'))
+            ->orderBy('name')
+            ->orderBy('id')
+            ->get(['id', 'name']);
+    }
+
+    /**
+     * City names of the scope's places.
      *
      * @return array<int, string>
      */
     #[Computed]
-    public function cityNames(): array
+    public function cityOptions(): array
     {
-        $ids = $this->validatable->map(fn (MonthlyReport $report): int => (int) $report->template->city_id)->unique()->values()->all();
+        $ids = $this->scopeTemplates->pluck('city_id')->filter()->map(fn (mixed $id): int => (int) $id)->unique()->all();
 
-        if ($ids === []) {
-            return [];
-        }
-
-        return HrCity::query()->whereIn('id', $ids)->get()->mapWithKeys(fn (HrCity $city): array => [(int) $city->id => (string) $city->name])->sort()->all();
+        return $this->allCities()->only($ids)->mapWithKeys(fn (HrCity $city): array => [(int) $city->id => (string) $city->name])->all();
     }
 
     /**
-     * @return array<string, string> 'Y-m' => translated month
+     * Program names of the scope's places.
+     *
+     * @return array<int, string>
      */
     #[Computed]
-    public function monthOptions(): array
+    public function programOptions(): array
     {
-        return $this->validatable->mapWithKeys(fn (MonthlyReport $report): array => [$report->period->format('Y-m') => $report->period->translatedFormat('F Y')])->sortKeys()->all();
+        $ids = $this->scopeTemplates->pluck('program_id')->filter()->map(fn (mixed $id): int => (int) $id)->unique()->all();
+
+        return collect(Program::options()->all())
+            ->filter(fn (Program $program): bool => in_array($program->id, $ids, true))
+            ->mapWithKeys(fn (Program $program): array => [$program->id => $program->name])
+            ->all();
+    }
+
+    /**
+     * The scope's places (D-79, D-82, D-88), narrowed by City and Program.
+     *
+     * @return list<array{value: string, label: string}>
+     */
+    #[Computed]
+    public function centerOptions(): array
+    {
+        $filter = $this->extractionFilter;
+
+        return $this->centerOptionsFor($filter->cityWide ? null : $filter->cityId, $filter->programId, $this->scopeTemplates->pluck('id')->map(fn (mixed $id): int => (int) $id)->values()->all());
+    }
+
+    /**
+     * The monthly matrix for a template's place, with this list's proposal
+     * and window (Y-05: a report row links back to the matrix).
+     */
+    protected function matrixUrlFor(ReportTemplate $template): string
+    {
+        $place = $template->city_id === null || $template->program_id === null
+            ? null
+            : new ReportPlace((int) $template->city_id, (int) $template->program_id, $template->center_id === null ? null : (int) $template->center_id, (bool) $template->city_wide);
+        $filter = $this->extractionFilter;
+
+        return route('reports.monthly-matrix', array_filter([
+            'proposal' => $filter->proposalId,
+            'city' => $place?->cityId,
+            'program' => $place?->programId,
+            'center' => $place === null ? null : $this->centerValueOf($place),
+            'from' => $filter->from?->format('Y-m'),
+            'to' => $filter->to?->format('Y-m'),
+        ], fn (mixed $value): bool => $value !== null));
     }
 
     public function clearFilters(): void
     {
-        $this->reset('city', 'project', 'month', 'status', 'show');
+        $this->reset('proposal', 'city', 'program', 'center', 'from', 'to', 'status', 'show');
+        $this->resetErrorBag('from');
+    }
+
+    /**
+     * Whether From and To are both set and From is after To.
+     */
+    protected function windowIsReversed(): bool
+    {
+        $from = $this->monthOf($this->from);
+        $to = $this->monthOf($this->to);
+
+        return $from !== null && $to !== null && $from->greaterThan($to);
+    }
+
+    /**
+     * Refuses a From after To with a field error (never swapped).
+     */
+    protected function checkWindow(): void
+    {
+        $this->resetErrorBag('from');
+
+        if ($this->windowIsReversed()) {
+            $this->addError('from', __('reports.matrix.from_after_to'));
+        }
+    }
+
+    /**
+     * The links of before Y-05 still open: `?month=` becomes From = To =
+     * that month, `?project=` the project's place (its city, program and
+     * center, through the bridge until Y-17). Both are then dropped.
+     */
+    protected function translateLegacyFilters(): void
+    {
+        if ($this->month !== '' && $this->monthOf($this->month) !== null && $this->from === '' && $this->to === '') {
+            $this->from = $this->month;
+            $this->to = $this->month;
+        }
+
+        if ($this->project !== '' && ctype_digit($this->project) && strlen($this->project) <= 18) {
+            $place = app(PlaceBridge::class)->placeOfProject((int) $this->project);
+
+            if ($place !== null) {
+                $this->city = (string) $place->cityId;
+                $this->program = (string) $place->programId;
+                $this->center = $this->centerValueOf($place);
+            }
+        }
+
+        $this->month = '';
+        $this->project = '';
     }
 };
 ?>
 
 @php
-    $filtersAreActive = $city !== '' || $project !== '' || $month !== '' || $status !== 'submitted' || ($tab === 'validate' && $show === 'not_seen');
+    $extractionFiltersAreActive = $this->extractionFiltersAreActive;
+    $filtersAreActive = $extractionFiltersAreActive || ($tab === 'validate' && ($status !== 'submitted' || $show === 'not_seen'));
+    $listFilter = $this->extractionFilter;
+    $centerValue = match (true) {
+        $listFilter->cityWide && $listFilter->cityId !== null => 'field-'.$listFilter->cityId,
+        $listFilter->centerUnset => 'unset',
+        $listFilter->centerId !== null => 'c'.$listFilter->centerId,
+        default => '',
+    };
+    $monthFieldClass = 'block h-9 w-full min-w-0 touch-manipulation rounded-[10px] border border-(--line-2) bg-(--paper) px-2.5 text-[12.5px] font-semibold text-(--ink) hover:border-(--ink-3) max-[720px]:h-11 aria-invalid:border-status-critical';
+    $monthLabelClass = 'mb-1.5 block text-[11px] font-semibold uppercase leading-4 tracking-[0.1em] text-secondary-medium dark:text-ink-muted';
 @endphp
 
 <x-desk.register
@@ -469,40 +760,68 @@ new #[Layout('layouts::desk'), Title('titles.monthly_reports')] class extends Co
         'validate' => $this->canValidate ? ['icon' => 'check', 'label' => __('monthly_reports.tab_validate')] : null,
     ])"
 >
-        @if ($tab === 'validate')
-            <x-slot:filters>
-                <x-ui.header-filter-select :label="__('common.city')" wire:model.live="city" :value="$city">
+        {{-- The D-79 filters on both tabs (Y-05), read through ReportExtraction like the monthly matrix. --}}
+        <x-slot:filters>
+            <div class="contents" data-list-filters>
+                <x-ui.header-filter-select :label="__('reports.matrix.proposal')" wire:model.live="proposal" :value="(string) ($listFilter->proposalId ?? '')">
+                    <option value="">{{ __('reports.matrix.all_proposals') }}</option>
+                    @foreach ($this->proposalOptions as $option)
+                        <option value="{{ $option->id }}">{{ $option->name }}</option>
+                    @endforeach
+                </x-ui.header-filter-select>
+
+                <x-ui.header-filter-select :label="__('common.city')" wire:model.live="city" :value="(string) ($listFilter->cityId ?? '')">
                     <option value="">{{ __('monthly_reports.any_city') }}</option>
-                    @foreach ($this->cityNames as $cityId => $cityName)
+                    @foreach ($this->cityOptions as $cityId => $cityName)
                         <option value="{{ $cityId }}">{{ $cityName }}</option>
                     @endforeach
                 </x-ui.header-filter-select>
 
-                <x-ui.header-filter-select :label="__('common.project')" wire:model.live="project" :value="$project">
-                    <option value="">{{ __('targets.any_project') }}</option>
-                    @foreach ($this->validatable->pluck('project')->unique('id')->sortBy('name') as $projectOption)
-                        <option value="{{ $projectOption->id }}">{{ $projectOption->name }}</option>
+                <x-ui.header-filter-select :label="__('reports.matrix.program')" wire:model.live="program" :value="(string) ($listFilter->programId ?? '')">
+                    <option value="">{{ __('reports.matrix.all_programs') }}</option>
+                    @foreach ($this->programOptions as $programId => $programName)
+                        <option value="{{ $programId }}">{{ $programName }}</option>
                     @endforeach
                 </x-ui.header-filter-select>
 
-                <x-ui.header-filter-select :label="__('monthly_reports.month')" wire:model.live="month" :value="$month">
-                    <option value="">{{ __('monthly_reports.any_month') }}</option>
-                    @foreach ($this->monthOptions as $monthKey => $monthLabel)
-                        <option value="{{ $monthKey }}">{{ $monthLabel }}</option>
+                <x-ui.header-filter-select :label="__('reports.matrix.center')" wire:model.live="center" :value="$centerValue">
+                    <option value="">{{ __('reports.matrix.all_centers') }}</option>
+                    @foreach ($this->centerOptions as $option)
+                        <option value="{{ $option['value'] }}">{{ $option['label'] }}</option>
                     @endforeach
                 </x-ui.header-filter-select>
 
-                <x-ui.header-filter-select :label="__('common.status')" wire:model.live="status" :value="$this->selectedStatus?->value ?? 'all'">
-                    <option value="submitted">{{ __('monthly_reports.status_to_validate') }}</option>
-                    <option value="validated">{{ MonthlyReportStatus::Validated->label() }}</option>
-                    <option value="all">{{ __('monthly_reports.status_all') }}</option>
-                </x-ui.header-filter-select>
+                <div class="min-w-0" data-list-from>
+                    <label for="monthly-reports-from" class="{{ $monthLabelClass }}">{{ __('reports.matrix.from') }}</label>
+                    <input id="monthly-reports-from" type="month" wire:model.live="from" class="{{ $monthFieldClass }}" dir="ltr" @error('from') aria-invalid="true" aria-describedby="monthly-reports-from-error" @enderror />
+                    @error('from')
+                        <p id="monthly-reports-from-error" class="mt-1 flex items-center gap-1 text-xs text-status-critical" data-list-from-error>
+                            <flux:icon.exclamation-triangle variant="micro" class="size-4 shrink-0" aria-hidden="true" />
+                            <span>{{ $message }}</span>
+                        </p>
+                    @enderror
+                </div>
+
+                <div class="min-w-0" data-list-to>
+                    <label for="monthly-reports-to" class="{{ $monthLabelClass }}">{{ __('reports.matrix.to') }}</label>
+                    <input id="monthly-reports-to" type="month" wire:model.live="to" class="{{ $monthFieldClass }}" dir="ltr" />
+                </div>
+
+                @if ($tab === 'validate')
+                    <x-ui.header-filter-select :label="__('common.status')" wire:model.live="status" :value="$this->selectedStatus?->value ?? 'all'">
+                        <option value="submitted">{{ __('monthly_reports.status_to_validate') }}</option>
+                        <option value="validated">{{ MonthlyReportStatus::Validated->label() }}</option>
+                        <option value="all">{{ __('monthly_reports.status_all') }}</option>
+                    </x-ui.header-filter-select>
+                @endif
 
                 @if ($filtersAreActive)
-                    <button type="button" class="dk-btn dk-ghost dk-sm" wire:click="clearFilters"><x-desk.icon name="x" />{{ __('desk.register.clear') }}</button>
+                    <div class="flex items-end">
+                        <button type="button" class="dk-btn dk-ghost dk-sm" wire:click="clearFilters"><x-desk.icon name="x" />{{ __('desk.register.clear') }}</button>
+                    </div>
                 @endif
-            </x-slot:filters>
-        @endif
+            </div>
+        </x-slot:filters>
 
 
     <div class="flex max-w-3xl flex-col gap-8">

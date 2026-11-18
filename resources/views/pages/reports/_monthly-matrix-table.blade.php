@@ -117,8 +117,12 @@
                         @foreach ($windowMonths as $month)
                             @php
                                 $cell = $row['cells'][$month->format('Y-m')];
+                                $cellUrl = $this->cellListUrl($row, $month);
                             @endphp
                             <td class="{{ $bodyCell }} text-end tabular-nums" data-matrix-cell="{{ $cell['state']->value }}">
+                                @if ($cellUrl !== null)
+                                    <a href="{{ $cellUrl }}" wire:navigate data-matrix-cell-link class="block rounded-sm text-end tabular-nums decoration-1 underline-offset-2 hover:underline focus-visible:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-secondary-medium">
+                                @endif
                                 @switch($cell['state'])
                                     @case(MatrixCellState::Approved)
                                         <span class="inline-flex items-center justify-end gap-1 font-semibold" title="{{ $cell['state']->label() }}">
@@ -154,6 +158,11 @@
                                         <span class="text-secondary-medium dark:text-ink-muted" title="{{ $cell['state']->label() }}"><span aria-hidden="true">—</span><span class="sr-only">{{ $cell['state']->label() }}</span></span>
                                         @break
                                 @endswitch
+                                @if ($cellUrl !== null)
+                                        {{-- Added to the figure, not in place of it: an aria-label would hide the value from screen readers. --}}
+                                        <span class="sr-only">{{ __('reports.matrix.open_month_list', ['month' => $month->translatedFormat(__('formats.month_year'))]) }}</span>
+                                    </a>
+                                @endif
                             </td>
                         @endforeach
 

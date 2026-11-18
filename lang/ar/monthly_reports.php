@@ -225,6 +225,7 @@ return [
     'place_center_not_set' => 'المركز غير محدد',
     'covers_proposals' => '{1} المقترح: :names|{2} المقترحان: :names|[3,10] المقترحات: :names|[11,*] المقترحات: :names',
     'no_proposal' => 'لا مقترح بعد',
+    'open_in_matrix' => 'افتح :name في المصفوفة الشهرية',
     'shared_with_centers' => '{1} مشترك مع مركز واحد|{2} مشترك مع مركزين|[3,10] مشترك مع :count مراكز|[11,*] مشترك مع :count مركزًا',
     'reached_together' => 'ما حققته المراكز معًا حتى الآن: :value',
     'reached_together_none' => 'ما حققته المراكز معًا حتى الآن: لا أرقام متحقَّق منها بعد',

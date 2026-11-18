@@ -225,6 +225,7 @@ return [
     'place_center_not_set' => 'Center not set',
     'covers_proposals' => '{1} Proposal: :names|[2,*] Proposals: :names',
     'no_proposal' => 'No proposal yet',
+    'open_in_matrix' => 'Open :name in the monthly matrix',
     'shared_with_centers' => '{1} shared with :count center|[2,*] shared with :count centers',
     'reached_together' => 'reached together so far: :value',
     'reached_together_none' => 'reached together so far: nothing validated yet',

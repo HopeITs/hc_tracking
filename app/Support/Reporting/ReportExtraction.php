@@ -238,12 +238,20 @@ final class ReportExtraction
      * proposal and donor filters read the template's proposals, the indicator
      * filter its lines. Columns: every `monthly_reports` column, plus
      * place_city_id, place_program_id, place_center_id, place_city_wide.
+     *
+     * With `$openEndUnbounded` (the monthly-reports list, Y-05 slice 2), an
+     * open `to` has no upper bound, so generated months still to come are
+     * listed; an open `from` has no lower bound either way.
      */
-    public function reports(): Builder
+    public function reports(bool $openEndUnbounded = false): Builder
     {
-        return $this->reportsBase(true)->select([
-            'mr.*', 'rt.city_id as place_city_id', 'rt.program_id as place_program_id', 'rt.center_id as place_center_id', 'rt.city_wide as place_city_wide',
-        ]);
+        $unbounded = $openEndUnbounded && $this->filter->to === null;
+
+        return $this->reportsBase(! $unbounded)
+            ->when($unbounded && $this->filter->from !== null, fn (Builder $query) => $query->where('mr.period', '>=', $this->filter->from?->toDateString()))
+            ->select([
+                'mr.*', 'rt.city_id as place_city_id', 'rt.program_id as place_program_id', 'rt.center_id as place_center_id', 'rt.city_wide as place_city_wide',
+            ]);
     }
 
     /**

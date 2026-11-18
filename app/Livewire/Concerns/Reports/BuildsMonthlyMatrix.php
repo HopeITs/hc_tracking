@@ -9,8 +9,8 @@ use App\Enums\DonorAttribution;
 use App\Enums\IndicatorMeasure;
 use App\Enums\MatrixCellState;
 use App\Enums\MonthlyReportStatus;
+use App\Livewire\Concerns\FiltersReportPlaces;
 use App\Models\Donor;
-use App\Models\HrCenter;
 use App\Models\HrCity;
 use App\Models\LibraryIndicator;
 use App\Models\Program;
@@ -22,7 +22,6 @@ use App\Support\Reporting\PlaceBridge;
 use App\Support\Reporting\ReportExtraction;
 use App\Support\Reporting\ReportPlace;
 use Carbon\CarbonImmutable;
-use Illuminate\Database\Eloquent\Model;
 use Illuminate\Pagination\LengthAwarePaginator;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Auth;
@@ -81,6 +80,8 @@ use stdClass;
  */
 trait BuildsMonthlyMatrix
 {
+    use FiltersReportPlaces;
+
     /** How many matrix rows one page holds; the export holds them all. */
     private const PER_PAGE = 100;
 
@@ -89,9 +90,6 @@ trait BuildsMonthlyMatrix
 
     /** @var array<string, ReportExtraction> */
     private array $extractionMemo = [];
-
-    /** @var Collection<int, HrCity>|null */
-    private ?Collection $allCitiesMemo = null;
 
     /**
      * The id filters that name a record that exists; an unknown or
@@ -329,41 +327,8 @@ trait BuildsMonthlyMatrix
     public function centerOptions(): array
     {
         $filters = $this->resolvedFilters;
-        $places = DB::table('report_templates')
-            ->whereNotNull('city_id')
-            ->whereNotNull('program_id')
-            ->when($filters['city'] !== null, fn ($query) => $query->where('city_id', $filters['city']))
-            ->when($filters['program'] !== null, fn ($query) => $query->where('program_id', $filters['program']))
-            ->distinct()
-            ->get(['city_id', 'center_id', 'city_wide']);
 
-        $centers = [];
-        $fieldWork = [];
-        $hasUnset = false;
-
-        foreach ($places as $place) {
-            $cityId = (int) $place->city_id;
-
-            if ((bool) $place->city_wide) {
-                $fieldWork['field-'.$cityId] = $this->placeLabel(new ReportPlace($cityId, 0, null, true))['center'];
-            } elseif ($place->center_id !== null) {
-                $centers['c'.$place->center_id] = $this->placeLabel(new ReportPlace($cityId, 0, (int) $place->center_id, false))['center'];
-            } else {
-                $hasUnset = true;
-            }
-        }
-
-        $sorted = fn (array $options): array => collect($options)
-            ->map(fn (string $label, string $value): array => ['value' => $value, 'label' => $label])
-            ->sortBy(fn (array $option): string => mb_strtolower($option['label']))
-            ->values()
-            ->all();
-
-        return [
-            ...$sorted($centers),
-            ...$sorted($fieldWork),
-            ...($hasUnset ? [['value' => 'unset', 'label' => __('reports.matrix.place_not_set')]] : []),
-        ];
+        return $this->centerOptionsFor($filters['city'], $filters['program']);
     }
 
     /**
@@ -393,6 +358,49 @@ trait BuildsMonthlyMatrix
     public function cityOptions(): Collection
     {
         return $this->allCities()->filter(fn (HrCity $city): bool => $city->is_active)->values();
+    }
+
+    /**
+     * The monthly-reports list at one month of a row (Y-05): the page's
+     * proposal, the row's place (or the page's place filters when the row
+     * spans several places or has none) and every status; null when the cell
+     * shows no monthly report. Built from the row alone: no query.
+     *
+     * @param  array<string, mixed>  $row
+     */
+    protected function cellListUrl(array $row, CarbonImmutable $month): ?string
+    {
+        $state = $row['cells'][$month->format('Y-m')]['state'] ?? null;
+
+        if (! in_array($state, [MatrixCellState::Approved, MatrixCellState::Pending, MatrixCellState::NotDue], true)) {
+            return null;
+        }
+
+        $place = count($row['place_keys']) === 1 ? self::placeOfKey($row['place_keys'][0]) : null;
+        $place = $place === null
+            ? ['city' => $this->resolvedFilters['city'], 'program' => $this->resolvedFilters['program'], 'center' => $this->centerArguments() === [] ? null : $this->center]
+            : ['city' => $place->cityId, 'program' => $place->programId, 'center' => $this->centerValueOf($place)];
+
+        return route('monthly-reports.index', array_filter([
+            'proposal' => $this->resolvedFilters['proposal'],
+            ...$place,
+            'from' => $month->format('Y-m'),
+            'to' => $month->format('Y-m'),
+            'status' => 'all',
+        ], fn (mixed $value): bool => $value !== null && $value !== ''));
+    }
+
+    /**
+     * The place a ReportPlace::key() names: "city:program:c{id}",
+     * "city:program:city-wide" or "city:program:unset".
+     */
+    private static function placeOfKey(string $key): ?ReportPlace
+    {
+        if (preg_match('/^(\d+):(\d+):(c(\d+)|city-wide|unset)$/', $key, $match) !== 1) {
+            return null;
+        }
+
+        return new ReportPlace((int) $match[1], (int) $match[2], isset($match[4]) ? (int) $match[4] : null, $match[3] === 'city-wide');
     }
 
     /**
@@ -466,52 +474,6 @@ trait BuildsMonthlyMatrix
     }
 
     /**
-     * The `center` value of a place.
-     */
-    protected function centerValueOf(ReportPlace $place): string
-    {
-        return match (true) {
-            $place->cityWide => 'field-'.$place->cityId,
-            $place->centerId !== null => 'c'.$place->centerId,
-            default => 'unset',
-        };
-    }
-
-    /**
-     * The city a `center` value stands in: an HR center's city or a Field
-     * work city; null for Center not set or an unknown value.
-     */
-    protected function cityOfCenter(string $value): ?int
-    {
-        if (preg_match('/^c(\d{1,18})$/', $value, $match) === 1) {
-            return HrCenter::remembered((int) $match[1])?->city_id;
-        }
-
-        return preg_match('/^field-(\d{1,18})$/', $value, $match) === 1 ? (int) $match[1] : null;
-    }
-
-    /**
-     * The id a filter value names when that record exists, else null.
-     *
-     * @param  class-string<Model>|null  $model
-     * @param  list<int>|null  $allowed  a fixed list to check against instead of a table
-     */
-    protected function existingId(string $value, ?string $model, ?array $allowed = null): ?int
-    {
-        if ($value === '' || ! ctype_digit($value) || strlen($value) > 18) {
-            return null;
-        }
-
-        $id = (int) $value;
-
-        if ($allowed !== null) {
-            return in_array($id, array_map('intval', $allowed), true) ? $id : null;
-        }
-
-        return $model !== null && $model::query()->whereKey($id)->exists() ? $id : null;
-    }
-
-    /**
      * The project ids "my projects" narrows the Activities tab to
      * (contracts §12.3, D-12a).
      *
@@ -582,19 +544,7 @@ trait BuildsMonthlyMatrix
      */
     private function centerArguments(): array
     {
-        if ($this->center === 'unset') {
-            return ['centerUnset' => true];
-        }
-
-        if (preg_match('/^field-(\d{1,18})$/', $this->center, $match) === 1 && $this->allCities()->has((int) $match[1])) {
-            return ['cityWide' => true, 'cityId' => (int) $match[1]];
-        }
-
-        if (preg_match('/^c(\d{1,18})$/', $this->center, $match) === 1 && HrCenter::remembered((int) $match[1]) !== null) {
-            return ['centerId' => (int) $match[1]];
-        }
-
-        return [];
+        return $this->centerArgumentsOf($this->center);
     }
 
     private function filterIsActive(string $name): bool
@@ -631,46 +581,6 @@ trait BuildsMonthlyMatrix
         }
 
         return ! $query->exists();
-    }
-
-    /**
-     * A `Y-m` value as its first day, or null.
-     */
-    private function monthOf(string $value): ?CarbonImmutable
-    {
-        return preg_match('/^(\d{4})-(0[1-9]|1[0-2])$/', $value, $match) === 1
-            ? CarbonImmutable::create((int) $match[1], (int) $match[2], 1)
-            : null;
-    }
-
-    /**
-     * Every HR city, active or not, keyed by id: one HR read per request.
-     *
-     * @return Collection<int, HrCity>
-     */
-    private function allCities(): Collection
-    {
-        return $this->allCitiesMemo ??= HrCity::query()->orderBy(HrCity::nameColumn())->orderBy('id')->get(['id', 'name_en', 'name_ar', 'is_active'])->keyBy('id');
-    }
-
-    /**
-     * A place's labels: "center · city", "Field work · city" or "Center not
-     * set", and the city's name.
-     *
-     * @return array{center: string, city: ?string}
-     */
-    private function placeLabel(ReportPlace $place): array
-    {
-        $city = $this->allCities()->get($place->cityId)?->name;
-        $cityLabel = $city ?? (string) $place->cityId;
-
-        $center = match (true) {
-            $place->cityWide => __('reports.matrix.place_field_work', ['city' => $cityLabel]),
-            $place->centerId !== null => __('reports.matrix.place_center', ['center' => HrCenter::remembered($place->centerId)->name ?? '#'.$place->centerId, 'city' => $cityLabel]),
-            default => __('reports.matrix.place_not_set', ['city' => $cityLabel]),
-        };
-
-        return ['center' => $center, 'city' => $city];
     }
 
     private function placeOfRow(stdClass $row): ?ReportPlace

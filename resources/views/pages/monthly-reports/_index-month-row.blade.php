@@ -59,6 +59,8 @@
     <div class="flex shrink-0 items-center gap-2">
         {{-- Named with its proposals and place: two templates share every month, and "View September 2026" twice told a screen reader nothing. --}}
         <x-ui.button tone="ghost" size="sm" icon="eye" class="max-sm:size-11" :href="route('monthly-reports.show', $rowReport)" wire:navigate :aria-label="__('common.view_name', ['name' => $rowName.' · '.$monthLabel])" />
+        {{-- Back to the monthly matrix for this template's place, with the list's proposal and window (Y-05). --}}
+        <x-ui.button tone="ghost" size="sm" icon="table-cells" class="max-sm:size-11" :href="$this->matrixUrlFor($rowGroup['template'])" wire:navigate :aria-label="__('monthly_reports.open_in_matrix', ['name' => $rowGroup['place']])" data-matrix-link="{{ $rowReport->id }}" />
         @if ($row['can_fill'])
             <x-ui.button
                 size="sm"

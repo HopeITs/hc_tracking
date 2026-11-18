@@ -1,6 +1,9 @@
 {{-- "My reports" on ⚡index.blade.php: the months waiting on the preparer first ("Needs you"), then one block per report template (D-76): its place, the proposals it covers (so two reports of one place are told apart) and its month strip, its months that still need something, and the validated ones folded away. --}}
 @if ($this->myMonths === [])
     <x-ui.empty-state icon="calendar-days" :heading="__('monthly_reports.empty_mine')" :body="__('monthly_reports.empty_mine_body')" />
+@elseif ($this->visibleGroups === [])
+    {{-- The user prepares templates, but the filters or the figure picked leave no month (Y-05). --}}
+    <x-ui.empty-state icon="calendar-days" :heading="__('monthly_reports.empty_filtered')" :body="__('common.change_the_filters_and_try_again')" />
 @else
     <div class="flex flex-col gap-10">
         @if ($this->needsYou !== [])

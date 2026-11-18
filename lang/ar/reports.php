@@ -140,6 +140,7 @@ return [
     'counts_toward_the_target_once_approved' => 'يُحتسب ضمن المستهدف بعد اعتماده',
     'achieved_so_far' => 'المتحقق حتى الآن',
     'matrix' => [
+        'open_month_list' => 'افتح تقارير :month',
         'legend' => 'حالات الخلايا',
         'legend_not_due_note' => 'غير مستحق هذا الشهر',
         'code' => 'الرمز',

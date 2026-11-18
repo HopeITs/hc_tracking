@@ -55,7 +55,11 @@
                                 @endif
                             </div>
 
-                            <x-ui.button tone="ghost" size="sm" icon="eye" class="max-sm:size-11" :href="route('monthly-reports.show', $queued)" wire:navigate :aria-label="__('common.view_name', ['name' => $queuedName.' · '.$queued->period->translatedFormat('F Y')])" />
+                            <div class="flex shrink-0 items-center gap-2">
+                                <x-ui.button tone="ghost" size="sm" icon="eye" class="max-sm:size-11" :href="route('monthly-reports.show', $queued)" wire:navigate :aria-label="__('common.view_name', ['name' => $queuedName.' · '.$queued->period->translatedFormat('F Y')])" />
+                                {{-- Back to the monthly matrix for this template's place, with the list's proposal and window (Y-05). --}}
+                                <x-ui.button tone="ghost" size="sm" icon="table-cells" class="max-sm:size-11" :href="$this->matrixUrlFor($queued->template)" wire:navigate :aria-label="__('monthly_reports.open_in_matrix', ['name' => $queuedNames['place']])" data-matrix-link="{{ $queued->id }}" />
+                            </div>
                         </article>
                     @endforeach
                 </section>

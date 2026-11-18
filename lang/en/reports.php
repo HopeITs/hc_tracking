@@ -140,6 +140,7 @@ return [
     'counts_toward_the_target_once_approved' => 'Counts toward the target once approved',
     'achieved_so_far' => 'Achieved so far',
     'matrix' => [
+        'open_month_list' => 'Open the reports of :month',
         'legend' => 'Cell states',
         'legend_not_due_note' => 'Not due this month',
         'code' => 'Code',
