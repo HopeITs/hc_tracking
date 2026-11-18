@@ -34,6 +34,7 @@ return [
     'select_a_role' => 'Select a role.',
     'select_a_valid_role' => 'Select a valid role.',
     'select_an_hr_account' => 'Select an HR account',
+    'loading_hr_accounts' => 'Loading HR accounts…',
     'select_an_hr_account_2' => 'Select an HR account.',
     'supervision_add' => 'Add supervision',
     'supervision_add_description' => 'Choose who supervises whom. It routes reminders and escalations only; it grants no permission.',

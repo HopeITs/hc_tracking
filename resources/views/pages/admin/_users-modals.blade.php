@@ -29,10 +29,26 @@
                 @endforeach
             </x-ui.form-select>
         </div>
+        @else
+        {{-- The dialog opens on the click itself; this holds the form's place until the HR accounts arrive. --}}
+        <div class="grid gap-y-4" role="status" aria-live="polite" data-test="create-user-loading">
+            <p class="flex items-center gap-2 text-sm font-medium text-primary dark:text-brand-text">
+                <flux:icon.loading variant="micro" class="size-4 shrink-0" aria-hidden="true" />
+                {{ __('users.loading_hr_accounts') }}
+            </p>
+            <div class="grid gap-y-4 animate-pulse motion-reduce:animate-none" aria-hidden="true">
+                @for ($i = 0; $i < 2; $i++)
+                    <div class="grid gap-y-2">
+                        <div class="h-3 w-28 rounded bg-secondary-soft dark:bg-surface-2"></div>
+                        <div class="h-11 rounded-lg bg-secondary-soft dark:bg-surface-2"></div>
+                    </div>
+                @endfor
+            </div>
+        </div>
         @endif
 
         <x-slot:actions>
-            <x-ui.button type="submit" tone="primary" data-test="save-user-button">{{ __('users.create_user') }}</x-ui.button>
+            <x-ui.button type="submit" tone="primary" :disabled="! $showCreateUserModal" data-test="save-user-button">{{ __('users.create_user') }}</x-ui.button>
         </x-slot:actions>
     </x-ui.modal>
 

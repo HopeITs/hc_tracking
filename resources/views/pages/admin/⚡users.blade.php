@@ -104,7 +104,7 @@ new #[Layout('layouts::desk'), Title('titles.user_directory')] class extends Com
     <x-slot:actions>
         @if ($activeTab === 'users')
             @can('create', App\Models\User::class)
-                <x-ui.button tone="primary" icon="plus" class="min-h-11 max-sm:h-11!" wire:click="openCreateModal" data-test="create-user-button" data-quick-create>{{ __('users.add_user') }}</x-ui.button>
+                <x-ui.button tone="primary" icon="plus" class="min-h-11 max-sm:h-11!" x-on:click="$wire.showCreateUserModal = true" wire:click="openCreateModal" data-test="create-user-button" data-quick-create>{{ __('users.add_user') }}</x-ui.button>
             @endcan
         @endif
 

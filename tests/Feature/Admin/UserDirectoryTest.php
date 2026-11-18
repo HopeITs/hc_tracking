@@ -531,12 +531,18 @@ test('the users tab offers add user, delete user and reset filters', function ()
         ->assertDontSeeHtml('data-test="create-user-button"');
 });
 
-test('the add-user form is rendered only while its modal is open', function () {
+test('the add-user dialog opens on the click and says it is loading until the form arrives', function () {
     Livewire::actingAs(accessAdmin())
         ->test('pages::admin.users')
+        ->assertSeeHtml('x-on:click="$wire.showCreateUserModal = true"')
         ->assertDontSeeHtml('wire:model="initialRoleId"')
+        ->assertSeeHtml('data-test="create-user-loading"')
+        ->assertSeeText(__('users.loading_hr_accounts'))
         ->call('openCreateModal')
-        ->assertSeeHtml('wire:model="initialRoleId"');
+        ->assertSeeHtml('wire:model="initialRoleId"')
+        ->assertDontSeeHtml('data-test="create-user-loading"')
+        ->call('closeCreateModal')
+        ->assertSeeHtml('data-test="create-user-loading"');
 });
 
 test('the assigned users list is rendered only while its modal is open', function () {
