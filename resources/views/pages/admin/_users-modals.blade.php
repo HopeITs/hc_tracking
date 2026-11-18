@@ -12,8 +12,9 @@
         close="closeCreateModal"
         required-note
     >
+        {{-- Distinct wire:keys: Livewire must swap the loader for the form, not patch one into the other (the pickers' Alpine then breaks on a second open). --}}
         @if ($showCreateUserModal)
-        <div class="grid gap-y-4">
+        <div class="grid gap-y-4" wire:key="create-user-form">
             <x-ui.form-select wire:model="hrUserId" :label="__('users.hr_account')" :placeholder="__('users.select_an_hr_account')" required autofocus>
                 @foreach ($this->hrAccountOptions as $hrAccountOption)
                     <option value="{{ $hrAccountOption->id }}">{{ $hrAccountOption->email }}@if ($hrAccountOption->employee) · {{ $hrAccountOption->employee->name }} · {{ $hrAccountOption->employee->secondary_name }}@endif</option>
@@ -31,7 +32,7 @@
         </div>
         @else
         {{-- The dialog opens on the click itself; this holds the form's place until the HR accounts arrive. --}}
-        <div class="grid gap-y-4" role="status" aria-live="polite" data-test="create-user-loading">
+        <div class="grid gap-y-4" role="status" aria-live="polite" wire:key="create-user-loading" data-test="create-user-loading">
             <p class="flex items-center gap-2 text-sm font-medium text-primary dark:text-brand-text">
                 <flux:icon.loading variant="micro" class="size-4 shrink-0" aria-hidden="true" />
                 {{ __('users.loading_hr_accounts') }}
