@@ -338,7 +338,10 @@ test('the activities step adds an activity and ticks it', function () {
         ->set('newActivityParent', (string) $outcome->id)
         ->call('addActivity')
         ->assertHasNoErrors()
-        ->assertSet('picked', fn (array $picked): bool => in_array((string) Result::query()->where('statement', 'Parent meetings')->value('id'), $picked, true));
+        ->assertSet('picked', fn (array $picked): bool => in_array((string) Result::query()->where('statement', 'Parent meetings')->value('id'), $picked, true))
+        // The link back to the Logical Framework stays on the activities step once
+        // activities exist, not only in the empty state, so more can be added.
+        ->assertSeeHtml('data-test="open-logframe-link"');
 });
 
 test('a MEAL reviewer who arrives after the plan was sent is told once that it waits for them', function () {

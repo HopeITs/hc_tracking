@@ -4,9 +4,15 @@
 @endphp
 
 <section class="ap-card" data-plan-step="activities">
-    <div>
-        <h2>{{ __('annual_plans.wf.activities_title') }}</h2>
-        <p class="ap-q">{{ __('annual_plans.wf.activities_question') }}</p>
+    {{-- A standing link to the proposal's Logical Framework: activities are added and
+         edited there, so the program manager always needs a way back to it, not only
+         while the plan has no activities yet (the @empty branch below). --}}
+    <div class="ap-row" style="align-items: flex-start; justify-content: space-between; gap: 12px">
+        <div class="ap-sp">
+            <h2>{{ __('annual_plans.wf.activities_title') }}</h2>
+            <p class="ap-q">{{ __('annual_plans.wf.activities_question') }}</p>
+        </div>
+        <a class="dk-btn" href="{{ route('proposals.show', [$plan->proposal, 'tab' => 'logframe']) }}" wire:navigate data-test="open-logframe-link">{{ __('annual_plans.wf.open_logframe') }}</a>
     </div>
 
     @forelse ($groups as $group)
