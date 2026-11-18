@@ -151,7 +151,7 @@
     .dk-story .dk-fold-t .dk-fold-i { margin: 0; }
     /* Proposals on this project: one aligned grid; under 720px each row stacks into a labelled card. */
     .dk-story .dk-prows { container: prows / inline-size; }
-    .dk-story .dk-prow { display: grid; grid-template-columns: minmax(0, 2.4fr) minmax(0, 1fr) minmax(0, 1.1fr) minmax(0, 1.6fr) minmax(0, 1fr) 4.5rem; align-items: center; gap: 16px; padding: 14px 18px; font-size: 13px; color: var(--ink-2); }
+    .dk-story .dk-prow { display: grid; grid-template-columns: minmax(0, 2.4fr) minmax(0, 1fr) minmax(0, 1.1fr) minmax(0, 1.6fr) minmax(0, 1fr) 6rem; align-items: center; gap: 16px; padding: 14px 18px; font-size: 13px; color: var(--ink-2); }
     .dk-story .dk-prow-h { padding-block: 9px; border-bottom: 1px solid var(--line); background: var(--tint); font-size: 11.5px; font-weight: 700; letter-spacing: .04em; text-transform: uppercase; color: var(--ink-3); }
     .dk-story .dk-prow-wrap + .dk-prow-wrap { border-top: 1px solid var(--line); }
     .dk-story .dk-prow-wrap { transition: background-color .15s; }
