@@ -35,7 +35,6 @@ final class ReturnMonthlyReport
 
         return DB::transaction(function () use ($report, $expectedStatus, $reason): MonthlyReport {
             $locked = MonthlyReportGuard::lock($report, $expectedStatus, 'return');
-            $project = $locked->project()->firstOrFail();
 
             $locked->fill([
                 'status' => MonthlyReportStatus::Draft,
@@ -44,7 +43,7 @@ final class ReturnMonthlyReport
                 'return_reason' => $reason,
                 // Dynamic Deadline rule: returned after its deadline, the report is due by the
                 // next working day (weekends and holidays skipped); otherwise it keeps its own.
-                'revised_due_on' => MonthlyReportPeriods::for($project)->revisedDueDateWhenSentBack($locked, CarbonImmutable::now()),
+                'revised_due_on' => MonthlyReportPeriods::for($locked->template)->revisedDueDateWhenSentBack($locked, CarbonImmutable::now()),
             ])->save();
 
             $this->mirrors->moveTo($locked, null);

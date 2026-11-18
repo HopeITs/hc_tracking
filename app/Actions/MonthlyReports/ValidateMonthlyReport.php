@@ -35,8 +35,7 @@ final class ValidateMonthlyReport
     {
         return DB::transaction(function () use ($report, $expectedStatus): MonthlyReport {
             $locked = MonthlyReportGuard::lock($report, $expectedStatus, 'validate');
-            $locked->project->loadMissing('program:id,donor_attribution');
-            $attribution = MonthlyReportLineBuilder::attributionOf($locked->project);
+            $attribution = MonthlyReportLineBuilder::attributionOf($locked->template);
 
             $pending = $locked->lines()
                 ->where('entered_by', IndicatorCollector::Meal->value)

@@ -12,7 +12,6 @@ use App\Models\MonthlyReport;
 use App\Models\ProjectActivityStatus;
 use App\Models\Proposal;
 use App\Models\Result;
-use App\Support\Reporting\PlaceBridge;
 use Carbon\CarbonImmutable;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
@@ -23,15 +22,15 @@ use Illuminate\Support\Facades\DB;
  * and the T17B page.
  *
  * An activity of a donor-approved proposal of the report's template (Y-06,
- * D-78: every proposal a joined template carries) appears when its calendar
- * schedules it in the month (the project's override rows when it has any,
- * else the proposal calendar) and the month lies inside its proposal's
- * schedule window, when its last status confirmed by an earlier month is not
- * final (not started, started, ongoing, suspended), or when this report
- * already has an entry for it. A project with no template yet (data from
- * before Y-02) keeps the proposals linked to the project. Until Y-03 gives a
- * report its own template, the proposals of all the templates of the report's
- * project are used. Queries stay constant whatever the number of activities.
+ * D-78: every proposal a joined template carries; Y-03, D-76: the report's
+ * own template) appears when its calendar schedules it in the month (the
+ * project's override rows when it has any, else the proposal calendar) and
+ * the month lies inside its proposal's schedule window, when its last status
+ * confirmed by an earlier month is not final (not started, started, ongoing,
+ * suspended), or when this report already has an entry for it. The schedule
+ * overrides and the confirmed statuses stay keyed by the report's legacy
+ * project until they move to places. Queries stay constant whatever the
+ * number of activities.
  */
 final class MonthlyReportActivities
 {
@@ -123,25 +122,17 @@ final class MonthlyReportActivities
     }
 
     /**
-     * The donor-approved proposals the report asks about, by id.
+     * The donor-approved proposals of the report's template (D-76), by id.
      *
      * @return Collection<int, Proposal>
      */
     private static function proposalsOf(MonthlyReport $report): Collection
     {
         $statuses = array_map(fn (ProposalStatus $status): string => $status->value, ProposalStatus::approvedByDonor());
-        $templateIds = app(PlaceBridge::class)->templateIdsOfProject($report->project_id);
-
-        if ($templateIds === []) {
-            return $report->project()->firstOrFail()->proposals()
-                ->whereIn('proposals.status', $statuses)
-                ->get(['proposals.*'])
-                ->keyBy('id');
-        }
 
         return Proposal::query()
             ->whereIn('proposals.status', $statuses)
-            ->whereIn('proposals.id', DB::table('proposal_report_template')->whereIn('report_template_id', $templateIds)->select('proposal_id'))
+            ->whereIn('proposals.id', DB::table('proposal_report_template')->where('report_template_id', $report->report_template_id)->select('proposal_id'))
             ->orderBy('id')
             ->get()
             ->keyBy('id');

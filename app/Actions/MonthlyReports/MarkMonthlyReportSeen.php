@@ -20,7 +20,7 @@ final class MarkMonthlyReportSeen
     public function handle(MonthlyReport $report): bool
     {
         return DB::transaction(function () use ($report): bool {
-            $locked = MonthlyReport::query()->with('project')->whereKey($report->id)->lockForUpdate()->firstOrFail();
+            $locked = MonthlyReport::query()->with('template')->whereKey($report->id)->lockForUpdate()->firstOrFail();
 
             Gate::authorize('markSeen', $locked);
 

@@ -26,6 +26,7 @@ use App\Models\PlanIndicator;
 use App\Models\Program;
 use App\Models\Project;
 use App\Models\Report;
+use App\Models\ReportTemplate;
 use App\Models\User;
 use Carbon\CarbonImmutable;
 use Illuminate\Auth\Access\AuthorizationException;
@@ -428,10 +429,11 @@ test('a double submit records one submission and notifies once, after commit', f
     Queue::assertPushed(FanOutActivity::class, 1);
 });
 
-test('opening refuses a future month and a month outside the project, and creates a started month\'s draft', function () {
+test('opening refuses a future month and a month outside the template window, and creates the draft of a started month', function () {
     $project = mrwProject();
+    $template = Activity::withoutRecording(fn (): ReportTemplate => ReportTemplate::factory()->create(['project_id' => $project->id]));
     $this->actingAs($this->owner);
-    $open = fn (string $month) => app(OpenMonthlyReport::class)->handle($project, CarbonImmutable::parse($month));
+    $open = fn (string $month) => app(OpenMonthlyReport::class)->handle($template, CarbonImmutable::parse($month));
 
     expect(mrwErrors(fn () => $open('2026-12-01'))['month'] ?? [])->toBe([__('monthly_reports.future_month')])
         ->and(mrwErrors(fn () => $open('2026-09-01'))['month'] ?? [])->toBe([__('monthly_reports.outside_period')]);
@@ -439,8 +441,15 @@ test('opening refuses a future month and a month outside the project, and create
     $report = $open('2026-11-15');
 
     expect($report->period->toDateString())->toBe('2026-11-01')
+        ->and($report->report_template_id)->toBe($template->id)
         ->and($report->prepared_by)->toBeNull()
         ->and($open('2026-11-01')->id)->toBe($report->id);
+
+    // The window is the template's proposals' (D-76), not the project's: a template with none has no period
+    // (and no preparer, so the action itself answers 403 before this reason).
+    $template->proposals()->detach();
+
+    expect(OpenMonthlyReport::refusal($template->fresh(), CarbonImmutable::parse('2026-10-01')))->toBe(__('monthly_reports.project_has_no_period'));
 });
 
 test('refresh recomputes a draft line\'s fixed denominator from its shares', function () {
@@ -480,7 +489,7 @@ test('a report writer outside the project is refused every move', function (Clos
 
     expect(fn () => $move($report, $project))->toThrow(AuthorizationException::class);
 })->with([
-    'open' => [fn (MonthlyReport $report, Project $project) => app(OpenMonthlyReport::class)->handle($project, CarbonImmutable::parse('2026-10-01'))],
+    'open' => [fn (MonthlyReport $report) => app(OpenMonthlyReport::class)->handle($report->template, CarbonImmutable::parse('2026-10-01'))],
     'save' => [fn (MonthlyReport $report) => app(SaveMonthlyReportLines::class)->handle($report, MonthlyReportStatus::Draft, [])],
     'submit' => [fn (MonthlyReport $report) => app(SubmitMonthlyReport::class)->handle($report, MonthlyReportStatus::Draft)],
     'refresh' => [fn (MonthlyReport $report) => app(RefreshMonthlyReportLines::class)->handle($report, MonthlyReportStatus::Draft)],

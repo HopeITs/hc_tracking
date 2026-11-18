@@ -27,6 +27,7 @@ use App\Support\IndicatorCode;
 use App\Support\MonthlyReportGenerator;
 use Carbon\CarbonImmutable;
 use Database\Seeders\Concerns\PicksHrRecords;
+use Database\Seeders\Concerns\SeedsReportTemplates;
 use Illuminate\Database\Seeder;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
@@ -40,6 +41,7 @@ use Illuminate\Support\Facades\DB;
 class MealSeeder extends Seeder
 {
     use PicksHrRecords;
+    use SeedsReportTemplates;
 
     /**
      * Seed the MEAL tables.
@@ -87,8 +89,10 @@ class MealSeeder extends Seeder
     /**
      * Three months for up to two projects (active ones first): from the
      * project start, or the last three months when the demo project has no
-     * dates, generated the way activation does: the oldest validated with
-     * an answer, the next submitted, the rest drafts (contracts §13).
+     * dates, generated the way a template confirmation does, on the
+     * project's confirmed report template (created when it has none): the
+     * oldest validated with an answer, the next submitted, the rest drafts
+     * (contracts §13).
      *
      * @param  Collection<int, User>  $users
      */
@@ -111,7 +115,8 @@ class MealSeeder extends Seeder
                 ? CarbonImmutable::today()->startOfMonth()->subMonths(2)
                 : CarbonImmutable::parse($project->start_date)->startOfMonth();
             $end = $start->addMonths(2);
-            $ids = app(MonthlyReportGenerator::class)->generate($project, $start, $end);
+            $template = $this->reportTemplateFor($project, $user->id);
+            $ids = app(MonthlyReportGenerator::class)->generate($template, $start, $end);
             $reports = MonthlyReport::query()->whereKey($ids)->orderBy('period')->get();
 
             $reports->get(0)?->forceFill([

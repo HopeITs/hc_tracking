@@ -53,14 +53,13 @@ final class DecideMonthlyReportReopen
 
             if ($grant) {
                 $this->activityStatuses->restore($locked);
-                $project = $locked->project()->firstOrFail();
                 $locked->fill([
                     'status' => MonthlyReportStatus::Draft,
                     'validated_at' => null,
                     'validated_by' => null,
                     // Dynamic Deadline rule, as for a return: reopened after its deadline, the report is
                     // due by the next working day (weekends and holidays skipped); otherwise it keeps its own.
-                    'revised_due_on' => MonthlyReportPeriods::for($project)->revisedDueDateWhenSentBack($locked, CarbonImmutable::now()),
+                    'revised_due_on' => MonthlyReportPeriods::for($locked->template)->revisedDueDateWhenSentBack($locked, CarbonImmutable::now()),
                 ]);
                 Activity::withoutRecording(fn () => $locked->save());
                 $this->mirrors->moveTo($locked, null);

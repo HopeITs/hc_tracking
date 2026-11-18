@@ -53,6 +53,9 @@ beforeEach(function () {
     ]));
     $this->proposal = Activity::withoutRecording(fn (): Proposal => Proposal::factory()->create(['status' => ProposalStatus::Approved, 'name' => 'Proposal Alpha', 'planned_date_begin' => '2026-10-01', 'planned_date_end' => '2027-03-31']));
     $this->project->proposals()->attach($this->proposal->id, ['target_beneficiaries' => 100]);
+    // The report's activities come from its template's proposals (D-76).
+    Activity::withoutRecording(fn () => ReportTemplate::factory()->create(['project_id' => $this->project->id]))
+        ->proposals()->attach($this->proposal->id, ['joined_at' => now()]);
     $this->output = Activity::withoutRecording(fn (): Result => Result::factory()->type(ResultType::Output)->create(['proposal_id' => $this->proposal->id]));
 });
 

@@ -19,4 +19,6 @@ test('the browser cannot call a page helper that returns data', function (string
     'donor money' => ['pages::donors.index', 'donorMoney', [1]],
     'delete check' => ['pages::milestones.index', 'canDelete', [1]],
     'matrix figure' => ['pages::reports.monthly-matrix', 'matrixNumber', [1.0]],
+    'matrix cell link' => ['pages::reports.monthly-matrix', 'cellListUrl', [[], '2026-10']],
+    'list row matrix link' => ['pages::monthly-reports.index', 'matrixUrlFor', [1]],
 ]);

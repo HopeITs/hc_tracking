@@ -2,7 +2,7 @@
     The by-sex breakdown rows of one matrix row (D-50): male, female and their
     total, each followed by its "of whom persons with disability" row when the
     pwd switch is on. Included by _monthly-matrix-table.blade.php inside the
-    row's own <tbody>, so $row, $matrix, $bodyCell, $stickyCode and $stickyName
+    row's own <tbody>, so $row, $windowMonths, $bodyCell, $stickyCode and $stickyName
     are in scope. Every figure arrives computed; the rows start hidden and
     the row's Alpine `open` flag shows them.
 --}}
@@ -32,7 +32,7 @@
             @endif
         </td>
         <td class="{{ $bodyCell }}"></td>
-        @foreach ($matrix['months'] as $month)
+        @foreach ($windowMonths as $month)
             @php $figure = $sub['figures']['cells'][$month->format('Y-m')] ?? null; @endphp
             <td class="{{ $bodyCell }} text-end text-xs tabular-nums">
                 @if ($figure !== null)<span dir="ltr">{{ $this->matrixNumber($figure) }}{{ $suffix }}</span>@endif

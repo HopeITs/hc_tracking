@@ -50,7 +50,19 @@ final class WorkingCalendar
     {
         $days = $project->getAttribute('working_days');
 
-        if (! is_array($days) || $days === []) {
+        return $this->forDays(is_array($days) ? $days : null);
+    }
+
+    /**
+     * The same calendar over the given ISO working days, or the global days
+     * when the list is null, empty or invalid (Y-03: a template's days come
+     * through MonthlyReportPeriods::workingDaysOf()). No query.
+     *
+     * @param  array<int, mixed>|null  $days
+     */
+    public function forDays(?array $days): self
+    {
+        if ($days === null || $days === []) {
             return new self($this->settings);
         }
 

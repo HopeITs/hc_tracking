@@ -10,10 +10,13 @@ use App\Enums\MonthlyReportStatus;
 use App\Enums\ProposalStatus;
 use App\Enums\ResultType;
 use App\Models\HrCenter;
+use App\Support\Reporting\ExtractionFilter;
+use App\Support\Reporting\PlaceBridge;
 use Carbon\CarbonImmutable;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use Livewire\Attributes\Computed;
+use stdClass;
 
 /**
  * The Activities tab of the Monthly Matrix (T18 slice 2, D-51, contracts
@@ -27,6 +30,12 @@ use Livewire\Attributes\Computed;
  * forward. Pending (submitted) reports never show. Five reads, whatever the
  * number of activities.
  *
+ * Still project-keyed (Y-05 Q2, until Y-17): the rows are (activity,
+ * project), the pairs come from `project_proposal` through PlaceBridge, the
+ * calendars read `activity_schedules.project_id` and the entries
+ * `monthly_reports.project_id`, so a monthly report written after Y-03 (no
+ * project) shows no activity status here yet.
+ *
  * @property-read array{months: list<CarbonImmutable>, outputs: list<array<string, mixed>>, count: int} $activityBoard
  */
 trait BuildsMatrixActivities
@@ -39,7 +48,13 @@ trait BuildsMatrixActivities
     {
         $months = $this->months;
         $empty = ['months' => $months, 'outputs' => [], 'count' => 0];
-        $links = $this->activityLinks($months[0], $months[11]->endOfMonth());
+
+        if ($months === []) {
+            return $empty;
+        }
+
+        $end = $months[count($months) - 1]->endOfMonth();
+        $links = $this->activityLinks($months[0], $end);
 
         if ($links->isEmpty()) {
             return $empty;
@@ -61,7 +76,7 @@ trait BuildsMatrixActivities
         $projectIds = $links->pluck('project_id')->unique()->all();
         $activityIds = $activities->pluck('id')->all();
         $calendars = $this->activityCalendars($activityIds, $projectIds);
-        $entries = $this->activityEntries($activityIds, $projectIds, $months[11]->endOfMonth());
+        $entries = $this->activityEntries($activityIds, $projectIds, $end);
 
         $centers = [];
         foreach ($links->pluck('center_id')->filter()->unique() as $centerId) {
@@ -95,24 +110,32 @@ trait BuildsMatrixActivities
     }
 
     /**
-     * The (proposal, project) pairs the filters select: donor-approved
+     * The (proposal, project) pairs the page's filters select: donor-approved
      * proposals whose period overlaps the window.
      *
-     * @return Collection<int, object{proposal_id: int, project_id: int, project_name: string, center_id: ?int}>
+     * @return Collection<int, stdClass> rows of proposal_id, project_id, project_name, center_id
      */
     protected function activityLinks(CarbonImmutable $from, CarbonImmutable $to): Collection
     {
-        $query = DB::table('project_proposal as pl')
-            ->join('proposals as pp', 'pp.id', '=', 'pl.proposal_id')
-            ->join('projects as pr', 'pr.id', '=', 'pl.project_id')
-            ->whereIn('pp.status', array_map(fn (ProposalStatus $status): string => $status->value, ProposalStatus::approvedByDonor()))
-            ->whereRaw('(case when pp.actual_date_begin is not null and pp.actual_date_end is not null then pp.actual_date_begin else pp.planned_date_begin end) <= ?', [$to->toDateString()])
-            ->whereRaw('(case when pp.actual_date_begin is not null and pp.actual_date_end is not null then coalesce(pp.extended_date_end, pp.actual_date_end) else pp.planned_date_end end) >= ?', [$from->toDateString()]);
+        return $this->activityLinksFor($this->extractionFilter, $from, $to);
+    }
 
-        return $this->applyMatrixFilters($query)
-            ->orderBy('pr.name')
-            ->orderBy('pr.id')
-            ->get(['pl.proposal_id', 'pl.project_id', 'pr.name as project_name', 'pr.center_id']);
+    /**
+     * The (proposal, project) pairs a filter selects, through PlaceBridge:
+     * the tab stays project-keyed until Y-17 (Y-05 Q2), and the place,
+     * program and window filters are translated onto the projects there.
+     *
+     * @return Collection<int, stdClass> rows of proposal_id, project_id, project_name, center_id
+     */
+    protected function activityLinksFor(ExtractionFilter $filter, CarbonImmutable $from, CarbonImmutable $to): Collection
+    {
+        return app(PlaceBridge::class)->activityLinks(
+            $filter,
+            $from,
+            $to,
+            array_map(fn (ProposalStatus $status): string => $status->value, ProposalStatus::approvedByDonor()),
+            $filter->mine ? $this->coveredProjectIds() : null,
+        );
     }
 
     /**
@@ -182,7 +205,7 @@ trait BuildsMatrixActivities
     }
 
     /**
-     * The twelve cells of one activity at one center.
+     * The cells of one activity at one center, one per month of the window.
      *
      * @param  list<CarbonImmutable>  $months
      * @param  array<string, list<int>|null>  $planned

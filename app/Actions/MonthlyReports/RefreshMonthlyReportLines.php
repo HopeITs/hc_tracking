@@ -30,9 +30,7 @@ final class RefreshMonthlyReportLines
         return DB::transaction(function () use ($report, $expectedStatus): array {
             $locked = MonthlyReportGuard::lock($report, $expectedStatus, 'update');
             $built = $this->builder->build($locked);
-
-            $locked->project->loadMissing('program:id,donor_attribution');
-            $attribution = MonthlyReportLineBuilder::attributionOf($locked->project);
+            $attribution = MonthlyReportLineBuilder::attributionOf($locked->template);
 
             $locked->lines()->with('shares:id,monthly_report_line_id,fixed_denominator')->get()
                 ->each(function (MonthlyReportLine $line) use ($attribution): void {

@@ -6,6 +6,7 @@ namespace App\Livewire\Concerns\Reports;
 
 use App\Enums\ActivityStatus;
 use App\Enums\MatrixCellState;
+use App\Models\HrCity;
 use App\Support\CsvExport;
 use Carbon\CarbonImmutable;
 use Flux\Flux;
@@ -19,7 +20,10 @@ use Symfony\Component\HttpFoundation\StreamedResponse;
  *
  * Used by reports/monthly-matrix only. It reads the same `matrix` (or
  * `activityBoard`) as the screen, so the file holds every row the filters
- * select, with the breakdown rows under their indicator, and no money.
+ * select, with the breakdown rows under their indicator, and no money. A
+ * header block first states every active filter in words and the window
+ * (Y-05); the file is in the page's language only, with one indicator name
+ * column in that language.
  */
 trait ExportsMonthlyMatrix
 {
@@ -42,29 +46,28 @@ trait ExportsMonthlyMatrix
         }
 
         $matrix = $this->matrix;
+        $months = $this->months;
         $monthFormat = __('formats.month_year');
 
         $headings = [
             __('reports.matrix.code'),
-            __('reports.matrix.name_en'),
-            __('reports.matrix.name_ar'),
+            __('reports.matrix.indicator'),
             __('reports.matrix.center'),
             __('reports.matrix.city'),
             __('reports.matrix.source'),
             __('reports.matrix.measure'),
             __('reports.matrix.breakdown'),
             __('reports.matrix.target'),
-            ...array_map(fn (CarbonImmutable $month): string => $month->translatedFormat($monthFormat), $matrix['months']),
+            ...array_map(fn (CarbonImmutable $month): string => $month->translatedFormat($monthFormat), $months),
             __('reports.matrix.total'),
             __('reports.matrix.achieved'),
         ];
 
-        $rows = (function () use ($matrix) {
+        $rows = (function () use ($matrix, $months) {
             foreach ($matrix['rows'] as $row) {
                 yield [
                     $row['code'],
-                    $row['name_en'],
-                    $row['name_ar'],
+                    $this->exportIndicatorName($row),
                     $row['is_group'] ? __('reports.matrix.centers_count', ['count' => $row['centers_count']]) : $row['center'],
                     $row['city'],
                     collect($row['sources'])
@@ -73,16 +76,115 @@ trait ExportsMonthlyMatrix
                     $row['measure']->label(),
                     '',
                     $this->matrixNumber($row['target']),
-                    ...array_map(fn (array $cell): string => $this->csvCell($cell), array_values($row['cells'])),
+                    ...array_map(fn (CarbonImmutable $month): string => $this->csvCell($row['cells'][$month->format('Y-m')]), $months),
                     $this->matrixNumber($row['total']),
                     $this->matrixNumber($row['achieved']),
                 ];
 
-                yield from $this->breakdownCsvRows($row);
+                yield from $this->breakdownCsvRows($row, $months);
             }
         })();
 
-        return CsvExport::download('monthly-matrix-'.CarbonImmutable::today()->toDateString().'.csv', $headings, $rows);
+        return CsvExport::download('monthly-matrix-'.CarbonImmutable::today()->toDateString().'.csv', $headings, $rows, $this->exportHeaderBlock());
+    }
+
+    /**
+     * The rows above the heading row: one [label, value in words] row per
+     * active filter, the window as "from – to", then an empty row.
+     *
+     * @return list<list<string>>
+     */
+    protected function exportHeaderBlock(): array
+    {
+        $filter = $this->extractionFilter;
+        $isArabic = app()->getLocale() === 'ar';
+        $lines = [];
+
+        if ($filter->proposalId !== null) {
+            $lines[] = [__('reports.matrix.proposal'), $this->exportOptionLabel($this->proposalOptions, (string) $filter->proposalId)];
+        }
+
+        if ($filter->donorId !== null) {
+            $lines[] = [__('reports.matrix.donor'), $this->exportOptionLabel($this->donorOptions, (string) $filter->donorId)];
+        }
+
+        if ($filter->cityId !== null) {
+            $lines[] = [__('reports.matrix.city'), $this->exportOptionLabel($this->cityOptions, (string) $filter->cityId)];
+        }
+
+        if ($filter->programId !== null) {
+            $lines[] = [__('reports.matrix.program'), $this->exportOptionLabel($this->programOptions, (string) $filter->programId)];
+        }
+
+        if ($filter->centerId !== null || $filter->cityWide || $filter->centerUnset) {
+            $lines[] = [__('reports.matrix.center'), $this->exportOptionLabel($this->centerOptions, $this->center)];
+        }
+
+        if ($filter->indicatorId !== null) {
+            $indicator = collect($this->indicatorOptions)->firstWhere('id', $filter->indicatorId);
+            $name = $isArabic ? ($indicator->name_ar ?? null) : ($indicator->name_en ?? $indicator->name_ar ?? null);
+            $lines[] = [__('reports.matrix.indicator'), $indicator === null ? (string) $filter->indicatorId : trim($indicator->code.' · '.$name, ' ·')];
+        }
+
+        if ($filter->pillarId !== null) {
+            $pillar = collect($this->pillarOptions)->firstWhere('id', $filter->pillarId);
+            $lines[] = [__('reports.matrix.pillar'), $pillar === null ? (string) $filter->pillarId : (string) ($isArabic ? $pillar->name_ar : ($pillar->name_en ?? $pillar->name_ar))];
+        }
+
+        if ($filter->mine) {
+            $lines[] = [__('reports.matrix.my_projects'), __('reports.matrix.export.mine_on')];
+        }
+
+        $months = $this->months;
+        $first = $months[0] ?? $filter->from;
+        $last = $months === [] ? $filter->to : $months[array_key_last($months)];
+        $monthFormat = __('formats.month_year');
+        $lines[] = [__('reports.matrix.window'), __('reports.matrix.export.window_value', [
+            'from' => $first?->translatedFormat($monthFormat) ?? '',
+            'to' => $last?->translatedFormat($monthFormat) ?? '',
+        ])];
+        $lines[] = [''];
+
+        return $lines;
+    }
+
+    /**
+     * The words of a picked option: an option is either an `{value, label}`
+     * array (centers) or a model with `id` and `name`; the id itself when the
+     * option is no longer listed.
+     *
+     * @param  iterable<int, array{value: string, label: string}|\stdClass|HrCity>  $options
+     */
+    protected function exportOptionLabel(iterable $options, string $value): string
+    {
+        foreach ($options as $option) {
+            if (is_array($option)) {
+                if ((string) $option['value'] === $value) {
+                    return (string) $option['label'];
+                }
+
+                continue;
+            }
+
+            if ((string) $option->id === $value) {
+                return (string) $option->name;
+            }
+        }
+
+        return $value;
+    }
+
+    /**
+     * The indicator's name in the page's language (approved Y-05 Q4): the
+     * file carries one name column, never both.
+     *
+     * @param  array<string, mixed>  $row
+     */
+    protected function exportIndicatorName(array $row): string
+    {
+        return (string) (app()->getLocale() === 'ar'
+            ? ($row['name_ar'] ?? $row['name_en'])
+            : ($row['name_en'] ?? $row['name_ar']));
     }
 
     /**
@@ -105,9 +207,10 @@ trait ExportsMonthlyMatrix
      * followed by its disability row when the pwd switch is on.
      *
      * @param  array<string, mixed>  $row
+     * @param  list<CarbonImmutable>  $months
      * @return list<list<string>>
      */
-    protected function breakdownCsvRows(array $row): array
+    protected function breakdownCsvRows(array $row, array $months): array
     {
         if ($row['breakdown'] === null) {
             return [];
@@ -124,10 +227,10 @@ trait ExportsMonthlyMatrix
 
             foreach ($figures as [$label, $series]) {
                 $lines[] = [
-                    $row['code'], $row['name_en'], $row['name_ar'],
+                    $row['code'], $this->exportIndicatorName($row),
                     $row['is_group'] ? __('reports.matrix.centers_count', ['count' => $row['centers_count']]) : $row['center'],
                     $row['city'], '', $row['measure']->label(), $label, '',
-                    ...array_map(fn (?float $figure): string => $this->matrixNumber($figure), array_values($series['cells'])),
+                    ...array_map(fn (CarbonImmutable $month): string => $this->matrixNumber($series['cells'][$month->format('Y-m')] ?? null), $months),
                     $this->matrixNumber($series['total']),
                     '',
                 ];
@@ -168,7 +271,7 @@ trait ExportsMonthlyMatrix
             }
         })();
 
-        return CsvExport::download('monthly-matrix-activities-'.CarbonImmutable::today()->toDateString().'.csv', $headings, $rows);
+        return CsvExport::download('monthly-matrix-activities-'.CarbonImmutable::today()->toDateString().'.csv', $headings, $rows, $this->exportHeaderBlock());
     }
 
     /**

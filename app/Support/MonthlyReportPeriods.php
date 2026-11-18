@@ -6,29 +6,31 @@ namespace App\Support;
 
 use App\Enums\MonthlyReportStatus;
 use App\Models\MonthlyReport;
-use App\Models\Project;
+use App\Models\ReportTemplate;
 use App\Notifications\Alerts\NotificationSettings;
 use App\Notifications\Alerts\WorkingCalendar;
+use App\Support\Reporting\PlaceBridge;
 use Carbon\CarbonImmutable;
 use Illuminate\Database\Eloquent\Collection;
 
 /**
- * The one read helper for a project's monthly report months (contracts §13,
- * §13.1 item 2, D-08): which months exist, which are required (have at
+ * The one read helper for a template's monthly report months (contracts §13,
+ * §13.1 item 2, D-08, D-76): which months exist, which are required (have at
  * least one line), whether a month has started, when it is due and whether
  * a report may be submitted yet. Every listener, command, policy and page
- * reads months and due-ness through here.
+ * reads months and due-ness through here. Sequencing is per template: a
+ * month of another template at the same place never blocks this one.
  *
- * for() loads the project's months once (one query); everything else
- * answers from memory. Days are counted on the project's own working days
- * (WorkingCalendar::forProject()), skipping the HR holidays of its center,
- * city and program (HrHolidays::forProject()). The project must be loaded
- * with center_id, city_id and program_id.
+ * for() loads the template's months once; everything else answers from
+ * memory. Days are counted on the working days of the template's legacy
+ * project (workingDaysOf(), read through PlaceBridge until Stage B copies
+ * them to the location row), skipping the HR holidays of its place
+ * (HrHolidays::forPlace()).
  */
 final class MonthlyReportPeriods
 {
     /**
-     * @param  Collection<int, MonthlyReport>  $reports  the project's reports, oldest first, with `lines_count`
+     * @param  Collection<int, MonthlyReport>  $reports  the template's reports, oldest first, with `lines_count`
      */
     private function __construct(
         private Collection $reports,
@@ -36,31 +38,56 @@ final class MonthlyReportPeriods
         private NotificationSettings $settings,
     ) {}
 
-    public static function for(Project $project): self
+    public static function for(ReportTemplate $template): self
     {
         $reports = MonthlyReport::query()
-            ->where('project_id', $project->id)
+            ->where('report_template_id', $template->id)
             ->withCount('lines')
             ->orderBy('period')
-            ->get(['id', 'project_id', 'period', 'status', 'revised_due_on']);
+            ->get(['id', 'report_template_id', 'project_id', 'period', 'status', 'revised_due_on']);
 
-        return self::fromLoaded($project, $reports);
+        return self::fromLoaded($template, $reports, self::workingDaysOf([$template])[$template->id] ?? null);
     }
 
     /**
      * The same helper over reports already loaded by the caller (the
-     * project's reports, oldest first, with `lines_count`), for scanners
-     * reading many projects at once. No query.
+     * template's reports, oldest first, with `lines_count`) and the
+     * template's working days from workingDaysOf(), for scanners reading
+     * many templates at once. No query.
      *
      * @param  Collection<int, MonthlyReport>  $reports
+     * @param  list<int>|null  $workingDays  null = the global working days
      */
-    public static function fromLoaded(Project $project, Collection $reports): self
+    public static function fromLoaded(ReportTemplate $template, Collection $reports, ?array $workingDays): self
     {
-        // The project's working days, with the HR holidays of its center, city and program skipped too:
+        // The working days, with the HR holidays of the place's center, city and program skipped too:
         // a holiday never counts as a day to report in, nor as the last working day of a month.
-        $calendar = app(WorkingCalendar::class)->forProject($project)->withHolidays(HrHolidays::forProject($project));
+        $calendar = app(WorkingCalendar::class)->forDays($workingDays)->withHolidays(HrHolidays::forPlace($template->place()));
 
         return new self($reports, $calendar, app(NotificationSettings::class));
+    }
+
+    /**
+     * The ISO working days of each template, read from its legacy project
+     * through PlaceBridge (D-74) in a fixed number of queries; null when it
+     * has none (the global days apply). Moves to the location row in Stage B.
+     *
+     * @param  iterable<ReportTemplate>  $templates
+     * @return array<int, list<int>|null> template id => working days
+     */
+    public static function workingDaysOf(iterable $templates): array
+    {
+        $bridge = app(PlaceBridge::class);
+        $projectIds = $bridge->legacyProjectIdsFor($templates);
+        $projects = $bridge->projectsByIds(array_values(array_unique(array_filter($projectIds, fn (?int $id): bool => $id !== null))));
+        $result = [];
+
+        foreach ($projectIds as $templateId => $projectId) {
+            $days = $projectId === null ? null : $projects->get($projectId)?->getAttribute('working_days');
+            $result[$templateId] = is_array($days) && $days !== [] ? array_values($days) : null;
+        }
+
+        return $result;
     }
 
     /**
@@ -138,7 +165,7 @@ final class MonthlyReportPeriods
      *
      * Sent back on or before its own deadline, the report keeps that deadline
      * (null: nothing to store). Sent back after it, the preparer gets until
-     * the end of the next working day, on the project's working days with
+     * the end of the next working day, on the template's working days with
      * official holidays skipped too.
      */
     public function revisedDueDateWhenSentBack(MonthlyReport $report, CarbonImmutable $sentBackOn): ?CarbonImmutable
@@ -173,20 +200,5 @@ final class MonthlyReportPeriods
         }
 
         return null;
-    }
-
-    /**
-     * Whether the project owner's current HR position is at another center
-     * than the project's. A warning only, never a refusal (§13 "Who").
-     */
-    public static function ownerCenterMismatch(Project $project): bool
-    {
-        if ($project->center_id === null) {
-            return false;
-        }
-
-        $centerId = EmployeeProfile::for($project->user_id)['center_id'] ?? null;
-
-        return $centerId !== null && $centerId !== (int) $project->center_id;
     }
 }
