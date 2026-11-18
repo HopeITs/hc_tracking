@@ -1,5 +1,6 @@
 <?php
 
+use App\Actions\Proposals\SaveProposal;
 use App\Enums\Currency;
 use App\Enums\DonorAttribution;
 use App\Enums\FileType;
@@ -22,6 +23,7 @@ use App\Models\PlanIndicator;
 use App\Models\Program;
 use App\Models\Project;
 use App\Models\Proposal;
+use App\Models\ProposalChangeRequest;
 use App\Models\ProposalLocation;
 use App\Models\Report;
 use App\Models\Result;
@@ -852,6 +854,62 @@ function holdMealManagerSlot(?int $employeeId = null): int
     EmployeeProfile::forgetRememberedLookup();
 
     return $employeeId;
+}
+
+/**
+ * Put one HR employee on each change-request review slot's position (Y-09);
+ * false leaves that slot vacant.
+ *
+ * @return array{finance: int|null, meal: int|null}
+ */
+function holdChangeReviewSlots(bool $finance = true, bool $meal = true): array
+{
+    $holders = ['finance' => null, 'meal' => null];
+    $positions = ['finance' => null, 'meal' => null];
+
+    if ($finance) {
+        $holders['finance'] = insertHrEmployee(firstNameEn: 'Fadi', lastNameEn: 'Finance');
+        $positions['finance'] = insertHrPosition(insertHrDepartment('Finance'), 'Finance Manager');
+        insertHrContract($holders['finance'], $positions['finance']);
+    }
+
+    if ($meal) {
+        $holders['meal'] = insertHrEmployee(firstNameEn: 'Maha', lastNameEn: 'Manager');
+        $positions['meal'] = insertHrPosition(insertHrDepartment('Monitoring & Evaluation'), 'MEAL Manager');
+        insertHrContract($holders['meal'], $positions['meal']);
+    }
+
+    app(NotificationSettings::class)->save(['proposal_default_reviewers' => [
+        'meal_manager' => $positions['meal'], 'finance_manager' => $positions['finance'], 'fundraising_manager' => null, 'ceo' => null,
+    ]]);
+
+    EmployeeProfile::forgetRememberedLookup();
+
+    return $holders;
+}
+
+/**
+ * A pending change request on the proposal (Y-09), stored the way
+ * RequestProposalChange stores it: `changes` is what SaveProposal computes
+ * for the payload now, with both reviews waiting. Written without recording.
+ *
+ * @param  array<string, mixed>  $payload
+ */
+function pendingChangeRequestOn(Proposal $proposal, array $payload, ?User $requester = null, string $reason = 'The donor asked for this change.'): ProposalChangeRequest
+{
+    $requester ??= userWithRole('Public Relations');
+
+    return Activity::withoutRecording(function () use ($proposal, $payload, $requester, $reason): ProposalChangeRequest {
+        $changes = DB::transaction(fn (): array => app(SaveProposal::class)->changesFor($proposal->fresh(), $payload, $requester));
+
+        return ProposalChangeRequest::factory()->withReviews()->create([
+            'proposal_id' => $proposal->id,
+            'requested_by' => $requester->id,
+            'reason' => $reason,
+            'changes' => $changes,
+            'payload' => $payload,
+        ]);
+    });
 }
 
 /**

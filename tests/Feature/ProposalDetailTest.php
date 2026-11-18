@@ -3,6 +3,7 @@
 use App\Enums\Currency;
 use App\Enums\FileType;
 use App\Enums\MediaCollection;
+use App\Enums\ProposalChangeRequestStatus;
 use App\Enums\ProposalStatus;
 use App\Enums\TaskStatus;
 use App\Models\Activity;
@@ -15,12 +16,14 @@ use App\Models\PlanIndicator;
 use App\Models\Program;
 use App\Models\Project;
 use App\Models\Proposal;
+use App\Models\ProposalChangeRequest;
 use App\Models\ProposalLocation;
 use App\Models\ProposalStatusNote;
 use App\Models\Report;
 use App\Models\Task;
 use App\Models\TransfersTracking;
 use App\Models\User;
+use App\Support\ProposalChangeLines;
 use Database\Seeders\RolesAndPermissionsSeeder;
 use Illuminate\Support\Facades\Storage;
 use Livewire\Livewire;
@@ -1013,4 +1016,101 @@ test('the Locations chapter lists each row with one status word, and field work 
         ->assertSeeText(__('proposals.location_status_missing_center'))
         ->assertSeeText(__('proposals.location_status_missing_responsible'))
         ->assertSeeText(__('proposals.location_status_waiting_program'));
+});
+
+test('the change requests chapter lists each request with its status word, newest first, and says when there is none', function () {
+    $user = User::factory()->role('Financial')->create();
+    $proposal = Proposal::factory()->running()->create(['name' => 'Winter Shelter']);
+
+    Livewire::actingAs($user)->test('pages::proposals.show', ['proposal' => $proposal])
+        ->assertSeeHtml('data-test="change-requests-chapter"')
+        ->assertSeeText(__('proposals.change.chapter_empty'));
+
+    $older = pendingChangeRequestOn($proposal, ['name' => 'Winter Shelter II'], reason: 'The donor renamed the grant.');
+    $older->forceFill(['status' => ProposalChangeRequestStatus::Rejected, 'decided_by' => $user->id, 'decided_at' => now(), 'decision_note' => 'The donor did not sign it.'])->save();
+    $newer = pendingChangeRequestOn($proposal, ['name' => 'Winter Shelter III'], reason: 'A second rename was asked.');
+
+    Livewire::actingAs($user)->test('pages::proposals.show', ['proposal' => $proposal])
+        ->assertDontSeeText(__('proposals.change.chapter_empty'))
+        ->assertSeeHtmlInOrder(['data-change-request="'.$newer->id.'"', 'data-change-request="'.$older->id.'"'])
+        ->assertSeeTextInOrder([
+            ProposalChangeRequestStatus::Pending->label(), 'A second rename was asked.', 'Winter Shelter III',
+            ProposalChangeRequestStatus::Rejected->label(), 'The donor renamed the grant.', 'The donor did not sign it.',
+        ])
+        ->assertSeeHtml('data-test="change-pending-notice"');
+});
+
+test('a proposal before approval shows no change requests chapter and no Request a change button', function () {
+    $user = User::factory()->role('Financial')->create();
+    $proposal = Proposal::factory()->create(['status' => ProposalStatus::Submitted]);
+
+    Livewire::actingAs($user)->test('pages::proposals.show', ['proposal' => $proposal])
+        ->assertSeeHtml('data-test="open-details-modal"')
+        ->assertDontSeeHtml('data-test="request-change-button"')
+        ->assertDontSeeHtml('data-test="change-requests-chapter"');
+});
+
+test('an approved proposal hides Edit details and offers Request a change only to proposals.update', function () {
+    $proposal = Proposal::factory()->running()->create();
+
+    Livewire::actingAs(User::factory()->role('Financial')->create())->test('pages::proposals.show', ['proposal' => $proposal])
+        ->assertDontSeeHtml('data-test="open-details-modal"')
+        ->assertSeeHtml('data-test="request-change-button"');
+
+    Livewire::actingAs(User::factory()->role('Team Member')->create())->test('pages::proposals.show', ['proposal' => $proposal])
+        ->assertDontSeeHtml('data-test="request-change-button"');
+
+    pendingChangeRequestOn($proposal, ['name' => 'Renamed while waiting']);
+
+    Livewire::actingAs(User::factory()->role('Financial')->create())->test('pages::proposals.show', ['proposal' => $proposal])
+        ->assertDontSeeHtml('data-test="request-change-button"')
+        ->assertSeeHtml('data-test="open-change-request"');
+});
+
+test('the summary step names each changed field and is the very list the request stores and the decision shows', function () {
+    $user = User::factory()->role('Financial')->create();
+    $proposal = Proposal::factory()->running()->create(['name' => 'Winter Shelter', 'notes' => 'Old notes.']);
+
+    $form = Livewire::actingAs($user)->test('pages::proposals.show', ['proposal' => $proposal])
+        ->call('openChangeRequest')
+        ->assertSet('changeRequestMode', true)
+        ->set('name', 'Winter Shelter Phase II')
+        ->set('notes', 'New notes for the donor.')
+        ->set('changeReason', 'The donor renamed the grant in the signed agreement.')
+        ->call('previewChangeRequest')
+        ->assertHasNoErrors()
+        ->assertSeeHtml('data-test="change-summary"')
+        ->assertSeeHtml('data-change-line="name"')
+        ->assertSeeHtml('data-change-line="notes"')
+        ->assertSeeText(__('proposals.change.fields.name'))
+        ->assertSeeText(__('proposals.change.fields.notes'));
+
+    $summary = $form->get('changeSummary');
+
+    $form->call('sendChangeRequest')->assertHasNoErrors();
+
+    $stored = ProposalChangeRequest::query()->where('proposal_id', $proposal->id)->sole();
+
+    expect($summary)->toBe(ProposalChangeLines::for($stored->changes, $user))
+        ->and($proposal->fresh()->name)->toBe('Winter Shelter');
+
+    $decision = Livewire::actingAs($user)->test('pages::proposals.show', ['proposal' => $proposal])
+        ->call('openChangeRequestModal', $stored->id);
+
+    expect($decision->instance()->decidingChangeLines)->toBe($summary);
+});
+
+test('a change request reason under ten characters is refused in the form', function () {
+    $user = User::factory()->role('Financial')->create();
+    $proposal = Proposal::factory()->running()->create(['name' => 'Winter Shelter']);
+
+    Livewire::actingAs($user)->test('pages::proposals.show', ['proposal' => $proposal])
+        ->call('openChangeRequest')
+        ->set('name', 'Winter Shelter Phase II')
+        ->set('changeReason', 'Too short')
+        ->call('previewChangeRequest')
+        ->assertHasErrors(['changeReason'])
+        ->assertSet('changeSummary', null);
+
+    expect(ProposalChangeRequest::query()->where('proposal_id', $proposal->id)->exists())->toBeFalse();
 });

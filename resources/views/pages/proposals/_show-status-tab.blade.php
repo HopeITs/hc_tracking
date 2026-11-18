@@ -11,6 +11,9 @@
                 @include('pages.proposals._show-reviewers')
             @endunless
 
+            {{-- Y-09: changes asked for after approval; a payroll proposal takes them too. --}}
+            @include('pages.proposals._show-change-requests')
+
             @if ($this->finalReportAcceptance !== null)
                 {{-- The donor accepted the final report (D-02c): the last requirement before the proposal closes. --}}
                 <p class="mt-6 flex items-center gap-2 rounded-lg border border-status-good bg-status-good-soft px-3 py-2 text-sm font-semibold text-status-good" data-test="final-report-accepted">

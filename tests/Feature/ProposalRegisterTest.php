@@ -1,16 +1,22 @@
 <?php
 
 use App\Enums\ArStatus;
+use App\Enums\ChangeReviewVerdict;
 use App\Enums\Currency;
+use App\Enums\ProposalChangeRequestStatus;
 use App\Enums\ProposalStatus;
 use App\Models\Donor;
 use App\Models\DonorProposal;
 use App\Models\DonorReport;
 use App\Models\Project;
 use App\Models\Proposal;
+use App\Models\ProposalChangeRequest;
 use App\Models\TransfersTracking;
 use App\Models\User;
+use App\Notifications\Alerts\NotificationSettings;
+use App\Support\EmployeeProfile;
 use Database\Seeders\RolesAndPermissionsSeeder;
+use Illuminate\Support\Facades\DB;
 use Livewire\Features\SupportTesting\Testable;
 use Livewire\Livewire;
 
@@ -411,4 +417,158 @@ test('an unknown kind in the address bar falls back to both kinds', function () 
 
 test('clearing the filters clears the kind', function () {
     proposalRegister(['kind' => 'payroll'])->call('clearFilters')->assertSet('proposalKind', '');
+});
+
+/*
+| Y-09 slice 2: the change requests waiting on an approved proposal. The PR
+| Manager's "Changes to approve" lists every pending request; the Finance
+| and MEAL Managers' "Changes to review" lists those waiting in their own
+| slot. Each button's count equals its list.
+*/
+
+/**
+ * Put one HR employee on each change-review slot's position.
+ *
+ * @return array{finance: int, meal: int}
+ */
+function registerHoldChangeSlots(): array
+{
+    $finance = insertHrEmployee(firstNameEn: 'Fadi', lastNameEn: 'Finance');
+    $financePosition = insertHrPosition(insertHrDepartment('Finance'), 'Finance Manager');
+    insertHrContract($finance, $financePosition);
+
+    $meal = insertHrEmployee(firstNameEn: 'Maha', lastNameEn: 'Manager');
+    $mealPosition = insertHrPosition(insertHrDepartment('Monitoring & Evaluation'), 'MEAL Manager');
+    insertHrContract($meal, $mealPosition);
+
+    app(NotificationSettings::class)->save(['proposal_default_reviewers' => [
+        'meal_manager' => $mealPosition, 'finance_manager' => $financePosition, 'fundraising_manager' => null, 'ceo' => null,
+    ]]);
+
+    EmployeeProfile::forgetRememberedLookup();
+
+    return ['finance' => $finance, 'meal' => $meal];
+}
+
+/**
+ * The register as the given user opens it.
+ *
+ * @param  array<string, string>  $query
+ */
+function changeRegisterAs(User $user, array $query = []): Testable
+{
+    return Livewire::actingAs($user)->withQueryParams($query)->test('pages::proposals.index');
+}
+
+/**
+ * Give one review of the request a verdict.
+ */
+function registerReviewIn(ProposalChangeRequest $request, string $slot): void
+{
+    $request->reviews()->where('slot', $slot)->update(['verdict' => ChangeReviewVerdict::NoObjection->value, 'reviewed_at' => now()]);
+}
+
+test('changes to approve counts every pending request and is absent without proposals.approve', function () {
+    $manager = userWithRole('Public Relations Manager');
+    $pending = ProposalChangeRequest::factory()->withReviews()->count(2)->create();
+    $decided = ProposalChangeRequest::factory()->create(['status' => ProposalChangeRequestStatus::Approved]);
+
+    $page = changeRegisterAs($manager, ['focus' => 'approve'])
+        ->assertSeeHtml('data-test="change-focus-approve"')
+        ->assertSeeHtml('data-change-count="2"')
+        ->assertSeeHtml('data-change-queue-row="'.$pending[0]->id.'"')
+        ->assertSeeHtml('data-change-queue-row="'.$pending[1]->id.'"')
+        ->assertDontSeeHtml('data-change-queue-row="'.$decided->id.'"')
+        ->assertDontSeeHtml('data-test="change-focus-review"');
+
+    expect($page->instance()->changesToApprove)->toHaveCount(2);
+
+    changeRegisterAs(userWithRole('Public Relations'), ['focus' => 'approve'])
+        ->assertSet('focus', '')
+        ->assertDontSeeHtml('data-test="change-focus-approve"')
+        ->assertDontSeeHtml('data-change-queue-row="');
+});
+
+test('pressing a change button again shows the register again', function () {
+    $manager = userWithRole('Public Relations Manager');
+    ProposalChangeRequest::factory()->withReviews()->create();
+
+    changeRegisterAs($manager)
+        ->call('setFocus', 'approve')->assertSet('focus', 'approve')
+        ->call('setFocus', 'approve')->assertSet('focus', '')
+        ->call('setFocus', 'anything')->assertSet('focus', '');
+});
+
+test('changes to review holds only the requests waiting in the viewer own slot', function () {
+    $holders = registerHoldChangeSlots();
+    $financeManager = userWithRole('Financial', $holders['finance']);
+
+    $waiting = ProposalChangeRequest::factory()->withReviews()->create();
+    $reviewed = ProposalChangeRequest::factory()->withReviews()->create();
+    registerReviewIn($reviewed, 'finance_manager');
+    $onlyMealWaits = ProposalChangeRequest::factory()->withReviews()->create();
+    registerReviewIn($onlyMealWaits, 'finance_manager');
+    $decided = ProposalChangeRequest::factory()->withReviews()->create(['status' => ProposalChangeRequestStatus::Rejected]);
+
+    $page = changeRegisterAs($financeManager, ['focus' => 'review'])
+        ->assertSeeHtml('data-test="change-focus-review"')
+        ->assertSeeHtml('data-change-count="1"')
+        ->assertSeeHtml('data-change-queue-row="'.$waiting->id.'"')
+        ->assertDontSeeHtml('data-change-queue-row="'.$reviewed->id.'"')
+        ->assertDontSeeHtml('data-change-queue-row="'.$onlyMealWaits->id.'"')
+        ->assertDontSeeHtml('data-change-queue-row="'.$decided->id.'"')
+        // A Finance Manager does not decide: no approve list.
+        ->assertDontSeeHtml('data-test="change-focus-approve"');
+
+    expect($page->instance()->changesToReview->pluck('id')->all())->toBe([$waiting->id]);
+
+    // The MEAL Manager still sees the requests whose finance review is in.
+    $mealIds = changeRegisterAs(userWithRole('MEAL', $holders['meal']))->instance()->changesToReview->pluck('id')->sort()->values()->all();
+    expect($mealIds)->toBe(collect([$waiting->id, $reviewed->id, $onlyMealWaits->id])->sort()->values()->all());
+
+    // Someone who holds no slot gets neither button.
+    proposalRegister()->assertDontSeeHtml('data-test="change-focus-review"')->assertDontSeeHtml('data-test="change-focus-approve"');
+});
+
+test('a queued request says which review it is waiting for and opens its proposal', function () {
+    $manager = userWithRole('Public Relations Manager');
+    $request = ProposalChangeRequest::factory()->withReviews()->create();
+    registerReviewIn($request, 'meal_manager');
+    $ready = ProposalChangeRequest::factory()->withReviews()->create();
+    registerReviewIn($ready, 'meal_manager');
+    registerReviewIn($ready, 'finance_manager');
+
+    changeRegisterAs($manager, ['focus' => 'approve'])
+        ->assertSeeInOrder([__('proposals.change.fields.name'), __('proposals.change.waiting_for_finance')])
+        ->assertSeeHtml(e(route('proposals.show', ['proposal' => $request->proposal, 'change-request' => 1])))
+        ->assertSee(__('proposals.change.queue_ready'))
+        ->assertDontSee(__('proposals.change.waiting_for_meal'));
+});
+
+test('an empty change list says nothing is waiting', function () {
+    changeRegisterAs(userWithRole('Public Relations Manager'), ['focus' => 'approve'])
+        ->assertSee(__('proposals.change.queue_empty_approve'));
+});
+
+test('the change list reads a flat number of queries however many requests wait', function () {
+    $manager = userWithRole('Public Relations Manager');
+
+    $countQueries = function () use ($manager): int {
+        $queries = 0;
+        DB::listen(function () use (&$queries): void {
+            $queries++;
+        });
+
+        changeRegisterAs($manager, ['focus' => 'approve']);
+
+        return $queries;
+    };
+
+    ProposalChangeRequest::factory()->withReviews()->create();
+    $one = $countQueries();
+
+    ProposalChangeRequest::factory()->withReviews()->count(19)->create();
+    $twenty = $countQueries();
+
+    expect($twenty)->toBeLessThanOrEqual($one + 2);
 });
