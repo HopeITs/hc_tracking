@@ -46,7 +46,7 @@ test('the plan asks a new activity its kind and period like the Logical Framewor
         ->and($activity->checkout_period)->toBe(Period::Annual);
 });
 
-test('the dates step opens the plan calendar on request and lists copy targets as checkbox rows', function () {
+test('the dates step shows the plan calendar unpinned and lists copy targets as chips', function () {
     $output = Result::factory()->type(ResultType::Output)->childOf($this->outcome)->create(['proposal_id' => $this->proposal->id, 'program_id' => $this->program->id]);
     $basic = Result::factory()->activity($output)->create(['statement' => 'Basic sessions']);
     $english = Result::factory()->activity($output)->create(['statement' => 'English sessions']);
@@ -55,14 +55,11 @@ test('the dates step opens the plan calendar on request and lists copy targets a
     $target = $plan->items()->where('result_id', $english->id)->firstOrFail();
 
     Livewire::actingAs($this->pm)->test('pages::annual-plans.plan', ['activityPlan' => $plan])
-        ->assertSeeHtml('data-dates-calendar')
-        ->assertDontSeeHtml('data-plan-gantt')
-        ->toggle('showPlanCalendar')
+        ->assertSeeHtml('class="ap-cal" data-dates-calendar')
         ->assertSeeHtml('data-plan-gantt')
         ->call('toggleItem', $target->id)
         ->assertSet('openItemId', $target->id)
-        ->assertSee(__('annual_plans.wf.copy_to'))
-        ->assertSeeHtml('class="ap-copy-opt"')
+        ->assertSeeHtml('class="ap-copy-list"')
         ->assertSeeHtml('data-test="copy-target-'.$source->id.'"');
 });
 

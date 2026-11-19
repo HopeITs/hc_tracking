@@ -146,14 +146,12 @@
             <details class="ap-copy">
                 <summary>{{ __('annual_plans.wf.copy_title') }}</summary>
                 <p class="ap-xs ap-faint">{{ __('annual_plans.wf.copy_help') }}</p>
-                {{-- One row per activity with its checkbox in view, so what is ticked is plain to see. --}}
-                <span class="ap-lbl">{{ __('annual_plans.wf.copy_to') }}</span>
                 <div class="ap-copy-list">
                     @foreach ($copyOptions as $other)
-                        <label class="ap-copy-opt" wire:key="copy-{{ $other->id }}"><input type="checkbox" value="{{ $other->id }}" wire:model.live="copyTargets" data-test="copy-target-{{ $other->id }}"><span dir="auto">{{ $other->activity?->statement }}</span></label>
+                        <label class="ap-chk" wire:key="copy-{{ $other->id }}"><input type="checkbox" value="{{ $other->id }}" wire:model="copyTargets" data-test="copy-target-{{ $other->id }}"><span dir="auto">{{ $other->activity?->statement }}</span></label>
                     @endforeach
                 </div>
-                <div><button type="button" class="dk-btn dk-primary" wire:click="copySettings" @disabled($copyTargets === []) data-test="copy-settings">{{ __('annual_plans.wf.copy_button') }}</button></div>
+                <div class="ap-copy-go"><button type="button" class="dk-btn" wire:click="copySettings" data-test="copy-settings">{{ __('annual_plans.wf.copy_button') }}</button></div>
             </details>
         @endif
         @error('item') <p class="ap-err">{{ $message }}</p> @enderror
