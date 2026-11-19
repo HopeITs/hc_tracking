@@ -72,6 +72,12 @@ trait EditsActivityPlan
     /** @var list<int|string> */
     public array $copyTargets = [];
 
+    /**
+     * Whether the dates step shows the whole-plan calendar: shown at first,
+     * with a button to hide it while filling an activity.
+     */
+    public bool $showPlanCalendar = true;
+
     public string $followUpItem = '';
 
     public string $followUpTrigger = 'finish';

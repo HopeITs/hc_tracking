@@ -324,6 +324,8 @@ return [
         'which_weeks' => 'Which weeks?',
         'whole_activity' => 'For the whole activity',
         'whole_plan' => 'Whole plan on the calendar',
+        'show_calendar' => 'Show',
+        'hide_calendar' => 'Hide',
         'with_meal_body' => "Sent on :date. You can't edit it while MEAL reviews it. You will be notified.",
         'with_meal_title' => 'Your plan is with MEAL',
     ],

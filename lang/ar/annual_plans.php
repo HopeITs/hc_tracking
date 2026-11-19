@@ -324,6 +324,8 @@ return [
         'which_weeks' => 'أي أسابيع؟',
         'whole_activity' => 'للنشاط كاملاً',
         'whole_plan' => 'الخطة كاملة على التقويم',
+        'show_calendar' => 'إظهار',
+        'hide_calendar' => 'إخفاء',
         'with_meal_body' => 'أُرسلت في :date. لا يمكنك تعديلها أثناء مراجعة الميل. ستصلك إشعارات.',
         'with_meal_title' => 'خطتك عند الميل',
     ],

@@ -17,8 +17,13 @@
     {{-- The whole-plan calendar scrolls with the page: pinned (sticky) it stayed
          over the activity being filled (AP-1 UAT). --}}
     <div class="ap-cal" data-dates-calendar>
-        <h3>{{ __('annual_plans.wf.whole_plan') }}</h3>
-        @include('pages.annual-plans._plan-gantt')
+        <div class="ap-row">
+            <h3 class="ap-sp">{{ __('annual_plans.wf.whole_plan') }}</h3>
+            <button type="button" class="dk-btn dk-sm" wire:click="$toggle('showPlanCalendar')" aria-expanded="{{ $showPlanCalendar ? 'true' : 'false' }}" data-test="toggle-plan-calendar">{{ $showPlanCalendar ? __('annual_plans.wf.hide_calendar') : __('annual_plans.wf.show_calendar') }}</button>
+        </div>
+        @if ($showPlanCalendar)
+            @include('pages.annual-plans._plan-gantt')
+        @endif
     </div>
 
     <div class="ap-row"><b data-ready-count>{{ __('annual_plans.wf.ready_count', ['ready' => $readyCount, 'total' => $items->count()]) }}</b></div>

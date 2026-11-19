@@ -86,6 +86,23 @@
 .ap-lbl { font-size: .84rem; font-weight: 700; color: var(--ink-2); }
 .ap-bt { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 10px; background: var(--paper); border: 1px solid var(--line); border-radius: 12px; padding: 10px 12px; }
 .ap-bt > b { min-width: 70px; font-size: .88rem; }
+/*
+ * Activity cards, a cleaner look with the same fields in the same order (AP-1
+ * review): a white card with a soft shadow, a stripe on the start edge that
+ * says Ready (green) or Needs details (amber), a white body where the batch
+ * rows and timeline sit on a light tint, and Done on its own footer line.
+ */
+.ap-act { position: relative; background: var(--paper); box-shadow: 0 1px 2px rgb(0 0 0 / 4%); transition: border-color .15s, box-shadow .15s; }
+.ap-act:has(> .ap-act-h[aria-expanded='true']) { border-color: var(--line-2); box-shadow: 0 8px 22px rgb(0 0 0 / 7%); }
+.ap-act::before { content: ''; position: absolute; inset-block: 0; inset-inline-start: 0; width: 4px; background: transparent; }
+.ap-act:has([data-item-badge='ready'])::before { background: var(--good); }
+.ap-act:has([data-item-badge='needs'])::before { background: var(--warn); }
+.ap-act-h { padding: 14px 18px; padding-inline-start: 20px; }
+.ap-act-h > b { font-size: .98rem; }
+.ap-act-b { padding: 18px 20px 20px; gap: 16px; background: var(--paper); }
+.ap-act-b .ap-bt { background: var(--tint); border-color: transparent; }
+.ap-act-b .ap-tl { background: var(--tint); border-color: transparent; }
+.ap-act:not(.is-ro) .ap-act-b > .ap-row:last-child { margin-top: 2px; padding-top: 14px; border-top: 1px solid var(--line); }
 .ap-sel { height: 40px; border: 1px solid var(--line-2); border-radius: 10px; background: var(--paper); padding: 0 8px; font-size: .88rem; color: var(--ink); }
 .ap-sel.is-wide { width: 100%; height: 38px; font-size: .84rem; }
 .ap-inp { height: 40px; border: 1px solid var(--line-2); border-radius: 10px; background: var(--paper); padding: 0 10px; width: 100%; color: var(--ink); }
