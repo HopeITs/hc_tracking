@@ -218,6 +218,14 @@ test('the sidebar offers the theme toggle and the other language', function () {
         ->assertSee('name="locale" value="en"', false);
 });
 
+test('both language switches on the desk are marked so a switch keeps the open desk tab', function () {
+    // desk-tabs.js listens for a submit of either form and comes back on the tab in front.
+    $this->actingAs(User::factory()->create(['locale' => 'en']))
+        ->get(route('dashboard'))
+        ->assertSee('data-locale-toggle', false)
+        ->assertSee('data-locale-form', false);
+});
+
 test('stored enum values stay english while their labels follow the language', function () {
     app()->setLocale('en');
     expect(TaskStatus::InProgress->label())->toBe('In Progress')

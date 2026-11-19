@@ -44,6 +44,34 @@ document.addEventListener('livewire:navigating', () => {
     firstLoad = false;
 });
 
+/*
+ * Switching the language posts a form and comes back to the Desk, which the
+ * browser counts as a new visit, not a reload, so the Desk opened on itself
+ * and dropped the tab the user was in. The language form marks the next load
+ * so it comes back on that tab like a reload does (AP-1 UAT, 2026-11-19).
+ */
+const KeepTabKey = 'hc-desk-keep-tab';
+document.addEventListener('submit', (event) => {
+    if (event.target instanceof HTMLFormElement && event.target.matches('[data-locale-toggle], [data-locale-form]')) {
+        try {
+            window.sessionStorage.setItem(KeepTabKey, '1');
+        } catch {
+            // Storage blocked: the Desk opens on itself, as before.
+        }
+    }
+}, true);
+
+function takeKeepTab() {
+    try {
+        const keep = window.sessionStorage.getItem(KeepTabKey) === '1';
+        window.sessionStorage.removeItem(KeepTabKey);
+
+        return keep;
+    } catch {
+        return false;
+    }
+}
+
 /* Desk tabs are always on (user decision 2026-11-10): a browser that once turned them off forgets it. */
 try {
     window.localStorage.removeItem('hc-desk-tabs-off');
@@ -858,8 +886,9 @@ document.addEventListener('alpine:init', () => {
                 .slice(0, MaxTabs)
                 .map((tab) => ({ id: tab.id, url: tab.url, key: this.keyOf(tab.url), title: String(tab.title ?? this.texts.untitled), icon: this.pageOf(tab.url)?.icon ?? 'file', loading: false, live: false }));
 
-            // Only a reload of the Desk itself comes back on the tab that was in front; arriving at the Desk shows the Desk.
-            const reloaded = firstLoad && performance.getEntriesByType?.('navigation')?.[0]?.type === 'reload';
+            // Only a reload of the Desk itself (or a language switch) comes back on the tab that was in front; arriving at the Desk shows the Desk.
+            const keepTab = takeKeepTab();
+            const reloaded = firstLoad && (keepTab || performance.getEntriesByType?.('navigation')?.[0]?.type === 'reload');
 
             if (reloaded && this.tabs.some((tab) => tab.id === stored.active)) {
                 this.$nextTick(() => this.activate(stored.active));
