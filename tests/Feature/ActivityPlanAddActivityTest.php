@@ -58,15 +58,19 @@ test('the dates step shows the plan calendar unpinned and lists copy targets as 
     $source = $plan->items()->where('result_id', $basic->id)->firstOrFail();
     $target = $plan->items()->where('result_id', $english->id)->firstOrFail();
 
-    Livewire::actingAs($this->pm)->test('pages::annual-plans.plan', ['activityPlan' => $plan])
-        ->assertSeeHtml('class="ap-cal" data-dates-calendar')
-        ->assertSeeHtml('data-plan-gantt')
-        ->toggle('showPlanCalendar')
-        ->assertDontSeeHtml('data-plan-gantt')
-        ->assertSee(__('annual_plans.wf.show_calendar'))
-        ->toggle('showPlanCalendar')
-        ->assertSeeHtml('data-plan-gantt')
-        ->call('toggleItem', $target->id)
+    $page = Livewire::actingAs($this->pm)->test('pages::annual-plans.plan', ['activityPlan' => $plan])
+        ->assertSeeHtml('class="ap-cal" data-dates-calendar');
+
+    // The one-page plan draws the whole-plan gantt in the send section too, so
+    // hiding the dates calendar takes exactly one gantt off the page.
+    $gantts = fn (): int => substr_count($page->html(), 'data-plan-gantt');
+    $shown = $gantts();
+    $page->toggle('showPlanCalendar')->assertSee(__('annual_plans.wf.show_calendar'));
+    expect($shown)->toBeGreaterThan(0)->and($gantts())->toBe($shown - 1);
+    $page->toggle('showPlanCalendar');
+    expect($gantts())->toBe($shown);
+
+    $page->call('toggleItem', $target->id)
         ->assertSet('openItemId', $target->id)
         ->assertSeeHtml('class="ap-line"')
         ->assertSeeHtml('class="ap-row ap-act-foot"')

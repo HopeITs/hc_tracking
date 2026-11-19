@@ -658,22 +658,23 @@ test('an approved plan is live, its program manager is told, and nobody edits it
         ->assertDontSeeHtml('data-plan-step="review"');
 });
 
-test('the dates step writes out why the send step is still closed', function () {
+test('the plan footer writes out why sending is still closed', function () {
     $plan = chosenPlan();
     [$first, $second] = $plan->items()->get()->all();
     app(SaveActivityPlanItem::class)->handle($this->pm, $first, itemInput(), true);
 
-    // A disabled button fires no click, so the rule is on the page as words.
+    // A disabled button fires no click, so the footer says how far the plan is
+    // and offers to show what is missing (main's one-page plan, 2026-11).
     Livewire::actingAs($this->pm)->test('pages::annual-plans.plan', ['activityPlan' => $plan->fresh()])
-        ->assertSeeHtml('data-not-ready')
-        ->assertSee(__('annual_plans.not_all_ready'))
-        ->assertSeeHtml('disabled');
+        ->assertSeeHtml('data-plan-footer-state')
+        ->assertSee(__('annual_plans.wf.ready_count', ['ready' => 1, 'total' => 2]))
+        ->assertSeeHtml('data-test="plan-show-missing"');
 
     app(SaveActivityPlanItem::class)->handle($this->pm, $second, itemInput(), true);
 
     Livewire::actingAs($this->pm)->test('pages::annual-plans.plan', ['activityPlan' => $plan->fresh()])
-        ->assertDontSeeHtml('data-not-ready')
-        ->assertDontSee(__('annual_plans.not_all_ready'));
+        ->assertSee(__('annual_plans.wf.footer_ready'))
+        ->assertDontSeeHtml('data-test="plan-show-missing"');
 });
 
 test('a plan with MEAL waits on the MEAL manager from the desk too, and on nobody else', function () {
