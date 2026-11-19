@@ -8,6 +8,7 @@ use App\Models\IndicatorProgress;
 use App\Models\PlanIndicator;
 use App\Models\Project;
 use App\Models\Proposal;
+use App\Models\ProposalLocation;
 use App\Models\Report;
 use App\Models\Result;
 use App\Models\User;
@@ -131,7 +132,7 @@ class RealResultsSeeder extends Seeder
 
             PlanIndicator::query()->firstOrCreate(
                 ['source_type' => 'proposal', 'source_id' => $proposalId, 'indicator_id' => $indicatorId, 'project_id' => $projectId],
-                ['target' => $row['target'], 'period' => $row['period'], ...app(PlaceBridge::class)->placeColumnsForTargets(Proposal::query()->whereKey($proposalId)->firstOrFail(), [$projectId])[$projectId]],
+                ['target' => $row['target'], 'period' => $row['period'], 'proposal_location_id' => ProposalLocation::query()->where('proposal_id', $proposalId)->where('project_id', $projectId)->value('id'), ...app(PlaceBridge::class)->placeColumnsForTargets(Proposal::query()->whereKey($proposalId)->firstOrFail(), [$projectId])[$projectId]],
             );
         }
 

@@ -9,10 +9,9 @@ use App\Enums\Period;
 use App\Models\Activity;
 use App\Models\Indicator;
 use App\Models\PlanIndicator;
-use App\Models\Project;
 use App\Models\Proposal;
+use App\Models\ProposalLocation;
 use App\Models\Result;
-use App\Support\Reporting\PlaceBridge;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Gate;
@@ -21,15 +20,19 @@ use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
 
 /**
- * Save a proposal's per-center targets grid in one go (contracts §12.1,
- * D-23, D-25, D-50a).
+ * Save a proposal's targets grid in one go: one target per indicator per
+ * location row (contracts §12.1, D-23, D-25, D-50a, D-90, D-91).
  *
  * - Who: MEAL. Creating a cell needs `targets.create`, changing one
  *   `targets.update`, clearing one `targets.delete`; `proposals.update`
  *   alone grants nothing. Terminal proposals are read-only.
  * - Scope (BOLA): every indicator is an instance under this proposal's
- *   framework and every project one the proposal links; one foreign id
- *   rejects the whole batch.
+ *   framework and every `location_id` a row of this proposal; one foreign id
+ *   rejects the whole batch. A cell naming `project_id` is refused (Y-10).
+ *   A row still waiting for its program takes no new or changed value.
+ * - Place: a new target takes its row's place (PlanIndicator::placeColumnsForRow:
+ *   one center, field work, or shared by several centers) and the row's
+ *   `project_id`. Later row changes reach it through syncPlaceFromRow().
  * - Cells: an empty value is no target, `0` a real zero target; a value
  *   needs a period; percentages are 0–100, averages uncapped. An indicator
  *   not linked to the library takes no target. A cleared cell is deleted
@@ -48,6 +51,17 @@ final class SaveProposalTargetsGrid
     public const string SourceType = 'proposal';
 
     /**
+     * Whether a row still waits for its program: it has none yet, or its
+     * program request is pending (Y-10). Such a row takes no new or changed
+     * target; the grid shows its column disabled with the reason. Load
+     * `programRequest` on the row first.
+     */
+    public static function isWaitingForProgram(ProposalLocation $row): bool
+    {
+        return $row->program_id === null || ($row->programRequest?->isPending() ?? false);
+    }
+
+    /**
      * The version of a saved cell, as the grid sends it back.
      */
     public static function versionOf(PlanIndicator $target): string
@@ -56,7 +70,7 @@ final class SaveProposalTargetsGrid
     }
 
     /**
-     * @param  list<array{indicator_id?: mixed, project_id?: mixed, value?: mixed, period?: mixed, target_population?: mixed, version?: mixed}>  $cells
+     * @param  list<array{indicator_id?: mixed, location_id?: mixed, value?: mixed, period?: mixed, target_population?: mixed, version?: mixed}>  $cells
      * @return array{created: int, updated: int, deleted: int}
      *
      * @throws ValidationException
@@ -68,7 +82,7 @@ final class SaveProposalTargetsGrid
         $cells = $this->validateCells($cells);
 
         return DB::transaction(function () use ($proposal, $cells): array {
-            $locked = Proposal::query()->whereKey($proposal->getKey())->lockForUpdate()->with('projects')->firstOrFail();
+            $locked = Proposal::query()->whereKey($proposal->getKey())->lockForUpdate()->firstOrFail();
 
             if ($locked->isPayroll()) {
                 throw ValidationException::withMessages(['proposal' => __('targets.payroll_has_no_targets')]);
@@ -85,33 +99,40 @@ final class SaveProposalTargetsGrid
                 ->get()
                 ->keyBy('id');
 
-            /** @var Collection<int, Project> $projects */
-            $projects = $locked->getRelation('projects')->keyBy('id');
+            /** @var Collection<int, ProposalLocation> $rows */
+            $rows = $locked->locations()->with(['centers', 'programRequest'])->get()->keyBy('id');
 
             $existing = PlanIndicator::query()
                 ->where('source_type', self::SourceType)
                 ->where('source_id', $locked->id)
                 ->whereIn('indicator_id', $indicators->keys())
+                ->whereNotNull('proposal_location_id')
                 ->withCount('reports')
                 ->lockForUpdate()
                 ->get()
-                ->keyBy(fn (PlanIndicator $target): string => $target->indicator_id.':'.$target->project_id);
+                ->keyBy(fn (PlanIndicator $target): string => $target->indicator_id.':'.$target->proposal_location_id);
 
             $errors = [];
             $plan = [];
 
             foreach ($cells as $index => $cell) {
-                $indicator = $indicators->get($cell['indicator_id']);
-                $project = $projects->get($cell['project_id']);
+                if ($cell['has_project_id']) {
+                    $errors["cells.{$index}"] = __('targets.cell_project_not_accepted');
 
-                if ($indicator === null || $project === null) {
+                    continue;
+                }
+
+                $indicator = $indicators->get($cell['indicator_id']);
+                $row = $rows->get($cell['location_id']);
+
+                if ($indicator === null || $row === null) {
                     $errors["cells.{$index}"] = __('targets.cell_outside_proposal');
 
                     continue;
                 }
 
                 /** @var PlanIndicator|null $target */
-                $target = $existing->get($indicator->id.':'.$project->id);
+                $target = $existing->get($indicator->id.':'.$row->id);
 
                 if (($target === null ? null : self::versionOf($target)) !== $cell['version']) {
                     $errors["cells.{$index}"] = __('targets.cell_stale');
@@ -119,7 +140,7 @@ final class SaveProposalTargetsGrid
                     continue;
                 }
 
-                $refusal = $this->refusalFor($locked, $indicator, $project, $target, $cell['value']);
+                $refusal = $this->refusalFor($indicator, $row, $target, $cell['value']);
 
                 if ($refusal !== null) {
                     $errors["cells.{$index}"] = $refusal;
@@ -127,21 +148,21 @@ final class SaveProposalTargetsGrid
                     continue;
                 }
 
-                $plan[] = [$cell, $indicator, $project, $target];
+                $plan[] = [$cell, $indicator, $row, $target];
             }
 
             if ($errors !== []) {
                 throw ValidationException::withMessages(['cells' => __('targets.grid_refused'), ...$errors]);
             }
 
-            return $this->write($locked, $plan, app(PlaceBridge::class)->placeColumnsForTargets($locked, array_values($projects->keys()->all())));
+            return $this->write($locked, $plan);
         });
     }
 
     /**
      * Why this cell cannot be saved, or null.
      */
-    private function refusalFor(Proposal $proposal, Indicator $indicator, Project $project, ?PlanIndicator $target, ?string $value): ?string
+    private function refusalFor(Indicator $indicator, ProposalLocation $row, ?PlanIndicator $target, ?string $value): ?string
     {
         if ($value === null) {
             if ($target === null) {
@@ -163,18 +184,23 @@ final class SaveProposalTargetsGrid
             return __('targets.cell_indicator_not_linked');
         }
 
+        // A row waiting for its program takes no new or changed target;
+        // clearing one (above) is still allowed (Y-10, pending Dev 1).
+        if (self::isWaitingForProgram($row) && ($target === null || (float) $target->target !== (float) $value)) {
+            return __('targets.cell_row_waiting_program');
+        }
+
         if ($indicator->measure === IndicatorMeasure::Percentage && (float) $value > 100) {
             return __('targets.percentage_over_100');
         }
 
-        if ($target === null) {
-            $issues = PlanIndicator::chainIssuesFor($proposal, $indicator, $project);
+        // The one chain rule that still applies to a row target, compared by
+        // id so no project is read (D-74): an indicator tied to a project
+        // takes targets only on the row that carries that project.
+        if ($target === null && $indicator->project_id !== null && $indicator->project_id !== $row->project_id) {
+            $issue = __('targets.issue_project_differs_from_indicator');
 
-            if ($issues !== []) {
-                $issue = __($issues[0]);
-
-                return __('targets.cell_chain_issue', ['issue' => is_string($issue) ? $issue : $issues[0]]);
-            }
+            return __('targets.cell_chain_issue', ['issue' => is_string($issue) ? $issue : 'targets.issue_project_differs_from_indicator']);
         }
 
         return null;
@@ -183,11 +209,10 @@ final class SaveProposalTargetsGrid
     /**
      * Apply the checked cells and record the summary.
      *
-     * @param  list<array{0: array{indicator_id: int, project_id: int, value: ?string, period: ?string, target_population: ?string, version: ?string}, 1: Indicator, 2: Project, 3: ?PlanIndicator}>  $plan
-     * @param  array<int|string, array{city_id: int|null, program_id: int|null, center_id: int|null, city_wide: bool, all_centers: bool}>  $places  place columns by project id (Y-08)
+     * @param  list<array{0: array{indicator_id: int, location_id: int, value: ?string, period: ?string, target_population: ?string, version: ?string, has_project_id: bool}, 1: Indicator, 2: ProposalLocation, 3: ?PlanIndicator}>  $plan
      * @return array{created: int, updated: int, deleted: int}
      */
-    private function write(Proposal $proposal, array $plan, array $places): array
+    private function write(Proposal $proposal, array $plan): array
     {
         $counts = ['created' => 0, 'updated' => 0, 'deleted' => 0];
 
@@ -201,8 +226,10 @@ final class SaveProposalTargetsGrid
             Gate::authorize($operation);
         }
 
-        Activity::withoutRecording(function () use ($proposal, $plan, $places, &$counts): void {
-            foreach ($plan as [$cell, $indicator, $project, $target]) {
+        $beneficiaries = $this->beneficiariesByProject($proposal, $plan);
+
+        Activity::withoutRecording(function () use ($proposal, $plan, $beneficiaries, &$counts): void {
+            foreach ($plan as [$cell, $indicator, $row, $target]) {
                 if ($cell['value'] === null) {
                     if ($target !== null) {
                         $target->delete();
@@ -212,36 +239,34 @@ final class SaveProposalTargetsGrid
                     continue;
                 }
 
-                $row = PlanIndicator::query()->firstOrNew([
+                $target ??= new PlanIndicator([
                     'source_type' => self::SourceType,
                     'source_id' => $proposal->id,
                     'indicator_id' => $indicator->id,
-                    'project_id' => $project->id,
+                    'proposal_location_id' => $row->id,
+                    'project_id' => $row->project_id,
+                    ...PlanIndicator::placeColumnsForRow($row),
                 ]);
 
                 $population = $cell['target_population'];
 
-                if ($population === null && ! $row->exists && $indicator->measure === IndicatorMeasure::Percentage) {
-                    $beneficiaries = $project->getRelation('pivot')->getAttribute('target_beneficiaries');
-                    $population = $beneficiaries === null ? null : (string) $beneficiaries;
+                if ($population === null && ! $target->exists && $indicator->measure === IndicatorMeasure::Percentage && $row->project_id !== null) {
+                    $default = $beneficiaries[$row->project_id] ?? null;
+                    $population = $default === null ? null : (string) $default;
                 }
 
-                if (! $row->exists) {
-                    $row->fill($places[$project->id]);
-                }
-
-                $row->fill([
+                $target->fill([
                     'target' => $cell['value'],
                     'period' => $cell['period'],
-                    'target_population' => $population ?? $row->target_population,
+                    'target_population' => $population ?? $target->target_population,
                 ]);
 
-                if (! $row->isDirty()) {
+                if (! $target->isDirty()) {
                     continue;
                 }
 
-                $counts[$row->exists ? 'updated' : 'created']++;
-                $row->save();
+                $counts[$target->exists ? 'updated' : 'created']++;
+                $target->save();
             }
         });
 
@@ -253,11 +278,38 @@ final class SaveProposalTargetsGrid
     }
 
     /**
+     * `project_proposal.target_beneficiaries` by project: the default display
+     * base of a new percentage target (D-25). Read once per save, only when a
+     * new percentage cell needs it. Moves to the location row in Y-11.
+     *
+     * @param  list<array{0: array{indicator_id: int, location_id: int, value: ?string, period: ?string, target_population: ?string, version: ?string, has_project_id: bool}, 1: Indicator, 2: ProposalLocation, 3: ?PlanIndicator}>  $plan
+     * @return array<int, int|null>
+     */
+    private function beneficiariesByProject(Proposal $proposal, array $plan): array
+    {
+        $needed = collect($plan)->contains(fn (array $step): bool => $step[0]['value'] !== null
+            && $step[0]['target_population'] === null
+            && $step[3] === null
+            && $step[1]->measure === IndicatorMeasure::Percentage
+            && $step[2]->project_id !== null);
+
+        if (! $needed) {
+            return [];
+        }
+
+        return DB::table('project_proposal')
+            ->where('proposal_id', $proposal->id)
+            ->pluck('target_beneficiaries', 'project_id')
+            ->map(fn (mixed $value): ?int => $value === null ? null : (int) $value)
+            ->all();
+    }
+
+    /**
      * Shape-check every cell. Messages are keyed by cell so the grid can mark
      * each one; nothing is written when any cell fails.
      *
      * @param  array<int, mixed>  $cells
-     * @return list<array{indicator_id: int, project_id: int, value: ?string, period: ?string, target_population: ?string, version: ?string}>
+     * @return list<array{indicator_id: int, location_id: int, value: ?string, period: ?string, target_population: ?string, version: ?string, has_project_id: bool}>
      *
      * @throws ValidationException
      */
@@ -266,7 +318,8 @@ final class SaveProposalTargetsGrid
         $data = Validator::make(['cells' => $cells], [
             'cells' => ['present', 'array', 'list'],
             'cells.*.indicator_id' => ['required', 'integer'],
-            'cells.*.project_id' => ['required', 'integer'],
+            'cells.*.location_id' => ['required_without:cells.*.project_id', 'nullable', 'integer'],
+            'cells.*.project_id' => ['nullable'],
             'cells.*.value' => ['nullable', 'numeric', 'min:0', 'max:9999999999.99'],
             'cells.*.period' => ['nullable', 'required_with:cells.*.value', Rule::enum(Period::class)],
             'cells.*.target_population' => ['nullable', 'numeric', 'min:0', 'max:9999999999.99'],
@@ -284,11 +337,12 @@ final class SaveProposalTargetsGrid
 
         return array_map(fn (array $cell): array => [
             'indicator_id' => (int) $cell['indicator_id'],
-            'project_id' => (int) $cell['project_id'],
+            'location_id' => (int) ($cell['location_id'] ?? 0),
             'value' => isset($cell['value']) && $cell['value'] !== '' ? (string) $cell['value'] : null,
             'period' => isset($cell['value']) && $cell['value'] !== '' ? (string) $cell['period'] : null,
             'target_population' => isset($cell['target_population']) && $cell['target_population'] !== '' ? (string) $cell['target_population'] : null,
             'version' => isset($cell['version']) && $cell['version'] !== '' ? (string) $cell['version'] : null,
+            'has_project_id' => array_key_exists('project_id', $cell),
         ], array_values($data['cells']));
     }
 }

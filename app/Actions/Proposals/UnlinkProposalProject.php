@@ -19,8 +19,11 @@ use Illuminate\Validation\ValidationException;
  * the proposal does not fund is "not found". The proposal row is locked and
  * its links recounted, so two people never unlink the last two projects at
  * once. A project carrying targets of this proposal that already have
- * reports stays linked; targets without reports stay too and are flagged on
- * the targets tab.
+ * reports stays linked. Since Y-10 a target belongs to the project's location
+ * row, which goes with the link: when that row carries targets the unlink is
+ * refused (UnlinkProjectWithTargets deletes them first, for a holder of
+ * `targets.delete`). Targets of a project with no row (data from before the
+ * rows) stay and are flagged on the targets tab, as before.
  *
  * Since W-34a the project's location row goes with the link (contracts.md
  * §7), and ProposalLocationsChanged fires after commit.
@@ -49,6 +52,13 @@ final class UnlinkProposalProject
 
             if ($hasReportedTargets) {
                 throw ValidationException::withMessages(['project' => __('proposals.this_project_has_reported_targets_in_this_proposal')]);
+            }
+
+            // Y-10: the project's location row goes with the link, and a row that
+            // carries targets is never removed on its own. The dialog's "delete
+            // and unlink" clears them first (UnlinkProjectWithTargets).
+            if ($locked->locations()->where('project_id', $project->id)->whereHas('targets')->exists()) {
+                throw ValidationException::withMessages(['project' => __('proposals.location_has_targets')]);
             }
 
             $locked->projects()->detach($project->id);

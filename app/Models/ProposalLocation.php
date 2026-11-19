@@ -110,6 +110,40 @@ class ProposalLocation extends Model
     }
 
     /**
+     * "City · program" for each row, the name a target's location carries
+     * (Y-10). Cities are read from HR in one query; a row still waiting for
+     * its program shows the city alone. Load `program` on the rows first.
+     *
+     * @param  iterable<ProposalLocation>  $rows
+     * @return array<int, string> row id => label
+     */
+    public static function placeLabels(iterable $rows): array
+    {
+        $rows = collect($rows);
+        $cities = HrCity::query()
+            ->whereKey($rows->pluck('city_id')->unique()->values()->all())
+            ->get(['id', 'name_en', 'name_ar'])
+            ->keyBy('id');
+
+        return $rows->mapWithKeys(function (ProposalLocation $row) use ($cities): array {
+            $city = $cities->get($row->city_id)->name ?? __('common.unknown_city');
+            $program = $row->program_id === null ? null : $row->program?->name;
+
+            return [$row->id => $program === null ? $city : $city.' · '.$program];
+        })->all();
+    }
+
+    /**
+     * The proposal targets of this row (Y-10, D-91): one per indicator.
+     *
+     * @return HasMany<PlanIndicator, $this>
+     */
+    public function targets(): HasMany
+    {
+        return $this->hasMany(PlanIndicator::class, 'proposal_location_id');
+    }
+
+    /**
      * The request opened when this row names a program HR does not have.
      *
      * @return HasOne<ProgramRequest, $this>

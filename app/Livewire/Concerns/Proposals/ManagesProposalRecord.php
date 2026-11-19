@@ -5,10 +5,11 @@ declare(strict_types=1);
 namespace App\Livewire\Concerns\Proposals;
 
 use App\Actions\Proposals\LinkProposalProject;
+use App\Actions\Proposals\UnlinkProjectWithTargets;
 use App\Actions\Proposals\UnlinkProposalProject;
-use App\Models\PlanIndicator;
 use App\Models\Project;
 use App\Models\Proposal;
+use App\Support\TargetCounts;
 use Flux\Flux;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Collection;
@@ -28,6 +29,7 @@ use Livewire\Attributes\Locked;
  *
  * @property int $proposalId
  * @property-read Proposal $proposal  #[Computed] proposal()
+ * @property-read bool $unlinkDeletesTargets  #[Computed] unlinkDeletesTargets()
  * @property-read Collection<int, Project> $projects  #[Computed] projects()
  */
 trait ManagesProposalRecord
@@ -39,8 +41,15 @@ trait ManagesProposalRecord
     #[Locked]
     public ?int $unlinkingProjectId = null;
 
+    /**
+     * The targets on the location row of the project being unlinked (Y-10):
+     * the dialog says how many, how many have reports, and offers to delete
+     * them with the unlink to a holder of `targets.delete`.
+     *
+     * @var array{count: int, reported: int}
+     */
     #[Locked]
-    public int $unlinkUnreportedTargetCount = 0;
+    public array $unlinkTargets = ['count' => 0, 'reported' => 0];
 
     /**
      * Drop every memoised reading after a write. Provided by the page.
@@ -98,9 +107,10 @@ trait ManagesProposalRecord
     }
 
     /**
-     * Ask before unlinking, counting this proposal's targets on the project
-     * that have no reports yet: they stay after the unlink, flagged. A
-     * project with reported targets is refused by the action on confirm.
+     * Ask before unlinking. The project's location row goes with the link
+     * (Y-10), so the dialog counts the targets on that row: a holder of
+     * `targets.delete` may delete them with the unlink, anyone else is sent
+     * to MEAL or to the targets. A reported target is never deleted.
      */
     public function confirmUnlinkProject(int $projectId): void
     {
@@ -108,31 +118,46 @@ trait ManagesProposalRecord
 
         $this->resetValidation();
         $this->unlinkingProjectId = $this->projects->firstWhere('id', $projectId)?->id;
-        $this->unlinkUnreportedTargetCount = $this->unlinkingProjectId === null ? 0 : PlanIndicator::query()
-            ->where('source_type', $this->proposal->getMorphClass())
-            ->where('source_id', $this->proposalId)
-            ->where('project_id', $this->unlinkingProjectId)
-            ->doesntHave('reports')
-            ->count();
+        $row = $this->unlinkingProjectId === null ? null : $this->proposal->locations()->where('project_id', $this->unlinkingProjectId)->first();
+        $this->unlinkTargets = $row === null ? ['count' => 0, 'reported' => 0] : TargetCounts::ofLocation($row);
         $this->showUnlinkModal = $this->unlinkingProjectId !== null;
     }
 
     /**
-     * Stop funding a project through UnlinkProposalProject. A refusal (the
-     * last project, reported targets) keeps the dialog open with the reason.
+     * Whether the unlink dialog offers to delete the row's targets with it.
+     */
+    #[Computed]
+    public function unlinkDeletesTargets(): bool
+    {
+        return $this->unlinkTargets['count'] > 0 && $this->unlinkTargets['reported'] === 0 && Gate::allows('targets.delete');
+    }
+
+    /**
+     * Stop funding a project through UnlinkProposalProject, deleting the
+     * row's targets with it when the dialog offered that. A refusal (the last
+     * project, reported targets, targets nobody may delete here) keeps the
+     * dialog open with the reason.
      */
     public function unlinkProject(): void
     {
         Gate::authorize('update', $this->proposal);
 
         if ($this->unlinkingProjectId !== null) {
-            app(UnlinkProposalProject::class)->handle(Proposal::query()->findOrFail($this->proposalId), $this->unlinkingProjectId);
+            $proposal = Proposal::query()->findOrFail($this->proposalId);
+
+            if ($this->unlinkDeletesTargets) {
+                app(UnlinkProjectWithTargets::class)->handle($proposal, $this->unlinkingProjectId);
+            } else {
+                app(UnlinkProposalProject::class)->handle($proposal, $this->unlinkingProjectId);
+            }
+
             Flux::toast(variant: 'success', text: __('proposals.project_unlinked'));
         }
 
         $this->showUnlinkModal = false;
         $this->unlinkingProjectId = null;
-        $this->unlinkUnreportedTargetCount = 0;
+        $this->unlinkTargets = ['count' => 0, 'reported' => 0];
+        unset($this->unlinkDeletesTargets);
         $this->forgetReadings();
     }
 }

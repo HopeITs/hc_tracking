@@ -21,8 +21,8 @@ use Illuminate\Validation\ValidationException;
  * Team B file in a Phase 1 folder; Dev 1 reviews it.
  *
  * - Refused while a funding agreement points at it (donor_proposal RESTRICTs,
- *   protecting the money trail) or while any indicator of its framework has a
- *   target with reports.
+ *   protecting the money trail) or while any indicator of its framework, or
+ *   any target committed in it (Y-10), has a target with reports.
  * - results.proposal_id RESTRICTs, so the framework goes first: leaf-first
  *   through Eloquent (indicators, their targets and milestone links follow by
  *   foreign key), then the proposal itself, whose observer removes the targets
@@ -57,7 +57,16 @@ final class DeleteProposal
                 ->select('id')
                 ->whereIn('result_id', Result::query()->select('id')->where('proposal_id', $locked->id));
 
-            if (PlanIndicator::query()->whereIn('indicator_id', $frameworkIndicatorIds)->whereHas('reports')->exists()) {
+            // Y-10: a reported target committed in this proposal blocks it too,
+            // not only one on its framework; a measurement is never deleted.
+            $reported = PlanIndicator::query()
+                ->where(fn ($query) => $query
+                    ->whereIn('indicator_id', $frameworkIndicatorIds)
+                    ->orWhere(fn ($own) => $own->where('source_type', $locked->getMorphClass())->where('source_id', $locked->id)))
+                ->whereHas('reports')
+                ->exists();
+
+            if ($reported) {
                 $this->refuse('results_framework.proposal_delete_reported');
             }
 

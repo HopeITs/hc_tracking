@@ -210,7 +210,7 @@ test('a project carrying reported targets of this proposal cannot be unlinked, w
         ->and(linkedIds($this->proposal))->toContain($project->id);
 });
 
-test('the unlink confirmation counts the unreported targets, which stay after the unlink', function () {
+test('targets of a project with no location row (data from before the rows) stay after the unlink (Y-10)', function () {
     $project = Project::factory()->create(['name' => 'Latakia Wells']);
     fileLink($this->proposal, $project, Project::factory()->create());
     proposalTarget($this->proposal, $project);
@@ -219,8 +219,7 @@ test('the unlink confirmation counts the unreported targets, which stay after th
     Livewire::test('pages::proposals.show', ['proposal' => $this->proposal])
         ->set('tab', 'projects')
         ->call('confirmUnlinkProject', $project->id)
-        ->assertSet('unlinkUnreportedTargetCount', 2)
-        ->assertSeeText(trans_choice('proposals.unlink_project_unreported_targets', 2, ['count' => 2, 'name' => 'Latakia Wells']))
+        ->assertSet('unlinkTargets', ['count' => 0, 'reported' => 0])
         ->call('unlinkProject')
         ->assertHasNoErrors();
 
