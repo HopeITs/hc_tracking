@@ -48,10 +48,11 @@
                 @endforeach
             </select>
             @if ($unit === CountUnit::Other)
-                <input class="ap-inp {{ ! $readOnly && $otherName === null ? 'is-err' : '' }}" style="max-width: 240px" {!! $readOnly ? '' : 'wire:model.live.blur="form.unit_other"' !!} value="{{ $data['unit_other'] }}" placeholder="{{ __('annual_plans.wf.unit_other_placeholder') }}" {{ $dis }} aria-label="{{ __('annual_plans.wf.unit_other_label') }}">
+                <input class="ap-inp @error('unit_other') is-err @enderror {{ ! $readOnly && $otherName === null ? 'is-err' : '' }}" style="max-width: 240px" {!! $readOnly ? '' : 'wire:model.live.blur="form.unit_other"' !!} value="{{ $data['unit_other'] }}" placeholder="{{ __('annual_plans.wf.unit_other_placeholder') }}" {{ $dis }} aria-label="{{ __('annual_plans.wf.unit_other_label') }}">
             @endif
             <span class="ap-faint ap-xs">{{ $unit->needsHours() ? __('annual_plans.wf.hours_needed') : __('annual_plans.wf.no_hours') }}</span>
         </div>
+        @error('unit_other') <p class="ap-err">{{ $message }}</p> @enderror
     </div>
 
     <div class="ap-grp">
@@ -123,6 +124,7 @@
                 <span class="ap-faint ap-sm">{{ __('annual_plans.wf.no_centres') }}</span>
             @endforelse
         </div>
+        @error('cities') <p class="ap-err">{{ $message }}</p> @enderror
     </div>
 
     <div class="ap-row" style="align-items: flex-start">
@@ -133,12 +135,16 @@
     </div>
 
     @unless ($readOnly)
-        @if ($plan->items->count() > 1)
+        {{-- Only activities of the same kind can take these settings (see
+             CopyActivityPlanItemSettings), so a one-off event is never offered a
+             weekly-sessions activity's batches and hours. --}}
+        @php($copyOptions = $plan->items->where('id', '!=', $item->id)->filter(fn ($other) => ($other->activity?->activity_kind) === ($item->activity?->activity_kind)))
+        @if ($copyOptions->isNotEmpty())
             <details class="ap-copy">
                 <summary>{{ __('annual_plans.wf.copy_title') }}</summary>
                 <p class="ap-xs ap-faint">{{ __('annual_plans.wf.copy_help') }}</p>
                 <div class="ap-row">
-                    @foreach ($plan->items->where('id', '!=', $item->id) as $other)
+                    @foreach ($copyOptions as $other)
                         <label class="ap-chk" wire:key="copy-{{ $other->id }}"><input type="checkbox" value="{{ $other->id }}" wire:model="copyTargets"><span dir="auto">{{ $other->activity?->statement }}</span></label>
                     @endforeach
                 </div>

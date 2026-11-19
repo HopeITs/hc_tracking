@@ -183,6 +183,40 @@ test('copying settings copies runs, unit, batches, places and people but keeps e
         ->and($target->batches->first()->end_week->toDateString())->toBe('2027-04-26');
 });
 
+test('settings only copy between activities of the same kind', function () {
+    $output = Result::find($this->basic->parent_id);
+    $this->basic->forceFill(['activity_kind' => 'continuous'])->save();
+    $event = Result::factory()->activity($output)->create(['statement' => 'Final exam', 'activity_kind' => 'event']);
+
+    $plan = app(CreateActivityPlan::class)->handle($this->pm, $this->proposal->id, $this->program->id);
+    $plan = app(ChooseActivityPlanActivities::class)->handle($this->pm, $plan, [$this->basic->id, $event->id]);
+    $source = $plan->items()->where('result_id', $this->basic->id)->first();
+    $target = $plan->items()->where('result_id', $event->id)->first();
+    app(SaveActivityPlanItem::class)->handle($this->pm, $source, itemInput(), true);
+
+    expect(fn () => app(CopyActivityPlanItemSettings::class)->handle($this->pm, $source->fresh(), [$target->id]))
+        ->toThrow(ValidationException::class, __('annual_plans.copy_same_kind'));
+});
+
+test('an incomplete activity names the field that is missing, not a generic message', function () {
+    $item = chosenPlan()->items()->first();
+
+    $errorsFor = function (array $overrides) use ($item): array {
+        try {
+            app(SaveActivityPlanItem::class)->handle($this->pm, $item, itemInput($overrides), true);
+        } catch (ValidationException $exception) {
+            return $exception->errors();
+        }
+
+        return [];
+    };
+
+    expect($errorsFor(['cities' => []]))->toHaveKey('cities')
+        ->and($errorsFor(['unit' => 'other', 'unit_other' => '']))->toHaveKey('unit_other')
+        ->and($errorsFor(['batches' => [['start' => '2027-03-01', 'end' => '2027-04-26', 'count' => null, 'hours' => 2]]]))->toHaveKey('batches.0')
+        ->and($errorsFor(['batches' => [['start' => '2027-03-01', 'end' => '2027-04-26', 'count' => 4, 'hours' => null]]]))->toHaveKey('batches.0');
+});
+
 test('a plan goes to MEAL only when every activity is ready, and is then locked', function () {
     $plan = chosenPlan();
     [$first, $second] = $plan->items()->get()->all();

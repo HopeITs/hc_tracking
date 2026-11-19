@@ -35,10 +35,11 @@ final class SaveActivityPlanItem
         Gate::forUser($user)->authorize('update', $plan);
         $calendar = $plan->calendar();
         $data = self::validated($input, ActivityPlanScope::cityIds($plan), $calendar->firstMonday(), $calendar->lastMonday());
-        $complete = self::isComplete($data);
+        $missing = self::incompleteError($data);
+        $complete = $missing === null;
 
-        if ($ready && ! $complete) {
-            throw ValidationException::withMessages(['item' => __('annual_plans.item_incomplete')]);
+        if ($ready && $missing !== null) {
+            throw ValidationException::withMessages($missing);
         }
 
         DB::transaction(fn () => self::write($item, $data, $ready || ($item->is_ready && $complete)));
@@ -152,18 +153,41 @@ final class SaveActivityPlanItem
      */
     public static function isComplete(array $data): bool
     {
+        return self::incompleteError($data) === null;
+    }
+
+    /**
+     * The first thing that stops the activity being "Ready", as a single
+     * field-keyed message so the form can outline that exact field, or null
+     * when nothing is missing. The order mirrors the form top to bottom:
+     * governorate, the "Other" unit name, then each batch's number and (for
+     * sessions) its hours.
+     *
+     * @param  array{unit: string, unit_other: string|null, cities: list<int>, batches: list<array{count: int|null, hours: float|null}>}  $data
+     * @return array<string, string>|null
+     */
+    public static function incompleteError(array $data): ?array
+    {
         $unit = CountUnit::from($data['unit']);
 
-        if ($data['cities'] === [] || $data['batches'] === [] || ($unit === CountUnit::Other && $data['unit_other'] === null)) {
-            return false;
+        if ($data['cities'] === []) {
+            return ['cities' => __('annual_plans.pick_governorate')];
         }
 
-        foreach ($data['batches'] as $batch) {
-            if ($batch['count'] === null || ($unit->needsHours() && $batch['hours'] === null)) {
-                return false;
+        if ($unit === CountUnit::Other && $data['unit_other'] === null) {
+            return ['unit_other' => __('annual_plans.name_the_unit')];
+        }
+
+        foreach ($data['batches'] as $index => $batch) {
+            if ($batch['count'] === null) {
+                return ["batches.{$index}" => __('annual_plans.batch_needs_count')];
+            }
+
+            if ($unit->needsHours() && $batch['hours'] === null) {
+                return ["batches.{$index}" => __('annual_plans.batch_needs_hours')];
             }
         }
 
-        return true;
+        return null;
     }
 }
