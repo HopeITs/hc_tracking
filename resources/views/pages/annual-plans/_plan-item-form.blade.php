@@ -27,6 +27,9 @@
 @endphp
 
 <div class="ap-act-b" data-item-form="{{ $item->id }}">
+    {{-- Short fields share a line (how it runs + what it counts; where + people + note)
+         so the card reads in about six bands, not eleven (AP-1 review). --}}
+    <div class="ap-line">
     <div class="ap-grp">
         <span class="ap-lbl">{{ __('annual_plans.wf.how_it_runs') }}</span>
         <div class="ap-seg">
@@ -53,6 +56,7 @@
             <span class="ap-faint ap-xs">{{ $unit->needsHours() ? __('annual_plans.wf.hours_needed') : __('annual_plans.wf.no_hours') }}</span>
         </div>
         @error('unit_other') <p class="ap-err">{{ $message }}</p> @enderror
+    </div>
     </div>
 
     <div class="ap-grp">
@@ -101,13 +105,12 @@
             @error('batches.'.$index.'.count') <p class="ap-err">{{ $message }}</p> @enderror
             @error('batches.'.$index.'.hours') <p class="ap-err">{{ $message }}</p> @enderror
         @endforeach
-        @unless ($readOnly)
-            <div class="ap-row">
-                <button type="button" class="dk-btn" wire:click="addBatch" data-test="add-batch">+ {{ $single ? __('annual_plans.wf.add_week') : __('annual_plans.wf.add_batch') }}</button>
-                @unless ($single)<span class="ap-faint ap-xs">{{ __('annual_plans.wf.batches_may_overlap') }}</span>@endunless
-            </div>
-        @endunless
-        <div class="ap-sm"><b data-item-totals>{{ $this->totalsLine($unit, $otherName, $data['batches']) }}</b></div>
+        <div class="ap-row">
+            @unless ($readOnly)
+                <button type="button" class="dk-btn dk-sm" wire:click="addBatch" @unless ($single) title="{{ __('annual_plans.wf.batches_may_overlap') }}" @endunless data-test="add-batch">+ {{ $single ? __('annual_plans.wf.add_week') : __('annual_plans.wf.add_batch') }}</button>
+            @endunless
+            <b class="ap-sm" data-item-totals>{{ $this->totalsLine($unit, $otherName, $data['batches']) }}</b>
+        </div>
         <div class="ap-tl" aria-hidden="true">
             @foreach ($timeline['months'] as $month)<span class="ap-m" style="inset-inline-start: {{ $month['left'] }}%">{{ $month['label'] }}</span>@endforeach
             @foreach ($timeline['bars'] as $bar)
@@ -117,6 +120,7 @@
         </div>
     </div>
 
+    <div class="ap-line">
     <div class="ap-grp">
         <span class="ap-lbl">{{ __('annual_plans.wf.where') }}</span>
         <div class="ap-row">
@@ -128,12 +132,10 @@
         </div>
         @error('cities') <p class="ap-err">{{ $message }}</p> @enderror
     </div>
-
-    <div class="ap-row" style="align-items: flex-start">
-        <label class="ap-grp" style="flex: 1; min-width: 180px"><span class="ap-lbl">{{ __('annual_plans.wf.expected_people') }}</span>
+        <label class="ap-grp ap-line-people"><span class="ap-lbl">{{ __('annual_plans.wf.expected_people') }}</span>
             <input class="ap-inp @error('expected_people') is-err @enderror" type="number" min="0" {!! $readOnly ? '' : 'wire:model.live.blur="form.expected_people"' !!} value="{{ $data['expected_people'] }}" placeholder="{{ $readOnly ? __('annual_plans.wf.not_set') : __('annual_plans.wf.whole_activity') }}" {{ $dis }}>
             @error('expected_people') <p class="ap-err">{{ $message }}</p> @enderror</label>
-        <label class="ap-grp" style="flex: 2; min-width: 220px"><span class="ap-lbl">{{ __('annual_plans.wf.note') }}</span>
+        <label class="ap-grp ap-line-grow"><span class="ap-lbl">{{ __('annual_plans.wf.note') }}</span>
             <input class="ap-inp" {!! $readOnly ? '' : 'wire:model.live.blur="form.note"' !!} value="{{ $data['note'] }}" placeholder="{{ $readOnly ? __('annual_plans.wf.no_note') : __('annual_plans.wf.note_placeholder') }}" {{ $dis }} dir="auto"></label>
     </div>
 
@@ -155,9 +157,8 @@
             </details>
         @endif
         @error('item') <p class="ap-err">{{ $message }}</p> @enderror
-        <div class="ap-row">
-            <span class="ap-xs ap-faint">{{ $unit->needsHours() ? __('annual_plans.wf.needs_sessions_hours', ['each' => $single ? __('annual_plans.wf.every_week') : __('annual_plans.wf.every_batch')]) : __('annual_plans.wf.needs_count', ['unit' => $plural, 'each' => $single ? __('annual_plans.wf.every_week') : __('annual_plans.wf.every_batch')]) }}</span>
-            <span class="ap-sp"></span>
+        {{-- Done alone: what each batch needs is already said by the unit hint and, on a miss, by the field's own error. --}}
+        <div class="ap-row ap-act-foot">
             <button type="button" class="dk-btn dk-primary" wire:click="finishItem" data-test="item-done">{{ $plan->items->last()?->id !== $item->id ? __('annual_plans.wf.done_next') : __('annual_plans.wf.done') }}</button>
         </div>
     @endunless
