@@ -127,10 +127,20 @@
             @forelse ($plannedCities as $cityId => $cityName)
                 <label class="ap-chk"><input type="checkbox" value="{{ $cityId }}" @if (! $readOnly) wire:model.live="form.cities" @endif @checked(in_array((string) $cityId, $data['cities'], true)) {{ $dis }}>{{ $cityName }}</label>
             @empty
-                <span class="ap-faint ap-sm">{{ __('annual_plans.wf.no_centres') }}</span>
+                @if ($this->centresWithoutGovernorate === [])
+                    <span class="ap-faint ap-sm">{{ __('annual_plans.wf.no_centres') }}</span>
+                @endif
             @endforelse
         </div>
         @error('cities') <p class="ap-err">{{ $message }}</p> @enderror
+        @unless ($readOnly)
+            @foreach ($this->centresWithoutGovernorate as $centre)
+                <p class="ap-info is-warn ap-sm" data-centre-without-governorate>{{ __('annual_plans.wf.centre_no_governorate', ['centre' => $centre['name']]) }} <a class="underline" href="{{ $centre['url'] }}" wire:navigate>{{ __('annual_plans.wf.fix_centre') }}</a></p>
+            @endforeach
+            @if ($removedCitiesNote !== null && $openItemId === $item->id)
+                <p class="ap-info is-warn ap-sm" data-removed-cities>{{ $removedCitiesNote }}</p>
+            @endif
+        @endunless
     </div>
         <label class="ap-grp ap-line-people"><span class="ap-lbl">{{ __('annual_plans.wf.expected_people') }}</span>
             <input class="ap-inp @error('expected_people') is-err @enderror" type="number" min="0" {!! $readOnly ? '' : 'wire:model.live.blur="form.expected_people"' !!} value="{{ $data['expected_people'] }}" placeholder="{{ $readOnly ? __('annual_plans.wf.not_set') : __('annual_plans.wf.whole_activity') }}" {{ $dis }}>

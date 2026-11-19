@@ -431,7 +431,16 @@ new #[Layout('layouts::desk'), Title('titles.proposal')] class extends Component
                     <span class="tabular-nums">{{ __('proposals.planned_range', ['begin' => $this->proposal->planned_date_begin?->translatedFormat(__('formats.date')), 'end' => $this->proposal->planned_date_end?->translatedFormat(__('formats.date'))]) }}</span>
                 </p>
             </div>
-            @include('pages.proposals._show-actions')
+            @if ($compact)
+                {{-- The way to the whole proposal (Logical Framework and every tab) sits up here, not
+                     under the readings where it was missed (AP-1 UAT). --}}
+                <div class="flex flex-wrap items-center gap-2">
+                    <a class="dk-btn dk-sm" href="{{ route('proposals.show', $this->proposal) }}" wire:navigate data-open-proposal-page>{{ __('proposals.open_proposal_page') }}<x-desk.icon name="arrow" class="dk-flip" /></a>
+                    @include('pages.proposals._show-actions')
+                </div>
+            @else
+                @include('pages.proposals._show-actions')
+            @endif
         </header>
     @else
         @include('pages.proposals._show-head')
@@ -452,7 +461,6 @@ new #[Layout('layouts::desk'), Title('titles.proposal')] class extends Component
 
         <div class="mt-6 flex flex-wrap items-center gap-2 border-t border-dashed border-secondary-soft pt-4 dark:border-line">
             <button type="button" class="dk-btn dk-sm dk-primary" wire:click="$set('tab', 'status')" data-show-all-details>{{ __('proposals.show_all_details') }}</button>
-            <a class="dk-btn dk-sm" href="{{ route('proposals.show', $this->proposal) }}" wire:navigate>{{ __('proposals.open_proposal_page') }}<x-desk.icon name="arrow" class="dk-flip" /></a>
         </div>
     @else
         @if ($this->pendingChangeRequestId !== null)

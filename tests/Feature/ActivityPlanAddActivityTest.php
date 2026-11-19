@@ -5,14 +5,18 @@ use App\Actions\AnnualPlans\CreateActivityPlan;
 use App\Enums\ActivityKind;
 use App\Enums\Period;
 use App\Enums\ResultType;
+use App\Models\ActivityPlan;
+use App\Models\ActivityPlanItem;
 use App\Models\Program;
 use App\Models\Project;
 use App\Models\Proposal;
 use App\Models\Result;
+use App\Support\ActivityPlanScope;
 use Illuminate\Support\Facades\Blade;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\View;
 use Illuminate\Support\ViewErrorBag;
+use Livewire\Features\SupportTesting\Testable;
 use Livewire\Livewire;
 
 beforeEach(function () {
@@ -79,4 +83,54 @@ test('a fit segmented row sizes each choice to its label', function () {
         ->toContain('form-segmented-fit')
         ->and(Blade::render('<x-ui.form-segmented wire:model="kind" label="Type" value="a" :options="$options" />', ['options' => $options]))
         ->not->toContain('form-segmented-fit');
+});
+
+/**
+ * The plan with one activity chosen, and that activity's item.
+ *
+ * @return array{0: ActivityPlan, 1: ActivityPlanItem}
+ */
+function planWithOneActivity(): array
+{
+    $output = Result::factory()->type(ResultType::Output)->childOf(test()->outcome)->create(['proposal_id' => test()->proposal->id, 'program_id' => test()->program->id]);
+    $basic = Result::factory()->activity($output)->create(['statement' => 'Basic sessions']);
+    $plan = app(ChooseActivityPlanActivities::class)->handle(test()->pm, test()->plan, [$basic->id]);
+
+    return [$plan, $plan->items()->firstOrFail()];
+}
+
+/**
+ * The plan page with the item's details open.
+ */
+function openPlanItem(ActivityPlan $plan, ActivityPlanItem $item): Testable
+{
+    $page = Livewire::actingAs(test()->pm)->test('pages::annual-plans.plan', ['activityPlan' => $plan]);
+
+    if ($page->get('openItemId') !== $item->id) {
+        $page->call('toggleItem', $item->id);
+    }
+
+    return $page;
+}
+
+test('opening an activity drops a governorate the plan no longer has, and says so', function () {
+    [$plan, $item] = planWithOneActivity();
+    $planCity = ActivityPlanScope::cityIds($plan)[0];
+    $item->cities()->create(['city_id' => insertHrCity('Homs', 'حمص')]);
+
+    openPlanItem($plan, $item)
+        ->assertSet('form.cities', [(string) $planCity])
+        ->assertSeeHtml('data-removed-cities')
+        ->assertSee(__('annual_plans.wf.removed_cities', ['cities' => 'Homs']));
+});
+
+test('a centre without a known governorate is named with a way to fix it', function () {
+    $broken = Project::factory()->create(['program_id' => $this->program->id, 'city_id' => 999999, 'center_id' => null, 'name' => 'Al-Wadi Training Center']);
+    DB::table('project_proposal')->insert(['project_id' => $broken->id, 'proposal_id' => $this->proposal->id]);
+    [$plan, $item] = planWithOneActivity();
+
+    openPlanItem($plan, $item)
+        ->assertSeeHtml('data-centre-without-governorate')
+        ->assertSee(__('annual_plans.wf.centre_no_governorate', ['centre' => 'Al-Wadi Training Center']))
+        ->assertSeeHtml('href="'.route('projects.show', $broken).'"');
 });

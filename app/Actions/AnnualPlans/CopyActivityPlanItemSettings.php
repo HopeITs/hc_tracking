@@ -7,6 +7,7 @@ namespace App\Actions\AnnualPlans;
 use App\Models\ActivityPlanBatch;
 use App\Models\ActivityPlanItem;
 use App\Models\User;
+use App\Support\ActivityPlanScope;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Validation\ValidationException;
@@ -47,7 +48,8 @@ final class CopyActivityPlanItemSettings
             'single_week' => $source->is_single_week,
             'unit' => $source->unit->value,
             'unit_other' => $source->unit_other,
-            'cities' => $source->cityIds(),
+            // Only governorates the plan still has: a stale one would fail every later save.
+            'cities' => array_values(array_intersect($source->cityIds(), ActivityPlanScope::cityIds($plan))),
             'expected_people' => $source->expected_people,
             'note' => null,
             'batches' => array_values($source->batches->map(fn (ActivityPlanBatch $batch): array => [

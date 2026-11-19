@@ -78,6 +78,12 @@ trait EditsActivityPlan
      */
     public bool $showPlanCalendar = true;
 
+    /**
+     * Said under "Where does it run?" when opening an activity dropped
+     * governorates that are no longer part of the plan (null when none were).
+     */
+    public ?string $removedCitiesNote = null;
+
     public string $followUpItem = '';
 
     public string $followUpTrigger = 'finish';
@@ -288,6 +294,29 @@ trait EditsActivityPlan
     public function cityNames(): array
     {
         return ActivityPlanScope::cityNames(ActivityPlanScope::cityIds($this->plan));
+    }
+
+    /**
+     * The plan's centres whose governorate is missing or unknown in HR, so they
+     * never appear under "Where does it run?": named with a link to fix them,
+     * instead of a bare "No centres linked yet".
+     *
+     * @return list<array{name: string, url: string}>
+     */
+    #[Computed]
+    public function centresWithoutGovernorate(): array
+    {
+        $centres = [];
+
+        foreach (ActivityPlanScope::projects($this->plan) as $project) {
+            $cityId = MealCoverage::cityIdOf($project);
+
+            if ($cityId === null || ! array_key_exists($cityId, $this->cityNames)) {
+                $centres[] = ['name' => (string) $project->name, 'url' => route('projects.show', $project)];
+            }
+        }
+
+        return $centres;
     }
 
     /**
@@ -725,6 +754,17 @@ trait EditsActivityPlan
             return;
         }
 
+        // A governorate the plan no longer has (its centre moved or left the
+        // proposal) cannot be ticked off and would fail "cities.0 is invalid" on
+        // every save, so it is dropped here and named in a note (AP-1 decision).
+        $planCityIds = ActivityPlanScope::cityIds($this->plan);
+        $stored = $item->cityIds();
+        $removed = array_values(array_diff($stored, $planCityIds));
+        $removedNames = ActivityPlanScope::cityNames($removed);
+        $this->removedCitiesNote = $removed === [] ? null : ($removedNames === []
+            ? __('annual_plans.wf.removed_city_unknown')
+            : __('annual_plans.wf.removed_cities', ['cities' => implode('، ', $removedNames)]));
+
         $this->openItemId = $item->id;
         $this->copyTargets = [];
         $this->resetErrorBag();
@@ -732,7 +772,7 @@ trait EditsActivityPlan
             'single_week' => $item->is_single_week,
             'unit' => $item->unit->value,
             'unit_other' => (string) ($item->unit_other ?? ''),
-            'cities' => array_map('strval', $item->cityIds()),
+            'cities' => array_map('strval', array_values(array_intersect($stored, $planCityIds))),
             'expected_people' => $item->expected_people === null ? '' : (string) $item->expected_people,
             'note' => (string) ($item->note ?? ''),
             'batches' => $this->batchRows($item),
