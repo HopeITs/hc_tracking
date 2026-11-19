@@ -178,11 +178,12 @@ final class SaveActivityPlanItem
             return ['unit_other' => __('annual_plans.name_the_unit')];
         }
 
-        // Name the unit in the message ("…number for each session"), so the
-        // error reads like the field it is about rather than a bare "this batch".
+        // Name the unit, in the plural, in the message ("…number of sessions"),
+        // so the error reads like the field it is about rather than a bare "this
+        // batch". A count of 3 skips the dual form Arabic uses for two.
         $unitName = $unit === CountUnit::Other
             ? ($data['unit_other'] ?? __('annual_plans.unit_other_fallback'))
-            : mb_strtolower($unit->label());
+            : trim(trans_choice('annual_plans.unit_noun.'.$unit->value, 3, ['count' => '']));
 
         foreach ($data['batches'] as $index => $batch) {
             if ($batch['count'] === null) {
