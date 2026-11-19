@@ -103,6 +103,17 @@ final class SaveActivityPlanItem
             'batches.*.end' => ['nullable', 'date_format:Y-m-d'],
             'batches.*.count' => ['nullable', 'integer', 'min:1', 'max:100000'],
             'batches.*.hours' => ['nullable', 'numeric', 'min:0.5', 'max:24'],
+        ], [
+            // Plain words instead of Laravel's "The batches.0.count field must be at least 1."
+            'batches.*.count.integer' => __('annual_plans.batch_count_invalid'),
+            'batches.*.count.min' => __('annual_plans.batch_count_invalid'),
+            'batches.*.count.max' => __('annual_plans.number_too_large'),
+            'batches.*.hours.numeric' => __('annual_plans.batch_hours_invalid'),
+            'batches.*.hours.min' => __('annual_plans.batch_hours_invalid'),
+            'batches.*.hours.max' => __('annual_plans.batch_hours_invalid'),
+            'expected_people.integer' => __('annual_plans.expected_people_invalid'),
+            'expected_people.min' => __('annual_plans.expected_people_invalid'),
+            'expected_people.max' => __('annual_plans.number_too_large'),
         ])->validate();
 
         $single = (bool) $data['single_week'];

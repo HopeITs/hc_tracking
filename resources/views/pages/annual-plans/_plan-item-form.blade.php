@@ -86,11 +86,11 @@
                 @endunless
                 <span class="ap-sp"></span>
                 <label class="ap-mini">{{ $plural }}
-                    <input class="ap-inp is-n {{ ! $readOnly && blank($batch['count'] ?? null) ? 'is-err' : '' }}" type="number" min="1" step="1" {!! $model('batches.'.$index.'.count') !!} value="{{ $batch['count'] }}" {{ $dis }} aria-label="{{ __('annual_plans.wf.how_many', ['unit' => $plural]) }}" data-test="batch-count">
+                    <input class="ap-inp is-n @error('batches.'.$index.'.count') is-err @enderror {{ ! $readOnly && blank($batch['count'] ?? null) ? 'is-err' : '' }}" type="number" min="1" step="1" {!! $model('batches.'.$index.'.count') !!} value="{{ $batch['count'] }}" {{ $dis }} aria-label="{{ __('annual_plans.wf.how_many', ['unit' => $plural]) }}" data-test="batch-count">
                 </label>
                 @if ($unit->needsHours())
                     <label class="ap-mini">{{ __('annual_plans.wf.hours_each') }}
-                        <input class="ap-inp is-n {{ ! $readOnly && blank($batch['hours'] ?? null) ? 'is-err' : '' }}" type="number" min="0.5" step="0.5" {!! $model('batches.'.$index.'.hours') !!} value="{{ $batch['hours'] }}" {{ $dis }} aria-label="{{ __('annual_plans.wf.hours_each') }}" data-test="batch-hours">
+                        <input class="ap-inp is-n @error('batches.'.$index.'.hours') is-err @enderror {{ ! $readOnly && blank($batch['hours'] ?? null) ? 'is-err' : '' }}" type="number" min="0.5" step="0.5" {!! $model('batches.'.$index.'.hours') !!} value="{{ $batch['hours'] }}" {{ $dis }} aria-label="{{ __('annual_plans.wf.hours_each') }}" data-test="batch-hours">
                     </label>
                 @endif
                 @if (! $readOnly && count($data['batches']) > 1)
@@ -98,6 +98,8 @@
                 @endif
             </div>
             @error('batches.'.$index) <p class="ap-err">{{ $message }}</p> @enderror
+            @error('batches.'.$index.'.count') <p class="ap-err">{{ $message }}</p> @enderror
+            @error('batches.'.$index.'.hours') <p class="ap-err">{{ $message }}</p> @enderror
         @endforeach
         @unless ($readOnly)
             <div class="ap-row">
@@ -129,7 +131,8 @@
 
     <div class="ap-row" style="align-items: flex-start">
         <label class="ap-grp" style="flex: 1; min-width: 180px"><span class="ap-lbl">{{ __('annual_plans.wf.expected_people') }}</span>
-            <input class="ap-inp" type="number" min="0" {!! $readOnly ? '' : 'wire:model.live.blur="form.expected_people"' !!} value="{{ $data['expected_people'] }}" placeholder="{{ $readOnly ? __('annual_plans.wf.not_set') : __('annual_plans.wf.whole_activity') }}" {{ $dis }}></label>
+            <input class="ap-inp @error('expected_people') is-err @enderror" type="number" min="0" {!! $readOnly ? '' : 'wire:model.live.blur="form.expected_people"' !!} value="{{ $data['expected_people'] }}" placeholder="{{ $readOnly ? __('annual_plans.wf.not_set') : __('annual_plans.wf.whole_activity') }}" {{ $dis }}>
+            @error('expected_people') <p class="ap-err">{{ $message }}</p> @enderror</label>
         <label class="ap-grp" style="flex: 2; min-width: 220px"><span class="ap-lbl">{{ __('annual_plans.wf.note') }}</span>
             <input class="ap-inp" {!! $readOnly ? '' : 'wire:model.live.blur="form.note"' !!} value="{{ $data['note'] }}" placeholder="{{ $readOnly ? __('annual_plans.wf.no_note') : __('annual_plans.wf.note_placeholder') }}" {{ $dis }} dir="auto"></label>
     </div>
