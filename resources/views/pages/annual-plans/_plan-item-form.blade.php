@@ -27,11 +27,6 @@
 @endphp
 
 <div class="ap-act-b" data-item-form="{{ $item->id }}">
-    {{-- Three titled sections (how it runs / weeks and numbers / where and who)
-         instead of one long column of fields, so the card reads in groups. --}}
-    <section class="ap-sec">
-    <h4>{{ __('annual_plans.wf.sec_run') }}</h4>
-    <div class="ap-cols">
     <div class="ap-grp">
         <span class="ap-lbl">{{ __('annual_plans.wf.how_it_runs') }}</span>
         <div class="ap-seg">
@@ -49,21 +44,17 @@
         <div class="ap-row">
             <select class="ap-sel" {!! $model('unit') !!} {{ $dis }} aria-label="{{ __('annual_plans.wf.what_you_count') }}" data-test="item-unit">
                 @foreach (CountUnit::cases() as $case)
-                    <option value="{{ $case->value }}" @selected($case === $unit)>{{ $case->label() }}</option>
+                    <option value="{{ $case->value }}" @selected($case === $unit)>{{ __('enums.count_unit.'.$case->value, [], 'en') }} · {{ __('enums.count_unit.'.$case->value, [], 'ar') }}</option>
                 @endforeach
             </select>
             @if ($unit === CountUnit::Other)
                 <input class="ap-inp @error('unit_other') is-err @enderror {{ ! $readOnly && $otherName === null ? 'is-err' : '' }}" style="max-width: 240px" {!! $readOnly ? '' : 'wire:model.live.blur="form.unit_other"' !!} value="{{ $data['unit_other'] }}" placeholder="{{ __('annual_plans.wf.unit_other_placeholder') }}" {{ $dis }} aria-label="{{ __('annual_plans.wf.unit_other_label') }}">
             @endif
+            <span class="ap-faint ap-xs">{{ $unit->needsHours() ? __('annual_plans.wf.hours_needed') : __('annual_plans.wf.no_hours') }}</span>
         </div>
-        @if ($unit->needsHours())<span class="ap-faint ap-xs">{{ __('annual_plans.wf.hours_needed') }}</span>@endif
         @error('unit_other') <p class="ap-err">{{ $message }}</p> @enderror
     </div>
-    </div>
-    </section>
 
-    <section class="ap-sec">
-    <h4>{{ __('annual_plans.wf.sec_weeks') }}</h4>
     <div class="ap-grp">
         <span class="ap-lbl">{{ $single ? __('annual_plans.wf.which_weeks') : __('annual_plans.wf.from_to') }}</span>
         @foreach ($data['batches'] as $index => $batch)
@@ -93,7 +84,7 @@
                         </label>
                     @endif
                 @endunless
-                <span class="ap-bt-sep" aria-hidden="true"></span>
+                <span class="ap-sp"></span>
                 <label class="ap-mini">{{ $plural }}
                     <input class="ap-inp is-n @error('batches.'.$index.'.count') is-err @enderror {{ ! $readOnly && blank($batch['count'] ?? null) ? 'is-err' : '' }}" type="number" min="1" step="1" {!! $model('batches.'.$index.'.count') !!} value="{{ $batch['count'] }}" {{ $dis }} aria-label="{{ __('annual_plans.wf.how_many', ['unit' => $plural]) }}" data-test="batch-count">
                 </label>
@@ -103,7 +94,7 @@
                     </label>
                 @endif
                 @if (! $readOnly && count($data['batches']) > 1)
-                    <button type="button" class="dk-btn dk-ghost ap-bt-end" wire:click="removeBatch({{ $index }})">{{ __('annual_plans.wf.remove') }}</button>
+                    <button type="button" class="dk-btn dk-ghost" wire:click="removeBatch({{ $index }})">{{ __('annual_plans.wf.remove') }}</button>
                 @endif
             </div>
             @error('batches.'.$index) <p class="ap-err">{{ $message }}</p> @enderror
@@ -125,10 +116,7 @@
             @endforeach
         </div>
     </div>
-    </section>
 
-    <section class="ap-sec">
-    <h4>{{ __('annual_plans.wf.sec_place') }}</h4>
     <div class="ap-grp">
         <span class="ap-lbl">{{ __('annual_plans.wf.where') }}</span>
         <div class="ap-row">
@@ -148,7 +136,6 @@
         <label class="ap-grp" style="flex: 2; min-width: 220px"><span class="ap-lbl">{{ __('annual_plans.wf.note') }}</span>
             <input class="ap-inp" {!! $readOnly ? '' : 'wire:model.live.blur="form.note"' !!} value="{{ $data['note'] }}" placeholder="{{ $readOnly ? __('annual_plans.wf.no_note') : __('annual_plans.wf.note_placeholder') }}" {{ $dis }} dir="auto"></label>
     </div>
-    </section>
 
     @unless ($readOnly)
         {{-- Only activities of the same kind can take these settings (see
