@@ -315,6 +315,7 @@ return [
         'step_proposal' => 'Proposal',
         'step_review' => 'MEAL review',
         'step_send' => 'Send to MEAL',
+        'task_text' => 'The task',
         'unit_other_label' => 'Unit name',
         'unit_other_placeholder' => 'e.g. trainings',
         'until' => 'until',

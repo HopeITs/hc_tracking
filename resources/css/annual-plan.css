@@ -13,6 +13,8 @@
 .ap-faint { color: var(--faint); }
 .ap-sm { font-size: .86rem; }
 .ap-xs { font-size: .78rem; }
+/* Text somebody typed over several lines (a send-back reason) keeps the shape they gave it; HTML would run it together. */
+.ap-lines { white-space: pre-line; }
 .ap-row { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; }
 .ap-sp { flex: 1; }
 .ap-num { font-variant-numeric: tabular-nums; }
@@ -123,8 +125,8 @@ textarea.ap-inp { height: auto; min-height: 90px; padding: 10px 12px; }
 .ap-copy-list { display: flex; flex-wrap: wrap; gap: 10px 12px; }
 .ap-copy-go { padding-top: 6px; border-top: 1px solid var(--line); }
 /* The inline "+ Add activity" form on step 2: a boxed panel so it reads as one form, not loose text. */
-.ap-add-activity { gap: 12px; background: var(--sunk); border: 1px solid var(--line-2); border-radius: 12px; padding: 16px; }
-.ap-add-activity > h3 { font-size: .95rem; text-transform: none; letter-spacing: 0; color: var(--ink); }
+.ap-add-activity, .ap-add-task { gap: 12px; background: var(--sunk); border: 1px solid var(--line-2); border-radius: 12px; padding: 16px; }
+.ap-add-activity > h3, .ap-add-task > h3 { font-size: .95rem; text-transform: none; letter-spacing: 0; color: var(--ink); }
 .ap-copy summary { cursor: pointer; font-weight: 700; font-size: .88rem; }
 
 /* timelines */

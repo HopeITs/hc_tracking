@@ -51,6 +51,8 @@ return [
         'position' => ':n / :total',
         'go_to' => 'Go to decision :n',
         'kind' => [
+            'plan' => 'Annual plan',
+            'plan_fix' => 'Annual plan',
             'review' => 'Review',
             'validate' => 'Validate',
             'approve' => 'Approve',

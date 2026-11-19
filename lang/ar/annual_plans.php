@@ -315,6 +315,7 @@ return [
         'step_proposal' => 'المقترح',
         'step_review' => 'مراجعة الميل',
         'step_send' => 'الإرسال إلى الميل',
+        'task_text' => 'المهمة',
         'unit_other_label' => 'اسم الوحدة',
         'unit_other_placeholder' => 'مثلاً: تدريبات',
         'until' => 'حتى',

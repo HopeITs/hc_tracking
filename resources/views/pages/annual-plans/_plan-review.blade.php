@@ -34,23 +34,43 @@
                 <button type="button" class="dk-btn dk-ghost" wire:click="removeFollowUp({{ $followUp->id }})">{{ __('annual_plans.wf.remove') }}</button>
             </div>
         @endforeach
-        <div class="ap-task">
-            <select class="ap-sel @error('followUpItem') is-err @enderror" wire:model="followUpItem" aria-label="{{ __('annual_plans.wf.activity') }}" data-test="follow-up-item">
-                <option value="">{{ __('annual_plans.wf.pick_activity') }}</option>
-                @foreach ($plan->items as $item)
-                    <option value="{{ $item->id }}">{{ $item->activity?->statement }}</option>
-                @endforeach
-            </select>
-            <select class="ap-sel" wire:model="followUpTrigger" aria-label="{{ __('annual_plans.wf.when') }}">
-                @foreach ($this->followUpTriggers() as $trigger)
-                    <option value="{{ $trigger->value }}">{{ $trigger->label() }}</option>
-                @endforeach
-            </select>
-            <input class="ap-inp @error('followUpText') is-err @enderror" wire:model="followUpText" placeholder="{{ __('annual_plans.wf.follow_up_placeholder') }}" dir="auto" data-test="follow-up-text">
-            <button type="button" class="dk-btn" wire:click="addFollowUp" data-test="add-follow-up">{{ __('annual_plans.wf.add_task') }}</button>
-        </div>
-        @error('followUpItem') <p class="ap-err">{{ $message }}</p> @enderror
-        @error('followUpText') <p class="ap-err">{{ $message }}</p> @enderror
+        {{-- The three fields stay behind their own button, the way a missing activity is added on step 2. --}}
+        @if ($addingFollowUp)
+            <div class="ap-grp ap-add-task" data-add-follow-up-form>
+                <h3>{{ __('annual_plans.wf.add_task') }}</h3>
+                <label class="ap-grp">
+                    <span class="ap-lbl">{{ __('annual_plans.wf.activity') }}</span>
+                    <select class="ap-sel is-wide @error('followUpItem') is-err @enderror" wire:model="followUpItem" data-test="follow-up-item">
+                        <option value="">{{ __('annual_plans.wf.pick_activity') }}</option>
+                        @foreach ($plan->items as $item)
+                            <option value="{{ $item->id }}">{{ $item->activity?->statement }}</option>
+                        @endforeach
+                    </select>
+                </label>
+                @error('followUpItem') <p class="ap-err">{{ $message }}</p> @enderror
+                <label class="ap-grp">
+                    <span class="ap-lbl">{{ __('annual_plans.wf.when') }}</span>
+                    <select class="ap-sel is-wide" wire:model="followUpTrigger" data-test="follow-up-trigger">
+                        @foreach ($this->followUpTriggers() as $trigger)
+                            <option value="{{ $trigger->value }}">{{ $trigger->label() }}</option>
+                        @endforeach
+                    </select>
+                </label>
+                <label class="ap-grp">
+                    <span class="ap-lbl">{{ __('annual_plans.wf.task_text') }}</span>
+                    <input class="ap-inp @error('followUpText') is-err @enderror" wire:model="followUpText" maxlength="255" placeholder="{{ __('annual_plans.wf.follow_up_placeholder') }}" dir="auto" data-test="follow-up-text" autofocus>
+                </label>
+                @error('followUpText') <p class="ap-err">{{ $message }}</p> @enderror
+                <div class="ap-row">
+                    <button type="button" class="dk-btn" wire:click="$set('addingFollowUp', false)">{{ __('annual_plans.wf.cancel') }}</button>
+                    <button type="button" class="dk-btn dk-primary" wire:click="addFollowUp" wire:loading.attr="disabled" wire:target="addFollowUp" data-test="add-follow-up">{{ __('annual_plans.wf.add_task') }}</button>
+                </div>
+            </div>
+        @else
+            <div class="ap-row">
+                <button type="button" class="dk-btn" wire:click="$set('addingFollowUp', true)" data-test="open-follow-up">+ {{ __('annual_plans.wf.add_task') }}</button>
+            </div>
+        @endif
     </div>
 
     <div class="ap-grp">
@@ -67,12 +87,16 @@
 </div>
 
 {{-- The app's own confirmation, never the browser's (user report 2026-11-12). --}}
+{{-- The plan it falls on is named in the dialog: two plans can wait with MEAL at once. --}}
 <x-ui.confirm-modal
     icon="check-badge"
     wire:model="confirmingApproval"
     tone="neutral"
     :title="__('annual_plans.wf.approve_button')"
     :message="__('annual_plans.wf.approve_confirm')"
+    :record="$plan->proposal->name"
+    :record-meta="$plan->program?->name"
+    record-icon="calendar-date-range"
     confirm="approvePlan"
     :confirm-label="__('annual_plans.wf.approve_button')"
     confirm-test="confirm-approve-plan"

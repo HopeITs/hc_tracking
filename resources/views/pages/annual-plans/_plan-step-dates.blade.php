@@ -11,7 +11,7 @@
     </div>
 
     @if ($plan->sent_back_reason)
-        <div class="ap-info is-bad" data-sent-back>↩︎ <b>{{ __('annual_plans.wf.sent_back_by', ['name' => $plan->sentBackBy?->name ?? __('annual_plans.wf.meal')]) }}</b> “<span dir="auto">{{ $plan->sent_back_reason }}</span>” {{ __('annual_plans.wf.fix_and_send') }}</div>
+        <div class="ap-info is-bad" data-sent-back>↩︎ <b>{{ __('annual_plans.wf.sent_back_by', ['name' => $plan->sentBackBy?->name ?? __('annual_plans.wf.meal')]) }}</b> “<span class="ap-lines" dir="auto">{{ $plan->sent_back_reason }}</span>” {{ __('annual_plans.wf.fix_and_send') }}</div>
     @endif
 
     {{-- The whole-plan calendar scrolls with the page: pinned (sticky) it stayed

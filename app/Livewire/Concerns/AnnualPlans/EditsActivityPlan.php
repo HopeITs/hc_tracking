@@ -233,7 +233,7 @@ trait EditsActivityPlan
     public function plan(): ActivityPlan
     {
         return ActivityPlan::query()
-            ->with(['proposal', 'items.activity:id,statement,activity_kind', 'items.batches', 'items.cities', 'followUps', 'submitter', 'approver', 'sentBackBy'])
+            ->with(['proposal', 'program', 'items.activity:id,statement,activity_kind', 'items.batches', 'items.cities', 'followUps', 'submitter', 'approver', 'sentBackBy'])
             ->findOrFail($this->planId);
     }
 
@@ -605,6 +605,12 @@ trait EditsActivityPlan
 
     // ---- MEAL review ----------------------------------------------------------------
 
+    /**
+     * The follow-up form opens from its own button, the way a missing
+     * activity is added on step 2; it closes once the task is on the list.
+     */
+    public bool $addingFollowUp = false;
+
     public function addFollowUp(): void
     {
         $this->run(function (): void {
@@ -613,7 +619,7 @@ trait EditsActivityPlan
             }
 
             app(ManageActivityPlanFollowUps::class)->add($this->user(), $this->plan, (int) $this->followUpItem, $this->followUpTrigger, $this->followUpText);
-            $this->followUpText = '';
+            $this->reset('followUpText', 'followUpItem', 'addingFollowUp');
             $this->refreshPlan();
         });
     }

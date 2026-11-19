@@ -310,7 +310,7 @@ new #[Layout('layouts::desk'), Title('titles.annual_plans')] class extends Compo
         @if ($next !== null)
             <section class="ap-next" data-next-step>
                 <span class="ap-ic is-{{ $next['tone'] }}" aria-hidden="true">!</span>
-                <div style="flex: 1; min-width: 220px"><h2>{{ $next['title'] }}</h2><p class="ap-sm ap-muted" dir="auto">{{ $next['body'] }}</p></div>
+                <div style="flex: 1; min-width: 220px"><h2>{{ $next['title'] }}</h2><p class="ap-sm ap-muted ap-lines" dir="auto">{{ $next['body'] }}</p></div>
                 <a class="dk-btn dk-primary" href="{{ $next['url'] }}" wire:navigate data-test="next-step-button">{{ $next['label'] }}</a>
             </section>
         @endif

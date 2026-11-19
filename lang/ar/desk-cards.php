@@ -51,6 +51,8 @@ return [
         'position' => ':n / :total',
         'go_to' => 'انتقل إلى القرار :n',
         'kind' => [
+            'plan' => 'خطة سنوية',
+            'plan_fix' => 'خطة سنوية',
             'review' => 'مراجعة',
             'validate' => 'اعتماد',
             'approve' => 'موافقة',

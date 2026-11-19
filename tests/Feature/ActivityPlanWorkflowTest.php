@@ -403,6 +403,10 @@ test('approving asks in the app modal, not the browser dialog, then the plan goe
         ->assertDontSeeHtml('wire:confirm')
         ->set('confirmingApproval', true)
         ->assertSeeHtml('data-test="confirm-approve-plan"')
+        // The dialog names the plan it falls on: two plans can wait with MEAL at once.
+        ->assertSeeHtml('data-confirm-record')
+        ->assertSee($plan->proposal->name)
+        ->assertSee($this->program->name)
         ->call('approvePlan')
         ->assertSet('confirmingApproval', false);
 
@@ -438,4 +442,290 @@ test('the plan page shows every section at once and keeps sending locked until t
 
     $page->call('submitPlan');
     expect($plan->fresh()->status->value)->toBe('draft');
+});
+
+// ---- AP-2: the send, the MEAL review, the send-back and the approval ------------
+
+/**
+ * A plan with every activity Ready, sent to MEAL.
+ */
+function sentPlan(): ActivityPlan
+{
+    $plan = chosenPlan();
+
+    foreach ($plan->items()->get() as $item) {
+        app(SaveActivityPlanItem::class)->handle(test()->pm, $item, itemInput(), true);
+    }
+
+    return app(SubmitActivityPlan::class)->handle(test()->pm, $plan->fresh());
+}
+
+/**
+ * The toast the page showed, by its text.
+ */
+function planToast(string $text): Closure
+{
+    return fn (string $event, array $params): bool => ($params['slots']['text'] ?? null) === $text;
+}
+
+test('the send step refuses an unready plan with the ready rule, then sends it with a toast', function () {
+    $plan = chosenPlan();
+    [$first, $second] = $plan->items()->get()->all();
+    app(SaveActivityPlanItem::class)->handle($this->pm, $first, itemInput(), true);
+
+    Livewire::actingAs($this->pm)->test('pages::annual-plans.plan', ['activityPlan' => $plan])
+        ->call('goToStep', 3)
+        ->assertDispatched('toast-show', planToast(__('annual_plans.not_all_ready')));
+
+    expect($plan->fresh()->step)->toBe(2)
+        ->and($plan->fresh()->status)->toBe(ActivityPlanStatus::Draft);
+
+    app(SaveActivityPlanItem::class)->handle($this->pm, $second, itemInput(), true);
+
+    Livewire::actingAs($this->pm)->test('pages::annual-plans.plan', ['activityPlan' => $plan->fresh()])
+        ->call('goToStep', 3)
+        ->assertSeeHtml('data-plan-step="send"')
+        ->assertSeeHtml('data-test="send-to-meal"')
+        ->call('submitPlan')
+        ->assertHasNoErrors()
+        ->assertDispatched('toast-show', planToast(__('annual_plans.wf.sent_to_meal')));
+
+    expect($plan->fresh()->status)->toBe(ActivityPlanStatus::InReview);
+});
+
+test('after the send the program manager only reads the plan, told it is with MEAL', function () {
+    $plan = sentPlan();
+
+    Livewire::actingAs($this->pm)->test('pages::annual-plans.plan', ['activityPlan' => $plan])
+        ->assertSet('mode', 'wait')
+        ->assertSee(__('annual_plans.wf.with_meal_title'))
+        ->assertSeeHtml('data-plan-waiting')
+        ->assertDontSeeHtml('data-test="send-to-meal"')
+        ->assertDontSeeHtml('data-plan-step="review"')
+        ->call('goToStep', 2);
+
+    expect($plan->fresh()->status)->toBe(ActivityPlanStatus::InReview)
+        ->and($plan->fresh()->step)->toBe(3);
+
+    expect(fn () => app(SaveActivityPlanItem::class)->handle($this->pm, $plan->items()->first(), itemInput(), true))->toThrow(AuthorizationException::class)
+        ->and(fn () => app(ChooseActivityPlanActivities::class)->handle($this->pm, $plan, [$this->basic->id]))->toThrow(AuthorizationException::class)
+        ->and(fn () => app(AddPlanActivity::class)->handle($this->pm, $plan, 'Late activity', (int) $this->basic->parent_id, false))->toThrow(AuthorizationException::class)
+        ->and(fn () => app(SubmitActivityPlan::class)->handle($this->pm, $plan))->toThrow(AuthorizationException::class);
+});
+
+test('the MEAL manager hears that a plan waits, and the register points at it only for them', function () {
+    Cache::flush();
+    $plan = sentPlan();
+
+    $told = UserNotification::query()->forUser($this->meal)->get()
+        ->filter(fn ($row): bool => $row->data['key'] === 'notifications.events.annual_plan.plan_submitted');
+    expect($told)->toHaveCount(1);
+
+    Livewire::actingAs($this->meal)->test('pages::annual-plans.plans')
+        ->assertSee(__('annual_plans.wf.next_review_title'));
+
+    Livewire::actingAs($this->otherManager)->test('pages::annual-plans.plans')
+        ->assertDontSee(__('annual_plans.wf.next_review_title'));
+});
+
+test('the review names who sent the plan and when, and says plainly that it is read-only', function () {
+    $plan = sentPlan();
+
+    Livewire::actingAs($this->meal)->test('pages::annual-plans.plan', ['activityPlan' => $plan])
+        ->assertSet('mode', 'review')
+        ->assertSee(__('annual_plans.wf.sent_by_on', ['name' => $this->pm->name, 'date' => now()->translatedFormat(__('formats.date'))]))
+        ->assertSee(__('annual_plans.wf.read_only_info'))
+        ->assertSee(__('annual_plans.wf.whole_plan'))
+        ->assertSeeHtml('data-review-items');
+});
+
+test('a follow-up task needs its words and its activity, then it is listed and removed', function () {
+    $plan = sentPlan();
+    $item = $plan->items()->first();
+
+    // The three fields are behind their own button, like adding an activity on step 2.
+    $page = Livewire::actingAs($this->meal)->test('pages::annual-plans.plan', ['activityPlan' => $plan])
+        ->assertSeeHtml('data-test="open-follow-up"')
+        ->assertDontSeeHtml('data-add-follow-up-form')
+        ->set('addingFollowUp', true)
+        ->assertSeeHtml('data-add-follow-up-form')
+        ->set('followUpText', 'Run the post test')
+        ->set('followUpItem', '')
+        ->call('addFollowUp')
+        ->assertHasErrors('followUpItem')
+        ->assertSee(__('annual_plans.wf.follow_up_pick_activity'))
+        ->assertSeeHtml('data-add-follow-up-form');
+
+    $page->set('followUpItem', (string) $item->id)
+        ->set('followUpText', '   ')
+        ->call('addFollowUp')
+        ->assertHasErrors('followUpText')
+        ->assertSee(__('annual_plans.follow_up_text_required'));
+
+    expect($plan->followUps()->count())->toBe(0);
+
+    $page->set('followUpText', 'Run the post test')
+        ->set('followUpTrigger', 'start')
+        ->call('addFollowUp')
+        ->assertHasNoErrors()
+        ->assertSee('Run the post test')
+        ->assertSeeHtml('data-follow-up="'.$plan->followUps()->value('id').'"')
+        // Once the task is on the list the form closes itself again.
+        ->assertSet('addingFollowUp', false)
+        ->assertDontSeeHtml('data-add-follow-up-form');
+
+    expect($plan->followUps()->count())->toBe(1)
+        ->and($plan->followUps()->value('trigger')->value)->toBe('start');
+
+    $page->call('removeFollowUp', $plan->followUps()->value('id'));
+
+    expect($plan->followUps()->count())->toBe(0);
+});
+
+test('a send back keeps everything the program manager entered and shows the reason in full', function () {
+    $plan = sentPlan();
+    $item = $plan->items()->first();
+    app(ManageActivityPlanFollowUps::class)->add($this->meal, $plan, $item->id, 'middle', 'Watch the first batch');
+    $reason = 'English sessions run in Aleppo only, but the proposal promises Homs as well, so add a Homs batch of the same size and move the second batch two weeks later so the two do not overlap with the exams.';
+
+    Livewire::actingAs($this->meal)->test('pages::annual-plans.plan', ['activityPlan' => $plan])
+        ->call('sendBackPlan')
+        ->assertHasErrors('sendBackReason')
+        ->assertSee(__('annual_plans.send_back_reason_required'))
+        ->set('sendBackReason', $reason)
+        ->call('sendBackPlan')
+        ->assertDispatched('toast-show', planToast(__('annual_plans.wf.sent_back_toast')));
+
+    $plan = $plan->fresh();
+    expect($plan->status)->toBe(ActivityPlanStatus::Draft)
+        ->and($plan->step)->toBe(2)
+        ->and($plan->sent_back_reason)->toBe($reason);
+
+    // Nothing the program manager entered was lost, and the reason is on the page whole.
+    $item = $plan->items()->where('id', $item->id)->first()->load('batches', 'cities');
+    expect($plan->items()->count())->toBe(2)
+        ->and($plan->items()->where('is_ready', true)->count())->toBe(2)
+        ->and($item->expected_people)->toBe(60)
+        ->and($item->cityIds())->toBe([$this->aleppo, $this->homs])
+        ->and($item->batches->first()->planned_count)->toBe(16)
+        ->and($item->batches->first()->start_week->toDateString())->toBe('2027-03-01')
+        ->and($plan->followUps()->count())->toBe(1);
+
+    Livewire::actingAs($this->pm)->test('pages::annual-plans.plan', ['activityPlan' => $plan])
+        ->assertSet('mode', 'plan')
+        ->assertSeeHtml('data-sent-back')
+        ->assertSee($reason)
+        ->assertSee(__('annual_plans.wf.sent_back_by', ['name' => $this->meal->name]))
+        // Sent again without re-entering a thing.
+        ->call('goToStep', 3)
+        ->call('submitPlan')
+        ->assertHasNoErrors();
+
+    expect($plan->fresh()->status)->toBe(ActivityPlanStatus::InReview)
+        ->and($plan->fresh()->sent_back_reason)->toBeNull();
+});
+
+test('an approved plan is live, its program manager is told, and nobody edits it again', function () {
+    $plan = sentPlan();
+    $superAdmin = userWithRole('Super Admin');
+
+    Livewire::actingAs($this->meal)->test('pages::annual-plans.plan', ['activityPlan' => $plan])
+        ->call('approvePlan')
+        ->assertDispatched('toast-show', planToast(__('annual_plans.wf.approved_toast')))
+        ->assertSeeHtml('data-plan-step="approved"');
+
+    $plan = $plan->fresh();
+    expect($plan->status)->toBe(ActivityPlanStatus::Approved);
+
+    $told = UserNotification::query()->forUser($this->pm)->get()
+        ->filter(fn ($row): bool => $row->data['key'] === 'notifications.events.annual_plan.plan_approved');
+    expect($told)->toHaveCount(1);
+
+    foreach ([$this->pm, $this->meal, $superAdmin] as $user) {
+        expect($user->can('update', $plan))->toBeFalse()
+            ->and($user->can('review', $plan))->toBeFalse()
+            ->and($user->can('delete', $plan))->toBeFalse();
+    }
+
+    expect(fn () => app(SaveActivityPlanItem::class)->handle($this->pm, $plan->items()->first(), itemInput(), true))->toThrow(AuthorizationException::class)
+        ->and(fn () => app(SaveActivityPlanItem::class)->handle($superAdmin, $plan->items()->first(), itemInput(), true))->toThrow(AuthorizationException::class)
+        ->and(fn () => app(ReviewActivityPlan::class)->sendBack($this->meal, $plan, 'Changed my mind'))->toThrow(AuthorizationException::class)
+        ->and(fn () => app(ManageActivityPlanFollowUps::class)->add($this->meal, $plan, (int) $plan->items()->value('id'), 'finish', 'One more'))->toThrow(AuthorizationException::class);
+
+    Livewire::actingAs($superAdmin)->test('pages::annual-plans.plan', ['activityPlan' => $plan])
+        ->assertSet('mode', 'read')
+        ->assertDontSeeHtml('data-test="send-to-meal"')
+        ->assertDontSeeHtml('data-plan-step="review"');
+});
+
+test('the dates step writes out why the send step is still closed', function () {
+    $plan = chosenPlan();
+    [$first, $second] = $plan->items()->get()->all();
+    app(SaveActivityPlanItem::class)->handle($this->pm, $first, itemInput(), true);
+
+    // A disabled button fires no click, so the rule is on the page as words.
+    Livewire::actingAs($this->pm)->test('pages::annual-plans.plan', ['activityPlan' => $plan->fresh()])
+        ->assertSeeHtml('data-not-ready')
+        ->assertSee(__('annual_plans.not_all_ready'))
+        ->assertSeeHtml('disabled');
+
+    app(SaveActivityPlanItem::class)->handle($this->pm, $second, itemInput(), true);
+
+    Livewire::actingAs($this->pm)->test('pages::annual-plans.plan', ['activityPlan' => $plan->fresh()])
+        ->assertDontSeeHtml('data-not-ready')
+        ->assertDontSee(__('annual_plans.not_all_ready'));
+});
+
+test('a plan with MEAL waits on the MEAL manager from the desk too, and on nobody else', function () {
+    $plan = sentPlan();
+
+    Livewire::actingAs($this->meal)->test('desk.panels.needs', ['size' => 'L'])
+        ->assertSee($plan->proposal->name)
+        ->assertSee(__('desk.decision.plan'))
+        ->assertSee($this->pm->name)
+        ->assertSeeHtml('data-decision="plan"');
+
+    Livewire::actingAs($this->otherManager)->test('desk.panels.needs', ['size' => 'L'])
+        ->assertDontSee($plan->proposal->name);
+
+    app(ReviewActivityPlan::class)->approve($this->meal, $plan);
+
+    Livewire::actingAs($this->meal)->test('desk.panels.needs', ['size' => 'L'])
+        ->assertDontSee($plan->proposal->name);
+});
+
+test('a plan MEAL sent back waits on its program manager from the desk, and on nobody else', function () {
+    $plan = sentPlan();
+    app(ReviewActivityPlan::class)->sendBack($this->meal, $plan, 'Add Homs to English');
+
+    Livewire::actingAs($this->pm)->test('desk.panels.needs', ['size' => 'L'])
+        ->assertSee($plan->proposal->name)
+        ->assertSee(__('desk.decision.plan_fix'))
+        ->assertSee($this->meal->name)
+        ->assertSeeHtml('data-decision="plan_fix"');
+
+    // MEAL is done with it until it comes back, and another manager never sees it.
+    Livewire::actingAs($this->meal)->test('desk.panels.needs', ['size' => 'L'])->assertDontSee($plan->proposal->name);
+    Livewire::actingAs($this->otherManager)->test('desk.panels.needs', ['size' => 'L'])->assertDontSee($plan->proposal->name);
+
+    app(SubmitActivityPlan::class)->handle($this->pm, $plan->fresh());
+
+    Livewire::actingAs($this->pm)->test('desk.panels.needs', ['size' => 'L'])->assertDontSee($plan->proposal->name);
+});
+
+test('a send-back reason written over several lines keeps its shape wherever it is read', function () {
+    $plan = sentPlan();
+    $reason = "English runs in Aleppo only.\n\nAdd a Homs batch of the same size, and move the second batch two weeks later.";
+    app(ReviewActivityPlan::class)->sendBack($this->meal, $plan, $reason);
+
+    // The reason is one block of text on the plan page and in the register's next step,
+    // and the stylesheet is what keeps its line breaks.
+    Livewire::actingAs($this->pm)->test('pages::annual-plans.plan', ['activityPlan' => $plan->fresh()])
+        ->assertSeeHtml('<span class="ap-lines" dir="auto">'.e($reason).'</span>');
+
+    Livewire::actingAs($this->pm)->test('pages::annual-plans.plans')
+        ->assertSeeHtml('ap-lines')
+        ->assertSee($reason);
+
+    expect(file_get_contents(resource_path('css/annual-plan.css')))->toContain('.ap-lines { white-space: pre-line; }');
 });
