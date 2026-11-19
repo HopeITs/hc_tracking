@@ -61,7 +61,7 @@ final class AddPlanActivity
                         'statement' => __('annual_plans.wf.auto_output', ['outcome' => mb_substr((string) $parent->statement, 0, 180)]),
                         'type' => ResultType::Output->value,
                         'parent_id' => $parent->id,
-                        'checkout_period' => $parent->checkout_period?->value ?? 'monthly',
+                        'checkout_period' => $parent->checkout_period->value,
                     ], $proposal, callerAuthorized: true));
 
             return $this->save->handle(null, [
@@ -69,7 +69,7 @@ final class AddPlanActivity
                 'type' => ResultType::Activity->value,
                 'activity_kind' => ($singleWeek ? ActivityKind::Event : ActivityKind::Continuous)->value,
                 'parent_id' => $output->id,
-                'checkout_period' => $period?->value ?? $output->checkout_period?->value ?? 'monthly',
+                'checkout_period' => ($period ?? $output->checkout_period)->value,
             ], $proposal, callerAuthorized: true);
         });
     }
