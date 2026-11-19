@@ -59,6 +59,8 @@ test('the dates step shows the plan calendar unpinned and lists copy targets as 
         ->assertSeeHtml('data-plan-gantt')
         ->call('toggleItem', $target->id)
         ->assertSet('openItemId', $target->id)
+        ->assertSeeInOrder([__('annual_plans.wf.sec_run'), __('annual_plans.wf.sec_weeks'), __('annual_plans.wf.sec_place')])
+        ->assertDontSee(__('enums.count_unit.session', [], 'en').' · '.__('enums.count_unit.session', [], 'ar'))
         ->assertSeeHtml('class="ap-copy-list"')
         ->assertSeeHtml('data-test="copy-target-'.$source->id.'"');
 });
