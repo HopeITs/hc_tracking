@@ -66,7 +66,20 @@
                 </select>
             </label>
             @error('newActivityParent') <p class="ap-err">{{ $message }}</p> @enderror
-            <label class="ap-row ap-sm"><input type="checkbox" wire:model="newActivitySingle"> {{ __('annual_plans.wf.activity_single_week') }}</label>
+            {{-- The same two questions, words and buttons as the Logical Framework's "Add result". --}}
+            <x-ui.form-segmented
+                wire:model="newActivityKind"
+                :label="__('results_framework.activity_kind')"
+                :help="__('results_framework.activity_kind_help')"
+                required
+                :options="collect(\App\Enums\ActivityKind::cases())->map(fn (\App\Enums\ActivityKind $kind): array => ['value' => $kind->value, 'label' => $kind->label()])->all()"
+            />
+            <x-ui.form-segmented
+                wire:model="newActivityPeriod"
+                :label="__('results_framework.checked')"
+                required
+                :options="collect(\App\Enums\Period::cases())->map(fn (\App\Enums\Period $period): array => ['value' => $period->value, 'label' => $period->label()])->all()"
+            />
             <div class="ap-row">
                 <button type="button" class="dk-btn" wire:click="$set('addingActivity', false)">{{ __('annual_plans.wf.cancel') }}</button>
                 <button type="button" class="dk-btn dk-primary" wire:click="addActivity" wire:loading.attr="disabled" wire:target="addActivity" data-test="save-new-activity">{{ __('annual_plans.wf.add_activity') }}</button>

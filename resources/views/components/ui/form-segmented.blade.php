@@ -6,6 +6,9 @@
     'help' => null,
     'value' => null,
     'disabled' => false,
+    // Size each segment to its label instead of equal widths: for a row of
+    // many choices whose labels differ a lot (e.g. "Cross-cutting").
+    'fit' => false,
 ])
 
 @php
@@ -52,7 +55,7 @@
         aria-labelledby="{{ $id }}-label"
         @if ($describedBy !== '') aria-describedby="{{ $describedBy }}" @endif
         @if ($error !== '') aria-invalid="true" data-invalid @endif
-        class="form-segmented"
+        @class(['form-segmented', 'form-segmented-fit' => $fit])
         x-data="formSegmented(@js($currentValue), @js($values))"
         x-modelable="value"
         {{ $attributes->whereStartsWith('wire:model') }}

@@ -22,6 +22,7 @@
                         wire:model.live="resultType"
                         :label="__('common.type')"
                         class="@2xl/modal:col-span-2"
+                        fit
                         required
                         :options="[
                             ['value' => ResultType::Impact->value, 'label' => ResultType::Impact->label(), 'dot' => 'bg-secondary-dark dark:bg-ink'],

@@ -12,9 +12,11 @@ use App\Actions\AnnualPlans\ManagePlanMilestones;
 use App\Actions\AnnualPlans\ReviewActivityPlan;
 use App\Actions\AnnualPlans\SaveActivityPlanItem;
 use App\Actions\AnnualPlans\SubmitActivityPlan;
+use App\Enums\ActivityKind;
 use App\Enums\ActivityPlanStatus;
 use App\Enums\CountUnit;
 use App\Enums\FollowUpTrigger;
+use App\Enums\Period;
 use App\Enums\ResultType;
 use App\Models\ActivityPlan;
 use App\Models\ActivityPlanBatch;
@@ -379,7 +381,13 @@ trait EditsActivityPlan
 
     public string $newActivityParent = '';
 
-    public bool $newActivitySingle = false;
+    /**
+     * The new activity's kind and checking period, asked the same way as the
+     * Logical Framework's own "Add result" form (Event = it happens once).
+     */
+    public string $newActivityKind = 'continuous';
+
+    public string $newActivityPeriod = 'quarterly';
 
     /**
      * The outcomes and outputs of the plan's program a new activity can serve.
@@ -405,10 +413,11 @@ trait EditsActivityPlan
     {
         $this->run(function (): void {
             $activity = app(AddPlanActivity::class)->handle(
-                $this->user(), $this->plan, $this->newActivityName, (int) $this->newActivityParent, $this->newActivitySingle,
+                $this->user(), $this->plan, $this->newActivityName, (int) $this->newActivityParent,
+                $this->newActivityKind === ActivityKind::Event->value, Period::tryFrom($this->newActivityPeriod),
             );
             $this->picked[] = (string) $activity->id;
-            $this->reset('newActivityName', 'newActivitySingle', 'addingActivity');
+            $this->reset('newActivityName', 'newActivityKind', 'newActivityPeriod', 'addingActivity');
             unset($this->activityGroups, $this->activityParentOptions);
             Flux::toast(variant: 'success', text: __('annual_plans.wf.activity_added'));
         });
