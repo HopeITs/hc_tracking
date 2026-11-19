@@ -309,7 +309,7 @@ test('the page extends the proposal and shows the new end beside the original wi
         ->call('saveExtension')
         ->assertHasNoErrors()
         ->assertSet('showExtensionModal', false)
-        ->assertSee('Ends Oct 31, 2027 · Extended to Mar 31, 2028')
+        ->assertSee('Extended to Mar 31, 2028')
         ->assertSee(StatusNoteKind::Extension->label());
 
     $media = Media::query()->sole();

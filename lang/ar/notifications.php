@@ -653,6 +653,18 @@ return [
                 'title' => 'قبول التقرير الختامي',
                 'body' => 'سجّل :actor موافقة الممول على التقرير الختامي لـ«:subject»',
             ],
+            'framework_done' => [
+                'title' => 'إنجاز الإطار المنطقي',
+                'body' => ':actor أنجز الإطار المنطقي لـ«:subject»',
+            ],
+            'framework_reopened' => [
+                'title' => 'إعادة فتح الإطار المنطقي',
+                'body' => ':actor أعاد فتح الإطار المنطقي لـ«:subject»',
+            ],
+            'status_date_changed' => [
+                'title' => 'تصحيح تاريخ في المقترح',
+                'body' => ':actor صحّح تاريخ حالة في «:subject»',
+            ],
             'beneficiaries_changed' => [
                 'title' => 'تغيير عدد المستفيدين',
                 'body' => 'غيّر :actor عدد المستفيدين في «:subject»',

@@ -123,9 +123,11 @@ new #[Layout('layouts::desk'), Title('titles.results_framework')] class extends 
             ->map(function (Proposal $proposal) use ($user, $mayViewProposals, $mayViewProjects): ?array {
                 $project = $mayViewProjects ? $proposal->projects->first(fn (Project $project): bool => $user->can('view', $project)) : null;
 
+                // A proposal opens on its own page (user decision 2026-11-19); the
+                // project's Story is the fallback for someone who may not view proposals.
                 $href = match (true) {
-                    $project !== null => route('projects.show', ['project' => $project, 'proposal' => $proposal->id, 'ptab' => 'logframe']).'#proposal',
                     $mayViewProposals => route('proposals.show', ['proposal' => $proposal, 'ptab' => 'logframe']),
+                    $project !== null => route('projects.show', ['project' => $project, 'proposal' => $proposal->id, 'ptab' => 'logframe']).'#proposal',
                     default => null,
                 };
 

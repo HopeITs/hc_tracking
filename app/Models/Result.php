@@ -40,11 +40,13 @@ use Illuminate\Support\Str;
  * @property int|null $copied_from_id
  * @property ResultType $type
  * @property ActivityKind|null $activity_kind
+ * @property CarbonImmutable|null $starts_on an activity's own start, "Dates" schedule only
+ * @property CarbonImmutable|null $ends_on an activity's own end, "Dates" schedule only
  * @property Period $checkout_period
  * @property CarbonImmutable|null $created_at
  * @property CarbonImmutable|null $updated_at
  */
-#[Fillable(['statement', 'parent_id', 'program_id', 'proposal_id', 'contributes_to_result_id', 'copied_from_id', 'type', 'activity_kind', 'checkout_period'])]
+#[Fillable(['statement', 'parent_id', 'program_id', 'proposal_id', 'contributes_to_result_id', 'copied_from_id', 'type', 'activity_kind', 'starts_on', 'ends_on', 'checkout_period'])]
 #[ObservedBy(ResultObserver::class)]
 class Result extends Model implements TracksActivity
 {
@@ -171,6 +173,8 @@ class Result extends Model implements TracksActivity
         return [
             'type' => ResultType::class,
             'activity_kind' => ActivityKind::class,
+            'starts_on' => 'immutable_date',
+            'ends_on' => 'immutable_date',
             'checkout_period' => Period::class,
         ];
     }

@@ -314,7 +314,8 @@ test('a concept note returned with a reason shows that reason to the proposal ed
 
     transition($prManager, $proposal, ProposalStatus::ConceptNote, ['reason' => 'Rework the problem statement.']);
 
-    Livewire::actingAs($fundraiser)
+    // The reason is in the status history, inside the folded "History & approvals" section.
+    Livewire::withQueryParams(['ptab' => 'status'])->actingAs($fundraiser)
         ->test('pages::proposals.show', ['proposal' => $proposal])
         ->assertOk()
         ->assertSee('Rework the problem statement.');

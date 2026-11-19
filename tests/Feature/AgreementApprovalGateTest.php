@@ -280,7 +280,9 @@ test('a proposal moved away from approved after its agreement was recorded warns
     $user = User::factory()->role('Financial')->create();
     $agreement = DonorProposal::factory()->create();
 
+    // On the proposal page it is a "Needs attention" item (stage 3); the bar opens on click.
     Livewire::actingAs($user)->test('pages::proposals.show', ['proposal' => $agreement->proposal])
+        ->set('attentionOpen', true)
         ->assertSee(__('funding_agreements.proposal_status_inconsistent_with_agreement'));
 
     Livewire::actingAs($user)->test('pages::funding-agreements.show', ['donorProposal' => $agreement])

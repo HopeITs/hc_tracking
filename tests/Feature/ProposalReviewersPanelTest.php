@@ -49,7 +49,9 @@ function reviewerWithLogin(Proposal $proposal, ReviewStage $stage = ReviewStage:
 
 function reviewersPanel(User $user, Proposal $proposal): Testable
 {
-    return Livewire::actingAs($user)->test('pages::proposals.show', ['proposal' => $proposal]);
+    // The panel sits in the folded "History & approvals" section; review links
+    // (ProposalStoryLink) carry ?ptab=status, which opens it.
+    return Livewire::withQueryParams(['ptab' => 'status'])->actingAs($user)->test('pages::proposals.show', ['proposal' => $proposal]);
 }
 
 beforeEach(fn () => $this->travelTo('2026-10-13 10:00:00'));
@@ -96,7 +98,8 @@ test('the viewer\'s own row in the open stage is where review links land, and no
     $outsiderView = reviewersPanel(userWithRole('Financial'), $proposal)->html();
 
     expect(substr_count($reviewerView, 'id="my-review"'))->toBe(1)
-        ->and($reviewerView)->toMatch('/<li\s+id="my-review"[^>]*data-reviewer-row="'.$mine->id.'"/')
+        // Stage 3b: reviewer rows are divs inside the stage fold.
+        ->and($reviewerView)->toMatch('/<div\s+id="my-review"[^>]*data-reviewer-row="'.$mine->id.'"/')
         ->and($outsiderView)->not->toContain('id="my-review"');
 });
 

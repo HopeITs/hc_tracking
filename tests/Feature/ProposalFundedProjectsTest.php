@@ -23,7 +23,8 @@ test('a project running past the grant term is flagged', function () {
     Livewire::actingAs($user)
         ->test('pages::proposals.show', ['proposal' => $proposal])
         ->set('tab', 'projects')
-        ->assertSee('Runs past the end of this grant')
+        // Stage 3b: the Projects & places section flags it with an "Ends after grant" pill.
+        ->assertSee(__('proposals.sections.ends_after_grant'))
         ->assertSeeHtml('data-outruns-grant');
 });
 

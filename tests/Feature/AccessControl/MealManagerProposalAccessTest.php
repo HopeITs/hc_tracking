@@ -44,9 +44,12 @@ test('the MEAL manager opens the proposal with the Funding tab', function () {
     $this->actingAs($mealManager)->get(route('proposals.index'))->assertOk();
     $this->get(route('proposals.show', $proposal))->assertOk();
 
-    $tabs = collect(Livewire::actingAs($mealManager)->test('pages::proposals.show', ['proposal' => $proposal])->instance()->tabs())->pluck('key');
+    // Stage 3 of the redesign: the tabs became folded sections ("money" is the
+    // old Funding tab) and the logical framework sits on the proposal card.
+    $page = Livewire::actingAs($mealManager)->test('pages::proposals.show', ['proposal' => $proposal]);
 
-    expect($tabs)->toContain('funding', 'projects', 'logframe', 'targets', 'plan', 'reports', 'documents');
+    expect(array_column($page->instance()->sections, 'key'))->toContain('money', 'projects', 'targets', 'plan', 'reports', 'docs');
+    $page->assertSeeHtml('data-test="proposal-logframe"');
 });
 
 test('a MEAL officer is still kept out of a proposal they do not review', function () {

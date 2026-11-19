@@ -13,8 +13,7 @@ use Symfony\Component\HttpFoundation\Response;
 /**
  * A redirect answered to a page inside a Desk tab keeps the tab marker
  * (?_tab=1) on its target. Without it, a redirect followed by Livewire's
- * navigate fetch (for example a proposal link redirected to its project
- * Story, RedirectProposalToStory) drew the whole application, sidebar and
+ * navigate fetch (for example a link redirected to another page) drew the whole application, sidebar and
  * top bar included, inside the tab: a screen inside a screen (user report
  * 2026-11-12). Only same-site targets are touched.
  */

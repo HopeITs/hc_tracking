@@ -51,7 +51,7 @@ trait BuildsResultsFramework
     public function allResults(): Collection
     {
         return $this->frameworkResults()
-            ->select(['id', 'statement', 'parent_id', 'program_id', 'proposal_id', 'contributes_to_result_id', 'copied_from_id', 'type', 'activity_kind', 'checkout_period'])
+            ->select(['id', 'statement', 'parent_id', 'program_id', 'proposal_id', 'contributes_to_result_id', 'copied_from_id', 'type', 'activity_kind', 'starts_on', 'ends_on', 'checkout_period'])
             ->with([
                 // program_id is nullable, so a result can outlive its program.
                 'program:id',
@@ -63,7 +63,7 @@ trait BuildsResultsFramework
                         'project:id,name',
                         'progress:id,indicator_id,date,value',
                         'planIndicators' => fn ($query) => $query
-                            ->select(['id', 'indicator_id', 'source_type', 'source_id', 'target', 'project_id', 'period'])
+                            ->select(['id', 'indicator_id', 'source_type', 'source_id', 'target', 'project_id', 'center_id', 'period'])
                             ->with([
                                 'project:id,name',
                                 // Rows, not counts: achievement is measured from the

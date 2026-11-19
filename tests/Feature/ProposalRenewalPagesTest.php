@@ -83,21 +83,22 @@ test('a proposal that cannot be renewed is refused', function () {
     expect(DB::table('proposals')->whereNotNull('previous_proposal_id')->count())->toBe(0);
 });
 
-test('the proposal page shows the renewal chain in both directions', function () {
+// The renewal chain now shows only inside the project page (embedded proposal).
+test('the embedded proposal shows the renewal chain in both directions', function () {
     $renewal = Proposal::factory()->create(['previous_proposal_id' => $this->previous->id, 'internal_project_number' => 'HC-2027-102']);
 
-    Livewire::actingAs($this->user)->test('pages::proposals.show', ['proposal' => $this->previous])
+    Livewire::actingAs($this->user)->test('pages::proposals.show', ['proposal' => $this->previous, 'embedded' => true])
         ->assertSeeHtml('data-test="renewal-chain-next"')
         ->assertSee('HC-2027-102')
         ->assertDontSeeHtml('data-test="renewal-chain-previous"');
 
-    Livewire::actingAs($this->user)->test('pages::proposals.show', ['proposal' => $renewal])
+    Livewire::actingAs($this->user)->test('pages::proposals.show', ['proposal' => $renewal, 'embedded' => true])
         ->assertSeeHtml('data-test="renewal-chain-previous"')
         ->assertSee('HC-2026-410');
 });
 
 test('a proposal outside any chain shows no chain', function () {
-    Livewire::actingAs($this->user)->test('pages::proposals.show', ['proposal' => $this->previous])
+    Livewire::actingAs($this->user)->test('pages::proposals.show', ['proposal' => $this->previous, 'embedded' => true])
         ->assertDontSeeHtml('data-test="renewal-chain"');
 });
 
@@ -116,7 +117,7 @@ test('a removed predecessor shows as removed and the renewal survives', function
     DB::table('project_proposal')->where('proposal_id', $this->previous->id)->delete();
     DB::table('proposals')->where('id', $this->previous->id)->delete();
 
-    Livewire::actingAs($this->user)->test('pages::proposals.show', ['proposal' => $renewal])
+    Livewire::actingAs($this->user)->test('pages::proposals.show', ['proposal' => $renewal, 'embedded' => true])
         ->assertSeeHtml('data-test="renewal-chain-removed"');
 
     expect(DB::table('proposals')->where('id', $renewal->id)->value('previous_proposal_id'))->toBeNull();

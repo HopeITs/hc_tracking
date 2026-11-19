@@ -95,6 +95,12 @@ final class TransitionProposal
 
         $proposal->refresh();
 
+        // The framework task opens when the proposal reaches Proposal draft
+        // (user decision 2026-11-19); ensure() skips payroll and duplicates.
+        if ($to === ProposalStatus::ProposalDraft) {
+            app(SyncLogframeTask::class)->ensure($proposal);
+        }
+
         return $result;
     }
 

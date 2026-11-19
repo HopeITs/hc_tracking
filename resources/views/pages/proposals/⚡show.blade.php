@@ -5,9 +5,12 @@ use App\Livewire\Concerns\ChecksFinanceVisibility;
 use App\Livewire\Concerns\ManagesAgreementForm;
 use App\Livewire\Concerns\ManagesTransferForm;
 use App\Livewire\Concerns\PreviewsFiles;
+use App\Livewire\Concerns\Proposals\BuildsProposalHead;
 use App\Livewire\Concerns\Proposals\ChartsProposalChronology;
 use App\Livewire\Concerns\Proposals\DecidesProposalChange;
+use App\Livewire\Concerns\Proposals\EditsProposalCard;
 use App\Livewire\Concerns\Proposals\FillsProposalCenters;
+use App\Livewire\Concerns\Proposals\FoldsProposalSections;
 use App\Livewire\Concerns\Proposals\ManagesFinalReportAcceptance;
 use App\Livewire\Concerns\Proposals\ManagesNegotiationNotes;
 use App\Livewire\Concerns\Proposals\ManagesProposalApproval;
@@ -19,6 +22,7 @@ use App\Livewire\Concerns\Proposals\ManagesProposalPlan;
 use App\Livewire\Concerns\Proposals\ManagesProposalRecord;
 use App\Livewire\Concerns\Proposals\ManagesProposalReviewers;
 use App\Livewire\Concerns\Proposals\ManagesProposalStatus;
+use App\Livewire\Concerns\Proposals\ReadsProposalAttention;
 use App\Livewire\Concerns\Proposals\ReadsProposalDelivery;
 use App\Livewire\Concerns\Proposals\ReadsProposalFunding;
 use App\Livewire\Concerns\Proposals\ReadsProposalHealth;
@@ -42,11 +46,14 @@ use Livewire\WithFileUploads;
 
 new #[Layout('layouts::desk'), Title('titles.proposal')] class extends Component
 {
+    use BuildsProposalHead;
     use BuildsProposalPlanGantt;
     use ChartsProposalChronology;
     use ChecksFinanceVisibility;
     use DecidesProposalChange;
+    use EditsProposalCard;
     use FillsProposalCenters;
+    use FoldsProposalSections;
     use ManagesAgreementForm;
     use ManagesFinalReportAcceptance;
     use ManagesNegotiationNotes;
@@ -61,6 +68,7 @@ new #[Layout('layouts::desk'), Title('titles.proposal')] class extends Component
     use ManagesProposalStatus;
     use ManagesTransferForm;
     use PreviewsFiles;
+    use ReadsProposalAttention;
     use ReadsProposalDelivery;
     use ReadsProposalFunding;
     use ReadsProposalHealth;
@@ -178,15 +186,30 @@ new #[Layout('layouts::desk'), Title('titles.proposal')] class extends Component
      * A tab picked in the compact view needs the tab panel, so the full
      * proposal opens in place. Runs on browser updates only, not in mount().
      */
-    public function updatingTab(): void
+    public function updatingTab(mixed $value = null): void
     {
         $this->compact = false;
+
+        // On its own page a tab is a folded section now: picking one opens it.
+        if (! $this->embedded && is_string($value)) {
+            $key = array_search($value === 'tasks' ? 'plan' : $value, self::SECTION_TABS, true);
+
+            if ($key !== false) {
+                $this->openSection($key);
+            }
+        }
     }
 
     public function updatedTab(): void
     {
         if ($this->tab === 'tasks') {
             $this->tab = 'plan';
+        }
+
+        if ($this->tab === 'logframe' && ! $this->embedded) {
+            // The framework lives in the proposal card now: an old ?ptab=logframe link scrolls to it.
+            $this->tab = 'status';
+            $this->dispatch('pp-flash', target: 'lf');
         }
 
         $offered = $this->proposal->isPayroll() ? self::PAYROLL_TABS : self::TABS;
@@ -220,7 +243,8 @@ new #[Layout('layouts::desk'), Title('titles.proposal')] class extends Component
             ['key' => 'deadlines', 'label' => __('proposals.deadlines'), 'count' => count($this->deadlines)],
             ...($this->canViewAgreements() ? [['key' => 'funding', 'label' => __('common.funding'), 'count' => $this->agreements->count()]] : []),
             ['key' => 'projects', 'label' => __('common.projects'), 'count' => $this->projects->count()],
-            ['key' => 'logframe', 'label' => __('proposals.tab_logframe'), 'count' => null],
+            // On its own page the framework sits in the proposal card; only the embedded view keeps the tab.
+            ...($this->embedded ? [['key' => 'logframe', 'label' => __('proposals.tab_logframe'), 'count' => null]] : []),
             ['key' => 'targets', 'label' => __('proposals.tab_targets'), 'count' => $this->targets->count()],
             ['key' => 'plan', 'label' => __('proposals.tab_plan'), 'count' => $this->planTaskRows->count()],
             ['key' => 'reports', 'label' => __('proposals.donor_reports'), 'count' => $this->reports->count()],
@@ -232,7 +256,7 @@ new #[Layout('layouts::desk'), Title('titles.proposal')] class extends Component
     public function proposal(): Proposal
     {
         return Proposal::query()
-            ->select(['id', 'name', 'internal_project_number', 'planned_date_begin', 'planned_date_end', 'actual_date_begin', 'actual_date_end', 'extended_date_end', 'extension_reason', 'status', 'kind', 'on_hold_since', 'status_remind_on', 'notes', 'concept_note', 'updated_at', 'created_at', 'donor_id', 'final_report_accepted_on', 'final_report_accepted_by'])
+            ->select(['id', 'name', 'internal_project_number', 'planned_date_begin', 'planned_date_end', 'actual_date_begin', 'actual_date_end', 'extended_date_end', 'extension_reason', 'status', 'kind', 'on_hold_since', 'status_remind_on', 'notes', 'concept_note', 'updated_at', 'created_at', 'donor_id', 'final_report_accepted_on', 'final_report_accepted_by', 'requested_budget', 'requested_currency'])
             // The donor's name heads the concept-note card (W-24); a name is not money.
             ->with('donor:id,name')
             ->findOrFail($this->proposalId);
@@ -370,8 +394,11 @@ new #[Layout('layouts::desk'), Title('titles.proposal')] class extends Component
             $this->arrivals, $this->vitals, $this->term, $this->tabs, $this->proposalFiles, $this->reviewStages, $this->needAssessments, $this->approvalSubject, $this->approvalPreview, $this->approvalLocations,
             $this->canRecordFinalReportAcceptance, $this->finalReportAcceptance,
             $this->canFillCenters, $this->centerFillRows, $this->centerFillCentersByCity,
+            $this->sections, $this->headActions, $this->attentionItems, $this->hiddenAttentionKeys, $this->cardDates, $this->donorChoices,
             $this->pendingChangeRequestId, $this->changeRequestHistory, $this->changeRequestHistoryLines, $this->decidingChangeRequest, $this->decidingChangeLines, $this->changeReviewSlot,
         );
+
+        $this->attentionFrameworkMemo = null;
     }
 };
 ?>
@@ -386,7 +413,7 @@ new #[Layout('layouts::desk'), Title('titles.proposal')] class extends Component
     $arrivals = $this->arrivals;
 @endphp
 
-<section @class(['dossier @container/detail flex w-full flex-col text-secondary-dark dark:text-ink', 'min-h-full flex-1 bg-white dark:bg-surface-0' => ! $embedded]) @if ($embedded) data-embedded-proposal @endif>
+<section @class(['dossier @container/detail flex w-full flex-col text-secondary-dark dark:text-ink', 'pp-page' => ! $embedded]) @if ($embedded) data-embedded-proposal @endif x-on:pp-flash.window="const el = document.getElementById($event.detail.target); if (el) { el.scrollIntoView({ behavior: 'smooth', block: 'start' }); el.classList.remove('pp-flash'); void el.offsetWidth; el.classList.add('pp-flash') }">
     @if ($embedded)
         <header @class(['flex flex-col gap-3 @3xl/detail:flex-row @3xl/detail:items-start @3xl/detail:justify-between', '@3xl/detail:justify-end' => $compact]) data-embedded-proposal-head>
             <div @class(['min-w-0', 'sr-only' => $compact])>
@@ -407,33 +434,12 @@ new #[Layout('layouts::desk'), Title('titles.proposal')] class extends Component
             @include('pages.proposals._show-actions')
         </header>
     @else
-        <x-ui.detail-header
-            :back="\App\Support\BackUrl::for(route('proposals.index'))"
-            :breadcrumbs="[
-                ['label' => __('common.proposals'), 'url' => route('proposals.index')],
-                ['label' => $this->proposal->name],
-            ]"
-            :title="$this->proposal->name"
-            :unread="app(\App\Notifications\UnreadSubjects::class)->has(auth()->user(), 'proposal', $this->proposal->id)"
-        >
-            <x-slot:meta>
-                @if ($this->proposal->isPayroll())
-                    <x-ui.enum-badge :case="$this->proposal->kind" :aria-label="__('proposals.payroll_kind_badge')" data-test="payroll-kind-chip" />
-                @endif
-                <x-ui.project-number :number="$this->proposal->internal_project_number" kind="internal" label />
-                <span class="tabular-nums">{{ __('proposals.planned_range', ['begin' => $this->proposal->planned_date_begin?->translatedFormat(__('formats.date')), 'end' => $this->proposal->planned_date_end?->translatedFormat(__('formats.date'))]) }}</span>
-                @if ($this->proposal->actual_date_begin !== null)
-                    <span class="tabular-nums">{{ __('proposals.actual_begin', ['begin' => $this->proposal->actual_date_begin->translatedFormat(__('formats.date'))]) }}</span>
-                @endif
-            </x-slot:meta>
-
-            <x-slot:actions>
-                @include('pages.proposals._show-actions')
-            </x-slot:actions>
-        </x-ui.detail-header>
+        @include('pages.proposals._show-head')
     @endif
 
-    @include('pages.proposals._show-lifecycle')
+    @if ($embedded)
+        @include('pages.proposals._show-lifecycle')
+    @endif
 
     @if ($compact)
         {{-- Compact (project Funding tab): what needs attention beside the four readings, then the way in. --}}
@@ -449,8 +455,6 @@ new #[Layout('layouts::desk'), Title('titles.proposal')] class extends Component
             <a class="dk-btn dk-sm" href="{{ route('proposals.show', $this->proposal) }}" wire:navigate>{{ __('proposals.open_proposal_page') }}<x-desk.icon name="arrow" class="dk-flip" /></a>
         </div>
     @else
-        @include('pages.proposals._show-renewal-chain')
-
         @if ($this->pendingChangeRequestId !== null)
             {{-- Y-09: a change request is waiting; nothing changes until the PR Manager decides. --}}
             <div class="mt-7 flex flex-wrap items-center justify-between gap-3 rounded-lg border border-status-warn bg-status-warn-soft px-4 py-3 text-sm" role="status" data-test="change-pending-notice">
@@ -462,9 +466,17 @@ new #[Layout('layouts::desk'), Title('titles.proposal')] class extends Component
             </div>
         @endif
 
-        @include('pages.proposals._show-warnings')
+        @if ($embedded)
+            @include('pages.proposals._show-renewal-chain')
 
-        @include('pages.proposals._show-vitals')
+            @include('pages.proposals._show-warnings')
+
+            @include('pages.proposals._show-vitals')
+        @else
+            @include('pages.proposals._show-attention')
+
+            @include('pages.proposals._show-card')
+        @endif
 
         @if ($embedded)
             <div class="mt-8 flex justify-end">
@@ -472,6 +484,7 @@ new #[Layout('layouts::desk'), Title('titles.proposal')] class extends Component
             </div>
         @endif
 
+        @if ($embedded)
         <x-ui.relation-tabs :tabs="$this->tabs" :active="$tab" wire-target="tab" @class(['flex-nowrap! overflow-x-auto [scrollbar-width:none] *:shrink-0 @3xl/detail:flex-wrap!', 'mt-8' => ! $embedded, 'mt-2' => $embedded]) />
 
         <div id="tab-panel" class="mt-6 min-w-0" wire:key="tab-{{ $tab }}" data-tab-panel="{{ $tab }}">
@@ -496,16 +509,9 @@ new #[Layout('layouts::desk'), Title('titles.proposal')] class extends Component
                 @include('pages.proposals._show-status-tab')
             @endif
         </div>
-
-        <section aria-labelledby="record-activity-heading" class="grid gap-3 mt-10" data-record-activity>
-            <div class="flex flex-wrap items-center justify-between gap-2">
-                <h2 id="record-activity-heading" class="text-base font-bold">{{ __('activity.title') }}</h2>
-                <button type="button" class="dk-btn dk-sm" wire:click="$toggle('showActivity')" aria-expanded="{{ $showActivity ? 'true' : 'false' }}" data-test="toggle-activity-log">{{ $showActivity ? __('activity.hide_log') : __('activity.show_log') }}</button>
-            </div>
-            @if ($showActivity)
-                <livewire:activity.timeline :subjects="['proposal' => [$this->proposal->id]]" :key="'proposal-activity-'.$this->proposal->id" />
-            @endif
-        </section>
+        @else
+            @include('pages.proposals._show-more')
+        @endif
     @endif
 
     @include('pages.proposals._show-modals')
