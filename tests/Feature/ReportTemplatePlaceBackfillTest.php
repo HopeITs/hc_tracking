@@ -28,8 +28,12 @@ function legacyTemplate(int $cityId, array $project = []): array
     $proposal = Proposal::factory()->create();
     $proposal->projects()->attach($project->id);
     $template = ReportTemplate::factory()->create(['project_id' => $project->id]);
+    // Before the backfill a template had no proposal and no row of its own: undo what the factory adds since Y-03.
+    $template->proposals()->detach();
+    ProposalLocation::query()->where('project_id', $project->id)->delete();
+    DB::table('report_templates')->where('id', $template->id)->update(['center_id' => null, 'city_wide' => false]);
 
-    return [$template, $proposal, $project];
+    return [$template->refresh(), $proposal, $project];
 }
 
 /**
@@ -129,7 +133,7 @@ it('prints the same counts on a dry run and writes nothing', function (): void {
 
 it('stops before writing when a template has no proposal', function (): void {
     $project = Project::factory()->approved()->create(['city_id' => $this->cityId]);
-    ReportTemplate::factory()->create(['project_id' => $project->id]);
+    ReportTemplate::factory()->create(['project_id' => $project->id])->proposals()->detach();
 
     $this->artisan('report-templates:place-backfill')->assertFailed();
 

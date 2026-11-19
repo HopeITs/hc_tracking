@@ -9,7 +9,7 @@ Reviewed 13 Oct 2026 (day 2, CP0). I read T01, T04 and T17-A line by line and ra
 ## P0: ship-blockers (fix before anyone starts a session)
 
 ### 1. The "authoritative" source does not exist
-Every prompt says to read `docs/superpowers/plans/2026-10-08-proposal-lifecycle-correction.ar.md` ("Arabic and authoritative") plus `…-decisions.md`, `…-open-questions-r6.ar.fixed.docx` and `…-r7.ar.docx`. **None of these files exist on any branch** (`main`, `gitlab/main`, or the current branch). T01's own precondition says: "The plan file exists… if not, stop and report."
+Every prompt says to read `docs/superpowers/plans/2026-10-08-proposal-lifecycle-correction.ar.md` ("Arabic and authoritative") plus `…-decisions.md`, `…-open-questions-r6.ar.fixed.docx` and `…-r7.ar.docx`. **None of these files exist on any branch** (`main` or the current branch). T01's own precondition says: "The plan file exists… if not, stop and report."
 - Even if you committed it, a 1.5 MB Arabic file is several hundred thousand tokens. That is more than the whole context window, so "read section 1.0, 5, 7, 9 and `### Task 17`…" can't be done in one session.
 - `.docx` files can't be read reliably in Claude Code.
 
