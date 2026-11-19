@@ -106,7 +106,7 @@ return [
         'survey' => '{0} :count surveys|{1} :count survey|[2,*] :count surveys',
     ],
     'batch_needs_count' => 'Fill the number of :unit.',
-    'batch_needs_hours' => 'Fill the hours for :unit.',
+    'batch_needs_hours' => 'Fill the hours for each session.',
     'choose_at_least_one' => 'Tick at least one activity.',
     'copy_pick_one' => 'Tick at least one activity to copy to.',
     'copy_same_kind' => 'Settings can only be copied to activities of the same kind.',
