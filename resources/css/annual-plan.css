@@ -96,6 +96,9 @@ textarea.ap-inp { height: auto; min-height: 90px; padding: 10px 12px; }
 .ap-mini { display: inline-flex; align-items: center; gap: 6px; font-size: .8rem; font-weight: 600; color: var(--ink-2); }
 .ap-err { font-size: .78rem; font-weight: 700; color: var(--brand-ink); }
 .ap-copy { background: var(--paper); border: 1px dashed var(--line-2); border-radius: 12px; padding: 10px 12px; display: flex; flex-direction: column; gap: 10px; }
+/* The inline "+ Add activity" form on step 2: a boxed panel so it reads as one form, not loose text. */
+.ap-add-activity { gap: 12px; background: var(--sunk); border: 1px solid var(--line-2); border-radius: 12px; padding: 16px; }
+.ap-add-activity > h3 { font-size: .95rem; text-transform: none; letter-spacing: 0; color: var(--ink); }
 .ap-copy summary { cursor: pointer; font-weight: 700; font-size: .88rem; }
 
 /* timelines */

@@ -238,6 +238,7 @@ return [
         'no_activities' => "The proposal's logframe has no activities yet for this program: only outcomes or outputs. An annual plan schedules activities, so add them first: on the Logical Framework tab, add an output under the outcome, then the activities under the output.",
         'add_activity' => 'Add activity',
         'activity_name' => 'Activity name',
+        'activity_name_placeholder' => 'e.g. English sessions',
         'activity_serves' => 'Which outcome does it serve?',
         'activity_single_week' => 'It happens once (a single week)',
         'activity_name_required' => 'Type the activity name.',

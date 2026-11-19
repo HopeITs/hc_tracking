@@ -46,14 +46,19 @@
 
     @php($parentOptions = $this->activityParentOptions)
     @if ($addingActivity)
-        <div class="ap-grp" data-add-activity-form>
+        {{-- Same field styles as the activity details (ap-lbl / ap-inp / ap-sel), in its own
+             boxed panel: form-box-input draws no border on its own, so outside an
+             x-ui form-box the name and outcome fields used to be all but invisible. --}}
+        <div class="ap-grp ap-add-activity" data-add-activity-form>
             <h3>{{ __('annual_plans.wf.add_activity') }}</h3>
-            <label class="ap-sm">{{ __('annual_plans.wf.activity_name') }}
-                <input type="text" class="form-box-input" wire:model="newActivityName" maxlength="500" dir="auto" data-test="new-activity-name" autofocus>
+            <label class="ap-grp">
+                <span class="ap-lbl">{{ __('annual_plans.wf.activity_name') }}</span>
+                <input type="text" class="ap-inp @error('newActivityName') is-err @enderror" wire:model="newActivityName" maxlength="500" dir="auto" placeholder="{{ __('annual_plans.wf.activity_name_placeholder') }}" data-test="new-activity-name" autofocus>
             </label>
             @error('newActivityName') <p class="ap-err">{{ $message }}</p> @enderror
-            <label class="ap-sm">{{ __('annual_plans.wf.activity_serves') }}
-                <select class="form-box-input" wire:model="newActivityParent" data-test="new-activity-parent">
+            <label class="ap-grp">
+                <span class="ap-lbl">{{ __('annual_plans.wf.activity_serves') }}</span>
+                <select class="ap-sel is-wide @error('newActivityParent') is-err @enderror" wire:model="newActivityParent" data-test="new-activity-parent">
                     <option value="">{{ __('annual_plans.wf.pick_outcome') }}</option>
                     @foreach ($parentOptions as $option)
                         <option value="{{ $option['id'] }}">{{ $option['label'] }}</option>
