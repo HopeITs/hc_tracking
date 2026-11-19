@@ -738,7 +738,7 @@ new class extends Component {
                 </x-slot:action>
             </x-ui.empty-state>
         @else
-            <div class="grid gap-0 @4xl/detail:grid-cols-[minmax(0,1fr)_minmax(0,24rem)]">
+            <div class="grid grid-cols-[minmax(0,1fr)] gap-0 @4xl/detail:grid-cols-[minmax(0,1fr)_minmax(0,24rem)]">
                 <ol class="max-h-[36rem] divide-y divide-secondary-soft overflow-y-auto dark:divide-line">
                     @foreach ($this->results as $result)
                         @php

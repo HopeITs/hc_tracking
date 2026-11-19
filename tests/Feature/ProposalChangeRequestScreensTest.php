@@ -232,12 +232,15 @@ it('leaves the money lines out for a viewer without money', function () {
 });
 
 it('reads the chapter in a fixed number of queries however many requests it lists', function () {
-    $countQueries = function (Proposal $proposal): int {
-        changeScreen($this->prManager, $proposal);
+    // The chapter sits in the folded "History & approvals" section; ?ptab=status opens it.
+    $historyScreen = fn (Proposal $proposal) => Livewire::withQueryParams(['ptab' => 'status'])->actingAs($this->prManager)->test('pages::proposals.show', ['proposal' => $proposal]);
+
+    $countQueries = function (Proposal $proposal) use ($historyScreen): int {
+        $historyScreen($proposal);
         DB::flushQueryLog();
         DB::enableQueryLog();
 
-        changeScreen($this->prManager, $proposal)->assertSeeHtml('data-test="change-requests-chapter"');
+        $historyScreen($proposal)->assertSeeHtml('data-test="change-requests-chapter"');
 
         $count = count(DB::getQueryLog());
         DB::disableQueryLog();

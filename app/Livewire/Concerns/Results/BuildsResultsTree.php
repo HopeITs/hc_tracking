@@ -17,14 +17,10 @@ use Livewire\Attributes\Computed;
  *
  * Used by results/index and the proposal Logical Framework tab (which has no
  * filters and overrides matchesFilters()). Reads the data
- * BuildsResultsFramework loads and the page's #[Url] filter properties;
- * SummarisesResults reads what it builds.
+ * BuildsResultsFramework loads and the page's #[Url] filter properties.
  *
  * @property string $search
- * @property string $proposal
  * @property string $program
- * @property string $type
- * @property string $focus
  * @property-read Collection<int, Result> $allResults
  * @property-read array<int, Result> $resultsById
  * @property-read array<int, int> $childCounts
@@ -34,46 +30,19 @@ use Livewire\Attributes\Computed;
 trait BuildsResultsTree
 {
     /**
-     * Whether one statement survives the current filters.
+     * Whether one statement survives the current filters: the program and
+     * the search.
      *
      * The search reaches the indicators too: looking for "people reached"
      * should find the statement that measure hangs from, not nothing.
      */
-    protected function matchesFilters(Result $result, ?string $focus = null): bool
+    protected function matchesFilters(Result $result): bool
     {
-        $focus ??= $this->focus;
-
-        if ($this->proposal === 'none' && $result->proposal_id !== null) {
-            return false;
-        }
-
-        if ($this->proposal !== '' && $this->proposal !== 'none' && $result->proposal_id !== (int) $this->proposal) {
-            return false;
-        }
-
         if ($this->program === 'none' && $result->program_id !== null) {
             return false;
         }
 
         if ($this->program !== '' && $this->program !== 'none' && $result->program_id !== (int) $this->program) {
-            return false;
-        }
-
-        if ($this->type !== '' && $result->type->value !== $this->type) {
-            return false;
-        }
-
-        $measurement = $this->measurements[$result->id];
-
-        if ($focus === 'unmeasured' && $measurement['rows'] !== []) {
-            return false;
-        }
-
-        if ($focus === 'offtrack' && $measurement['status'] !== 'behind') {
-            return false;
-        }
-
-        if ($focus === 'waiting' && $measurement['status'] !== 'waiting') {
             return false;
         }
 
@@ -233,33 +202,5 @@ trait BuildsResultsTree
             })
             ->map(fn (Result $result): array => $this->buildNode($result, $childrenByParent, $visibleIds, 0))
             ->all());
-    }
-
-    /**
-     * Every visible node flattened into reading order, each tagged with the
-     * program it sits under. Drives the matrix view and every headline figure.
-     *
-     * @return list<array{node: array<string, mixed>, program: string}>
-     */
-    #[Computed]
-    public function visibleNodes(): array
-    {
-        $rows = [];
-
-        $walk = function (array $node, string $program) use (&$walk, &$rows): void {
-            $rows[] = ['node' => $node, 'program' => $program];
-
-            foreach ($node['children'] as $child) {
-                $walk($child, $program);
-            }
-        };
-
-        foreach ($this->groupedRoots as $program => $nodes) {
-            foreach ($nodes as $node) {
-                $walk($node, (string) $program);
-            }
-        }
-
-        return $rows;
     }
 }

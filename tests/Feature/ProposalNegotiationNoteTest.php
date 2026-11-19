@@ -132,6 +132,8 @@ test('the page saves a negotiation note and the file downloads through the propo
         ->set('negotiationFile', validUpload('request.pdf'))
         ->call('saveNegotiationNote')
         ->assertHasNoErrors()
+        // Notes are listed in the folded "History & approvals" section.
+        ->call('openSection', 'history')
         ->assertSee('The donor wants the logframe indicators reduced to ten.')
         ->assertSee(StatusNoteKind::Negotiation->label());
 

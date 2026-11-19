@@ -68,25 +68,6 @@ trait ManagesProposalRisks
     }
 
     /**
-     * Rated risks per heat-map square (keyed "likelihood:severity") and the
-     * number left off the map because they are not rated yet.
-     *
-     * @return array{cells: array<string, int>, unrated: int, total: int}
-     */
-    #[Computed]
-    public function riskHeat(): array
-    {
-        $risks = $this->proposalRisks->flatten(1);
-        $rated = $risks->filter(fn (Risk $risk): bool => $risk->heatScore() !== null);
-
-        return [
-            'cells' => $rated->countBy(fn (Risk $risk): string => $risk->likelihood.':'.$risk->severity)->all(),
-            'unrated' => $risks->count() - $rated->count(),
-            'total' => $risks->count(),
-        ];
-    }
-
-    /**
      * The active library entries the picker offers, by category.
      *
      * @return Collection<string, Collection<int, RiskLibrary>>
@@ -162,7 +143,7 @@ trait ManagesProposalRisks
         }
 
         $this->riskPicks = [];
-        unset($this->proposalRisks, $this->riskCounts, $this->riskHeat);
+        unset($this->proposalRisks, $this->riskCounts);
 
         Flux::toast(variant: 'success', text: trans_choice('risks.attached', count($picks), ['count' => count($picks)]));
     }
@@ -171,7 +152,7 @@ trait ManagesProposalRisks
     {
         app(DetachRisk::class)->handle($this->proposal, $riskId);
 
-        unset($this->proposalRisks, $this->riskCounts, $this->riskHeat);
+        unset($this->proposalRisks, $this->riskCounts);
 
         Flux::toast(variant: 'success', text: __('risks.detached'));
     }

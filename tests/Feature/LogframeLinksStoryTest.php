@@ -28,7 +28,7 @@ test('the empty targets checklist switches the proposal to the logframe tab in p
         ->assertSet('tab', 'logframe');
 });
 
-test('the results framework links a proposal group straight to its Story block', function () {
+test('the results framework links a proposal card straight to its Story block', function () {
     Result::factory()->create(['type' => ResultType::Impact, 'program_id' => $this->program->id, 'proposal_id' => $this->proposal->id]);
 
     Livewire::actingAs($this->user)->test('pages::results.index')

@@ -24,7 +24,6 @@ use App\Http\Controllers\TaskFilePreviewController;
 use App\Http\Controllers\ToggleDeskItemController;
 use App\Http\Controllers\ToggleNavPinController;
 use App\Http\Middleware\EnsureTwoFactorIsEnabled;
-use App\Http\Middleware\RedirectProposalToStory;
 use App\Models\DonorReport;
 use App\Models\RiskLibrary;
 use App\Models\Task;
@@ -177,7 +176,6 @@ Route::middleware(['auth', EnsureTwoFactorIsEnabled::class])->group(function () 
 
     Route::livewire('proposals/{proposal}', 'pages::proposals.show')
         ->can('view', 'proposal')
-        ->middleware(RedirectProposalToStory::class)
         ->name('proposals.show');
 
     Route::get('proposals/{proposal}/files/{media}/download', ProposalFileDownloadController::class)

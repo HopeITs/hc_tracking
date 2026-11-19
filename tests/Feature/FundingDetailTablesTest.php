@@ -231,8 +231,10 @@ test('the donor page exports every tranche of the donor', function () {
 test('the proposal funding tab opens on its agreements and tranches as tables', function () {
     $agreement = detailAgreement();
 
+    // Stage 3b: the tables stay on the project Story's embedded proposal view;
+    // the proposal's own page shows the "Money" section instead.
     $page = Livewire::actingAs($this->user)
-        ->test('pages::proposals.show', ['proposal' => $agreement->proposal])
+        ->test('pages::proposals.show', ['proposal' => $agreement->proposal, 'embedded' => true])
         ->set('tab', 'funding')
         ->assertSet('view', 'table')
         ->assertDontSeeHtml('data-chronology')
@@ -250,18 +252,6 @@ test('the proposal funding tab opens on its agreements and tranches as tables', 
 
     expect($page->instance()->agreementRows)->toHaveCount(1)
         ->and($page->instance()->fundingTranches)->toHaveCount(3);
-});
-
-test('the proposal funding tab overview shows the chronology instead of the tables', function () {
-    $agreement = detailAgreement();
-
-    Livewire::actingAs($this->user)
-        ->test('pages::proposals.show', ['proposal' => $agreement->proposal])
-        ->set('tab', 'funding')
-        ->set('view', 'overview')
-        ->assertSeeHtml('data-chronology')
-        ->assertSeeHtml('data-agreement="'.$agreement->id.'"')
-        ->assertDontSeeHtml('data-funding-tranches');
 });
 
 test('the proposal funding tab shows budgets without tranches to someone who may not see transfers', function () {

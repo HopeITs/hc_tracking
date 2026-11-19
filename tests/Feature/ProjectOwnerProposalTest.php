@@ -32,12 +32,14 @@ test('the project owner opens the proposal from Needs you without a 403', functi
 });
 
 test('a redirect inside a desk tab keeps the tab marker, so the page never draws the whole app inside the tab', function () {
-    $response = $this->actingAs($this->owner->fresh())->get(route('proposals.show', [$this->proposal, '_tab' => 1]));
+    // The proposal link no longer redirects (RedirectProposalToStory was removed
+    // 2026-11-19), so the home redirect stands in for "any redirect in a tab".
+    $response = $this->actingAs($this->owner->fresh())->get(route('home', ['_tab' => 1]));
 
     $response->assertRedirect();
     expect($response->headers->get('Location'))->toContain('_tab=1');
 
-    $outside = $this->actingAs($this->owner->fresh())->get(route('proposals.show', $this->proposal));
+    $outside = $this->actingAs($this->owner->fresh())->get(route('home'));
     expect($outside->headers->get('Location'))->not->toContain('_tab=1');
 });
 

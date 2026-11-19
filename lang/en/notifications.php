@@ -653,6 +653,18 @@ return [
                 'title' => 'Final report accepted',
                 'body' => ':actor recorded the donor\'s acceptance of the final report for “:subject”',
             ],
+            'framework_done' => [
+                'title' => 'Framework marked as done',
+                'body' => ':actor marked the logical framework of “:subject” as done',
+            ],
+            'framework_reopened' => [
+                'title' => 'Framework reopened',
+                'body' => ':actor reopened the logical framework of “:subject”',
+            ],
+            'status_date_changed' => [
+                'title' => 'Proposal date corrected',
+                'body' => ':actor corrected a status date of “:subject”',
+            ],
             'beneficiaries_changed' => [
                 'title' => 'Beneficiaries changed',
                 'body' => ':actor changed the beneficiaries of “:subject”',

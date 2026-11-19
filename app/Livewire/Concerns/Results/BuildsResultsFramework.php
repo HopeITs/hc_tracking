@@ -21,9 +21,9 @@ use Livewire\Attributes\Computed;
  * The one read of the results framework and the measurement attached to
  * every statement in it.
  *
- * Used by results/index (every framework) and the proposal Logical Framework
- * tab (one proposal's framework, see fixedProposalId()). The tree, the
- * filters and the headline figures (BuildsResultsTree, SummarisesResults)
+ * Used by results/index (program frameworks only) and the proposal Logical Framework
+ * tab (one proposal's framework, see fixedProposalId()). The tree and the
+ * filters (BuildsResultsTree)
  * resolve in memory from what is loaded here, so the page holds a fixed
  * query count however it is filtered.
  *
@@ -51,7 +51,7 @@ trait BuildsResultsFramework
     public function allResults(): Collection
     {
         return $this->frameworkResults()
-            ->select(['id', 'statement', 'parent_id', 'program_id', 'proposal_id', 'contributes_to_result_id', 'copied_from_id', 'type', 'activity_kind', 'checkout_period'])
+            ->select(['id', 'statement', 'parent_id', 'program_id', 'proposal_id', 'contributes_to_result_id', 'copied_from_id', 'type', 'activity_kind', 'starts_on', 'ends_on', 'checkout_period'])
             ->with([
                 // program_id is nullable, so a result can outlive its program.
                 'program:id',
@@ -63,7 +63,7 @@ trait BuildsResultsFramework
                         'project:id,name',
                         'progress:id,indicator_id,date,value',
                         'planIndicators' => fn ($query) => $query
-                            ->select(['id', 'indicator_id', 'source_type', 'source_id', 'target', 'project_id', 'period'])
+                            ->select(['id', 'indicator_id', 'source_type', 'source_id', 'target', 'project_id', 'center_id', 'period'])
                             ->with([
                                 'project:id,name',
                                 // Rows, not counts: achievement is measured from the

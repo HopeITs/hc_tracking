@@ -142,8 +142,10 @@ test('a fundraiser without agreements sees the proposal page without a funding t
         ->assertDontSeeHtml(route('donors.show', $donor))
         ->assertDontSee('731,942')
         ->assertDontSee('123,457')
-        ->assertDontSeeHtml('data-vital="money"')
-        ->assertSeeHtml('data-vital="work"');
+        // Stage 3: the readings strip left the proposal's own page; money is the
+        // "Money" folded section, which this fundraiser does not get at all.
+        ->assertDontSeeHtml('data-section="money"')
+        ->assertSeeHtml('data-section="plan"');
 
     expect(collect($fundraiser->instance()->tabs)->pluck('key')->all())->not->toContain('funding');
 
@@ -165,7 +167,7 @@ test('a fundraiser without agreements sees the proposal page without a funding t
         ->assertSee('Aurora Foundation')
         ->assertSee('731,942.00')
         ->assertSee('123,457.00')
-        ->assertSeeHtml('data-vital="money"');
+        ->assertSeeHtml('data-section="money"');
 });
 
 test('Public Relations Manager sees agreement budgets but no tranches', function () {

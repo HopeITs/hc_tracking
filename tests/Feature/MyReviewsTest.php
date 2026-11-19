@@ -192,7 +192,7 @@ test('asked by me lists other people who still owe a review on the viewer\'s pro
         ->assertSee('Rana Late')
         ->assertDontSee('Sami Done')
         ->assertDontSee('Omar Owner')
-        ->assertSee(route('projects.show', ['project' => $project, 'proposal' => $proposal->id, 'ptab' => 'status']).'#reviewers');
+        ->assertSee(route('proposals.show', ['proposal' => $proposal, 'ptab' => 'status']).'#reviewers');
 });
 
 test('asked by me shows its own empty state', function () {
@@ -270,7 +270,8 @@ test('a review on a project opens straight on the viewer\'s own review in that p
     $waiting = myReview($employeeId, 'Water Access', ProposalStatus::ConceptNoteReview);
     $project = Project::factory()->create();
     $waiting->proposal->projects()->attach($project->id);
-    $onReview = route('projects.show', ['project' => $project, 'proposal' => $waiting->proposal_id, 'ptab' => 'status']).'#my-review';
+    // The proposal page, not the project Story (user decision 2026-11-19).
+    $onReview = route('proposals.show', ['proposal' => $waiting->proposal, 'ptab' => 'status']).'#my-review';
 
     Livewire::actingAs($user)->test('pages::reviews.index')->assertSee($onReview);
     Livewire::actingAs($user)->test('desk.panels.reviews', ['size' => 'M'])->assertSee($onReview);
@@ -284,18 +285,22 @@ test('any reviewer goes from My reviews to their open review box in one click, a
     $project = Project::factory()->create();
     $waiting->proposal->projects()->attach($project->id);
     DonorProposal::factory()->create(['proposal_id' => $waiting->proposal_id, 'budget' => 987654]);
-    $story = route('projects.show', ['project' => $project, 'proposal' => $waiting->proposal_id, 'ptab' => 'status']);
+    $story = route('proposals.show', ['proposal' => $waiting->proposal, 'ptab' => 'status']);
 
     Livewire::actingAs($user)->test('pages::reviews.index')->assertSee($story.'#my-review');
 
     $this->actingAs($user)->get($story)
         ->assertSeeHtml('id="my-review"')
         ->assertSeeHtml('data-mark-seen')
-        ->assertSee(__('proposals.mark_as_seen'))
-        ->{$seesMoney ? 'assertSeeHtml' : 'assertDontSeeHtml'}('data-funding-envelope');
+        ->assertSee(__('proposals.mark_as_seen'));
+
+    // Money lives on the proposal's Funding tab, offered only with money permission.
+    $this->actingAs($user)->get(route('proposals.show', ['proposal' => $waiting->proposal, 'ptab' => 'funding']))
+        ->{$seesMoney ? 'assertSeeHtml' : 'assertDontSeeHtml'}('data-tab-panel="funding"');
 })->with([
     'MEAL Manager' => ['MEAL', false],
-    'fundraising (Public Relations Manager)' => ['Public Relations Manager', false],
+    // Holds funding-agreements.view, so the proposal page's Funding tab is open to them (as it always was there).
+    'fundraising (Public Relations Manager)' => ['Public Relations Manager', true],
     'finance' => ['Financial', true],
 ]);
 
@@ -307,6 +312,6 @@ test('a finished review on All opens the proposal, not the review box', function
 
     Livewire::actingAs($user)->test('pages::reviews.index')
         ->set('state', 'done')
-        ->assertSee(route('projects.show', ['project' => $project, 'proposal' => $done->proposal_id, 'ptab' => 'status']).'#proposal')
+        ->assertSee(route('proposals.show', ['proposal' => $done->proposal, 'ptab' => 'status']).'#proposal')
         ->assertDontSee('#my-review');
 });

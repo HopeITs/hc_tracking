@@ -76,7 +76,7 @@ test('proposal detail shows only its own status notes newest first', function ()
     });
 
     $this->actingAs($user)
-        ->get(route('proposals.show', $proposal))
+        ->get(route('proposals.show', ['proposal' => $proposal, 'ptab' => 'status']))
         ->assertOk()
         ->assertSeeTextInOrder(['Newer note', 'Older note'])
         ->assertDontSeeText('Someone elses note');
@@ -164,7 +164,7 @@ test('proposal detail renders a proposal with nothing attached', function () {
     $proposal = Proposal::factory()->create(['name' => 'Bare Proposal']);
 
     $this->actingAs($user)
-        ->get(route('proposals.show', $proposal))
+        ->get(route('proposals.show', ['proposal' => $proposal, 'ptab' => 'status']))
         ->assertOk()
         ->assertSeeText('Bare Proposal')
         ->assertSeeText('No status history yet');
@@ -225,7 +225,8 @@ test('a pending tranche whose scheduled date has passed puts the money reading i
 
     expect($money['alarm'])->toBeTrue();
 
-    $component->assertSeeText('Overdue');
+    // Stage 3b: the Money section marks the tranche Late.
+    $component->assertSeeHtml('data-tranche-state="late"');
 });
 
 test('the work reading counts finished tasks and the plan tab lists the funded projects\' work', function () {
@@ -355,7 +356,7 @@ test('an unknown tab from an old bookmark falls back to status history rather th
         ->assertSet('tab', 'status')
         ->set('tab', 'promises')
         ->assertSet('tab', 'status')
-        ->assertSeeText('No status history yet');
+        ->assertSeeHtml('data-test="more-sections"');
 });
 
 test('each tab shows only its own content and the strip counts its records', function () {
@@ -375,7 +376,8 @@ test('each tab shows only its own content and the strip counts its records', fun
         ->test('pages::proposals.show', ['proposal' => $proposal]);
 
     expect(collect($component->instance()->tabs)->pluck('count', 'key')->all())
-        ->toBe(['status' => 1, 'deadlines' => 1, 'funding' => 1, 'projects' => 0, 'logframe' => null, 'targets' => 0, 'plan' => 1, 'reports' => 0, 'documents' => 0]);
+        // The framework sits in the proposal card now, not in a tab (proposal page redesign).
+        ->toBe(['status' => 1, 'deadlines' => 1, 'funding' => 1, 'projects' => 0, 'targets' => 0, 'plan' => 1, 'reports' => 0, 'documents' => 0]);
 
     /*
      * The Status tab names the donor in plain text inside the concept-note
@@ -384,15 +386,21 @@ test('each tab shows only its own content and the strip counts its records', fun
      * §7 forces the agreement's donor to be the proposal's, so the name itself
      * can no longer tell the two tabs apart.
      */
-    $component->assertSeeText('Board signed off')
-        ->assertDontSeeHtml(route('donors.show', Donor::query()->findOrFail($fundingDonorId)))
+    // On the proposal's own page the tabs are folded sections (redesign): a
+    // section's content renders only while it is open; picking a tab opens it.
+    $donorLink = route('donors.show', Donor::query()->findOrFail($fundingDonorId));
+    $component->assertDontSeeText('Board signed off')
+        ->assertDontSeeHtml($donorLink)
         ->assertDontSeeText('Draft the budget narrative')
         ->set('tab', 'funding')
-        ->assertSeeText('UNICEF')
+        ->assertSeeHtml($donorLink)
         ->assertDontSeeText('Board signed off')
+        ->call('toggleSection', 'money')
         ->set('tab', 'plan')
         ->assertSeeText('Draft the budget narrative')
-        ->assertDontSeeText('UNICEF');
+        ->assertDontSeeHtml($donorLink)
+        ->call('openSection', 'history')
+        ->assertSeeText('Board signed off');
 });
 
 test('a department task can be added from the plan tab pre-filled with this proposal', function () {
@@ -589,7 +597,8 @@ test('the tasks tab puts open work before finished work and flags overdue and la
         ->assertSeeTextInOrder(['Late procurement', 'Forgotten status', 'Finished survey'])
         ->assertSeeHtml('data-status-lags')
         ->assertSeeText('100% done, but the status is still Todo')
-        ->assertSeeHtml('data-task-gap="overdue"');
+        // Stage 3b: the overdue count is the group's red "late" pill now.
+        ->assertSeeHtml('<span class="pp-pill pp-pill-red">1 late</span>');
 });
 
 test('a finished task waiting under review is not flagged as a lagging status', function () {
@@ -664,17 +673,16 @@ test('the indicators and targets tab renders the targets component, no longer un
         ->assertDontSeeHtml('data-under-construction="targets"');
 });
 
-test('the logical framework tab renders the proposal framework, no longer under construction', function () {
+test('the logical framework renders inside the proposal card, and an old logframe tab link lands on the page', function () {
     $user = User::factory()->role('Financial')->create();
     $proposal = Proposal::factory()->create();
 
     Livewire::actingAs($user)
         ->test('pages::proposals.show', ['proposal' => $proposal])
-        ->assertSeeText('Logical Framework')
+        ->assertSeeLivewire('proposals.logframe')
         ->set('tab', 'logframe')
-        ->assertSeeHtml('data-tab-panel="logframe"')
-        ->assertDontSeeHtml('data-under-construction="logframe"')
-        ->assertSeeLivewire('proposals.logframe');
+        ->assertSet('tab', 'status')
+        ->assertDispatched('pp-flash', target: 'lf');
 });
 
 test('the tab labels read in Arabic', function () {
@@ -729,7 +737,7 @@ test('the ideation phase shows the concept note with its title, donor and create
     ]));
 
     $this->actingAs($user)
-        ->get(route('proposals.show', $proposal))
+        ->get(route('proposals.show', ['proposal' => $proposal, 'ptab' => 'status']))
         ->assertOk()
         ->assertSeeHtml('data-concept-note')
         ->assertSeeText(__('proposals.concept_note.title'))
@@ -751,7 +759,7 @@ test('the concept note text is shown as text, never as markup', function () {
         'concept_note' => '<script>alert(1)</script> **bold** stays flat',
     ]));
 
-    $response = $this->actingAs($user)->get(route('proposals.show', $proposal))->assertOk();
+    $response = $this->actingAs($user)->get(route('proposals.show', ['proposal' => $proposal, 'ptab' => 'status']))->assertOk();
 
     $response->assertSeeText('<script>alert(1)</script> **bold** stays flat')
         // The raw tag never reaches the page: {{ }} escaped it.
@@ -766,12 +774,12 @@ test('outside the ideation phase the concept note folds to one line that expands
     ]));
 
     $this->actingAs($user)
-        ->get(route('proposals.show', $proposal))
+        ->get(route('proposals.show', ['proposal' => $proposal, 'ptab' => 'status']))
         ->assertOk()
+        // Stage 3b: the concept note is a fold in "History & approvals" with its date on the line.
         ->assertSeeHtml('data-concept-note')
-        ->assertSeeHtml('data-concept-note-toggle')
-        ->assertSeeText(__('proposals.concept_note.view'))
-        // The body is in the page, hidden behind the toggle rather than dropped.
+        ->assertSeeText(__('proposals.sections.concept_written', ['date' => $proposal->created_at->translatedFormat(__('formats.date'))]))
+        // The body is in the page, hidden behind the fold rather than dropped.
         ->assertSeeText('The idea we started from.');
 });
 
@@ -794,26 +802,28 @@ test('the concept note document downloads through the protected proposal route',
     Storage::disk('local')->put($media->path, 'encrypted bytes');
 
     $this->actingAs($user)
-        ->get(route('proposals.show', $proposal))
+        ->get(route('proposals.show', ['proposal' => $proposal, 'ptab' => 'status']))
         ->assertOk()
         ->assertSeeText('concept-note.pdf')
         ->assertSeeHtml('href="'.route('proposals.files.download', [$proposal, $media]).'"');
 });
 
-test('a proposal with no concept note says so in the ideation phase and shows nothing later', function () {
+// Stage 3b (approved mockup): the concept note fold is always there and says "not written" when empty.
+test('a proposal with no concept note says so in every phase', function () {
     $user = User::factory()->role('Financial')->create();
     $ideation = Activity::withoutRecording(fn () => Proposal::factory()->create(['status' => ProposalStatus::ConceptNote]));
     $later = Activity::withoutRecording(fn () => Proposal::factory()->create(['status' => ProposalStatus::Active]));
 
     $this->actingAs($user)
-        ->get(route('proposals.show', $ideation))
+        ->get(route('proposals.show', ['proposal' => $ideation, 'ptab' => 'status']))
         ->assertOk()
         ->assertSeeText(__('proposals.concept_note.nothing_recorded'));
 
     $this->actingAs($user)
-        ->get(route('proposals.show', $later))
+        ->get(route('proposals.show', ['proposal' => $later, 'ptab' => 'status']))
         ->assertOk()
-        ->assertDontSeeHtml('data-concept-note');
+        ->assertSeeText(__('proposals.sections.concept_not_written'))
+        ->assertSeeText(__('proposals.concept_note.nothing_recorded'));
 });
 
 test('someone without proposals.view cannot open a proposal page at all', function () {
@@ -857,9 +867,9 @@ test('the lifecycle stepper draws the nine merged stops and marks the current on
         ->and($current[0]['status'])->toBe(ProposalStatus::Submitted)
         ->and($current[0]['held'])->toBeFalse();
 
-    $this->actingAs($user)
-        ->get(route('proposals.show', $proposal))
-        ->assertOk()
+    // The stepper now shows only where the proposal sits inside the project page (embedded).
+    Livewire::actingAs($user)
+        ->test('pages::proposals.show', ['proposal' => $proposal, 'embedded' => true])
         ->assertSeeHtml('aria-current="step"')
         ->assertDontSeeHtml('data-test="on-hold-chip"');
 });
@@ -882,9 +892,9 @@ test('a proposal on hold wears the chip on its current stop and reads Submitted 
         ->and($held[0]['state'])->toBe('current')
         ->and(array_map(fn (array $stop): string => $stop['status']->value, $stops))->not->toContain('on hold');
 
-    $this->actingAs($user)
-        ->get(route('proposals.show', $proposal))
-        ->assertOk()
+    // The stepper now shows only where the proposal sits inside the project page (embedded).
+    Livewire::actingAs($user)
+        ->test('pages::proposals.show', ['proposal' => $proposal, 'embedded' => true])
         ->assertSeeHtml('data-test="on-hold-chip"')
         ->assertSeeText(__('proposals.on_hold_chip'))
         ->assertSeeText($proposal->fresh()->statusLabel())
@@ -946,7 +956,7 @@ test('a project proposal keeps every tab and shows no payroll chip', function ()
     $component = Livewire::actingAs(User::factory()->role('General Manager')->create())
         ->test('pages::proposals.show', ['proposal' => $proposal]);
 
-    expect(array_column($component->instance()->tabs, 'key'))->toContain('projects', 'logframe', 'targets', 'plan');
+    expect(array_column($component->instance()->tabs, 'key'))->toContain('projects', 'targets', 'plan');
     $component->assertDontSeeHtml('data-test="payroll-kind-chip"');
 });
 
@@ -997,6 +1007,8 @@ test('the change requests chapter lists each request with its status word, newes
     $proposal = Proposal::factory()->running()->create(['name' => 'Winter Shelter']);
 
     Livewire::actingAs($user)->test('pages::proposals.show', ['proposal' => $proposal])
+        // Sections start folded (proposal page redesign): open History & approvals.
+        ->call('openSection', 'history')
         ->assertSeeHtml('data-test="change-requests-chapter"')
         ->assertSeeText(__('proposals.change.chapter_empty'));
 
@@ -1005,6 +1017,8 @@ test('the change requests chapter lists each request with its status word, newes
     $newer = pendingChangeRequestOn($proposal, ['name' => 'Winter Shelter III'], reason: 'A second rename was asked.');
 
     Livewire::actingAs($user)->test('pages::proposals.show', ['proposal' => $proposal])
+        // Sections start folded (proposal page redesign): open History & approvals.
+        ->call('openSection', 'history')
         ->assertDontSeeText(__('proposals.change.chapter_empty'))
         ->assertSeeHtmlInOrder(['data-change-request="'.$newer->id.'"', 'data-change-request="'.$older->id.'"'])
         ->assertSeeTextInOrder([
@@ -1096,6 +1110,8 @@ test('the activity log under the tabs stays closed until asked for', function ()
 
     Livewire::actingAs($user)
         ->test('pages::proposals.show', ['proposal' => $proposal])
+        // Sections start folded (proposal page redesign): open History & approvals.
+        ->call('openSection', 'history')
         ->assertSeeHtml('data-record-activity')
         ->assertDontSeeLivewire('activity.timeline')
         ->toggle('showActivity')
