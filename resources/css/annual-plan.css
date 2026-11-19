@@ -96,6 +96,11 @@ textarea.ap-inp { height: auto; min-height: 90px; padding: 10px 12px; }
 .ap-mini { display: inline-flex; align-items: center; gap: 6px; font-size: .8rem; font-weight: 600; color: var(--ink-2); }
 .ap-err { font-size: .78rem; font-weight: 700; color: var(--brand-ink); }
 .ap-copy { background: var(--paper); border: 1px dashed var(--line-2); border-radius: 12px; padding: 10px 12px; display: flex; flex-direction: column; gap: 10px; }
+.ap-copy-list { display: grid; gap: 6px; }
+.ap-copy-opt { display: flex; align-items: center; gap: 10px; padding: 10px 12px; border: 1px solid var(--line-2); border-radius: 10px; background: var(--paper); font-weight: 600; font-size: .88rem; cursor: pointer; }
+.ap-copy-opt:hover { background: var(--sunk); }
+.ap-copy-opt:has(input:checked) { border-color: var(--ink); background: var(--sunk); }
+.ap-copy-opt input { flex: none; width: 18px; height: 18px; accent-color: var(--ink); }
 /* The inline "+ Add activity" form on step 2: a boxed panel so it reads as one form, not loose text. */
 .ap-add-activity { gap: 12px; background: var(--sunk); border: 1px solid var(--line-2); border-radius: 12px; padding: 16px; }
 .ap-add-activity > h3 { font-size: .95rem; text-transform: none; letter-spacing: 0; color: var(--ink); }
@@ -108,7 +113,10 @@ textarea.ap-inp { height: auto; min-height: 90px; padding: 10px 12px; }
 .ap-tl .ap-b.is-alt { background: var(--warn); top: 16px; height: 10px; }
 .ap-tl .ap-o { position: absolute; top: 13px; width: 12px; height: 12px; margin-inline-start: -1px; border-radius: 3px; transform: rotate(45deg); background: var(--active); }
 .ap-gantt { border: 1px solid var(--line); border-radius: 14px; overflow: hidden; }
-.ap-pin { position: sticky; top: 0; z-index: 5; background: var(--paper); padding-block: 8px; max-height: 45vh; overflow-y: auto; display: grid; gap: 6px; }
+/* The whole-plan calendar on the dates step: opened on request, never pinned over the form. */
+.ap-cal { display: grid; gap: 10px; }
+.ap-cal-toggle { display: flex; align-items: center; justify-content: space-between; gap: 12px; width: 100%; padding: 10px 14px; border: 1px solid var(--line-2); border-radius: 12px; background: var(--paper); font-weight: 700; font-size: .9rem; color: var(--ink); cursor: pointer; text-align: start; }
+.ap-cal-toggle:hover { background: var(--sunk); }
 .ap-gr { display: grid; grid-template-columns: minmax(130px, 230px) 1fr; border-bottom: 1px solid var(--line); }
 .ap-gr:last-child { border-bottom: 0; }
 .ap-gr > div:first-child { padding: 10px 14px; font-weight: 600; font-size: .88rem; border-inline-end: 1px solid var(--line); background: var(--paper); min-width: 0; }

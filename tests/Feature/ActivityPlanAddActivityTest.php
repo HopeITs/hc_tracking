@@ -1,5 +1,6 @@
 <?php
 
+use App\Actions\AnnualPlans\ChooseActivityPlanActivities;
 use App\Actions\AnnualPlans\CreateActivityPlan;
 use App\Enums\ActivityKind;
 use App\Enums\Period;
@@ -43,6 +44,26 @@ test('the plan asks a new activity its kind and period like the Logical Framewor
 
     expect($activity->activity_kind)->toBe(ActivityKind::Event)
         ->and($activity->checkout_period)->toBe(Period::Annual);
+});
+
+test('the dates step opens the plan calendar on request and lists copy targets as checkbox rows', function () {
+    $output = Result::factory()->type(ResultType::Output)->childOf($this->outcome)->create(['proposal_id' => $this->proposal->id, 'program_id' => $this->program->id]);
+    $basic = Result::factory()->activity($output)->create(['statement' => 'Basic sessions']);
+    $english = Result::factory()->activity($output)->create(['statement' => 'English sessions']);
+    $plan = app(ChooseActivityPlanActivities::class)->handle($this->pm, $this->plan, [$basic->id, $english->id]);
+    $source = $plan->items()->where('result_id', $basic->id)->firstOrFail();
+    $target = $plan->items()->where('result_id', $english->id)->firstOrFail();
+
+    Livewire::actingAs($this->pm)->test('pages::annual-plans.plan', ['activityPlan' => $plan])
+        ->assertSeeHtml('data-dates-calendar')
+        ->assertDontSeeHtml('data-plan-gantt')
+        ->toggle('showPlanCalendar')
+        ->assertSeeHtml('data-plan-gantt')
+        ->call('toggleItem', $target->id)
+        ->assertSet('openItemId', $target->id)
+        ->assertSee(__('annual_plans.wf.copy_to'))
+        ->assertSeeHtml('class="ap-copy-opt"')
+        ->assertSeeHtml('data-test="copy-target-'.$source->id.'"');
 });
 
 test('a fit segmented row sizes each choice to its label', function () {
