@@ -4,10 +4,10 @@ The plan, decisions and status for the **Tracking Desk** redesign of HC Tracking
 
 > This replaces the earlier "Operations Board" plan in this folder (`README.md`, `00`–`06`, `pages/`) wherever they conflict. That older plan describes the sidebar layout, which no longer exists.
 
-- **Branch:** `tracking-desk-ux-update` (cut from `gitlab/main` at `bf06a7f8`)
+- **Branch:** `tracking-desk-ux-update` (cut from `main` at `bf06a7f8`)
 - **Backup of the old site:** branch `original-website`
 - **Design source:** the "HC Tracking Desk" artifact, https://claude.ai/artifact/RQSAP2DWspKcyXX3HgTKbW (private, ask Youssef for access). Its "Where did every page go?" button lists where every old page now lives.
-- **Push to:** the `gitlab` remote only. Do not push to `origin`, because it mirrors to GitHub.
+- **Push to:** `origin` (GitHub, `HopeITs/hc_tracking`).
 - **Merge to main:** only when Youssef says so.
 - **Area rules:** `.ai/rules/desk.md` (Desk panel decisions, removal of the sidebar)
 

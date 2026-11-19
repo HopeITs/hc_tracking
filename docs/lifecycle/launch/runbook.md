@@ -1,7 +1,7 @@
 # Launch runbook: rehearsal, production order and rollback
 
 > **DRAFT (pre-CP5). NOT READY FOR A REHEARSAL.**
-> - Written 2026-10-21 on `lifecycle/T27-rehearsal` from GitHub `main` `21b3187a` (`HopeITs/hc_tracking`, the canonical repository since the move from GitLab).
+> - Written 2026-10-21 on `lifecycle/T27-rehearsal` from GitHub `main` `21b3187a` (`HopeITs/hc_tracking`, the canonical repository).
 > - Dev 1 approved drafting before T27's start state passes.
 > - CP5 (feature freeze, first rehearsal) is day 12, **Tue 27 Oct**; the deploy is day 14, Thu 29 Oct (README checkpoints).
 > - At CP5: re-run the inventory, fill the PENDING rows, settle the decisions in §1b, then remove this banner.
