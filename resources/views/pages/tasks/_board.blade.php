@@ -63,7 +63,8 @@
                 if (dragged.id && dragged.status !== '{{ $case->value }}') {
                     {{-- Move the card at once; the server's answer then confirms it, or puts it back if refused. --}}
                     const card = document.querySelector(`[data-task-id='${dragged.id}']`);
-                    $el.querySelector('[data-test=task-board-cards-{{ $case->value }}]')?.prepend(card);
+                    {{-- Quoted: "in progress" and "under review" hold a space, which an unquoted selector refuses. --}}
+                    $el.querySelector(`[data-test='task-board-cards-{{ $case->value }}']`)?.prepend(card);
                     $wire.quickSetStatus(dragged.id, '{{ $case->value }}');
                 }
             "
