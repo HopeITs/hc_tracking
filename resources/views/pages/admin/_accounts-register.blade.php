@@ -77,7 +77,7 @@
                     <td class="date" data-label="{{ __('finance_tables.closed_on') }}">{{ $date($account->closed_at) }}</td>
                     <td class="num" data-label="{{ __('common.transfers') }}">
                         @can('transfers.view')
-                            <a href="{{ route('transfers.index', ['account' => $account->id]) }}" wire:navigate class="fig font-semibold underline underline-offset-2">{{ (int) $account->money_transfers }}</a>
+                            <a href="{{ route('transfers.index', ['account' => $account->id]) }}" wire:navigate class="fig font-semibold underline underline-offset-2 max-sm:inline-flex max-sm:min-h-11 max-sm:min-w-11 max-sm:items-center max-sm:justify-end">{{ (int) $account->money_transfers }}</a>
                         @else
                             <span class="fig">{{ (int) $account->money_transfers }}</span>
                         @endcan

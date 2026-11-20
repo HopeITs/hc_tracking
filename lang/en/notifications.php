@@ -257,7 +257,7 @@ return [
         'manager_after' => 'Tell the program manager after',
         'manager_after_hint' => 'Counted from the due date.',
         'top_after' => 'Tell management after',
-        'top_after_hint' => 'Must be later than the program manager.',
+        'top_after_hint' => 'Always after the program manager; the two move together.',
         'escalation_window' => 'Escalation window',
         'escalation_window_hint' => 'Older overdue items still get reminders but are not escalated.',
 

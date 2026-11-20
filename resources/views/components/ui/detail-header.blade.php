@@ -23,8 +23,9 @@
         </nav>
     @endif
 
-    <div class="flex flex-col gap-3 sm:flex-row sm:items-end">
-        <div class="min-w-0 sm:me-auto">
+    {{-- The title keeps at least 28rem and takes the rest; actions that do not fit beside it wrap under it, at the end. --}}
+    <div class="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-end">
+        <div class="min-w-0 sm:flex-[1_1_28rem]">
             <div class="flex min-w-0 items-center gap-2">
                 <flux:heading size="lg" class="page-title! {{ $titleClass }}">{{ $title }}</flux:heading>
                 @if ($unread)
@@ -38,7 +39,10 @@
                 <div class="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1.5 text-xs text-secondary-medium dark:text-ink-muted">{{ $meta }}</div>
             @endisset
         </div>
-        {{ $actions ?? '' }}
+        @isset($actions)
+            {{-- Actions sit at the end, also when a narrow screen drops them under the title. --}}
+            <div data-detail-header-actions class="flex min-w-0 flex-wrap items-center justify-end gap-2 sm:ms-auto [&>.flex]:justify-end">{{ $actions }}</div>
+        @endisset
     </div>
 
     @isset($summary)

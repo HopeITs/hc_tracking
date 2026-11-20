@@ -279,7 +279,6 @@ new #[Layout('layouts::desk'), Title('titles.donor')] class extends Component {
         <x-slot:actions>
             @can('funding-agreements.view')
                 <x-ui.view-toggle
-                    class="@3xl/detail:order-last"
                     :label="__('finance_tables.view_label')"
                     wire-model="view"
                     :active="$this->view"
@@ -290,11 +289,15 @@ new #[Layout('layouts::desk'), Title('titles.donor')] class extends Component {
                 />
             @endcan
             @can('donors.update')
-            <x-ui.button tone="primary" icon="pencil-square" class="min-h-11 shrink-0 touch-manipulation @3xl/detail:order-last @3xl/detail:min-h-10" wire:click="openEditModal({{ $donor->id }})" data-test="edit-donor-button">
+            <x-ui.button tone="primary" icon="pencil-square" class="min-h-11 shrink-0 touch-manipulation @3xl/detail:min-h-10" wire:click="openEditModal({{ $donor->id }})" data-test="edit-donor-button">
                 {{ __('donors.edit_donor') }}
             </x-ui.button>
             @endcan
-            <address class="flex flex-col gap-1 text-sm not-italic @3xl/detail:items-end" data-donor-contact>
+        </x-slot:actions>
+
+        {{-- Who to talk to: information, so it sits under the title, not among the buttons. --}}
+        <x-slot:summary>
+            <address class="flex flex-col gap-1 text-sm not-italic" data-donor-contact>
                 @if (filled($donor->contact_person) || filled($donor->email) || filled($donor->phone))
                     @if (filled($donor->contact_person))
                         <span class="inline-flex items-center gap-1.5 font-semibold {{ $inkText }}"><flux:icon.user variant="micro" class="size-4 {{ $mutedText }}" aria-hidden="true" />{{ $donor->contact_person }}</span>
@@ -311,7 +314,7 @@ new #[Layout('layouts::desk'), Title('titles.donor')] class extends Component {
                     <span class="{{ $mutedText }}">{{ __('donors.no_contact_on_file') }}</span>
                 @endif
             </address>
-        </x-slot:actions>
+        </x-slot:summary>
     </x-ui.detail-header>
 
     @if (filled($donor->notes))

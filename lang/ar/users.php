@@ -34,6 +34,7 @@ return [
     'select_a_role' => 'اختر دورًا.',
     'select_a_valid_role' => 'اختر دورًا صالحًا.',
     'select_an_hr_account' => 'اختر حسابًا من الموارد البشرية',
+    'loading_hr_accounts' => 'جارٍ تحميل حسابات الموارد البشرية…',
     'select_an_hr_account_2' => 'اختر حسابًا من الموارد البشرية.',
     'supervision_add' => 'إضافة متابعة',
     'supervision_add_description' => 'اختر من يتابع من. تُوجّه المتابعة التذكيرات والتصعيد فقط، ولا تمنح أي صلاحية.',

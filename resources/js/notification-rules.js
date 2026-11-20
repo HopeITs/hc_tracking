@@ -149,6 +149,7 @@ document.addEventListener('alpine:init', () => {
 
             useDefault(key) {
                 this.$wire[key] = clone(defaults[key]);
+                this.keepEscalationOrder(key);
             },
 
             discard() {
@@ -178,17 +179,28 @@ document.addEventListener('alpine:init', () => {
             },
 
             bounds(key) {
-                const [min, max] = NUMBER_BOUNDS[key];
+                return NUMBER_BOUNDS[key];
+            },
 
-                if (key === 'escalateManagerAfter') {
-                    return [min, Math.min(max, this.num('escalateTopAfter') - 1)];
+            /**
+             * The program manager hears first, management later: the two
+             * escalation rows move together. Raising the manager past
+             * management pushes management one day after it; lowering
+             * management to the manager pulls the manager one day before it.
+             */
+            keepEscalationOrder(changed) {
+                const manager = this.num('escalateManagerAfter');
+                const top = this.num('escalateTopAfter');
+
+                if (top > manager) {
+                    return;
                 }
 
-                if (key === 'escalateTopAfter') {
-                    return [Math.max(min, this.num('escalateManagerAfter') + 1), max];
+                if (changed === 'escalateTopAfter') {
+                    this.$wire.escalateManagerAfter = Math.max(NUMBER_BOUNDS.escalateManagerAfter[0], top - 1);
+                } else if (changed === 'escalateManagerAfter') {
+                    this.$wire.escalateTopAfter = Math.min(NUMBER_BOUNDS.escalateTopAfter[1], manager + 1);
                 }
-
-                return [min, max];
             },
 
             canStep(key, delta) {
@@ -201,6 +213,7 @@ document.addEventListener('alpine:init', () => {
             step(key, delta) {
                 if (this.canStep(key, delta)) {
                     this.$wire[key] = this.num(key) + delta;
+                    this.keepEscalationOrder(key);
                 }
             },
 
@@ -211,6 +224,7 @@ document.addEventListener('alpine:init', () => {
 
                 if (Number.isInteger(value) && value >= min && value <= max) {
                     this.$wire[key] = value;
+                    this.keepEscalationOrder(key);
                 }
             },
 
@@ -222,6 +236,7 @@ document.addEventListener('alpine:init', () => {
 
                 this.$wire[key] = settled;
                 event.target.value = settled;
+                this.keepEscalationOrder(key);
             },
 
             /* ---- Working week ----------------------------------------------------- */

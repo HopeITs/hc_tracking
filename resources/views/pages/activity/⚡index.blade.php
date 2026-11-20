@@ -6,7 +6,7 @@ use App\Models\User;
 use App\Notifications\ActivityPresenter;
 use App\Notifications\NotificationPresenter;
 use App\Notifications\SubjectLinks;
-use App\Support\Like;
+use App\Support\ActivitySearch;
 use Carbon\CarbonImmutable;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Pagination\LengthAwarePaginator;
@@ -134,9 +134,7 @@ new #[Layout('layouts::desk'), Title('titles.activity_log')] class extends Compo
             ->when($this->module !== '', fn (Builder $query) => $query->where('module', $this->module))
             ->when($this->actor === 'system', fn (Builder $query) => $query->whereNull('actor_id'))
             ->when(ctype_digit($this->actor), fn (Builder $query) => $query->where('actor_id', (int) $this->actor))
-            ->when($term !== '', fn (Builder $query) => $query->where(Like::everyWord($term, fn (Builder $query, string $word) => $query
-                ->where(Like::word('event', $word))
-                ->orWhere(Like::word('properties', $word)))))
+            ->when($term !== '', fn (Builder $query) => $query->where(ActivitySearch::matching($term)))
             ->when($from !== null, fn (Builder $query) => $query->where('created_at', '>=', $from->startOfDay()))
             ->when($to !== null, fn (Builder $query) => $query->where('created_at', '<=', $to->endOfDay()));
     }
@@ -146,9 +144,15 @@ new #[Layout('layouts::desk'), Title('titles.activity_log')] class extends Compo
     {
         $sortingByModule = $this->sortField === 'module';
 
+        $areaOrder = $sortingByModule ? $this->areasInDisplayOrder() : [];
+        $areaPlaceholders = implode(', ', array_fill(0, max(1, count($areaOrder)), '?'));
+
         return $this->filteredQuery()
             ->with('actor:id,hr_user_id,employee_id')
-            ->when($sortingByModule, fn (Builder $query) => $query->orderBy('module', $this->sortDirection))
+            // Unknown areas (FIELD = 0) go last, then the order the reader sees.
+            ->when($sortingByModule && $areaOrder !== [], fn (Builder $query) => $query
+                ->orderByRaw("FIELD(module, {$areaPlaceholders}) = 0", $areaOrder)
+                ->orderByRaw("FIELD(module, {$areaPlaceholders})", $areaOrder))
             ->orderBy('created_at', $sortingByModule ? 'desc' : $this->sortDirection)
             ->orderBy('id', $sortingByModule ? 'desc' : $this->sortDirection)
             ->paginate(50);
@@ -266,6 +270,24 @@ new #[Layout('layouts::desk'), Title('titles.activity_log')] class extends Compo
             'risks' => 'warn',
             default => 'neutral',
         };
+    }
+
+    /**
+     * The area keys ordered by the name the reader sees ("Users & roles"
+     * for access-management), in the chosen direction, so sorting by Area
+     * reads alphabetically in either language.
+     *
+     * @return list<string>
+     */
+    private function areasInDisplayOrder(): array
+    {
+        $presenter = app(NotificationPresenter::class);
+
+        $areas = collect(array_keys(config('notifications.modules')))
+            ->sortBy(fn (string $module): string => mb_strtolower($presenter->moduleLabel($module)))
+            ->values();
+
+        return array_values(($this->sortDirection === 'desc' ? $areas->reverse() : $areas)->all());
     }
 
     private function parseDate(string $value): ?CarbonImmutable
@@ -450,7 +472,7 @@ new #[Layout('layouts::desk'), Title('titles.activity_log')] class extends Compo
 
                             <x-ui.data-table.cell class="@3xl:text-end">
                                 @if ($url !== null)
-                                    <a href="{{ $url }}" wire:navigate class="font-semibold text-status-critical hover:underline">{{ __('activity.open_record') }}</a>
+                                    <a href="{{ $url }}" wire:navigate class="font-semibold text-status-critical hover:underline max-sm:inline-flex max-sm:min-h-11 max-sm:items-center">{{ __('activity.open_record') }}</a>
                                 @elseif (! $exists)
                                     <span class="text-secondary-medium dark:text-ink-muted">{{ __('activity.record_gone') }}</span>
                                 @endif

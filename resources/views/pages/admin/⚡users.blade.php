@@ -98,13 +98,17 @@ new #[Layout('layouts::desk'), Title('titles.user_directory')] class extends Com
                 <option value="active">{{ __('common.active') }}</option>
                 <option value="inactive">{{ __('cities.inactive') }}</option>
             </x-ui.header-filter-select>
+
+            @if (trim($search) !== '' || $role !== '' || $status !== '')
+                <button type="button" class="dk-btn dk-ghost dk-sm max-sm:min-h-11" wire:click="clearFilters" data-test="clear-user-filters"><x-desk.icon name="x" />{{ __('desk.register.clear') }}</button>
+            @endif
         </x-slot:filters>
     @endif
 
     <x-slot:actions>
         @if ($activeTab === 'users')
             @can('create', App\Models\User::class)
-                <x-ui.button tone="primary" icon="plus" class="min-h-11 max-sm:h-11!" wire:click="openCreateModal" data-test="create-user-button" data-quick-create>{{ __('users.add_user') }}</x-ui.button>
+                <x-ui.button tone="primary" icon="plus" class="min-h-11 max-sm:h-11!" x-on:click="$wire.showCreateUserModal = true" wire:click="openCreateModal" data-test="create-user-button" data-quick-create>{{ __('users.add_user') }}</x-ui.button>
             @endcan
         @endif
 

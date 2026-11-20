@@ -3,6 +3,7 @@
 use App\Models\Activity;
 use App\Models\Risk;
 use App\Models\Task;
+use App\Models\User;
 use Livewire\Livewire;
 
 test('only super admins and the general manager can open the activity log', function (string $role, int $status) {
@@ -32,6 +33,27 @@ test('the log filters by module, person, text and date range', function () {
     $page()->set('from', now()->toDateString())->assertSeeText('Road closure')->assertDontSeeText('Water trucking');
 });
 
+test('search finds what the row says: the person, the wording and the label in any case', function () {
+    $sami = Activity::withoutRecording(fn () => User::factory()->role('Managers')->create(['name' => 'Sami Haddad']));
+    $rana = Activity::withoutRecording(fn () => User::factory()->role('Managers')->create(['name' => 'Rana Khoury']));
+
+    $this->actingAs($sami);
+    Task::factory()->create(['title' => 'Water trucking']);
+    $this->actingAs($rana);
+    Risk::factory()->create(['name' => 'Road closure']);
+
+    $page = fn () => Livewire::actingAs(userWithRole('Super Admin'))->test('pages::activity.index');
+
+    $page()->set('search', 'Khoury')->assertSeeText('Road closure')->assertDontSeeText('Water trucking');
+    $page()->set('search', 'logged')->assertSeeText('Road closure')->assertDontSeeText('Water trucking');
+    $page()->set('search', 'WATER')->assertSeeText('Water trucking')->assertDontSeeText('Road closure');
+    $page()->set('search', 'sami trucking')->assertSeeText('Water trucking')->assertDontSeeText('Road closure');
+    $page()->set('search', 'sami closure')->assertDontSeeText('Water trucking')->assertDontSeeText('Road closure');
+
+    app()->setLocale('ar');
+    $page()->set('search', 'سجل')->assertSeeText('Road closure')->assertDontSeeText('Water trucking');
+});
+
 test('entries sort by time or module, toggling direction on repeat clicks', function () {
     $this->actingAs(userWithRole('Managers'));
     Risk::factory()->create(['name' => 'Alpha risk']);
@@ -50,6 +72,24 @@ test('entries sort by time or module, toggling direction on repeat clicks', func
 
     $page->call('setSort', 'created_at')
         ->assertSeeInOrder(['Alpha risk', 'Beta task']);
+});
+
+test('sorting by area follows the area name the reader sees, not its key', function () {
+    $this->actingAs(userWithRole('Managers'));
+    Risk::factory()->create(['name' => 'A risk entry']);
+    $access = Activity::query()->first()->replicate();
+    $access->module = 'access-management';
+    $access->properties = [...$access->properties, 'label' => 'An access entry'];
+    $access->save();
+
+    expect(__('notifications.modules.risks'))->toBe('Risks')
+        ->and(__('notifications.modules.access-management'))->toBe('Users & roles');
+
+    Livewire::actingAs(userWithRole('Super Admin'))->test('pages::activity.index')
+        ->call('setSort', 'module')
+        ->assertSeeInOrder(['A risk entry', 'An access entry'])
+        ->call('setSort', 'module')
+        ->assertSeeInOrder(['An access entry', 'A risk entry']);
 });
 
 test('a deleted record shows as deleted instead of a link', function () {
