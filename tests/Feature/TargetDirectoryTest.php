@@ -9,6 +9,7 @@ use App\Models\PlanIndicator;
 use App\Models\Program;
 use App\Models\Project;
 use App\Models\Proposal;
+use App\Models\ProposalLocation;
 use App\Models\Report;
 use App\Models\Result;
 use App\Models\User;
@@ -474,12 +475,43 @@ test('a target that does not fit its chain is refused', function () {
         ->set('targetIndicatorId', (string) Indicator::factory()->create()->id)
         ->set('targetSourceType', 'proposal')
         ->set('targetSourceId', (string) $proposal->id)
-        ->set('targetProjectId', (string) Project::factory()->create()->id)
+        ->set('targetLocationId', (string) ProposalLocation::factory()->create()->id)
         ->set('targetValue', '100')
         ->call('saveTarget')
-        ->assertHasErrors(['targetProjectId']);
+        ->assertHasErrors(['targetLocationId']);
 
     expect(PlanIndicator::query()->count())->toBe(0);
+});
+
+test('a proposal target picks a location row and takes its place and project (Y-10)', function () {
+    $user = mealManager();
+    $proposal = Proposal::factory()->create();
+    $project = Project::factory()->create();
+    $row = proposalRowForProject($proposal, $project);
+    $second = insertHrCenter((int) $project->city_id, 'Second '.Str::random(5));
+    $row->centers()->create(['center_id' => $second]);
+    $indicator = Indicator::factory()->create();
+
+    $form = fn () => Livewire::actingAs($user)
+        ->test('pages::targets.index')
+        ->call('openCreateModal')
+        ->set('targetIndicatorId', (string) $indicator->id)
+        ->set('targetSourceType', 'proposal')
+        ->set('targetSourceId', (string) $proposal->id)
+        ->set('targetLocationId', (string) $row->id)
+        ->set('targetValue', '90');
+
+    $form()->assertSee(__('targets.location'))->call('saveTarget')->assertHasNoErrors();
+
+    expect(PlanIndicator::query()->sole()->only(['proposal_location_id', 'project_id', 'center_id', 'all_centers']))->toBe([
+        'proposal_location_id' => $row->id,
+        'project_id' => $project->id,
+        'center_id' => null,
+        'all_centers' => true,
+    ]);
+
+    $form()->call('saveTarget')->assertHasErrors(['targetIndicatorId']);
+    expect(PlanIndicator::query()->count())->toBe(1);
 });
 
 test('a percentage target above 100 is refused', function () {

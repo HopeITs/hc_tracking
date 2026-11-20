@@ -116,12 +116,17 @@
         :title="__('proposals.stop_funding_this_project')"
         :message="$unlinkingProjectId !== null && ($unlinking = $this->projects->firstWhere('id', $unlinkingProjectId)) !== null ? __('proposals.unlink_project_consequence', ['name' => $unlinking->name]) : null"
         confirm="unlinkProject"
-        :confirm-label="__('proposals.unlink_project')"
+        :confirm-label="$this->unlinkDeletesTargets ? __('proposals.unlink_with_targets') : __('proposals.unlink_project')"
         confirm-test="confirm-unlink-project"
     >
         @if ($showUnlinkModal)
-            @if ($unlinkUnreportedTargetCount > 0)
-                <p class="text-sm text-secondary-dark dark:text-ink" data-unlink-unreported-targets>{{ trans_choice('proposals.unlink_project_unreported_targets', $unlinkUnreportedTargetCount, ['count' => $unlinkUnreportedTargetCount, 'name' => $this->projects->firstWhere('id', $unlinkingProjectId)?->name ?? '']) }}</p>
+            @if ($unlinkTargets['count'] > 0)
+                <x-proposals.targets-notice
+                    :body="trans_choice('proposals.location_targets_body', $unlinkTargets['count'], ['count' => $unlinkTargets['count']])"
+                    :reported="$unlinkTargets['reported'] > 0 ? trans_choice('proposals.location_targets_reported', $unlinkTargets['reported'], ['count' => $unlinkTargets['reported']]) : null"
+                    :no-right="$unlinkTargets['reported'] === 0 && ! $this->unlinkDeletesTargets ? __('proposals.location_targets_no_right') : null"
+                    :url="route('proposals.show', ['proposal' => $this->proposal, 'tab' => 'targets'])"
+                />
             @endif
             <flux:error name="project" />
         @endif

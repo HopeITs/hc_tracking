@@ -4,6 +4,7 @@ use App\Models\AnnualPlan;
 use App\Models\PlanIndicator;
 use App\Models\Program;
 use App\Models\Proposal;
+use App\Models\ProposalLocation;
 use App\Models\Report;
 use App\Models\ReportFile;
 
@@ -27,6 +28,17 @@ test('deleting a proposal deletes the targets committed in it', function () {
 
     $this->assertDatabaseMissing('plan_indicators', ['id' => $target->id]);
     $this->assertDatabaseHas('plan_indicators', ['id' => $survivor->id]);
+});
+
+test('deleting a proposal deletes the targets of its location rows before the rows go (Y-10)', function () {
+    $proposal = Proposal::factory()->create();
+    $row = ProposalLocation::factory()->create(['proposal_id' => $proposal->id]);
+    $target = PlanIndicator::factory()->forProposal($proposal)->create(['proposal_location_id' => $row->id]);
+
+    $proposal->delete();
+
+    $this->assertDatabaseMissing('plan_indicators', ['id' => $target->id]);
+    $this->assertDatabaseMissing('proposal_locations', ['id' => $row->id]);
 });
 
 test('deleting a program reaches the targets planned in its annual plans', function () {

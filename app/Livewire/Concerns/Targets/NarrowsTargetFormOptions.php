@@ -8,6 +8,7 @@ use App\Models\AnnualPlan;
 use App\Models\Indicator;
 use App\Models\Project;
 use App\Models\Proposal;
+use App\Models\ProposalLocation;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Support\Facades\DB;
 use Livewire\Attributes\Computed;
@@ -26,11 +27,13 @@ use Livewire\Attributes\Computed;
  * @property string $targetSourceId
  * @property string $targetIndicatorId
  * @property string $targetProjectId
+ * @property string $targetLocationId
  * @property string $targetPeriod
  * @property ?int $editingTargetId
  * @property-read Indicator|null $formIndicator
  * @property-read array<int, array{id: int, label: string}> $sourceOptions
  * @property-read Collection<int, Project> $formProjectOptions
+ * @property-read list<array{id: int, label: string}> $formLocationOptions
  */
 trait NarrowsTargetFormOptions
 {
@@ -153,11 +156,41 @@ trait NarrowsTargetFormOptions
     }
 
     /**
-     * Keep the chosen project inside the options that fit, and fill it in
-     * when the indicator leaves exactly one.
+     * The location rows (city · program) a proposal target may belong to: the
+     * rows of the chosen proposal (Y-10, D-91). Empty for an annual plan.
+     *
+     * @return list<array{id: int, label: string}>
+     */
+    #[Computed]
+    public function formLocationOptions(): array
+    {
+        if ($this->targetSourceType !== 'proposal' || $this->targetSourceId === '') {
+            return [];
+        }
+
+        $rows = ProposalLocation::query()
+            ->with('program')
+            ->where('proposal_id', (int) $this->targetSourceId)
+            ->orderBy('sort')
+            ->orderBy('id')
+            ->get();
+        $labels = ProposalLocation::placeLabels($rows);
+
+        return $rows->map(fn (ProposalLocation $row): array => ['id' => $row->id, 'label' => $labels[$row->id]])->values()->all();
+    }
+
+    /**
+     * Keep the chosen project and location inside the options that fit, and
+     * fill the project in when the indicator leaves exactly one.
      */
     protected function syncFormProject(): void
     {
+        unset($this->formLocationOptions);
+
+        if ($this->targetLocationId !== '' && ! collect($this->formLocationOptions)->contains('id', (int) $this->targetLocationId)) {
+            $this->targetLocationId = '';
+        }
+
         $options = $this->formProjectOptions;
 
         if ($this->targetProjectId !== '' && ! $options->contains('id', (int) $this->targetProjectId)) {

@@ -7,14 +7,13 @@ use App\Enums\DonorAttribution;
 use App\Enums\IndicatorMeasure;
 use App\Livewire\Concerns\IndicatorLibrary\ManagesLibraryEntryForm;
 use App\Models\HrCenter;
-use App\Models\HrCity;
 use App\Models\HrProgram;
 use App\Models\Indicator;
 use App\Models\LibraryIndicator;
 use App\Models\PlanIndicator;
 use App\Models\Program;
-use App\Models\Project;
 use App\Models\Proposal;
+use App\Models\ProposalLocation;
 use App\Models\Result;
 use App\Support\ArabicText;
 use App\Support\Like;
@@ -31,8 +30,9 @@ use Livewire\Component;
  *
  * Two parts: the checklist (library entries of the proposal's programs plus
  * institutional ones, attached to nodes of the proposal's own framework) and
- * the per-center targets grid (rows = instances in the framework, columns =
- * linked projects, labelled center · city). Every write goes through the
+ * the targets grid (rows = instances in the framework, columns = the
+ * proposal's location rows, labelled city · program: one target per row,
+ * shared by the row's centers, D-90, D-91). Every write goes through the
  * App\Actions\Targets actions, which authorize, lock the proposal and refuse
  * foreign ids; the flags kept here only shape the page.
  *
@@ -47,7 +47,7 @@ new class extends Component {
     public int $proposalId;
 
     /**
-     * The grid as edited, keyed "{indicatorId}_{projectId}".
+     * The grid as edited, keyed "{indicatorId}_{locationId}" (Y-10).
      *
      * @var array<string, array{value: string, period: string, population: string}>
      */
@@ -84,7 +84,10 @@ new class extends Component {
     {
         return Proposal::query()
             ->select(['id', 'name', 'slug', 'status', 'previous_proposal_id'])
-            ->with(['projects' => fn ($query) => $query->select(['projects.id', 'projects.name', 'projects.program_id', 'projects.center_id', 'projects.city_id'])])
+            ->with([
+                'projects' => fn ($query) => $query->select(['projects.id', 'projects.name', 'projects.program_id', 'projects.center_id', 'projects.city_id']),
+                'locations' => fn ($query) => $query->with(['program', 'centers', 'programRequest'])->orderBy('sort')->orderBy('id'),
+            ])
             ->findOrFail($this->proposalId);
     }
 
@@ -114,14 +117,17 @@ new class extends Component {
     }
 
     /**
-     * Distinct programs of the linked projects, read off the loaded projects.
+     * Distinct programs of the proposal's location rows and linked projects,
+     * read off the loaded relations.
      *
      * @return list<int>
      */
     #[Computed]
     public function programIds(): array
     {
-        return $this->proposal->projects->pluck('program_id')->filter()->map(fn (mixed $id): int => (int) $id)->unique()->sort()->values()->all();
+        return $this->proposal->locations->pluck('program_id')
+            ->merge($this->proposal->projects->pluck('program_id'))
+            ->filter()->map(fn (mixed $id): int => (int) $id)->unique()->sort()->values()->all();
     }
 
     /**
@@ -170,7 +176,7 @@ new class extends Component {
     public function savedTargets(): Collection
     {
         return PlanIndicator::query()
-            ->select(['id', 'source_type', 'source_id', 'indicator_id', 'project_id', 'target', 'target_population', 'period', 'updated_at'])
+            ->select(['id', 'source_type', 'source_id', 'indicator_id', 'project_id', 'proposal_location_id', 'target', 'target_population', 'period', 'updated_at'])
             ->where('source_type', SaveProposalTargetsGrid::SourceType)
             ->where('source_id', $this->proposalId)
             ->withCount('reports')
@@ -180,13 +186,13 @@ new class extends Component {
                 'project:id,name,program_id',
             ])
             ->get()
-            ->keyBy(fn (PlanIndicator $target): string => $target->indicator_id.'_'.$target->project_id);
+            ->keyBy(fn (PlanIndicator $target): string => $target->indicator_id.'_'.($target->proposal_location_id ?? 'p'.$target->project_id));
     }
 
     /**
      * Saved targets the grid cannot show: committed on an indicator outside
-     * this proposal's framework (legacy data) or on a project the proposal no
-     * longer links. They stay, read-only, flagged with their chain issues.
+     * this proposal's framework (legacy data) or on no location row of this
+     * proposal. They stay, read-only, flagged with their chain issues.
      *
      * @return Collection<int, PlanIndicator>
      */
@@ -194,48 +200,77 @@ new class extends Component {
     public function outsideTargets(): Collection
     {
         $instanceIds = $this->instances->modelKeys();
-        $projectIds = $this->proposal->projects->modelKeys();
+        $rowIds = $this->proposal->locations->modelKeys();
         $source = $this->proposal;
 
         return $this->savedTargets
             ->filter(fn (PlanIndicator $target): bool => ! in_array($target->indicator_id, $instanceIds, true)
-                || ! in_array($target->project_id, $projectIds, true))
+                || ! in_array($target->proposal_location_id, $rowIds, true))
             ->each(fn (PlanIndicator $target) => $target->setRelation('source', $source))
             ->values();
     }
 
     /**
-     * Grid columns: one per linked project, labelled center · city, falling
-     * back to the project name when the project has no center (§10).
+     * Grid columns: one per location row (city · program), never one per
+     * center (Y-10, D-91). Under the title the header names the row's
+     * centers (HR names, read once, never copied), or says field work or
+     * "center not set"; a row with several centers carries one shared
+     * target (D-90). A row still waiting for its program is shown disabled,
+     * with the reason in words. The row's project, when it has one, keys the
+     * renewal suggestion, the other donors' targets and the beneficiaries.
      *
-     * @return list<array{id: int, label: string, city: ?string, beneficiaries: ?int, programId: ?int}>
+     * @return list<array{id: int, label: string, city: ?string, beneficiaries: ?int, programId: ?int, projectId: ?int, centers: list<string>, fieldWork: bool, shared: bool, waiting: ?string}>
      */
     #[Computed]
     public function columns(): array
     {
-        $projects = $this->proposal->projects;
-        $centers = $projects->mapWithKeys(fn (Project $project): array => [$project->id => $project->center()]);
-        $cityIds = $centers->filter()->map(fn (HrCenter $center): int => $center->city_id)
-            ->merge($projects->pluck('city_id'))
-            ->filter()->unique()->values()->all();
-        $cities = HrCity::query()->select(['id', 'name_en', 'name_ar'])->whereIn('id', $cityIds)->get()->keyBy('id');
+        $rows = $this->proposal->locations;
+        $labels = ProposalLocation::placeLabels($rows);
+        $projects = $this->proposal->projects->keyBy('id');
+        $centerNames = HrCenter::query()
+            ->whereKey($rows->flatMap(fn (ProposalLocation $row): array => $row->centerIds())->unique()->values()->all())
+            ->get()
+            ->mapWithKeys(fn (HrCenter $center): array => [$center->id => $center->name]);
 
-        return $projects
-            ->map(function (Project $project) use ($centers, $cities): array {
-                $center = $centers->get($project->id);
-                $cityId = $center?->city_id ?? $project->city_id;
+        return $rows
+            ->map(function (ProposalLocation $row) use ($labels, $projects, $centerNames): array {
+                $beneficiaries = $row->project_id === null ? null : $projects->get($row->project_id)?->pivot?->getAttribute('target_beneficiaries');
+                $centers = $row->city_wide ? [] : array_map(fn (int $id): string => $centerNames->get($id) ?? '#'.$id, $row->centerIds());
 
                 return [
-                    'id' => $project->id,
-                    'label' => $center?->name ?? $project->name,
-                    'city' => $center === null ? null : $cities->get($cityId)?->name,
-                    'beneficiaries' => ($beneficiaries = $project->pivot?->getAttribute('target_beneficiaries')) === null ? null : (int) $beneficiaries,
-                    'programId' => $project->program_id === null ? null : (int) $project->program_id,
+                    'id' => $row->id,
+                    'label' => $labels[$row->id],
+                    'city' => null,
+                    'beneficiaries' => $beneficiaries === null ? null : (int) $beneficiaries,
+                    'programId' => $row->program_id,
+                    'projectId' => $row->project_id,
+                    'centers' => $centers,
+                    'fieldWork' => $row->city_wide,
+                    'shared' => count($centers) > 1,
+                    'waiting' => $this->waitingReason($row),
                 ];
             })
-            ->sortBy('label', SORT_NATURAL | SORT_FLAG_CASE)
             ->values()
             ->all();
+    }
+
+    /**
+     * Why a row takes no targets yet, in words, or null. A row waits while
+     * it has no program or its program request is still pending (the same
+     * rule SaveProposalTargetsGrid refuses on).
+     */
+    private function waitingReason(ProposalLocation $row): ?string
+    {
+        if (! SaveProposalTargetsGrid::isWaitingForProgram($row)) {
+            return null;
+        }
+
+        $request = $row->programRequest;
+        $name = $request === null ? null : trim((string) (app()->getLocale() === 'ar' && trim((string) $request->name_ar) !== '' ? $request->name_ar : $request->name_en));
+
+        return $name === null || $name === ''
+            ? __('targets.column_waiting_program')
+            : __('targets.column_waiting_program').' '.__('proposals.location_program_pending', ['name' => $name]);
     }
 
     /**
@@ -473,7 +508,8 @@ new class extends Component {
     {
         Gate::authorize('targets.create');
 
-        [$indicatorId, $projectId] = array_map('intval', explode('_', $key) + [1 => 0]);
+        [$indicatorId, $rowId] = array_map('intval', explode('_', $key) + [1 => 0]);
+        $projectId = collect($this->columns)->firstWhere('id', $rowId)['projectId'] ?? null;
         $indicator = $this->instances->firstWhere('id', $indicatorId);
         $suggestion = $indicator === null ? null : ($this->previousAchievements[$indicator->library_indicator_id.'_'.$projectId] ?? null);
 
@@ -610,15 +646,21 @@ new class extends Component {
      * The cells sent to the action: every filled cell and every saved one,
      * with the version it was loaded at, and their grid keys by position.
      *
-     * @return array{0: list<array{indicator_id: int, project_id: int, value: ?string, period: ?string, target_population: ?string, version: ?string}>, 1: list<string>}
+     * @return array{0: list<array{indicator_id: int, location_id: int, value: ?string, period: ?string, target_population: ?string, version: ?string}>, 1: list<string>}
      */
     private function cellsToSend(): array
     {
         $cells = [];
         $keys = [];
+        $waitingIds = collect($this->columns)->filter(fn (array $column): bool => $column['waiting'] !== null)->pluck('id')->all();
 
         foreach ($this->grid as $key => $cell) {
-            [$indicatorId, $projectId] = array_map('intval', explode('_', (string) $key) + [1 => 0]);
+            [$indicatorId, $locationId] = array_map('intval', explode('_', (string) $key) + [1 => 0]);
+
+            // A column waiting for its program is read-only: nothing in it is sent.
+            if (in_array($locationId, $waitingIds, true)) {
+                continue;
+            }
             $value = trim((string) ($cell['value'] ?? ''));
             $version = $this->versions[$key] ?? null;
 
@@ -630,7 +672,7 @@ new class extends Component {
 
             $cells[] = [
                 'indicator_id' => $indicatorId,
-                'project_id' => $projectId,
+                'location_id' => $locationId,
                 'value' => $value === '' ? null : $value,
                 'period' => $value === '' ? null : (string) ($cell['period'] ?? ''),
                 'target_population' => $population === '' ? null : $population,
@@ -645,7 +687,7 @@ new class extends Component {
     /**
      * What one cell shows besides its input.
      *
-     * @param  array{id: int, label: string, city: ?string, beneficiaries: ?int, programId: ?int}  $column
+     * @param  array{id: int, label: string, city: ?string, beneficiaries: ?int, programId: ?int, projectId: ?int, centers: list<string>, fieldWork: bool, shared: bool, waiting: ?string}  $column
      * @return array{key: string, saved: bool, reported: bool, beneficiaries: ?int, derived: ?string, suggestion: ?string, centerTotal: ?string, attribution: ?DonorAttribution}
      */
     private function cellFacts(Indicator $indicator, array $column): array
@@ -667,7 +709,7 @@ new class extends Component {
             ]);
         }
 
-        $libraryKey = $indicator->library_indicator_id.'_'.$column['id'];
+        $libraryKey = $indicator->library_indicator_id.'_'.($column['projectId'] ?? 0);
         $suggestion = $value === '' && $indicator->library_indicator_id !== null ? ($this->previousAchievements[$libraryKey] ?? null) : null;
 
         $others = $indicator->library_indicator_id === null ? [] : ($this->otherDonorTargets[$libraryKey] ?? []);

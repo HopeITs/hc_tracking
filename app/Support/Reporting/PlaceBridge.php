@@ -54,9 +54,11 @@ final class PlaceBridge
 
     /**
      * `project_proposal.target_beneficiaries` of a proposal target's project
-     * (D-25), the source of a `fixed` line's denominator.
+     * (D-25), the source of a `fixed` line's denominator. Since Y-10 a
+     * proposal target's `project_id` is its location row's project, so this
+     * reads the row's beneficiaries.
      *
-     * Removed by Y-10, when targets are keyed by location row (D-91).
+     * Removed by Y-11, when the location row carries its beneficiaries.
      */
     public function targetBeneficiariesOf(PlanIndicator $target): ?int
     {
@@ -377,17 +379,17 @@ final class PlaceBridge
     }
 
     /**
-     * The place a new or re-pointed target gets (Y-08), by the backfill's
-     * rule: the project's city and program; its center when it has one (left
-     * unset when a row of the proposal names other centers); else, for a
-     * proposal target, what the proposal's one row carrying the project says
-     * (for an annual-plan target, what every row carrying the project says,
-     * as on main: Dev 1, 17 Nov): its single center, city-wide (D-88) or
-     * shared by several centers (D-90). Rows that disagree leave it unset.
-     * Null without a project.
+     * The place a new or re-pointed target gets.
      *
-     * Its project branch is replaced by Y-10, when targets are keyed by
-     * location row (D-91).
+     * A proposal target (Y-10, D-91): the place of the proposal's location
+     * row that carries the project (PlanIndicator::placeColumnsForRow); no
+     * row, no place. The project is never read for it any more.
+     *
+     * An annual-plan target (Y-08, D-44, unchanged): the project's city and
+     * program; its center when it has one; else what every row carrying the
+     * project says (as on main: Dev 1, 17 Nov): its single center, city-wide
+     * (D-88) or shared by several centers (D-90). Rows that disagree leave it
+     * unset. Null without a project.
      */
     public function placeForTarget(Model $source, ?int $projectId): ?ReportPlace
     {
@@ -407,9 +409,9 @@ final class PlaceBridge
     /**
      * The place columns a writer stores next to `project_id`, per project, in
      * a fixed number of queries (the targets grid saves many cells at once).
-     * Same rule as placeForTarget(), which cannot express a shared target.
-     *
-     * Its project branch is replaced by Y-10 (D-91).
+     * Same rule as placeForTarget(), which cannot express a shared target:
+     * the row's place for a proposal source (Y-10), the project branch for an
+     * annual plan only (until Y-17).
      *
      * @param  list<int|null>  $projectIds
      * @return array<int|string, array{city_id: int|null, program_id: int|null, center_id: int|null, city_wide: bool, all_centers: bool}> keyed by project id ('' for none)
@@ -424,11 +426,26 @@ final class PlaceBridge
             return $result;
         }
 
+        if ($source->getMorphClass() === 'proposal') {
+            $rows = ProposalLocation::query()
+                ->with('centers')
+                ->where('proposal_id', $source->getKey())
+                ->whereIn('project_id', $ids)
+                ->orderBy('id')
+                ->get();
+
+            foreach ($ids as $id) {
+                $row = $rows->firstWhere('project_id', $id);
+                $result[$id] = $row === null ? $none : PlanIndicator::placeColumnsForRow($row);
+            }
+
+            return $result;
+        }
+
         $projects = Project::query()->select(['id', 'city_id', 'program_id', 'center_id'])->whereKey($ids)->get()->keyBy('id');
         $rows = ProposalLocation::query()
             ->with('centers')
             ->whereIn('project_id', $ids)
-            ->when($source->getMorphClass() === 'proposal', fn ($query) => $query->where('proposal_id', $source->getKey()))
             ->orderBy('id')
             ->get();
 
@@ -452,9 +469,7 @@ final class PlaceBridge
             $columns = [...$none, 'city_id' => (int) $project->city_id, 'program_id' => (int) $project->program_id];
 
             if ($project->center_id !== null) {
-                $center = (int) $project->center_id;
-                $disagree = $source->getMorphClass() === 'proposal' && $answers->contains(fn (array $answer): bool => $answer['center_ids'] !== [] && ! in_array($center, $answer['center_ids'], true));
-                $columns['center_id'] = $disagree ? null : $center;
+                $columns['center_id'] = (int) $project->center_id;
             } elseif ($answers->count() === 1) {
                 $answer = $answers->first();
                 $columns['city_wide'] = $answer['city_wide'];

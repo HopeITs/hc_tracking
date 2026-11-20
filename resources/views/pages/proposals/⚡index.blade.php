@@ -360,5 +360,14 @@ new #[Layout('layouts::desk'), Title('titles.proposals')] class extends Componen
         confirm="deleteProposal"
         :confirm-label="__('proposals.delete_proposal')"
         confirm-test="confirm-delete-proposal"
-    />
+    >
+        {{-- Y-10: the targets that go with it, and the reported ones that keep it. --}}
+        @if ($showDeleteModal && $this->deletingProposal !== null && $this->deletingProposalTargets['count'] > 0)
+            <x-proposals.targets-notice
+                :body="trans_choice('proposals.proposal_delete_targets', $this->deletingProposalTargets['count'], ['count' => $this->deletingProposalTargets['count']])"
+                :reported="$this->deletingProposalTargets['reported'] > 0 ? trans_choice('proposals.proposal_delete_reported_targets', $this->deletingProposalTargets['reported'], ['count' => $this->deletingProposalTargets['reported']]) : null"
+                :url="route('proposals.show', ['proposal' => $this->deletingProposal, 'tab' => 'targets'])"
+            />
+        @endif
+    </x-ui.confirm-modal>
 </x-desk.register>

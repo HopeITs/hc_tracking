@@ -2,14 +2,18 @@
 
 declare(strict_types=1);
 
+use App\Models\AnnualPlan;
 use App\Models\PlanIndicator;
 use App\Models\Program;
 use App\Models\Project;
 use App\Models\Proposal;
 use App\Models\ProposalLocation;
 use App\Models\ReportTemplate;
+use App\Support\ProposalLocationRows;
 use App\Support\Reporting\PlaceBridge;
 use App\Support\Reporting\ReportPlace;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Validation\ValidationException;
 
 beforeEach(function (): void {
     $this->cityId = insertHrCity('Homs '.Str::random(4), 'حمص');
@@ -145,11 +149,18 @@ it('finds the legacy project of a template from its own column or its place row'
         ->and($this->bridge->legacyProjectIdFor($unlinked))->toBeNull();
 });
 
-it('gives a new target the place of its project center, by the backfill rule', function (): void {
+it('gives a new annual-plan target the place of its project center, by the backfill rule', function (): void {
+    $project = Project::factory()->create(['city_id' => $this->cityId, 'program_id' => $this->program->id, 'center_id' => $this->centerA]);
+    $plan = AnnualPlan::factory()->create(['program_id' => $this->program->id]);
+
+    expect($this->bridge->placeForTarget($plan, $project->id))->toEqual(new ReportPlace($this->cityId, $this->program->id, $this->centerA, false))
+        ->and($this->bridge->placeForTarget($plan, null))->toBeNull();
+});
+
+it('gives a proposal target no place when no row of the proposal carries its project (Y-10)', function (): void {
     $project = Project::factory()->create(['city_id' => $this->cityId, 'program_id' => $this->program->id, 'center_id' => $this->centerA]);
 
-    expect($this->bridge->placeForTarget($this->proposal, $project->id))->toEqual(new ReportPlace($this->cityId, $this->program->id, $this->centerA, false))
-        ->and($this->bridge->placeForTarget($this->proposal, null))->toBeNull();
+    expect($this->bridge->placeForTarget($this->proposal, $project->id))->toBeNull();
 });
 
 it('gives a new target the single center, city-wide or shared answer of its proposal row', function (): void {
@@ -163,14 +174,54 @@ it('gives a new target the single center, city-wide or shared answer of its prop
     $columns = $this->bridge->placeColumnsForTargets($this->proposal, [$single->id, $field->id, $shared->id]);
 
     expect($this->bridge->placeForTarget($this->proposal, $single->id))->toEqual(new ReportPlace($this->cityId, $this->program->id, $this->centerB, false))
-        ->and($this->bridge->placeForTarget($this->proposal, $field->id))->toEqual(new ReportPlace($this->cityId, $this->program->id, null, true))
+        ->and($this->bridge->placeForTarget($this->proposal, $field->id))->toEqual(new ReportPlace($this->cityId + 1000, $this->program->id, null, true))
         ->and($this->bridge->placeForTarget($this->proposal, $shared->id))->toBeNull()
         ->and($columns[$shared->id])->toMatchArray(['center_id' => null, 'city_wide' => false, 'all_centers' => true]);
 });
 
-it('leaves a new target unset when its project center and its row disagree', function (): void {
+it('takes the row center over the project center for a proposal target (Y-10)', function (): void {
     $project = Project::factory()->create(['city_id' => $this->cityId, 'program_id' => $this->program->id, 'center_id' => $this->centerA]);
     bridgeRow($this->proposal, $this->cityId, $this->program, [$this->centerB], ['project_id' => $project->id]);
 
-    expect($this->bridge->placeForTarget($this->proposal, $project->id)?->isUnset())->toBeTrue();
+    expect($this->bridge->placeForTarget($this->proposal, $project->id))->toEqual(new ReportPlace($this->cityId, $this->program->id, $this->centerB, false));
+});
+
+it('turns a row target shared in the same save when a second center is added (Y-10)', function (): void {
+    $first = Project::factory()->create(['city_id' => $this->cityId, 'program_id' => $this->program->id, 'center_id' => $this->centerA]);
+    $second = Project::factory()->create(['city_id' => $this->cityId, 'program_id' => $this->program->id, 'center_id' => $this->centerB]);
+    $row = bridgeRow($this->proposal, $this->cityId, $this->program, [$this->centerA], ['project_id' => $first->id]);
+    $target = PlanIndicator::factory()->forProposal($this->proposal)->create(['project_id' => $first->id]);
+
+    expect($target->refresh()->only(['proposal_location_id', 'center_id', 'all_centers']))->toBe(['proposal_location_id' => $row->id, 'center_id' => $this->centerA, 'all_centers' => false]);
+
+    DB::transaction(fn () => app(ProposalLocationRows::class)->attachProject($this->proposal, $second));
+
+    expect($target->refresh()->only(['proposal_location_id', 'project_id', 'center_id', 'all_centers']))->toBe([
+        'proposal_location_id' => $row->id,
+        'project_id' => $first->id,
+        'center_id' => null,
+        'all_centers' => true,
+    ])
+        ->and($this->bridge->targetCoversPlace($target, new ReportPlace($this->cityId, $this->program->id, $this->centerB, false)))->toBeTrue();
+});
+
+it('gives a row target the project the approval links to its row (Y-10)', function (): void {
+    $row = bridgeRow($this->proposal, $this->cityId, $this->program, [$this->centerA]);
+    $target = PlanIndicator::factory()->forProposal($this->proposal)->create(['proposal_location_id' => $row->id, ...PlanIndicator::placeColumnsForRow($row)]);
+    $project = Project::factory()->create(['city_id' => $this->cityId, 'program_id' => $this->program->id, 'center_id' => $this->centerA]);
+
+    DB::transaction(fn () => app(ProposalLocationRows::class)->attachProject($this->proposal, $project));
+
+    expect($target->refresh()->project_id)->toBe($project->id);
+});
+
+it('refuses to remove a row that still has targets (Y-10)', function (): void {
+    $row = bridgeRow($this->proposal, $this->cityId, $this->program, [$this->centerA]);
+    $project = Project::factory()->create(['city_id' => $this->cityId, 'program_id' => $this->program->id]);
+    $row->forceFill(['project_id' => $project->id])->save();
+    PlanIndicator::factory()->forProposal($this->proposal)->create(['project_id' => $project->id]);
+
+    expect(fn () => app(ProposalLocationRows::class)->detachProject($this->proposal, $project->id))
+        ->toThrow(ValidationException::class, __('proposals.location_has_targets'));
+    expect(ProposalLocation::query()->whereKey($row->id)->exists())->toBeTrue();
 });

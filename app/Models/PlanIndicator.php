@@ -45,7 +45,7 @@ use InvalidArgumentException;
  * @property CarbonImmutable|null $created_at
  * @property CarbonImmutable|null $updated_at
  */
-#[Fillable(['source_type', 'source_id', 'indicator_id', 'target', 'target_population', 'project_id', 'city_id', 'program_id', 'center_id', 'city_wide', 'all_centers', 'period'])]
+#[Fillable(['source_type', 'source_id', 'indicator_id', 'target', 'target_population', 'project_id', 'proposal_location_id', 'city_id', 'program_id', 'center_id', 'city_wide', 'all_centers', 'period'])]
 class PlanIndicator extends Model implements TracksActivity
 {
     /** @use HasFactory<PlanIndicatorFactory> */
@@ -93,6 +93,58 @@ class PlanIndicator extends Model implements TracksActivity
     public function project(): BelongsTo
     {
         return $this->belongsTo(Project::class);
+    }
+
+    /**
+     * The proposal location row (city × program) a proposal target belongs
+     * to (Y-10, D-91). Null on annual-plan targets (D-44).
+     *
+     * @return BelongsTo<ProposalLocation, $this>
+     */
+    public function location(): BelongsTo
+    {
+        return $this->belongsTo(ProposalLocation::class, 'proposal_location_id');
+    }
+
+    /**
+     * The place columns of a target of the row (Y-10, D-90, D-91): the one
+     * rule every writer uses. One center gives that center, a field-work row
+     * `city_wide`, several centers a shared target (`all_centers`), no center
+     * an unset place. A row still waiting for its program has no place.
+     *
+     * @return array{city_id: int|null, program_id: int|null, center_id: int|null, city_wide: bool, all_centers: bool}
+     */
+    public static function placeColumnsForRow(ProposalLocation $row): array
+    {
+        if ($row->program_id === null) {
+            return ['city_id' => null, 'program_id' => null, 'center_id' => null, 'city_wide' => false, 'all_centers' => false];
+        }
+
+        $centerIds = $row->city_wide ? [] : $row->loadMissing('centers')->centerIds();
+
+        return [
+            'city_id' => $row->city_id,
+            'program_id' => $row->program_id,
+            'center_id' => count($centerIds) === 1 ? $centerIds[0] : null,
+            'city_wide' => $row->city_wide,
+            'all_centers' => count($centerIds) > 1,
+        ];
+    }
+
+    /**
+     * Rewrite the place and `project_id` of the row's targets from the row
+     * (Y-10). Called by ProposalLocationRows inside the transaction that
+     * changed the row's centers, field-work flag or project, so a target
+     * turns shared the moment a second center is added. Template lines are
+     * not touched. Returns the number of targets written.
+     */
+    public static function syncPlaceFromRow(ProposalLocation $row): int
+    {
+        $row->load('centers');
+
+        return static::query()
+            ->where('proposal_location_id', $row->id)
+            ->update([...static::placeColumnsForRow($row), 'project_id' => $row->project_id]);
     }
 
     /**
@@ -680,6 +732,7 @@ class PlanIndicator extends Model implements TracksActivity
             'target' => 'decimal:2',
             'target_population' => 'decimal:2',
             'period' => Period::class,
+            'proposal_location_id' => 'integer',
             'city_id' => 'integer',
             'program_id' => 'integer',
             'center_id' => 'integer',
