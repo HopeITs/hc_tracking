@@ -6,6 +6,7 @@ namespace App\Actions\Projects;
 
 use App\Enums\ProjectStatus;
 use App\Models\Project;
+use App\Support\Locations\ProjectLocationMirror;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Validation\ValidationException;
@@ -25,6 +26,8 @@ use Illuminate\Validation\ValidationException;
  */
 final class ReopenProjectAsDraft
 {
+    public function __construct(private ProjectLocationMirror $mirror) {}
+
     public function handle(Project $project): void
     {
         DB::transaction(function () use ($project): void {
@@ -53,6 +56,8 @@ final class ReopenProjectAsDraft
             $locked->start_date = null;
             $locked->end_date = null;
             $locked->save();
+
+            $this->mirror->sync($locked);
         });
 
         $project->refresh();

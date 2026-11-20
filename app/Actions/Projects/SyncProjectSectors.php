@@ -6,6 +6,7 @@ namespace App\Actions\Projects;
 
 use App\Models\Project;
 use App\Models\Sector;
+use App\Support\Locations\ProjectLocationMirror;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Validation\ValidationException;
@@ -26,6 +27,8 @@ use Illuminate\Validation\ValidationException;
  */
 final class SyncProjectSectors
 {
+    public function __construct(private ProjectLocationMirror $mirror) {}
+
     /**
      * @param  list<int>  $sectorIds
      *
@@ -80,6 +83,8 @@ final class SyncProjectSectors
                     'removed_sectors' => $removedNames,
                 ]);
             }
+
+            $this->mirror->syncSectors($locked);
         });
 
         $project->unsetRelation('sectors');
