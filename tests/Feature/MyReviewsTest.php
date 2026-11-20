@@ -128,6 +128,22 @@ test('the three buttons show disjoint counts that match what each click lists, a
     expect($page->instance()->mode)->toBe('asked');
 });
 
+test('the search reads Arabic as the other pages do: tashkeel, alef forms and the wrong layout do not matter', function (string $search) {
+    [$employeeId, $user] = reviewerLogin();
+    myReview($employeeId, 'مشروع الأمل', ProposalStatus::ConceptNoteReview);
+    myReview($employeeId, 'Water Access', ProposalStatus::ConceptNoteReview);
+
+    Livewire::actingAs($user)->test('pages::reviews.index')
+        ->set('search', $search)
+        ->assertSee('مشروع الأمل')
+        ->assertDontSee('Water Access');
+})->with([
+    'plain alef' => ['الامل'],
+    'tashkeel' => ['مَشْرُوع'],
+    'tatweel' => ['مشـــروع'],
+    'English layout' => ['lav,u'],
+]);
+
 test('a stale link with the old All value opens on Waiting on me', function () {
     [$employeeId, $user] = reviewerLogin();
     myReview($employeeId, 'Water Access', ProposalStatus::ConceptNoteReview);

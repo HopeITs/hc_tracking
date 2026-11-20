@@ -21,3 +21,9 @@ test('searches under three letters are never read on the other layout', function
         ->and(KeyboardLayout::readings('hd'))->toBe(['hd'])
         ->and(KeyboardLayout::readings('سؤا'))->toBe(['سؤا', 'sch']);
 });
+
+test('tashkeel and tatweel do not change how a search is read on the other layout', function () {
+    expect(KeyboardLayout::readings('شَمَّه'))->toBe(KeyboardLayout::readings('شمه'))
+        ->and(KeyboardLayout::readings('شمـــه'))->toBe(KeyboardLayout::readings('شمه'))
+        ->and(KeyboardLayout::readings('فِي'))->toBe(['في']);
+});

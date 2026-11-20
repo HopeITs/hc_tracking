@@ -47,6 +47,15 @@ final class ArabicText
     private const array SearchDrops = ["\u{064B}", "\u{064C}", "\u{064D}", "\u{064E}", "\u{064F}", "\u{0650}", "\u{0651}", "\u{0652}", "\u{0653}", "\u{0654}", "\u{0655}", "\u{0670}", "\u{0640}"];
 
     /**
+     * The text without tashkeel or tatweel and nothing else changed, so a
+     * word reads the same on the other keyboard layout with or without them.
+     */
+    public static function withoutMarks(string $text): string
+    {
+        return str_replace(self::SearchDrops, '', $text);
+    }
+
+    /**
      * The text as search compares it: lower case, without tashkeel or
      * tatweel, every letter variant folded (see SearchFolds).
      */
