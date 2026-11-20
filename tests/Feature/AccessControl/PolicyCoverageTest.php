@@ -8,6 +8,7 @@ use App\Models\ActivityPlanItem;
 use App\Models\ActivityPlanItemCity;
 use App\Models\ActivityPlanMilestone;
 use App\Models\AiRequest;
+use App\Models\Assumption;
 use App\Models\DonorProposal;
 use App\Models\FundingAgreementInstallment;
 use App\Models\HrCenter;
@@ -38,6 +39,7 @@ use App\Models\PlanUpdateNumber;
 use App\Models\PlanUpdateQuestion;
 use App\Models\PlanUpdateWeek;
 use App\Models\ProjectActivityStatus;
+use App\Models\ProposalAttentionDismissal;
 use App\Models\ProposalChangeRequest;
 use App\Models\ProposalChangeRequestReview;
 use App\Models\ProposalLocationCenter;
@@ -86,6 +88,7 @@ function modelsGuardedWithoutPolicy(): array
         AiRequest::class => ['ai', 'The AI usage ledger: written only by App\Support\Ai\AiGateway, read only under ai.view-usage.'],
         Account::class => ['accounts', 'accounts.* permissions on the admin accounts page and the transfer forms.'],
         Activity::class => ['activity-log', 'The global log needs activity-log.view; a record\'s own Activity tab follows that record\'s page.'],
+        Assumption::class => ['results', 'Part of its proposal\'s logical framework: written only by SaveAssumption under results.create or results.update and the framework lock; read through the proposal page.'],
         DonorProposal::class => ['funding-agreements', 'funding-agreements.* permissions (ManagesAgreementForm).'],
         FundingAgreementInstallment::class => ['funding-agreements', 'The payment schedule of an agreement: written only by SaveAgreementInstallments under funding-agreements.update (T09).'],
         HrCenter::class => [null, 'Read-only mirror of the HR database; never written here.'],
@@ -116,6 +119,7 @@ function modelsGuardedWithoutPolicy(): array
         PlanUpdateWeek::class => ['annual-plans', 'Part of its monthly update (PlanUpdatePolicy::canFill); written only by SavePlanUpdate.'],
         PlanIndicator::class => ['targets', 'targets.* permissions on the targets page.'],
         ProjectActivityStatus::class => ['reports', 'Written only when a monthly report is validated or reopened (MonthlyReportPolicy::validate, decideReopen).'],
+        ProposalAttentionDismissal::class => [null, 'The signed-in user\'s own hidden "Needs attention" items, written and read under ProposalPolicy::view (ReadsProposalAttention).'],
         ProposalStatusNote::class => ['proposals', 'Written only through a proposal status change (ProposalPolicy::update).'],
         ProposalChangeRequest::class => ['proposals', 'Written only by the change-request actions under ProposalPolicy::requestChange, decideChange and withdrawChange (Y-09, D-89a).'],
         ProposalChangeRequestReview::class => ['proposals', 'Part of its change request; written only by RequestProposalChange and ReviewProposalChange under ProposalPolicy::reviewChange (Y-09).'],
