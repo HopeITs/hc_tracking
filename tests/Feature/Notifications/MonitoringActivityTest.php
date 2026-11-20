@@ -6,6 +6,7 @@ use App\Models\Indicator;
 use App\Models\IndicatorProgress;
 use App\Models\PlanIndicator;
 use App\Models\Project;
+use App\Models\ProposalLocation;
 use App\Models\Result;
 use App\Models\Risk;
 use App\Models\UserNotification;
@@ -15,10 +16,12 @@ test('a risk that happens is critical for the owner, managers, meal and the top 
     $owner = userWithRole('Managers', $ownerEmployee);
     $meal = userWithRole('MEAL');
     $generalManager = userWithRole('General Manager');
-    $risk = Activity::withoutRecording(fn () => Risk::factory()->create([
-        'project_id' => Project::factory()->create(['user_id' => $ownerEmployee])->id,
-        'name' => 'Road closure',
-    ]));
+    // Y-13 (D-93): the risk's direct recipient is the row's responsible employee.
+    $risk = Activity::withoutRecording(fn () => Risk::factory()
+        ->onRow(ProposalLocation::factory()
+            ->forProject(Project::factory()->create())
+            ->create(['responsible_employee_id' => $ownerEmployee]))
+        ->create(['name' => 'Road closure']));
 
     $this->actingAs(userWithRole('Managers'));
     $risk->update(['happened' => true]);

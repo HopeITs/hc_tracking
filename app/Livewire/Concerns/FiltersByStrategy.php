@@ -82,6 +82,32 @@ trait FiltersByStrategy
     }
 
     /**
+     * Keep only records whose location row sits under a program of the
+     * filtered strategy (Y-13, D-93). The twin of `whereInStrategy()` for a
+     * module that has left `projects` behind.
+     *
+     * @template TModel of \Illuminate\Database\Eloquent\Model
+     *
+     * @param  Builder<TModel>  $query
+     * @param  string  $locationColumn  the qualified column holding the row id
+     * @return Builder<TModel>
+     */
+    protected function whereLocationInStrategy(Builder $query, string $locationColumn): Builder
+    {
+        $strategy = $this->strategyFilter;
+
+        if ($strategy === null) {
+            return $query;
+        }
+
+        return $query->whereIn($locationColumn, fn ($rows) => $rows
+            ->select('proposal_locations.id')
+            ->from('proposal_locations')
+            ->join('programs', 'programs.id', '=', 'proposal_locations.program_id')
+            ->where('programs.strategy_id', $strategy->id));
+    }
+
+    /**
      * Keep only rows whose proposal funds a project of the filtered strategy.
      *
      * @template TModel of \Illuminate\Database\Eloquent\Model
