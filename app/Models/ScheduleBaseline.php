@@ -19,12 +19,13 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
  *
  * @property int $id
  * @property int $project_id
+ * @property int|null $proposal_location_id
  * @property string $name
  * @property int|null $created_by
  * @property CarbonImmutable|null $created_at
  * @property CarbonImmutable|null $updated_at
  */
-#[Fillable(['project_id', 'name', 'created_by'])]
+#[Fillable(['project_id', 'proposal_location_id', 'name', 'created_by'])]
 class ScheduleBaseline extends Model
 {
     /** @use HasFactory<ScheduleBaselineFactory> */
@@ -36,6 +37,17 @@ class ScheduleBaseline extends Model
     public function project(): BelongsTo
     {
         return $this->belongsTo(Project::class);
+    }
+
+    /**
+     * The location row this belongs to (Y-12, D-93). Null until the backfill
+     * maps it; `project_id` is kept and still written until Y-18.
+     *
+     * @return BelongsTo<ProposalLocation, $this>
+     */
+    public function location(): BelongsTo
+    {
+        return $this->belongsTo(ProposalLocation::class, 'proposal_location_id');
     }
 
     /**
@@ -70,5 +82,15 @@ class ScheduleBaseline extends Model
     protected function parentActivityProperties(string $hook): array
     {
         return ['baseline' => (string) $this->name];
+    }
+
+    /**
+     * @return array<string, string>
+     */
+    protected function casts(): array
+    {
+        return [
+            'proposal_location_id' => 'integer',
+        ];
     }
 }
