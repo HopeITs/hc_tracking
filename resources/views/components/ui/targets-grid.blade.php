@@ -11,9 +11,14 @@
 
 @php
     /*
-     * The per-center targets grid of proposals/show (T13). Rows are the
+     * The targets grid of proposals/show (T13, Y-10). Rows are the
      * indicator instances of the proposal's framework, grouped under their
-     * node; columns are the linked projects, labelled center · city.
+     * node; columns are the proposal's location rows (D-91), headed
+     * "city · program" with the row's centers as chips ("Field work" or
+     * "Center not set" otherwise). A row with several centers says once that
+     * they reach one target together (D-90); there is no per-center column
+     * and no way to split a target. A row waiting for its program is shown
+     * read-only, with the reason in words.
      *
      * Everything shown is prebuilt by the caller (rows[].indicators[].cells
      * carry the saved/reported flags, the percentage helper, suggestions and
@@ -30,7 +35,7 @@
 @endphp
 
 <div
-    class="max-h-[70vh] overflow-auto"
+    class="relative max-h-[70vh] overflow-auto"
     data-targets-grid
     x-data="{
         isRtl() { return getComputedStyle(this.$root).direction === 'rtl'; },
@@ -56,11 +61,56 @@
                     {{ __('targets.indicator_column') }}
                 </th>
                 @foreach ($columns as $column)
-                    <th scope="col" class="sticky top-0 z-[1] min-w-40 border-b border-secondary-soft bg-white px-3 py-2 text-start align-bottom dark:border-line dark:bg-surface-1" data-column="{{ $column['id'] }}">
+                    <th
+                        scope="col"
+                        @class([
+                            'sticky top-0 z-[1] min-w-44 max-w-64 border-b border-secondary-soft px-3 py-2 text-start align-bottom dark:border-line',
+                            'bg-white dark:bg-surface-1' => $column['waiting'] === null,
+                            'bg-board dark:bg-surface-2' => $column['waiting'] !== null,
+                        ])
+                        data-column="{{ $column['id'] }}"
+                        @if ($column['waiting'] !== null) data-waiting @endif
+                    >
                         <span class="block text-sm font-semibold {{ $inkText }}" dir="auto">{{ $column['label'] }}</span>
                         @if ($column['city'] !== null)
                             <span class="block text-xs font-normal {{ $mutedText }}" dir="auto">{{ $column['city'] }}</span>
                         @endif
+
+                        <span class="mt-1 flex flex-wrap gap-1" data-column-centers>
+                            @if ($column['fieldWork'])
+                                <span class="inline-flex items-center gap-1 rounded-full border border-secondary-light px-2 py-0.5 text-[11px] font-medium {{ $inkText }} dark:border-line">
+                                    <flux:icon.map variant="micro" class="size-3" aria-hidden="true" />
+                                    {{ __('targets.column_field_work') }}
+                                </span>
+                            @elseif ($column['centers'] === [])
+                                <span class="inline-flex items-center gap-1 rounded-full border border-dashed border-secondary-light px-2 py-0.5 text-[11px] font-medium {{ $mutedText }} dark:border-line">
+                                    <flux:icon.question-mark-circle variant="micro" class="size-3" aria-hidden="true" />
+                                    {{ __('targets.column_center_not_set') }}
+                                </span>
+                            @else
+                                @foreach ($column['centers'] as $centerName)
+                                    <span class="inline-flex items-center gap-1 rounded-full bg-board px-2 py-0.5 text-[11px] font-medium {{ $inkText }} dark:bg-surface-2" dir="auto">
+                                        <flux:icon.building-office-2 variant="micro" class="size-3" aria-hidden="true" />
+                                        {{ $centerName }}
+                                    </span>
+                                @endforeach
+                            @endif
+                        </span>
+
+                        @if ($column['shared'])
+                            <span class="mt-1 flex items-start gap-1 text-[11px] font-normal {{ $inkText }}" data-shared-target>
+                                <flux:icon.user-group variant="micro" class="mt-px size-3 shrink-0" aria-hidden="true" />
+                                {{ __('targets.column_shared_target') }}
+                            </span>
+                        @endif
+
+                        @if ($column['waiting'] !== null)
+                            <span class="mt-1 flex items-start gap-1 text-[11px] font-normal {{ $inkText }}" data-waiting-reason>
+                                <flux:icon.lock-closed variant="micro" class="mt-px size-3 shrink-0" aria-hidden="true" />
+                                <span dir="auto">{{ $column['waiting'] }}</span>
+                            </span>
+                        @endif
+
                         <span class="mt-0.5 block text-[11px] font-normal tabular-nums {{ $mutedText }}">
                             @if ($column['beneficiaries'] === null)
                                 {{ __('targets.beneficiaries_unknown') }}
@@ -121,7 +171,8 @@
                                 )));
                                 $hasError = $cellErrors !== [];
                                 $inputId = 'target-cell-'.$key;
-                                $cellLabel = __('targets.cell_label', ['indicator' => $indicatorName, 'center' => $column['label']]);
+                                $cellLabel = __('targets.cell_label', ['indicator' => $indicatorName, 'location' => $column['label']]);
+                                $cellEditable = $editable && $column['waiting'] === null;
                             @endphp
                             <td
                                 @class([
@@ -136,7 +187,7 @@
                             >
                                 @if (! $row['linked'])
                                     <span class="{{ $mutedText }}" aria-label="{{ __('targets.no_target_without_library') }}">—</span>
-                                @elseif ($editable)
+                                @elseif ($cellEditable)
                                     <div class="flex items-center gap-1.5">
                                         <label for="{{ $inputId }}" class="sr-only">{{ $cellLabel }}</label>
                                         <input
@@ -227,7 +278,7 @@
                                         @endif
 
                                         @if ($facts['suggestion'] !== null)
-                                            @if ($editable)
+                                            @if ($cellEditable)
                                                 <button
                                                     type="button"
                                                     wire:click="acceptSuggestion('{{ $key }}')"

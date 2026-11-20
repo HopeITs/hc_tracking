@@ -6,6 +6,7 @@ namespace App\Livewire\Concerns\Proposals;
 
 use App\Actions\Proposals\DeleteProposal;
 use App\Models\Proposal;
+use App\Support\TargetCounts;
 use Flux\Flux;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Validation\ValidationException;
@@ -54,7 +55,22 @@ trait DeletesProposals
             return null;
         }
 
-        return Proposal::query()->select(['id', 'name', 'internal_project_number'])->find($this->deletingProposalId);
+        return Proposal::query()->select(['id', 'name', 'slug', 'internal_project_number'])->find($this->deletingProposalId);
+    }
+
+    /**
+     * The targets the open confirmation would delete with the proposal, and
+     * how many have reports, which keep the proposal from being deleted
+     * (Y-10, DeleteProposal).
+     *
+     * @return array{count: int, reported: int}
+     */
+    #[Computed]
+    public function deletingProposalTargets(): array
+    {
+        $proposal = $this->deletingProposal;
+
+        return $proposal === null ? ['count' => 0, 'reported' => 0] : TargetCounts::ofProposal($proposal);
     }
 
     public function confirmDelete(int $proposalId): void
@@ -69,6 +85,7 @@ trait DeletesProposals
     {
         $this->deletingProposalId = null;
         $this->showDeleteModal = false;
+        unset($this->deletingProposal, $this->deletingProposalTargets);
     }
 
     public function deleteProposal(): void

@@ -46,7 +46,7 @@
                 </div>
             </x-ui.form-section>
 
-            <x-ui.form-section :title="__('targets.section_commitment')" :fields="['targetValue', 'targetPeriod', 'targetProjectId']">
+            <x-ui.form-section :title="__('targets.section_commitment')" :fields="['targetValue', 'targetPeriod', 'targetProjectId', 'targetLocationId']">
                 <div class="grid gap-x-4 gap-y-3 @2xl/modal:grid-cols-2">
                     <x-ui.form-input wire:model="targetValue" :label="$formIsPercentage ? __('targets.target_value_percent') : __('targets.target_value')" type="number" step="0.01" min="0" :max="$formIsPercentage ? 100 : null" :suffix="$formIsPercentage ? '%' : null" required />
 
@@ -57,6 +57,21 @@
                         :options="collect(Period::cases())->map(fn (Period $periodCase): array => ['value' => $periodCase->value, 'label' => $periodCase->label()])->all()"
                     />
 
+                    @if ($targetSourceType === 'proposal')
+                    <x-ui.form-select
+                        wire:model="targetLocationId"
+                        :label="__('targets.location')"
+                        :help="$targetSourceId === '' ? null : ($this->formLocationOptions === [] ? __('targets.no_locations') : __('targets.location_help'))"
+                        required
+                        class="@2xl/modal:col-span-2"
+                        data-test="target-location-select"
+                    >
+                        <option value="">{{ __('targets.choose_the_location') }}</option>
+                        @foreach ($this->formLocationOptions as $locationOption)
+                            <option value="{{ $locationOption['id'] }}">{{ $locationOption['label'] }}</option>
+                        @endforeach
+                    </x-ui.form-select>
+                    @else
                     <x-ui.form-select
                         wire:model="targetProjectId"
                         :label="__('common.project')"
@@ -72,6 +87,7 @@
                             <option value="{{ $projectOption->id }}">{{ $projectOption->name }}</option>
                         @endforeach
                     </x-ui.form-select>
+                    @endif
                 </div>
             </x-ui.form-section>
         @endif
