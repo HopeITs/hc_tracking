@@ -170,7 +170,7 @@ test('a new approved proposal at another place gets its own pending template and
         ->and($project->fresh()->status)->toBe(ProjectStatus::Active);
 });
 
-test('a second proposal at an occupied place gets its own pending template and a re-run adds nothing', function () {
+test('a second proposal at an occupied place waits for MEAL and a re-run adds nothing', function () {
     $center = insertHrCenter((int) $this->centerA->city_id, 'Shared '.Str::random(5));
     $first = prefillProposal([]);
     $second = prefillProposal([]);
@@ -182,11 +182,11 @@ test('a second proposal at an occupied place gets its own pending template and a
     }
 
     $templates = ReportTemplate::query()->where('center_id', $center)->get();
-    expect($templates)->toHaveCount(2)
+    expect($templates)->toHaveCount(1)
         ->and($templates->every(fn (ReportTemplate $template): bool => $template->status === ReportTemplateStatus::Pending && $template->proposals()->count() === 1))->toBeTrue();
 
     approveForPrefill($first);
-    expect(ReportTemplate::query()->where('center_id', $center)->count())->toBe(2);
+    expect(ReportTemplate::query()->where('center_id', $center)->count())->toBe(1);
 });
 
 test('a proposal with two centers gets a template per center and a shared target is a line in both', function () {

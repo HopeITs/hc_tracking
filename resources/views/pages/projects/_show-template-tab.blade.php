@@ -6,6 +6,16 @@
 @endphp
 
 <div class="flex flex-col gap-4" data-report-template>
+    @if (auth()->user()->can('report-templates.manage'))
+        <x-ui.button tone="ghost" :href="route('report-templates.index', ['focus' => 'placement'])" wire:navigate>{{ __('report_templates.placement_review') }}</x-ui.button>
+    @endif
+    @if ($this->reportTemplateOptions->count() > 1)
+        <x-ui.form-select wire:model.live="selectedReportTemplate" :label="__('report_templates.placement_template')" :value="(string) $this->reportTemplate?->id" data-test="template-selector">
+            @foreach ($this->reportTemplateOptions as $option)
+                <option value="{{ $option->id }}">{{ __('report_templates.placement_template_label', ['id' => $option->id, 'proposals' => $option->proposals->pluck('name')->implode(' · ')]) }}</option>
+            @endforeach
+        </x-ui.form-select>
+    @endif
     @if ($templateItems !== null)
         <x-ui.panel :title="__('report_templates.tab.title')" :subtitle="__('report_templates.tab.subtitle')" :count="$templateItems['template']['lineCount']">
             <x-slot:toolbar>
@@ -19,6 +29,14 @@
                     @endif
                 </div>
             </x-slot:toolbar>
+            @if ($templateItems['notReportedTargets'] !== [])
+                <div class="flex flex-col gap-1 p-4 text-sm" data-not-reported-targets>
+                    <h3 class="font-semibold">{{ __('report_templates.placement_not_reported') }}</h3>
+                    @foreach ($templateItems['notReportedTargets'] as $target)
+                        <span dir="auto">{{ $target['name'] }}</span>
+                    @endforeach
+                </div>
+            @endif
             @if ($templateItems['template']['proposals'] !== [])
                 <p class="mb-3 flex flex-wrap items-baseline gap-x-2 gap-y-1 text-sm text-secondary-medium dark:text-ink-muted" data-test="template-proposals">
                     <span class="font-semibold">{{ __('report_templates.tab.proposals') }}</span>
