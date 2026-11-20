@@ -214,6 +214,7 @@ SyncReportTask::handle(DonorReport $report): ?Task
 - `donors.is_internal` boolean default false, plus seeded internal donor «تمويل ذاتي — Hope» (D-27a).
 - `milestones.proposal_id` FK `proposals` null cascadeOnDelete, `milestones.is_final_report` boolean default false (used by T04's `final_report` check; T31 owns their behaviour).
 - `projects.working_days` JSON null (D-22): sorted distinct ISO weekday numbers 1–7 (1 = Monday, as `WorkingCalendar`); null = the global calendar (Mon–Fri default, `NotificationSettings` `working_days`). Cast `array`. No edit UI in October (§17 item 9). Read only through `WorkingCalendar::forProject()` (§9, T21 slice 2).
+- **Y-13 (D-93):** `risks.proposal_location_id` FK `proposal_locations` null cascadeOnDelete, indexed (Y-13, D-93). A register risk belongs to a row and carries that row's `proposal_id`; a logframe risk belongs to a proposal's result and has no row. `project_id` is kept and still written (the row's `project_id`) until Y-18.
 - `requested_budget` is in `Proposal::activityExcludedFields()`.
 
 **T04:** `proposal_status_notes.is_correction` boolean default false, `changed_by` FK `users` null nullOnDelete. `MediaCollection`: `final_report`, `final_report_acceptance`.
@@ -301,6 +302,7 @@ Nine roles (fixed): Super Admin, General Manager, Managers, MEAL, Financial, Med
 | `projects.create` (W-34a, D-62) | existing (PR Manager, GM) **plus Financial** | approval materialises the proposal's projects through `SaveProject`, so every approver holds it; `permissions:sync` adds it |
 | `donors.approve` (W-04, D-57) | **General Manager** only (plus `Super Admin` through the administrator roles rule); `donors.create` is unchanged (PR, PR Manager, GM) | — |
 | `risk-library.manage` (W-09, D-61) | MEAL, General Manager; `risks.create/update/delete` keep their holders and now mean "on a proposal's logframe" | MEAL Manager slot holder (add, edit, remove, reorder library entries) |
+| `risks.create` / `risks.update` (Y-13, D-93) | existing holders, **or** the location row is in `User::ownedLocationIds()`: creating or changing a register risk is allowed either way. `risks.delete`, `attach` and `detach` are unchanged | the row's responsible employee, and the manager of the row's program |
 
 No `media-deliverables` module: department tasks use `tasks.*` / `milestones.*` with a server-side department condition (T31).
 
