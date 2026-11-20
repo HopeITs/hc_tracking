@@ -24,7 +24,7 @@
 @import './desk-customize.css';
 @import './desk-workspace.css';
 @import './annual-plan.css';
-@import './logframe-tree.css';
+@import './proposal-page.css';
 
 /* flux.css already scans Flux's own stubs; these are the app's views and Laravel's pagination views. */
 @source '../views';

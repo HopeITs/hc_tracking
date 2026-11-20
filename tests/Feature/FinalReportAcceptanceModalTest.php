@@ -30,8 +30,10 @@ test('a proposal editor records the acceptance from the page and then sees it in
     $actor = userWithRole('Financial');
     $proposal = proposalAwaitingFinalReportAcceptance($actor);
 
+    // Stage 3b: the acceptance line sits in the "History & approvals" section, opened here.
     $component = Livewire::actingAs($actor)
         ->test('pages::proposals.show', ['proposal' => $proposal])
+        ->call('openSection', 'history')
         ->assertSeeHtml('data-test="open-final-report-modal"')
         ->assertDontSeeHtml('data-test="final-report-accepted"')
         ->call('openAcceptanceModal')

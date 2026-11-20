@@ -95,44 +95,52 @@ test('the Story shows money received only to viewers who may see money', functio
         ->assertDontSeeHtml('data-test="story-received"');
 });
 
-test('every proposal link lands on its project Story with the proposal, tab and agreement deep link carried over', function (array $query, array $expected) {
+// User decision 2026-11-19: a proposal link opens the proposal's own page,
+// no longer its project Story (the redirect was removed).
+// Stage 3: the tabs became folded sections. A bare link shows them all folded;
+// a tab link opens its section.
+test('every proposal link opens the proposal page, with the tab and agreement deep link kept', function (array $query, ?string $panel) {
     $project = storyProject(ProposalStatus::Submitted);
     $proposal = $project->proposals()->first();
 
-    $this->actingAs(userWithRole('General Manager'))
+    $page = $this->actingAs(userWithRole('General Manager'))
         ->get(route('proposals.show', ['proposal' => $proposal, ...$query]))
-        ->assertRedirect(route('projects.show', ['project' => $project, 'proposal' => $proposal->id, ...$expected]).'#proposal');
+        ->assertOk()
+        ->assertSeeHtml('data-test="proposal-card"')
+        ->assertSeeHtml('data-test="more-sections"');
+
+    $panel === null
+        ? $page->assertDontSeeHtml('data-tab-panel=')
+        : $page->assertSeeHtml('data-tab-panel="'.$panel.'"');
 })->with([
-    'bare' => [[], []],
-    'a tab' => [['tab' => 'plan'], ['ptab' => 'plan']],
-    'the record-agreement link' => [['record_agreement' => '1'], ['record_agreement' => 1]],
+    'bare' => [[], null],
+    'a tab' => [['tab' => 'plan'], 'plan'],
+    'the record-agreement link' => [['record_agreement' => '1'], null],
 ]);
 
-test('a bare proposal link opened by a reviewer it still waits on lands on their own review; a tab they ask for wins', function () {
+test('a reviewer opening a proposal lands on its own page, on the tab they ask for', function () {
     $project = storyProject(ProposalStatus::ConceptNoteReview);
     $proposal = $project->proposals()->first();
     $employeeId = insertHrEmployee(firstNameEn: 'Lina', lastNameEn: 'Reviewer');
     ProposalReviewer::factory()->create(['proposal_id' => $proposal->id, 'stage' => ReviewStage::ConceptNote, 'employee_id' => $employeeId]);
     $reviewer = userWithRole('Team Member', $employeeId);
 
+    // Folded sections (stage 3): a bare visit flags the reviewer's turn on the
+    // "History & approvals" row; the review link (?ptab=status) opens it.
     $this->actingAs($reviewer)
         ->get(route('proposals.show', $proposal))
-        ->assertRedirect(route('projects.show', ['project' => $project, 'proposal' => $proposal->id, 'ptab' => 'status']).'#my-review');
+        ->assertOk()
+        ->assertSee(__('proposals.sections.flag_your_review'));
+
+    $this->actingAs($reviewer)
+        ->get(route('proposals.show', ['proposal' => $proposal, 'ptab' => 'status']))
+        ->assertOk()
+        ->assertSeeHtml('data-tab-panel="status"');
 
     $this->actingAs($reviewer)
         ->get(route('proposals.show', ['proposal' => $proposal, 'tab' => 'plan']))
-        ->assertRedirect(route('projects.show', ['project' => $project, 'proposal' => $proposal->id, 'ptab' => 'plan']).'#proposal');
-});
-
-test('a reviewer who already marked the proposal seen lands on the proposal as before', function () {
-    $project = storyProject(ProposalStatus::ConceptNoteReview);
-    $proposal = $project->proposals()->first();
-    $employeeId = insertHrEmployee(firstNameEn: 'Lina', lastNameEn: 'Reviewer');
-    ProposalReviewer::factory()->seen()->create(['proposal_id' => $proposal->id, 'stage' => ReviewStage::ConceptNote, 'employee_id' => $employeeId]);
-
-    $this->actingAs(userWithRole('Team Member', $employeeId))
-        ->get(route('proposals.show', $proposal))
-        ->assertRedirect(route('projects.show', ['project' => $project, 'proposal' => $proposal->id]).'#proposal');
+        ->assertOk()
+        ->assertSeeHtml('data-tab-panel="plan"');
 });
 
 test('a proposal on no project still opens its own page on the desk', function () {
@@ -178,6 +186,8 @@ test('the compact embedded proposal hides the tabs until one is picked', functio
     Livewire::actingAs(userWithRole('General Manager'))
         ->test('pages::proposals.show', ['proposal' => $proposal, 'embedded' => true, 'compact' => true])
         ->assertSeeHtml('data-compact-proposal')
+        // The way to the full proposal is in the head, above the readings, not under them.
+        ->assertSeeHtmlInOrder(['data-embedded-proposal-head', 'data-open-proposal-page', 'data-compact-proposal'])
         ->assertDontSeeHtml('data-tab-panel')
         ->set('tab', 'deadlines')
         ->assertSet('compact', false)

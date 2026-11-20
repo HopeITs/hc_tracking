@@ -220,7 +220,7 @@
                 </div>
                 @endif
 
-                <x-ui.form-input wire:model="name" :label="__('proposals.proposal_name')" maxlength="255" required autofocus dir="auto" />
+                <x-ui.form-input wire:model="name" :label="__('proposals.proposal_name')" :help="$editing ? null : __('proposals.name_agreed_first')" maxlength="255" required autofocus dir="auto" />
 
                 @if ($editing && filled($storedNumber))
                 <div class="min-w-0">

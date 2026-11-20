@@ -35,10 +35,11 @@ final class SaveActivityPlanItem
         Gate::forUser($user)->authorize('update', $plan);
         $calendar = $plan->calendar();
         $data = self::validated($input, ActivityPlanScope::cityIds($plan), $calendar->firstMonday(), $calendar->lastMonday());
-        $complete = self::isComplete($data);
+        $missing = self::incompleteError($data);
+        $complete = $missing === null;
 
-        if ($ready && ! $complete) {
-            throw ValidationException::withMessages(['item' => __('annual_plans.item_incomplete')]);
+        if ($ready && $missing !== null) {
+            throw ValidationException::withMessages($missing);
         }
 
         DB::transaction(fn () => self::write($item, $data, $ready || ($item->is_ready && $complete)));
@@ -102,6 +103,17 @@ final class SaveActivityPlanItem
             'batches.*.end' => ['nullable', 'date_format:Y-m-d'],
             'batches.*.count' => ['nullable', 'integer', 'min:1', 'max:100000'],
             'batches.*.hours' => ['nullable', 'numeric', 'min:0.5', 'max:24'],
+        ], [
+            // Plain words instead of Laravel's "The batches.0.count field must be at least 1."
+            'batches.*.count.integer' => __('annual_plans.batch_count_invalid'),
+            'batches.*.count.min' => __('annual_plans.batch_count_invalid'),
+            'batches.*.count.max' => __('annual_plans.number_too_large'),
+            'batches.*.hours.numeric' => __('annual_plans.batch_hours_invalid'),
+            'batches.*.hours.min' => __('annual_plans.batch_hours_invalid'),
+            'batches.*.hours.max' => __('annual_plans.batch_hours_invalid'),
+            'expected_people.integer' => __('annual_plans.expected_people_invalid'),
+            'expected_people.min' => __('annual_plans.expected_people_invalid'),
+            'expected_people.max' => __('annual_plans.number_too_large'),
         ])->validate();
 
         $single = (bool) $data['single_week'];
@@ -152,18 +164,48 @@ final class SaveActivityPlanItem
      */
     public static function isComplete(array $data): bool
     {
+        return self::incompleteError($data) === null;
+    }
+
+    /**
+     * The first thing that stops the activity being "Ready", as a single
+     * field-keyed message so the form can outline that exact field, or null
+     * when nothing is missing. The order mirrors the form top to bottom:
+     * governorate, the "Other" unit name, then each batch's number and (for
+     * sessions) its hours.
+     *
+     * @param  array{unit: string, unit_other: string|null, cities: list<int>, batches: list<array{count: int|null, hours: float|null}>}  $data
+     * @return array<string, string>|null
+     */
+    public static function incompleteError(array $data): ?array
+    {
         $unit = CountUnit::from($data['unit']);
 
-        if ($data['cities'] === [] || $data['batches'] === [] || ($unit === CountUnit::Other && $data['unit_other'] === null)) {
-            return false;
+        if ($data['cities'] === []) {
+            return ['cities' => __('annual_plans.pick_governorate')];
         }
 
-        foreach ($data['batches'] as $batch) {
-            if ($batch['count'] === null || ($unit->needsHours() && $batch['hours'] === null)) {
-                return false;
+        if ($unit === CountUnit::Other && $data['unit_other'] === null) {
+            return ['unit_other' => __('annual_plans.name_the_unit')];
+        }
+
+        // Name the unit, in the plural, in the message ("…number of sessions"),
+        // so the error reads like the field it is about rather than a bare "this
+        // batch". A count of 3 skips the dual form Arabic uses for two.
+        $unitName = $unit === CountUnit::Other
+            ? ($data['unit_other'] ?? __('annual_plans.unit_other_fallback'))
+            : trim(trans_choice('annual_plans.unit_noun.'.$unit->value, 3, ['count' => '']));
+
+        foreach ($data['batches'] as $index => $batch) {
+            if ($batch['count'] === null) {
+                return ["batches.{$index}" => __('annual_plans.batch_needs_count', ['unit' => $unitName])];
+            }
+
+            if ($unit->needsHours() && $batch['hours'] === null) {
+                return ["batches.{$index}" => __('annual_plans.batch_needs_hours', ['unit' => $unitName])];
             }
         }
 
-        return true;
+        return null;
     }
 }

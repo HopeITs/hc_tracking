@@ -4,17 +4,20 @@ declare(strict_types=1);
 
 namespace App\Livewire\Concerns\Dashboard;
 
+use App\Enums\ActivityPlanStatus;
 use App\Enums\DeliveryState;
 use App\Enums\MonthlyReportStatus;
 use App\Enums\ProposalStatus;
 use App\Enums\TaskKind;
 use App\Enums\TaskStatus;
+use App\Models\ActivityPlan;
 use App\Models\HrEmployee;
 use App\Models\MonthlyReport;
 use App\Models\Proposal;
 use App\Models\ProposalReviewer;
 use App\Models\Task;
 use App\Models\User;
+use App\Policies\ActivityPlanPolicy;
 use App\Support\ProposalStoryLink;
 use Carbon\CarbonImmutable;
 use Illuminate\Database\Eloquent\Builder;
@@ -25,9 +28,10 @@ use Livewire\Attributes\Computed;
  * Needs you (user decision 2026-10-27): only what waits on the viewer's
  * decision and no other card owns. Reviews asked of them, monthly reports
  * waiting for their validation, tasks they created that were sent for
- * their review, and media deliverables they requested that were delivered
- * for their acceptance. The viewer's own work to do belongs to the Tasks
- * card and never appears here; risks are not decisions.
+ * their review, media deliverables they requested that were delivered
+ * for their acceptance, and — for the MEAL manager — annual plans sent to
+ * MEAL. The viewer's own work to do belongs to the Tasks card and never
+ * appears here; risks are not decisions.
  *
  * A decision is late when its due date has passed or, with no due date,
  * when it has waited more than LateAfterDays. Used by the Needs you panel
@@ -124,8 +128,9 @@ trait ReadsDeskDecisions
             });
 
         $proposals = $this->ownerProposalSteps($user);
+        $plans = $this->plansToReview($user)->concat($this->plansToFix($user));
 
-        return $reviews->concat($reports)->concat($tasks)->concat($proposals)
+        return $reviews->concat($reports)->concat($tasks)->concat($proposals)->concat($plans)
             ->sortBy([
                 fn (array $a, array $b): int => $b['late'] <=> $a['late'],
                 fn (array $a, array $b): int => ($a['since']?->timestamp ?? PHP_INT_MAX) <=> ($b['since']?->timestamp ?? PHP_INT_MAX),
@@ -168,6 +173,66 @@ trait ReadsDeskDecisions
                 since: $proposal->updated_at,
                 due: null,
                 href: route('proposals.show', $proposal),
+            ));
+    }
+
+    /**
+     * Annual plans sent to MEAL: each one waits on the MEAL manager to
+     * approve it or send it back, and no other card owns that decision. The
+     * plans register's own next-step card points at the same plan, for the
+     * person who opens that page instead of the desk.
+     *
+     * @return Collection<int, array{key: string, kind: string, title: string, context: string, who: string, since: CarbonImmutable|null, due: CarbonImmutable|null, late: bool, href: string, action: string, taskId: int|null}>
+     */
+    private function plansToReview(User $user): Collection
+    {
+        if (! ActivityPlanPolicy::isMealManager($user)) {
+            return new Collection;
+        }
+
+        return ActivityPlan::query()
+            ->where('status', ActivityPlanStatus::InReview)
+            ->with(['proposal:id,slug,name', 'submitter:id,employee_id,hr_user_id'])
+            ->oldest('submitted_at')
+            ->get()
+            ->map(fn (ActivityPlan $plan): array => $this->decision(
+                key: 'plan-'.$plan->id,
+                kind: 'plan',
+                title: $plan->proposal?->name ?? '—',
+                context: __('desk.decision.plan'),
+                who: $plan->submitter?->name ?? '',
+                since: $plan->submitted_at,
+                due: null,
+                href: route('activity-plans.show', $plan),
+            ));
+    }
+
+    /**
+     * The other half of the annual plan loop: a plan MEAL sent back waits on
+     * its program manager to fix it and send it again, the same way an
+     * unfinished proposal of their own project does (ownerProposalSteps).
+     * The program is eager loaded because the policy reads its manager.
+     *
+     * @return Collection<int, array{key: string, kind: string, title: string, context: string, who: string, since: CarbonImmutable|null, due: CarbonImmutable|null, late: bool, href: string, action: string, taskId: int|null}>
+     */
+    private function plansToFix(User $user): Collection
+    {
+        return ActivityPlan::query()
+            ->where('status', ActivityPlanStatus::Draft)
+            ->whereNotNull('sent_back_reason')
+            ->with(['proposal:id,slug,name', 'program:id,manager_id', 'sentBackBy:id,employee_id,hr_user_id'])
+            ->oldest('sent_back_at')
+            ->get()
+            ->filter(fn (ActivityPlan $plan): bool => $user->can('update', $plan))
+            ->map(fn (ActivityPlan $plan): array => $this->decision(
+                key: 'plan-fix-'.$plan->id,
+                kind: 'plan_fix',
+                title: $plan->proposal?->name ?? '—',
+                context: __('desk.decision.plan_fix'),
+                who: $plan->sentBackBy?->name ?? '',
+                since: $plan->sent_back_at,
+                due: null,
+                href: route('activity-plans.show', $plan),
             ));
     }
 

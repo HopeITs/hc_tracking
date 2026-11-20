@@ -222,6 +222,11 @@
 
     .filter-picker [data-flux-button] {
         min-height: 2.75rem;
+        /* Clip a long selected label to the trigger instead of letting it spill
+           past the box (and widen crowded form grids): the inner label already
+           carries `truncate`, this guarantees the box edge holds even if a flex
+           ancestor inside Flux's button does not pass min-width: 0 down. */
+        overflow: hidden;
         border-color: var(--color-secondary-soft);
         background-color: color-mix(in srgb, var(--color-secondary-soft) 38%, var(--color-white));
         box-shadow: none;

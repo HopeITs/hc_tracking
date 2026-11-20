@@ -128,7 +128,7 @@
                         </a>
                         {{-- Below 560px the language and theme pair leaves the bar and sits here. --}}
                         <div class="dk-narrow-tools">
-                            <form method="POST" action="{{ route('locale.update') }}" class="contents">
+                            <form method="POST" action="{{ route('locale.update') }}" class="contents" data-locale-form>
                                 @csrf
                                 <button type="submit" role="menuitem" name="locale" value="{{ $other->value }}" lang="{{ $other->value }}">
                                     <flux:icon.language variant="outline" class="dk-menu-ic" />

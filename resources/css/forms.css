@@ -1445,6 +1445,11 @@
         white-space: nowrap;
     }
 
+    /* `fit`: a segment takes its label's width plus a share of the rest, so a long label is not cut. */
+    .form-segmented-fit > .form-segment {
+        flex: 1 1 auto;
+    }
+
     .form-segment[aria-checked='true'] {
         background-color: var(--color-white);
         color: var(--color-secondary-dark);

@@ -85,7 +85,8 @@ test('each record page carries its activity', function (string $route, Closure $
 
 test('the proposal page folds its activity behind a toggle', function () {
     $this->actingAs(userWithRole('Super Admin'))
-        ->get(route('proposals.show', Activity::withoutRecording(fn () => Proposal::factory()->create())))
+        // The toggle sits in the folded "History & approvals" section; ?ptab=status opens it.
+        ->get(route('proposals.show', ['proposal' => Activity::withoutRecording(fn () => Proposal::factory()->create()), 'ptab' => 'status']))
         ->assertSee('data-test="toggle-activity-log"', false)
         ->assertDontSeeLivewire('activity.timeline');
 });

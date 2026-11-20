@@ -54,6 +54,7 @@ use Spatie\Permission\Traits\HasRoles;
  * @property list<array{route: string, key: string, label: string, kind: string, n?: int, t?: int}>|null $nav_recent the records this person works in, with how often (n) and when last (t) each was opened; read through RemembersRecentRecord::mostUsed()
  * @property array<mixed>|null $desk_layout the saved Desk arrangement, list<array{panel: string, size: string}> as written; read through Panels::layoutFor(), which drops anything malformed
  * @property array<mixed>|null $page_panels the Panels popup's sets per route name, array<string, list<array{panel: string, size: string}>> as written; read through Panels::pageLayoutFor()
+ * @property array<string, mixed>|null $page_prefs pure view preferences per page key (proposal page: framework layout, open sections), written by proposals/show
  * @property array<mixed>|null $desk_panel_flags the Desk panels pinned to the top and folded into tiles, array{pinned?: list<string>, folded?: list<string>} as written; read through Panels::flagsFor()
  * @property array<mixed>|null $desk_quick_access the Desk's Quick access list, Ask row keys in order (list<string>) as written; read through QuickAccess::for(), which drops what is no longer offered
  * @property bool $notification_popups
@@ -149,6 +150,7 @@ class User extends Authenticatable implements HasLocalePreference, PasskeyUser, 
         'locale' => null,
         'desk_layout' => null,
         'page_panels' => null,
+        'page_prefs' => null,
         'desk_quick_access' => null,
         'desk_panel_flags' => null,
         'nav_pins' => null,
@@ -760,6 +762,7 @@ class User extends Authenticatable implements HasLocalePreference, PasskeyUser, 
             'tour_seen_at' => 'datetime',
             'desk_layout' => 'array',
             'page_panels' => 'array',
+            'page_prefs' => 'array',
             'desk_quick_access' => 'array',
             'desk_panel_flags' => 'array',
             'nav_pins' => 'array',

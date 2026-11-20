@@ -30,8 +30,8 @@ use Livewire\Attributes\On;
  * through. The form writes into one framework: `formProposalId` (null = the
  * program framework), taken from the pinned proposal, the parent a child is
  * added under, or the result being edited — never from the request.
- * forgetFramework() unsets the computed reads of BuildsResultsFramework,
- * BuildsResultsTree and SummarisesResults, so a write re-renders the tree it
+ * forgetFramework() unsets the computed reads of BuildsResultsFramework
+ * and BuildsResultsTree, so a write re-renders the tree it
  * just changed in the same request.
  *
  * @property-read Collection<int, Result> $parentOptions

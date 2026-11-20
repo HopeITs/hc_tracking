@@ -202,6 +202,11 @@ return [
         'reviewed' => 'تمت مراجعته',
         'approved' => 'معتمد',
     ],
+    'assumption_status' => [
+        'holds' => 'قائم',
+        'at_risk' => 'مهدد',
+        'broken' => 'منهار',
+    ],
     'activity_kind' => [
         'continuous' => 'مستمر',
         'event' => 'حدث',

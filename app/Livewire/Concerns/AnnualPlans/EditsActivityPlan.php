@@ -12,9 +12,11 @@ use App\Actions\AnnualPlans\ManagePlanMilestones;
 use App\Actions\AnnualPlans\ReviewActivityPlan;
 use App\Actions\AnnualPlans\SaveActivityPlanItem;
 use App\Actions\AnnualPlans\SubmitActivityPlan;
+use App\Enums\ActivityKind;
 use App\Enums\ActivityPlanStatus;
 use App\Enums\CountUnit;
 use App\Enums\FollowUpTrigger;
+use App\Enums\Period;
 use App\Enums\ResultType;
 use App\Models\ActivityPlan;
 use App\Models\ActivityPlanBatch;
@@ -69,6 +71,18 @@ trait EditsActivityPlan
 
     /** @var list<int|string> */
     public array $copyTargets = [];
+
+    /**
+     * Whether the dates step shows the whole-plan calendar: shown at first,
+     * with a button to hide it while filling an activity.
+     */
+    public bool $showPlanCalendar = true;
+
+    /**
+     * Said under "Where does it run?" when opening an activity dropped
+     * governorates that are no longer part of the plan (null when none were).
+     */
+    public ?string $removedCitiesNote = null;
 
     public string $followUpItem = '';
 
@@ -219,7 +233,7 @@ trait EditsActivityPlan
     public function plan(): ActivityPlan
     {
         return ActivityPlan::query()
-            ->with(['proposal', 'items.activity:id,statement,activity_kind', 'items.batches', 'items.cities', 'followUps', 'submitter', 'approver', 'sentBackBy'])
+            ->with(['proposal', 'program', 'items.activity:id,statement,activity_kind', 'items.batches', 'items.cities', 'followUps', 'submitter', 'approver', 'sentBackBy'])
             ->findOrFail($this->planId);
     }
 
@@ -280,6 +294,29 @@ trait EditsActivityPlan
     public function cityNames(): array
     {
         return ActivityPlanScope::cityNames(ActivityPlanScope::cityIds($this->plan));
+    }
+
+    /**
+     * The plan's centres whose governorate is missing or unknown in HR, so they
+     * never appear under "Where does it run?": named with a link to fix them,
+     * instead of a bare "No centres linked yet".
+     *
+     * @return list<array{name: string, url: string}>
+     */
+    #[Computed]
+    public function centresWithoutGovernorate(): array
+    {
+        $centres = [];
+
+        foreach (ActivityPlanScope::projects($this->plan) as $project) {
+            $cityId = MealCoverage::cityIdOf($project);
+
+            if ($cityId === null || ! array_key_exists($cityId, $this->cityNames)) {
+                $centres[] = ['name' => (string) $project->name, 'url' => route('projects.show', $project)];
+            }
+        }
+
+        return $centres;
     }
 
     /**
@@ -379,7 +416,13 @@ trait EditsActivityPlan
 
     public string $newActivityParent = '';
 
-    public bool $newActivitySingle = false;
+    /**
+     * The new activity's kind and checking period, asked the same way as the
+     * Logical Framework's own "Add result" form (Event = it happens once).
+     */
+    public string $newActivityKind = 'continuous';
+
+    public string $newActivityPeriod = 'quarterly';
 
     /**
      * The outcomes and outputs of the plan's program a new activity can serve.
@@ -405,10 +448,11 @@ trait EditsActivityPlan
     {
         $this->run(function (): void {
             $activity = app(AddPlanActivity::class)->handle(
-                $this->user(), $this->plan, $this->newActivityName, (int) $this->newActivityParent, $this->newActivitySingle,
+                $this->user(), $this->plan, $this->newActivityName, (int) $this->newActivityParent,
+                $this->newActivityKind === ActivityKind::Event->value, Period::tryFrom($this->newActivityPeriod),
             );
             $this->picked[] = (string) $activity->id;
-            $this->reset('newActivityName', 'newActivitySingle', 'addingActivity');
+            $this->reset('newActivityName', 'newActivityKind', 'newActivityPeriod', 'addingActivity');
             unset($this->activityGroups, $this->activityParentOptions);
             Flux::toast(variant: 'success', text: __('annual_plans.wf.activity_added'));
         });
@@ -561,6 +605,12 @@ trait EditsActivityPlan
 
     // ---- MEAL review ----------------------------------------------------------------
 
+    /**
+     * The follow-up form opens from its own button, the way a missing
+     * activity is added on step 2; it closes once the task is on the list.
+     */
+    public bool $addingFollowUp = false;
+
     public function addFollowUp(): void
     {
         $this->run(function (): void {
@@ -569,7 +619,7 @@ trait EditsActivityPlan
             }
 
             app(ManageActivityPlanFollowUps::class)->add($this->user(), $this->plan, (int) $this->followUpItem, $this->followUpTrigger, $this->followUpText);
-            $this->followUpText = '';
+            $this->reset('followUpText', 'followUpItem', 'addingFollowUp');
             $this->refreshPlan();
         });
     }
@@ -710,6 +760,17 @@ trait EditsActivityPlan
             return;
         }
 
+        // A governorate the plan no longer has (its centre moved or left the
+        // proposal) cannot be ticked off and would fail "cities.0 is invalid" on
+        // every save, so it is dropped here and named in a note (AP-1 decision).
+        $planCityIds = ActivityPlanScope::cityIds($this->plan);
+        $stored = $item->cityIds();
+        $removed = array_values(array_diff($stored, $planCityIds));
+        $removedNames = ActivityPlanScope::cityNames($removed);
+        $this->removedCitiesNote = $removed === [] ? null : ($removedNames === []
+            ? __('annual_plans.wf.removed_city_unknown')
+            : __('annual_plans.wf.removed_cities', ['cities' => implode('، ', $removedNames)]));
+
         $this->openItemId = $item->id;
         $this->copyTargets = [];
         $this->resetErrorBag();
@@ -717,7 +778,7 @@ trait EditsActivityPlan
             'single_week' => $item->is_single_week,
             'unit' => $item->unit->value,
             'unit_other' => (string) ($item->unit_other ?? ''),
-            'cities' => array_map('strval', $item->cityIds()),
+            'cities' => array_map('strval', array_values(array_intersect($stored, $planCityIds))),
             'expected_people' => $item->expected_people === null ? '' : (string) $item->expected_people,
             'note' => (string) ($item->note ?? ''),
             'batches' => $this->batchRows($item),

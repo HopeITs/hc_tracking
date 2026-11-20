@@ -13,6 +13,8 @@
 .ap-faint { color: var(--faint); }
 .ap-sm { font-size: .86rem; }
 .ap-xs { font-size: .78rem; }
+/* Text somebody typed over several lines (a send-back reason) keeps the shape they gave it; HTML would run it together. */
+.ap-lines { white-space: pre-line; }
 .ap-row { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; }
 .ap-sp { flex: 1; }
 .ap-num { font-variant-numeric: tabular-nums; }
@@ -86,6 +88,28 @@
 .ap-lbl { font-size: .84rem; font-weight: 700; color: var(--ink-2); }
 .ap-bt { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 10px; background: var(--paper); border: 1px solid var(--line); border-radius: 12px; padding: 10px 12px; }
 .ap-bt > b { min-width: 70px; font-size: .88rem; }
+/*
+ * Activity cards (AP-1 review): same fields and order, fewer bands. Short
+ * fields share a line (.ap-line), the run-mode toggle keeps its own width
+ * instead of filling the row, batch rows and the timeline sit on a light tint
+ * inside a white body, the copy panel is one quiet line until opened, and
+ * Done closes the card on its own footer line. Ready / Needs details stays
+ * with the badge; no coloured edge stripe.
+ */
+.ap-act { background: var(--paper); box-shadow: 0 1px 2px rgb(0 0 0 / 4%); transition: border-color .15s, box-shadow .15s; }
+.ap-act:has(> .ap-act-h[aria-expanded='true']) { border-color: var(--line-2); box-shadow: 0 8px 22px rgb(0 0 0 / 7%); }
+.ap-act-h { padding: 14px 18px; }
+.ap-act-h > b { font-size: .98rem; }
+.ap-act-b { padding: 16px 18px 18px; gap: 12px; background: var(--paper); }
+.ap-act-b .ap-seg { align-self: flex-start; }
+.ap-act-b .ap-bt { background: var(--tint); border-color: transparent; padding: 8px 10px; }
+.ap-act-b .ap-tl { background: var(--tint); border-color: transparent; }
+.ap-line { display: flex; flex-wrap: wrap; align-items: flex-start; gap: 12px 28px; }
+.ap-line > .ap-grp { flex: 0 1 auto; min-width: 0; }
+.ap-line > .ap-line-people { flex: 0 1 190px; }
+.ap-line > .ap-line-grow { flex: 1 1 240px; }
+.ap-act-b .ap-copy:not([open]) { border-color: transparent; background: none; padding: 0; }
+.ap-act-foot { justify-content: flex-end; padding-top: 12px; border-top: 1px solid var(--line); }
 .ap-sel { height: 40px; border: 1px solid var(--line-2); border-radius: 10px; background: var(--paper); padding: 0 8px; font-size: .88rem; color: var(--ink); }
 .ap-sel.is-wide { width: 100%; height: 38px; font-size: .84rem; }
 .ap-inp { height: 40px; border: 1px solid var(--line-2); border-radius: 10px; background: var(--paper); padding: 0 10px; width: 100%; color: var(--ink); }
@@ -96,6 +120,13 @@ textarea.ap-inp { height: auto; min-height: 90px; padding: 10px 12px; }
 .ap-mini { display: inline-flex; align-items: center; gap: 6px; font-size: .8rem; font-weight: 600; color: var(--ink-2); }
 .ap-err { font-size: .78rem; font-weight: 700; color: var(--brand-ink); }
 .ap-copy { background: var(--paper); border: 1px dashed var(--line-2); border-radius: 12px; padding: 10px 12px; display: flex; flex-direction: column; gap: 10px; }
+/* Copy targets: more air between the chips, and between them and the button. */
+.ap-copy { gap: 14px; padding: 14px 16px; }
+.ap-copy-list { display: flex; flex-wrap: wrap; gap: 10px 12px; }
+.ap-copy-go { padding-top: 6px; border-top: 1px solid var(--line); }
+/* The inline "+ Add activity" form on step 2: a boxed panel so it reads as one form, not loose text. */
+.ap-add-activity, .ap-add-task { gap: 12px; background: var(--sunk); border: 1px solid var(--line-2); border-radius: 12px; padding: 16px; }
+.ap-add-activity > h3, .ap-add-task > h3 { font-size: .95rem; text-transform: none; letter-spacing: 0; color: var(--ink); }
 .ap-copy summary { cursor: pointer; font-weight: 700; font-size: .88rem; }
 
 /* timelines */
@@ -105,7 +136,8 @@ textarea.ap-inp { height: auto; min-height: 90px; padding: 10px 12px; }
 .ap-tl .ap-b.is-alt { background: var(--warn); top: 16px; height: 10px; }
 .ap-tl .ap-o { position: absolute; top: 13px; width: 12px; height: 12px; margin-inline-start: -1px; border-radius: 3px; transform: rotate(45deg); background: var(--active); }
 .ap-gantt { border: 1px solid var(--line); border-radius: 14px; overflow: hidden; }
-.ap-pin { position: sticky; top: 0; z-index: 5; background: var(--paper); padding-block: 8px; max-height: 45vh; overflow-y: auto; display: grid; gap: 6px; }
+/* The whole-plan calendar on the dates step: always shown, scrolls with the page (never sticky). */
+.ap-cal { display: grid; gap: 8px; }
 .ap-gr { display: grid; grid-template-columns: minmax(130px, 230px) 1fr; border-bottom: 1px solid var(--line); }
 .ap-gr:last-child { border-bottom: 0; }
 .ap-gr > div:first-child { padding: 10px 14px; font-weight: 600; font-size: .88rem; border-inline-end: 1px solid var(--line); background: var(--paper); min-width: 0; }

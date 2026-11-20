@@ -112,7 +112,7 @@ new #[Layout('layouts::desk'), Title('titles.annual_plan')] class extends Compon
                     <p class="ap-q">{{ __('annual_plans.wf.preparing_body', ['step' => $plan->step + 1]) }}</p>
                 </div>
                 @if ($plan->sent_back_reason)
-                    <div class="ap-info is-bad">↩︎ <b>{{ __('annual_plans.wf.sent_back_banner') }}</b> “{{ $plan->sent_back_reason }}”</div>
+                    <div class="ap-info is-bad">↩︎ <b>{{ __('annual_plans.wf.sent_back_banner') }}</b> “<span class="ap-lines" dir="auto">{{ $plan->sent_back_reason }}</span>”</div>
                 @endif
                 @if ($plan->items->isNotEmpty())
                     @include('pages.annual-plans._plan-gantt')

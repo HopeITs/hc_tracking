@@ -49,12 +49,14 @@ describe('the node', function () {
         $this->actingAs($this->editor);
         app(AttachLibraryRisk::class)->handle($this->proposal, $this->output->id, $this->delay->id, []);
 
+        // Results start folded on the redesigned page: open them to reach their Add buttons.
         riskTab($this->editor, $this->proposal)
+            ->call('openAll')
             ->assertSeeHtml('data-test="result-risks-'.$this->outcome->id.'"')
             ->assertSeeHtml('data-test="result-risks-'.$this->output->id.'"')
             ->assertDontSeeHtml('data-test="result-risks-'.$this->impact->id.'"')
             ->assertDontSeeHtml('data-test="result-risks-'.$this->activity->id.'"')
-            ->assertSee(trans_choice('risks.node_risk_count', 1, ['count' => 1]));
+            ->assertSee(trans_choice('proposals.framework.count_risks', 1, ['count' => 1]));
     });
 
     it('opens the drawer on one result and lists only its risks, with rating words', function () {
@@ -164,29 +166,6 @@ describe('removing and permissions', function () {
         riskTab($viewer, $this->proposal)->call('detachRisk', $risk->id)->assertForbidden();
 
         expect(Risk::query()->count())->toBe(1);
-    });
-});
-
-describe('the heat map', function () {
-    it('counts only this proposal’s rated risks and lists the unrated ones apart', function () {
-        $this->actingAs($this->editor);
-        app(AttachLibraryRisk::class)->handle($this->proposal, $this->output->id, $this->delay->id, []);
-        app(AttachLibraryRisk::class)->handle($this->proposal, $this->outcome->id, $this->delay->id, []);
-        app(AttachLibraryRisk::class)->handle($this->proposal, $this->outcome->id, $this->access->id, ['likelihood' => null, 'severity' => null]);
-
-        $other = Proposal::factory()->create();
-        app(AttachLibraryRisk::class)->handle($other, riskNode($other, ResultType::Output, null)->id, $this->delay->id, []);
-
-        riskTab($this->editor, $this->proposal)
-            ->assertSeeHtml('data-risk-heat')
-            ->assertSeeHtml('data-risk-cell="2:3"')
-            ->assertSeeHtml('data-risk-count="2:3:2"')
-            ->assertSee(trans_choice('risks.heat_unrated', 1, ['count' => 1]))
-            ->assertSee(__('risks.heat_table_caption'));
-    });
-
-    it('is absent while the proposal has no risks', function () {
-        riskTab($this->editor, $this->proposal)->assertDontSeeHtml('data-risk-heat');
     });
 });
 

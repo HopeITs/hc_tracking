@@ -7,6 +7,7 @@ namespace App\Actions\AnnualPlans;
 use App\Models\ActivityPlanBatch;
 use App\Models\ActivityPlanItem;
 use App\Models\User;
+use App\Support\ActivityPlanScope;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Validation\ValidationException;
@@ -27,18 +28,28 @@ final class CopyActivityPlanItemSettings
     {
         $plan = $source->plan()->firstOrFail();
         Gate::forUser($user)->authorize('update', $plan);
-        $source->load(['batches', 'cities']);
-        $targets = $plan->items()->whereKey($targetItemIds)->whereKeyNot($source->id)->get();
+        $source->load(['batches', 'cities', 'activity:id,activity_kind']);
+
+        // Settings only transfer between activities of the same kind: copying a
+        // weekly-sessions activity onto a one-off event (or vice versa) would
+        // overwrite it into a shape that does not fit, so targets of another
+        // kind are refused rather than silently mangled.
+        $sourceKind = $source->activity?->activity_kind;
+        $targets = $plan->items()->whereKey($targetItemIds)->whereKeyNot($source->id)
+            ->with('activity:id,activity_kind')->get()
+            ->filter(fn (ActivityPlanItem $target): bool => ($target->activity?->activity_kind) === $sourceKind)
+            ->values();
 
         if ($targets->isEmpty()) {
-            throw ValidationException::withMessages(['copy' => __('annual_plans.copy_pick_one')]);
+            throw ValidationException::withMessages(['copy' => __('annual_plans.copy_same_kind')]);
         }
 
         $data = [
             'single_week' => $source->is_single_week,
             'unit' => $source->unit->value,
             'unit_other' => $source->unit_other,
-            'cities' => $source->cityIds(),
+            // Only governorates the plan still has: a stale one would fail every later save.
+            'cities' => array_values(array_intersect($source->cityIds(), ActivityPlanScope::cityIds($plan))),
             'expected_people' => $source->expected_people,
             'note' => null,
             'batches' => array_values($source->batches->map(fn (ActivityPlanBatch $batch): array => [

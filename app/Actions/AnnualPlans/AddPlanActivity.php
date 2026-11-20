@@ -6,6 +6,7 @@ namespace App\Actions\AnnualPlans;
 
 use App\Actions\Results\SaveResult;
 use App\Enums\ActivityKind;
+use App\Enums\Period;
 use App\Enums\ResultType;
 use App\Models\ActivityPlan;
 use App\Models\Result;
@@ -30,7 +31,12 @@ final class AddPlanActivity
 {
     public function __construct(private SaveResult $save) {}
 
-    public function handle(User $user, ActivityPlan $plan, string $statement, int $parentId, bool $singleWeek): Result
+    /**
+     * $singleWeek makes it an Event (it happens once), otherwise Continuous —
+     * the Activity kind the Logical Framework form asks for. $period is how
+     * often it is checked; null takes its output's period.
+     */
+    public function handle(User $user, ActivityPlan $plan, string $statement, int $parentId, bool $singleWeek, ?Period $period = null): Result
     {
         Gate::forUser($user)->authorize('update', $plan);
         $statement = trim($statement);
@@ -47,7 +53,7 @@ final class AddPlanActivity
             throw ValidationException::withMessages(['newActivityParent' => __('annual_plans.wf.pick_outcome')]);
         }
 
-        return DB::transaction(function () use ($parent, $proposal, $statement, $singleWeek): Result {
+        return DB::transaction(function () use ($parent, $proposal, $statement, $singleWeek, $period): Result {
             $output = $parent->type === ResultType::Output
                 ? $parent
                 : (Result::query()->where('parent_id', $parent->id)->where('type', ResultType::Output->value)->orderBy('id')->first()
@@ -55,7 +61,7 @@ final class AddPlanActivity
                         'statement' => __('annual_plans.wf.auto_output', ['outcome' => mb_substr((string) $parent->statement, 0, 180)]),
                         'type' => ResultType::Output->value,
                         'parent_id' => $parent->id,
-                        'checkout_period' => $parent->checkout_period?->value ?? 'monthly',
+                        'checkout_period' => $parent->checkout_period->value,
                     ], $proposal, callerAuthorized: true));
 
             return $this->save->handle(null, [
@@ -63,7 +69,7 @@ final class AddPlanActivity
                 'type' => ResultType::Activity->value,
                 'activity_kind' => ($singleWeek ? ActivityKind::Event : ActivityKind::Continuous)->value,
                 'parent_id' => $output->id,
-                'checkout_period' => $output->checkout_period?->value ?? 'monthly',
+                'checkout_period' => ($period ?? $output->checkout_period)->value,
             ], $proposal, callerAuthorized: true);
         });
     }

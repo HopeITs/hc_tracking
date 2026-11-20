@@ -5,12 +5,20 @@
     call. Included by _show-status-tab.blade.php; the page's top PHP block defines $mutedText, $inkText and
     $hairline.
 --}}
+@php
+    /* $bare: inside the proposal page's History fold (stage 3b), which already carries the title. */
+    $bare ??= false;
+@endphp
 @if ($this->proposal->status->isApprovedByDonor() || $this->changeRequestHistory->isNotEmpty())
-    <section aria-labelledby="change-requests-heading" class="mt-10 min-w-0" data-test="change-requests-chapter">
-        <div class="border-b pb-3 {{ $hairline }}">
-            <h2 id="change-requests-heading" class="text-lg font-bold {{ $inkText }}">{{ __('proposals.change.chapter_title') }}</h2>
-            <p class="mt-0.5 text-xs {{ $mutedText }}">{{ __('proposals.change.chapter_hint') }}</p>
-        </div>
+    <section @unless ($bare) aria-labelledby="change-requests-heading" @endunless @class(['min-w-0', 'mt-10' => ! $bare]) data-test="change-requests-chapter">
+        @if ($bare)
+            <p class="text-xs {{ $mutedText }}">{{ __('proposals.change.chapter_hint') }}</p>
+        @else
+            <div class="border-b pb-3 {{ $hairline }}">
+                <h2 id="change-requests-heading" class="text-lg font-bold {{ $inkText }}">{{ __('proposals.change.chapter_title') }}</h2>
+                <p class="mt-0.5 text-xs {{ $mutedText }}">{{ __('proposals.change.chapter_hint') }}</p>
+            </div>
+        @endif
 
         @if ($this->changeRequestHistory->isEmpty())
             <p class="mt-4 text-sm {{ $mutedText }}" data-test="change-requests-empty">{{ __('proposals.change.chapter_empty') }}</p>

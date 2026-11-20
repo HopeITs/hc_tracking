@@ -54,14 +54,9 @@ return [
     'remove_risk_name' => 'Remove “:name” from this result',
     'attached' => '{1} Risk added.|[2,*] :count risks added.',
     'detached' => 'Risk removed.',
-    'heat_title' => 'Risk heat map',
-    'heat_unrated' => '{1} 1 risk is not rated and is left off the map.|[2,*] :count risks are not rated and are left off the map.',
-    'heat_table_caption' => 'Rated risks by likelihood and severity',
-    'heat_count' => 'Risks',
 
     'moved_notice' => 'New risks are picked from the MEAL library on a proposal’s Logical Framework tab. This register keeps the earlier entries and will be retired.',
     'moved_notice_link' => 'Open the proposals',
 
-    'heat_axes' => 'Rows: likelihood, high at the top. Columns: severity, low to high.',
     'high_risks' => 'High risks',
 ];
