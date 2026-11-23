@@ -281,6 +281,25 @@ class Assignment extends Model
             'response_note' => $note,
             'seen_at' => $this->seen_at ?? now(),
         ])->save();
+
+        $this->notifyAssignableOfResponse();
+    }
+
+    /**
+     * Tell the record its assignment was answered, whichever way.
+     *
+     * The twin of `assignmentAcknowledged()`, which only fires on an accept:
+     * a record that has to follow a **reject** as well (a project keeping its
+     * location rows in step, Y-11) implements this instead of the generic
+     * model learning about it.
+     */
+    private function notifyAssignableOfResponse(): void
+    {
+        $assignable = $this->assignable;
+
+        if ($assignable instanceof Model && method_exists($assignable, 'assignmentResponded')) {
+            $assignable->assignmentResponded($this->field);
+        }
     }
 
     private function recordOnAssignable(string $suffix, ?string $note): void

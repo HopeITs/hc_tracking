@@ -8,6 +8,7 @@ use App\Enums\ProjectStatus;
 use App\Enums\ProposalStatus;
 use App\Models\Project;
 use App\Models\Proposal;
+use App\Support\Locations\ProjectLocationMirror;
 use App\Support\ProjectPeriods;
 use Carbon\CarbonImmutable;
 use Illuminate\Support\Facades\DB;
@@ -30,6 +31,8 @@ use InvalidArgumentException;
  */
 final class ApproveProjectFromProposal
 {
+    public function __construct(private ProjectLocationMirror $mirror) {}
+
     /** @var list<string> */
     public const VIAS = ['proposal_approval', 'owner_acknowledgement'];
 
@@ -69,11 +72,17 @@ final class ApproveProjectFromProposal
                 return false;
             }
 
-            return match ($locked->status) {
+            $approvedNow = match ($locked->status) {
                 ProjectStatus::Draft => $this->approveDraft($locked, array_values($approved->all()), $via),
                 ProjectStatus::Approved, ProjectStatus::Active => $this->extendDates($locked, array_values($approved->all())),
                 ProjectStatus::Submitted, ProjectStatus::Closed, ProjectStatus::Archived => false,
             };
+
+            // Covers the widen inside extendDates too, so a period that grew
+            // reaches the rows in the same transaction.
+            $this->mirror->sync($locked);
+
+            return $approvedNow;
         });
     }
 

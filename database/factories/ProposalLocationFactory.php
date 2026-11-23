@@ -2,6 +2,7 @@
 
 namespace Database\Factories;
 
+use App\Enums\ProjectStatus;
 use App\Models\Program;
 use App\Models\Project;
 use App\Models\Proposal;
@@ -56,6 +57,41 @@ class ProposalLocationFactory extends Factory
             'program_id' => Program::factory(),
             'responsible_employee_id' => fn (): int => $this->createHrEmployee(),
         ]);
+    }
+
+    /**
+     * A row whose project has been approved (Y-11): dated, with its period
+     * and the five beneficiary targets. `schedule_weekend` is left to the
+     * column default.
+     */
+    public function approved(): static
+    {
+        return $this->state([
+            'status' => ProjectStatus::Approved->value,
+            'start_date' => '2026-01-01',
+            'end_date' => '2026-12-31',
+            'target_beneficiaries' => 400,
+            'target_men' => 100,
+            'target_women' => 100,
+            'target_boys' => 100,
+            'target_girls' => 100,
+        ]);
+    }
+
+    /**
+     * A row being delivered: approved, with MEAL's template confirmed.
+     */
+    public function active(): static
+    {
+        return $this->approved()->state(['status' => ProjectStatus::Active->value]);
+    }
+
+    /**
+     * A row whose delivery has finished. It keeps its dates (contracts.md §3).
+     */
+    public function closed(): static
+    {
+        return $this->approved()->state(['status' => ProjectStatus::Closed->value]);
     }
 
     /**

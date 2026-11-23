@@ -6,6 +6,8 @@ namespace App\Actions\Projects;
 
 use App\Enums\ProjectStatus;
 use App\Models\Project;
+use App\Support\Locations\ProjectLocationMirror;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Gate;
 
 /**
@@ -14,10 +16,16 @@ use Illuminate\Support\Facades\Gate;
  */
 class ArchiveProject
 {
+    public function __construct(private ProjectLocationMirror $mirror) {}
+
     public function handle(Project $project): void
     {
         Gate::authorize('delete', $project);
 
-        $project->update(['status' => ProjectStatus::Archived]);
+        DB::transaction(function () use ($project): void {
+            $project->update(['status' => ProjectStatus::Archived]);
+
+            $this->mirror->sync($project);
+        });
     }
 }

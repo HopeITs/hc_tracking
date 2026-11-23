@@ -11,6 +11,7 @@ use App\Models\Project;
 use App\Models\Proposal;
 use App\Models\ProposalLocation;
 use App\Models\User;
+use App\Support\Locations\ProjectLocationMirror;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Validation\ValidationException;
 
@@ -189,6 +190,7 @@ final class ProposalLocationRows
             ]);
             $row->save();
             $this->writeCenters($row, $centerIds);
+            app(ProjectLocationMirror::class)->apply($project);
             $counts['added']++;
 
             return $counts;
@@ -199,6 +201,7 @@ final class ProposalLocationRows
             // the row keeps its first project and gains the center.
             $this->writeCenters($row, array_values(array_unique([...$row->centerIds(), ...$centerIds])));
             PlanIndicator::syncPlaceFromRow($row);
+            app(ProjectLocationMirror::class)->apply($project);
             $counts['changed']++;
 
             return $counts;
@@ -212,6 +215,12 @@ final class ProposalLocationRows
         $this->writeCenters($row, array_values(array_unique([...$row->centerIds(), ...$centerIds])));
         PlanIndicator::syncPlaceFromRow($row);
         $row->programRequest()->where('status', ProgramRequestStatus::Pending->value)->delete();
+
+        // A row that has just taken a project needs the whole mirror, not
+        // only the columns: its sectors, the owner's acknowledgement and the
+        // files have never been written. Approval links its rows through here.
+        app(ProjectLocationMirror::class)->apply($project);
+
         $counts['changed']++;
 
         return $counts;

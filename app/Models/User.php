@@ -681,6 +681,35 @@ class User extends Authenticatable implements HasLocalePreference, PasskeyUser, 
     }
 
     /**
+     * Location rows this user answers for: the ones whose responsible is
+     * their HR employee, and every row of a program they manage. The twin of
+     * `ownedProjectIds()` and cached the same way (Y-11).
+     *
+     * From Y-16 the pages read this instead; until then both exist, because
+     * `projects` is still what every screen reads.
+     *
+     * @return list<int>
+     */
+    public function ownedLocationIds(): array
+    {
+        return once(function (): array {
+            if ($this->employee_id === null) {
+                return [];
+            }
+
+            $programIds = $this->managedProgramIds();
+
+            return array_values(ProposalLocation::query()
+                ->where(fn (Builder $query) => $query
+                    ->where('responsible_employee_id', $this->employee_id)
+                    ->when($programIds !== [], fn (Builder $query) => $query->orWhereIn('program_id', $programIds)))
+                ->pluck('id')
+                ->map(fn (mixed $id): int => (int) $id)
+                ->all());
+        });
+    }
+
+    /**
      * Projects this user answers for: the ones they own (projects.user_id is
      * their HR employee) and every project in a program they manage.
      * Memoized per user instance.
