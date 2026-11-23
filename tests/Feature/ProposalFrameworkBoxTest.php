@@ -181,6 +181,55 @@ test('the layout, layers and open results are remembered for the person', functi
     frameworkBox(User::factory()->role('Financial')->create())->assertSet('layout', 'chain')->assertSet('openIds', []);
 });
 
+test('the framework scrolls with the page under a sticky toolbar, with no fixed-box option', function () {
+    frameworkResult(ResultType::Outcome);
+
+    frameworkBox($this->meal)
+        ->assertSeeHtmlInOrder(['data-test="framework-toolbar"', 'data-test="framework-search"', 'data-test="framework-body"'])
+        ->assertDontSeeHtml('setTall');
+});
+
+test('the results chain shows one outcome tab in front, with its outputs folded', function () {
+    $first = frameworkResult(ResultType::Outcome);
+    $second = frameworkResult(ResultType::Outcome);
+    $output = frameworkResult(ResultType::Output, $second);
+
+    // Every panel is in the page so switching is instant; only the one in front shows.
+    frameworkBox($this->meal)
+        ->assertSet('focusedId', $first->id)
+        ->assertSeeHtml('data-test="outcome-panel-'.$first->id.'"')
+        ->assertSeeHtmlInOrder(['data-test="outcome-panel-'.$second->id.'"', 'style="display: none"'])
+        ->call('focusOn', $second->id)
+        ->assertSet('focusedId', $second->id)
+        ->assertSeeHtml('data-test="node-toggle-'.$output->id.'"')
+        ->assertSeeHtmlInOrder(['data-test="node-body-'.$output->id.'"', 'data-open="false"'])
+        ->call('toggleChild', $output->id)
+        ->assertSeeHtmlInOrder(['data-test="node-body-'.$output->id.'"', 'data-open="true"']);
+});
+
+test('an outcome keeps its indicators and its risks and assumptions folded until asked for', function () {
+    $outcome = frameworkResult(ResultType::Outcome);
+
+    frameworkBox($this->meal)
+        ->assertSet('drawer', '')
+        ->call('toggleDrawer', 'ind')
+        ->assertSet('drawer', 'ind')
+        ->assertSeeHtml('data-test="drawer-ind-'.$outcome->id.'"')
+        ->call('toggleDrawer', 'ra')
+        ->assertSet('drawer', 'ra')
+        ->call('toggleDrawer', 'ra')
+        ->assertSet('drawer', '');
+});
+
+test('activities linked to no output show as a count on the Activity board tab', function () {
+    frameworkResult(ResultType::Activity);
+
+    frameworkBox($this->meal)
+        ->assertSeeHtml('data-test="loose-badge"')
+        ->assertSee(trans_choice('proposals.framework.loose_banner', 1, ['count' => 1]))
+        ->assertDontSeeHtml('data-test="loose-banner"');
+});
+
 test('search and "only results with problems" keep a matching child with its parent', function () {
     $impact = frameworkResult(ResultType::Impact);
     $outcome = frameworkResult(ResultType::Outcome, $impact);

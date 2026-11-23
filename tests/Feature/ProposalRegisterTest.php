@@ -111,10 +111,9 @@ test('the page opens on the table with one row per proposal and currency', funct
         ->assertSee('Shelter Response')
         ->assertSee('ECHO')
         ->assertSee('GIZ')
-        ->assertSee('1,000.00')
-        ->assertSee('390.00')
-        ->assertSee('39%')
-        ->assertSee('600.00');
+        // 2026-11-19: the list shows no money; the figures below are still read for sorting and the CSV export.
+        ->assertDontSee('1,000.00')
+        ->assertDontSee('39%');
 
     $rows = $page->instance()->rows->getCollection();
 
@@ -197,7 +196,7 @@ test('choosing a year adds that year beside the lifetime figures and hides lines
         ->and((float) $row->money_due_in_year)->toBe(700.0)
         ->and((float) $row->money_received_in_year)->toBe(390.0);
 
-    $page->assertSee('Due in 2026')->assertSee('Received in 2026');
+    // 2026-11-19: the year figures are no longer columns in the list; the row still carries them for the CSV export.
 
     $only = proposalRegister()->set('year', '2024')->set('figures', 'year')->instance()->rows->getCollection()->sole();
 
@@ -216,9 +215,8 @@ test('totals are kept per currency and add up to the rows shown', function () {
         ->and($totals['USD'])->toMatchArray(['proposals' => 2, 'agreements' => 2, 'committed' => 3000.0, 'received' => 390.0, 'outstanding' => 2600.0, 'overdue' => 200.0])
         ->and($totals['EUR'])->toMatchArray(['proposals' => 1, 'committed' => 500.0]);
 
-    $page->assertDontSeeHtml('data-register-total=')->assertSeeHtml('data-totals-currency="USD"')
-        ->assertSeeHtml('data-totals-currency="EUR"')
-        ->assertDontSee('3,500.00');
+    // 2026-11-19: the per-currency totals block was removed from the list (user decision); the totals are still computed.
+    $page->assertDontSeeHtml('data-register-total=')->assertDontSeeHtml('data-totals-currency=');
 });
 
 test('the table opens newest planned start first and a heading sorts it', function () {
@@ -263,8 +261,8 @@ test('someone who may see agreements but not transfers gets budgets without tran
 
     $page = Livewire::actingAs($viewer)->test('pages::proposals.index');
 
+    // 2026-11-19: the list shows no money at all now; the donor still shows to an agreement viewer.
     $page->assertSee('ECHO')
-        ->assertSee('1,000.00')
         ->assertDontSee('390.00')
         ->assertDontSeeHtml('data-cell="received"');
 
@@ -571,4 +569,21 @@ test('the change list reads a flat number of queries however many requests wait'
     $twenty = $countQueries();
 
     expect($twenty)->toBeLessThanOrEqual($one + 2);
+});
+
+// User decisions 2026-11-19: few columns, no sideways scroll, no money totals or committed column; the name opens the proposal.
+test('the table keeps only the key columns, the name opens the proposal and the money stays on its page', function () {
+    $proposal = registerFundedProposal();
+
+    proposalRegister()
+        ->assertSeeHtml('href="'.route('proposals.show', $proposal).'"')
+        ->assertSeeHtml('data-test="proposal-name-link-'.$proposal->id.'"')
+        ->assertSee('ECHO')
+        ->assertDontSeeHtml('data-register-totals')
+        ->assertDontSeeHtml('data-cell="committed"')
+        ->assertDontSeeHtml('data-cell="percent"')
+        ->assertDontSeeHtml('data-cell="outstanding"')
+        ->assertDontSeeHtml('data-cell="received"')
+        ->assertDontSeeHtml('data-label="'.__('proposals.phase').'"')
+        ->assertDontSeeHtml('data-label="'.__('finance_tables.next_due').'"');
 });

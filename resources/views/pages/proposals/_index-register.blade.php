@@ -1,63 +1,23 @@
 {{--
-    The register table of proposals/index: totals, the sortable money table
-    and its pager. Included by ⚡index.blade.php when the table view has rows.
+    The register table of proposals/index and its pager. Included by
+    ⚡index.blade.php when the table view has rows.
 --}}
-@use('App\Models\DonorProposal')
         @php
-            $totals = $this->totals;
             $money = fn (string|float|int|null $value): string => number_format((float) $value, 2);
             $date = fn (?\DateTimeInterface $value): string => $value?->translatedFormat(__('formats.date')) ?? '—';
-            $today = \Carbon\CarbonImmutable::today();
-            $showsYearColumns = $selectedYear !== null && ! $yearOnly;
             $unreadIds = $this->unreadIds;
-
-            $totalLines = $totals->map(fn (array $line): array => [
-                'currency' => $line['currency'],
-                'caption' => trans_choice('finance_tables.count_proposals', $line['proposals'], ['count' => $line['proposals']]),
-                'figures' => array_values(array_filter([
-                    ['key' => 'committed', 'label' => __('common.committed'), 'value' => $line['committed']],
-                    $canTransfers ? ['key' => 'received', 'label' => __('finance_tables.received'), 'value' => $line['received'], 'tone' => 'good', 'note' => DonorProposal::percentLabel($line['received'], $line['committed']).'%'] : null,
-                    $showsYearColumns ? ['key' => 'due_in_year', 'label' => __('finance_tables.due_in_year', ['year' => $selectedYear]), 'value' => $line['due_in_year']] : null,
-                    $showsYearColumns ? ['key' => 'received_in_year', 'label' => __('finance_tables.received_in_year', ['year' => $selectedYear]), 'value' => $line['received_in_year'], 'tone' => 'good'] : null,
-                    $canTransfers && ! $yearOnly ? ['key' => 'outstanding', 'label' => __('finance_tables.outstanding'), 'value' => $line['outstanding']] : null,
-                    $canTransfers ? ['key' => 'overdue', 'label' => __('finance_tables.overdue'), 'value' => $line['overdue'], 'tone' => $line['overdue'] > 0 ? 'critical' : null] : null,
-                ])),
-            ])->all();
-
             $previousProposalId = null;
         @endphp
 
-        @if ($canAgreements)
-            <x-funding.totals :lines="$totalLines" />
-        @endif
-
-        <x-funding.register :size="$canAgreements ? '2xl' : 'md'" :caption="__('finance_tables.proposals_caption')">
+        {{-- Few columns, no sideways scroll, no money totals or committed column (user decisions 2026-11-19); the figures are on the proposal page. --}}
+        <x-funding.register size="sm" :caption="__('finance_tables.proposals_caption')">
             <x-slot:head>
                 <x-funding.register.th sort="proposal" :active="$sortKey" :dir="$sortDirection">{{ __('common.proposal') }}</x-funding.register.th>
                 <x-funding.register.th sort="status" :active="$sortKey" :dir="$sortDirection">{{ __('common.status') }}</x-funding.register.th>
-                <x-funding.register.th>{{ __('proposals.phase') }}</x-funding.register.th>
-                <x-funding.register.th sort="planned_start" :active="$sortKey" :dir="$sortDirection">{{ __('proposals.planned_start') }}</x-funding.register.th>
-                <x-funding.register.th sort="planned_end" :active="$sortKey" :dir="$sortDirection">{{ __('proposals.planned_end') }}</x-funding.register.th>
-                <x-funding.register.th sort="projects" :active="$sortKey" :dir="$sortDirection" numeric>{{ __('common.projects') }}</x-funding.register.th>
                 @if ($canAgreements)
                     <x-funding.register.th>{{ __('common.donors') }}</x-funding.register.th>
-                    <x-funding.register.th sort="agreements" :active="$sortKey" :dir="$sortDirection" numeric>{{ __('finance_tables.agreements') }}</x-funding.register.th>
-                    <x-funding.register.th>{{ __('common.currency') }}</x-funding.register.th>
-                    <x-funding.register.th sort="committed" :active="$sortKey" :dir="$sortDirection" numeric>{{ $yearOnly ? __('finance_tables.committed_whole') : __('common.committed') }}</x-funding.register.th>
                 @endif
-                @if ($canTransfers)
-                    <x-funding.register.th sort="received" :active="$sortKey" :dir="$sortDirection" numeric>{{ __('finance_tables.received') }}</x-funding.register.th>
-                    <x-funding.register.th sort="percent" :active="$sortKey" :dir="$sortDirection" numeric>{{ __('finance_tables.percent_received') }}</x-funding.register.th>
-                    @if ($showsYearColumns)
-                        <x-funding.register.th sort="due_in_year" :active="$sortKey" :dir="$sortDirection" numeric>{{ __('finance_tables.due_in_year', ['year' => $selectedYear]) }}</x-funding.register.th>
-                        <x-funding.register.th sort="received_in_year" :active="$sortKey" :dir="$sortDirection" numeric>{{ __('finance_tables.received_in_year', ['year' => $selectedYear]) }}</x-funding.register.th>
-                    @endif
-                    @unless ($yearOnly)
-                        <x-funding.register.th sort="outstanding" :active="$sortKey" :dir="$sortDirection" numeric>{{ __('finance_tables.outstanding') }}</x-funding.register.th>
-                    @endunless
-                    <x-funding.register.th sort="overdue" :active="$sortKey" :dir="$sortDirection" numeric>{{ __('finance_tables.overdue') }}</x-funding.register.th>
-                    <x-funding.register.th sort="next_due" :active="$sortKey" :dir="$sortDirection">{{ __('finance_tables.next_due') }}</x-funding.register.th>
-                @endif
+                <x-funding.register.th sort="planned_start" :active="$sortKey" :dir="$sortDirection">{{ __('proposals.period') }}</x-funding.register.th>
                 <th scope="col"><span class="sr-only">{{ __('common.actions') }}</span></th>
             </x-slot:head>
 
@@ -69,7 +29,6 @@
                     $lineCurrency = $canAgreements ? $proposal->money_currency : null;
                     $hasMoney = $lineCurrency !== null;
                     $lineAgreements = $hasMoney ? $proposal->donorProposals->filter(fn ($agreement): bool => $agreement->currency->value === $lineCurrency)->unique('donor_id') : collect();
-                    $nextDue = $canTransfers && $hasMoney && $proposal->money_next_due !== null ? \Carbon\CarbonImmutable::parse($proposal->money_next_due) : null;
                     $overdue = $canTransfers && $hasMoney ? (float) $proposal->money_overdue : 0.0;
                 @endphp
                 <tr wire:key="proposal-{{ $proposal->id }}-{{ $lineCurrency ?? 'none' }}" data-proposal-row data-proposal="{{ $proposal->id }}">
@@ -77,10 +36,22 @@
                         @if (! $isRepeat && in_array($proposal->id, $unreadIds, true))
                             <span class="me-1 inline-block size-2 rounded-full bg-primary align-middle dark:bg-ink" data-unread-dot="proposal-{{ $proposal->id }}" title="{{ __('notifications.has_unread') }}"><span class="sr-only">{{ __('notifications.has_unread') }}</span></span>
                         @endif
-                        <span @class(['font-semibold', $mutedText => $isRepeat])>{{ $proposal->name }}</span>
+                        @if ($isRepeat)
+                            <span class="font-semibold {{ $mutedText }}" dir="auto">{{ $proposal->name }}</span>
+                        @else
+                            <a href="{{ route('proposals.show', $proposal) }}" wire:navigate class="font-semibold underline-offset-2 hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-secondary-medium" dir="auto" data-test="proposal-name-link-{{ $proposal->id }}">{{ $proposal->name }}</a>
+                        @endif
                         @if (! $isRepeat && $proposal->isPayroll())
                             <x-ui.enum-badge :case="$proposal->kind" class="ms-1.5 align-middle" data-payroll-chip="{{ $proposal->id }}" />
                         @endif
+                        @unless ($isRepeat)
+                            <span class="mt-0.5 flex flex-wrap items-center gap-x-2 text-xs {{ $mutedText }}">
+                                <x-ui.project-number :number="$proposal->internal_project_number" />
+                                @if ($overdue > 0)
+                                    <span class="font-semibold text-status-critical" data-overdue-flag="{{ $proposal->id }}">{{ __('proposals.overdue_amount', ['amount' => $money($overdue), 'currency' => $lineCurrency]) }}</span>
+                                @endif
+                            </span>
+                        @endunless
                         @if (! $isRepeat && $this->flag === 'no_center')
                             {{-- The rows still without a center, and where to give them one: the editor opens for an approved proposal only. --}}
                             <div class="mt-1.5 space-y-1 text-xs {{ $mutedText }}" data-test="missing-center-rows-{{ $proposal->id }}">
@@ -108,79 +79,26 @@
                             />
                         @endunless
                     </td>
-                    {{-- phase is a read-only accessor over status->phase(), not a column. --}}
-                    <td data-label="{{ __('proposals.phase') }}">{{ $isRepeat ? '' : $proposal->phase->label() }}</td>
-                    <td class="date" data-label="{{ __('proposals.planned_start') }}">{{ $isRepeat ? '' : $date($proposal->planned_date_begin) }}</td>
-                    <td class="date" data-label="{{ __('proposals.planned_end') }}">{{ $isRepeat ? '' : $date($proposal->planned_date_end) }}</td>
-                    <td class="num" data-label="{{ __('common.projects') }}">
+                    @if ($canAgreements)
+                    <td data-label="{{ __('common.donors') }}">
+                        @if ($lineAgreements->isNotEmpty())
+                            @foreach ($lineAgreements as $lineAgreement)
+                                @can('donors.view')
+                                    <a href="{{ route('donors.show', $lineAgreement->donor) }}" wire:navigate class="block underline-offset-2 hover:underline" dir="auto">{{ $lineAgreement->donor->name }}</a>
+                                @else
+                                    <span class="block" dir="auto">{{ $lineAgreement->donor->name }}</span>
+                                @endcan
+                            @endforeach
+                        @elseif (! $isRepeat)
+                            <span dir="auto" @class([$mutedText => $proposal->donor === null])>{{ $proposal->donor?->name ?? '—' }}</span>
+                        @endif
+                    </td>
+                    @endif
+                    <td class="date" data-label="{{ __('proposals.period') }}">
                         @unless ($isRepeat)
-                            <span class="fig">{{ (int) $proposal->projects_count }}</span>
+                            <span class="whitespace-nowrap">{{ $date($proposal->planned_date_begin) }} – {{ $date($proposal->planned_date_end) }}</span>
                         @endunless
                     </td>
-
-                    @if ($canAgreements)
-                        <td data-label="{{ __('common.donors') }}">
-                            @forelse ($lineAgreements as $lineAgreement)
-                                <a href="{{ route('donors.show', $lineAgreement->donor) }}" wire:navigate class="block underline-offset-2 hover:underline">{{ $lineAgreement->donor->name }}</a>
-                            @empty
-                                <span class="{{ $mutedText }}">{{ __('proposals.no_funding_agreements') }}</span>
-                            @endforelse
-                        </td>
-                        <td class="num" data-label="{{ __('finance_tables.agreements') }}"><span class="fig">{{ (int) $proposal->money_agreements }}</span></td>
-                        <td data-label="{{ __('common.currency') }}">{{ $lineCurrency ?? '—' }}</td>
-                        <td class="num" data-label="{{ __('common.committed') }}" data-cell="committed">
-                            @if ($hasMoney)
-                                <span class="fig font-semibold">{{ $money($proposal->money_committed) }}</span>
-                            @else
-                                —
-                            @endif
-                        </td>
-                    @endif
-
-                    @if ($canTransfers)
-                        <td class="num" data-label="{{ __('finance_tables.received') }}" data-cell="received">
-                            @if ($hasMoney)
-                                <span class="fig font-semibold text-funding">{{ $money($proposal->money_received) }}</span>
-                            @else
-                                —
-                            @endif
-                        </td>
-                        <td class="num" data-label="{{ __('finance_tables.percent_received') }}" data-cell="percent">
-                            @if ($hasMoney)
-                                <span class="fig">{{ DonorProposal::percentLabel((float) $proposal->money_received, (float) $proposal->money_committed) }}%</span>
-                            @else
-                                —
-                            @endif
-                        </td>
-                        @if ($showsYearColumns)
-                            <td class="num" data-label="{{ __('finance_tables.due_in_year', ['year' => $selectedYear]) }}" data-cell="due_in_year"><span class="fig">{{ $money($proposal->money_due_in_year) }}</span></td>
-                            <td class="num" data-label="{{ __('finance_tables.received_in_year', ['year' => $selectedYear]) }}" data-cell="received_in_year"><span class="fig font-semibold text-funding">{{ $money($proposal->money_received_in_year) }}</span></td>
-                        @endif
-                        @unless ($yearOnly)
-                            <td class="num" data-label="{{ __('finance_tables.outstanding') }}" data-cell="outstanding">
-                                @if ($hasMoney)
-                                    <span class="fig">{{ $money($proposal->money_outstanding) }}</span>
-                                @else
-                                    —
-                                @endif
-                            </td>
-                        @endunless
-                        <td class="num" data-label="{{ __('finance_tables.overdue') }}" data-cell="overdue">
-                            @if ($hasMoney)
-                                <span @class(['fig', 'font-semibold text-status-critical' => $overdue > 0])>{{ $money($overdue) }}</span>
-                            @else
-                                —
-                            @endif
-                        </td>
-                        <td class="date" data-label="{{ __('finance_tables.next_due') }}">
-                            @if ($nextDue !== null)
-                                <span @class(['font-semibold text-status-critical' => $nextDue->lt($today)])>{{ $date($nextDue) }}</span>
-                            @else
-                                —
-                            @endif
-                        </td>
-                    @endif
-
                     <td>
                         @unless ($isRepeat)
                             <span class="flex items-center justify-end">

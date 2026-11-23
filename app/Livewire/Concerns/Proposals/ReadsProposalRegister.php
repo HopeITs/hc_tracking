@@ -302,10 +302,12 @@ trait ReadsProposalRegister
     protected function selectLine(Builder $query): Builder
     {
         $query
-            ->select(['proposals.id', 'proposals.slug', 'proposals.name', 'proposals.planned_date_begin', 'proposals.planned_date_end', 'proposals.status', 'proposals.kind', 'proposals.on_hold_since'])
+            ->select(['proposals.id', 'proposals.slug', 'proposals.name', 'proposals.internal_project_number', 'proposals.donor_id', 'proposals.planned_date_begin', 'proposals.planned_date_end', 'proposals.status', 'proposals.kind', 'proposals.on_hold_since'])
             ->withCount(['projects', 'donorProposals']);
 
+        // Donors stay hidden from someone who may not see agreements (FundraisingPagesMoneyTest).
         if ($this->canViewAgreements()) {
+            $query->with(['donor' => fn ($query) => $query->select(['id', 'slug', 'name'])]);
             $query->selectRaw(AgreementMoney::ownerSelect());
         }
 

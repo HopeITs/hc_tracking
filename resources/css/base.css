@@ -31,6 +31,16 @@
  * are dimmed slightly unless they opt out with data-no-dim (logos, previews, charts).
  */
 @layer base {
+    /* Slim grey scrollbars everywhere (inherited), instead of the chunky Windows bar with arrow buttons. */
+    /* scrollbar-width does not inherit, so it goes on every element; hidden strips (scrollbar-width: none) are unlayered and still win. */
+    * {
+        scrollbar-width: thin;
+    }
+
+    html {
+        scrollbar-color: var(--color-gray-300, #d4d4d4) transparent;
+    }
+
     .dark {
         color-scheme: dark;
         scrollbar-color: var(--color-line-strong) transparent;

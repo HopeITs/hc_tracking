@@ -30,6 +30,7 @@
  */
 
 import { inserted, resized, rowsIn, sameLayout, swapped } from './desk-rows';
+import { pageScroller } from './page-scroller';
 
 const moveThreshold = 6;
 const holdDelay = 400;
@@ -258,7 +259,7 @@ function autoScroll() {
     const speed = y < edge ? -(edge - y) / 3 : y > window.innerHeight - edge ? (y - (window.innerHeight - edge)) / 3 : 0;
 
     if (speed) {
-        window.scrollBy(0, speed);
+        pageScroller().scrollBy(0, speed);
     }
 
     /* The pointer is read on every event but the Desk is touched once per frame at most. */
@@ -655,10 +656,11 @@ function pull() {
 
 /** The first row grown from its top: scroll by what it grew, so its bottom stays where it was on screen and its top follows the pointer. */
 function scrollWith(by) {
-    const before = window.scrollY;
+    const scroller = pageScroller();
+    const before = scroller.scrollTop;
 
-    window.scrollTo({ top: before + by, behavior: 'instant' });
-    resize.scrolled += window.scrollY - before;
+    scroller.scrollTo({ top: before + by, behavior: 'instant' });
+    resize.scrolled += scroller.scrollTop - before;
 }
 
 function endResize(commit) {
@@ -682,7 +684,7 @@ function endResize(commit) {
 
     if (! commit || sameLayout(layout, placed)) {
         flip(grid, () => lay(grid, layout), panel);
-        window.scrollTo({ top: window.scrollY - current.scrolled, behavior: 'instant' });
+        pageScroller().scrollTo({ top: pageScroller().scrollTop - current.scrolled, behavior: 'instant' });
         panelsIn(grid).forEach(fitAgain);
     } else {
         seenHint();

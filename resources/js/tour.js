@@ -12,6 +12,8 @@
  * each page gets its own tour and a running one closes when you leave.
  */
 
+import { pageScroller } from './page-scroller';
+
 const SEEN_KEY = 'hc-tour-seen';
 const GAP = 14;
 const PAD = 8;
@@ -265,7 +267,7 @@ document.addEventListener('alpine:init', () => {
                 // Inside a sticky/fixed ancestor there is nothing to scroll.
                 const scrollBy = rect.top - headerClearance - Math.max(0, (window.innerHeight - headerClearance - footerClearance - rect.height) / 3);
 
-                window.scrollBy({
+                pageScroller().scrollBy({
                     top: scrollBy,
                     behavior: window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth',
                 });

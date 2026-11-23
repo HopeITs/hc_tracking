@@ -2,13 +2,16 @@
     "Start from program framework": the program's framework as a checklist.
     Ticking runs in the browser (instant); copySelection() checks it all again.
     Already here = greyed and locked; ticking a child ticks its parents,
-    unticking a parent unticks its new children.
+    unticking a parent unticks its new children. Each outcome reads as one
+    group with its outputs and indicators under it; the count and the Copy
+    button sit in the dialog's own footer (shared through Alpine.store('pk')).
 --}}
 @php
     $tree = $showPicker ? $this->pickerTree : ['results' => [], 'programs' => 0];
+    $copyLabel = __('proposals.picker.copy');
 @endphp
 
-<x-ui.modal wire:model="showPicker" size="lg" :title="__('proposals.picker.title')">
+<x-ui.modal wire:model="showPicker" size="lg" :title="__('proposals.picker.title')" :description="__('proposals.picker.intro')">
     @if ($showPicker)
         @if ($tree['results'] === [])
             <div class="pp-empty">{{ $tree['programs'] === 0 ? __('proposals.picker.no_program') : __('proposals.picker.empty') }}</div>
@@ -19,7 +22,10 @@
                     res: {}, ind: {}, targets: true,
                     init() {
                         this.rows.forEach(r => { this.res[r.id] = ! r.have; r.indicators.forEach(i => this.ind[i.id] = ! i.have) });
+                        Alpine.store('pk', { res: 0, ind: 0, tg: 0, copy: () => this.copy() });
+                        Alpine.effect(() => { const s = Alpine.store('pk'); s.res = this.willRes(); s.ind = this.willInd(); s.tg = this.willTargets() });
                     },
+                    groups() { const out = []; this.rows.forEach(r => { if (r.depth === 0 || out.length === 0) out.push([]); out[out.length - 1].push(r) }); return out },
                     row(id) { return this.rows.find(r => r.id === id) },
                     kids(id) { return this.rows.filter(r => r.parent === id) },
                     up(id) { let r = this.row(id); while (r && r.parent) { const p = this.row(r.parent); if (! p) break; if (! p.have) this.res[p.id] = true; r = p } },
@@ -35,40 +41,56 @@
                     picked() { return { results: this.rows.filter(r => ! r.have && this.res[r.id]).map(r => r.id), indicators: this.rows.flatMap(r => r.indicators.filter(i => (! i.have && this.ind[i.id]) || (i.fillable && this.targets)).map(i => i.id)) } },
                     copy() { const p = this.picked(); $wire.copySelection(p.results, p.indicators, this.targets) },
                 }">
-                <p class="pp-small">{{ __('proposals.picker.intro') }}</p>
                 <div class="pp-pk-tools">
-                    <span class="pp-pk-btns">
-                        <button type="button" class="pp-btn pp-btn-sm" x-on:click="all(true)" x-bind:disabled="! anyNew()">{{ __('proposals.picker.tick_all_new') }}</button>
-                        <button type="button" class="pp-btn pp-btn-sm" x-on:click="all(false)">{{ __('proposals.picker.untick_all') }}</button>
+                    <span class="pp-pk-sel" role="group" aria-label="{{ __('proposals.picker.select') }}">
+                        <button type="button" class="pp-pk-pill" x-on:click="all(true)" x-bind:disabled="! anyNew()">{{ __('proposals.picker.tick_all_new') }}</button>
+                        <button type="button" class="pp-pk-pill" x-on:click="all(false)">{{ __('proposals.picker.untick_all') }}</button>
                     </span>
-                    <label class="pp-toggle"><input type="checkbox" x-model="targets" data-test="picker-targets"> <span>{{ __('proposals.picker.copy_targets') }} (<span x-text="fillable()"></span> {{ __('proposals.picker.empty_here') }})</span></label>
+                    <label class="pp-pk-opt" x-show="fillable() > 0">
+                        <input type="checkbox" class="pp-pk-box" x-model="targets" data-test="picker-targets">
+                        <span>{{ __('proposals.picker.copy_targets') }} <span class="pp-pk-meta">· <span x-text="fillable()"></span> {{ __('proposals.picker.empty_here') }}</span></span>
+                    </label>
                 </div>
+
                 <div class="pp-pk-list">
-                    <template x-for="r in rows" :key="r.id">
-                        <div>
-                            <label class="pp-pk-row pp-pk-res" x-bind:class="r.have && 'pp-pk-dis'" x-bind:style="'padding-inline-start:' + (12 + r.depth * 20) + 'px'">
-                                <input type="checkbox" x-bind:checked="r.have || res[r.id]" x-bind:disabled="r.have" x-on:change="tickRes(r, $event.target.checked)">
-                                <span class="pp-lvl" x-bind:class="'pp-lvl-' + r.type" x-text="r.typeLabel"></span>
-                                <span dir="auto" x-text="r.statement"></span>
-                                <span class="pp-pk-tag" x-bind:class="! r.have && 'pp-pk-new'" x-text="r.have ? @js(__('proposals.picker.already_here')) : @js(__('proposals.picker.new'))"></span>
-                            </label>
-                            <template x-for="i in r.indicators" :key="i.id">
-                                <label class="pp-pk-row" x-bind:class="i.have && 'pp-pk-dis'" x-bind:style="'padding-inline-start:' + (44 + r.depth * 20) + 'px'">
-                                    <input type="checkbox" x-bind:checked="i.have || ind[i.id]" x-bind:disabled="i.have" x-on:change="tickInd(r, i, $event.target.checked)">
-                                    <span class="pp-small">•</span>
-                                    <span dir="auto"><span x-text="i.name"></span> <span class="pp-small">· <span x-text="i.frequency"></span><template x-if="i.target !== null"><span> · {{ __('proposals.picker.program_target') }} <b x-text="i.target"></b></span></template></span></span>
-                                    <span class="pp-pk-tag" x-bind:class="(! i.have || (i.fillable && targets)) && 'pp-pk-new'" x-text="! i.have ? @js(__('proposals.picker.new')) : (i.fillable && targets ? @js(__('proposals.picker.target_filled')) : @js(__('proposals.picker.already_here')))"></span>
-                                </label>
+                    <template x-for="g in groups()" :key="g[0].id">
+                        <section class="pp-pk-card">
+                            <template x-for="r in g" :key="r.id">
+                                <div class="pp-pk-item" x-bind:class="{ 'pp-pk-dis': r.have, 'pp-pk-head': r.depth === 0 }" x-bind:style="'--d:' + r.depth">
+                                    <label class="pp-pk-row">
+                                        <input type="checkbox" class="pp-pk-box" x-bind:checked="r.have || res[r.id]" x-bind:disabled="r.have" x-on:change="tickRes(r, $event.target.checked)">
+                                        <span class="pp-pk-txt">
+                                            <span class="pp-pk-kind" x-bind:class="'pp-pk-kind-' + r.type" x-text="r.typeLabel"></span>
+                                            <span class="pp-pk-st" dir="auto" x-text="r.statement"></span>
+                                        </span>
+                                        <span class="pp-pk-here" x-show="r.have">{{ __('proposals.picker.already_here') }}</span>
+                                    </label>
+                                    <template x-for="i in r.indicators" :key="i.id">
+                                        <label class="pp-pk-row pp-pk-ind" x-bind:class="i.have && 'pp-pk-dis'">
+                                            <input type="checkbox" class="pp-pk-box pp-pk-box-sm" x-bind:checked="i.have || ind[i.id]" x-bind:disabled="i.have" x-on:change="tickInd(r, i, $event.target.checked)">
+                                            <span class="pp-pk-txt">
+                                                <span dir="auto" x-text="i.name"></span>
+                                                <span class="pp-pk-meta"><span x-text="i.frequency"></span><template x-if="i.target !== null"><span> · {{ __('proposals.picker.program_target') }} <b x-text="i.target"></b></span></template></span>
+                                            </span>
+                                            <span class="pp-pk-here" x-show="i.have" x-text="i.fillable && targets ? @js(__('proposals.picker.target_filled')) : @js(__('proposals.picker.already_here'))"></span>
+                                        </label>
+                                    </template>
+                                </div>
                             </template>
-                        </div>
+                        </section>
                     </template>
                 </div>
-                <div class="pp-pk-sum" data-test="picker-summary">{{ __('proposals.picker.will_copy') }} <span x-text="willRes()"></span> {{ __('proposals.picker.results') }}, <span x-text="willInd()"></span> {{ __('proposals.picker.indicators') }}, <span x-text="willTargets()"></span> {{ __('proposals.picker.targets') }}.</div>
                 @error('picker')<p class="pp-err" role="alert">{{ $message }}</p>@enderror
-                <div class="pp-pk-acts">
-                    <button type="button" class="pp-btn pp-btn-primary" x-on:click="copy()" x-bind:disabled="willRes() + willInd() + willTargets() === 0" data-test="picker-copy">{{ __('proposals.picker.copy') }}</button>
-                </div>
             </div>
         @endif
+    @endif
+
+    @if ($showPicker && $tree['results'] !== [])
+        <x-slot:footerMeta>
+            <span class="pp-pk-sum" data-test="picker-summary">{{ __('proposals.picker.will_copy') }} <b x-text="$store.pk?.res ?? 0"></b> {{ __('proposals.picker.results') }} · <b x-text="$store.pk?.ind ?? 0"></b> {{ __('proposals.picker.indicators') }} · <b x-text="$store.pk?.tg ?? 0"></b> {{ __('proposals.picker.targets') }}</span>
+        </x-slot:footerMeta>
+        <x-slot:actions>
+            <x-ui.button type="button" tone="primary" x-on:click="$store.pk?.copy()" x-bind:disabled="! $store.pk || ($store.pk.res + $store.pk.ind + $store.pk.tg) === 0" data-test="picker-copy">{{ $copyLabel }}</x-ui.button>
+        </x-slot:actions>
     @endif
 </x-ui.modal>
