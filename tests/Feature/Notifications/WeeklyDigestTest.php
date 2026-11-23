@@ -4,6 +4,7 @@ use App\Jobs\RunScanner;
 use App\Models\Activity;
 use App\Models\Program;
 use App\Models\Project;
+use App\Models\ProposalLocation;
 use App\Models\Risk;
 use App\Models\Task;
 use App\Models\UserNotification;
@@ -22,7 +23,9 @@ test('program managers get their program digest and the general manager the whol
         $project = Project::factory()->create(['program_id' => $program->id, 'end_date' => '2027-12-31']);
         Task::factory()->create(['source_type' => 'project', 'source_id' => $project->id, 'due_date' => '2026-09-15']);
         Task::factory()->create(['source_type' => 'project', 'source_id' => $project->id, 'due_date' => '2026-09-25']);
-        Risk::factory()->create(['project_id' => $project->id, 'happened' => true, 'solution' => null]);
+        // Y-13 (D-93): the digest counts an open risk through its location row.
+        $row = ProposalLocation::factory()->forProject($project)->create();
+        Risk::factory()->onRow($row)->create(['happened' => true, 'solution' => null]);
     });
 
     expect(app(WeeklyDigestScanner::class)->scan(CarbonImmutable::parse('2026-09-22 08:00')))->toBe(0); // Tuesday

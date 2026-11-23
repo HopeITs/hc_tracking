@@ -2,15 +2,19 @@
     "Risks to be aware of" on the project's Overview (W-09, D-61, Dev 1 ruling
     of 4 Nov): a read-only alert for the project's manager. It lists the risks
     picked onto the logframes of the proposals linked to this project, one
-    group per proposal, then the older register rows logged against the
-    project itself. Nothing is edited here: risks are added and removed on the
+    group per proposal, then the place's own register rows (Y-13: a register
+    risk carries its row's proposal too, so the groups are told apart by
+    whether the risk sits on a result). Nothing is edited here: risks are added and removed on the
     proposal's Logical Framework tab, which each group links to. Included by
     _story-chapters.blade.php.
 --}}
 @can('viewAny', App\Models\Risk::class)
     @php
         $awareness = $this->riskAwareness;
-        $groups = $awareness->groupBy(fn ($risk) => $risk->proposal_id ?? 0);
+        // Y-13 (D-93): one group per proposal logframe, then one per location
+        // row of this place, named by the place itself.
+        $groups = $awareness->groupBy(fn ($risk) => $risk->isOnLogframe() ? 'proposal-'.$risk->proposal_id : 'row-'.($risk->proposal_location_id ?? 0));
+        $places = App\Models\ProposalLocation::placeLabels($awareness->pluck('location')->filter()->unique('id')->values());
     @endphp
 
     @if ($awareness->isNotEmpty())
@@ -23,13 +27,18 @@
             <p class="mt-1 type-meta text-secondary-medium dark:text-ink-muted">{{ __('projects.risk_awareness_note') }}</p>
 
             <div class="mt-3 grid gap-3 @lg/detail:grid-cols-2">
-                @foreach ($groups as $proposalId => $risks)
-                    <div class="overflow-hidden rounded-lg border border-secondary-soft bg-white dark:border-line dark:bg-surface-2" wire:key="project-risk-group-{{ $proposalId }}" data-risk-group="{{ $proposalId === 0 ? 'register' : $proposalId }}">
+                @foreach ($groups as $groupKey => $risks)
+                    @php
+                        $onLogframe = str_starts_with($groupKey, 'proposal-');
+                        $rowId = $risks->first()->proposal_location_id;
+                        $place = $onLogframe ? null : ($places[$rowId] ?? null);
+                    @endphp
+                    <div class="overflow-hidden rounded-lg border border-secondary-soft bg-white dark:border-line dark:bg-surface-2" wire:key="project-risk-group-{{ $groupKey }}" data-risk-group="{{ $onLogframe ? $risks->first()->proposal_id : 'register' }}">
                         <div class="flex items-center gap-2 border-b border-secondary-soft px-3 py-2 dark:border-line">
-                            @if ($proposalId === 0)
-                                <p class="type-label text-secondary-medium dark:text-ink-muted">{{ __('projects.risk_awareness_register') }}</p>
+                            @if (! $onLogframe)
+                                <p class="min-w-0 truncate type-label text-secondary-medium dark:text-ink-muted" dir="auto" data-test="risk-group-place">{{ $place ?? __('projects.risk_awareness_register') }}</p>
                             @else
-                                <a href="{{ route('proposals.show', ['proposal' => $proposalId, 'ptab' => 'logframe']) }}" wire:navigate class="min-w-0 truncate type-label font-semibold text-secondary-dark underline decoration-secondary-light underline-offset-2 hover:text-primary dark:text-ink dark:hover:text-brand-text" dir="auto">{{ $risks->first()->proposal?->name }}</a>
+                                <a href="{{ route('proposals.show', ['proposal' => $risks->first()->proposal_id, 'ptab' => 'logframe']) }}" wire:navigate class="min-w-0 truncate type-label font-semibold text-secondary-dark underline decoration-secondary-light underline-offset-2 hover:text-primary dark:text-ink dark:hover:text-brand-text" dir="auto">{{ $risks->first()->proposal?->name }}</a>
                             @endif
                             <span class="ms-auto text-xs font-semibold tabular-nums text-secondary-medium dark:text-ink-muted">{{ $risks->count() }}</span>
                         </div>

@@ -92,12 +92,12 @@ final class WeeklyDigestScanner implements Scanner
         });
 
         Risk::query()
-            ->join('projects', 'projects.id', '=', 'risks.project_id')
+            ->join('proposal_locations', 'proposal_locations.id', '=', 'risks.proposal_location_id')
             ->where('risks.happened', true)
             ->where(fn ($query) => $query->whereNull('risks.solution')->orWhere('risks.solution', ''))
-            ->groupBy('projects.program_id')
+            ->groupBy('proposal_locations.program_id')
             ->toBase()
-            ->selectRaw('projects.program_id, count(*) as aggregate')
+            ->selectRaw('proposal_locations.program_id, count(*) as aggregate')
             ->pluck('aggregate', 'program_id')
             ->each(function (int|string $count, int|string $programId) use (&$stats, $empty): void {
                 $stats[(int) $programId] ??= $empty;

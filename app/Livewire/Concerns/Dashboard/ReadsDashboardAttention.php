@@ -6,6 +6,7 @@ namespace App\Livewire\Concerns\Dashboard;
 
 use App\Enums\ArStatus;
 use App\Enums\TaskStatus;
+use App\Models\ProposalLocation;
 use App\Models\ProposalReviewer;
 use App\Models\Risk;
 use App\Models\Task;
@@ -105,21 +106,27 @@ trait ReadsDashboardAttention
                 href: $this->transferHref($transfer),
             ));
 
-        $risks = $this->visible(Risk::query(), 'risks')
-            ->select(['id', 'project_id', 'name', 'updated_at'])
-            ->with('project:id,name')
+        // Y-13 (D-93): a risk names the place it belongs to, which is one
+        // location row of a proposal, and the register opens on that row.
+        $happenedRisks = $this->visible(Risk::query(), 'risks')
+            ->select(['id', 'project_id', 'proposal_location_id', 'name', 'updated_at'])
+            ->with(['project:id,name', 'location:id,program_id,city_id', 'location.program:id'])
             ->where('happened', true)
             ->latest('updated_at')
             ->limit(self::AttentionLimit)
-            ->get()
+            ->get();
+
+        $places = ProposalLocation::placeLabels($happenedRisks->pluck('location')->filter()->unique('id')->values());
+
+        $risks = $happenedRisks
             ->map(fn (Risk $risk): array => $this->attentionEntry(
                 key: 'risk-'.$risk->id,
                 group: 'risks',
                 icon: 'exclamation-triangle',
                 title: $risk->name,
-                context: __('dashboard.risk_in', ['project' => $risk->project?->name ?? '—']),
+                context: __('dashboard.risk_in', ['project' => $places[$risk->proposal_location_id] ?? $risk->project?->name ?? '—']),
                 daysLate: null,
-                href: route('risks.index', ['project' => $risk->project_id, 'status' => 'happened']),
+                href: route('risks.index', ['location' => $risk->proposal_location_id, 'materialisedOnly' => 1]),
             ));
 
         $viewer = auth()->user();
