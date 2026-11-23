@@ -933,6 +933,7 @@ return [
             ],
         ],
         'report_template' => [
+            'placement_pending' => ':subject needs a reporting choice.',
             'created' => 'The report template of “:subject” was created',
             'updated' => ':actor updated the report template of “:subject”',
             'pending' => [

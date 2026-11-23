@@ -1,6 +1,15 @@
 <?php
 
 use App\Enums\ReportTemplateStatus;
+use App\Enums\TemplatePlacementStatus;
+use App\Models\ReportTemplate;
+use App\Models\ReportTemplatePlacement;
+use App\Models\PlanIndicator;
+use App\Actions\ReportTemplates\JoinReportTemplate;
+use App\Actions\ReportTemplates\CreateReportTemplateForProposal;
+use App\Support\ReportTemplatePrefiller;
+use Flux\Flux;
+use Livewire\Attributes\Locked;
 use App\Support\ReportTemplateQueue;
 use Illuminate\Support\Facades\Gate;
 use Livewire\Attributes\Computed;
@@ -14,19 +23,147 @@ use Livewire\Component;
 | pending templates and the confirmed templates with new pending lines of the
 | projects this user covers (all for the MEAL Manager slot holder). Each row
 | opens the project's Report template tab, where the template is confirmed.
-| Read-only, no money.
+| Placement decisions are authorized on the server; no money is queried.
 */
 new #[Layout('layouts::desk'), Title('titles.report_templates')] class extends Component {
     /** The governorate filter (HR city id); '' shows every governorate. */
     #[Url(except: '')]
     public string $city = '';
 
-    /** The status button pressed: pending (new template) or lines (lines added). Empty shows both. */
+    /** The status button pressed: pending (new template), lines (lines added), or placement (MEAL choice). Empty shows all. */
     #[Url(except: '')]
     public string $focus = '';
 
     #[Url(except: '')]
     public string $search = '';
+
+    #[Locked]
+    public ?int $placementId = null;
+
+    public bool $showPlacementModal = false;
+
+    public bool $showPlacementConfirm = false;
+
+    #[Locked]
+    public string $placementMode = 'join';
+
+    public string $selectedPlacementTemplateId = '';
+
+    /** @var list<int|string> */
+    public array $selectedPlacementTargets = [];
+
+    #[Computed]
+    public function placement(): ?ReportTemplatePlacement
+    {
+        if ($this->placementId === null) {
+            return null;
+        }
+        $placement = ReportTemplatePlacement::query()->with(['proposal', 'city', 'program'])->findOrFail($this->placementId);
+        Gate::authorize('manage', $placement);
+
+        return $placement;
+    }
+
+    #[Computed]
+    public function placementContext(): string
+    {
+        if ($this->placement === null) {
+            return '';
+        }
+        $placement = $this->placement;
+        $center = $placement->city_wide ? __('report_templates.queue.field_work')
+            : \App\Models\HrCenter::remembered($placement->center_id)?->name;
+
+        return collect([$placement->proposal->name, $placement->city?->name,
+            $placement->program->name, $center])->filter()->implode(' · ');
+    }
+
+    #[Computed]
+    public function placementTemplates(): \Illuminate\Support\Collection
+    {
+        if ($this->placement === null) {
+            return collect();
+        }
+
+        return ReportTemplate::query()->atPlace($this->placement->place())
+            ->whereHas('proposals', fn ($query) => $query->whereKeyNot($this->placement->proposal_id))
+            ->with('proposals:id,name')->withCount(['lines as confirmed_count' => fn ($query) => $query->where('status', 'confirmed')])
+            ->orderBy('id')->get();
+    }
+
+    #[Computed]
+    public function placementTargets(): array
+    {
+        if ($this->placement === null) {
+            return [];
+        }
+
+        $planned = app(ReportTemplatePrefiller::class)->plannedLines($this->placement->proposal, $this->placement->place())['lines'];
+        $template = $this->placementTemplates->firstWhere('id', (int) $this->selectedPlacementTemplateId);
+        $shared = $template === null ? [] : $template->lines()->where('status', '!=', 'retired')
+            ->join('plan_indicators as p', 'p.id', '=', 'report_template_lines.plan_indicator_id')
+            ->join('indicators as i', 'i.id', '=', 'p.indicator_id')->pluck('i.library_indicator_id')->all();
+
+        return PlanIndicator::query()->whereIn('id', array_keys($planned))
+            ->where('source_type', 'proposal')->where('source_id', $this->placement->proposal_id)
+            ->with('indicator')->get()->map(fn ($target): array => [
+                'id' => $target->id, 'name' => $target->indicator->name,
+                'shared' => in_array($target->indicator->library_indicator_id, $shared, true),
+            ])->all();
+    }
+
+    public function openPlacement(int $id): void
+    {
+        Gate::authorize('report-templates.manage');
+        $this->placementId = $id;
+        unset($this->placement, $this->placementTemplates, $this->placementTargets);
+        Gate::authorize('manage', $this->placement);
+        $this->resetValidation();
+        $this->selectedPlacementTemplateId = '';
+        $this->selectedPlacementTargets = array_column($this->placementTargets, 'id');
+        $this->showPlacementModal = true;
+    }
+
+    public function updatedSelectedPlacementTemplateId(): void
+    {
+        unset($this->placementTargets);
+        $this->selectedPlacementTargets = array_column($this->placementTargets, 'id');
+    }
+
+    public function askJoinPlacement(): void
+    {
+        Gate::authorize('manage', $this->placement);
+        $this->validate(['selectedPlacementTemplateId' => ['required', 'integer']]);
+        $this->placementTemplates->firstWhere('id', (int) $this->selectedPlacementTemplateId) ?? abort(404);
+        $this->placementMode = 'join';
+        $this->showPlacementModal = false;
+        $this->showPlacementConfirm = true;
+    }
+
+    public function askCreatePlacement(int $id): void
+    {
+        $this->openPlacement($id);
+        $this->placementMode = 'create';
+        $this->showPlacementModal = false;
+        $this->showPlacementConfirm = true;
+    }
+
+    public function decidePlacement(): void
+    {
+        Gate::authorize('manage', $this->placement);
+        $placement = $this->placement;
+        $this->placementMode === 'join'
+            ? app(JoinReportTemplate::class)->handle($placement->proposal,
+                $this->placementTemplates->firstWhere('id', (int) $this->selectedPlacementTemplateId) ?? abort(404),
+                array_map(intval(...), $this->selectedPlacementTargets))
+            : app(CreateReportTemplateForProposal::class)->handle($placement->proposal, $placement->place());
+
+        $this->showPlacementConfirm = false;
+        $this->placementId = null;
+        unset($this->rows, $this->matchingRows, $this->visibleRows, $this->focusCounts, $this->cityOptions,
+            $this->placement, $this->placementTemplates, $this->placementTargets);
+        Flux::toast(variant: 'success', text: __('report_templates.placement_saved'));
+    }
 
     public function mount(): void
     {
@@ -41,7 +178,10 @@ new #[Layout('layouts::desk'), Title('titles.report_templates')] class extends C
     #[Computed]
     public function rows(): array
     {
-        return ReportTemplateQueue::rowsFor(auth()->user());
+        return [
+            ...array_map(fn (array $row): array => [...$row, 'category' => $row['status'] === ReportTemplateStatus::Pending ? 'pending' : 'lines'], ReportTemplateQueue::rowsFor(auth()->user())),
+            ...ReportTemplateQueue::placementRowsFor(auth()->user()),
+        ];
     }
 
     /**
@@ -75,7 +215,7 @@ new #[Layout('layouts::desk'), Title('titles.report_templates')] class extends C
     /** Press a status button to narrow the list; press it again to show everything. */
     public function setFocus(string $focus): void
     {
-        $this->focus = $this->focus === $focus || ! in_array($focus, ['pending', 'lines'], true) ? '' : $focus;
+        $this->focus = $this->focus === $focus || ! in_array($focus, ['pending', 'lines', 'placement'], true) ? '' : $focus;
     }
 
     public function clearFilters(): void
@@ -87,7 +227,7 @@ new #[Layout('layouts::desk'), Title('titles.report_templates')] class extends C
 
     /**
      * The rows that match the city and the search, whatever button is pressed.
-     * The two buttons count these, so a click shows exactly that many.
+     * The three buttons count these, so a click shows exactly that many.
      *
      * @return list<array{template: \App\Models\ReportTemplate, project: object|null, name: string, status: ReportTemplateStatus, pendingLineCount: int, annualPlanLineCount: int, proposals: list<array{id: int, name: string, number: string}>, cityId: int|null, cityName: string|null, centerName: string|null}>
      */
@@ -112,16 +252,19 @@ new #[Layout('layouts::desk'), Title('titles.report_templates')] class extends C
     }
 
     /**
-     * New templates and templates that gained lines. Disjoint, they add up to the page count.
+     * New templates, added lines and pending choices add up to the page count.
      *
-     * @return array{pending: int, lines: int, total: int}
+     * @return array{pending: int, lines: int, placement: int, total: int}
      */
     #[Computed]
     public function focusCounts(): array
     {
-        $pending = count(array_filter($this->matchingRows, fn (array $row): bool => $row['status'] === ReportTemplateStatus::Pending));
+        $counts = ['pending' => 0, 'lines' => 0, 'placement' => 0, 'total' => count($this->matchingRows)];
+        foreach ($this->matchingRows as $row) {
+            $counts[$row['category']]++;
+        }
 
-        return ['pending' => $pending, 'lines' => count($this->matchingRows) - $pending, 'total' => count($this->matchingRows)];
+        return $counts;
     }
 
     /**
@@ -134,9 +277,7 @@ new #[Layout('layouts::desk'), Title('titles.report_templates')] class extends C
             return $this->matchingRows;
         }
 
-        $wantsPending = $this->focus === 'pending';
-
-        return array_values(array_filter($this->matchingRows, fn (array $row): bool => ($row['status'] === ReportTemplateStatus::Pending) === $wantsPending));
+        return array_values(array_filter($this->matchingRows, fn (array $row): bool => $row['category'] === $this->focus));
     }
 };
 ?>
@@ -146,6 +287,7 @@ new #[Layout('layouts::desk'), Title('titles.report_templates')] class extends C
     $rows = $this->visibleRows;
     $focusCounts = $this->focusCounts;
     $tabs = [
+        ['key' => 'placement', 'label' => __('report_templates.placement_choose'), 'tone' => 'text-status-warn'],
         ['key' => 'pending', 'label' => __('report_templates.queue.new_templates'), 'tone' => 'text-status-warn'],
         ['key' => 'lines', 'label' => __('report_templates.queue.lines_added'), 'tone' => 'text-status-active'],
     ];
@@ -229,6 +371,24 @@ new #[Layout('layouts::desk'), Title('titles.report_templates')] class extends C
             </x-slot:head>
 
             @foreach ($rows as $row)
+                @if ($row['category'] === 'placement')
+                    <tr wire:key="placement-{{ $row['placement']->id }}" data-placement-row="{{ $row['placement']->id }}">
+                        <x-ui.data-table.cell :label="__('report_templates.queue.project')">
+                            <span class="block font-semibold" dir="auto">{{ $row['name'] }}</span>
+                            <span class="block text-xs {{ $muted }}" dir="auto">{{ $row['cityName'] }} · {{ $row['programName'] }} · {{ $row['centerName'] }}</span>
+                        </x-ui.data-table.cell>
+                        <x-ui.data-table.cell :label="__('common.state')">{{ __('report_templates.placement_choose') }}</x-ui.data-table.cell>
+                        <x-ui.data-table.cell :label="__('report_templates.queue.pending_lines')">—</x-ui.data-table.cell>
+                        <x-ui.data-table.cell :label="__('report_templates.queue.proposals')"><span dir="auto">{{ $row['name'] }}</span></x-ui.data-table.cell>
+                        <x-ui.data-table.cell>
+                            <div class="flex flex-wrap gap-2">
+                                <x-ui.button tone="primary" size="sm" wire:click="openPlacement({{ $row['placement']->id }})" wire:loading.attr="disabled">{{ __('report_templates.placement_join') }}</x-ui.button>
+                                <x-ui.button size="sm" wire:click="askCreatePlacement({{ $row['placement']->id }})" wire:loading.attr="disabled">{{ __('report_templates.placement_create') }}</x-ui.button>
+                            </div>
+                        </x-ui.data-table.cell>
+                    </tr>
+                    @continue
+                @endif
                 @php
                     $project = $row['project'];
                     $openProposal = $row['templateProposals'][0]['id'] ?? null;
@@ -238,6 +398,12 @@ new #[Layout('layouts::desk'), Title('titles.report_templates')] class extends C
                     <x-ui.data-table.cell :label="__('report_templates.queue.project')">
                         <span class="block font-semibold" dir="auto">{{ $row['name'] }}</span>
                         <span class="block text-xs {{ $muted }}" dir="auto">{{ $place !== '' ? $place : __('common.unknown_city') }}</span>
+                        @if ($row['template']->place()->isUnset())
+                            <span class="block text-xs {{ $muted }}" data-center-unset>{{ __('report_templates.placement_center_missing') }}</span>
+                            @if ($openProposal !== null && auth()->user()->can('proposals.update'))
+                                <a href="{{ route('proposals.show', $openProposal) }}" wire:navigate class="text-xs underline">{{ __('report_templates.placement_center_missing') }}</a>
+                            @endif
+                        @endif
                     </x-ui.data-table.cell>
                     <x-ui.data-table.cell :label="__('common.state')">
                         @if ($row['status'] === ReportTemplateStatus::Pending)
@@ -277,7 +443,7 @@ new #[Layout('layouts::desk'), Title('titles.report_templates')] class extends C
                                 size="sm"
                                 icon="eye"
                                 class="min-h-8 touch-manipulation"
-                                :href="$project !== null ? route('projects.show', [$project, 'tab' => 'template']) : route('proposals.show', [$openProposal])"
+                                :href="$project !== null ? route('projects.show', [$project, 'tab' => 'template', 'template' => $row['template']->id]) : route('proposals.show', [$openProposal])"
                                 wire:navigate
                                 data-queue-open
                                 :aria-label="__('report_templates.queue.open', ['name' => $row['name']])"
@@ -287,5 +453,39 @@ new #[Layout('layouts::desk'), Title('titles.report_templates')] class extends C
                 </tr>
             @endforeach
         </x-ui.data-table>
+    @endif
+    @if ($this->placement !== null)
+        <x-ui.modal wire:model="showPlacementModal" :title="__('report_templates.placement_join')" :description="$this->placementContext" submit="askJoinPlacement">
+            <div class="flex flex-col gap-4">
+                <p class="text-sm text-secondary-medium dark:text-ink-muted">{{ __('report_templates.placement_join_help') }}</p>
+                <x-ui.form-select wire:model.live="selectedPlacementTemplateId" :label="__('report_templates.placement_template')" :placeholder="__('report_templates.placement_template')" required>
+                    @foreach ($this->placementTemplates as $option)
+                        <option value="{{ $option->id }}">{{ $option->proposals->pluck('name')->implode(' · ') }} · {{ __('report_templates.placement_confirmed_lines', ['count' => $option->confirmed_count]) }}</option>
+                    @endforeach
+                </x-ui.form-select>
+                <fieldset class="flex flex-col gap-3">
+                    <legend class="mb-2 text-sm font-semibold">{{ __('report_templates.placement_targets') }}</legend>
+                    @foreach ($this->placementTargets as $target)
+                        <label class="flex items-start gap-2" wire:key="placement-target-{{ $target['id'] }}">
+                            <input type="checkbox" wire:model="selectedPlacementTargets" value="{{ $target['id'] }}" @disabled($target['shared']) class="mt-1 shrink-0" />
+                            <span dir="auto">{{ $target['name'] }} @if ($target['shared'])<span class="block text-xs text-secondary-medium dark:text-ink-muted">{{ __('report_templates.placement_shared') }}</span>@endif</span>
+                        </label>
+                    @endforeach
+                </fieldset>
+                <flux:error name="selectedPlacementTargets" />
+                <flux:error name="placement" />
+            </div>
+            <x-slot:actions><x-ui.button type="submit" tone="primary">{{ __('common.next') }}</x-ui.button></x-slot:actions>
+        </x-ui.modal>
+        <x-ui.confirm-modal wire:model="showPlacementConfirm" tone="neutral"
+            :title="$this->placementContext"
+            :message="$placementMode === 'join' ? __('report_templates.placement_join_help') : __('report_templates.placement_create_help')"
+            confirm="decidePlacement"
+            :confirm-label="$placementMode === 'join' ? __('report_templates.placement_join') : __('report_templates.placement_create')">
+            <flux:error name="placement" />
+            <flux:error name="selectedPlacementTargets" />
+        </x-ui.confirm-modal>
+        <flux:error name="placement" />
+        <flux:error name="selectedPlacementTargets" />
     @endif
 </x-desk.register>

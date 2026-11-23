@@ -231,6 +231,7 @@ final class EventCatalog
             ],
             // report-templates
             [
+                'report_template.placement_pending' => self::entry('report-templates', $now, 'listener', $all),
                 'report_template.pending' => self::entry('report-templates', $now, 'listener', $all),
                 'report_template.confirmed' => self::entry('report-templates', $now, 'module_map', $all, activity: 'report_template.confirmed'),
                 'report_template.lines_added' => self::entry('report-templates', $now, 'module_map', $all, activity: 'report_template.lines_added'),

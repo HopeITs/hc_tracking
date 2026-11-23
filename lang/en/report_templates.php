@@ -1,6 +1,25 @@
 <?php
 
 return [
+    'join_needs_one_line' => 'Select at least one indicator, or join a report that already carries one of this proposal’s indicators.',
+    'placement_stale' => 'This reporting choice has already been decided. Reload the page.',
+    'placement_wrong_place' => 'Choose a report at the same city, program and center. Set the center first if it is missing.',
+    'placement_invalid_target' => 'Select only indicators of this proposal at this place.',
+    'placement_choose' => 'Choose a report',
+    'placement_join' => 'Add to an existing report',
+    'placement_create' => 'Create a separate report',
+    'placement_join_help' => 'The center will keep filling one monthly report. Shared indicators add your target to the existing line.',
+    'placement_create_help' => 'The center will fill an additional report each month. If it currently fills one, it will fill two.',
+    'placement_template' => 'Existing report',
+    'placement_targets' => 'Indicators to add',
+    'placement_shared' => 'Already in this report · adds your target',
+    'placement_saved' => 'Reporting choice saved. Confirm the pending indicators next.',
+    'placement_center_missing' => 'Set the center first',
+    'placement_not_reported' => 'Not reported in this template',
+    'placement_confirmed_lines' => ':count confirmed indicators',
+    'placement_review' => 'Review the reporting choice',
+    'placement_template_label' => 'Report template #:id · :proposals',
+
     'link_library_first' => 'Link it to the library first',
     'choose_measurement_months' => 'Choose the measurement months for this indicator',
     'confirm_at_least_one' => 'Confirm at least one line before activating the project.',

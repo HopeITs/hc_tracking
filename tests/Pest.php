@@ -1,10 +1,12 @@
 <?php
 
 use App\Actions\Proposals\SaveProposal;
+use App\Enums\AssignmentStatus;
 use App\Enums\Currency;
 use App\Enums\DonorAttribution;
 use App\Enums\FileType;
 use App\Enums\MonthlyReportStatus;
+use App\Enums\ProposalStatus;
 use App\Enums\ResultType;
 use App\Models\Account;
 use App\Models\Activity;
@@ -1179,4 +1181,40 @@ function donorReportFigures(Project $center, string $month, LibraryIndicator $li
 
         return $shares;
     });
+}
+
+/**
+ * Two approved proposals with targets at one explicit reporting place.
+ *
+ * @return array<string, mixed>
+ */
+function placementFixture(bool $cityWide = false): array
+{
+    return (function () use ($cityWide): array {
+        $program = Program::factory()->create();
+        $cityId = insertHrCity();
+        $centerId = $cityWide ? null : insertHrCenter($cityId);
+        $project = Project::factory()->approved()->create([
+            'program_id' => $program->id, 'city_id' => $cityId, 'center_id' => $centerId,
+            'start_date' => '2026-01-01', 'end_date' => '2026-12-31',
+        ]);
+        $project->currentAssignment('user_id')?->forceFill(['status' => AssignmentStatus::Acknowledged])->save();
+        $proposals = [];
+        $targets = [];
+        $library = LibraryIndicator::factory()->create(['frequency' => 'monthly', 'collected_by' => 'project_team', 'measure' => 'numeric', 'denominator_basis' => null]);
+        foreach (['First grant', 'Second grant'] as $name) {
+            $proposal = Proposal::factory()->create([
+                'name' => $name, 'status' => ProposalStatus::Approved,
+                'actual_date_begin' => '2026-01-01', 'actual_date_end' => '2026-12-31',
+                'planned_date_begin' => '2026-01-01', 'planned_date_end' => '2026-12-31',
+            ]);
+            $proposal->projects()->attach($project->id, ['target_beneficiaries' => 100]);
+            $row = proposalRowForProject($proposal, $project, $cityWide ? false : $centerId);
+            $row->forceFill(['responsible_employee_id' => $project->user_id])->save();
+            $targets[] = donorReportTarget($proposal, $project, $library);
+            $proposals[] = $proposal;
+        }
+
+        return compact('program', 'project', 'proposals', 'targets', 'library');
+    })();
 }

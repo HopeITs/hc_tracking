@@ -9,13 +9,16 @@ use App\Enums\NotificationKind;
 use App\Enums\NotificationPriority;
 use App\Enums\ProposalStatus;
 use App\Enums\ReportTemplateLineStatus;
+use App\Enums\TemplatePlacementStatus;
 use App\Models\AnnualPlan;
 use App\Models\LibraryIndicator;
 use App\Models\NarrativeQuestion;
 use App\Models\PlanIndicator;
+use App\Models\Program;
 use App\Models\Proposal;
 use App\Models\ReportTemplate;
 use App\Models\ReportTemplateLine;
+use App\Models\ReportTemplatePlacement;
 use App\Models\User;
 use App\Notifications\ActivityRecorder;
 use App\Notifications\AppNotification;
@@ -30,6 +33,7 @@ use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Validation\ValidationException;
 
 /**
  * Pre-fills monthly report templates as `pending` (contracts.md §12.4, T33,
@@ -44,10 +48,9 @@ use Illuminate\Support\Facades\Log;
  * `fixed_denominator`, which takes the `target_beneficiaries` filled since
  * (T27 step 8a).
  *
- * An approval always creates its own template at a place where the proposal
- * has none; it never joins another proposal's template (MEAL's choice, Y-04).
- * Until then a second proposal at an occupied place gets a second pending
- * template. A self-funded proposal (internal donor) is pre-filled like any
+ * Y-04: an approval at an occupied place waits for MEAL to choose an
+ * existing template or a separate one. A free place gets its first template.
+ * A decided Join is never re-filled with targets that MEAL left out. A self-funded proposal (internal donor) is pre-filled like any
  * other (D-87).
  *
  * A shared target (D-90: one target of a row with several centers) gets one
@@ -134,6 +137,7 @@ final class ReportTemplatePrefiller
             'sharedFixedPlanIndicatorIds' => [],
         ];
 
+        $countedTemplateIds = [];
         foreach ($this->approvedProposals($projectId) as $proposal) {
             foreach ($this->places->placesOfProject($proposal, $projectId) as $place) {
                 ['lines' => $lines, 'unlinked' => $unlinked, 'sharedFixed' => $sharedFixed] = $this->plannedLines($proposal, $place);
@@ -141,6 +145,21 @@ final class ReportTemplatePrefiller
 
                 $template = $this->existingTemplate($proposal, $place);
                 $existing = $template === null ? new Collection : $template->lines()->get()->keyBy(fn (ReportTemplateLine $line): int => (int) $line->plan_indicator_id);
+                if ($template !== null && ! in_array($template->id, $countedTemplateIds, true)) {
+                    $preview['existingLineCount'] += $existing->count();
+                    $countedTemplateIds[] = $template->id;
+                }
+                $preview['hasTemplate'] = $preview['hasTemplate'] || $template !== null;
+                $placement = $place->isUnset() ? null : ReportTemplatePlacement::query()
+                    ->where('proposal_id', $proposal->id)->atPlace($place)->first();
+
+                if ($placement?->status === TemplatePlacementStatus::Pending
+                    || ($placement === null && $this->needsPlacementChoice($proposal, $place, $template))) {
+                    continue;
+                }
+                if ($placement?->status === TemplatePlacementStatus::Joined) {
+                    $lines = array_intersect_key($lines, $existing->all());
+                }
                 $new = [];
 
                 foreach ($lines as $planIndicatorId => $attributes) {
@@ -163,7 +182,6 @@ final class ReportTemplatePrefiller
 
                 $preview['hasTemplate'] = $preview['hasTemplate'] || $template !== null || $new !== [];
                 $preview['createsTemplate'] = $preview['createsTemplate'] || ($template === null && $new !== []);
-                $preview['existingLineCount'] += $existing->count();
                 $preview['newLinePlanIndicatorIds'] = [...$preview['newLinePlanIndicatorIds'], ...$new];
                 $preview['unlinkedPlanIndicatorIds'] = [...$preview['unlinkedPlanIndicatorIds'], ...$unlinked];
             }
@@ -212,7 +230,34 @@ final class ReportTemplatePrefiller
         }
 
         [$result, $templateId] = DB::transaction(function () use ($proposal, $place, $lines, $unlinked, $sharedFixed): array {
+            Program::query()->whereKey($place->programId)->lockForUpdate()->firstOrFail();
+            Proposal::query()->whereKey($proposal->id)->lockForUpdate()->firstOrFail();
+
+            $placement = $place->isUnset() ? null : ReportTemplatePlacement::query()
+                ->where('proposal_id', $proposal->id)->atPlace($place)->lockForUpdate()->first();
+
+            if ($placement?->status === TemplatePlacementStatus::Pending) {
+                return [new PrefillResult, null];
+            }
+
+            if ($placement?->status === TemplatePlacementStatus::Joined) {
+                $selectedIds = ReportTemplateLine::query()->where('report_template_id', $placement->report_template_id)
+                    ->pluck('plan_indicator_id')->all();
+                $lines = array_intersect_key($lines, array_flip($selectedIds));
+            }
+
+            $existing = $this->existingTemplate($proposal, $place, lock: true);
+            if ($placement === null && $this->needsPlacementChoice($proposal, $place, $existing)) {
+                $placement = $this->recordPlacement($proposal, $place, TemplatePlacementStatus::Pending);
+                DB::afterCommit(fn () => $this->notifyPlacementPending($placement));
+
+                return [new PrefillResult, null];
+            }
+
             [$template, $created] = $this->lockedTemplate($proposal, $place);
+            if ($placement === null && ! $place->isUnset()) {
+                $this->recordPlacement($proposal, $place, TemplatePlacementStatus::Created, $template);
+            }
 
             if ($created) {
                 $this->copyQuestions($template);
@@ -292,7 +337,7 @@ final class ReportTemplatePrefiller
      *
      * @return array{lines: array<int, array{values: array<string, mixed>, fixed: bool}>, unlinked: list<int>, sharedFixed: list<int>}
      */
-    private function plannedLines(Proposal $proposal, ReportPlace $place): array
+    public function plannedLines(Proposal $proposal, ReportPlace $place): array
     {
         $lines = [];
         $unlinked = [];
@@ -442,6 +487,13 @@ final class ReportTemplatePrefiller
         ];
     }
 
+    private function needsPlacementChoice(Proposal $proposal, ReportPlace $place, ?ReportTemplate $existing): bool
+    {
+        return ! $place->isUnset() && $existing === null
+            && ReportTemplate::query()->atPlace($place)
+                ->whereHas('proposals', fn ($query) => $query->whereKeyNot($proposal->id))->exists();
+    }
+
     /**
      * The proposal's template at the place, if it is linked to one.
      */
@@ -452,6 +504,74 @@ final class ReportTemplatePrefiller
             ->orderBy('id')
             ->when($lock, fn ($query) => $query->lockForUpdate())
             ->first();
+    }
+
+    /**
+     * Create the explicitly requested template, reusing all prefill defaults.
+     * The caller holds the placement and program locks and authorizes MEAL.
+     */
+    public function createForPlacement(Proposal $proposal, ReportPlace $place): ReportTemplate
+    {
+        [$template, $created] = $this->lockedTemplate($proposal, $place);
+        if ($created) {
+            $this->copyQuestions($template);
+        }
+
+        $planned = $this->plannedLines($proposal, $place)['lines'];
+        if ($planned === []) {
+            throw ValidationException::withMessages(['placement' => __('report_templates.join_needs_one_line')]);
+        }
+        $this->addPlacementLines($template, $planned);
+
+        return $template;
+    }
+
+    /**
+     * @param  array<int, array{values: array<string, mixed>, fixed: bool}>  $planned
+     */
+    public function addPlacementLines(ReportTemplate $template, array $planned): void
+    {
+        foreach ($planned as $targetId => $attributes) {
+            $template->lines()->firstOrCreate(['plan_indicator_id' => $targetId], $attributes['values']);
+        }
+
+        DB::afterCommit(fn () => $this->notifyPending($template));
+    }
+
+    private function recordPlacement(Proposal $proposal, ReportPlace $place, TemplatePlacementStatus $status, ?ReportTemplate $template = null): ReportTemplatePlacement
+    {
+        $placement = new ReportTemplatePlacement;
+        $placement->forceFill([
+            'proposal_id' => $proposal->id, 'city_id' => $place->cityId, 'program_id' => $place->programId,
+            'center_id' => $place->centerId, 'city_wide' => $place->cityWide, 'status' => $status,
+            'report_template_id' => $template?->id, 'decided_at' => $template === null ? null : now(),
+        ])->save();
+
+        return $placement;
+    }
+
+    private function notifyPlacementPending(ReportTemplatePlacement $placement): void
+    {
+        $event = $this->catalog->effective('report_template.placement_pending');
+        if ($event === null || ! $event['enabled']) {
+            return;
+        }
+
+        $employeeId = $this->places->mealOfficerFor($placement->proposal, $placement->place()) ?? Slots::holderOf('meal_manager');
+        $userIds = array_values($this->employees->usersFor(array_filter([$employeeId])));
+        $payload = new NotificationPayload(
+            kind: NotificationKind::Action,
+            module: 'report-templates',
+            priority: NotificationPriority::Important,
+            key: 'notifications.events.report_template.placement_pending',
+            params: ['subject' => $placement->proposal->name],
+            subjectType: null,
+            subjectId: null,
+            link: ['route' => 'report-templates.index', 'parameters' => ['focus' => 'placement']],
+        );
+        foreach (User::query()->whereIn('id', $this->filter->apply($userIds, 'report-templates', null, $userIds, $userIds))->get() as $user) {
+            rescue(fn () => $user->notify(new AppNotification($payload)));
+        }
     }
 
     /**

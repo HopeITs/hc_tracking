@@ -158,6 +158,14 @@ final class ReportTemplateReader
                 'proposals' => array_values($template->proposals->sortBy('name')->map(fn (Proposal $proposal): array => ['id' => $proposal->id, 'name' => (string) $proposal->name, 'number' => $proposal->internal_project_number])->all()),
             ],
             'groups' => $groups,
+            'notReportedTargets' => PlanIndicator::query()->where('source_type', 'proposal')
+                ->whereIn('source_id', $template->proposals->modelKeys())
+                ->whereNotIn('id', $template->lines->pluck('plan_indicator_id')->all())
+                ->whereHas('indicator', fn ($query) => $query->whereNotNull('library_indicator_id'))
+                ->with('indicator')->get()
+                ->filter(fn (PlanIndicator $target): bool => $this->places->targetCoversPlace($target, $template->place()))
+                ->map(fn (PlanIndicator $target): array => ['id' => $target->id, 'name' => $target->indicator->name])
+                ->values()->all(),
             'questions' => $this->questionItems($template->questions),
         ];
     }

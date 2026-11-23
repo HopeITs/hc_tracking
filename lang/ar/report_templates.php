@@ -1,6 +1,25 @@
 <?php
 
 return [
+    'join_needs_one_line' => 'اختر مؤشرًا واحدًا على الأقل، أو انضم إلى تقرير يتضمن أحد مؤشرات هذا المقترح.',
+    'placement_stale' => 'تم اتخاذ قرار إعداد التقرير مسبقًا. أعد تحميل الصفحة.',
+    'placement_wrong_place' => 'اختر تقريرًا في المحافظة والبرنامج والمركز نفسها. حدد المركز أولًا إن كان غير محدد.',
+    'placement_invalid_target' => 'اختر مؤشرات هذا المقترح في هذا الموقع فقط.',
+    'placement_choose' => 'اختيار التقرير',
+    'placement_join' => 'الإضافة إلى تقرير موجود',
+    'placement_create' => 'إنشاء تقرير منفصل',
+    'placement_join_help' => 'سيستمر المركز بتعبئة تقرير شهري واحد. المؤشرات المشتركة تضيف مستهدفك إلى السطر الموجود.',
+    'placement_create_help' => 'سيعبئ المركز تقريرًا إضافيًا كل شهر. إذا كان يعبئ تقريرًا واحدًا، فسيصبحان تقريرين.',
+    'placement_template' => 'التقرير الموجود',
+    'placement_targets' => 'المؤشرات المراد إضافتها',
+    'placement_shared' => 'موجود في هذا التقرير · يضيف مستهدفك',
+    'placement_saved' => 'تم حفظ اختيار التقرير. أكد المؤشرات المعلقة في الخطوة التالية.',
+    'placement_center_missing' => 'حدد المركز أولًا',
+    'placement_not_reported' => 'غير مشمول بهذا القالب',
+    'placement_confirmed_lines' => ':count مؤشر مؤكد',
+    'placement_review' => 'مراجعة اختيار التقرير',
+    'placement_template_label' => 'قالب التقرير رقم :id · :proposals',
+
     'link_library_first' => 'اربطه بالمكتبة أولًا',
     'choose_measurement_months' => 'اختر أشهر القياس لهذا المؤشر',
     'confirm_at_least_one' => 'أكّد سطرًا واحدًا على الأقل قبل تفعيل المشروع',

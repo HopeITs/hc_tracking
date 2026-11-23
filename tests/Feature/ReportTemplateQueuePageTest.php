@@ -1,5 +1,6 @@
 <?php
 
+use App\Actions\ReportTemplates\CreateReportTemplateForProposal;
 use App\Enums\ProjectStatus;
 use App\Enums\ReportTemplateLineStatus;
 use App\Models\Activity;
@@ -10,8 +11,10 @@ use App\Models\Project;
 use App\Models\Proposal;
 use App\Models\ReportTemplate;
 use App\Models\ReportTemplateLine;
+use App\Models\ReportTemplatePlacement;
 use App\Models\User;
 use App\Support\Reporting\ReportPlace;
+use App\Support\ReportTemplatePrefiller;
 use Illuminate\Support\Facades\DB;
 use Livewire\Livewire;
 
@@ -187,7 +190,7 @@ test('the two status buttons count what a click shows, and pressing one again cl
 
     $page = Livewire::actingAs($manager)->test('pages::report-templates.index');
 
-    expect($page->instance()->focusCounts)->toBe(['pending' => 1, 'lines' => 2, 'total' => 3]);
+    expect($page->instance()->focusCounts)->toBe(['pending' => 1, 'lines' => 2, 'placement' => 0, 'total' => 3]);
 
     $page->call('setFocus', 'lines')
         ->assertSeeHtml('data-test="focus-tab-clear-lines"')
@@ -277,3 +280,101 @@ test('two templates at one place are listed with their own proposals at a fixed 
     $this->get(route('report-templates.index'))->assertSee('First proposal')->assertSee('Second proposal')->assertSee('Third proposal');
     expect($countQueries())->toBe($before);
 });
+
+test('the pending-choice queue joins the selected report and clears the decision', function (string $locale) {
+    app()->setLocale($locale);
+    $fixture = placementFixture();
+    $manager = mealManager();
+    $prefiller = app(ReportTemplatePrefiller::class);
+    $prefiller->prefillForProposal($fixture['proposals'][0]);
+    $prefiller->prefillForProposal($fixture['proposals'][1]);
+    $template = ReportTemplate::query()->sole();
+    $placement = ReportTemplatePlacement::query()->where('proposal_id', $fixture['proposals'][1]->id)->sole();
+
+    $page = Livewire::actingAs($manager)->test('pages::report-templates.index')
+        ->assertSeeHtml('data-test="queue-tab-placement"')
+        ->call('setFocus', 'placement')
+        ->assertSeeHtml('data-placement-row="'.$placement->id.'"')
+        ->call('openPlacement', $placement->id)
+        ->assertSet('showPlacementModal', true)
+        ->set('selectedPlacementTemplateId', (string) $template->id)
+        ->assertSee(__('report_templates.placement_shared'))
+        ->call('askJoinPlacement')->assertSet('showPlacementConfirm', true)
+        ->call('decidePlacement')->assertHasNoErrors()
+        ->assertSet('showPlacementConfirm', false);
+
+    expect($placement->fresh()->status->value)->toBe('joined')
+        ->and($page->instance()->focusCounts['placement'])->toBe(0)
+        ->and(ReportTemplate::query()->count())->toBe(1);
+})->with(['en', 'ar']);
+
+test('the separate-report dialog explains the consequence and creates its own template', function () {
+    $fixture = placementFixture();
+    $prefiller = app(ReportTemplatePrefiller::class);
+    $prefiller->prefillForProposal($fixture['proposals'][0]);
+    $prefiller->prefillForProposal($fixture['proposals'][1]);
+    $placement = ReportTemplatePlacement::query()->where('proposal_id', $fixture['proposals'][1]->id)->sole();
+
+    Livewire::actingAs(mealManager())->test('pages::report-templates.index')
+        ->call('askCreatePlacement', $placement->id)
+        ->assertSee(__('report_templates.placement_create_help'))
+        ->assertSet('showPlacementConfirm', true)
+        ->call('decidePlacement')->assertHasNoErrors();
+
+    expect(ReportTemplate::query()->count())->toBe(2)
+        ->and($placement->fresh()->status->value)->toBe('created');
+});
+
+test('a covered officer sees and decides only their place choices', function () {
+    $fixture = placementFixture();
+    $officer = userWithRole('MEAL', insertHrEmployee());
+    rtqCover($fixture['project']->id, $officer->employee_id);
+    $prefiller = app(ReportTemplatePrefiller::class);
+    $prefiller->prefillForProposal($fixture['proposals'][0]);
+    $prefiller->prefillForProposal($fixture['proposals'][1]);
+    $placement = ReportTemplatePlacement::query()->where('proposal_id', $fixture['proposals'][1]->id)->sole();
+    Livewire::actingAs($officer)->test('pages::report-templates.index')
+        ->assertSeeHtml('data-placement-row="'.$placement->id.'"')
+        ->call('openPlacement', $placement->id)->assertHasNoErrors();
+
+    Livewire::actingAs(userWithRole('MEAL', insertHrEmployee()))->test('pages::report-templates.index')
+        ->assertDontSeeHtml('data-placement-row="'.$placement->id.'"')
+        ->call('openPlacement', $placement->id)->assertForbidden();
+});
+
+test('MEAL selects among multiple templates at the same place', function () {
+    $fixture = placementFixture();
+    $manager = mealManager();
+    $this->actingAs($manager);
+    $prefiller = app(ReportTemplatePrefiller::class);
+    $prefiller->prefillForProposal($fixture['proposals'][0]);
+    $prefiller->prefillForProposal($fixture['proposals'][1]);
+    $first = ReportTemplate::query()->sole();
+    $second = app(CreateReportTemplateForProposal::class)->handle($fixture['proposals'][1], $first->place());
+    $third = Proposal::factory()->create([
+        'name' => 'Third grant', 'status' => 'approved', 'actual_date_begin' => '2026-01-01', 'actual_date_end' => '2026-12-31',
+    ]);
+    $third->projects()->attach($fixture['project']->id);
+    proposalRowForProject($third, $fixture['project'], $first->center_id);
+    donorReportTarget($third, $fixture['project'], $fixture['library']);
+    $prefiller->prefillForProposal($third);
+    $placement = ReportTemplatePlacement::query()->where('proposal_id', $third->id)->sole();
+
+    $page = Livewire::actingAs($manager)->test('pages::report-templates.index')->call('openPlacement', $placement->id);
+    expect($page->instance()->placementTemplates)->toHaveCount(2);
+    $page->set('selectedPlacementTemplateId', (string) $second->id)->call('askJoinPlacement')->call('decidePlacement')->assertHasNoErrors();
+
+    expect($first->proposals()->count())->toBe(1)
+        ->and($second->proposals()->count())->toBe(2);
+});
+
+test('templates without a center explain that it must be set first', function (string $locale) {
+    $manager = mealManager();
+    $template = rtqTemplate('Center still missing');
+    $template->forceFill(['center_id' => null, 'city_wide' => false])->save();
+    app()->setLocale($locale);
+
+    Livewire::actingAs($manager)->test('pages::report-templates.index')
+        ->assertSeeHtml('data-center-unset')
+        ->assertSee(__('report_templates.placement_center_missing'));
+})->with(['en', 'ar']);
