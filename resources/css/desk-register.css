@@ -598,7 +598,7 @@
     @container tc (min-width: 1080px) {
         .dk-tc { grid-template-columns: minmax(0, 1fr) minmax(18rem, 26%); }
         .dk-tc.is-side-closed { grid-template-columns: minmax(0, 1fr) 3.25rem; }
-        .dk-tc-side { position: sticky; top: 16px; max-height: calc(100vh - 32px); }
+        .dk-tc-side { position: sticky; top: 16px; max-height: calc(100dvh - var(--top-h) - 32px); }
         .dk-tc-side-body { overflow: hidden; }
         .dk-tc-side-list { margin-inline: -4px; padding: 2px 4px; overflow-y: auto; }
         .is-side-closed .dk-tc-side-toggle { flex-direction: column; justify-content: center; padding: 8px 0; }

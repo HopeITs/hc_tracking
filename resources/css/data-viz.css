@@ -555,7 +555,7 @@
         --register-ground: var(--color-white);
         --register-ink: var(--color-secondary-dark);
         --register-muted: var(--color-secondary-medium);
-        --register-sticky-top: 4rem;
+        --register-sticky-top: 0px;
         color: var(--register-ink);
     }
 

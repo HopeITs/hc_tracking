@@ -484,7 +484,7 @@ new #[Layout('layouts::desk'), Title('titles.notifications')] class extends Comp
         {{-- Feed --}}
         <div class="relative min-w-0" x-bind:data-selecting="$wire.selected.length > 0 ? '' : null" data-inbox-feed>
             @if ($selected !== [])
-                <div class="sticky top-[4.75rem] z-20 mb-4 flex lg:top-3 flex-wrap items-center gap-x-2 gap-y-1 rounded-2xl bg-secondary-dark py-2 ps-4 pe-2 text-sm text-white shadow-[0_12px_28px_rgba(16,24,40,0.18),0_2px_6px_rgba(16,24,40,0.1)] dark:bg-surface-3 dark:shadow-raised dark:text-ink" role="toolbar" aria-label="{{ trans_choice('notifications.selected_count', count($selected), ['count' => count($selected)]) }}" data-selection-bar>
+                <div class="sticky top-3 z-20 mb-4 flex flex-wrap items-center gap-x-2 gap-y-1 rounded-2xl bg-secondary-dark py-2 ps-4 pe-2 text-sm text-white shadow-[0_12px_28px_rgba(16,24,40,0.18),0_2px_6px_rgba(16,24,40,0.1)] dark:bg-surface-3 dark:shadow-raised dark:text-ink" role="toolbar" aria-label="{{ trans_choice('notifications.selected_count', count($selected), ['count' => count($selected)]) }}" data-selection-bar>
                     <span class="me-auto font-bold tabular-nums">{{ trans_choice('notifications.selected_count', count($selected), ['count' => count($selected)]) }}</span>
                     @if (count($selected) < count($shownIds))
                         <button type="button" x-on:click="$wire.set('selected', @js($shownIds))" class="inline-flex min-h-9 cursor-pointer items-center rounded-lg px-3 font-semibold hover:bg-white/10 dark:hover:bg-white/[0.06]">{{ __('notifications.select_all_shown') }}</button>

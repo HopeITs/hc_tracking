@@ -87,7 +87,7 @@
     .dk-story .dk-rail li.dk-picked span { color: var(--ink); text-decoration: underline; text-decoration-thickness: 2px; text-underline-offset: 5px; text-decoration-color: var(--brand); }
 
     /* Section tabs: underlined, sticky. */
-    .dk-story .dk-pjtabs { position: sticky; top: calc(env(safe-area-inset-top, 0px) + 64px); z-index: 20; display: flex; gap: 4px; overflow-x: auto; scrollbar-width: none; margin-top: 10px; border-bottom: 1px solid var(--line-2); background: var(--ground); }
+    .dk-story .dk-pjtabs { position: sticky; top: 0; z-index: 20; display: flex; gap: 4px; overflow-x: auto; scrollbar-width: none; margin-top: 10px; border-bottom: 1px solid var(--line-2); background: var(--ground); }
     .dk-story .dk-pjtabs::-webkit-scrollbar { display: none; }
     .dk-story .dk-pjtabs button { display: inline-flex; align-items: center; gap: 7px; height: 48px; padding-inline: 14px; border: 0; border-bottom: 3px solid transparent; margin-bottom: -1px; background: none; font-size: 15px; font-weight: 700; color: var(--ink-3); white-space: nowrap; cursor: pointer; }
     .dk-story .dk-pjtabs button:hover { color: var(--ink); }
@@ -641,7 +641,7 @@
 
     /* Split view: the buckets beside the picked bucket's tasks, both always --ptk-h tall (about ten people, seven tasks); anything more scrolls inside. */
     .dk-ptk-split { --ptk-h: 37rem; display: grid; grid-template-columns: 17.5rem minmax(0, 1fr); align-items: start; gap: 12px; }
-    .dk-ptk-rail { position: sticky; top: 72px; display: flex; flex-direction: column; gap: 6px; overflow: hidden; height: var(--ptk-h); min-width: 0; padding: 8px; border: 1px solid var(--line); border-radius: var(--prog-radius); background: var(--prog-card); box-shadow: var(--prog-shadow); }
+    .dk-ptk-rail { position: sticky; top: 8px; display: flex; flex-direction: column; gap: 6px; overflow: hidden; height: var(--ptk-h); min-width: 0; padding: 8px; border: 1px solid var(--line); border-radius: var(--prog-radius); background: var(--prog-card); box-shadow: var(--prog-shadow); }
     .dk-ptk-rail-pick { display: none; }
     .dk-ptk-rail-find { display: flex; flex: none; align-items: center; gap: 6px; min-height: 34px; padding: 0 10px; border: 1px solid var(--line); border-radius: 10px; color: var(--ink-3); }
     .dk-ptk-rail-find svg.dk-i { width: 14px; height: 14px; flex: none; }

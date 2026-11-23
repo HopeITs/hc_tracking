@@ -29,7 +29,10 @@
                     <x-desk.top-bar :shows-inbox="$showsInbox" />
                 @endunless
 
-                {{ $slot }}
+                {{-- The page scrolls here, under the top bar, so its scrollbar never runs beside the bar. --}}
+                <div class="dk-page-scroll" data-page-scroll>
+                    {{ $slot }}
+                </div>
             </div>
         </div>
 

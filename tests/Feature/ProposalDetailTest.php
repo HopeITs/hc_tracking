@@ -698,26 +698,15 @@ test('the tab labels read in Arabic', function () {
         ->assertDontSeeHtml('data-under-construction="plan"');
 });
 
-test('proposal detail shows a back link to the register when nothing referred the visitor', function () {
+test('proposal breadcrumb always links to the proposals list, whatever page referred the visitor', function () {
     $user = User::factory()->role('Financial')->create();
     $proposal = Proposal::factory()->create();
 
     $this->actingAs($user)
+        ->withHeader('referer', route('home'))
         ->get(route('proposals.show', $proposal))
         ->assertOk()
         ->assertSeeHtml('href="'.route('proposals.index').'" wire:navigate.hover data-detail-back');
-});
-
-test('proposal detail sends the back link to the in-app page the visitor came from', function () {
-    $user = User::factory()->role('Financial')->create();
-    $proposal = Proposal::factory()->create();
-    $from = route('projects.index').'?view=board';
-
-    $this->actingAs($user)
-        ->withHeader('referer', $from)
-        ->get(route('proposals.show', $proposal))
-        ->assertOk()
-        ->assertSeeHtml('href="'.$from.'" wire:navigate.hover data-detail-back');
 });
 
 /*

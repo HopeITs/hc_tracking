@@ -10,18 +10,21 @@
  * lifts off the page with a shadow only when there is something under it.
  */
 
+import { pageScroller } from './page-scroller';
+
 const items = (menu) => [...menu.querySelectorAll('[role="menuitem"], [role="menuitemcheckbox"]')].filter((item) => item.offsetParent !== null);
 
 function syncScrolled() {
-    document.documentElement.classList.toggle('dk-scrolled', window.scrollY > 2);
+    document.documentElement.classList.toggle('dk-scrolled', pageScroller().scrollTop > 2);
 }
 
 let scrollFrame = 0;
 
-window.addEventListener('scroll', () => {
+// Scroll does not bubble; a capturing listener hears the page scroller, which wire:navigate replaces.
+document.addEventListener('scroll', () => {
     cancelAnimationFrame(scrollFrame);
     scrollFrame = requestAnimationFrame(syncScrolled);
-}, { passive: true });
+}, { capture: true, passive: true });
 
 document.addEventListener('livewire:navigated', syncScrolled);
 syncScrolled();

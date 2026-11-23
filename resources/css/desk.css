@@ -204,7 +204,7 @@
 [lang="ar"] .dk-facts dt{ letter-spacing:0;font-size:12.5px }
 .dk-facts dd{ margin:3px 0 0;font-size:15px;font-weight:700 }
 .dk-facts dd .dk-num{ font-size:22px;font-weight:800;letter-spacing:-.01em }
-.dk-rail{ position:sticky;top:calc(env(safe-area-inset-top,0px) + 64px);z-index:20;background:var(--header-bg);backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);border-bottom:1px solid var(--line);margin-inline:calc(-1 * max(16px, env(safe-area-inset-left,0px)));padding-inline:max(16px, env(safe-area-inset-left,0px));overflow-x:auto }
+.dk-rail{ position:sticky;top:0;z-index:20;background:var(--header-bg);backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);border-bottom:1px solid var(--line);margin-inline:calc(-1 * max(16px, env(safe-area-inset-left,0px)));padding-inline:max(16px, env(safe-area-inset-left,0px));overflow-x:auto }
 .dk-rail ol{ display:flex;min-width:640px;padding-block:12px 10px }
 .dk-rail li{ flex:1;position:relative;display:flex;flex-direction:column;align-items:flex-start }
 .dk-rail li:not(:last-child)::after{ content:"";position:absolute;top:7px;inset-inline-start:22px;inset-inline-end:6px;height:2px;background:var(--line-2);border-radius:2px }
@@ -940,7 +940,7 @@ button.dk-step.dk-go:hover,button.dk-step.dk-go:focus-visible{ background:var(--
 .dk-locked svg.dk-i{ width:26px;height:26px }
 /* story v2 */
 .dk-story-grid{ display:grid;grid-template-columns:minmax(0,1fr) minmax(260px,340px);gap:0 36px;align-items:start }
-.dk-story-side{ position:sticky;top:140px;display:grid;gap:22px;padding-top:18px }
+.dk-story-side{ position:sticky;top:76px;display:grid;gap:22px;padding-top:18px }
 .dk-sblock h3{ font-size:12px;font-weight:800;letter-spacing:.08em;text-transform:uppercase;color:var(--ink-2);margin-bottom:6px }
 [lang="ar"] .dk-sblock h3{ letter-spacing:0;font-size:13px }
 .dk-facts dd .dk-pill{ vertical-align:2px }
