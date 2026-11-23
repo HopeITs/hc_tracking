@@ -74,7 +74,7 @@ Two findings that shape the order:
 | Y-06 | **Activity calendar in the template and the report.** | Y-02, D-78 | M · 1 slice | [task](https://app.clickup.com/t/123jdbat8bv) |
 | Y-07 | **MEAL edits the template's narrative questions.** | Y-02, D-78 | M · 2 slices | [task](https://app.clickup.com/t/123jdbat8bw) |
 | Y-09 | **Change request on an approved proposal.** The PR team asks for a change to an approved proposal (centers, rows, other fields) with a reason; the Finance Manager and the MEAL Manager review it; the PR Manager approves or rejects it; the proposal page lists its change requests. | Y-01, Y-02, D-89, D-89a | L · 2 slices | — |
-| Y-19 | **A location row is deactivated, never deleted (D-96).** A proposal target is a total; each row carries a share. A closing row keeps what it reached; its remainder goes to a replacement row or is spread over the active rows on a split the system proposes and MEAL edits. | Y-09, Y-10, Y-11 slice 1, D-96 | L · 3 slices | — |
+| Y-19 | **A location row is deactivated, never deleted (D-96).** A proposal target is a total; each row carries a share. A closing row keeps what it reached; its remainder goes to a replacement row or is spread over the active rows on a split the system proposes and MEAL edits. | Y-09, Y-10, Y-11 slice 1, D-96 | L · 4 slices | — |
 
 Order: Y-01 → Y-02 → Y-08 → Y-10 → Y-03 → (Y-04 ‖ Y-05) → Y-06 → Y-07 → Y-09. Y-01 slice 1 touches only the proposal form and can start today; everything from Y-02 on changes `[contract]` §12.1, §12.4 and §13. All decisions D-74…D-94 are signed.
 

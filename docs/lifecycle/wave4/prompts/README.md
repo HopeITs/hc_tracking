@@ -15,7 +15,7 @@ One prompt per item in `docs/lifecycle/wave4/README.md §2`. Run with `/lifecycl
 | 7 | [Y-06](Y-06.md) Activity calendar in the template and the report | Dev 2 | M | Y-02 | — |
 | 8 | [Y-07](Y-07.md) MEAL edits the template's narrative questions | Dev 1 + Dev 2 | M · 2 slices | Y-02 | §12.4 |
 | 9 | [Y-09](Y-09.md) Change request on an approved proposal | Dev 1 + Dev 2 | L · 2 slices | Y-01, Y-02, **D-89, D-89a** | §6, §7, §15.2 |
-| 9b | [Y-19](Y-19.md) A location row is deactivated, never deleted; its remainder moves | Dev 1 (slice 1) + Dev 2 (slices 2, 3) | L · 3 slices | Y-09, Y-10, Y-11 slice 1, **D-96** | §7, §12.1 |
+| 9b | [Y-19](Y-19.md) A location row is deactivated, never deleted; its remainder moves | Dev 1 (slices 1, 4) + Dev 2 (slices 2, 3) | L · 4 slices | Y-09, Y-10, Y-11 slice 1, **D-96** | §7, §12.1 |
 
 No decision is open (D-74…D-94 signed): Y-01 slice 1 starts now. Y-04 and Y-05 may run side by side (different pages). Y-02, Y-08, Y-10 and Y-03 run alone and in that order: they change the tables every report reads, and Y-03 matches template lines to targets by place.
 
