@@ -43,9 +43,7 @@ class ReportTemplatePolicy
             return true;
         }
 
-        $project = app(PlaceBridge::class)->legacyProjectFor($reportTemplate);
-
-        return $project !== null && $user->employee_id === MealCoverage::responsibleFor($project);
+        return MealCoverage::covers($user->employee_id, $reportTemplate->place());
     }
 
     /**

@@ -181,9 +181,7 @@ class MonthlyReportPolicy
         $template = $monthlyReport->relationLoaded('template')
             ? $monthlyReport->template
             : ReportTemplate::query()->findOrFail($monthlyReport->report_template_id);
-        $project = $this->bridge->legacyProjectFor($template)
-            ?? ($monthlyReport->project_id === null ? null : $this->bridge->projectsByIds([$monthlyReport->project_id])->first());
-        $responsible = $project === null ? null : MealCoverage::responsibleFor($project);
+        $responsible = MealCoverage::responsibleForPlace($template->place());
 
         if ($user->employee_id !== null
             && ($user->employee_id === $responsible || $user->employee_id === MealCoverage::mealManagerEmployeeId())) {

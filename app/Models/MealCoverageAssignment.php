@@ -18,7 +18,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 /**
  * The MEAL officer of one governorate (HR city) or of one project
- * (contracts §12.3). Routing reads it through App\Support\MealCoverage; the
+ * (contracts Â§12.3). Routing reads it through App\Support\MealCoverage; the
  * only writer is App\Actions\Cities\AssignMealCoverage.
  *
  * @property int $id
@@ -30,7 +30,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
  * @property CarbonImmutable|null $created_at
  * @property CarbonImmutable|null $updated_at
  */
-#[Fillable(['scope_type', 'city_id', 'project_id', 'employee_id', 'assigned_by'])]
+#[Fillable(['scope_type', 'city_id', 'project_id', 'program_id', 'center_id', 'city_wide', 'scope_key', 'employee_id', 'assigned_by'])]
 class MealCoverageAssignment extends Model implements TracksActivity
 {
     /** @use HasFactory<MealCoverageAssignmentFactory> */
@@ -69,6 +69,9 @@ class MealCoverageAssignment extends Model implements TracksActivity
             'scope_type' => MealCoverageScope::class,
             'city_id' => 'integer',
             'project_id' => 'integer',
+            'program_id' => 'integer',
+            'center_id' => 'integer',
+            'city_wide' => 'boolean',
             'employee_id' => 'integer',
             'assigned_by' => 'integer',
         ];

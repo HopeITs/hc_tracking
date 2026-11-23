@@ -19,7 +19,7 @@ use Illuminate\Validation\ValidationException;
 
 /**
  * Make an employee the MEAL officer of a governorate (HR city) or of one
- * project (contracts §12.3). A different employee replaces the row; the same
+ * project (contracts Ã‚Â§12.3). A different employee replaces the row; the same
  * employee again is a no-op. Error keys match the cities page's modal fields.
  */
 class AssignMealCoverage
@@ -44,22 +44,24 @@ class AssignMealCoverage
         $column = match ($scope) {
             MealCoverageScope::City => 'city_id',
             MealCoverageScope::Project => 'project_id',
+            MealCoverageScope::Place => throw new \InvalidArgumentException('Place assignments require a place target.'),
         };
 
         return DB::transaction(function () use ($scope, $column, $targetId, $employeeId): MealCoverageAssignment {
-            $existing = MealCoverageAssignment::query()->where($column, $targetId)->lockForUpdate()->first();
+            $existing = MealCoverageAssignment::query()->where('scope_type', $scope)->where($column, $targetId)->lockForUpdate()->first();
 
             if ($existing === null) {
                 try {
                     return MealCoverageAssignment::query()->create([
                         'scope_type' => $scope,
+                        'scope_key' => $scope === MealCoverageScope::City ? 'city:'.$targetId : null,
                         $column => $targetId,
                         'employee_id' => $employeeId,
                         'assigned_by' => Auth::id(),
                     ]);
                 } catch (UniqueConstraintViolationException) {
                     // Another request created the row after we looked: take it over.
-                    $existing = MealCoverageAssignment::query()->where($column, $targetId)->lockForUpdate()->firstOrFail();
+                    $existing = MealCoverageAssignment::query()->where('scope_type', $scope)->where($column, $targetId)->lockForUpdate()->firstOrFail();
                 }
             }
 

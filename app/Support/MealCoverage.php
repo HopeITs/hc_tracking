@@ -8,15 +8,100 @@ use App\Enums\MealCoverageScope;
 use App\Models\HrEmployee;
 use App\Models\MealCoverageAssignment;
 use App\Models\Project;
+use App\Models\ProposalLocation;
+use App\Support\Reporting\ReportPlace;
+use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Database\Query\Builder as QueryBuilder;
 use Illuminate\Support\Collection;
 
 /**
- * Who validates a project's monthly reports (contracts §12.3, D-12/D-12a).
+ * Who validates a project's monthly reports (contracts Â§12.3, D-12/D-12a).
  * Every answer is an HR employee id; map it to a user with
  * EmployeeRecipients::usersFor().
  */
 final class MealCoverage
 {
+    public static function responsibleForPlace(ReportPlace $place): ?int
+    {
+        $placeOfficer = $place->isUnset() ? null : MealCoverageAssignment::query()
+            ->where('scope_key', 'place:'.$place->key())
+            ->value('employee_id');
+        $candidates = array_values(array_filter([
+            $placeOfficer === null ? null : (int) $placeOfficer,
+            self::officerOfCity($place->cityId),
+            self::mealManagerEmployeeId(),
+        ], fn (?int $id): bool => $id !== null));
+
+        $active = self::activeEmployeeIds($candidates);
+
+        foreach ($candidates as $id) {
+            if (in_array($id, $active, true)) {
+                return $id;
+            }
+        }
+
+        return null;
+    }
+
+    /** @return list<int> */
+    public static function responsibleForLocation(ProposalLocation $row): array
+    {
+        $row->loadMissing('centers');
+        $centers = $row->city_wide || $row->centers->isEmpty()
+            ? [null]
+            : $row->centers->pluck('center_id')->all();
+        $officers = [];
+
+        foreach ($centers as $center) {
+            $officer = self::responsibleForPlace(new ReportPlace(
+                $row->city_id,
+                (int) $row->program_id,
+                $center === null ? null : (int) $center,
+                $row->city_wide,
+            ));
+            if ($officer !== null) {
+                $officers[$officer] = $officer;
+            }
+        }
+
+        return array_values($officers);
+    }
+
+    public static function covers(int $employeeId, ReportPlace $place): bool
+    {
+        return self::responsibleForPlace($place) === $employeeId;
+    }
+
+    /**
+     * Select direct place assignments and governorate coverage only where
+     * there is no explicit place assignment.
+     */
+    public static function scopeCoveredBy(Builder $query, int $employeeId): Builder
+    {
+        $column = $query->getModel()->qualifyColumn(...);
+        $atPlace = static function (QueryBuilder $place) use ($column): void {
+            $place->selectRaw('1')->from('meal_coverages as place_coverage')
+                ->where('place_coverage.scope_type', 'place')
+                ->whereColumn('place_coverage.city_id', $column('city_id'))
+                ->whereColumn('place_coverage.program_id', $column('program_id'))
+                ->whereColumn('place_coverage.city_wide', $column('city_wide'))
+                ->where(fn (QueryBuilder $target) => $target
+                    ->whereColumn('place_coverage.center_id', $column('center_id'))
+                    ->orWhere(fn (QueryBuilder $field) => $field->where('place_coverage.city_wide', true)
+                        ->whereNull('place_coverage.center_id')->whereNull($column('center_id'))));
+        };
+
+        return $query->whereExists(function (QueryBuilder $coverage) use ($column, $employeeId, $atPlace): void {
+            $coverage->selectRaw('1')->from('meal_coverages as coverage')
+                ->where('coverage.employee_id', $employeeId)
+                ->whereColumn('coverage.city_id', $column('city_id'))
+                ->where(fn (QueryBuilder $scope) => $scope
+                    ->where(fn (QueryBuilder $direct) => $direct->where('coverage.scope_type', 'place')
+                        ->whereExists(fn (QueryBuilder $place) => $atPlace($place->whereColumn('place_coverage.id', 'coverage.id'))))
+                    ->orWhere(fn (QueryBuilder $city) => $city->where('coverage.scope_type', 'city')->whereNotExists($atPlace)));
+        });
+    }
+
     /**
      * The active project officer, else the active officer of the project's
      * governorate (its center's city, falling back to projects.city_id), else
@@ -105,13 +190,13 @@ final class MealCoverage
      */
     public static function officerOfCity(int $cityId): ?int
     {
-        $employeeId = MealCoverageAssignment::query()->where('city_id', $cityId)->value('employee_id');
+        $employeeId = MealCoverageAssignment::query()->where('scope_type', MealCoverageScope::City)->where('city_id', $cityId)->value('employee_id');
 
         return $employeeId === null ? null : (int) $employeeId;
     }
 
     /**
-     * The MEAL Manager slot holder (contracts §9), null when the slot is
+     * The MEAL Manager slot holder (contracts Â§9), null when the slot is
      * vacant. One meaning of vacant for every caller: Slots::holderOf().
      */
     public static function mealManagerEmployeeId(): ?int

@@ -181,7 +181,7 @@ test('a create race on the same city ends with one row holding the latest office
     MealCoverageAssignment::creating(function () use (&$raced, $aleppo, $racer): void {
         if (! $raced) {
             $raced = true;
-            DB::table('meal_coverages')->insert(['scope_type' => 'city', 'city_id' => $aleppo, 'employee_id' => $racer, 'created_at' => now(), 'updated_at' => now()]);
+            DB::table('meal_coverages')->insert(['scope_type' => 'city', 'scope_key' => 'city:'.$aleppo, 'city_id' => $aleppo, 'employee_id' => $racer, 'created_at' => now(), 'updated_at' => now()]);
         }
     });
 
