@@ -240,11 +240,14 @@ class Task extends Model implements TracksActivity
      * There is no foreign key behind source_id, so a source can be deleted
      * out from under this row.
      *
+     * An eager-loaded location row brings what its label reads, so a list
+     * of tasks names its rows without a query per task.
+     *
      * @return MorphTo<Model, $this>
      */
     public function source(): MorphTo
     {
-        return $this->morphTo();
+        return $this->morphTo()->morphWith([ProposalLocation::class => ['city', 'program', 'centers']]);
     }
 
     /**
@@ -289,10 +292,17 @@ class Task extends Model implements TracksActivity
 
     /**
      * The source's display name, or a placeholder when it no longer exists.
+     * A location row has no name of its own, so it shows its place label.
      */
     public function sourceLabel(): string
     {
-        $name = $this->loadedSource()?->getAttribute('name');
+        $source = $this->loadedSource();
+
+        if ($source instanceof ProposalLocation) {
+            return $source->loadMissing(['city', 'program', 'centers'])->label();
+        }
+
+        $name = $source?->getAttribute('name');
 
         return is_string($name) ? $name : __('tasks.no_source');
     }

@@ -3,6 +3,7 @@
 use App\Enums\TaskStatus;
 use App\Models\HrEmployee;
 use App\Models\Project;
+use App\Models\ProposalLocation;
 use App\Models\Task;
 use App\Models\TaskAttachment;
 use App\Models\User;
@@ -30,6 +31,20 @@ test('a task sourceLabel falls back to no source when the source no longer exist
     $sourceProject->delete();
 
     expect($task->fresh()->sourceLabel())->toBe(__('tasks.no_source'));
+});
+
+test('a task raised against a location row is labelled with the place of that row', function () {
+    $location = ProposalLocation::factory()->cityWide()->create();
+    $task = Task::factory()->create([
+        'source_type' => 'proposal_location',
+        'source_id' => $location->id,
+    ]);
+
+    $loadedTask = Task::query()->with('source')->get()->firstWhere('id', $task->id);
+
+    expect($loadedTask->sourceLabel())
+        ->toBe($location->fresh()->load(['city', 'program', 'centers'])->label())
+        ->not->toBe(__('tasks.no_source'));
 });
 
 test('a task resolves its hr employee assignees and its user creator separately', function () {
