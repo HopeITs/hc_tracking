@@ -350,14 +350,17 @@ test('marking the framework as done tells the program manager (user decision 202
         ->and($confirmed($meal))->toBe(0);
 });
 
-test('the logframe tab starts with every branch and indicator list collapsed', function () {
+test('the logframe opens on the first outcome with its outputs collapsed', function () {
     $meal = mealManager();
     $impact = logframeNode($this->proposal, ResultType::Impact, programId: $this->program->id);
-    logframeNode($this->proposal, ResultType::Outcome, $impact);
+    $outcome = logframeNode($this->proposal, ResultType::Outcome, $impact);
+    $output = logframeNode($this->proposal, ResultType::Output, $outcome);
 
     logframeTab($meal, $this->proposal)
-        ->assertSeeHtml('data-test="node-toggle-'.$impact->id.'"')
-        ->assertDontSeeHtml('data-test="node-body-');
+        ->assertSeeHtml('data-test="outcome-panel-'.$outcome->id.'"')
+        ->assertSeeHtml('data-test="node-toggle-'.$output->id.'"')
+        ->assertSeeHtmlInOrder(['data-test="node-body-'.$output->id.'"', 'data-open="false"'])
+        ->assertDontSeeHtml('data-test="node-toggle-'.$impact->id.'"');
 });
 
 test('the activity calendar starts closed behind a toggle', function () {

@@ -11,9 +11,14 @@
             <h2>{{ __('proposals.sections.title') }}</h2>
             <span class="pp-small">{{ __('proposals.sections.intro') }}</span>
         </div>
+        @php
+            $sectionKeys = array_column($this->sections, 'key');
+            $allSectionsOpen = $sectionKeys !== [] && array_diff($sectionKeys, $openSections) === [];
+            $noSectionOpen = array_intersect($sectionKeys, $openSections) === [];
+        @endphp
         <span class="pp-more-acts">
-            <button type="button" class="pp-btn pp-btn-sm" wire:click="openAllSections" data-test="sections-open-all">{{ __('proposals.framework.open_all') }}</button>
-            <button type="button" class="pp-btn pp-btn-sm" wire:click="closeAllSections" data-test="sections-close-all">{{ __('proposals.framework.close_all') }}</button>
+            <button type="button" class="pp-btn pp-btn-sm" wire:click="openAllSections" @disabled($allSectionsOpen) data-test="sections-open-all">{{ __('proposals.framework.open_all') }}</button>
+            <button type="button" class="pp-btn pp-btn-sm" wire:click="closeAllSections" @disabled($noSectionOpen) data-test="sections-close-all">{{ __('proposals.framework.close_all') }}</button>
         </span>
     </div>
 

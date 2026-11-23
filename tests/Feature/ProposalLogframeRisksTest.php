@@ -45,7 +45,7 @@ function riskTab(User $user, Proposal $proposal): Testable
 }
 
 describe('the node', function () {
-    it('offers the risks drawer on outcomes and outputs only, with a count badge in text', function () {
+    it('offers the risks drawer on outcomes and outputs only, with the count in the list heading', function () {
         $this->actingAs($this->editor);
         app(AttachLibraryRisk::class)->handle($this->proposal, $this->output->id, $this->delay->id, []);
 
@@ -56,7 +56,7 @@ describe('the node', function () {
             ->assertSeeHtml('data-test="result-risks-'.$this->output->id.'"')
             ->assertDontSeeHtml('data-test="result-risks-'.$this->impact->id.'"')
             ->assertDontSeeHtml('data-test="result-risks-'.$this->activity->id.'"')
-            ->assertSee(trans_choice('proposals.framework.count_risks', 1, ['count' => 1]));
+            ->assertSee(__('proposals.framework.layer_risks').' · 1');
     });
 
     it('opens the drawer on one result and lists only its risks, with rating words', function () {
