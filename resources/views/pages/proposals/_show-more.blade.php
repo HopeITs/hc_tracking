@@ -51,17 +51,11 @@
                             @case('coming')
                                 @include('pages.proposals._show-coming-up')
                                 @break
-                            @case('projects')
-                                @include('pages.proposals._sec-projects')
-                                @break
                             @case('plan')
                                 @include('pages.proposals._sec-plan')
                                 @break
                             @case('reports')
                                 @include('pages.proposals._sec-reports')
-                                @break
-                            @case('targets')
-                                @include('pages.proposals._tab-targets')
                                 @break
                             @case('docs')
                                 @include('pages.proposals._sec-docs')

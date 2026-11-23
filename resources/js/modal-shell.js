@@ -16,7 +16,8 @@
  * screen and Save stays in the footer. A dialog with five or more sections
  * (`indexed`, decided by x-ui.modal) also gets the section index: entries
  * read from the sections' headings, the current one follows the scroll, a
- * click jumps there, a section ticks once its required fields are filled and
+ * click jumps there, a section ticks once its required fields are filled (or,
+ * with none required, once any field holds an answer) and
  * shows its error count after a failed save. Enter does not save an indexed
  * form from a plain text field (a long create form saved half-filled by
  * accident); Ctrl/Cmd+Enter does.
@@ -251,6 +252,20 @@ document.addEventListener('alpine:init', () => {
             return [...fields, ...bare];
         },
 
+        // Any visible field of the section answered, read the same way as a required one.
+        hasAnyAnswer(section) {
+            const fields = [...section.querySelectorAll('[data-form-field]')].filter((field) => field.offsetParent !== null);
+            const bare = [...section.querySelectorAll('input:not([type="hidden"]):not([type="search"]), select, textarea')]
+                .filter((control) => ! control.closest('[data-form-field]') && ! control.disabled && control.offsetParent !== null);
+
+            return [...fields, ...bare].some((control) => this.isRequiredFilled(control));
+        },
+
+        // The index step's tag: Required, Optional or Needed for review.
+        kindLabel(kind) {
+            return errorLabels?.kinds?.[kind] ?? '';
+        },
+
         readSections() {
             const sections = this.sections();
 
@@ -266,7 +281,11 @@ document.addEventListener('alpine:init', () => {
                 const done = controls.filter((control) => this.isRequiredFilled(control)).length;
 
                 const errors = Number(section.dataset.invalidCount ?? 0);
-                const complete = controls.length > 0 && done === controls.length;
+                // Nothing required: the section ticks once any of its fields holds an answer.
+                const complete = controls.length > 0 ? done === controls.length : this.hasAnyAnswer(section);
+                const kind = section.hasAttribute('data-for-review')
+                    ? 'review'
+                    : (controls.length > 0 ? 'required' : 'optional');
 
                 filled += done;
                 required += controls.length;
@@ -275,6 +294,7 @@ document.addEventListener('alpine:init', () => {
                 return {
                     label: (section.querySelector('.form-section-title') ?? section.querySelector('.form-section-heading'))?.textContent.trim() ?? '',
                     optional: section.hasAttribute('data-optional'),
+                    kind,
                     errors,
                     done: complete,
                 };

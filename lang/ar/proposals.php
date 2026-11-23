@@ -816,6 +816,7 @@ return [
         'unscheduled' => ':amount :currency موقّع لكنه غير مُجدول كدفعة',
         'no_agreement' => 'المنحة جارية لكن لا توجد اتفاقية تمويل مسجلة',
         'project_outrun' => 'ينتهي :project في :end، بعد انتهاء المنحة (:grant)',
+        'missing_centres' => '{1} مكان واحد بلا مركز بعد|[2,*] :count من الأماكن بلا مركز بعد',
         'unreported' => 'لا تقرير بعد عن «:indicator»',
         'no_indicator' => ':level بلا مؤشر: «:statement»',
         'risk_happened' => 'وقع خطر: :risk',

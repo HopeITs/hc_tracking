@@ -964,3 +964,11 @@ test('the create form shows every section at once with the section index and its
         ->not->toContain('data-modal-steps')
         ->and(substr_count($html, 'data-optional'))->toBe(2);
 });
+
+test('donor and budget carry a needed-for-review tag instead of a required star', function () {
+    $html = openProposalCreateForm(userWithRole('Financial'))->html();
+    $donorField = str($html)->after('data-donor-field')->before('</x-ui.form-select>')->before('data-donor-pending')->toString();
+
+    expect(substr_count($html, 'data-for-review-badge'))->toBe(2)
+        ->and(str($donorField)->before('id="proposal-donor"')->contains('form-required'))->toBeFalse();
+});

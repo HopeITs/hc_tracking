@@ -7,7 +7,6 @@ namespace App\Policies;
 use App\Models\Proposal;
 use App\Models\Risk;
 use App\Models\User;
-use Illuminate\Support\Facades\Gate;
 
 /**
  * Risks follow their project: besides holders of the risks.* permissions, the
@@ -16,8 +15,9 @@ use Illuminate\Support\Facades\Gate;
  * risks.delete.
  *
  * Since W-09 (D-61) new risks are picked from the library onto a proposal's
- * logframe: `attach` and `detach` follow whoever may update that proposal
- * (ProposalPolicy::update). The project-based abilities above serve the
+ * logframe: `attach` and `detach` belong to whoever may build the framework
+ * (results.update, the MEAL manager), like the rest of the logframe; a PR
+ * officer only reads them. The project-based abilities above serve the
  * legacy rows only.
  */
 class RiskPolicy
@@ -74,7 +74,7 @@ class RiskPolicy
      */
     public function attach(User $user, Proposal $proposal): bool
     {
-        return Gate::forUser($user)->allows('update', $proposal);
+        return $user->can('results.update');
     }
 
     /**
@@ -82,7 +82,7 @@ class RiskPolicy
      */
     public function detach(User $user, Proposal $proposal): bool
     {
-        return Gate::forUser($user)->allows('update', $proposal);
+        return $user->can('results.update');
     }
 
     /**

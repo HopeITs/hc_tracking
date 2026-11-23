@@ -142,6 +142,7 @@ return [
     'back' => 'Back',
     'show_me' => 'show me',
     'optional' => 'Optional',
+    'needed_for_review' => 'Needed for review',
     'sections_in_this_form' => 'On this form',
     'required_filled' => ':filled of :total required filled',
     'add_section' => 'Add :section',

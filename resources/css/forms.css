@@ -406,6 +406,42 @@
         transition: stroke-dashoffset 0.3s ease;
     }
 
+    /* Every required field filled: the ring turns solid with a tick in the middle. */
+    .modal-shell-index-ring-wrap {
+        position: relative;
+        display: inline-flex;
+        flex-shrink: 0;
+    }
+
+    .modal-shell-index-ring-tick {
+        position: absolute;
+        inset: 0;
+        display: none;
+        align-items: center;
+        justify-content: center;
+        color: var(--color-white);
+        font-size: 1rem;
+        font-weight: 700;
+    }
+
+    .modal-shell-index-progress.is-complete .modal-shell-index-ring circle:last-child {
+        fill: var(--color-primary);
+    }
+
+    .modal-shell-index-progress.is-complete .modal-shell-index-ring-tick {
+        display: flex;
+    }
+
+    .modal-shell-index-optional.is-required {
+        color: var(--color-secondary-medium);
+    }
+
+    .modal-shell-index-optional.is-review,
+    .form-section-review {
+        color: var(--color-primary);
+        font-weight: 600;
+    }
+
     :where(:dir(rtl)) .modal-shell-index-ring {
         transform: rotate(-90deg) scaleY(-1);
     }
@@ -1011,6 +1047,11 @@
     .dark .form-section-optional {
         background-color: var(--color-surface-2);
         color: var(--color-ink-muted);
+    }
+
+    .dark .form-section-review,
+    .dark .modal-shell-index-optional.is-review {
+        color: var(--color-brand-text);
     }
 
     .dark .form-section-hint,

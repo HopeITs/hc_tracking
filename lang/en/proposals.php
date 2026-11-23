@@ -816,6 +816,7 @@ return [
         'unscheduled' => ':amount :currency signed but not scheduled as a tranche',
         'no_agreement' => 'The grant is running but no funding agreement is recorded',
         'project_outrun' => ':project ends :end, after the grant ends (:grant)',
+        'missing_centres' => '{1} :count place has no center yet|[2,*] :count places have no center yet',
         'unreported' => 'No report yet on “:indicator”',
         'no_indicator' => ':level has no indicator: “:statement”',
         'risk_happened' => 'Risk happened: :risk',

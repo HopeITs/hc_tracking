@@ -227,8 +227,15 @@ trait ReadsProposalAttention
             foreach ($this->projects as $project) {
                 if ($grantEnd !== null && $project->end_date !== null && $project->end_date->gt($grantEnd)) {
                     $over = (int) $grantEnd->diffInDays($project->end_date);
-                    $push('project-outrun-'.$project->id, 'projects', true, __('proposals.attention.project_outrun', ['project' => $project->name, 'end' => $project->end_date->translatedFormat(__('formats.date')), 'grant' => $grantEnd->translatedFormat(__('formats.date'))]), trans_choice('proposals.attention.days_over', $over, ['count' => $over]), ['label' => __('proposals.attention.fix_open'), 'url' => route('projects.show', $project)], 'projects');
+                    $push('project-outrun-'.$project->id, 'projects', true, __('proposals.attention.project_outrun', ['project' => $project->name, 'end' => $project->end_date->translatedFormat(__('formats.date')), 'grant' => $grantEnd->translatedFormat(__('formats.date'))]), trans_choice('proposals.attention.days_over', $over, ['count' => $over]), ['label' => __('proposals.attention.fix_open'), 'url' => route('projects.show', $project)], 'card');
                 }
+            }
+
+            // The Projects & places fold that used to flag this was removed (PR feedback 2026-11-23).
+            $missingCentres = collect($this->locationRows)->where('status', 'missing_center')->count();
+
+            if ($missingCentres > 0) {
+                $push('missing-centres', 'projects', false, trans_choice('proposals.attention.missing_centres', $missingCentres, ['count' => $missingCentres]), __('proposals.attention.when_missing'), $this->canFillCenters ? ['label' => __('proposals.add_centers'), 'call' => 'openCenterFill'] : null, 'card');
             }
 
             foreach ($this->targets as $target) {

@@ -25,7 +25,7 @@ beforeEach(function () {
     $this->output = riskNode($this->proposal, ResultType::Output, $this->outcome);
     $this->activity = riskNode($this->proposal, ResultType::Activity, $this->output);
 
-    $this->editor = User::factory()->role('Public Relations Manager')->create();
+    $this->editor = mealManager();
     $this->delay = RiskLibrary::factory()->create(['title_en' => 'Funding delay', 'title_ar' => 'تأخر التمويل', 'category' => 'financial', 'default_likelihood' => 2, 'default_severity' => 3]);
     $this->access = RiskLibrary::factory()->create(['title_en' => 'Access denied', 'title_ar' => 'منع الوصول', 'category' => 'security', 'default_likelihood' => 1, 'default_severity' => 3]);
 });
@@ -152,10 +152,10 @@ describe('removing and permissions', function () {
         expect(Risk::query()->whereKey($foreign->id)->exists())->toBeTrue();
     });
 
-    it('lets a viewer read the drawer but refuses every write', function () {
+    it('lets a PR officer read the drawer but refuses every write', function () {
         $this->actingAs($this->editor);
         $risk = app(AttachLibraryRisk::class)->handle($this->proposal, $this->output->id, $this->delay->id, []);
-        $viewer = User::factory()->role('Team Member')->create();
+        $viewer = User::factory()->role('Public Relations Manager')->create();
 
         riskTab($viewer, $this->proposal)
             ->call('openRisks', $this->output->id)

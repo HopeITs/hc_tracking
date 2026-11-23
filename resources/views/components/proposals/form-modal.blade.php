@@ -237,7 +237,7 @@
 
         {{-- 2 · Donor. --}}
         @unless ($isRenewal)
-        <x-ui.form-section :title="__('proposals.section_donor')" :fields="$sectionFields[__('proposals.section_donor')]">
+        <x-ui.form-section :title="__('proposals.section_donor')" :for-review="true" :fields="$sectionFields[__('proposals.section_donor')]">
             <div class="grid gap-x-4 gap-y-3 @2xl/modal:grid-cols-2">
                 @if ($lockedDonorName !== null)
                     <x-ui.form-field :label="__('funding_agreements.donor')" for="proposal-locked-donor" :help="__('proposals.the_donor_cannot_change_after_the_concept_note')" :error="$errors->first('donorId')" class="@2xl/modal:col-span-2">
@@ -248,7 +248,7 @@
                     </x-ui.form-field>
                 @else
                     <div class="flex flex-wrap items-end gap-2 @2xl/modal:col-span-2" data-donor-field>
-                        <x-ui.form-select wire:model.live="donorId" id="proposal-donor" :label="__('funding_agreements.donor')" :placeholder="__('funding_agreements.select_a_donor')" required class="min-w-0 flex-1">
+                        <x-ui.form-select wire:model.live="donorId" id="proposal-donor" :label="__('funding_agreements.donor')" :placeholder="__('funding_agreements.select_a_donor')" class="min-w-0 flex-1">
                             @foreach ($donors as $donor)
                                 <option value="{{ $donor->id }}">{{ $donor->name }}@if ($donor->isPending()) — {{ __('donors.pending_badge') }}@endif</option>
                             @endforeach
@@ -447,7 +447,7 @@
 
         {{-- 5 · Budget. Absent, not hidden, for anyone without the money permissions. --}}
         @if ($showsMoney && ! $isRenewal)
-            <x-ui.form-section :title="__('proposals.section_budget')" :fields="$sectionFields[__('proposals.section_budget')]">
+            <x-ui.form-section :title="__('proposals.section_budget')" :for-review="true" :fields="$sectionFields[__('proposals.section_budget')]">
                 <div class="grid gap-x-4 gap-y-3 @2xl/modal:grid-cols-2">
                     <x-ui.form-input wire:model="requestedBudget" :label="__('proposals.requested_budget')" :help="__('proposals.requested_budget_help')" type="number" step="0.01" min="0" dir="ltr" />
                     <x-ui.form-segmented

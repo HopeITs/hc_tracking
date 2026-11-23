@@ -3,6 +3,7 @@
     'hint' => null,
     'fields' => [],
     'optional' => false,
+    'forReview' => false,
 ])
 
 @php
@@ -22,6 +23,10 @@
      * need attention, and data-invalid-count carries that number for the
      * index. A `hint` slot replaces the plain-text prop for live figures
      * written in Alpine.
+     *
+     * `forReview` marks a section the record saves without but cannot go to
+     * review without (a proposal's donor and budget): no red star, a
+     * "Needed for review" tag here and on its index step instead.
      */
     $invalidCount = collect($fields)->filter(fn (string $field): bool => $errors->has($field))->count();
     $hasHint = $hint !== null && trim((string) $hint) !== '';
@@ -32,6 +37,7 @@
     data-invalid-count="{{ $invalidCount }}"
     @if ($invalidCount > 0) data-invalid @endif
     @if ($optional) data-optional x-data="formSectionFold" @endif
+    @if ($forReview) data-for-review @endif
 >
     @if ($optional)
         <button type="button" class="form-section-fold" x-show="! open" x-on:click="unfold()" data-section-fold>
@@ -56,6 +62,9 @@
                     <span class="form-section-title">{{ $title }}</span>
                     @if ($optional)
                         <span class="form-section-optional">{{ __('common.optional') }}</span>
+                    @endif
+                    @if ($forReview)
+                        <span class="form-section-optional form-section-review" data-for-review-badge>{{ __('common.needed_for_review') }}</span>
                     @endif
                 </h3>
 
