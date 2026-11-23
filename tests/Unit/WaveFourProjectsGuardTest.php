@@ -6,6 +6,10 @@ declare(strict_types=1);
  * D-74: a wave 4 file names `Project` only inside PlaceBridge. Starts with the
  * files Y-02 creates or lists; later tasks add theirs. Do not add a file to
  * the allow-list without Dev 1.
+ *
+ * Y-11 (Dev 1, 23 Nov): `LocationBackfill` and `ProjectLocationMirror` copy
+ * `projects` onto the location rows while `projects` is still the writer, so
+ * they must read it. Both are removed by Y-18.
  */
 it('names the Project model only in the place bridge', function (): void {
     $paths = [
@@ -31,12 +35,16 @@ it('names the Project model only in the place bridge', function (): void {
         dirname(__DIR__, 2).'/app/Livewire/Concerns/Reports/GroupsMonthlyMatrix.php',
         dirname(__DIR__, 2).'/app/Livewire/Concerns/Reports/BuildsMatrixBreakdowns.php',
         dirname(__DIR__, 2).'/app/Livewire/Concerns/Reports/BuildsMatrixActivities.php',
+        // Y-11: the location rows and their successors.
+        ...glob(dirname(__DIR__, 2).'/app/Support/Locations/*.php'),
     ];
+
+    $allowed = ['PlaceBridge.php', 'LocationBackfill.php', 'ProjectLocationMirror.php'];
 
     $offenders = [];
 
     foreach ($paths as $path) {
-        if (basename($path) === 'PlaceBridge.php') {
+        if (in_array(basename($path), $allowed, true)) {
             continue;
         }
 

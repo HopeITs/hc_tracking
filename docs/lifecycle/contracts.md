@@ -71,7 +71,7 @@ Rules:
 
 **W-32 (D-55b): payroll rows.** New rows (payroll only; `ProposalTransitions::requirements()` gains the kind from the proposal): `proposal draft → submitted` keys `budget`, `planned_dates`, `narrative`, `effective_date`; `submitted → proposal draft` `reason`; `submitted → rejected` `reason_min_10`, `effective_date`; `submitted → approved` **ApproveProposal only**; `approved → active` **ApproveProposal** (same transaction, right after `approved`: a payroll proposal has nothing to wait for); `active → completed` `final_report`, `effective_date` where `final_report` for payroll = the `final_report` file + `final_report_accepted_on/by` (no milestone). Project-kind rows are untouched. Key meaning `narrative`: `narrative` is set (≥ 50 chars).
 
-*W-32 rulings (4 Nov, for Dev 1 to confirm):*
+*W-32 rulings (4 Nov, confirmed by Dev 1 on 23 Nov):*
 - `concept note → proposal draft` `reason` is a payroll row **used only at creation**: `SaveProposal` creates the proposal (column default `concept note`, first note) and moves it straight to `proposal draft` through `TransitionProposal` with the standard note "payroll proposal", in one transaction, exactly like the D-03 skip. No other move leads into `concept note`, `concept note review`, `concept note submitted` or `proposal review` for payroll.
 - `ProposalTransitions::targets()` and `correctionTargets()` take the kind as well. Payroll correction targets: `proposal draft`, `submitted`, `active`, `completed`, `rejected` (never `approved`, never the current status).
 - `final_report` for payroll with an internal (self-funded) donor = the `final_report` file only.
