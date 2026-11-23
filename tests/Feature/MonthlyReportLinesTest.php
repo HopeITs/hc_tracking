@@ -1,5 +1,8 @@
 <?php
 
+use App\Actions\MonthlyReports\RefreshMonthlyReportLines;
+use App\Actions\ReportTemplates\ConfirmReportTemplate;
+use App\Actions\ReportTemplates\JoinReportTemplate;
 use App\Enums\CollectionFrequency;
 use App\Enums\DonorAttribution;
 use App\Enums\IndicatorCollector;
@@ -21,6 +24,7 @@ use App\Models\ReportTemplateLine;
 use App\Support\MonthlyReportLineBuilder;
 use App\Support\MonthlyReportPeriods;
 use App\Support\MonthlyReportPreparers;
+use App\Support\ReportTemplatePrefiller;
 use Carbon\CarbonImmutable;
 use Illuminate\Support\Facades\DB;
 
@@ -405,4 +409,25 @@ test('sequencing is per template: an unsubmitted month of one template never blo
 
     expect(MonthlyReportPeriods::for($second)->canSubmit($secondDecember))->toBeNull()
         ->and(MonthlyReportPeriods::for($first)->months())->toHaveCount(1);
+});
+
+test('join and confirm add shares only when the preparer refreshes a draft', function () {
+    $fixture = placementFixture();
+    $this->actingAs(mealManager());
+    $prefiller = app(ReportTemplatePrefiller::class);
+    $prefiller->prefillForProposal($fixture['proposals'][0]);
+    $template = ReportTemplate::query()->sole();
+    app(ConfirmReportTemplate::class)->handle($template, $template->lines()->pluck('id')->all());
+    $report = $template->monthlyReports()->where('period', '2026-01-01')->sole();
+    app(MonthlyReportLineBuilder::class)->build($report);
+    $prefiller->prefillForProposal($fixture['proposals'][1]);
+
+    app(JoinReportTemplate::class)->handle($fixture['proposals'][1], $template, []);
+    app(ConfirmReportTemplate::class)->handle($template, $template->lines()->where('status', 'pending')->pluck('id')->all());
+    expect($report->lines()->sole()->shares()->count())->toBe(1);
+    $this->actingAs(userWithRole('Managers', $fixture['project']->user_id));
+    app(RefreshMonthlyReportLines::class)->handle($report, MonthlyReportStatus::Draft);
+
+    expect($report->lines()->count())->toBe(1)
+        ->and($report->lines()->sole()->shares()->count())->toBe(2);
 });

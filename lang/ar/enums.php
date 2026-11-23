@@ -1,6 +1,7 @@
 <?php
 
 return [
+    'template_placement_status' => ['pending' => 'بانتظار الاختيار', 'joined' => 'منضم', 'created' => 'تم الإنشاء'],
     'ar_status' => [
         'pending' => 'قيد الانتظار',
         'received' => 'مستلم',

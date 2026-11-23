@@ -1,5 +1,6 @@
 <?php
 
+use App\Actions\ReportTemplates\CreateReportTemplateForProposal;
 use App\Enums\AssignmentStatus;
 use App\Enums\CollectionFrequency;
 use App\Enums\DenominatorBasis;
@@ -28,6 +29,7 @@ use App\Models\ReportTemplateQuestion;
 use App\Models\Result;
 use App\Models\User;
 use App\Support\Reporting\ReportPlace;
+use App\Support\ReportTemplatePrefiller;
 use Illuminate\Support\Facades\DB;
 use Livewire\Features\SupportTesting\Testable;
 use Livewire\Livewire;
@@ -777,4 +779,37 @@ test('a template covering two or more proposals says so once above the questions
     rtpPage(mealManager(), $project)
         ->assertSeeHtml('data-test="template-questions-shared"')
         ->assertSee(__('report_templates.tab.questions_shared', ['proposals' => 'Spring WASH'.__('report_templates.tab.list_separator').'Winter WASH']));
+});
+
+test('the template tab opens the selected template and rejects templates from another project', function () {
+    $fixture = placementFixture();
+    $manager = mealManager();
+    $this->actingAs($manager);
+    $prefiller = app(ReportTemplatePrefiller::class);
+    $prefiller->prefillForProposal($fixture['proposals'][0]);
+    $prefiller->prefillForProposal($fixture['proposals'][1]);
+    $first = ReportTemplate::query()->sole();
+    $second = app(CreateReportTemplateForProposal::class)->handle($fixture['proposals'][1], $first->place());
+    $foreign = ReportTemplate::factory()->create();
+
+    $page = rtpPage($manager, $fixture['project'])->assertSeeHtml('data-test="template-selector"')
+        ->set('selectedReportTemplate', (string) $second->id)
+        ->assertSeeHtml('data-template-line="'.$second->lines()->sole()->id.'"')
+        ->assertDontSeeHtml('data-template-line="'.$first->lines()->sole()->id.'"');
+
+    expect($page->instance()->reportTemplate->id)->toBe($second->id);
+    $page->call('selectAllPendingTemplateLines')
+        ->assertSet('selectedTemplateLineIds', [$second->lines()->sole()->id])
+        ->call('askConfirmReportTemplate')
+        ->assertSet('showTemplateConfirmModal', true)
+        ->call('confirmReportTemplate')
+        ->assertHasNoErrors();
+
+    expect($second->fresh()->status)->toBe(ReportTemplateStatus::Confirmed)
+        ->and($second->lines()->sole()->status)->toBe(ReportTemplateLineStatus::Confirmed)
+        ->and($first->fresh()->status)->toBe(ReportTemplateStatus::Pending)
+        ->and($first->lines()->sole()->status)->toBe(ReportTemplateLineStatus::Pending);
+
+    $page->set('selectedReportTemplate', (string) $foreign->id);
+    expect($page->instance()->reportTemplate->id)->toBe($first->id);
 });

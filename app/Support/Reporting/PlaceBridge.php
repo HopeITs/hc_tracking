@@ -9,6 +9,7 @@ use App\Models\Project;
 use App\Models\Proposal;
 use App\Models\ProposalLocation;
 use App\Models\ReportTemplate;
+use App\Support\MealCoverage;
 use Carbon\CarbonImmutable;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Collection;
@@ -22,6 +23,44 @@ use stdClass;
  */
 final class PlaceBridge
 {
+    /**
+     * Legacy projects of the proposal lines being confirmed, locked in id order.
+     * Removed by Y-17 when activation belongs to location rows.
+     *
+     * @param  list<int>  $proposalIds
+     * @return \Illuminate\Database\Eloquent\Collection<int, Project>
+     */
+    public function projectsForConfirmation(ReportTemplate $template, array $proposalIds): \Illuminate\Database\Eloquent\Collection
+    {
+        $place = $template->place();
+        $rows = ProposalLocation::query()->whereIn('proposal_id', $proposalIds)
+            ->where('city_id', $place->cityId)->where('program_id', $place->programId)
+            ->whereNotNull('project_id')->with('centers')->get()
+            ->filter(fn (ProposalLocation $row): bool => $place->isUnset()
+                || ($place->cityWide ? $row->city_wide : $row->centers->contains('center_id', $place->centerId)));
+        $ids = $rows->pluck('project_id')->unique()->all();
+        if ($ids === []) {
+            $legacyId = $this->legacyProjectIdFor($template);
+            $ids = $legacyId === null ? [] : [$legacyId];
+        }
+
+        return Project::query()->whereKey($ids)->orderBy('id')->lockForUpdate()->get();
+    }
+
+    /**
+     * Resolve the place's MEAL officer for a placement that has no template yet.
+     * Removed by Y-14 when coverage moves to places.
+     */
+    public function mealOfficerFor(Proposal $proposal, ReportPlace $place): ?int
+    {
+        $row = $proposal->locations()->with('centers')->get()->first(fn ($row): bool => $row->city_id === $place->cityId
+            && $row->program_id === $place->programId
+            && ($place->cityWide ? $row->city_wide : $row->centers->contains('center_id', $place->centerId)));
+        $project = $row?->project_id === null ? null : Project::query()->find($row->project_id);
+
+        return $project === null ? null : MealCoverage::responsibleFor($project);
+    }
+
     /**
      * The place of a target, read from its own columns (Y-08, D-85): no
      * `projects` read is left in it. Null for a target with no place and for a
@@ -345,7 +384,9 @@ final class PlaceBridge
         $result = array_fill_keys($projectIds, []);
 
         foreach (ReportTemplate::query()->whereIn('project_id', $projectIds)->get(['id', 'project_id']) as $template) {
-            $result[$template->project_id][] = $template->id;
+            if ($template->project_id !== null) {
+                $result[$template->project_id][] = $template->id;
+            }
         }
 
         $rows = ProposalLocation::query()->with('centers')->whereIn('project_id', $projectIds)->whereNotNull('program_id')->get();
@@ -358,6 +399,10 @@ final class PlaceBridge
                 ->keyBy('id');
 
             foreach ($rows as $row) {
+                if ($row->project_id === null) {
+                    continue;
+                }
+
                 $placeKeys = array_map(fn (ReportPlace $place): string => $place->key(), $this->placesOfRows(collect([$row])));
 
                 foreach ($links->where('proposal_id', $row->proposal_id) as $link) {

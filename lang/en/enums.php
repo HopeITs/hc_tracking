@@ -1,6 +1,7 @@
 <?php
 
 return [
+    'template_placement_status' => ['pending' => 'Pending', 'joined' => 'Joined', 'created' => 'Created'],
     'ar_status' => [
         'pending' => 'Pending',
         'received' => 'Received',

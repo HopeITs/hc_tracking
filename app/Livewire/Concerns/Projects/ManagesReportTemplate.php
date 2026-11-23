@@ -35,6 +35,7 @@ use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
 use Livewire\Attributes\Computed;
 use Livewire\Attributes\Locked;
+use Livewire\Attributes\Url;
 
 /**
  * The "Report template" tab on projects/show (contracts.md §12.4, T33 slice
@@ -131,12 +132,31 @@ trait ManagesReportTemplate
     /**
      * The project's template, with just enough of the project for the policy.
      */
+    #[Url(as: 'template', except: '')]
+    public string $selectedReportTemplate = '';
+
+    /** @return Collection<int, ReportTemplate> */
+    #[Computed]
+    public function reportTemplateOptions(): Collection
+    {
+        return ReportTemplate::query()->whereKey(app(PlaceBridge::class)->templateIdsOfProject($this->projectId))
+            ->with('proposals:id,name')->orderBy('id')->get();
+    }
+
+    public function updatedSelectedReportTemplate(): void
+    {
+        $this->selectedTemplateLineIds = [];
+        $this->forgetReportTemplate();
+    }
+
     #[Computed]
     public function reportTemplate(): ?ReportTemplate
     {
         return ReportTemplate::query()
             ->whereKey(app(PlaceBridge::class)->templateIdsOfProject($this->projectId))
             ->withCount(['lines as pending_lines_count' => fn ($query) => $query->where('status', ReportTemplateLineStatus::Pending)])
+            ->when($this->reportTemplateOptions->contains('id', (int) $this->selectedReportTemplate),
+                fn ($query) => $query->whereKey((int) $this->selectedReportTemplate))
             ->orderBy('id')
             ->first();
     }
@@ -631,7 +651,12 @@ trait ManagesReportTemplate
 
     private function managedTemplate(): ReportTemplate
     {
-        return ReportTemplate::query()->whereKey(app(PlaceBridge::class)->templateIdsOfProject($this->projectId))->orderBy('id')->firstOrFail();
+        $templateIds = app(PlaceBridge::class)->templateIdsOfProject($this->projectId);
+
+        return ReportTemplate::query()->whereKey($templateIds)
+            ->when(in_array((int) $this->selectedReportTemplate, $templateIds, true),
+                fn ($query) => $query->whereKey((int) $this->selectedReportTemplate))
+            ->orderBy('id')->firstOrFail();
     }
 
     /**

@@ -7,11 +7,13 @@ namespace App\Support;
 use App\Enums\ProjectStatus;
 use App\Enums\ReportTemplateLineStatus;
 use App\Enums\ReportTemplateStatus;
+use App\Enums\TemplatePlacementStatus;
 use App\Models\HrCenter;
 use App\Models\HrCity;
 use App\Models\Proposal;
 use App\Models\ReportTemplate;
 use App\Models\ReportTemplateLine;
+use App\Models\ReportTemplatePlacement;
 use App\Models\User;
 use App\Support\Reporting\PlaceBridge;
 use Illuminate\Database\Eloquent\Builder;
@@ -29,6 +31,26 @@ use Illuminate\Support\Facades\DB;
  */
 final class ReportTemplateQueue
 {
+    /** @return list<array<string, mixed>> */
+    public static function placementRowsFor(User $user): array
+    {
+        return array_values(ReportTemplatePlacement::query()->manageableBy($user)
+            ->where('status', TemplatePlacementStatus::Pending)
+            ->with(['proposal:id,name,internal_project_number', 'program', 'city'])
+            ->orderBy('id')->get()->map(function (ReportTemplatePlacement $placement): array {
+                return [
+                    'placement' => $placement, 'category' => 'placement', 'template' => null, 'project' => null,
+                    'name' => $placement->proposal->name,
+                    'status' => ReportTemplateStatus::Pending, 'pendingLineCount' => 0, 'annualPlanLineCount' => 0,
+                    'templateProposals' => [], 'proposals' => [['id' => $placement->proposal_id, 'name' => $placement->proposal->name, 'number' => $placement->proposal->internal_project_number]],
+                    'cityId' => $placement->city_id, 'cityName' => $placement->city?->name,
+                    'centerName' => $placement->city_wide ? __('report_templates.queue.field_work')
+                        : HrCenter::remembered($placement->center_id)?->name,
+                    'programName' => $placement->program->name,
+                ];
+            })->values()->all());
+    }
+
     /**
      * The queue rows for this user, pending templates first, then by project name.
      *
