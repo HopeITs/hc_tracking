@@ -148,3 +148,7 @@ test('a grouped monthly report activation sends exactly one notification', funct
         ->filter(fn (UserNotification $row): bool => $row->data['key'] === 'notifications.events.monthly_reports.generated')
         ->count())->toBe(1);
 });
+
+test('a place coverage assignment has its own event catalog entry', function () {
+    expect(EventCatalog::keyForActivity('meal_coverage.place_assigned'))->toBe('meal_coverage.place_assigned');
+});

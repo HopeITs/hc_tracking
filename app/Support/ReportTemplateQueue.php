@@ -22,7 +22,7 @@ use Illuminate\Support\Facades\DB;
 /**
  * MEAL's "Templates to confirm" queue (contracts.md §12.4, T33 slice 3): the
  * templates still pending, plus the confirmed ones that received pending
- * lines (D-41), of the projects the user covers (MealCoverage::projectsCoveredBy());
+ * lines (D-41), at the places the user covers (MealCoverage::scopeCoveredBy());
  * every project for the MEAL Manager slot holder.
  *
  * A fixed number of queries whatever the row count: the templates with their
@@ -76,13 +76,12 @@ final class ReportTemplateQueue
             return [];
         }
 
-        $coveredProjectIds = $employeeId === Slots::holderOf('meal_manager') ? null : MealCoverage::projectsCoveredBy($employeeId);
-
-        if ($coveredProjectIds === []) {
-            return [];
+        $query = ReportTemplate::query();
+        if ($employeeId !== Slots::holderOf('meal_manager')) {
+            MealCoverage::scopeCoveredBy($query, $employeeId);
         }
 
-        $templates = ReportTemplate::query()
+        $templates = $query
             ->select(['id', 'project_id', 'city_id', 'program_id', 'center_id', 'city_wide', 'status', 'updated_at'])
             ->where(fn (Builder $query) => $query
                 ->where('status', ReportTemplateStatus::Pending->value)
@@ -94,14 +93,14 @@ final class ReportTemplateQueue
         $legacyIds = $bridge->legacyProjectIdsFor($templates);
         $projects = $bridge->projectsByIds(array_values(array_unique(array_filter($legacyIds))));
 
-        $templates = $templates->filter(function (ReportTemplate $template) use ($legacyIds, $projects, $coveredProjectIds): bool {
+        $templates = $templates->filter(function (ReportTemplate $template) use ($legacyIds, $projects): bool {
             $project = $projects->get($legacyIds[$template->id] ?? 0);
 
             if ($project !== null && ! in_array($project->status, [ProjectStatus::Approved, ProjectStatus::Active], true)) {
                 return false;
             }
 
-            return $coveredProjectIds === null || ($project !== null && in_array($project->id, $coveredProjectIds, true));
+            return true;
         })->values();
 
         if ($templates->isEmpty()) {

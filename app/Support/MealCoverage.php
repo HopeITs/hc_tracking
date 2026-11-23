@@ -9,10 +9,10 @@ use App\Models\HrEmployee;
 use App\Models\MealCoverageAssignment;
 use App\Models\Project;
 use App\Models\ProposalLocation;
+use App\Support\Locations\ProjectSuccessor;
 use App\Support\Reporting\ReportPlace;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Query\Builder as QueryBuilder;
-use Illuminate\Support\Collection;
 
 /**
  * Who validates a project's monthly reports (contracts Â§12.3, D-12/D-12a).
@@ -67,6 +67,21 @@ final class MealCoverage
         return array_values($officers);
     }
 
+    /**
+     * Resolve all place officers for callers that still carry a legacy project
+     * identifier during the annual-plan and notification transition.
+     *
+     * @return list<int>
+     */
+    public static function officersForLegacyProject(int $projectId, ?int $proposalId = null): array
+    {
+        return app(ProjectSuccessor::class)->rowsFor($projectId)
+            ->filter(fn (ProposalLocation $row): bool => $proposalId === null || $row->proposal_id === $proposalId)
+            ->loadMissing('centers')
+            ->flatMap(self::responsibleForLocation(...))
+            ->unique()->values()->all();
+    }
+
     public static function covers(int $employeeId, ReportPlace $place): bool
     {
         return self::responsibleForPlace($place) === $employeeId;
@@ -76,12 +91,23 @@ final class MealCoverage
      * Select direct place assignments and governorate coverage only where
      * there is no explicit place assignment.
      */
-    public static function scopeCoveredBy(Builder $query, int $employeeId): Builder
+    public static function scopeCoveredBy(Builder $query, int $employeeId, bool $includeUnassigned = false): Builder
     {
-        $column = $query->getModel()->qualifyColumn(...);
-        $atPlace = static function (QueryBuilder $place) use ($column): void {
+        self::constrainPlaceColumns($query, $employeeId, $query->getModel()->qualifyColumn(...), $includeUnassigned);
+
+        return $query;
+    }
+
+    /** @param callable(string): string $column */
+    public static function constrainPlaceColumns(Builder|QueryBuilder $query, int $employeeId, callable $column, bool $includeUnassigned = false): void
+    {
+        $active = self::activeEmployeeIds(MealCoverageAssignment::query()
+            ->whereIn('scope_type', ['city', 'place'])->distinct()->pluck('employee_id')->map(intval(...))->all());
+        $manager = self::mealManagerEmployeeId();
+        $allowUnassigned = $includeUnassigned && ($manager === null || self::activeEmployeeIds([$manager]) === []);
+        $atPlace = static function (QueryBuilder $place) use ($column, $active): void {
             $place->selectRaw('1')->from('meal_coverages as place_coverage')
-                ->where('place_coverage.scope_type', 'place')
+                ->where('place_coverage.scope_type', 'place')->whereIn('place_coverage.employee_id', $active)
                 ->whereColumn('place_coverage.city_id', $column('city_id'))
                 ->whereColumn('place_coverage.program_id', $column('program_id'))
                 ->whereColumn('place_coverage.city_wide', $column('city_wide'))
@@ -91,84 +117,31 @@ final class MealCoverage
                         ->whereNull('place_coverage.center_id')->whereNull($column('center_id'))));
         };
 
-        return $query->whereExists(function (QueryBuilder $coverage) use ($column, $employeeId, $atPlace): void {
-            $coverage->selectRaw('1')->from('meal_coverages as coverage')
-                ->where('coverage.employee_id', $employeeId)
-                ->whereColumn('coverage.city_id', $column('city_id'))
-                ->where(fn (QueryBuilder $scope) => $scope
-                    ->where(fn (QueryBuilder $direct) => $direct->where('coverage.scope_type', 'place')
-                        ->whereExists(fn (QueryBuilder $place) => $atPlace($place->whereColumn('place_coverage.id', 'coverage.id'))))
-                    ->orWhere(fn (QueryBuilder $city) => $city->where('coverage.scope_type', 'city')->whereNotExists($atPlace)));
+        $query->where(function (Builder|QueryBuilder $result) use ($column, $employeeId, $atPlace, $active, $allowUnassigned): void {
+            $result->whereExists(function (QueryBuilder $coverage) use ($column, $employeeId, $atPlace, $active): void {
+                $coverage->selectRaw('1')->from('meal_coverages as coverage')
+                    ->where('coverage.employee_id', $employeeId)
+                    ->whereIn('coverage.employee_id', $active)
+                    ->whereColumn('coverage.city_id', $column('city_id'))
+                    ->where(fn (QueryBuilder $scope) => $scope
+                        ->where(fn (QueryBuilder $direct) => $direct->where('coverage.scope_type', 'place')
+                            ->whereExists(fn (QueryBuilder $place) => $atPlace($place->whereColumn('place_coverage.id', 'coverage.id'))))
+                        ->orWhere(fn (QueryBuilder $city) => $city->where('coverage.scope_type', 'city')->whereNotExists($atPlace)));
+            });
+
+            if ($allowUnassigned) {
+                $result->orWhere(fn (Builder|QueryBuilder $unassigned) => $unassigned
+                    ->whereNotExists($atPlace)
+                    ->whereNotExists(fn (QueryBuilder $city) => $city->selectRaw('1')->from('meal_coverages as city_coverage')
+                        ->where('city_coverage.scope_type', 'city')
+                        ->whereIn('city_coverage.employee_id', $active)
+                        ->whereColumn('city_coverage.city_id', $column('city_id'))));
+            }
         });
     }
 
     /**
-     * The active project officer, else the active officer of the project's
-     * governorate (its center's city, falling back to projects.city_id), else
-     * the active MEAL Manager slot holder, else null (callers then use the
-     * MEAL role holders).
-     */
-    public static function responsibleFor(Project $project): ?int
-    {
-        $cityId = self::cityIdOf($project);
-
-        $rows = MealCoverageAssignment::query()
-            ->select(['id', 'scope_type', 'city_id', 'project_id', 'employee_id'])
-            ->where(fn ($query) => $query
-                ->where('project_id', $project->getKey())
-                ->when($cityId !== null, fn ($query) => $query->orWhere('city_id', $cityId)))
-            ->get();
-
-        $candidates = array_values(array_filter([
-            $rows->firstWhere('scope_type', MealCoverageScope::Project)?->employee_id,
-            $rows->firstWhere('scope_type', MealCoverageScope::City)?->employee_id,
-            self::mealManagerEmployeeId(),
-        ], fn (?int $employeeId): bool => $employeeId !== null));
-
-        $activeIds = self::activeEmployeeIds($candidates);
-
-        foreach ($candidates as $employeeId) {
-            if (in_array($employeeId, $activeIds, true)) {
-                return $employeeId;
-            }
-        }
-
-        return null;
-    }
-
-    /**
-     * The projects assigned to the employee directly, plus the projects in
-     * the governorates they cover, excluding projects assigned to someone else.
-     *
-     * @return list<int>
-     */
-    public static function projectsCoveredBy(int $employeeId): array
-    {
-        /** @var Collection<int, MealCoverageAssignment> $rows */
-        $rows = MealCoverageAssignment::query()->get(['id', 'scope_type', 'city_id', 'project_id', 'employee_id']);
-        $projectRows = $rows->where('scope_type', MealCoverageScope::Project);
-
-        $directIds = $projectRows->where('employee_id', $employeeId)->pluck('project_id')->map(fn (int $id): int => $id)->all();
-        $takenIds = $projectRows->where('employee_id', '!=', $employeeId)->pluck('project_id')->map(fn (int $id): int => $id)->all();
-        $cityIds = $rows->where('scope_type', MealCoverageScope::City)->where('employee_id', $employeeId)->pluck('city_id')->map(fn (int $id): int => $id)->all();
-
-        $inheritedIds = $cityIds === [] ? [] : Project::query()
-            ->select(['id', 'city_id', 'center_id'])
-            ->where(fn ($query) => $query->whereIn('city_id', $cityIds)->orWhereNotNull('center_id'))
-            ->get()
-            ->filter(fn (Project $project): bool => in_array(self::cityIdOf($project), $cityIds, true)
-                && ! in_array($project->id, $takenIds, true))
-            ->pluck('id')
-            ->all();
-
-        $ids = array_values(array_unique([...$directIds, ...$inheritedIds]));
-        sort($ids);
-
-        return $ids;
-    }
-
-    /**
-     * The project's governorate: its center's city, else its own city_id.
+     * Legacy annual-plan and execution city lookup. Y-15 moves these readers to location rows.
      */
     public static function cityIdOf(Project $project): ?int
     {

@@ -313,7 +313,16 @@ test('the officer assigned to the project is allowed though based in another gov
     holdMealManagerSlot();
     $officer = userWithRole('MEAL', insertHrEmployee(insertHrCity('Homs', 'حمص'), 'Nour', 'Ali'));
     ['project' => $project, 'template' => $template, 'line' => $line] = rtFixture();
-    rtCoverProject($project->id, $officer->employee_id);
+    $template->forceFill(['center_id' => null, 'city_wide' => true])->save();
+    $place = $template->place();
+    DB::table('meal_coverages')->insert([
+        'scope_type' => 'place',
+        'scope_key' => 'place:'.$place->key(),
+        'city_id' => $place->cityId,
+        'program_id' => $place->programId,
+        'city_wide' => true,
+        'employee_id' => $officer->employee_id,
+    ]);
     Event::fake([ProjectActivated::class]);
 
     rtConfirm($officer, $template, [$line->id]);

@@ -69,7 +69,16 @@ test('a responsible MEAL officer sees only the pending templates of the projects
     $officer = userWithRole('MEAL', insertHrEmployee(firstNameEn: 'Nour'));
     $covered = rtqTemplate('Aleppo Literacy');
     rtqTemplate('Homs Nutrition');
-    rtqCover($covered->project_id, $officer->employee_id);
+    $covered->forceFill(['center_id' => null, 'city_wide' => true])->save();
+    $place = $covered->place();
+    DB::table('meal_coverages')->insert([
+        'scope_type' => 'place',
+        'scope_key' => 'place:'.$place->key(),
+        'city_id' => $place->cityId,
+        'program_id' => $place->programId,
+        'city_wide' => true,
+        'employee_id' => $officer->employee_id,
+    ]);
 
     $this->actingAs($officer)
         ->get(route('report-templates.index'))
@@ -328,11 +337,21 @@ test('the separate-report dialog explains the consequence and creates its own te
 test('a covered officer sees and decides only their place choices', function () {
     $fixture = placementFixture();
     $officer = userWithRole('MEAL', insertHrEmployee());
-    rtqCover($fixture['project']->id, $officer->employee_id);
     $prefiller = app(ReportTemplatePrefiller::class);
     $prefiller->prefillForProposal($fixture['proposals'][0]);
     $prefiller->prefillForProposal($fixture['proposals'][1]);
     $placement = ReportTemplatePlacement::query()->where('proposal_id', $fixture['proposals'][1]->id)->sole();
+    $place = $placement->place();
+    DB::table('meal_coverages')->insert([
+        'scope_type' => 'place',
+        'scope_key' => 'place:'.$place->key(),
+        'city_id' => $place->cityId,
+        'program_id' => $place->programId,
+        'center_id' => $place->centerId,
+        'city_wide' => $place->cityWide,
+        'employee_id' => $officer->employee_id,
+    ]);
+
     Livewire::actingAs($officer)->test('pages::report-templates.index')
         ->assertSeeHtml('data-placement-row="'.$placement->id.'"')
         ->call('openPlacement', $placement->id)->assertHasNoErrors();

@@ -44,9 +44,6 @@ final class ReportExtraction
     /** @var list<CarbonImmutable>|null */
     private ?array $months = null;
 
-    /** @var list<ReportPlace>|null */
-    private ?array $minePlaces = null;
-
     /** @var Collection<int, stdClass>|null */
     private ?Collection $targetRows = null;
 
@@ -587,19 +584,15 @@ final class ReportExtraction
             return;
         }
 
-        $places = $this->minePlaces();
-
-        if ($places === []) {
+        $employeeId = Auth::user()?->employee_id;
+        if ($employeeId === null) {
             $query->whereRaw('1 = 0');
 
             return;
         }
 
-        $query->where(function (Builder $any) use ($places, $city, $program, $center, $cityWide): void {
-            foreach ($places as $place) {
-                $any->orWhere(fn (Builder $one) => $this->wherePlaceIs($one, $place, $city, $program, $center, $cityWide));
-            }
-        });
+        $columns = ['city_id' => $city, 'program_id' => $program, 'center_id' => $center, 'city_wide' => $cityWide];
+        MealCoverage::constrainPlaceColumns($query, (int) $employeeId, fn (string $name): string => $columns[$name]);
     }
 
     private function wherePlaceIs(Builder $query, ReportPlace $place, string $city, string $program, string $center, string $cityWide): Builder
@@ -608,24 +601,6 @@ final class ReportExtraction
             ->where($program, $place->programId)
             ->where($cityWide, $place->cityWide)
             ->when($place->centerId === null, fn (Builder $q) => $q->whereNull($center), fn (Builder $q) => $q->where($center, $place->centerId));
-    }
-
-    /**
-     * The places of the projects the viewer covers as MEAL (contracts §12.3,
-     * D-12a), as "my projects" read them before Y-05.
-     *
-     * @return list<ReportPlace>
-     */
-    private function minePlaces(): array
-    {
-        if ($this->minePlaces !== null) {
-            return $this->minePlaces;
-        }
-
-        $employeeId = Auth::user()?->employee_id;
-        $projectIds = $employeeId === null ? [] : MealCoverage::projectsCoveredBy((int) $employeeId);
-
-        return $this->minePlaces = app(PlaceBridge::class)->placesOfProjects($projectIds);
     }
 
     /**

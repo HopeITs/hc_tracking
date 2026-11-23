@@ -44,6 +44,12 @@ beforeEach(function () {
     $this->aleppo = insertHrCity('Aleppo', 'حلب');
     $this->centre = Project::factory()->create(['program_id' => $this->program->id, 'city_id' => $this->aleppo, 'user_id' => $this->aleppoOwner, 'name' => 'Children University Aleppo']);
     DB::table('project_proposal')->insert(['project_id' => $this->centre->id, 'proposal_id' => $this->proposal->id]);
+    $this->proposal->locations()->create([
+        'project_id' => $this->centre->id,
+        'city_id' => $this->aleppo,
+        'program_id' => $this->program->id,
+        'city_wide' => true,
+    ]);
     MealCoverageAssignment::query()->create(['scope_type' => MealCoverageScope::City->value, 'city_id' => $this->aleppo, 'employee_id' => $this->officerEmployee]);
 
     $this->plan = ActivityPlan::factory()->approved()->create(['proposal_id' => $this->proposal->id, 'program_id' => $this->program->id]);

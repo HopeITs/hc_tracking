@@ -4,10 +4,12 @@ use App\Actions\Cities\AssignMealCoverage;
 use App\Enums\MealCoverageScope;
 use App\Models\Activity;
 use App\Models\MealCoverageAssignment;
-use App\Models\Project;
+use App\Models\Program;
+use App\Models\ReportTemplate;
 use App\Models\UserNotification;
 use App\Notifications\ActivityPresenter;
 use App\Support\MealCoverage;
+use App\Support\Reporting\ReportPlace;
 use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
@@ -20,17 +22,21 @@ function coverCity(int $cityId, int $employeeId): void
     Activity::withoutRecording(fn () => MealCoverageAssignment::factory()->forCity($cityId)->create(['employee_id' => $employeeId]));
 }
 
-/**
- * A project coverage row written without recording, for routing tests.
- */
-function coverProject(int $projectId, int $employeeId): void
+function coveragePlace(int $city, ?int $center = null, bool $wide = true): ReportPlace
 {
-    Activity::withoutRecording(fn () => MealCoverageAssignment::factory()->forProject($projectId)->create(['employee_id' => $employeeId]));
+    return new ReportPlace($city, Program::factory()->create()->id, $center, $wide);
 }
 
-function projectInCity(int $cityId, ?int $centerId = null): Project
+function coveragePlaceFields(ReportPlace $place): array
 {
-    return Activity::withoutRecording(fn () => Project::factory()->create(['city_id' => $cityId, 'center_id' => $centerId]));
+    return ['city_id' => $place->cityId, 'program_id' => $place->programId, 'center_id' => $place->centerId, 'city_wide' => $place->cityWide];
+}
+
+function coverPlace(ReportPlace $place, int $employee): void
+{
+    DB::table('meal_coverages')->insert(coveragePlaceFields($place) + [
+        'scope_type' => 'place', 'scope_key' => 'place:'.$place->key(), 'employee_id' => $employee,
+    ]);
 }
 
 test('assigning a governorate officer stores who assigned them and records the activity', function () {
@@ -123,7 +129,7 @@ test('a city inactive in hr can still be given an officer', function () {
     expect(DB::table('meal_coverages')->where('city_id', $tartus)->exists())->toBeTrue();
 });
 
-test('a project officer from another governorate notifies the new officer and the governorate officer', function () {
+test('a place officer from another governorate notifies the new officer and the governorate officer', function () {
     $manager = mealManager();
     $aleppo = insertHrCity('Aleppo');
     $governorateOfficer = insertHrEmployee(firstNameEn: 'Rami', lastNameEn: 'Saleh');
@@ -131,27 +137,28 @@ test('a project officer from another governorate notifies the new officer and th
     $governorateUser = userWithRole('MEAL', $governorateOfficer);
     $projectUser = userWithRole('MEAL', $projectOfficer);
     coverCity($aleppo, $governorateOfficer);
-    $project = projectInCity($aleppo);
+    $place = coveragePlace($aleppo);
 
     $this->actingAs($manager);
-    app(AssignMealCoverage::class)->handle(MealCoverageScope::Project, $project->id, $projectOfficer);
+    app(AssignMealCoverage::class)->handle(MealCoverageScope::Place, coveragePlaceFields($place), $projectOfficer);
 
-    $row = DB::table('meal_coverages')->where('scope_type', 'project')->sole();
+    $row = DB::table('meal_coverages')->where('scope_type', 'place')->sole();
 
-    expect($row->project_id)->toBe($project->id)
-        ->and($row->city_id)->toBeNull()
-        ->and(Activity::query()->sole()->event)->toBe('meal_coverage.project_assigned')
-        ->and(UserNotification::query()->forUser($projectUser)->sole()->data['key'])->toBe('notifications.events.meal_coverage.project_assigned_you')
-        ->and(UserNotification::query()->forUser($governorateUser)->sole()->data['key'])->toBe('notifications.events.meal_coverage.project_assigned');
+    expect($row->project_id)->toBeNull()
+        ->and($row->city_id)->toBe($aleppo)
+        ->and(Activity::query()->where('event', 'meal_coverage.place_assigned')->sole()->event)->toBe('meal_coverage.place_assigned')
+        ->and(UserNotification::query()->forUser($projectUser)->sole()->data['key'])->toBe('notifications.events.meal_coverage.place_assigned_you')
+        ->and(UserNotification::query()->forUser($governorateUser)->sole()->data['key'])->toBe('notifications.events.meal_coverage.place_assigned');
 });
 
-test('a project that does not exist cannot be given an officer', function () {
+test('a center outside the selected governorate cannot be given an officer', function () {
     $manager = mealManager();
 
     $this->actingAs($manager);
 
-    expect(fn () => app(AssignMealCoverage::class)->handle(MealCoverageScope::Project, 999_999, insertHrEmployee()))
-        ->toThrow(ValidationException::class, 'Project not found.');
+    $place = coveragePlace(insertHrCity('Aleppo'), insertHrCenter(insertHrCity('Homs')), false);
+    expect(fn () => app(AssignMealCoverage::class)->handle(MealCoverageScope::Place, coveragePlaceFields($place), insertHrEmployee()))
+        ->toThrow(ValidationException::class);
 });
 
 test('only the meal manager slot holder with the coverage permission may assign', function (string $role, bool $holdsSlot) {
@@ -192,60 +199,61 @@ test('a create race on the same city ends with one row holding the latest office
         ->and(DB::table('meal_coverages')->value('employee_id'))->toBe($officer);
 });
 
-test('the project officer outranks the governorate officer', function () {
+test('the place officer outranks the governorate officer', function () {
     $aleppo = insertHrCity('Aleppo');
-    $project = projectInCity($aleppo);
+    $place = coveragePlace($aleppo);
     coverCity($aleppo, insertHrEmployee());
-    coverProject($project->id, $projectOfficer = insertHrEmployee(cityId: insertHrCity('Homs', 'حمص')));
+    coverPlace($place, $projectOfficer = insertHrEmployee(cityId: insertHrCity('Homs', 'حمص')));
 
-    expect(MealCoverage::responsibleFor($project))->toBe($projectOfficer);
+    expect(MealCoverage::responsibleForPlace($place))->toBe($projectOfficer);
 });
 
-test('a project with no officer of its own inherits the officer of its center\'s governorate', function () {
+test('a place with no officer of its own inherits the officer of its center\'s governorate', function () {
     $aleppo = insertHrCity('Aleppo');
     $homs = insertHrCity('Homs', 'حمص');
     coverCity($aleppo, $aleppoOfficer = insertHrEmployee());
     coverCity($homs, insertHrEmployee());
-    $project = projectInCity($homs, insertHrCenter($aleppo));
+    $place = coveragePlace($aleppo, insertHrCenter($aleppo), false);
 
-    expect(MealCoverage::responsibleFor($project))->toBe($aleppoOfficer);
+    expect(MealCoverage::responsibleForPlace($place))->toBe($aleppoOfficer);
 });
 
-test('a project without a center falls back to its own city', function () {
+test('an unset place falls back to its own city', function () {
     $aleppo = insertHrCity('Aleppo');
     coverCity($aleppo, $officer = insertHrEmployee());
 
-    expect(MealCoverage::responsibleFor(projectInCity($aleppo)))->toBe($officer);
+    expect(MealCoverage::responsibleForPlace(coveragePlace($aleppo, wide: false)))->toBe($officer);
 });
 
 test('inactive officers are skipped down to the meal manager slot holder', function () {
     $aleppo = insertHrCity('Aleppo');
-    $project = projectInCity($aleppo);
-    coverProject($project->id, insertHrEmployee(isActive: false));
+    $place = coveragePlace($aleppo);
+    coverPlace($place, insertHrEmployee(isActive: false));
     coverCity($aleppo, insertHrEmployee(isActive: false));
     $managerId = holdMealManagerSlot();
 
-    expect(MealCoverage::responsibleFor($project))->toBe($managerId);
+    expect(MealCoverage::responsibleForPlace($place))->toBe($managerId);
 });
 
 test('with no officer and a vacant meal manager slot nobody is responsible', function () {
-    expect(MealCoverage::responsibleFor(projectInCity(insertHrCity('Aleppo'))))->toBeNull();
+    expect(MealCoverage::responsibleForPlace(coveragePlace(insertHrCity('Aleppo'))))->toBeNull();
 });
 
-test('an officer covers their own projects and their governorates\' projects, except those given to someone else', function () {
+test('the place scope includes direct and inherited places and excludes another officer’s place', function () {
     $aleppo = insertHrCity('Aleppo');
-    $homs = insertHrCity('Homs', 'حمص');
+    $homs = insertHrCity('Homs');
     $officer = insertHrEmployee();
     coverCity($aleppo, $officer);
+    $inherited = coveragePlace($aleppo);
+    $taken = coveragePlace($aleppo);
+    $direct = coveragePlace($homs);
+    $outside = coveragePlace($homs);
+    coverPlace($taken, insertHrEmployee());
+    coverPlace($direct, $officer);
+    $templates = collect([$inherited, $taken, $direct, $outside])->map(
+        fn (ReportPlace $place) => ReportTemplate::factory()->create(coveragePlaceFields($place)),
+    );
 
-    $inherited = projectInCity($aleppo);
-    $viaCenter = projectInCity($homs, insertHrCenter($aleppo));
-    $takenByOther = projectInCity($aleppo);
-    coverProject($takenByOther->id, insertHrEmployee());
-    $direct = projectInCity($homs);
-    coverProject($direct->id, $officer);
-    projectInCity($homs);
-
-    expect(MealCoverage::projectsCoveredBy($officer))
-        ->toEqualCanonicalizing([$inherited->id, $viaCenter->id, $direct->id]);
+    expect(MealCoverage::scopeCoveredBy(ReportTemplate::query(), $officer)->pluck('id')->all())
+        ->toEqualCanonicalizing([$templates[0]->id, $templates[2]->id]);
 });

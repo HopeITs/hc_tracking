@@ -105,7 +105,7 @@ final class PlanNotifier
             }
 
             if (in_array('officer', $to, true)) {
-                $employeeIds[] = MealCoverage::responsibleFor($centre);
+                $employeeIds = [...$employeeIds, ...MealCoverage::officersForLegacyProject($centre->id, $plan->proposal_id)];
             }
         }
 

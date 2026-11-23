@@ -61,7 +61,7 @@ new class extends Component {
                 'href' => route('monthly-reports.show', $report),
                 'date' => $report->submitted_at?->toImmutable(),
                 'subject' => $report,
-                'targets' => $this->others($report->project === null ? [] : [MealCoverage::responsibleFor($report->project)]),
+                'targets' => $this->others($report->template === null ? [] : [MealCoverage::responsibleForPlace($report->template->place())]),
             ]);
 
         $reviews = DeskWork::waitingReviews($user)

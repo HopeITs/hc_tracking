@@ -200,7 +200,7 @@ new #[Layout('layouts::desk'), Title('titles.annual_plans')] class extends Compo
 
             foreach ($execution->projects() as $centre) {
                 $isProjectManager = PlanUpdatePolicy::isProjectManager($user, $centre) && ! $user->hasRole('Super Admin');
-                $isOfficer = $user->employee_id !== null && MealCoverage::responsibleFor($centre) === (int) $user->employee_id;
+                $isOfficer = $user->employee_id !== null && in_array((int) $user->employee_id, MealCoverage::officersForLegacyProject($centre->id), true);
 
                 foreach ($execution->startedMonths($today) as $month) {
                     $update = $execution->update($centre, $month);

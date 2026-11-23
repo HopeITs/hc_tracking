@@ -13,8 +13,10 @@ use App\Livewire\Concerns\FiltersReportPlaces;
 use App\Models\Donor;
 use App\Models\HrCity;
 use App\Models\LibraryIndicator;
+use App\Models\PlanIndicator;
 use App\Models\Program;
 use App\Models\Proposal;
+use App\Models\ReportTemplate;
 use App\Models\StrategicPillar;
 use App\Support\MealCoverage;
 use App\Support\Reporting\ExtractionFilter;
@@ -232,7 +234,7 @@ trait BuildsMonthlyMatrix
     #[Computed]
     public function hasNoAssignedProjects(): bool
     {
-        return $this->mine && $this->coveredProjectIds() === [];
+        return $this->mine && ! $this->hasCoveredPlaces();
     }
 
     /**
@@ -473,17 +475,14 @@ trait BuildsMonthlyMatrix
         $this->year = '';
     }
 
-    /**
-     * The project ids "my projects" narrows the Activities tab to
-     * (contracts §12.3, D-12a).
-     *
-     * @return list<int>
-     */
-    protected function coveredProjectIds(): array
+    protected function hasCoveredPlaces(): bool
     {
         $employeeId = Auth::user()?->employee_id;
 
-        return $employeeId === null ? [] : MealCoverage::projectsCoveredBy((int) $employeeId);
+        return $employeeId !== null && (
+            MealCoverage::scopeCoveredBy(ReportTemplate::query(), (int) $employeeId)->exists()
+            || MealCoverage::scopeCoveredBy(PlanIndicator::query(), (int) $employeeId)->exists()
+        );
     }
 
     /**

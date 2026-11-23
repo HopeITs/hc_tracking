@@ -36,7 +36,7 @@ final class FireActivityPlanFollowUps
         }
 
         $execution = PlanExecution::for($plan->fresh());
-        $officer = MealCoverage::responsibleFor($project);
+        $officers = MealCoverage::officersForLegacyProject($project->id, $plan->proposal_id);
 
         foreach ($plan->followUps as $followUp) {
             $item = $execution->plan->items->firstWhere('id', $followUp->activity_plan_item_id);
@@ -49,7 +49,7 @@ final class FireActivityPlanFollowUps
                 continue;
             }
 
-            DB::transaction(function () use ($followUp, $item, $project, $officer, $plan, $update): void {
+            DB::transaction(function () use ($followUp, $item, $project, $officers, $plan, $update): void {
                 $task = Task::query()->create([
                     'source_type' => 'project',
                     'source_id' => $project->id,
@@ -61,7 +61,7 @@ final class FireActivityPlanFollowUps
                     'created_by' => $plan->approved_by ?? $followUp->created_by,
                 ]);
 
-                if ($officer !== null) {
+                foreach ($officers as $officer) {
                     $task->taskAssignees()->create(['employee_id' => $officer]);
                 }
 

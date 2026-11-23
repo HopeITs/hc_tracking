@@ -537,6 +537,11 @@ return [
                 'body' => 'جعل :actor :employee مسؤول المتابعة والتقييم في «:subject» بدلًا من :from',
             ],
             'responsible_changed_you' => 'جعلك :actor مسؤول المتابعة والتقييم في «:subject»',
+            'place_assigned' => [
+                'title' => 'تعيين مسؤول متابعة وتقييم لمشروع',
+                'body' => 'جعل :actor :employee مسؤول المتابعة والتقييم للموقع «:subject»',
+            ],
+            'place_assigned_you' => 'جعلك :actor مسؤول المتابعة والتقييم للموقع «:subject»',
             'project_assigned' => [
                 'title' => 'تعيين مسؤول متابعة وتقييم لمشروع',
                 'body' => 'جعل :actor :employee مسؤول المتابعة والتقييم للمشروع «:subject»',
@@ -933,7 +938,10 @@ return [
             ],
         ],
         'report_template' => [
-            'placement_pending' => 'يحتاج :subject إلى اختيار طريقة إعداد التقرير.',
+            'placement_pending' => [
+                'title' => 'يلزم اختيار طريقة إعداد التقرير',
+                'body' => 'يحتاج :subject إلى اختيار طريقة إعداد التقرير.',
+            ],
             'created' => 'أُنشئ قالب تقرير المشروع «:subject»',
             'updated' => 'عدّل :actor قالب تقرير المشروع «:subject»',
             'pending' => [

@@ -5,6 +5,7 @@ namespace Database\Factories;
 use App\Enums\MealCoverageScope;
 use App\Models\MealCoverageAssignment;
 use App\Models\Project;
+use App\Support\Reporting\ReportPlace;
 use Database\Factories\Concerns\CreatesHrRecords;
 use Illuminate\Database\Eloquent\Factories\Factory;
 
@@ -50,6 +51,19 @@ class MealCoverageAssignmentFactory extends Factory
             'scope_type' => MealCoverageScope::Project,
             'city_id' => null,
             'project_id' => $projectId ?? Project::factory(),
+        ]);
+    }
+
+    public function forPlace(ReportPlace $place): static
+    {
+        return $this->state([
+            'scope_type' => MealCoverageScope::Place,
+            'city_id' => $place->cityId,
+            'program_id' => $place->programId,
+            'center_id' => $place->centerId,
+            'city_wide' => $place->cityWide,
+            'scope_key' => 'place:'.$place->key(),
+            'project_id' => null,
         ]);
     }
 }

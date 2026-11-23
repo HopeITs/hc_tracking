@@ -2,7 +2,9 @@
 
 use App\Models\Activity;
 use App\Models\MealCoverageAssignment;
+use App\Models\Program;
 use App\Models\Project;
+use App\Models\ReportTemplate;
 use App\Models\User;
 use Illuminate\Support\Facades\DB;
 use Livewire\Livewire;
@@ -194,18 +196,27 @@ test('each governorate shows its meal officer in the grid and on the map, flaggi
         ->assertSee(__('cities.responsible_inactive'));
 })->with(['grid', 'map']);
 
-test('the project officers section shows each project\'s own officer or the inherited one, and searches projects', function () {
+function cityCoverageTemplate(int $city, string $name): ReportTemplate
+{
+    $program = Program::factory()->create(['name' => $name]);
+
+    return ReportTemplate::factory()->create([
+        'city_id' => $city, 'program_id' => $program->id, 'center_id' => null, 'city_wide' => true,
+    ]);
+}
+
+test('the place officers section shows direct and inherited officers and searches places', function () {
     $aleppo = insertHrCity('Aleppo');
-    $own = Project::factory()->create(['city_id' => $aleppo, 'name' => 'Wells Of Hope']);
-    Project::factory()->create(['city_id' => $aleppo, 'name' => 'Study Zone']);
+    $own = cityCoverageTemplate($aleppo, 'Wells Of Hope');
+    cityCoverageTemplate($aleppo, 'Study Zone');
     Activity::withoutRecording(function () use ($aleppo, $own): void {
         MealCoverageAssignment::factory()->forCity($aleppo)->create(['employee_id' => insertHrEmployee(firstNameEn: 'Nour', lastNameEn: 'Ali')]);
-        MealCoverageAssignment::factory()->forProject($own->id)->create(['employee_id' => insertHrEmployee(firstNameEn: 'Lina', lastNameEn: 'Haddad')]);
+        MealCoverageAssignment::factory()->forPlace($own->place())->create(['employee_id' => insertHrEmployee(firstNameEn: 'Lina', lastNameEn: 'Haddad')]);
     });
 
     Livewire::actingAs(User::factory()->role('MEAL')->create())
         ->test('pages::admin.cities')
-        ->assertSee(__('cities.project_officers'))
+        ->assertSee(__('cities.meal_place_officers'))
         ->assertSee('Lina Haddad')
         ->assertSee(__('cities.inherited_from_governorate'))
         ->set('projectSearch', 'Wells')
@@ -232,19 +243,23 @@ test('the meal manager assigns a governorate officer through the modal', functio
     expect(DB::table('meal_coverages')->where('city_id', $aleppo)->value('employee_id'))->toBe($officer);
 });
 
-test('the meal manager gives a project its own officer through the modal', function () {
-    $project = Project::factory()->create(['city_id' => insertHrCity('Aleppo'), 'name' => 'Wells Of Hope']);
+test('the meal manager assigns and reassigns a place officer through the modal', function () {
+    $place = cityCoverageTemplate(insertHrCity('Aleppo'), 'Wells Of Hope')->place();
     $officer = insertHrEmployee(firstNameEn: 'Lina', lastNameEn: 'Haddad');
+    $next = insertHrEmployee(firstNameEn: 'Nour', lastNameEn: 'Ali');
 
     Livewire::actingAs(mealManager())
         ->test('pages::admin.cities')
-        ->assertSeeHtml('data-test="assign-meal-officer-project-'.$project->id.'"')
-        ->call('openMealModal', 'project', $project->id)
+        ->assertSeeHtml('data-test="assign-meal-officer-place-'.$place->key().'"')
+        ->call('openMealModal', 'place', $place->key())
         ->set('mealEmployeeId', (string) $officer)
-        ->call('saveMealCoverage')
-        ->assertHasNoErrors();
+        ->call('saveMealCoverage')->assertHasNoErrors()
+        ->call('openMealModal', 'place', $place->key())
+        ->assertSet('mealEmployeeId', (string) $officer)
+        ->set('mealEmployeeId', (string) $next)
+        ->call('saveMealCoverage')->assertHasNoErrors();
 
-    expect(DB::table('meal_coverages')->where('project_id', $project->id)->value('employee_id'))->toBe($officer);
+    expect(DB::table('meal_coverages')->where('scope_key', 'place:'.$place->key())->sole()->employee_id)->toBe($next);
 });
 
 test('the modal refuses an employee inactive in hr and warns about a city inactive in hr', function () {
@@ -296,10 +311,10 @@ test('meal coverage adds a flat number of queries however many cities and projec
     };
     $cover = function (): void {
         $cityId = insertHrCity(fake()->unique()->city());
-        $project = Project::factory()->create(['city_id' => $cityId]);
-        Activity::withoutRecording(function () use ($cityId, $project): void {
+        $template = cityCoverageTemplate($cityId, fake()->unique()->word());
+        Activity::withoutRecording(function () use ($cityId, $template): void {
             MealCoverageAssignment::factory()->forCity($cityId)->create();
-            MealCoverageAssignment::factory()->forProject($project->id)->create();
+            MealCoverageAssignment::factory()->forPlace($template->place())->create();
         });
     };
 

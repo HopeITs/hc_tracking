@@ -10,6 +10,7 @@ use App\Models\Proposal;
 use App\Models\ProposalLocation;
 use App\Models\User;
 use App\Support\MealCoverage;
+use App\Support\Reporting\ReportPlace;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
 use Livewire\Livewire;
@@ -336,7 +337,7 @@ describe('hosted projects (W-01, D-55)', function () {
         MealCoverageAssignment::factory()->forCity($this->idlebId)->create(['employee_id' => $officer]);
         $project = Project::factory()->create(['center_id' => null, 'host_center_id' => $this->hostId, 'city_id' => $this->idlebId]);
 
-        expect(MealCoverage::responsibleFor($project))->toBe($officer);
+        expect(MealCoverage::responsibleForPlace(new ReportPlace($project->city_id, (int) $project->program_id, null, false)))->toBe($officer);
     });
 });
 
