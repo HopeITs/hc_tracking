@@ -14,7 +14,8 @@ use Illuminate\Support\Facades\DB;
 /**
  * Move a proposal's activity calendar once, when the donor approves it
  * (contracts §11.2, D-49): every scheduled month of its framework's
- * activities — the proposal calendar and every center override — moves by
+ * activities — the proposal calendar and every location row's override
+ * (with its row's `project_id`, Y-15) — moves by
  * the whole months between the planned and the actual start, keeping its
  * weeks.
  *
@@ -51,7 +52,7 @@ final class ShiftActivitySchedulesOnApproval implements ShouldQueue
             $delta = (int) $proposal->planned_date_begin->startOfMonth()->diffInMonths($proposal->actual_date_begin->startOfMonth());
 
             $rows = ActivitySchedule::query()
-                ->select(['activity_schedules.id', 'activity_schedules.result_id', 'activity_schedules.project_id', 'activity_schedules.month', 'activity_schedules.weeks'])
+                ->select(['activity_schedules.id', 'activity_schedules.result_id', 'activity_schedules.project_id', 'activity_schedules.proposal_location_id', 'activity_schedules.month', 'activity_schedules.weeks'])
                 ->join('results', 'results.id', '=', 'activity_schedules.result_id')
                 ->where('results.proposal_id', $proposal->id)
                 ->lockForUpdate()
@@ -64,6 +65,7 @@ final class ShiftActivitySchedulesOnApproval implements ShouldQueue
                 foreach ($rows as $row) {
                     ActivitySchedule::query()->create([
                         'result_id' => $row->result_id,
+                        'proposal_location_id' => $row->proposal_location_id,
                         'project_id' => $row->project_id,
                         'month' => $row->month->addMonthsNoOverflow($delta)->toDateString(),
                         'weeks' => $row->weeks,

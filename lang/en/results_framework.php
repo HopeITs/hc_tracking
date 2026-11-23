@@ -210,4 +210,17 @@ return [
     'proposal_logframes_none' => 'No proposal logframe matches the search or program.',
     'proposal_logframes_empty' => 'No proposal has its own logframe yet.',
     'open_proposal_logframe' => "Open :name's logframe",
+
+    'console' => [
+        'backfill_applying' => 'Applying: calendar overrides will be moved onto their location row.',
+        'backfill_dry_run' => 'Dry run: nothing will be written.',
+        'backfill_seen' => 'Calendar overrides with no row yet',
+        'backfill_moved' => 'Moved onto a row',
+        'backfill_by_own_proposal' => 'Decided by the activity’s own proposal (no date rule)',
+        'backfill_by_date' => 'Decided by date',
+        'backfill_by_most_recent' => 'Decided by the most recent proposal',
+        'backfill_rows' => 'Overrides per row (row id x count): :rows.',
+        'backfill_unmapped' => 'Overrides no row could take (ids, left alone): :ids.',
+        'backfill_none' => 'none',
+    ],
 ];

@@ -20,6 +20,7 @@ use App\Models\Program;
 use App\Models\Project;
 use App\Models\ProjectActivityStatus;
 use App\Models\Proposal;
+use App\Models\ProposalLocation;
 use App\Models\ReportTemplate;
 use App\Models\Result;
 use App\Support\MonthlyReportActivities;
@@ -97,11 +98,29 @@ function mraActivity(ActivityKind $kind = ActivityKind::Continuous, ?int $propos
 }
 
 /**
+ * A month of the proposal calendar, or with $projectId a month of the override
+ * of the activity's proposal's location row carrying that project at the
+ * template's place (Y-15: overrides are keyed on the row).
+ *
  * @param  list<int>|null  $weeks
  */
 function mraSchedule(Result $activity, string $month, ?array $weeks = null, ?int $projectId = null): void
 {
-    ActivitySchedule::query()->create(['result_id' => $activity->id, 'project_id' => $projectId, 'month' => $month, 'weeks' => $weeks]);
+    $row = null;
+
+    if ($projectId !== null) {
+        $project = Project::query()->findOrFail($projectId);
+        $row = ProposalLocation::query()->where('proposal_id', $activity->proposal_id)->where('project_id', $projectId)->first()
+            ?? proposalRowForProject(Proposal::query()->findOrFail($activity->proposal_id), $project, false);
+    }
+
+    ActivitySchedule::query()->create([
+        'result_id' => $activity->id,
+        'proposal_location_id' => $row?->id,
+        'project_id' => $projectId,
+        'month' => $month,
+        'weeks' => $weeks,
+    ]);
 }
 
 function mraReport(string $month, MonthlyReportStatus $status = MonthlyReportStatus::Draft): MonthlyReport

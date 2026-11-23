@@ -23,13 +23,13 @@ use Illuminate\Support\Facades\DB;
  *
  * An activity of a donor-approved proposal of the report's template (Y-06,
  * D-78: every proposal a joined template carries; Y-03, D-76: the report's
- * own template) appears when its calendar schedules it in the month (the
- * project's override rows when it has any, else the proposal calendar) and
+ * own template) appears when its calendar schedules it in the month
+ * (ActivitySchedule::effectiveOf() at its proposal's location row at the
+ * template's place, Y-15) and
  * the month lies inside its proposal's schedule window, when its last status
  * confirmed by an earlier month is not final (not started, started, ongoing,
- * suspended), or when this report already has an entry for it. The schedule
- * overrides and the confirmed statuses stay keyed by the report's legacy
- * project until they move to places. Queries stay constant whatever the
+ * suspended), or when this report already has an entry for it. The confirmed
+ * statuses stay keyed by the report's legacy project until Y-15 slice 2. Queries stay constant whatever the
  * number of activities.
  */
 final class MonthlyReportActivities
@@ -59,10 +59,12 @@ final class MonthlyReportActivities
 
         $activityIds = $activities->modelKeys();
 
+        $locationIds = $report->loadMissing('template')->template?->locationIdsByProposal(array_values($proposalIds)) ?? [];
+
         /** @var Collection<int, Collection<int, ActivitySchedule>> $schedules */
         $schedules = ActivitySchedule::query()
             ->whereIn('result_id', $activityIds)
-            ->where(fn ($query) => $query->whereNull('project_id')->orWhere('project_id', $projectId))
+            ->where(fn ($query) => $query->whereNull('proposal_location_id')->when($locationIds !== [], fn ($query) => $query->orWhereIn('proposal_location_id', array_values($locationIds))))
             ->get()
             ->groupBy('result_id');
 
@@ -79,16 +81,11 @@ final class MonthlyReportActivities
         $windows = $proposals->mapWithKeys(fn (Proposal $proposal): array => [$proposal->id => ProposalFramework::scheduleWindow($proposal)]);
         $labelled = $proposals->count() > 1;
 
-        return $activities->map(function (Result $activity) use ($schedules, $statuses, $entered, $month, $report, $proposals, $windows, $labelled): ?array {
-            $rows = $schedules->get($activity->id, collect());
-            $calendar = $rows->contains(fn (ActivitySchedule $row): bool => $row->project_id !== null)
-                ? $rows->whereNotNull('project_id')
-                : $rows->whereNull('project_id');
+        return $activities->map(function (Result $activity) use ($schedules, $statuses, $entered, $month, $report, $proposals, $windows, $labelled, $locationIds): ?array {
+            $calendar = ActivitySchedule::effectiveOf($schedules->get($activity->id, collect()), $locationIds[$activity->proposal_id] ?? null);
             [$from, $to] = $windows->get($activity->proposal_id);
             $inWindow = $month->greaterThanOrEqualTo($from) && $month->lessThanOrEqualTo($to);
-            $scheduledRow = $inWindow
-                ? $calendar->first(fn (ActivitySchedule $row): bool => CarbonImmutable::parse($row->month)->isSameMonth($month))
-                : null;
+            $scheduled = $inWindow && array_key_exists($month->format('Y-m'), $calendar);
 
             $status = $statuses->get($activity->id);
             $confirmedEarlier = $status !== null
@@ -100,19 +97,18 @@ final class MonthlyReportActivities
 
             $listed = in_array($activity->id, $entered, true)
                 || $carried
-                || ($scheduledRow !== null && ! $stoppedEarlier);
+                || ($scheduled && ! $stoppedEarlier);
 
             if (! $listed) {
                 return null;
             }
 
-            /** @var list<int>|null $weeks */
-            $weeks = $scheduledRow?->weeks;
+            $weeks = $scheduled ? $calendar[$month->format('Y-m')] : null;
 
             return [
                 'activity' => $activity,
                 'proposal_name' => $labelled ? (string) $proposals->get($activity->proposal_id)?->name : null,
-                'scheduled' => $scheduledRow !== null,
+                'scheduled' => $scheduled,
                 'planned_weeks' => $weeks,
                 'carried_from' => $carried ? CarbonImmutable::parse($status->monthlyReport->period)->startOfMonth() : null,
                 'late' => $carried && $status->status === ActivityStatus::NotStarted,

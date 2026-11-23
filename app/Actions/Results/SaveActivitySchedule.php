@@ -18,21 +18,24 @@ use Illuminate\Validation\ValidationException;
 
 /**
  * Replace the calendar of one activity of a proposal's framework, for the
- * whole proposal or for one of its centers (contracts §11.2, D-49).
+ * whole proposal or for one of its location rows (contracts §11.2, D-49,
+ * Y-15).
  *
  * - Who: ActivitySchedulePolicy::update (MEAL and the proposal editor before
  *   approval, MEAL alone after it). After approval the change is logged on
  *   the activity as `result.updated` (field `schedule`).
  * - Scope: the activity is loaded through the proposal's framework and the
- *   project through the proposal's links (BOLA).
+ *   location row through the proposal's rows (BOLA). Each row written also
+ *   carries the row's `project_id`, still read by modules not yet moved
+ *   (until Y-18).
  * - Shape: a continuous activity runs every month from its first to its last;
  *   an event keeps the months given. Months lie inside
  *   ProposalFramework::scheduleWindow(); weeks are 1–5 and only on scheduled
- *   months. A center calendar saved empty falls back to the proposal's.
+ *   months. A row's calendar saved empty falls back to the proposal's.
  * - Concurrency: the editor sends the version it saw (ActivitySchedule::
  *   versionOf()); a calendar changed meanwhile is refused and nothing is
  *   written. The activity row lock also covers the proposal-calendar rows,
- *   whose NULL project the unique index cannot see.
+ *   whose NULL location the unique index cannot see.
  *
  * Error keys: months, weeks, schedule.
  */
@@ -44,13 +47,13 @@ final class SaveActivitySchedule
      *
      * @throws ValidationException
      */
-    public function handle(Proposal $proposal, int $activityId, ?int $projectId, array $input): array
+    public function handle(Proposal $proposal, int $activityId, ?int $locationId, array $input): array
     {
         Gate::authorize('update', [ActivitySchedule::class, $proposal]);
 
         $request = $this->validateInput($input);
 
-        return DB::transaction(function () use ($proposal, $activityId, $projectId, $request): array {
+        return DB::transaction(function () use ($proposal, $activityId, $locationId, $request): array {
             $locked = Proposal::query()->whereKey($proposal->getKey())->lockForUpdate()->firstOrFail();
 
             // The status may have moved since the page loaded: decide on the locked row.
@@ -67,12 +70,12 @@ final class SaveActivitySchedule
                 ->lockForUpdate()
                 ->firstOrFail();
 
-            if ($projectId !== null) {
-                $locked->projects()->whereKey($projectId)->firstOrFail();
-            }
+            $projectId = $locationId === null
+                ? null
+                : $locked->locations()->whereKey($locationId)->firstOrFail(['id', 'project_id'])->project_id;
 
             $current = ActivitySchedule::calendarOf(
-                ActivitySchedule::query()->where('result_id', $activity->id)->where('project_id', $projectId)->get(['id', 'month', 'weeks'])
+                ActivitySchedule::query()->where('result_id', $activity->id)->where('proposal_location_id', $locationId)->get(['id', 'month', 'weeks'])
             );
 
             if (ActivitySchedule::versionOf($current) !== $request['expected_version']) {
@@ -85,11 +88,12 @@ final class SaveActivitySchedule
                 return $current;
             }
 
-            ActivitySchedule::query()->where('result_id', $activity->id)->where('project_id', $projectId)->delete();
+            ActivitySchedule::query()->where('result_id', $activity->id)->where('proposal_location_id', $locationId)->delete();
 
             foreach ($calendar as $month => $weeks) {
                 ActivitySchedule::query()->create([
                     'result_id' => $activity->id,
+                    'proposal_location_id' => $locationId,
                     'project_id' => $projectId,
                     'month' => $month.'-01',
                     'weeks' => $weeks,
@@ -100,7 +104,7 @@ final class SaveActivitySchedule
                 $activity->recordActivity(
                     'result.updated',
                     ['schedule' => [ActivitySchedule::summaryOf($current), ActivitySchedule::summaryOf($calendar)]],
-                    ['field' => 'schedule', 'project_id' => $projectId],
+                    ['field' => 'schedule', 'proposal_location_id' => $locationId, 'project_id' => $projectId],
                 );
             }
 

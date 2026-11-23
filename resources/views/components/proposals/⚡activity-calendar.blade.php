@@ -4,8 +4,8 @@ use App\Actions\Results\SaveActivitySchedule;
 use App\Enums\ActivityKind;
 use App\Enums\ResultType;
 use App\Models\ActivitySchedule;
-use App\Models\Project;
 use App\Models\Proposal;
+use App\Models\ProposalLocation;
 use App\Models\Result;
 use App\Support\ProposalFramework;
 use Carbon\CarbonImmutable;
@@ -24,9 +24,10 @@ use Livewire\Component;
  * its weeks. A continuous activity fills every month between its first and
  * last; an event keeps separate months.
  *
- * The scope picker switches between the proposal calendar and one center's
- * calendar; a center follows the proposal calendar until one of its months
- * is changed here. Every write goes through SaveActivitySchedule with the
+ * The scope picker switches between the proposal calendar and one location
+ * row's calendar (Y-15, D-93); a row follows the proposal calendar until one
+ * of its months is changed here. The rule is ActivitySchedule::effectiveOf(),
+ * on overrides loaded once for every activity. Every write goes through SaveActivitySchedule with the
  * version the row was rendered with, so a calendar changed by someone else
  * is refused instead of overwritten. Nested in the tab so a toggle re-renders
  * the grid only. A flat query count; no money.
@@ -35,7 +36,7 @@ new class extends Component {
     #[Locked]
     public int $proposalId;
 
-    /** '' = the proposal calendar; a project id = that center's calendar. */
+    /** '' = the proposal calendar; a location row id = that row's calendar. */
     public string $scope = '';
 
     public bool $showStale = false;
@@ -87,26 +88,30 @@ new class extends Component {
     }
 
     /**
-     * The centers the proposal funds, for the scope picker.
+     * The proposal's location rows, for the scope picker, by label.
      *
-     * @return Collection<int, Project>
+     * @return Collection<int, ProposalLocation>
      */
     #[Computed]
-    public function projects(): Collection
+    public function locations(): Collection
     {
-        return $this->proposal->projects()->select(['projects.id', 'projects.name'])->orderBy('projects.name')->get();
+        return $this->proposal->locations()
+            ->with(['city', 'program', 'centers'])
+            ->get()
+            ->sortBy(fn (ProposalLocation $location): string => $location->label(), SORT_NATURAL | SORT_FLAG_CASE)
+            ->values();
     }
 
     /**
-     * The chosen center, or null for the proposal calendar (an unknown id
-     * falls back to it).
+     * The chosen row, or null for the proposal calendar (an unknown id falls
+     * back to it).
      */
     #[Computed]
-    public function scopeProjectId(): ?int
+    public function scopeLocationId(): ?int
     {
-        $projectId = (int) $this->scope;
+        $locationId = (int) $this->scope;
 
-        return $this->projects->contains('id', $projectId) ? $projectId : null;
+        return $this->locations->contains('id', $locationId) ? $locationId : null;
     }
 
     /**
@@ -152,13 +157,13 @@ new class extends Component {
             ->orderBy('id')
             ->get();
 
-        $projectId = $this->scopeProjectId;
+        $locationId = $this->scopeLocationId;
         $schedules = ActivitySchedule::query()
-            ->select(['id', 'result_id', 'project_id', 'month', 'weeks'])
+            ->select(['id', 'result_id', 'proposal_location_id', 'month', 'weeks'])
             ->whereIn('result_id', $activities->modelKeys())
-            ->where(fn ($query) => $projectId === null
-                ? $query->whereNull('project_id')
-                : $query->whereNull('project_id')->orWhere('project_id', $projectId))
+            ->where(fn ($query) => $locationId === null
+                ? $query->whereNull('proposal_location_id')
+                : $query->whereNull('proposal_location_id')->orWhere('proposal_location_id', $locationId))
             ->get()
             ->groupBy('result_id');
 
@@ -166,15 +171,15 @@ new class extends Component {
 
         foreach ($activities as $activity) {
             $rows = $schedules->get($activity->id, collect());
-            $own = $projectId === null ? $rows : $rows->where('project_id', $projectId);
-            $isOverride = $projectId !== null && $own->isNotEmpty();
+            $own = $locationId === null ? $rows : $rows->where('proposal_location_id', $locationId);
+            $isOverride = $locationId !== null && $own->isNotEmpty();
 
             $groups[$activity->parent_id]['output'] = (string) $activity->parent?->statement;
             $groups[$activity->parent_id]['rows'][] = [
                 'id' => $activity->id,
                 'statement' => $activity->statement,
                 'kind' => $activity->activity_kind ?? ActivityKind::Continuous,
-                'calendar' => ActivitySchedule::calendarOf($isOverride || $projectId === null ? $own : $rows->whereNull('project_id')),
+                'calendar' => ActivitySchedule::effectiveOf($rows, $locationId),
                 'isOverride' => $isOverride,
                 'version' => ActivitySchedule::versionOf(ActivitySchedule::calendarOf($own)),
             ];
@@ -239,7 +244,7 @@ new class extends Component {
     {
         Gate::authorize('update', [ActivitySchedule::class, $this->proposal]);
 
-        if ($this->resettingActivityId !== null && $this->scopeProjectId !== null) {
+        if ($this->resettingActivityId !== null && $this->scopeLocationId !== null) {
             $this->save($this->resettingActivityId, [], [], $this->resettingVersion);
         }
 
@@ -294,7 +299,7 @@ new class extends Component {
         $this->justSaved = false;
 
         try {
-            app(SaveActivitySchedule::class)->handle($this->proposal, $activityId, $this->scopeProjectId, [
+            app(SaveActivitySchedule::class)->handle($this->proposal, $activityId, $this->scopeLocationId, [
                 'months' => $months,
                 'weeks' => $weeks,
                 'expected_version' => $version,
@@ -328,7 +333,7 @@ new class extends Component {
     $months = $this->months;
     $canEdit = $this->canEdit;
     $isApproved = $this->proposal->status->isApprovedByDonor();
-    $scopeProjectId = $this->scopeProjectId;
+    $scopeLocationId = $this->scopeLocationId;
     $years = collect($months)->groupBy('year');
     $writeTargets = 'toggleMonth,removeMonth,saveWeeks,resetCenter';
 @endphp
@@ -402,12 +407,12 @@ new class extends Component {
             @endif
         </p>
 
-        @if ($this->projects->isNotEmpty())
+        @if ($this->locations->isNotEmpty())
             <div class="w-full sm:w-72">
-                <x-ui.header-filter-select id="activity-calendar-scope" :label="__('results_framework.calendar_scope')" wire:model.live="scope" :value="(string) ($scopeProjectId ?? '')">
+                <x-ui.header-filter-select id="activity-calendar-scope" :label="__('results_framework.calendar_scope')" wire:model.live="scope" :value="(string) ($scopeLocationId ?? '')">
                     <option value="">{{ __('results_framework.calendar_scope_proposal') }}</option>
-                    @foreach ($this->projects as $project)
-                        <option value="{{ $project->id }}">{{ $project->name }}</option>
+                    @foreach ($this->locations as $location)
+                        <option value="{{ $location->id }}">{{ $location->label() }}</option>
                     @endforeach
                 </x-ui.header-filter-select>
             </div>
@@ -425,7 +430,7 @@ new class extends Component {
             <flux:icon.lock-closed variant="micro" class="mt-0.5 size-3.5 shrink-0" aria-hidden="true" />
             <span>{{ $isApproved ? __('results_framework.calendar_read_only_approved') : __('results_framework.calendar_read_only') }}</span>
         </p>
-    @elseif ($scopeProjectId !== null)
+    @elseif ($scopeLocationId !== null)
         <p class="type-meta text-secondary-medium dark:text-ink-muted">{{ __('results_framework.calendar_uses_proposal') }}</p>
     @endif
 
@@ -488,7 +493,7 @@ new class extends Component {
                                     $lastKey = $scheduledKeys[count($scheduledKeys) - 1] ?? null;
                                     $rowIndex++;
                                 @endphp
-                                <tr wire:key="calendar-row-{{ $row['id'] }}-{{ $scopeProjectId ?? 'p' }}" data-test="calendar-row-{{ $row['id'] }}">
+                                <tr wire:key="calendar-row-{{ $row['id'] }}-{{ $scopeLocationId ?? 'p' }}" data-test="calendar-row-{{ $row['id'] }}">
                                     <th scope="row" class="sticky start-0 z-10 min-w-40 max-w-44 sm:min-w-56 sm:max-w-72 border-b border-e border-secondary-soft bg-white px-3 py-2 text-start align-top font-normal dark:border-line dark:bg-surface-1">
                                         <span class="flex items-start gap-2">
                                             <span class="mt-1.5 size-2 shrink-0 rounded-full bg-transparent ring-2 ring-secondary-medium dark:ring-ink-muted" aria-hidden="true"></span>
