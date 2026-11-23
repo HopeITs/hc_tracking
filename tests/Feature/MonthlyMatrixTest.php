@@ -404,13 +404,13 @@ test('each filter narrows the rows and an unknown id is ignored', function () {
         ->and($codes(['proposal' => '999999', 'donor' => '999999', 'indicator' => 'abc', 'program' => '999999', 'center' => 'c999999']))->toBe($codes([]));
 });
 
-test('a stray legacy year falls back to this year, January to this month', function () {
+test('a stray legacy year falls back to this year, January to December', function () {
     Livewire::actingAs(mmViewer())
         ->withQueryParams(['year' => '1850'])
         ->test('pages::reports.monthly-matrix')
         ->assertSet('year', '')
         ->assertSet('from', '2026-01')
-        ->assertSet('to', '2026-11');
+        ->assertSet('to', '2026-12');
 });
 
 test('my projects without coverage is an empty result with a hint', function () {
@@ -1073,7 +1073,7 @@ test('From after To is refused with a field error and builds no matrix', functio
         ->and($page->instance()->months)->toBe([])
         ->and($page->instance()->emptyReason)->toBe('window');
 
-    $page->call('thisYear')->assertHasNoErrors()->assertSet('from', '2026-01')->assertSet('to', '2026-11');
+    $page->call('thisYear')->assertHasNoErrors()->assertSet('from', '2026-01')->assertSet('to', '2026-12');
 });
 
 test('an empty result names the filter that emptied it', function () {
@@ -1125,4 +1125,89 @@ test('the query count is flat with three places, twelve months and five indicato
     $sevenPlaces = $count(3); // the data adds up: 3 more places, 180 more lines
 
     expect($sevenPlaces)->toBe($fourPlaces);
+});
+
+test('the default window runs January to December, the last month still to come', function () {
+    $page = Livewire::actingAs(mmViewer())->test('pages::reports.monthly-matrix')
+        ->assertSet('from', '2026-01')
+        ->assertSet('to', '2026-12');
+
+    expect($page->instance()->months)->toHaveCount(12);
+});
+
+test('a count row is behind pace against its target spread over the grant, and a missed month is told from this month', function () {
+    $project = mmProject();
+    $library = LibraryIndicator::factory()->create();
+    $target = mmTarget(mmProposal($project), $project, $library, '120');
+
+    mmLine(mmReport($project, '2026-01-01'), $library, [$target], 10);
+    mmLine(mmReport($project, '2026-02-01'), $library, [$target], 5);
+    mmLine(mmReport($project, '2026-03-01', MonthlyReportStatus::Draft), $library, [$target], 4);
+    mmLine(mmReport($project, '2026-10-01', MonthlyReportStatus::Submitted), $library, [$target], 9);
+
+    $page = Livewire::actingAs(mmViewer())->test('pages::reports.monthly-matrix');
+    $row = mmRows($page)[$library->code];
+    $progress = $page->instance()->rowProgress[$row['key']];
+
+    expect($progress['expected'])->toBe(20.0)
+        ->and($progress['behind'])->toBeTrue()
+        ->and($progress['gap'])->toBe(5.0)
+        ->and($progress['waiting'])->toBe(1)
+        ->and($progress['missing'])->toBe(7) // March's draft and April to September with no report
+        ->and($progress['kinds']['2026-11'])->toBe('open')
+        ->and($progress['kinds']['2026-12'])->toBe('upcoming');
+
+    $page->assertSee(__('reports.matrix.behind_by', ['gap' => '5']))
+        ->assertSeeHtml('data-matrix-cell="not_submitted"');
+});
+
+test('a summary card keeps only its rows, and pressing it again shows them all', function () {
+    $project = mmProject();
+    $proposal = mmProposal($project, '2026-01-01', '2026-02-28');
+    $onPace = LibraryIndicator::factory()->create();
+    $behind = LibraryIndicator::factory()->create();
+    $onPaceTarget = mmTarget($proposal, $project, $onPace, '20');
+    $behindTarget = mmTarget($proposal, $project, $behind, '20');
+
+    foreach (['2026-01-01', '2026-02-01'] as $month) {
+        $report = mmReport($project, $month);
+        mmLine($report, $onPace, [$onPaceTarget], 10);
+        mmLine($report, $behind, [$behindTarget], 2);
+    }
+
+    $page = Livewire::actingAs(mmViewer())->test('pages::reports.monthly-matrix');
+    $codes = fn (): array => collect($page->instance()->pagedRows->items())->pluck('code')->sort()->values()->all();
+
+    expect($page->instance()->matrixSummary)->toMatchArray(['total' => 2, 'pace' => 1, 'behind' => 1, 'missing' => 0]);
+
+    $page->call('setFocus', 'behind')->assertSet('focus', 'behind');
+    expect($codes())->toBe([$behind->code]);
+
+    $page->call('setFocus', 'behind')->assertSet('focus', '');
+    expect($codes())->toHaveCount(2);
+});
+
+test('rows group by proposal, by center or by indicator, and the search finds a code', function () {
+    $project = mmProject();
+    $proposal = mmProposal($project, name: 'Family to Family');
+    $first = LibraryIndicator::factory()->create();
+    $second = LibraryIndicator::factory()->create();
+    mmTarget($proposal, $project, $first);
+    mmTarget($proposal, $project, $second);
+
+    $page = Livewire::actingAs(mmViewer())->test('pages::reports.monthly-matrix');
+    $cards = fn (): array => $page->instance()->matrixCards;
+
+    expect($cards())->toHaveCount(1)
+        ->and($cards()[0]['title'])->toBe('Family to Family')
+        ->and($cards()[0]['rows'])->toHaveCount(2);
+
+    $page->call('groupBy', 'center')->assertSet('view', 'rows')->assertSet('group', 'center');
+    expect($cards()[0]['title'])->toBe(__('reports.matrix.place_not_set'));
+
+    $page->call('groupBy', 'indicator')->assertSet('view', 'grouped');
+    expect($page->instance()->resolvedGroup)->toBe('indicator');
+
+    $page->call('groupBy', 'proposal')->set('search', $second->code);
+    expect(collect($page->instance()->pagedRows->items())->pluck('code')->all())->toBe([$second->code]);
 });

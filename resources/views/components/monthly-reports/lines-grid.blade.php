@@ -1,6 +1,8 @@
 @props([
     'rows',
     'figures' => [],
+    'context' => [],
+    'month' => null,
 ])
 
 @php
@@ -24,7 +26,7 @@
 <div
     role="list"
     aria-label="{{ __('monthly_reports.indicators_this_month') }}"
-    class="border-t border-secondary-soft dark:border-line"
+    class="mrp-lines"
     data-lines-grid
     x-data="{
         isRtl() { return getComputedStyle(this.$root).direction === 'rtl'; },
@@ -58,7 +60,7 @@
 >
     @foreach ($listed as $row)
         <div role="listitem">
-            <x-monthly-reports.line-row :row="$row" :state="$figures[$row['id']] ?? []" />
+            <x-monthly-reports.line-row :row="$row" :state="$figures[$row['id']] ?? []" :context="$context[$row['id']] ?? null" :month="$month" />
         </div>
     @endforeach
 
@@ -76,7 +78,7 @@
             </button>
             <div x-show="open" style="display: none" class="mt-2">
                 @foreach ($mealRows as $row)
-                    <x-monthly-reports.line-row :row="$row" :state="$figures[$row['id']] ?? []" />
+                    <x-monthly-reports.line-row :row="$row" :state="$figures[$row['id']] ?? []" :context="$context[$row['id']] ?? null" :month="$month" />
                 @endforeach
             </div>
         </div>

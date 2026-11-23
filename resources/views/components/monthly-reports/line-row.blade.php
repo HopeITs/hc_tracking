@@ -1,7 +1,11 @@
 @props([
     'row',
     'state' => [],
+    'context' => null,
+    'month' => null,
 ])
+
+@use('App\Enums\MonthlyReportEntryKind')
 
 @php
     /*
@@ -20,14 +24,21 @@
     $hasExtras = filled($row['note']) || $row['files'] !== [];
     $open = $row['split'] || $row['disaggregated'] || $hasDetailErrors;
     $detailsId = 'line-details-'.$id;
+    // A read-only count shows its figure once, as the large number; inputs and ratio parts stay.
+    $isCount = $row['kind'] === MonthlyReportEntryKind::Count;
+    $showsEntry = $inlineEntry && ($row['editable'] || ! $isCount);
+    $entryIsTheFigure = $showsEntry && $row['editable'] && $isCount;
+    $monthName = $month?->translatedFormat('F');
+    $whole = fn (float $value): string => number_format($value, 0);
+    $sparkMax = $context === null ? 1.0 : max(1.0, ...array_column($context['series'], 'value'));
 @endphp
 
-<div data-line="{{ $id }}" data-line-kind="{{ $row['kind']->value }}" wire:key="line-{{ $id }}" x-data="{ open: @js($open) }" class="border-b border-secondary-soft py-4 dark:border-line">
-    <div class="flex flex-wrap items-center gap-x-6 gap-y-3">
-        <div class="min-w-0 flex-1 basis-64">
-            <p class="font-semibold text-secondary-dark dark:text-ink" dir="auto">{{ $row['name'] }}</p>
+<div data-line="{{ $id }}" data-line-kind="{{ $row['kind']->value }}" wire:key="line-{{ $id }}" x-data="{ open: @js($open) }" class="mrp-line">
+    <div class="mrp-line-main">
+        <div class="mrp-line-ind">
+            <p class="mrp-line-name" dir="auto">{{ $row['name'] }}</p>
             <p class="mt-0.5 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs {{ $mutedText }}">
-                <bdi dir="ltr" class="font-mono text-[11px]">{{ $row['code'] }}</bdi>
+                <bdi dir="ltr" class="mrp-code">{{ $row['code'] }}</bdi>
                 <span aria-hidden="true">·</span>
                 <span>{{ __('monthly_reports.grid_target') }} <bdi dir="ltr" class="font-semibold tabular-nums text-secondary-dark dark:text-ink" data-target="{{ $id }}">{{ $row['target'] }}</bdi></span>
                 @if (($row['shared'] ?? null) !== null)
@@ -58,7 +69,16 @@
             </p>
         </div>
 
-        @if ($inlineEntry)
+        <div class="mrp-line-value">
+            @if ($monthName !== null)
+                <span class="mrp-line-label">{{ $monthName }}</span>
+            @endif
+            @if ($row['split'])
+                <bdi dir="ltr" @class(['mrp-line-figure', 'mrp-line-empty' => $row['computed'] === '—']) data-split-total="{{ $id }}">{{ $row['computed'] }}</bdi>
+            @elseif (! $entryIsTheFigure)
+                <bdi dir="ltr" @class(['mrp-line-figure', 'mrp-line-empty' => $row['computed'] === '—']) data-computed="{{ $id }}">{{ $row['computed'] }}</bdi>
+            @endif
+        @if ($showsEntry)
             <div class="shrink-0" data-nav-row>
                 <x-monthly-reports.line-entry
                     :row="$row"
@@ -72,13 +92,38 @@
                 />
             </div>
         @endif
-
-        <div class="ms-auto flex shrink-0 items-center gap-2">
-            @if ($row['split'])
-                <bdi dir="ltr" @class(['min-w-16 text-end tabular-nums', 'text-2xl font-extrabold' => $row['computed'] !== '—', 'text-base text-secondary-light dark:text-ink-faint' => $row['computed'] === '—']) data-split-total="{{ $id }}">{{ $row['computed'] }}</bdi>
-            @else
-                <bdi dir="ltr" @class(['min-w-16 text-end tabular-nums', 'text-2xl font-extrabold' => $row['computed'] !== '—', 'text-base text-secondary-light dark:text-ink-faint' => $row['computed'] === '—']) data-computed="{{ $id }}">{{ $row['computed'] }}</bdi>
+            @if ($entryIsTheFigure)
+                <bdi dir="ltr" class="sr-only" data-computed="{{ $id }}">{{ $row['computed'] }}</bdi>
             @endif
+            @if ($context !== null && $context['vsShare'] !== null)
+                <span @class(['mrp-line-compare', 'mrp-line-low' => $context['vsShare'] < 80]) data-month-share>
+                    {{ $context['vsShare'] < 80
+                        ? __('monthly_reports.below_monthly_share', ['percent' => round(100 - $context['vsShare'])])
+                        : __('monthly_reports.of_monthly_share', ['percent' => round($context['vsShare'])]) }}
+                </span>
+            @endif
+        </div>
+
+        @if ($context !== null)
+            <div class="mrp-line-year" data-year-so-far>
+                <span class="mrp-line-year-head">
+                    <span>{{ __('monthly_reports.year_so_far', ['month' => $monthName]) }}</span>
+                    <b dir="ltr">{{ $whole($context['ytd']) }} · {{ round($context['ytdPercent']) }}%</b>
+                </span>
+                <span class="mrp-bar" role="img" aria-label="{{ __('monthly_reports.year_share_label', ['percent' => round($context['ytdPercent'])]) }}">
+                    <span @class(['mrp-bar-fill', 'mrp-bar-behind' => $context['behind']]) style="width: {{ min(100, max(2, $context['ytdPercent'])) }}%"></span>
+                    <span class="mrp-bar-tick" style="inset-inline-start: calc({{ min(100, $context['expectedPercent']) }}% - 1px)"></span>
+                </span>
+                <span class="mrp-spark" style="--mrp-cols: {{ count($context['series']) }}" role="img" aria-label="{{ __('monthly_reports.year_chart_label', ['month' => $monthName]) }}">
+                    @foreach ($context['series'] as $point)
+                        <span @class(['mrp-spark-bar', 'mrp-spark-now' => $point['current'], 'mrp-spark-low' => $point['current'] && $context['vsShare'] !== null && $context['vsShare'] < 80]) style="height: {{ max(8, $point['value'] / $sparkMax * 100) }}%" title="{{ $month?->setMonth($point['month'])->translatedFormat('M') }}: {{ $whole($point['value']) }}"></span>
+                    @endforeach
+                </span>
+                <span class="mrp-line-year-foot">{{ __('monthly_reports.year_target', ['value' => $whole($context['target'])]) }}</span>
+            </div>
+        @endif
+
+        <div class="mrp-line-tools">
             <button
                 type="button"
                 x-on:click="open = ! open"
@@ -96,7 +141,7 @@
         </div>
     </div>
 
-    <div id="{{ $detailsId }}" x-show="open" @if (! $open) style="display: none" @endif class="mt-3 flex flex-col gap-4 rounded-lg bg-board/50 p-3 dark:bg-surface-2/40">
+    <div id="{{ $detailsId }}" x-show="open" @if (! $open) style="display: none" @endif class="mrp-line-details flex flex-col gap-4">
         @if ($row['secondary_name'] !== null || filled($row['frequency_note']))
             <div class="text-xs {{ $mutedText }}">
                 @if ($row['secondary_name'] !== null)

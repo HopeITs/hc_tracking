@@ -95,6 +95,7 @@ trait GroupsMonthlyMatrix
             'center' => null,
             'city' => null,
             'shared_centers' => null,
+            'source_windows' => array_values(array_unique(array_merge(...array_column($children, 'source_windows')), SORT_REGULAR)),
             'attribution' => null,
             'is_group' => true,
             'centers_count' => count(array_unique(array_merge(...array_column($children, 'place_keys')))),

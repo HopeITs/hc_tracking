@@ -8,6 +8,7 @@ use App\Livewire\Concerns\MonthlyReports\EditsMonthlyReportActivities;
 use App\Livewire\Concerns\MonthlyReports\EditsMonthlyReportLines;
 use App\Livewire\Concerns\MonthlyReports\ManagesMonthlyReportFiles;
 use App\Livewire\Concerns\MonthlyReports\ReadsMonthlyReport;
+use App\Livewire\Concerns\MonthlyReports\ReadsMonthlyReportContext;
 use App\Livewire\Concerns\MonthlyReports\RunsMonthlyReportWorkflow;
 use Livewire\Component;
 
@@ -24,5 +25,6 @@ abstract class MonthlyReportShowPageHost extends Component
     use EditsMonthlyReportLines;
     use ManagesMonthlyReportFiles;
     use ReadsMonthlyReport;
+    use ReadsMonthlyReportContext;
     use RunsMonthlyReportWorkflow;
 }

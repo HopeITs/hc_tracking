@@ -1,0 +1,74 @@
+/* Monthly report page (monthly-reports/show, 2026-11-23 redesign): the journey,
+ * two columns (indicators | about, other months, reopen requests) and each
+ * indicator as a card with its month, its monthly share and the year so far.
+ * Own classes, prefixed mr-, in @layer components; colours are the Desk
+ * aliases of tokens.css (red and greys only), so .dark needs no second block. */
+
+@layer components {
+    .mrp-card { padding: 18px 20px; border: 1px solid var(--line); border-radius: 18px; background: var(--paper); }
+    .mrp-note { display: flex; gap: 12px; }
+
+    /* Journey */
+    .mrp-journey { display: grid; grid-template-columns: repeat(auto-fit, minmax(13rem, 1fr)); gap: 10px; }
+    .mrp-step { display: flex; align-items: center; gap: 12px; padding: 12px 14px; list-style: none; border: 1px solid var(--line); border-radius: 14px; background: var(--sunk); }
+    .mrp-step-current { border: 2px solid var(--ink); padding: 11px 13px; background: var(--paper); }
+    .mrp-step-dot { display: grid; flex: none; place-items: center; width: 28px; height: 28px; border: 1.5px solid var(--line-2); border-radius: 999px; background: var(--paper); color: var(--ink-3); font-size: 13px; font-weight: 800; }
+    .mrp-step-reached .mrp-step-dot { border-color: var(--ink); background: var(--ink); color: var(--paper); }
+    .mrp-step-text { display: flex; min-width: 0; flex-direction: column; }
+    .mrp-step-text b { font-size: 14px; color: var(--ink); }
+    .mrp-step-text span { font-size: 13px; color: var(--ink-3); }
+
+    .mrp-actions { padding: 12px 16px; border: 1px solid var(--line); border-radius: 14px; background: var(--paper); }
+
+    /* Columns */
+    .mrp-cols { display: flex; flex-wrap: wrap; align-items: flex-start; gap: 20px; }
+    .mrp-main { display: flex; flex: 999 1 38rem; min-width: 0; flex-direction: column; gap: 20px; }
+    .mrp-aside { display: flex; flex: 1 1 18rem; min-width: 0; flex-direction: column; gap: 16px; }
+    .mrp-section-head h2 { font-size: 19px; font-weight: 800; color: var(--ink); }
+    .mrp-section-head p { font-size: 13.5px; color: var(--ink-3); }
+    .mrp-side-card { display: flex; flex-direction: column; gap: 12px; }
+    .mrp-side-card h2 { font-size: 15.5px; font-weight: 800; color: var(--ink); }
+    .mrp-facts { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 10px 14px; font-size: 14px; }
+    .mrp-facts dt { color: var(--ink-3); }
+    .mrp-facts dd { min-width: 0; color: var(--ink); }
+    .mrp-months { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 6px; }
+    .mrp-months li { list-style: none; }
+    .mrp-month { display: grid; place-items: center; height: 38px; box-sizing: border-box; border-radius: 9px; font-size: 13px; font-weight: 700; text-decoration: none; color: var(--ink-3); border: 1px solid var(--line); }
+    a.mrp-month:hover { border-color: var(--ink-3); }
+    .mrp-month-done { border-color: var(--sunk); background: var(--sunk); color: var(--ink); }
+    .mrp-month-waiting { border: 1.5px dashed var(--ink-3); color: var(--ink-2); }
+    .mrp-month-draft { border-style: dotted; border-color: var(--faint); }
+    .mrp-month-this { border: 2px solid var(--ink); background: var(--paper); color: var(--ink); }
+    .mrp-month-none { color: var(--faint); }
+    .mrp-side-hint { font-size: 12.5px; color: var(--ink-3); }
+    .mrp-empty { display: flex; align-items: flex-start; gap: 10px; padding: 12px 14px; border-radius: 12px; background: var(--sunk); font-size: 14px; color: var(--ink-2); }
+
+    /* Indicator cards */
+    .mrp-lines { display: flex; flex-direction: column; gap: 12px; }
+    .mrp-line { overflow: hidden; border: 1px solid var(--line); border-radius: 18px; background: var(--paper); }
+    .mrp-line-main { display: flex; flex-wrap: wrap; align-items: center; gap: 16px 28px; padding: 20px; }
+    .mrp-line-ind { display: flex; flex: 1 1 16rem; min-width: 0; flex-direction: column; gap: 4px; }
+    .mrp-line-name { font-size: 16.5px; font-weight: 700; line-height: 1.35; color: var(--ink); }
+    .mrp-code { padding: 1px 7px; border-radius: 6px; background: var(--sunk); color: var(--ink); font-size: 11.5px; font-weight: 800; }
+    .mrp-line-value { display: flex; flex: 0 0 12rem; flex-direction: column; gap: 4px; }
+    .mrp-line-label { font-size: 12px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; color: var(--ink-3); }
+    .mrp-line-label:lang(ar) { letter-spacing: 0; }
+    .mrp-line-figure { font-size: 30px; line-height: 1.1; font-weight: 800; font-variant-numeric: tabular-nums; color: var(--ink); }
+    .mrp-line-empty { font-size: 18px; color: var(--faint); }
+    .mrp-line-compare { font-size: 13px; font-weight: 700; color: var(--ink-2); }
+    .mrp-line-low { color: var(--color-status-critical-text); }
+    .mrp-line-year { display: flex; flex: 1 1 15rem; min-width: 0; flex-direction: column; gap: 8px; }
+    .mrp-line-year-head { display: flex; justify-content: space-between; gap: 8px; font-size: 13px; color: var(--ink-3); }
+    .mrp-line-year-head b { color: var(--ink); font-variant-numeric: tabular-nums; }
+    .mrp-line-year-foot { font-size: 12px; color: var(--ink-3); }
+    .mrp-bar { position: relative; display: block; height: 8px; border-radius: 8px; background: var(--sunk); }
+    .mrp-bar-fill { position: absolute; inset-block: 0; inset-inline-start: 0; border-radius: 8px; background: var(--ink); }
+    .mrp-bar-behind { background: var(--brand); }
+    .mrp-bar-tick { position: absolute; top: -4px; bottom: -4px; width: 2px; border-radius: 2px; background: var(--ink-3); }
+    .mrp-spark { display: grid; height: 34px; grid-template-columns: repeat(var(--mrp-cols, 12), minmax(0, 1fr)); align-items: end; gap: 3px; }
+    .mrp-spark-bar { display: block; border-radius: 3px; background: var(--line-2); }
+    .mrp-spark-now { background: var(--ink); }
+    .mrp-spark-low { background: var(--brand); }
+    .mrp-line-tools { display: flex; flex: none; align-items: center; }
+    .mrp-line-details { margin: 0 20px 20px; padding: 16px; border-radius: 14px; background: var(--sunk); }
+}

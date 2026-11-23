@@ -11,6 +11,7 @@ use App\Enums\MonthlyReportStatus;
 use App\Enums\NarrativeQuestionFrequency;
 use App\Enums\ProposalStatus;
 use App\Enums\ReopenRequestStatus;
+use App\Enums\ReportStatus;
 use App\Enums\ResultType;
 use App\Models\Activity;
 use App\Models\ActivitySchedule;
@@ -928,4 +929,36 @@ test('a target of one center shows no shared line', function () {
 
     mrsPage($report)->assertDontSeeHtml('data-shared-target="'.$line->id.'"')
         ->assertDontSeeText(__('monthly_reports.reached_together_none'));
+});
+
+test('a count line shows the month against its monthly share and the year so far with this month', function () {
+    $project = mrsProject();
+    $september = mrsReport($project, '2026-09-01', MonthlyReportStatus::Validated);
+    $report = mrsReport($project);
+    $line = mrsLine($report, ['measure' => IndicatorMeasure::Numeric]);
+    $target = $line->shares->first()->plan_indicator_id;
+
+    Activity::withoutRecording(function () use ($line, $september, $target): void {
+        $line->forceFill(['value' => 5])->save();
+        Report::factory()->create([
+            'plan_indicator_id' => $target,
+            'status' => ReportStatus::Approved,
+            'monthly_report_id' => $september->id,
+            'period_start' => '2026-09-01',
+            'period_end' => '2026-09-30',
+            'planned_date' => '2026-09-30',
+            'value' => 30,
+        ]);
+    });
+
+    $page = mrsPage($report);
+    $context = $page->instance()->lineContext[$line->id];
+
+    expect($context['share'])->toBe(10.0)
+        ->and($context['vsShare'])->toBe(50.0)
+        ->and($context['ytd'])->toBe(35.0)
+        ->and($context['behind'])->toBeTrue();
+
+    $page->assertSee(__('monthly_reports.below_monthly_share', ['percent' => 50]))
+        ->assertSeeHtml('data-year-so-far');
 });

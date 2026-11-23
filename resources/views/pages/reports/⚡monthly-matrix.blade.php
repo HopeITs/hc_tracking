@@ -5,6 +5,7 @@ use App\Livewire\Concerns\Reports\BuildsMatrixBreakdowns;
 use App\Livewire\Concerns\Reports\BuildsMonthlyMatrix;
 use App\Livewire\Concerns\Reports\ExportsMonthlyMatrix;
 use App\Livewire\Concerns\Reports\GroupsMonthlyMatrix;
+use App\Livewire\Concerns\Reports\ReadsMatrixProgress;
 use Livewire\Attributes\Layout;
 use Livewire\Attributes\Locked;
 use Livewire\Attributes\Title;
@@ -18,6 +19,7 @@ new #[Layout('layouts::desk'), Title('titles.monthly_matrix')] class extends Com
     use BuildsMonthlyMatrix;
     use ExportsMonthlyMatrix;
     use GroupsMonthlyMatrix;
+    use ReadsMatrixProgress;
     use WithPagination;
 
     #[Url(except: '')]
@@ -127,7 +129,7 @@ new #[Layout('layouts::desk'), Title('titles.monthly_matrix')] class extends Com
         $this->resetPage();
     }
 
-    /** January of this year → this month. */
+    /** January → December of this year. */
     public function thisYear(): void
     {
         $this->setThisYearWindow();
@@ -152,7 +154,7 @@ new #[Layout('layouts::desk'), Title('titles.monthly_matrix')] class extends Com
 
     public function clearFilters(): void
     {
-        $this->reset(['proposal', 'donor', 'center', 'city', 'program', 'indicator', 'pillar', 'year', 'mine', 'filterOrder']);
+        $this->reset(['proposal', 'donor', 'center', 'city', 'program', 'indicator', 'pillar', 'year', 'mine', 'filterOrder', 'focus', 'search']);
         $this->setThisYearWindow();
         $this->checkWindow();
         $this->resetPage();
@@ -189,12 +191,16 @@ new #[Layout('layouts::desk'), Title('titles.monthly_matrix')] class extends Com
         'window' => __('reports.matrix.window'),
         'mine' => __('reports.matrix.my_projects'),
     ];
-    $monthFieldClass = 'block h-9 w-full min-w-0 touch-manipulation rounded-[10px] border border-(--line-2) bg-(--paper) px-2.5 text-[12.5px] font-semibold text-(--ink) hover:border-(--ink-3) max-[720px]:h-11 aria-invalid:border-status-critical';
-    $monthLabelClass = 'mb-1.5 block text-[11px] font-semibold uppercase leading-4 tracking-[0.1em] text-secondary-medium dark:text-ink-muted';
 @endphp
 
 <x-desk.register class="@container/directory" heading-id="monthly-matrix-heading" :title="__('titles.monthly_matrix')" :count="$onActivities ? $board['count'] : $paged->total()"
     >
+        @unless ($onActivities)
+            <x-slot:search>
+                <x-desk.register-search wire:model.live.debounce.300ms="search" :label="__('reports.matrix.search_label')" :placeholder="__('reports.matrix.search_label')" data-test="matrix-search" />
+            </x-slot:search>
+        @endunless
+
         <x-slot:filters>
             <div class="contents" data-matrix-filters>
                 <x-ui.header-filter-select :label="__('reports.matrix.proposal')" wire:model.live="proposal" :value="(string) ($extraction->proposalId ?? '')">
@@ -225,25 +231,26 @@ new #[Layout('layouts::desk'), Title('titles.monthly_matrix')] class extends Com
                     @endforeach
                 </x-ui.header-filter-select>
 
-                <div class="min-w-0" data-matrix-from>
-                    <label for="matrix-from" class="{{ $monthLabelClass }}">{{ __('reports.matrix.from') }}</label>
-                    <input id="matrix-from" type="month" wire:model.live="from" class="{{ $monthFieldClass }}" dir="ltr" @error('from') aria-invalid="true" aria-describedby="matrix-from-error" @enderror />
+                <div class="mm-period" data-matrix-from>
+                    <div @class(['mm-period-box', 'mm-period-invalid' => $errors->has('from')])>
+                        <flux:icon.calendar variant="micro" class="size-4 shrink-0" aria-hidden="true" />
+                        <label for="matrix-from" class="sr-only">{{ __('reports.matrix.from') }}</label>
+                        <input id="matrix-from" type="month" wire:model.live="from" dir="ltr" @error('from') aria-invalid="true" aria-describedby="matrix-from-error" @enderror />
+                        <span class="mm-period-sep" aria-hidden="true">→</span>
+                        <label for="matrix-to" class="sr-only">{{ __('reports.matrix.to') }}</label>
+                        <input id="matrix-to" type="month" wire:model.live="to" dir="ltr" data-matrix-to />
+                    </div>
                     @error('from')
-                        <p id="matrix-from-error" class="mt-1 flex items-center gap-1 text-xs text-status-critical" data-matrix-from-error>
+                        <p id="matrix-from-error" class="mm-period-error" data-matrix-from-error>
                             <flux:icon.exclamation-triangle variant="micro" class="size-4 shrink-0" aria-hidden="true" />
                             <span>{{ $message }}</span>
                         </p>
                     @enderror
                 </div>
 
-                <div class="min-w-0" data-matrix-to>
-                    <label for="matrix-to" class="{{ $monthLabelClass }}">{{ __('reports.matrix.to') }}</label>
-                    <input id="matrix-to" type="month" wire:model.live="to" class="{{ $monthFieldClass }}" dir="ltr" />
-                </div>
-
                 <div class="contents" x-data="{ open: @js($moreFiltersAreActive) }">
-                    <div class="flex items-end">
-                        <button type="button" class="dk-btn min-h-11 w-full touch-manipulation" x-on:click="open = ! open" x-bind:aria-expanded="open.toString()" aria-controls="matrix-more-filters" data-test="more-filters-button">
+                    <div class="mm-more">
+                        <button type="button" class="dk-btn" x-on:click="open = ! open" x-bind:aria-expanded="open.toString()" aria-controls="matrix-more-filters" data-test="more-filters-button">
                             <flux:icon.adjustments-horizontal variant="micro" class="size-4" aria-hidden="true" />
                             {{ __('reports.matrix.more_filters') }}
                         </button>
@@ -273,8 +280,8 @@ new #[Layout('layouts::desk'), Title('titles.monthly_matrix')] class extends Com
                             @endforeach
                         </x-ui.header-filter-select>
 
-                        <div class="flex items-end">
-                            <x-ui.button tone="secondary" icon="user" class="min-h-11 w-full touch-manipulation" wire:click="toggleMine" aria-pressed="{{ $mine ? 'true' : 'false' }}" data-test="matrix-mine">
+                        <div class="mm-more">
+                            <x-ui.button tone="secondary" icon="user" class="touch-manipulation" wire:click="toggleMine" aria-pressed="{{ $mine ? 'true' : 'false' }}" data-test="matrix-mine">
                                 @if ($mine)<flux:icon.check variant="micro" class="size-4" aria-hidden="true" />@endif
                                 {{ __('reports.matrix.my_projects') }}
                             </x-ui.button>
@@ -302,7 +309,7 @@ new #[Layout('layouts::desk'), Title('titles.monthly_matrix')] class extends Com
         </x-slot:actions>
 
 
-    <div class="flex flex-wrap items-end justify-between gap-3" data-matrix-modes>
+    <div class="mm-modes" data-matrix-modes>
         <x-ui.relation-tabs
             wire-target="tab"
             :active="$this->resolvedTab"
@@ -312,35 +319,16 @@ new #[Layout('layouts::desk'), Title('titles.monthly_matrix')] class extends Com
             ]"
         />
 
-        @unless ($onActivities)
-            <div class="flex flex-wrap items-center gap-3">
-                <div class="flex items-center gap-1" role="group" aria-label="{{ __('reports.matrix.view_label') }}">
-                    <x-ui.button tone="secondary" :icon="$isGrouped ? null : 'check'" class="min-h-11 touch-manipulation" wire:click="$set('view', 'rows')" aria-pressed="{{ $isGrouped ? 'false' : 'true' }}" data-test="matrix-view-rows">
-                        {{ __('reports.matrix.view_rows') }}
-                    </x-ui.button>
-                    <x-ui.button tone="secondary" :icon="$isGrouped ? 'check' : null" class="min-h-11 touch-manipulation" wire:click="$set('view', 'grouped')" aria-pressed="{{ $isGrouped ? 'true' : 'false' }}" data-test="matrix-view-grouped">
-                        {{ __('reports.matrix.view_grouped') }}
-                    </x-ui.button>
-                </div>
-                <x-ui.button tone="secondary" :icon="$pwd ? 'check' : null" class="min-h-11 touch-manipulation" wire:click="$toggle('pwd')" aria-pressed="{{ $pwd ? 'true' : 'false' }}" data-test="matrix-pwd">
-                    {{ __('reports.matrix.show_pwd') }}
-                </x-ui.button>
-            </div>
-        @endunless
     </div>
-
-    @if ($windowMonths !== [])
-        <p class="text-sm text-secondary-medium dark:text-ink-muted" data-matrix-window>
-            {{ __('reports.matrix.window_shown', ['from' => $windowMonths[0]->translatedFormat($monthFormat), 'to' => $windowMonths[array_key_last($windowMonths)]->translatedFormat($monthFormat)]) }}
-        </p>
-    @endif
 
     @if ($onActivities)
         @include('pages.reports._monthly-matrix-activities')
-    @elseif ($paged->isEmpty())
+    @elseif ($this->matrix['rows'] === [])
+        @include('pages.reports._monthly-matrix-toolbar')
         @include('pages.reports._monthly-matrix-empty', ['emptyIcon' => 'table-cells', 'emptyHeading' => __('reports.matrix.no_matching_indicators')])
     @else
-        @include('pages.reports._monthly-matrix-legend')
-        @include('pages.reports._monthly-matrix-table')
+        @include('pages.reports._monthly-matrix-summary')
+        @include('pages.reports._monthly-matrix-toolbar')
+        @include('pages.reports._monthly-matrix-cards')
     @endif
 </x-desk.register>
