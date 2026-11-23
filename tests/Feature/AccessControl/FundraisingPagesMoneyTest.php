@@ -187,8 +187,8 @@ test('Public Relations Manager sees agreement budgets but no tranches', function
         ->assertDontSee('123.5K')
         ->assertDontSeeHtml('data-upcoming-transfers');
 
+    // 2026-11-19: the proposals list shows no money any more (user decision); tranches stay hidden all the same.
     Livewire::actingAs($viewer())->test('pages::proposals.index')
-        ->assertSee('731,942')
         ->assertDontSee('123,457');
 });
 
