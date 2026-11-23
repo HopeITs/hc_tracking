@@ -76,15 +76,7 @@ class ReportTemplatePlacement extends Model
             return;
         }
 
-        $covered = MealCoverage::projectsCoveredBy($user->employee_id);
-        $query->whereHas('proposal.locations', fn (Builder $rows) => $rows
-            ->whereIn('project_id', $covered)
-            ->whereColumn('proposal_locations.city_id', 'report_template_placements.city_id')
-            ->whereColumn('proposal_locations.program_id', 'report_template_placements.program_id')
-            ->where(fn (Builder $place) => $place
-                ->where(fn (Builder $wide) => $wide->where('report_template_placements.city_wide', true)->where('proposal_locations.city_wide', true))
-                ->orWhere(fn (Builder $center) => $center->where('report_template_placements.city_wide', false)
-                    ->whereHas('centers', fn (Builder $centers) => $centers->whereColumn('proposal_location_centers.center_id', 'report_template_placements.center_id')))));
+        MealCoverage::scopeCoveredBy($query, $user->employee_id);
     }
 
     protected function casts(): array

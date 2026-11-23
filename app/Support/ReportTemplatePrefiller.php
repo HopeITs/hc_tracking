@@ -557,7 +557,7 @@ final class ReportTemplatePrefiller
             return;
         }
 
-        $employeeId = $this->places->mealOfficerFor($placement->proposal, $placement->place()) ?? Slots::holderOf('meal_manager');
+        $employeeId = MealCoverage::responsibleForPlace($placement->place()) ?? Slots::holderOf('meal_manager');
         $userIds = array_values($this->employees->usersFor(array_filter([$employeeId])));
         $payload = new NotificationPayload(
             kind: NotificationKind::Action,
@@ -644,9 +644,8 @@ final class ReportTemplatePrefiller
             return;
         }
 
-        $project = $this->places->legacyProjectFor($template);
         $employeeIds = array_values(array_unique(array_filter([
-            $project === null ? null : MealCoverage::responsibleFor($project),
+            MealCoverage::responsibleForPlace($template->place()),
             Slots::holderOf('meal_manager'),
         ])));
         $userIds = array_values($this->employees->usersFor($employeeIds));
@@ -656,6 +655,7 @@ final class ReportTemplatePrefiller
             return;
         }
 
+        $project = $this->places->legacyProjectFor($template);
         $subject = $project ?? $template;
         $payload = new NotificationPayload(
             kind: NotificationKind::Action,

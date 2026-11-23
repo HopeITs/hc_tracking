@@ -537,6 +537,11 @@ return [
                 'body' => ':actor made :employee the MEAL officer for “:subject” instead of :from',
             ],
             'responsible_changed_you' => ':actor made you the MEAL officer for “:subject”',
+            'place_assigned' => [
+                'title' => 'Project MEAL officer assigned',
+                'body' => ':actor made :employee the MEAL officer for the place “:subject”',
+            ],
+            'place_assigned_you' => ':actor made you the MEAL officer for the place “:subject”',
             'project_assigned' => [
                 'title' => 'Project MEAL officer assigned',
                 'body' => ':actor made :employee the MEAL officer for the project “:subject”',
@@ -933,7 +938,10 @@ return [
             ],
         ],
         'report_template' => [
-            'placement_pending' => ':subject needs a reporting choice.',
+            'placement_pending' => [
+                'title' => 'Reporting choice needed',
+                'body' => ':subject needs a reporting choice.',
+            ],
             'created' => 'The report template of “:subject” was created',
             'updated' => ':actor updated the report template of “:subject”',
             'pending' => [

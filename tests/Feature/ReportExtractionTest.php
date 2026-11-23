@@ -7,20 +7,17 @@ use App\Models\Activity;
 use App\Models\Donor;
 use App\Models\Indicator;
 use App\Models\LibraryIndicator;
-use App\Models\MealCoverageAssignment;
 use App\Models\MonthlyReport;
 use App\Models\MonthlyReportLine;
 use App\Models\MonthlyReportLineShare;
 use App\Models\PlanIndicator;
 use App\Models\Program;
-use App\Models\Project;
 use App\Models\Proposal;
 use App\Models\Report;
 use App\Models\ReportTemplate;
 use App\Models\ReportTemplateLine;
 use App\Models\StrategicPillar;
 use App\Support\Reporting\ExtractionFilter;
-use App\Support\Reporting\PlaceBridge;
 use App\Support\Reporting\ReportExtraction;
 use App\Support\Reporting\ReportPlace;
 use Carbon\CarbonImmutable;
@@ -329,14 +326,20 @@ test('an open window runs from the first reported month to this month', function
 test('my places follow the viewer\'s MEAL coverage', function () {
     ['places' => $places, 'count' => $count] = $this->rx;
     $employee = insertHrEmployee();
-    $project = Activity::withoutRecording(fn (): Project => Project::factory()->create(['city_id' => $this->rx['homs'], 'program_id' => $this->rx['split']->id, 'center_id' => $this->rx['centerThree']]));
-    Activity::withoutRecording(fn () => MealCoverageAssignment::factory()->forProject($project->id)->create(['employee_id' => $employee]));
+    $place = $places['c3split'];
+    DB::table('meal_coverages')->insert([
+        'scope_type' => 'place',
+        'scope_key' => 'place:'.$place->key(),
+        'city_id' => $place->cityId,
+        'program_id' => $place->programId,
+        'center_id' => $place->centerId,
+        'city_wide' => $place->cityWide,
+        'employee_id' => $employee,
+    ]);
 
     $this->actingAs(userWithRole('MEAL', $employee));
 
-    expect(app(PlaceBridge::class)->placesOfProjects([$project->id]))->toEqual([$places['c3split']])
-        ->and(app(PlaceBridge::class)->placeOfProject($project->id))->toEqual($places['c3split'])
-        ->and(rxCenter(new ExtractionFilter(mine: true)))->toEqual([rxKey($places['c3split'], $count) => [40.0, 2.0]]);
+    expect(rxCenter(new ExtractionFilter(mine: true)))->toEqual([rxKey($place, $count) => [40.0, 2.0]]);
 
     $this->actingAs(userWithRole('MEAL', insertHrEmployee()));
 

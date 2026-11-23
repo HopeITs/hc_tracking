@@ -249,12 +249,8 @@ final class ProposalRecipients extends WatcherRecipients
             ? array_map(fn (mixed $project): int => is_array($project) ? (int) ($project['project_id'] ?? 0) : 0, $projects)
             : [];
 
-        $officerIds = Project::query()
-            ->select(['id', 'city_id', 'center_id'])
-            ->whereKey($this->uniqueIds($projectIds))
-            ->get()
-            ->map(fn (Project $project): ?int => MealCoverage::responsibleFor($project))
-            ->all();
+        $officerIds = collect($this->uniqueIds($projectIds))
+            ->flatMap(MealCoverage::officersForLegacyProject(...))->all();
 
         return $this->uniqueIds($officerIds);
     }

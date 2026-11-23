@@ -14,7 +14,7 @@
         PlanUpdateStatus::Seen => 3,
         default => -1,
     };
-    $officerName = \App\Models\HrEmployee::query()->whereKey(\App\Support\MealCoverage::responsibleFor($project))->first()?->name;
+    $officerName = \App\Models\HrEmployee::query()->whereKey(\App\Support\MealCoverage::officersForLegacyProject($project->id))->get()->pluck('name')->implode(', ') ?: null;
     $chain = [
         [__('annual_plans.up.role_project_manager'), $record?->sender?->name ?? \App\Models\HrEmployee::query()->whereKey($project->user_id)->first()?->name, __('annual_plans.up.chain_fills'), $record?->sent_at],
         [__('annual_plans.up.role_officer'), $record?->officer?->name ?? $officerName, __('annual_plans.up.chain_officer'), $record?->officer_approved_at],

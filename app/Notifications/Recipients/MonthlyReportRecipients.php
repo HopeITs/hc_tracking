@@ -83,10 +83,8 @@ final class MonthlyReportRecipients extends ModuleRecipients
             return [];
         }
 
-        $project = app(PlaceBridge::class)->legacyProjectFor($template);
-
         return $this->uniqueIds([
-            $project === null ? null : MealCoverage::responsibleFor($project),
+            MealCoverage::responsibleForPlace($template->place()),
             MealCoverage::mealManagerEmployeeId(),
         ]);
     }

@@ -12,7 +12,6 @@ use App\Models\ReportTemplate;
 use App\Models\User;
 use App\Support\MealCoverage;
 use App\Support\MonthlyReportPreparers;
-use App\Support\Reporting\PlaceBridge;
 
 /**
  * Who does what on a monthly report (contracts §13.1 items 6 and 9).
@@ -22,8 +21,7 @@ use App\Support\Reporting\PlaceBridge;
  *   supervisor of one (MonthlyReportPreparers). They open, fill, submit,
  *   delete a never-submitted draft and request a reopen.
  * - Validator: a reports.approve holder who is the responsible MEAL officer
- *   (MealCoverage::responsibleFor() of the template's legacy project, read
- *   through PlaceBridge until coverage moves to places), the MEAL Manager slot holder, or any
+ *   (MealCoverage::responsibleForPlace() of the report template), the MEAL Manager slot holder, or any
  *   MEAL role holder when no one is responsible (D-12a). Never the preparer or
  *   submitter, never the General Manager.
  * - Reopen decider (D-09a): a reports.reopen holder who holds the MEAL
@@ -36,7 +34,6 @@ class MonthlyReportPolicy
 {
     public function __construct(
         private MonthlyReportPreparers $preparers,
-        private PlaceBridge $bridge,
     ) {}
 
     public function viewAny(User $user): bool
@@ -181,9 +178,7 @@ class MonthlyReportPolicy
         $template = $monthlyReport->relationLoaded('template')
             ? $monthlyReport->template
             : ReportTemplate::query()->findOrFail($monthlyReport->report_template_id);
-        $project = $this->bridge->legacyProjectFor($template)
-            ?? ($monthlyReport->project_id === null ? null : $this->bridge->projectsByIds([$monthlyReport->project_id])->first());
-        $responsible = $project === null ? null : MealCoverage::responsibleFor($project);
+        $responsible = MealCoverage::responsibleForPlace($template->place());
 
         if ($user->employee_id !== null
             && ($user->employee_id === $responsible || $user->employee_id === MealCoverage::mealManagerEmployeeId())) {

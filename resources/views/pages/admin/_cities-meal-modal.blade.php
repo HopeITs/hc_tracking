@@ -10,7 +10,7 @@
     wire:model="showMealModal"
     size="md"
     :title="__('cities.meal_officer_for_name', ['name' => $mealTarget['name'] ?? ''])"
-    :description="$mealScope === 'project' ? __('cities.project_officer_hint') : __('cities.meal_officer_hint')"
+    :description="$mealScope === 'place' ? __('cities.meal_place_hint') : __('cities.meal_officer_hint')"
     submit="saveMealCoverage"
     close="closeMealModal"
     required-note

@@ -9,7 +9,6 @@ use App\Models\Project;
 use App\Models\Proposal;
 use App\Models\ProposalLocation;
 use App\Models\ReportTemplate;
-use App\Support\MealCoverage;
 use Carbon\CarbonImmutable;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Collection;
@@ -45,20 +44,6 @@ final class PlaceBridge
         }
 
         return Project::query()->whereKey($ids)->orderBy('id')->lockForUpdate()->get();
-    }
-
-    /**
-     * Resolve the place's MEAL officer for a placement that has no template yet.
-     * Removed by Y-14 when coverage moves to places.
-     */
-    public function mealOfficerFor(Proposal $proposal, ReportPlace $place): ?int
-    {
-        $row = $proposal->locations()->with('centers')->get()->first(fn ($row): bool => $row->city_id === $place->cityId
-            && $row->program_id === $place->programId
-            && ($place->cityWide ? $row->city_wide : $row->centers->contains('center_id', $place->centerId)));
-        $project = $row?->project_id === null ? null : Project::query()->find($row->project_id);
-
-        return $project === null ? null : MealCoverage::responsibleFor($project);
     }
 
     /**
@@ -142,44 +127,14 @@ final class PlaceBridge
         );
     }
 
-    /**
-     * The place of each project with a city and a program, read from its own
-     * columns, in one query: the places "my places" of the report extraction
-     * narrows to (Y-05). A project without a center is an unset place.
-     *
-     * Removed by Y-14, when MEAL coverage is keyed by place.
-     *
-     * @param  list<int>  $projectIds
-     * @return list<ReportPlace>
-     */
-    public function placesOfProjects(array $projectIds): array
-    {
-        if ($projectIds === []) {
-            return [];
-        }
-
-        return array_values(Project::query()
-            ->select(['id', 'city_id', 'program_id', 'center_id'])
-            ->whereKey($projectIds)
-            ->whereNotNull('city_id')
-            ->whereNotNull('program_id')
-            ->orderBy('id')
-            ->get()
-            ->map(fn (Project $project): ReportPlace => new ReportPlace((int) $project->city_id, (int) $project->program_id, $project->center_id === null ? null : (int) $project->center_id, false))
-            ->unique(fn (ReportPlace $place): string => $place->key())
-            ->all());
-    }
-
-    /**
-     * The place of one project, to translate a legacy `?center=<project id>`
-     * matrix link (Y-05). Null for an unknown project or one without a city
-     * or program.
-     *
-     * Removed by Y-17.
-     */
+    /** Translate a legacy matrix center link. Removed by Y-17. */
     public function placeOfProject(int $projectId): ?ReportPlace
     {
-        return $this->placesOfProjects([$projectId])[0] ?? null;
+        $project = Project::query()
+            ->select(['city_id', 'program_id', 'center_id'])
+            ->whereNotNull('city_id')->whereNotNull('program_id')->find($projectId);
+
+        return $project === null ? null : new ReportPlace((int) $project->city_id, (int) $project->program_id, $project->center_id, false);
     }
 
     /**

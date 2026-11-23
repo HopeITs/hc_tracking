@@ -557,7 +557,7 @@ new #[Layout('layouts::desk'), Title('titles.city_directory')] class extends Com
 
     @can('projects.view')
         @include('pages.admin._cities-project-officers', [
-            'projectOfficers' => $this->projectOfficers,
+            'placeOfficers' => $this->placeOfficers,
             'canManage' => $this->canManageMealCoverage,
         ])
     @endcan

@@ -14,4 +14,6 @@ enum MealCoverageScope: string
 
     /** One project, overriding its governorate's officer. */
     case Project = 'project';
+
+    case Place = 'place';
 }

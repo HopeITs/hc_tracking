@@ -268,6 +268,7 @@ final class EventCatalog
             [
                 'meal_coverage.assigned' => self::entry('cities', $digest, 'module_map', $all, activity: 'meal_coverage.assigned'),
                 'meal_coverage.responsible_changed' => self::entry('cities', $digest, 'module_map', $all, activity: 'meal_coverage.responsible_changed'),
+                'meal_coverage.place_assigned' => self::entry('cities', $digest, 'module_map', $all, activity: 'meal_coverage.place_assigned'),
                 'meal_coverage.project_assigned' => self::entry('cities', $digest, 'module_map', $all, activity: 'meal_coverage.project_assigned'),
             ],
             // results

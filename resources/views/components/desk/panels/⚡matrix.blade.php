@@ -133,10 +133,9 @@ new class extends Component {
         }
 
         $responsibles = app(MonthlyReportPreparers::class)->responsiblesByTemplate($templates);
-        $bridge = app(PlaceBridge::class);
-        $legacyIds = $bridge->legacyProjectIdsFor($templates);
-        $projects = $bridge->projectsByIds(array_values(array_unique(array_filter($legacyIds))));
-        $officers = array_map(fn (?int $projectId): ?int => $projectId === null || ! $projects->has($projectId) ? null : MealCoverage::responsibleFor($projects->get($projectId)), $legacyIds);
+        $officers = $templates->mapWithKeys(fn ($template): array => [
+            $template->id => MealCoverage::responsibleForPlace($template->place()),
+        ])->all();
         $owners = array_map(fn (array $ids): ?int => $ids[0] ?? null, $responsibles);
         $names = HrEmployee::query()->whereKey(array_values(array_unique(array_filter([...array_values($owners), ...array_values($officers)]))))->get(HrEmployee::NameColumns)
             ->mapWithKeys(fn (HrEmployee $employee): array => [$employee->id => $employee->name]);

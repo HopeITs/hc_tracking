@@ -259,7 +259,7 @@ trait EditsActivityPlan
             return $all;
         }
 
-        $own = array_values(array_filter($all, fn ($centre): bool => PlanUpdatePolicy::isProjectManager($user, $centre) || ($user->employee_id !== null && MealCoverage::responsibleFor($centre) === (int) $user->employee_id)));
+        $own = array_values(array_filter($all, fn ($centre): bool => PlanUpdatePolicy::isProjectManager($user, $centre) || ($user->employee_id !== null && in_array((int) $user->employee_id, MealCoverage::officersForLegacyProject($centre->id), true))));
 
         return $own === [] ? $all : $own;
     }

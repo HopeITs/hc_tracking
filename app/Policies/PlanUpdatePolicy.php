@@ -46,7 +46,7 @@ class PlanUpdatePolicy
         }
 
         return self::isProjectManager($user, $project)
-            || self::isOfficer($user, $project)
+            || self::isOfficer($user, $project, $plan->proposal_id)
             || ActivityPlanPolicy::isMealManager($user)
             || self::isProgramManager($user, $plan);
     }
@@ -63,7 +63,7 @@ class PlanUpdatePolicy
 
     public function decideAsOfficer(User $user, PlanUpdate $planUpdate): bool
     {
-        return $planUpdate->status === PlanUpdateStatus::Sent && self::isOfficer($user, $planUpdate->project()->firstOrFail());
+        return $planUpdate->status === PlanUpdateStatus::Sent && self::isOfficer($user, $planUpdate->project()->firstOrFail(), $planUpdate->plan->proposal_id);
     }
 
     public function decideAsMealManager(User $user, PlanUpdate $planUpdate): bool
@@ -99,17 +99,17 @@ class PlanUpdatePolicy
         return $user->employee_id !== null && $owner !== null && (int) $owner === (int) $user->employee_id;
     }
 
-    public static function isOfficer(User $user, Project $project): bool
+    public static function isOfficer(User $user, Project $project, ?int $proposalId): bool
     {
         if ($user->hasRole('Super Admin')) {
             return true;
         }
 
-        $responsible = MealCoverage::responsibleFor($project);
+        $officers = MealCoverage::officersForLegacyProject($project->id, $proposalId);
 
-        return $responsible === null
+        return $officers === []
             ? $user->hasRole('MEAL')
-            : $user->employee_id !== null && (int) $user->employee_id === $responsible;
+            : $user->employee_id !== null && in_array((int) $user->employee_id, $officers, true);
     }
 
     public static function isProgramManager(User $user, ActivityPlan $plan): bool
