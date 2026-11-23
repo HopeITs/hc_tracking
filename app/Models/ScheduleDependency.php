@@ -17,6 +17,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
  *
  * @property int $id
  * @property int $project_id
+ * @property int|null $proposal_location_id
  * @property string $predecessor_type
  * @property int $predecessor_id
  * @property string $successor_type
@@ -26,7 +27,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
  * @property CarbonImmutable|null $created_at
  * @property CarbonImmutable|null $updated_at
  */
-#[Fillable(['project_id', 'predecessor_type', 'predecessor_id', 'successor_type', 'successor_id', 'type', 'lag_days'])]
+#[Fillable(['project_id', 'proposal_location_id', 'predecessor_type', 'predecessor_id', 'successor_type', 'successor_id', 'type', 'lag_days'])]
 class ScheduleDependency extends Model
 {
     /** @use HasFactory<ScheduleDependencyFactory> */
@@ -48,6 +49,17 @@ class ScheduleDependency extends Model
     public function project(): BelongsTo
     {
         return $this->belongsTo(Project::class);
+    }
+
+    /**
+     * The location row this belongs to (Y-12, D-93). Null until the backfill
+     * maps it; `project_id` is kept and still written until Y-18.
+     *
+     * @return BelongsTo<ProposalLocation, $this>
+     */
+    public function location(): BelongsTo
+    {
+        return $this->belongsTo(ProposalLocation::class, 'proposal_location_id');
     }
 
     /**
@@ -76,6 +88,7 @@ class ScheduleDependency extends Model
             'lag_days' => 'integer',
             'predecessor_id' => 'integer',
             'successor_id' => 'integer',
+            'proposal_location_id' => 'integer',
         ];
     }
 }

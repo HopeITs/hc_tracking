@@ -6,13 +6,15 @@ namespace App\Actions\Tasks;
 
 use App\Models\Program;
 use App\Models\Project;
+use App\Models\ProposalLocation;
 use App\Models\Task;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Gate;
 
 /**
  * Move a task, with its subtasks, somewhere else inside its own program: the
- * program itself ("program") or one of its projects ("project:ID"). A subtask always follows its parent, so
+ * program itself ("program") or one of its location rows ("location:ID";
+ * "project:ID" is still accepted for an unmapped legacy task). A subtask always follows its parent, so
  * it never moves on its own, and a task raised outside a program (a proposal,
  * a report…) has nowhere to move to.
  *
@@ -99,9 +101,19 @@ class MoveTask
         [$type, $id] = array_pad(explode(':', $target, 2), 2, '');
         $id = (int) $id;
 
-        $belongs = $type === 'project' && Project::query()->whereKey($id)->where('program_id', $programId)->exists();
+        // "location:ID" is where a task moves from Y-12 on; "project:ID" is
+        // still accepted for tasks the backfill could not map (until Y-18).
+        $belongs = match ($type) {
+            'location' => ProposalLocation::query()->whereKey($id)->where('program_id', $programId)->exists(),
+            'project' => Project::query()->whereKey($id)->where('program_id', $programId)->exists(),
+            default => false,
+        };
 
-        return $belongs ? ['type' => $type, 'id' => $id] : null;
+        if (! $belongs) {
+            return null;
+        }
+
+        return ['type' => $type === 'location' ? 'proposal_location' : $type, 'id' => $id];
     }
 
     /**
@@ -109,7 +121,11 @@ class MoveTask
      */
     public function targetFor(string $type, int $id): string
     {
-        return $type === 'program' ? 'program' : $type.':'.$id;
+        return match ($type) {
+            'program' => 'program',
+            'proposal_location' => 'location:'.$id,
+            default => $type.':'.$id,
+        };
     }
 
     /**
@@ -121,9 +137,11 @@ class MoveTask
             return $id;
         }
 
-        $projectId = $type === 'project' ? $id : null;
-
-        $programId = $projectId === null ? null : Project::query()->whereKey($projectId)->value('program_id');
+        $programId = match ($type) {
+            'proposal_location' => ProposalLocation::programIdFor($id),
+            'project' => Project::query()->whereKey($id)->value('program_id'),
+            default => null,
+        };
 
         return $programId === null ? null : (int) $programId;
     }

@@ -1,7 +1,10 @@
 <?php
 
+use App\Models\Program;
 use App\Models\Project;
 use App\Models\Proposal;
+use App\Models\ProposalLocation;
+use App\Models\Scopes\TaskVisibilityScope;
 use App\Models\Task;
 use App\Models\TaskAttachment;
 use Illuminate\Support\Facades\Gate;
@@ -115,4 +118,58 @@ test('a Media Team editor moves status on department tasks but cannot edit them,
 
 test('Managers edit tasks in every department', function () {
     expect(Gate::forUser(userWithRole('Managers'))->allows('update', $this->financeTask))->toBeTrue();
+});
+
+test('a task on a row the user is responsible for is visible (Y-12)', function () {
+    $owner = userWithRole('Team Member', $this->mediaEmployee);
+    $proposal = Proposal::factory()->create();
+    $row = ProposalLocation::factory()->create([
+        'proposal_id' => $proposal->id,
+        'program_id' => Program::factory()->create()->id,
+        'responsible_employee_id' => $this->mediaEmployee,
+        'city_wide' => true,
+    ]);
+
+    $task = Task::factory()->create(['source_type' => 'proposal_location', 'source_id' => $row->id]);
+    $task->taskAssignees()->delete();
+    $task->taskAssignees()->create(['employee_id' => $this->financeEmployee]);
+
+    // Not an assignee, not in the department: visible only because the row
+    // is theirs.
+    expect(TaskVisibilityScope::allows($owner, $task))->toBeTrue();
+});
+
+test('a task on a row of a program the user manages is visible (Y-12)', function () {
+    $manager = userWithRole('Team Member', $this->mediaEmployee);
+    $program = Program::factory()->create(['manager_id' => $this->mediaEmployee]);
+    $proposal = Proposal::factory()->create();
+    $row = ProposalLocation::factory()->create([
+        'proposal_id' => $proposal->id,
+        'program_id' => $program->id,
+        'responsible_employee_id' => insertHrEmployee(),
+        'city_wide' => true,
+    ]);
+
+    $task = Task::factory()->create(['source_type' => 'proposal_location', 'source_id' => $row->id]);
+    $task->taskAssignees()->delete();
+    $task->taskAssignees()->create(['employee_id' => $this->financeEmployee]);
+
+    expect(TaskVisibilityScope::allows($manager, $task))->toBeTrue();
+});
+
+test('a task on someone else row stays hidden (Y-12)', function () {
+    $stranger = userWithRole('Team Member', insertHrEmployee());
+    $proposal = Proposal::factory()->create();
+    $row = ProposalLocation::factory()->create([
+        'proposal_id' => $proposal->id,
+        'program_id' => Program::factory()->create()->id,
+        'responsible_employee_id' => $this->mediaEmployee,
+        'city_wide' => true,
+    ]);
+
+    $task = Task::factory()->create(['source_type' => 'proposal_location', 'source_id' => $row->id]);
+    $task->taskAssignees()->delete();
+    $task->taskAssignees()->create(['employee_id' => $this->financeEmployee]);
+
+    expect(TaskVisibilityScope::allows($stranger, $task))->toBeFalse();
 });
