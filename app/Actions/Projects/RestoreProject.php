@@ -7,6 +7,7 @@ namespace App\Actions\Projects;
 use App\Enums\ProjectStatus;
 use App\Models\Program;
 use App\Models\Project;
+use App\Support\Locations\ProjectLocationMirror;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Validation\ValidationException;
@@ -21,6 +22,8 @@ use Illuminate\Validation\ValidationException;
  */
 final class RestoreProject
 {
+    public function __construct(private ProjectLocationMirror $mirror) {}
+
     /**
      * @throws ValidationException when the project is not archived or another open project holds its center and program
      */
@@ -51,6 +54,8 @@ final class RestoreProject
 
             $locked->status = $locked->start_date !== null && $locked->end_date !== null ? ProjectStatus::Closed : ProjectStatus::Draft;
             $locked->save();
+
+            $this->mirror->sync($locked);
 
             return $locked->status;
         });

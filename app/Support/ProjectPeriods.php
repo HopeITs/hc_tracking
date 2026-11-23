@@ -7,6 +7,7 @@ namespace App\Support;
 use App\Enums\ProjectStatus;
 use App\Events\ProjectPeriodChanged;
 use App\Models\Project;
+use App\Support\Locations\ProjectLocationMirror;
 use Carbon\CarbonImmutable;
 
 /**
@@ -44,6 +45,11 @@ final class ProjectPeriods
         $project->start_date = $newStart;
         $project->end_date = $newEnd;
         $project->save();
+
+        // Sync here rather than in each caller: ApproveProjectFromProposal and
+        // ExtendProposal both widen, and until Y-17 no period may reach
+        // `projects` without reaching its location rows (wave4/AGENT.md §8.2).
+        app(ProjectLocationMirror::class)->sync($project);
 
         if ($project->status === ProjectStatus::Active && $oldStart !== null && $oldEnd !== null) {
             ProjectPeriodChanged::dispatch($project->id, $oldStart, $oldEnd, $newStart, $newEnd);

@@ -12,6 +12,7 @@ use App\Models\Proposal;
 use App\Models\ProposalLocation;
 use App\Models\User;
 use Illuminate\Auth\Access\AuthorizationException;
+use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Event;
 use Illuminate\Validation\ValidationException;
@@ -152,6 +153,25 @@ test('a new row becomes a draft through SaveProject, linked to the proposal and 
 
     expect(Activity::query()->where('subject_type', 'project')->where('event', 'project.created')->count())->toBe(1)
         ->and(Activity::query()->where('subject_type', 'proposal')->where('event', 'proposal.project_linked')->count())->toBe(1);
+});
+
+test('a row linked at approval is mirrored at once (Y-11 slice 2)', function () {
+    $proposal = proposalWithRows([newRow()]);
+
+    approveWithRows($this->approver, $proposal);
+
+    $project = DB::table('projects')->sole();
+    $row = rowsOf($proposal)[0];
+
+    // The row carries the project's status, period and calendar the moment it
+    // takes it, so `locations:verify-mirror` is clean straight after approval.
+    expect($row->status)->toBe($project->status)
+        ->and($row->start_date)->toBe($project->start_date)
+        ->and($row->end_date)->toBe($project->end_date)
+        ->and($row->schedule_weekend)->toBe($project->schedule_weekend)
+        ->and($row->slug)->not->toBeNull();
+
+    expect(Artisan::call('locations:verify-mirror'))->toBe(0);
 });
 
 test('a row with two centers creates one draft per center and keeps the first on the row', function () {

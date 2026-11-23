@@ -12,6 +12,7 @@ use App\Models\HrEmployee;
 use App\Models\Program;
 use App\Models\Project;
 use App\Models\User;
+use App\Support\Locations\ProjectLocationMirror;
 use Closure;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Gate;
@@ -37,6 +38,8 @@ use Illuminate\Validation\ValidationException;
  */
 final class SaveProject
 {
+    public function __construct(private ProjectLocationMirror $mirror) {}
+
     /**
      * `startDate` and `endDate` are only accepted for a project that is no
      * longer a draft. `name` may be blank on create: it defaults to
@@ -116,6 +119,8 @@ final class SaveProject
             if ($input['sectorIds'] !== null) {
                 app(SyncProjectSectors::class)->handle($project, $input['sectorIds'], requireOne: $existing === null);
             }
+
+            $this->mirror->sync($project);
 
             return $project;
         });

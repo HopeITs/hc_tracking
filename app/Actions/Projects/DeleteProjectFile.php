@@ -6,6 +6,7 @@ namespace App\Actions\Projects;
 
 use App\Models\Media;
 use App\Models\Project;
+use App\Support\Locations\ProjectLocationMirror;
 use App\Support\StoredFiles;
 use Illuminate\Support\Facades\Gate;
 
@@ -14,9 +15,13 @@ use Illuminate\Support\Facades\Gate;
  */
 class DeleteProjectFile
 {
+    public function __construct(private ProjectLocationMirror $mirror) {}
+
     public function handle(Project $project, Media $file): void
     {
         Gate::authorize('update', $project);
+
+        $this->mirror->detachFile($project, $file);
 
         StoredFiles::forget($file->disk, $file->path, 'project file', ['media_id' => $file->id]);
 

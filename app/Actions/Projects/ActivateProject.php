@@ -11,6 +11,7 @@ use App\Events\ProposalStatusChanged;
 use App\Models\Project;
 use App\Models\Proposal;
 use App\Models\ProposalStatusNote;
+use App\Support\Locations\ProjectLocationMirror;
 use Carbon\CarbonImmutable;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
@@ -29,6 +30,8 @@ use InvalidArgumentException;
  */
 final class ActivateProject
 {
+    public function __construct(private ProjectLocationMirror $mirror) {}
+
     /** @var list<string> */
     public const VIAS = ['template_confirmation'];
 
@@ -84,6 +87,8 @@ final class ActivateProject
                 CarbonImmutable::parse($locked->end_date->toDateString()),
                 $via,
             );
+
+            $this->mirror->sync($locked);
         });
 
         $project->refresh();
