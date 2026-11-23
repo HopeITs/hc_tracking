@@ -3,6 +3,7 @@
 use App\Actions\Proposals\SyncLogframeTask;
 use App\Actions\Results\SaveAssumption;
 use App\Enums\AssumptionStatus;
+use App\Enums\ResultType;
 use App\Enums\TaskStatus;
 use App\Livewire\Concerns\Proposals\CopiesProgramFramework;
 use App\Livewire\Concerns\Proposals\EditsCentreTargets;
@@ -26,6 +27,7 @@ use Illuminate\Validation\ValidationException;
 use Livewire\Attributes\Computed;
 use Livewire\Attributes\Locked;
 use Livewire\Attributes\On;
+use Livewire\Attributes\Url;
 use Livewire\Component;
 
 /*
@@ -69,9 +71,20 @@ new class extends Component {
 
     public string $density = 'comfortable';
 
-    public bool $tall = false;
-
+    #[Url(as: 'problems', except: false)]
     public bool $problemsOnly = false;
+
+    /**
+     * The outcome tab in front; 0 picks the first one.
+     */
+    #[Url(as: 'outcome', except: 0)]
+    public int $focus = 0;
+
+    /** The output opened under the outcome in front, if any. */
+    public ?int $openChild = null;
+
+    /** Which list of the outcome in front is unfolded: 'ind', 'ra', 'all' (after Open all) or ''. */
+    public string $drawer = '';
 
     public string $search = '';
 
@@ -160,18 +173,11 @@ new class extends Component {
         $this->savePrefs();
     }
 
-    public function setTall(bool $tall): void
-    {
-        $this->tall = $tall;
-        $this->savePrefs();
-    }
-
     public function resetPrefs(): void
     {
         $this->layout = 'chain';
         $this->layers = $this->defaultLayers();
         $this->density = 'comfortable';
-        $this->tall = false;
         $this->savePrefs();
     }
 
@@ -185,12 +191,15 @@ new class extends Component {
 
     public function openAll(): void
     {
+        $this->drawer = 'all';
         $this->openIds = array_keys($this->framework['results']);
         $this->saveOpen();
     }
 
     public function closeAll(): void
     {
+        $this->drawer = '';
+        $this->openChild = null;
         $this->openIds = [];
         $this->saveOpen();
     }
@@ -215,6 +224,102 @@ new class extends Component {
             $this->layout = $this->layout === 'board' ? 'chain' : $this->layout;
             $this->savePrefs();
         }
+
+        $this->drawer = match ($key) {
+            'ind', 'tgt' => 'ind',
+            'ra' => 'ra',
+            default => $this->drawer,
+        };
+    }
+
+    /**
+     * Bring an outcome tab to the front, folded.
+     */
+    public function focusOn(int $resultId): void
+    {
+        $this->focus = isset($this->framework['results'][$resultId]) ? $resultId : 0;
+        $this->openChild = null;
+        $this->drawer = '';
+    }
+
+    public function toggleChild(int $resultId): void
+    {
+        $this->openChild = $this->openChild === $resultId ? null : $resultId;
+        $this->openIds = array_values(array_diff($this->openIds, [$resultId]));
+    }
+
+    public function toggleDrawer(string $drawer): void
+    {
+        $this->drawer = $this->drawer === $drawer || ! in_array($drawer, ['ind', 'ra'], true) ? '' : $drawer;
+    }
+
+    /**
+     * The tabs' entries in tree order: an impact heads its outcomes; any
+     * other root stands on its own.
+     *
+     * @return list<array{id: int, heading: bool}>
+     */
+    #[Computed]
+    public function rail(): array
+    {
+        $framework = $this->framework;
+        $rail = [];
+
+        foreach ($framework['roots'] as $root) {
+            if ($framework['results'][$root]['type'] === ResultType::Impact) {
+                $rail[] = ['id' => $root, 'heading' => true];
+
+                foreach ($framework['children'][$root] ?? [] as $child) {
+                    $rail[] = ['id' => $child, 'heading' => false];
+                }
+            } else {
+                $rail[] = ['id' => $root, 'heading' => false];
+            }
+        }
+
+        return $rail;
+    }
+
+    /**
+     * Per result: how many results in its branch (itself included) have a
+     * problem, and how many indicators the branch carries.
+     *
+     * @return array<int, array{issues: int, indicators: int}>
+     */
+    #[Computed]
+    public function subtreeTotals(): array
+    {
+        $framework = $this->framework;
+        $totals = [];
+        $walk = function (int $id) use (&$walk, &$totals, $framework): array {
+            $sum = ['issues' => $framework['results'][$id]['issues'] === [] ? 0 : 1, 'indicators' => count($framework['results'][$id]['indicators'])];
+
+            foreach ($framework['children'][$id] ?? [] as $child) {
+                $below = $walk($child);
+                $sum['issues'] += $below['issues'];
+                $sum['indicators'] += $below['indicators'];
+            }
+
+            return $totals[$id] = $sum;
+        };
+
+        foreach ($framework['roots'] as $root) {
+            $walk($root);
+        }
+
+        return $totals;
+    }
+
+    /**
+     * The outcome tab in front: the one asked for while it is still shown,
+     * otherwise the first shown; null when no tab is left.
+     */
+    #[Computed]
+    public function focusedId(): ?int
+    {
+        $ids = array_column(array_filter($this->rail, fn (array $entry): bool => ! $entry['heading'] && in_array($entry['id'], $this->visibleIds, true)), 'id');
+
+        return in_array($this->focus, $ids, true) ? $this->focus : ($ids[0] ?? null);
     }
 
     /**
@@ -249,7 +354,6 @@ new class extends Component {
         $this->layout = in_array($mine['layout'] ?? null, ['chain', 'matrix', 'board'], true) ? $mine['layout'] : 'chain';
         $this->layers = array_merge($this->defaultLayers(), array_intersect_key(array_map('boolval', is_array($mine['layers'] ?? null) ? $mine['layers'] : []), array_flip(self::LAYERS)));
         $this->density = ($mine['density'] ?? null) === 'compact' ? 'compact' : 'comfortable';
-        $this->tall = (bool) ($mine['tall'] ?? false);
 
         $open = $prefs[self::PREFS.'_open'][(string) $this->proposalId] ?? [];
         $this->openIds = array_values(array_map('intval', is_array($open) ? $open : []));
@@ -264,7 +368,7 @@ new class extends Component {
         }
 
         $prefs = $user->page_prefs ?? [];
-        $prefs[self::PREFS] = ['layout' => $this->layout, 'layers' => $this->layers, 'density' => $this->density, 'tall' => $this->tall];
+        $prefs[self::PREFS] = ['layout' => $this->layout, 'layers' => $this->layers, 'density' => $this->density];
         $user->forceFill(['page_prefs' => $prefs])->saveQuietly();
     }
 
@@ -481,7 +585,7 @@ new class extends Component {
      */
     private function forgetBox(): void
     {
-        unset($this->allResults, $this->framework, $this->visibleIds, $this->checks, $this->logframeTask, $this->taskPeople, $this->proposalRisks);
+        unset($this->allResults, $this->framework, $this->visibleIds, $this->rail, $this->subtreeTotals, $this->focusedId, $this->checks, $this->logframeTask, $this->taskPeople, $this->proposalRisks);
     }
 
     protected function forgetFramework(): void

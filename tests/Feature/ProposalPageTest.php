@@ -394,6 +394,16 @@ test('sections start folded, open and close, and stay open for the person', func
     expect(proposalPageFor()->instance()->openSections)->toContain('history', 'docs', 'coming');
 });
 
+test('Open all is dimmed when every section is open, Close all when none is', function () {
+    proposalPageFor()
+        ->assertSeeHtml('data-test="sections-close-all"')
+        ->assertSeeHtmlInOrder(['wire:click="closeAllSections" disabled', 'data-test="sections-close-all"'])
+        ->assertDontSeeHtml('wire:click="openAllSections" disabled')
+        ->call('openAllSections')
+        ->assertSeeHtml('wire:click="openAllSections" disabled')
+        ->assertDontSeeHtml('wire:click="closeAllSections" disabled');
+});
+
 test('a payroll proposal shows only money, coming up, documents and history', function () {
     Proposal::query()->whereKey($this->proposal->id)->update(['kind' => 'payroll', 'narrative' => 'Salaries']);
 

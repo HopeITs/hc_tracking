@@ -1,6 +1,6 @@
 {{--
     The logical framework box (components/proposals/⚡logframe): task bar,
-    tools and the Results chain or Matrix. Sticky top, scrolling body.
+    tools and the Results chain or Matrix. Title scrolls away; the filter toolbar sticks while the page scrolls.
 --}}
 @php
     $fw = $this->framework;
@@ -29,7 +29,7 @@
     $svg = fn (string $name, int $size = 14): string => '<svg width="'.$size.'" height="'.$size.'" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">'.$icon[$name].'</svg>';
 @endphp
 
-<section @class(['pp-lf', 'pp-compact' => $density === 'compact', 'pp-tall' => $tall]) id="lf" aria-labelledby="lf-h" data-test="proposal-logframe" data-tour="proposal-logframe">
+<section @class(['pp-lf', 'pp-compact' => $density === 'compact']) id="lf" aria-labelledby="lf-h" data-test="proposal-logframe" data-tour="proposal-logframe">
     <div class="pp-lf-top">
         @if ($task !== null)
             @include('components.proposals._framework-task')
@@ -54,7 +54,7 @@
                 <span class="pp-switch" role="group" aria-label="{{ __('proposals.framework.layout') }}">
                     <button type="button" @class(['pp-on' => $layout === 'chain']) wire:click="setLayout('chain')" aria-pressed="{{ $layout === 'chain' ? 'true' : 'false' }}" data-test="layout-chain">{!! $svg('tree') !!} {{ __('proposals.framework.layout_chain') }}</button>
                     <button type="button" @class(['pp-on' => $layout === 'matrix']) wire:click="setLayout('matrix')" aria-pressed="{{ $layout === 'matrix' ? 'true' : 'false' }}" data-test="layout-matrix">{!! $svg('table') !!} {{ __('proposals.framework.layout_matrix') }}</button>
-                    <button type="button" @class(['pp-on' => $layout === 'board']) wire:click="setLayout('board')" aria-pressed="{{ $layout === 'board' ? 'true' : 'false' }}" data-test="layout-board">{!! $svg('task') !!} {{ __('proposals.framework.layout_board') }}</button>
+                    <button type="button" @class(['pp-on' => $layout === 'board']) wire:click="setLayout('board')" aria-pressed="{{ $layout === 'board' ? 'true' : 'false' }}" data-test="layout-board" @if ($looseIds !== []) title="{{ trans_choice('proposals.framework.loose_banner', count($looseIds), ['count' => count($looseIds)]) }} {{ __('proposals.framework.loose_tab_help') }}" @endif>{!! $svg('task') !!} {{ __('proposals.framework.layout_board') }}@if ($looseIds !== [])<span class="pp-tab-badge" data-test="loose-badge"><span class="sr-only">{{ trans_choice('proposals.framework.loose_banner', count($looseIds), ['count' => count($looseIds)]) }}</span><span aria-hidden="true">{{ count($looseIds) }}</span></span>@endif</button>
                 </span>
                 <span class="pp-rel" x-data="{ open: false }" x-on:click.outside="open = false" x-on:keydown.escape.window="open = false">
                     <button type="button" class="pp-btn pp-btn-sm" x-on:click="open = ! open" x-bind:aria-expanded="open" data-test="customize">{!! $svg('sliders') !!} {{ __('proposals.framework.customize') }}</button>
@@ -66,9 +66,6 @@
                         <h4>{{ __('proposals.framework.spacing') }}</h4>
                         <label><input type="radio" name="pp-density" @checked($density !== 'compact') wire:click="setDensity('comfortable')"> {{ __('proposals.framework.comfortable') }}</label>
                         <label><input type="radio" name="pp-density" @checked($density === 'compact') wire:click="setDensity('compact')"> {{ __('proposals.framework.compact') }}</label>
-                        <h4>{{ __('proposals.framework.box_height') }}</h4>
-                        <label><input type="radio" name="pp-tall" @checked(! $tall) wire:click="setTall(false)"> {{ __('proposals.framework.fixed_box') }}</label>
-                        <label><input type="radio" name="pp-tall" @checked($tall) wire:click="setTall(true)"> {{ __('proposals.framework.full_length') }}</label>
                         <h4>{{ __('proposals.framework.layout') }}</h4>
                         <label><input type="radio" name="pp-layout" @checked($layout === 'chain') wire:click="setLayout('chain')"> {{ __('proposals.framework.layout_chain_long') }}</label>
                         <label><input type="radio" name="pp-layout" @checked($layout === 'matrix') wire:click="setLayout('matrix')"> {{ __('proposals.framework.layout_matrix_long') }}</label>
@@ -81,7 +78,9 @@
                 </span>
             </div>
         </div>
+    </div>
 
+    <div class="pp-lf-sticky" data-test="framework-toolbar">
         @if ($layout !== 'board')
         <div class="pp-layers" role="group" aria-label="{{ __('proposals.framework.show_under_each') }}">
             <span class="pp-small">{{ __('proposals.framework.show') }}</span>
@@ -101,10 +100,6 @@
                 @endif
             </span>
             <span class="pp-lf-bar-r">
-                @if ($layout === 'chain')
-                    <button type="button" class="pp-btn pp-btn-sm" wire:click="openAll" data-test="open-all">{{ __('proposals.framework.open_all') }}</button>
-                    <button type="button" class="pp-btn pp-btn-sm" wire:click="closeAll" data-test="close-all">{{ __('proposals.framework.close_all') }}</button>
-                @endif
                 @if ($canCreate)
                     <button type="button" class="pp-btn pp-btn-sm pp-btn-primary" wire:click="openCreateModal" data-test="create-logframe-result">{!! $svg('plus') !!} {{ __('proposals.framework.add_result') }}</button>
                 @endif
@@ -113,13 +108,6 @@
     </div>
 
     <div class="pp-lf-body" data-test="framework-body">
-        @if ($looseIds !== [] && $layout !== 'board')
-            <div class="pp-lbanner" data-test="loose-banner">
-                {!! $svg('task', 16) !!}
-                <span><b>{{ trans_choice('proposals.framework.loose_banner', count($looseIds), ['count' => count($looseIds)]) }}</b> {{ __('proposals.framework.loose_banner_help') }}</span>
-                <button type="button" class="pp-btn pp-btn-sm pp-btn-primary" wire:click="setLayout('board')" data-test="open-board">{{ __('proposals.framework.open_board') }}</button>
-            </div>
-        @endif
 
         @if ($layout === 'board')
             @include('components.proposals._framework-board')
@@ -130,11 +118,7 @@
         @elseif ($layout === 'matrix')
             @include('components.proposals._framework-matrix')
         @else
-            <div class="pp-tree">
-                @foreach ($fw['roots'] as $rootId)
-                    @include('components.proposals._framework-node', ['resultId' => $rootId])
-                @endforeach
-            </div>
+            @include('components.proposals._framework-tabs')
         @endif
     </div>
 

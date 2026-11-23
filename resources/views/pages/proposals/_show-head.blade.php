@@ -19,7 +19,7 @@
 
 <header class="pp-head" data-test="proposal-head">
     <nav class="pp-crumb" aria-label="{{ __('proposals.page.breadcrumb') }}">
-        <a href="{{ \App\Support\BackUrl::for(route('proposals.index')) }}" wire:navigate.hover data-detail-back>{{ __('common.proposals') }}</a>
+        <a href="{{ route('proposals.index') }}" wire:navigate.hover data-detail-back>{{ __('common.proposals') }}</a>
         <span aria-hidden="true">/</span>
         <span class="sr-only">{{ __('common.internal_project_number') }}</span>
         <x-ui.project-number :number="$this->proposal->internal_project_number" kind="internal" />

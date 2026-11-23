@@ -154,7 +154,7 @@
     /* While a card is pulled or carried: cards gliding past the Desk's side never widen the page (no horizontal scrollbar). */
     .dk-resizing-doc, .dk-moving-doc { overflow-x: clip; }
     /* A row that grows past the window's height must not bring the page's scrollbar in and narrow the whole Desk mid-pull. */
-    html:has([data-desk-grid]) { scrollbar-gutter: stable; }
+    .dk-page-scroll:has([data-desk-grid]) { scrollbar-gutter: stable; }
 
     .dk-resize-badge { position: absolute; z-index: 10; inset-block-start: 50%; inset-inline-start: 50%; translate: -50% -50%; pointer-events: none; padding: 6px 14px; border-radius: 999px; background: var(--ink); color: var(--paper); font-size: 18px; font-weight: 800; font-variant-numeric: tabular-nums; letter-spacing: .02em; white-space: nowrap; }
     [dir="rtl"] .dk-resize-badge { translate: 50% -50%; }
