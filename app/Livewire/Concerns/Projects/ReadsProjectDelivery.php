@@ -68,23 +68,37 @@ trait ReadsProjectDelivery
     }
 
     /**
-     * The risks the project's manager should be aware of (W-09, D-61): those
+     * The risks the place's manager should be aware of (W-09, D-61): those
      * picked onto the logframes of the proposals linked to this project, plus
-     * the register rows logged against the project before the library
-     * existed. Read-only; one query. Newest framework risks sit with their
-     * proposal, the earlier register rows in a group of their own.
+     * the place's own register. Read-only; one query. Framework risks sit with
+     * their proposal, the register rows in a group of their own.
+     *
+     * Since Y-13 (D-93) a register risk belongs to a location row and carries
+     * that row's proposal, so the two groups are told apart by the row (see
+     * `Risk::isOnLogframe()`): the register group is read through the rows
+     * carrying this project, not through `proposal_id`. A register risk the
+     * backfill could not map (D-80) is still shown by its project, so nothing
+     * drops out of the panel.
      *
      * @return Collection<int, Risk>
      */
     #[Computed]
     public function riskAwareness(): Collection
     {
+        $rowIds = DB::table('proposal_locations')->select('id')->where('project_id', $this->projectId);
+
         return Risk::query()
-            ->select(['id', 'name', 'name_en', 'impact', 'solution', 'happened', 'likelihood', 'severity', 'project_id', 'proposal_id'])
-            ->with('proposal:id,name')
+            ->select(['id', 'name', 'name_en', 'impact', 'solution', 'happened', 'likelihood', 'severity', 'project_id', 'proposal_location_id', 'proposal_id', 'result_id'])
+            ->with(['proposal:id,name', 'location:id,program_id,city_id', 'location.program:id'])
             ->where(fn (Builder $query) => $query
-                ->where('project_id', $this->projectId)
-                ->orWhereIn('proposal_id', DB::table('project_proposal')->select('proposal_id')->where('project_id', $this->projectId)))
+                ->where(fn (Builder $logframe) => $logframe
+                    ->whereNull('proposal_location_id')
+                    ->whereIn('proposal_id', DB::table('project_proposal')->select('proposal_id')->where('project_id', $this->projectId)))
+                ->orWhereIn('proposal_location_id', $rowIds)
+                ->orWhere(fn (Builder $unmapped) => $unmapped
+                    ->whereNull('proposal_location_id')
+                    ->whereNull('proposal_id')
+                    ->where('project_id', $this->projectId)))
             ->orderByDesc('happened')
             ->orderBy('id')
             ->get();

@@ -3,7 +3,9 @@
 use App\Livewire\Concerns\FiltersByStrategy;
 use App\Support\Like;
 use App\Support\StrategyRollup;
-use App\Models\Project;
+use App\Models\HrCity;
+use App\Models\HrProgram;
+use App\Models\ProposalLocation;
 use App\Models\Risk;
 use Flux\Flux;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
@@ -23,11 +25,18 @@ new #[Layout('layouts::desk'), Title('titles.risks')] class extends Component {
     use FiltersByStrategy;
     use WithPagination;
 
+    /**
+     * What a place's name needs (`ProposalLocation::placeLabels()`), so a page
+     * of cards costs one HR query and none per row.
+     */
+    private const PlaceRelations = ['location:id,proposal_id,project_id,program_id,city_id', 'location.program:id'];
+
     #[Url(except: '')]
     public string $search = '';
 
+    /** The location row the register is narrowed to (Y-13, D-93). */
     #[Url(except: '')]
-    public string $project = '';
+    public string $location = '';
 
     #[Url(except: false)]
     public bool $materialisedOnly = false;
@@ -67,14 +76,14 @@ new #[Layout('layouts::desk'), Title('titles.risks')] class extends Component {
     /** How hard it would hit, 1–3, or empty while unrated. */
     public string $severity = '';
 
-    public string $riskProjectId = '';
+    public string $riskLocationId = '';
 
     public function updatedSearch(): void
     {
         $this->resetPage();
     }
 
-    public function updatedProject(): void
+    public function updatedLocation(): void
     {
         $this->resetPage();
     }
@@ -100,7 +109,7 @@ new #[Layout('layouts::desk'), Title('titles.risks')] class extends Component {
     public function clearFilters(): void
     {
         $this->search = '';
-        $this->project = '';
+        $this->location = '';
         $this->materialisedOnly = false;
         $this->unmitigated = false;
         $this->high = false;
@@ -108,22 +117,31 @@ new #[Layout('layouts::desk'), Title('titles.risks')] class extends Component {
     }
 
     /**
-     * Risks matching search/project/materialised/mitigation filters. Each
+     * Risks matching search/place/materialised/mitigation filters. Each
      * filter can be switched off so summary widgets can share this base
      * query while excluding the very filter they let the user toggle.
+     *
+     * Since Y-13 (D-93) a register risk belongs to a location row, so the
+     * place filter, the strategy chip and the search all read the row. The
+     * place's city and program names live in HR, so each search word is
+     * resolved to ids there first and the register's own query never joins
+     * that connection (AGENT.md §5).
      */
-    protected function filteredQuery(bool $includeProject = true, bool $includeMaterialised = true, bool $includeUnmitigated = true): Builder
+    protected function filteredQuery(bool $includeLocation = true, bool $includeMaterialised = true, bool $includeUnmitigated = true): Builder
     {
         $search = trim($this->search);
+        $places = $this->searchedPlaceIds;
 
-        return $this->whereInStrategy(Risk::query(), 'risks.project_id')
-            ->when($search !== '', function ($query) use ($search): void {
+        return $this->whereLocationInStrategy(Risk::query(), 'risks.proposal_location_id')
+            ->when($search !== '', function ($query) use ($search, $places): void {
                 $query->where(Like::everyWord($search, fn ($query, string $word) => $query
                     ->where(Like::word('name', $word))
                     ->orWhere(Like::word('impact', $word))
-                    ->orWhereHas('project', Like::word('name', $word))));
+                    ->orWhereHas('location', fn ($row) => $row
+                        ->whereIn('city_id', $places['cities'][$word] ?? [])
+                        ->orWhereIn('program_id', $places['programs'][$word] ?? []))));
             })
-            ->when($includeProject && $this->project !== '', fn ($query) => $query->where('project_id', (int) $this->project))
+            ->when($includeLocation && $this->location !== '', fn ($query) => $query->where('proposal_location_id', (int) $this->location))
             ->when($this->high, fn ($query) => $query->whereRaw('likelihood * severity >= ?', [StrategyRollup::HighRiskScore]))
             ->when($includeMaterialised && $this->materialisedOnly, fn ($query) => $query->where('happened', true))
             // A risk only needs a solution once it has actually happened — a
@@ -132,6 +150,37 @@ new #[Layout('layouts::desk'), Title('titles.risks')] class extends Component {
             ->when($includeUnmitigated && $this->unmitigated, fn ($query) => $query->where('happened', true)->where(function ($query): void {
                 $query->whereNull('solution')->orWhere('solution', '');
             }));
+    }
+
+    /**
+     * The HR cities and programs each search word names, resolved on the HR
+     * side (the city by a LIKE, the program through the in-memory name
+     * lookup) so the register's own query never joins that connection.
+     *
+     * @return array{cities: array<string, list<int>>, programs: array<string, list<int>>}
+     */
+    #[Computed]
+    public function searchedPlaceIds(): array
+    {
+        $search = trim($this->search);
+
+        if ($search === '') {
+            return ['cities' => [], 'programs' => []];
+        }
+
+        $cities = [];
+        $programs = [];
+
+        foreach (Like::searchWords($search) as $word) {
+            $cities[$word] = HrCity::query()
+                ->where(fn ($query) => $query->where(Like::word('name_en', $word))->orWhere(Like::word('name_ar', $word)))
+                ->pluck('id')
+                ->map(fn (mixed $id): int => (int) $id)
+                ->all();
+            $programs[$word] = HrProgram::idsMatchingName($word);
+        }
+
+        return ['cities' => $cities, 'programs' => $programs];
     }
 
     /** @return LengthAwarePaginator<int, Risk> */
@@ -145,8 +194,8 @@ new #[Layout('layouts::desk'), Title('titles.risks')] class extends Component {
     public function boardColumns(): array
     {
         $risks = $this->filteredQuery()
-            ->select(['id', 'name', 'happened', 'project_id'])
-            ->with('project:id,name')
+            ->select(['id', 'name', 'happened', 'project_id', 'proposal_location_id'])
+            ->with([...self::PlaceRelations, 'project:id,name'])
             ->latest('updated_at')
             ->get();
 
@@ -164,8 +213,8 @@ new #[Layout('layouts::desk'), Title('titles.risks')] class extends Component {
     public function risks(): LengthAwarePaginator
     {
         return $this->filteredQuery()
-            ->select(['id', 'name', 'impact', 'solution', 'happened', 'project_id', 'updated_at'])
-            ->with(['project:id,name,city_id', 'project.city:id,name_en,name_ar'])
+            ->select(['id', 'name', 'impact', 'solution', 'happened', 'project_id', 'proposal_location_id', 'updated_at'])
+            ->with([...self::PlaceRelations, 'project:id,name'])
             ->orderByDesc('happened')
             ->orderByDesc('id')
             ->paginate(15);
@@ -202,55 +251,88 @@ new #[Layout('layouts::desk'), Title('titles.risks')] class extends Component {
 
     /**
      * Challenges (risks that happened) vs potential risks (risks that
-     * haven't) per project, for the top 8 projects by total risk count,
+     * haven't) per place, for the top 8 location rows by total risk count,
      * matching every active filter exactly like the register list below it.
+     *
+     * Two queries whatever the number of bars: the counts, then the rows
+     * those bars name.
      *
      * @return array{categories: array<int, string>, series: array<int, array{name: string, data: array<int, int>}>}
      */
     #[Computed]
-    public function projectRiskChart(): array
+    public function locationRiskChart(): array
     {
-        $rows = $this->filteredQuery()
-            ->selectRaw('project_id, happened, count(*) as total')
-            ->groupBy('project_id', 'happened')
+        $counts = $this->filteredQuery()
+            ->whereNotNull('proposal_location_id')
+            ->selectRaw('proposal_location_id, happened, count(*) as total')
+            ->groupBy('proposal_location_id', 'happened')
             ->get()
-            ->groupBy('project_id');
+            ->groupBy('proposal_location_id');
 
-        $topProjectIds = $rows
+        $topLocationIds = $counts
             ->sortByDesc(fn (Collection $group): int => (int) $group->sum('total'))
             ->take(8)
             ->keys();
 
-        $projectNames = Project::query()->whereIn('id', $topProjectIds)->pluck('name', 'id');
+        $labels = ProposalLocation::placeLabels(ProposalLocation::query()
+            ->select(['id', 'program_id', 'city_id'])
+            ->with('program:id')
+            ->whereKey($topLocationIds)
+            ->get());
 
-        $categories = $topProjectIds->map(fn (int $projectId): string => $projectNames[$projectId] ?? '')->values()->all();
-
-        $countFor = fn (int $projectId, bool $happened): int => (int) ($rows->get($projectId)?->first(fn ($row) => (bool) $row->happened === $happened)->total ?? 0);
+        $countFor = fn (int $locationId, bool $happened): int => (int) ($counts->get($locationId)?->first(fn ($row) => (bool) $row->happened === $happened)->total ?? 0);
 
         return [
-            'categories' => $categories,
+            'categories' => $topLocationIds->map(fn (int $locationId): string => $labels[$locationId] ?? '')->values()->all(),
             'series' => [
                 [
                     'name' => __('risks.challenges'),
-                    'data' => $topProjectIds->map(fn (int $projectId): int => $countFor($projectId, true))->values()->all(),
+                    'data' => $topLocationIds->map(fn (int $locationId): int => $countFor($locationId, true))->values()->all(),
                 ],
                 [
                     'name' => __('risks.potential_risks'),
-                    'data' => $topProjectIds->map(fn (int $projectId): int => $countFor($projectId, false))->values()->all(),
+                    'data' => $topLocationIds->map(fn (int $locationId): int => $countFor($locationId, false))->values()->all(),
                 ],
             ],
         ];
     }
 
-    /** @return Collection<int, Project> */
-    #[Computed]
-    public function projectOptions(): Collection
+    /**
+     * The place of each risk in the given list, by row id: one HR query for
+     * the whole page, and the same wording as the filter and the chart.
+     *
+     * A paginator is unwrapped first: `collect()` on one reads its array
+     * shape (data, total, links), not the risks inside it.
+     *
+     * @param  iterable<Risk>|LengthAwarePaginator<int, Risk>  $risks
+     * @return array<int, string>
+     */
+    public function placeLabelsFor(iterable|LengthAwarePaginator $risks): array
     {
-        return Project::query()
-            ->select(['id', 'name'])
-            ->orderBy('name')
+        $rows = $risks instanceof LengthAwarePaginator ? $risks->getCollection() : collect($risks);
+
+        return ProposalLocation::placeLabels($rows->pluck('location')->filter()->unique('id')->values());
+    }
+
+    /**
+     * The places a risk can be logged at or filtered to: every location row
+     * carrying a project, by its own name (city · program).
+     *
+     * @return array<int, string> row id => label
+     */
+    #[Computed]
+    public function locationOptions(): array
+    {
+        $labels = ProposalLocation::placeLabels(ProposalLocation::query()
+            ->select(['id', 'program_id', 'city_id'])
+            ->with('program:id')
+            ->whereNotNull('project_id')
             ->orderBy('id')
-            ->get();
+            ->get());
+
+        asort($labels, SORT_NATURAL | SORT_FLAG_CASE);
+
+        return $labels;
     }
 
     public function openCreateModal(): void
@@ -279,7 +361,7 @@ new #[Layout('layouts::desk'), Title('titles.risks')] class extends Component {
     public function openEditModal(int $riskId): void
     {
         $risk = Risk::query()
-            ->select(['id', 'name', 'impact', 'solution', 'happened', 'likelihood', 'severity', 'project_id'])
+            ->select(['id', 'name', 'impact', 'solution', 'happened', 'likelihood', 'severity', 'project_id', 'proposal_location_id'])
             ->findOrFail($riskId);
 
         Gate::authorize('update', $risk);
@@ -292,7 +374,7 @@ new #[Layout('layouts::desk'), Title('titles.risks')] class extends Component {
         $this->happened = $risk->happened;
         $this->likelihood = (string) ($risk->likelihood ?? '');
         $this->severity = (string) ($risk->severity ?? '');
-        $this->riskProjectId = (string) $risk->project_id;
+        $this->riskLocationId = (string) $risk->proposal_location_id;
         $this->showRiskModal = true;
     }
 
@@ -315,22 +397,26 @@ new #[Layout('layouts::desk'), Title('titles.risks')] class extends Component {
             'happened' => ['boolean'],
             'likelihood' => ['nullable', 'integer', 'between:1,3'],
             'severity' => ['nullable', 'integer', 'between:1,3'],
-            'riskProjectId' => ['required', 'integer', Rule::exists(Project::class, 'id')],
+            'riskLocationId' => ['required', 'integer', Rule::exists(ProposalLocation::class, 'id')->whereNotNull('project_id')],
         ], [
             'name.required' => __('risks.enter_a_short_risk_name'),
             'impact.required' => __('risks.describe_what_happens_if_this_risk_materialises'),
-            'riskProjectId.required' => __('risks.select_the_project_this_risk_affects'),
-            'riskProjectId.exists' => __('risks.the_selected_project_is_no_longer_available'),
+            'riskLocationId.required' => __('risks.select_the_project_this_risk_affects'),
+            'riskLocationId.exists' => __('risks.the_selected_project_is_no_longer_available'),
         ]);
 
         $risk = $this->editingRiskId === null
             ? new Risk
             : Risk::query()->findOrFail($this->editingRiskId);
 
-        // Logging a risk on a project, or moving one onto it, needs the right
-        // to log risks there.
-        if (! $risk->exists || $risk->project_id !== (int) $validated['riskProjectId']) {
-            Gate::authorize('create', [Risk::class, (int) $validated['riskProjectId']]);
+        // Y-13 (D-93): the risk belongs to the location row the form named,
+        // and carries that row's proposal and — until Y-18 — its project.
+        $row = ProposalLocation::query()->select(['id', 'proposal_id', 'project_id'])->findOrFail((int) $validated['riskLocationId']);
+
+        // Logging a risk at a place, or moving one there, needs the right to
+        // log risks on that row.
+        if (! $risk->exists || $risk->proposal_location_id !== $row->id) {
+            Gate::authorize('create', [Risk::class, $row->id]);
         }
 
         $risk->fill([
@@ -340,7 +426,9 @@ new #[Layout('layouts::desk'), Title('titles.risks')] class extends Component {
             'happened' => $validated['happened'],
             'likelihood' => $validated['likelihood'] === '' || $validated['likelihood'] === null ? null : (int) $validated['likelihood'],
             'severity' => $validated['severity'] === '' || $validated['severity'] === null ? null : (int) $validated['severity'],
-            'project_id' => (int) $validated['riskProjectId'],
+            'proposal_location_id' => $row->id,
+            'proposal_id' => $row->proposal_id,
+            'project_id' => $row->project_id,
         ])->save();
 
         $wasRecentlyCreated = $risk->wasRecentlyCreated;
@@ -408,13 +496,13 @@ new #[Layout('layouts::desk'), Title('titles.risks')] class extends Component {
         $this->happened = false;
         $this->likelihood = '';
         $this->severity = '';
-        $this->riskProjectId = '';
+        $this->riskLocationId = '';
     }
 };
 ?>
 
 @php
-    $filtersAreActive = $search !== '' || $project !== '' || $materialisedOnly || $unmitigated || $high || $this->strategyFilter !== null;
+    $filtersAreActive = $search !== '' || $location !== '' || $materialisedOnly || $unmitigated || $high || $this->strategyFilter !== null;
 @endphp
 
 <x-desk.register
@@ -439,10 +527,10 @@ new #[Layout('layouts::desk'), Title('titles.risks')] class extends Component {
     <x-slot:filters>
             <x-desk.strategy-chip :strategy="$this->strategyFilter" />
 
-            <x-ui.header-filter-select :label="__('common.project')" wire:model.live="project" :value="$project">
+            <x-ui.header-filter-select :label="__('common.project')" wire:model.live="location" :value="$location">
                 <option value="">{{ __('common.all_projects') }}</option>
-                @foreach ($this->projectOptions as $projectOption)
-                    <option value="{{ $projectOption->id }}">{{ $projectOption->name }}</option>
+                @foreach ($this->locationOptions as $locationId => $locationLabel)
+                    <option value="{{ $locationId }}">{{ $locationLabel }}</option>
                 @endforeach
             </x-ui.header-filter-select>
 
@@ -463,7 +551,7 @@ new #[Layout('layouts::desk'), Title('titles.risks')] class extends Component {
         <a href="{{ route('proposals.index') }}" wire:navigate class="font-semibold underline decoration-secondary-light underline-offset-2 hover:text-primary dark:hover:text-brand-text">{{ __('risks.moved_notice_link') }}</a>
     </p>
 
-    @php $chart = $this->projectRiskChart; $landscape = $this->riskLandscape; @endphp
+    @php $chart = $this->locationRiskChart; $landscape = $this->riskLandscape; @endphp
     @if (count($chart['categories']) > 0)
         <x-ui.panel as="div" x-data="{ open: true }">
             <button
@@ -506,18 +594,19 @@ new #[Layout('layouts::desk'), Title('titles.risks')] class extends Component {
 
     @if ($view === 'board')
         <x-desk.board data-test="risk-board">
+            @php $boardPlaces = $this->placeLabelsFor(collect($this->boardColumns)->pluck('items')->flatten()); @endphp
             @foreach ($this->boardColumns as $column)
                 <x-desk.board-column :label="$column['label']" :count="$column['count']" :key="$column['key']" wire:key="risk-column-{{ $column['key'] }}">
                     @foreach ($column['items'] as $boardRisk)
                         @can('update', $boardRisk)
                             <x-desk.board-card :click="'openEditModal('.$boardRisk->id.')'" wire:key="risk-card-{{ $boardRisk->id }}" data-test="risk-board-card-{{ $boardRisk->id }}">
                                 <strong>{{ $boardRisk->name }}</strong>
-                                <span class="dk-is">{{ $boardRisk->project?->name }}</span>
+                                <span class="dk-is">{{ $boardPlaces[$boardRisk->proposal_location_id] ?? $boardRisk->project?->name }}</span>
                             </x-desk.board-card>
                         @else
                             <x-desk.board-card wire:key="risk-card-{{ $boardRisk->id }}" data-test="risk-board-card-{{ $boardRisk->id }}">
                                 <strong>{{ $boardRisk->name }}</strong>
-                                <span class="dk-is">{{ $boardRisk->project?->name }}</span>
+                                <span class="dk-is">{{ $boardPlaces[$boardRisk->proposal_location_id] ?? $boardRisk->project?->name }}</span>
                             </x-desk.board-card>
                         @endcan
                     @endforeach
@@ -548,6 +637,7 @@ new #[Layout('layouts::desk'), Title('titles.risks')] class extends Component {
             </x-ui.empty-state>
         @else
             <div class="grid grid-cols-1 gap-3 p-3.5 @4xl:grid-cols-2">
+                @php $places = $this->placeLabelsFor($this->risks); @endphp
                 @foreach ($this->risks as $risk)
                     <article class="flex flex-col gap-2 rounded-lg border border-secondary-soft p-3.5 dark:border-line" wire:key="risk-{{ $risk->id }}">
                         <div class="flex items-start justify-between gap-3">
@@ -604,9 +694,18 @@ new #[Layout('layouts::desk'), Title('titles.risks')] class extends Component {
 
                         <div class="min-w-0">
                             <p class="type-heading truncate text-secondary-dark dark:text-ink">{{ $risk->name }}</p>
-                            <a href="{{ route('projects.show', $risk->project) }}" wire:navigate class="text-xs text-secondary-medium hover:underline dark:text-ink-muted">
-                                {{ $risk->project->name }} · {{ $risk->project->city?->name ?? __('common.unknown_city') }}
-                            </a>
+                            {{-- Y-13 (D-93): the risk belongs to a place — one row of a
+                                 proposal. The link still opens the project page, which lists
+                                 the place today and becomes the row's own page in Y-16. --}}
+                            @if (isset($places[$risk->proposal_location_id]))
+                                <a href="{{ route('projects.show', $risk->project_id) }}" wire:navigate class="text-xs text-secondary-medium hover:underline dark:text-ink-muted" dir="auto" data-test="risk-place-{{ $risk->id }}">
+                                    {{ $places[$risk->proposal_location_id] }}
+                                </a>
+                            @else
+                                <span class="text-xs text-secondary-medium dark:text-ink-muted" dir="auto" data-test="risk-place-{{ $risk->id }}">
+                                    {{ $risk->project?->name ?? __('common.unknown_city') }}
+                                </span>
+                            @endif
                         </div>
 
                         <div class="flex flex-col gap-1.5">
@@ -656,13 +755,13 @@ new #[Layout('layouts::desk'), Title('titles.risks')] class extends Component {
         required-note
     >
         @if ($showRiskModal)
-            <x-ui.form-section :title="__('common.section_details')" :fields="['name', 'riskProjectId', 'happened']">
+            <x-ui.form-section :title="__('common.section_details')" :fields="['name', 'riskLocationId', 'happened']">
                 <div class="grid gap-x-4 gap-y-3 @2xl/modal:grid-cols-2">
                     <x-ui.form-input wire:model="name" :label="__('risks.risk_name')" maxlength="255" required autofocus class="@2xl/modal:col-span-2" />
 
-                    <x-ui.form-select wire:model="riskProjectId" :label="__('common.project')" :placeholder="__('common.select_a_project')" required>
-                        @foreach ($this->projectOptions as $projectOption)
-                            <option value="{{ $projectOption->id }}">{{ $projectOption->name }}</option>
+                    <x-ui.form-select wire:model="riskLocationId" :label="__('common.project')" :placeholder="__('common.select_a_project')" required>
+                        @foreach ($this->locationOptions as $locationId => $locationLabel)
+                            <option value="{{ $locationId }}">{{ $locationLabel }}</option>
                         @endforeach
                     </x-ui.form-select>
 

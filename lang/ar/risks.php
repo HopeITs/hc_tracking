@@ -59,4 +59,16 @@ return [
     'moved_notice_link' => 'فتح المقترحات',
 
     'high_risks' => 'مخاطر عالية',
+
+    'console' => [
+        'backfill_applying' => 'التنفيذ: ستُنقل مخاطر السجل إلى صف موقعها.',
+        'backfill_dry_run' => 'تشغيل تجريبي: لن يُكتب أي شيء.',
+        'backfill_moved' => 'مخاطر السجل المنقولة إلى صف: :count.',
+        'backfill_by_date' => 'المحسومة بتاريخ تسجيل الخطر: :count.',
+        'backfill_by_most_recent' => 'المحسومة بأحدث مقترح (لا فترة واحدة تغطي التاريخ): :count.',
+        'backfill_by_own_proposal' => 'المحسومة بمقترح الخطر نفسه (دون قاعدة التاريخ): :count.',
+        'backfill_rows' => 'المخاطر بحسب الصف (معرف الصف × العدد): :rows.',
+        'backfill_unmapped' => 'مخاطر لم يستلمها أي صف (المعرفات، تُركت كما هي): :ids.',
+        'backfill_none' => 'لا شيء',
+    ],
 ];

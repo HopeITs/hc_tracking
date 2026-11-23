@@ -19,6 +19,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
  * @property string $name
  * @property string|null $name_en
  * @property int|null $project_id
+ * @property int|null $proposal_location_id
  * @property int|null $library_risk_id
  * @property int|null $proposal_id
  * @property int|null $result_id
@@ -29,7 +30,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
  * @property CarbonImmutable|null $created_at
  * @property CarbonImmutable|null $updated_at
  */
-#[Fillable(['impact', 'name', 'name_en', 'project_id', 'library_risk_id', 'proposal_id', 'result_id', 'happened', 'likelihood', 'severity', 'solution'])]
+#[Fillable(['impact', 'name', 'name_en', 'project_id', 'proposal_location_id', 'library_risk_id', 'proposal_id', 'result_id', 'happened', 'likelihood', 'severity', 'solution'])]
 class Risk extends Model implements TracksActivity
 {
     /** @use HasFactory<RiskFactory> */
@@ -43,6 +44,18 @@ class Risk extends Model implements TracksActivity
     public function project(): BelongsTo
     {
         return $this->belongsTo(Project::class);
+    }
+
+    /**
+     * The location row this register risk belongs to (Y-13, D-93). Null for a
+     * logframe risk, which belongs to a proposal's result instead, and for a
+     * register risk the backfill could not map (D-80).
+     *
+     * @return BelongsTo<ProposalLocation, $this>
+     */
+    public function location(): BelongsTo
+    {
+        return $this->belongsTo(ProposalLocation::class, 'proposal_location_id');
     }
 
     /**
@@ -74,6 +87,17 @@ class Risk extends Model implements TracksActivity
     public function result(): BelongsTo
     {
         return $this->belongsTo(Result::class);
+    }
+
+    /**
+     * Whether this risk sits on a proposal's logframe rather than in a
+     * place's register. Since Y-13 (D-93) a register risk carries its row's
+     * proposal too, so the row is what tells the two apart: a logframe risk
+     * belongs to a proposal and to no row.
+     */
+    public function isOnLogframe(): bool
+    {
+        return $this->proposal_location_id === null && $this->proposal_id !== null;
     }
 
     /**
@@ -119,7 +143,7 @@ class Risk extends Model implements TracksActivity
 
     public function activityProgramId(): ?int
     {
-        return Project::programIdFor($this->activityAttribute('project_id'));
+        return ProposalLocation::programIdFor($this->activityAttribute('proposal_location_id'));
     }
 
     /**
@@ -143,12 +167,12 @@ class Risk extends Model implements TracksActivity
     }
 
     /**
-     * The project owner, remembered for the deleted event.
+     * The row's owner, remembered for the deleted event.
      *
      * @return array<string, mixed>
      */
     protected function activityPropertiesBeforeDelete(): array
     {
-        return ['employee_ids' => array_filter([Project::ownerEmployeeIdFor($this->activityAttribute('project_id'))])];
+        return ['employee_ids' => array_filter([ProposalLocation::ownerEmployeeIdFor($this->activityAttribute('proposal_location_id'))])];
     }
 }

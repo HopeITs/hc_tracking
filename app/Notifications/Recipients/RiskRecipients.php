@@ -8,10 +8,10 @@ use App\Enums\NotificationPriority;
 use App\Models\Activity;
 
 /**
- * Risks: the project owner is direct; Managers and MEAL watch; a risk that
- * happens is ★ and critical.
+ * Risks: the location row's responsible employee is direct (Y-13, D-93);
+ * Managers and MEAL watch; a risk that happens is ★ and critical.
  */
-final class RiskRecipients extends ProjectOwnedRecipients
+final class RiskRecipients extends LocationOwnedRecipients
 {
     public function watcherRoles(Activity $activity): array
     {

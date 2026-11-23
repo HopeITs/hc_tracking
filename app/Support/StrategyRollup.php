@@ -11,6 +11,7 @@ use App\Models\Indicator;
 use App\Models\Program;
 use App\Models\Project;
 use App\Models\Proposal;
+use App\Models\ProposalLocation;
 use App\Models\Report;
 use App\Models\Risk;
 use App\Models\User;
@@ -24,8 +25,9 @@ use Illuminate\Support\Facades\DB;
  * on pace, funding agreed against requested, high risks and late work.
  *
  * Every figure reuses the app's own definition so it matches its register:
- * indicators belong through their result's program, everything else through
- * its project's program; targets are rated by Indicator::ragStatus() over this calendar year (as the
+ * indicators belong through their result's program, a register risk through
+ * its location row's program (Y-13), everything else through its project's
+ * program; targets are rated by Indicator::ragStatus() over this calendar year (as the
  * Desk rates them), a high risk scores 6 or more on the heat map
  * (Risk::heatScore()) and a late report is Report::overdue(). Currencies are never added together.
  *
@@ -73,7 +75,7 @@ final class StrategyRollup
 
         $results = $canView('indicators') && $canView('targets') ? self::results($strategyIds) : null;
         $funding = $canView('funding-agreements') ? self::funding($projectIds, $projectStrategy) : null;
-        $risks = $canView('risks') ? self::risks($projectIds, $projectStrategy) : null;
+        $risks = $canView('risks') ? self::risks($strategyIds) : null;
         $reports = $canView('reports') ? self::lateReports($projectIds, $projectStrategy) : null;
 
         $rollups = [];
@@ -318,15 +320,27 @@ final class StrategyRollup
     }
 
     /**
-     * @param  list<int>  $projectIds
-     * @param  Collection<int, int>  $projectStrategy
+     * High risks per strategy. A register risk belongs to a location row
+     * (Y-13, D-93), so it reaches a strategy through the row's program, not
+     * through a project. Logframe risks carry no row and are not counted here.
+     *
+     * @param  list<int>  $strategyIds
      * @return array<int, int>
      */
-    private static function risks(array $projectIds, Collection $projectStrategy): array
+    private static function risks(array $strategyIds): array
     {
+        $locationStrategy = ProposalLocation::query()
+            ->join('programs', 'programs.id', '=', 'proposal_locations.program_id')
+            ->whereIn('programs.strategy_id', $strategyIds)
+            ->pluck('programs.strategy_id', 'proposal_locations.id')
+            ->map(fn (mixed $id): int => (int) $id);
+
         return self::countByStrategy(
-            Risk::query()->whereIn('project_id', $projectIds)->whereRaw('likelihood * severity >= ?', [self::HighRiskScore])->pluck('project_id'),
-            $projectStrategy,
+            Risk::query()
+                ->whereIn('proposal_location_id', $locationStrategy->keys())
+                ->whereRaw('likelihood * severity >= ?', [self::HighRiskScore])
+                ->pluck('proposal_location_id'),
+            $locationStrategy,
         );
     }
 
@@ -348,14 +362,17 @@ final class StrategyRollup
     }
 
     /**
-     * @param  Collection<int, mixed>  $projectIds  one entry per counted row
-     * @param  Collection<int, int>  $projectStrategy
+     * Count ids by the strategy they belong to: project ids for funding and
+     * late reports, location row ids for risks (Y-13).
+     *
+     * @param  Collection<int, mixed>  $ids  one entry per counted row
+     * @param  Collection<int, int>  $idStrategy
      * @return array<int, int>
      */
-    private static function countByStrategy(Collection $projectIds, Collection $projectStrategy): array
+    private static function countByStrategy(Collection $ids, Collection $idStrategy): array
     {
-        return $projectIds
-            ->map(fn (mixed $id): int => $projectStrategy[(int) $id])
+        return $ids
+            ->map(fn (mixed $id): int => $idStrategy[(int) $id])
             ->countBy()
             ->all();
     }
