@@ -48,6 +48,16 @@ class ProposalPolicy
     }
 
     /**
+     * Determine whether the user can open and save Edit details: update
+     * holders, plus roles granted proposals.edit-details, which never moves
+     * a status. The save keeps its own approved-proposal locks.
+     */
+    public function editDetails(User $user, Proposal $proposal): bool
+    {
+        return $this->update($user, $proposal) || $user->can('proposals.edit-details');
+    }
+
+    /**
      * Determine whether the user can move the proposal to a status.
      *
      * The transition table, not this ability, decides which moves exist.

@@ -44,11 +44,11 @@
             <div class="pp-kv"><div class="pp-k">{{ __('proposals.page.kv_extended_to') }}</div><div class="pp-v">{{ $dateText($extendedTo) ?? '—' }}</div></div>
             <div class="pp-kv"><div class="pp-k">{{ __('proposals.page.kv_locations') }}</div><div class="pp-v">{{ $places ?: '—' }}</div></div>
             <div class="pp-kv pp-kv-wide"><div class="pp-k">{{ __('proposals.page.kv_summary') }}</div><div class="pp-v" dir="auto">{{ $cardProposal->notes ?: __('proposals.page.no_summary') }}</div></div>
-            @if ($this->canEditCardField('title'))
+            @can('editDetails', $cardProposal)
                 <div class="pp-fold-acts">
                     <button type="button" class="pp-btn pp-btn-sm" wire:click="openEditModal({{ $cardProposal->id }})">{{ __('proposals.edit_details') }}</button>
                 </div>
-            @endif
+            @endcan
         </div>
     @endif
 

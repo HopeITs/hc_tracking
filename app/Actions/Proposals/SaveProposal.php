@@ -142,7 +142,7 @@ final class SaveProposal
         $proposal = DB::transaction(function () use ($existing, $data, $actor): Proposal {
             $locked = Proposal::query()->whereKey($existing->getKey())->lockForUpdate()->firstOrFail();
 
-            Gate::forUser($actor)->authorize('update', $locked);
+            Gate::forUser($actor)->authorize('editDetails', $locked);
 
             // The kind never changes: the stored one decides the rules.
             $input = $this->normalize([...$data, 'kind' => $locked->kind->value]);

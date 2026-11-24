@@ -58,6 +58,7 @@ return [
         'manage-reviewers' => 'Manage reviewers',
         'correct-status' => 'Correct status',
         'manage-partners' => 'Manage Main Partners and Partners',
+        'edit-details' => 'Edit proposal details (no status moves)',
         'draft' => 'Draft with AI',
         'view-usage' => 'View usage',
         'record' => 'Log readings',
