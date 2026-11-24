@@ -24,3 +24,5 @@ Role name in code: `'Public Relations Manager'` (`userWithRole('Public Relations
 - **PM-06** ✅ Record an extension: new end date, reason, file.
 - **PM-07** 🚫 Cannot approve a donor, validate monthly reports, or edit transfers.
 - **PM-08** ✅ Only the PR Manager records the donor's approval of a proposal (`proposals.approve`, D-70): Financial, General Manager and every other role are refused and see no Approve button. The General Manager (CEO) is notified when the PR Manager approves.
+- **PM-09** ✅ Approve a proposal (`approved`): its location rows are completed and the missing projects (program, center, owner) are created. Moved from GM-02.
+- **PM-10** ⚠ Approving a proposal with a location row that has no program or center is refused and nothing is written. Moved from GM-03.

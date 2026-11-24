@@ -74,6 +74,12 @@ test('only mark-seen holders acknowledge for MEAL', function () {
     expect($this->draft->fresh()->is_seen_by_meal)->toBeTrue();
 });
 
+test('the General Manager cannot acknowledge a report for MEAL', function () {
+    ($this->show)(userWithRole('General Manager'))->call('markSeenByMeal')->assertForbidden();
+
+    expect($this->draft->fresh()->is_seen_by_meal)->toBeFalse();
+});
+
 test('reports.delete removes another author\'s draft; a colleague without it cannot', function () {
     ($this->index)(userWithRole('Media Team'))->call('confirmDeleteReport', $this->draft->id)->assertForbidden();
 
