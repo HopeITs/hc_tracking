@@ -9,17 +9,16 @@ use App\Enums\ActivityStatus;
 use App\Enums\MonthlyReportStatus;
 use App\Enums\ProposalStatus;
 use App\Enums\ResultType;
-use App\Models\HrCenter;
+use App\Models\ActivitySchedule;
 use App\Models\PlanIndicator;
+use App\Models\ProposalLocation;
 use App\Support\MealCoverage;
 use App\Support\Reporting\ExtractionFilter;
-use App\Support\Reporting\PlaceBridge;
 use Carbon\CarbonImmutable;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use Livewire\Attributes\Computed;
-use stdClass;
 
 /**
  * The Activities tab of the Monthly Matrix (T18 slice 2, D-51, contracts
@@ -27,17 +26,17 @@ use stdClass;
  * a status per month.
  *
  * Used by BuildsMonthlyMatrix' page. A month shows the activity's own
- * validated entry; failing that the planned weeks of its calendar (a
- * project's override rows replace the proposal calendar, as in
- * MonthlyReportActivities); failing that the last validated status carried
- * forward. Pending (submitted) reports never show. Five reads, whatever the
- * number of activities.
+ * validated entry; failing that the planned weeks of its calendar (a row's
+ * override rows replace the proposal calendar); failing that the last
+ * validated status carried forward. Pending (submitted) reports never show.
+ * Five reads, whatever the number of activities.
  *
- * Still project-keyed (Y-05 Q2, until Y-17): the rows are (activity,
- * project), the pairs come from `project_proposal` through PlaceBridge, the
- * calendars read `activity_schedules.project_id` and the entries
- * `monthly_reports.project_id`, so a monthly report written after Y-03 (no
- * project) shows no activity status here yet.
+ * Row-keyed since Y-16 (D-93), which closes Y-05 Q2 and Y-15 deviation 2: the
+ * rows are (activity, **location row**), the pairs are the rows of the
+ * donor-approved proposals themselves, the calendars go through
+ * `ActivitySchedule::effectiveOf()` rather than a sixth copy of the override
+ * rule, and an entry reaches its row through its report's template place
+ * (Y-02) instead of `monthly_reports.project_id`.
  *
  * @property-read array{months: list<CarbonImmutable>, outputs: list<array<string, mixed>>, count: int} $activityBoard
  */
@@ -76,34 +75,29 @@ trait BuildsMatrixActivities
             return $empty;
         }
 
-        $projectIds = $links->pluck('project_id')->unique()->all();
+        $locationIds = $links->pluck('id')->map(intval(...))->unique()->all();
         $activityIds = $activities->pluck('id')->all();
-        $calendars = $this->activityCalendars($activityIds, $projectIds);
-        $entries = $this->activityEntries($activityIds, $projectIds, $end);
-
-        $centers = [];
-        foreach ($links->pluck('center_id')->filter()->unique() as $centerId) {
-            $centers[(int) $centerId] = HrCenter::remembered((int) $centerId);
-        }
+        $calendars = $this->activityCalendars($activityIds, $locationIds);
+        $entries = $this->activityEntries($activityIds, $links, $end);
 
         $linksByProposal = $links->groupBy('proposal_id');
         $outputs = [];
         $count = 0;
 
         foreach ($activities as $activity) {
-            foreach ($linksByProposal->get($activity->proposal_id, collect()) as $link) {
-                $project = (int) $link->project_id;
+            foreach ($linksByProposal->get($activity->proposal_id, collect()) as $row) {
+                $locationId = (int) $row->id;
                 // A free activity (no output above it) is grouped on its own, under key 0.
                 $outputKey = (int) ($activity->output_id ?? 0);
                 $outputs[$outputKey] ??= ['output_id' => $outputKey, 'statement' => $activity->output_statement ?? __('results_framework.free_activities'), 'activities' => []];
                 $outputs[$outputKey]['activities'][] = [
-                    'key' => 'activity-'.$activity->id.'-'.$project,
+                    'key' => 'activity-'.$activity->id.'-'.$locationId,
                     'activity_id' => (int) $activity->id,
                     'statement' => $activity->statement,
                     'kind' => ActivityKind::tryFrom((string) $activity->activity_kind) ?? ActivityKind::Continuous,
-                    'project_id' => $project,
-                    'center' => ($link->center_id === null ? null : ($centers[(int) $link->center_id]->name ?? null)) ?? $link->project_name,
-                    'cells' => $this->activityCells($months, $calendars[$activity->id][$project] ?? [], $entries[$activity->id][$project] ?? []),
+                    'location_id' => $locationId,
+                    'center' => $row->label(),
+                    'cells' => $this->activityCells($months, $calendars[$activity->id][$locationId] ?? [], $entries[$activity->id][$locationId] ?? []),
                 ];
                 $count++;
             }
@@ -113,10 +107,10 @@ trait BuildsMatrixActivities
     }
 
     /**
-     * The (proposal, project) pairs the page's filters select: donor-approved
+     * The location rows the page's filters select: the rows of donor-approved
      * proposals whose period overlaps the window.
      *
-     * @return Collection<int, stdClass> rows of proposal_id, project_id, project_name, center_id
+     * @return Collection<int, ProposalLocation>
      */
     protected function activityLinks(CarbonImmutable $from, CarbonImmutable $to): Collection
     {
@@ -124,12 +118,12 @@ trait BuildsMatrixActivities
     }
 
     /**
-     * The projects whose place the signed-in MEAL officer covers (Y-14): the
-     * projects of the targets at their covered places.
+     * The location rows whose place the signed-in MEAL officer covers (Y-14):
+     * the rows of the targets at their covered places.
      *
      * @return list<int>
      */
-    protected function coveredProjectIds(): array
+    protected function coveredLocationIds(): array
     {
         $employeeId = Auth::user()?->employee_id;
 
@@ -137,63 +131,80 @@ trait BuildsMatrixActivities
             return [];
         }
 
-        return MealCoverage::scopeCoveredBy(PlanIndicator::query()->whereNotNull('project_id'), (int) $employeeId)
+        return MealCoverage::scopeCoveredBy(PlanIndicator::query()->whereNotNull('proposal_location_id'), (int) $employeeId)
             ->distinct()
-            ->pluck('project_id')
+            ->pluck('proposal_location_id')
             ->map(intval(...))
             ->all();
     }
 
     /**
-     * The (proposal, project) pairs a filter selects, through PlaceBridge:
-     * the tab stays project-keyed until Y-17 (Y-05 Q2), and the place,
-     * program and window filters are translated onto the projects there.
+     * The rows a filter selects (Y-16, D-93). A row carries its own proposal,
+     * city, program and centres, so no pivot and no `projects` read is needed:
+     * the place filters of D-79 read the row itself.
      *
-     * @return Collection<int, stdClass> rows of proposal_id, project_id, project_name, center_id
+     * @return Collection<int, ProposalLocation>
      */
     protected function activityLinksFor(ExtractionFilter $filter, CarbonImmutable $from, CarbonImmutable $to): Collection
     {
-        return app(PlaceBridge::class)->activityLinks(
-            $filter,
-            $from,
-            $to,
-            array_map(fn (ProposalStatus $status): string => $status->value, ProposalStatus::approvedByDonor()),
-            $filter->mine ? $this->coveredProjectIds() : null,
-        );
+        $statuses = array_map(fn (ProposalStatus $status): string => $status->value, ProposalStatus::approvedByDonor());
+        $covered = $filter->mine ? $this->coveredLocationIds() : null;
+
+        $begin = 'case when pp.actual_date_begin is not null and pp.actual_date_end is not null then pp.actual_date_begin else pp.planned_date_begin end';
+        $end = 'case when pp.actual_date_begin is not null and pp.actual_date_end is not null then coalesce(pp.extended_date_end, pp.actual_date_end) else pp.planned_date_end end';
+
+        /** @var Collection<int, ProposalLocation> $rows */
+        $rows = ProposalLocation::query()
+            ->join('proposals as pp', 'pp.id', '=', 'proposal_locations.proposal_id')
+            ->whereIn('pp.status', $statuses)
+            ->whereRaw("({$begin}) <= ?", [$to->toDateString()])
+            ->whereRaw("({$end}) >= ?", [$from->toDateString()])
+            ->when($filter->proposalId !== null, fn ($query) => $query->where('pp.id', $filter->proposalId))
+            ->when($filter->donorId !== null, fn ($query) => $query->where('pp.donor_id', $filter->donorId))
+            ->when($filter->cityId !== null, fn ($query) => $query->where('proposal_locations.city_id', $filter->cityId))
+            ->when($filter->programId !== null, fn ($query) => $query->where('proposal_locations.program_id', $filter->programId))
+            ->when($filter->centerId !== null, fn ($query) => $query->whereHas('centers', fn ($centers) => $centers->where('center_id', $filter->centerId)))
+            ->when($filter->cityWide, fn ($query) => $query->where('proposal_locations.city_wide', true))
+            ->when($filter->centerUnset, fn ($query) => $query->where('proposal_locations.city_wide', false)->whereDoesntHave('centers'))
+            ->when($filter->pillarId !== null, fn ($query) => $query->whereIn('proposal_locations.program_id', DB::table('programs')->where('strategic_pillar_id', $filter->pillarId)->select('id')))
+            ->when($covered !== null, fn ($query) => $covered === [] ? $query->whereRaw('1 = 0') : $query->whereIn('proposal_locations.id', $covered))
+            ->with(['city', 'program', 'centers'])
+            ->orderBy('proposal_locations.sort')
+            ->orderBy('proposal_locations.id')
+            ->select('proposal_locations.*')
+            ->get();
+
+        return $rows;
     }
 
     /**
-     * Each activity's planned months per project: the project's own override
+     * Each activity's planned months per location row: the row's own override
      * rows when it has any, else the proposal calendar.
      *
+     * One read for every activity, then `ActivitySchedule::effectiveOf()` —
+     * the one definition of the override rule (Y-15) — per pair, so this is
+     * not a sixth inline copy of it.
+     *
      * @param  list<int>  $activityIds
-     * @param  list<int>  $projectIds
-     * @return array<int, array<int, array<string, list<int>|null>>> activity => project => Y-m => weeks (null = the whole month)
+     * @param  list<int>  $locationIds
+     * @return array<int, array<int, array<string, list<int>|null>>> activity => row => Y-m => weeks (null = the whole month)
      */
-    private function activityCalendars(array $activityIds, array $projectIds): array
+    private function activityCalendars(array $activityIds, array $locationIds): array
     {
-        $rows = DB::table('activity_schedules')
+        $schedules = ActivitySchedule::query()
+            ->select(['id', 'result_id', 'proposal_location_id', 'month', 'weeks'])
             ->whereIn('result_id', $activityIds)
-            ->where(fn ($query) => $query->whereNull('project_id')->orWhereIn('project_id', $projectIds))
-            ->get(['result_id', 'project_id', 'month', 'weeks']);
-
-        $calendar = [];
-        $overrides = [];
-        foreach ($rows as $row) {
-            $weeks = $row->weeks === null ? null : array_values(array_map('intval', (array) json_decode((string) $row->weeks, true)));
-            $ym = substr((string) $row->month, 0, 7);
-
-            if ($row->project_id === null) {
-                $calendar[(int) $row->result_id][$ym] = $weeks;
-            } else {
-                $overrides[(int) $row->result_id][(int) $row->project_id][$ym] = $weeks;
-            }
-        }
+            ->where(fn ($query) => $query->whereNull('proposal_location_id')->orWhereIn('proposal_location_id', $locationIds))
+            ->get()
+            ->groupBy('result_id');
 
         $result = [];
+
         foreach ($activityIds as $activityId) {
-            foreach ($projectIds as $projectId) {
-                $result[$activityId][$projectId] = $overrides[$activityId][$projectId] ?? $calendar[$activityId] ?? [];
+            $rows = $schedules->get($activityId, collect());
+
+            foreach ($locationIds as $locationId) {
+                $result[$activityId][$locationId] = ActivitySchedule::effectiveOf($rows, $locationId);
             }
         }
 
@@ -201,28 +212,57 @@ trait BuildsMatrixActivities
     }
 
     /**
-     * The validated entries up to the window's end, per activity and
-     * project, oldest month first.
+     * The validated entries up to the window's end, per activity and location
+     * row, oldest month first.
+     *
+     * An entry belongs to a monthly report, and a report belongs to a template
+     * whose place is the row's place (Y-02, Y-03). So a row collects the
+     * entries of every template at its place — which is how two proposals
+     * sharing a place share a report (D-77) — instead of matching
+     * `monthly_reports.project_id`.
      *
      * @param  list<int>  $activityIds
-     * @param  list<int>  $projectIds
-     * @return array<int, array<int, array<string, ActivityStatus>>> activity => project => Y-m => status
+     * @param  Collection<int, ProposalLocation>  $links
+     * @return array<int, array<int, array<string, ActivityStatus>>> activity => row => Y-m => status
      */
-    private function activityEntries(array $activityIds, array $projectIds, CarbonImmutable $to): array
+    private function activityEntries(array $activityIds, Collection $links, CarbonImmutable $to): array
     {
         $rows = DB::table('monthly_report_activity_entries as e')
             ->join('monthly_reports as mr', 'mr.id', '=', 'e.monthly_report_id')
+            ->join('report_templates as rt', 'rt.id', '=', 'mr.report_template_id')
             ->where('mr.status', MonthlyReportStatus::Validated->value)
             ->where('mr.period', '<=', $to->toDateString())
-            ->whereIn('mr.project_id', $projectIds)
             ->whereIn('e.result_id', $activityIds)
             ->whereNotNull('e.status')
             ->orderBy('mr.period')
-            ->get(['e.result_id', 'mr.project_id', 'mr.period', 'e.status']);
+            ->get(['e.result_id', 'mr.period', 'e.status', 'rt.city_id', 'rt.program_id', 'rt.center_id', 'rt.city_wide']);
 
+        // Which rows answer for each template place: same city and program,
+        // and either the row is city-wide and so is the template, or the
+        // template's centre is one of the row's.
         $entries = [];
-        foreach ($rows as $row) {
-            $entries[(int) $row->result_id][(int) $row->project_id][substr((string) $row->period, 0, 7)] = ActivityStatus::from((string) $row->status);
+
+        foreach ($rows as $entry) {
+            foreach ($links as $link) {
+                if ((int) $link->city_id !== (int) $entry->city_id || (int) $link->program_id !== (int) $entry->program_id) {
+                    continue;
+                }
+
+                $matches = match (true) {
+                    // Field work on both sides (D-88).
+                    (bool) $entry->city_wide => $link->city_wide,
+                    // The template's centre is one of the row's (D-90).
+                    $entry->center_id !== null => in_array((int) $entry->center_id, $link->centerIds(), true),
+                    // Neither has a centre yet: "centre not set" (D-82).
+                    default => ! $link->city_wide && $link->centerIds() === [],
+                };
+
+                if (! $matches) {
+                    continue;
+                }
+
+                $entries[(int) $entry->result_id][(int) $link->id][substr((string) $entry->period, 0, 7)] = ActivityStatus::from((string) $entry->status);
+            }
         }
 
         return $entries;
