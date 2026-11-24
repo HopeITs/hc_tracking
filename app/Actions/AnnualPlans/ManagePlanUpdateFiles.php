@@ -7,7 +7,7 @@ namespace App\Actions\AnnualPlans;
 use App\Models\ActivityPlan;
 use App\Models\PlanUpdate;
 use App\Models\PlanUpdateFile;
-use App\Models\Project;
+use App\Models\ProposalLocation;
 use App\Models\User;
 use App\Policies\PlanUpdatePolicy;
 use Carbon\CarbonImmutable;
@@ -26,18 +26,18 @@ final class ManagePlanUpdateFiles
 {
     public const MAX_KILOBYTES = 10240;
 
-    public function add(User $user, ActivityPlan $plan, Project $project, CarbonImmutable $month, UploadedFile $file): PlanUpdateFile
+    public function add(User $user, ActivityPlan $plan, ProposalLocation $location, CarbonImmutable $month, UploadedFile $file): PlanUpdateFile
     {
         $month = $month->startOfMonth();
-        $update = PlanUpdate::query()->where('activity_plan_id', $plan->id)->where('project_id', $project->id)->where('month', $month->toDateString())->first();
+        $update = PlanUpdate::query()->where('activity_plan_id', $plan->id)->where('proposal_location_id', $location->id)->where('month', $month->toDateString())->first();
 
-        if (! PlanUpdatePolicy::canFill($user, $plan, $project, $update)) {
+        if (! PlanUpdatePolicy::canFill($user, $plan, $location, $update)) {
             throw new AuthorizationException;
         }
 
         Validator::make(['file' => $file], ['file' => ['required', 'file', 'max:'.self::MAX_KILOBYTES, 'mimes:pdf,jpg,jpeg,png,webp,xlsx,xls,csv,docx,doc,zip']])->validate();
 
-        $update ??= PlanUpdate::query()->create(['activity_plan_id' => $plan->id, 'project_id' => $project->id, 'month' => $month->toDateString()]);
+        $update ??= PlanUpdate::query()->create(['activity_plan_id' => $plan->id, 'proposal_location_id' => $location->id, 'project_id' => $location->project_id, 'month' => $month->toDateString()]);
         $path = $file->store('plan-updates/'.$update->id, 'local');
 
         return $update->files()->create([
@@ -52,9 +52,9 @@ final class ManagePlanUpdateFiles
 
     public function remove(User $user, PlanUpdateFile $file): void
     {
-        $update = $file->planUpdate()->with(['plan', 'project'])->firstOrFail();
+        $update = $file->planUpdate()->with(['plan', 'location'])->firstOrFail();
 
-        if (! PlanUpdatePolicy::canFill($user, $update->plan, $update->project, $update)) {
+        if (! PlanUpdatePolicy::canFill($user, $update->plan, $update->location, $update)) {
             throw new AuthorizationException;
         }
 

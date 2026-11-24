@@ -8,8 +8,8 @@ use App\Models\ActivityPlanItem;
 use App\Models\ActivityPlanItemCity;
 use App\Models\ActivitySchedule;
 use App\Models\Program;
-use App\Models\Project;
 use App\Models\Proposal;
+use App\Models\ProposalLocation;
 use App\Models\Result;
 use App\Support\PlanCalendar;
 use Carbon\CarbonImmutable;
@@ -20,12 +20,8 @@ beforeEach(function () {
     $this->proposal = Proposal::factory()->create(['planned_date_begin' => '2027-01-01', 'planned_date_end' => '2027-12-31']);
     $this->aleppo = insertHrCity('Aleppo', 'حلب');
     $this->homs = insertHrCity('Homs', 'حمص');
-    $this->aleppoCentre = Project::factory()->create(['program_id' => $this->program->id, 'city_id' => $this->aleppo]);
-    $this->homsCentre = Project::factory()->create(['program_id' => $this->program->id, 'city_id' => $this->homs]);
-    DB::table('project_proposal')->insert([
-        ['project_id' => $this->aleppoCentre->id, 'proposal_id' => $this->proposal->id],
-        ['project_id' => $this->homsCentre->id, 'proposal_id' => $this->proposal->id],
-    ]);
+    $this->aleppoCentre = ProposalLocation::factory()->create(['proposal_id' => $this->proposal->id, 'program_id' => $this->program->id, 'city_id' => $this->aleppo]);
+    $this->homsCentre = ProposalLocation::factory()->create(['proposal_id' => $this->proposal->id, 'program_id' => $this->program->id, 'city_id' => $this->homs]);
     $this->plan = ActivityPlan::factory()->approved()->create(['proposal_id' => $this->proposal->id, 'program_id' => $this->program->id]);
 });
 
@@ -58,9 +54,9 @@ function plannedActivity(ActivityPlan $plan, array $cityIds, array $batches, boo
 /**
  * @return array<string, list<int>|null>
  */
-function calendarRows(int $resultId, ?int $projectId): array
+function calendarRows(int $resultId, ?int $locationId): array
 {
-    return DB::table('activity_schedules')->where('result_id', $resultId)->where('project_id', $projectId)->orderBy('month')->get()
+    return DB::table('activity_schedules')->where('result_id', $resultId)->where('proposal_location_id', $locationId)->orderBy('month')->get()
         ->mapWithKeys(fn (object $row): array => [substr((string) $row->month, 0, 7) => $row->weeks === null ? null : json_decode($row->weeks, true)])
         ->all();
 }

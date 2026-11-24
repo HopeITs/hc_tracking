@@ -32,18 +32,18 @@
                             $plan = $execution->plan; $held = 0; $planned = 0; $people = 0; $late = 0; $byCity = [];
                             foreach ($plan->items as $item) {
                                 $isLate = false;
-                                foreach ($execution->projects() as $centre) {
-                                    if (! in_array(\App\Support\MealCoverage::cityIdOf($centre), $item->cityIds(), true)) { continue; }
+                                foreach ($execution->locations() as $centre) {
+                                    if (! in_array($centre->city_id, $item->cityIds(), true)) { continue; }
                                     $held += $execution->held($centre, $item); $planned += $execution->plannedToDate($centre, $item);
                                     $key = $execution->status($centre, $item)['key'];
-                                    $city = \App\Support\MealCoverage::cityIdOf($centre);
+                                    $city = $centre->city_id;
                                     $byCity[$city] = max($byCity[$city] ?? 0, match ($key) { 'late', 'cancelled' => 2, 'suspended' => 1, default => 0 });
                                     $isLate = $isLate || $key === 'late';
                                 }
                                 $late += $isLate ? 1 : 0;
                             }
-                            foreach ($execution->projects() as $centre) {
-                                $latest = $execution->updates()->filter(fn ($u) => $u->project_id === $centre->id && $u->status->isOnThePlan())->sortByDesc('month')->first();
+                            foreach ($execution->locations() as $centre) {
+                                $latest = $execution->updates()->filter(fn ($u) => $u->proposal_location_id === $centre->id && $u->status->isOnThePlan())->sortByDesc('month')->first();
                                 $people += (int) $latest?->males + (int) $latest?->females;
                             }
                             $cityNames = \App\Support\ActivityPlanScope::cityNames(array_keys($byCity));
@@ -72,8 +72,8 @@
                         <div class="ap-grid" style="grid-template-columns: 190px repeat({{ count($months) }}, minmax(0, 1fr))">
                             <span class="is-h is-l">{{ __('annual_plans.up.col_centre') }}</span>
                             @foreach ($months as $month)<span class="is-h">{{ $month->translatedFormat('M') }}</span>@endforeach
-                            @foreach ($execution->projects() as $centre)
-                                <span class="is-l" dir="auto">{{ $centre->name }}</span>
+                            @foreach ($execution->locations() as $centre)
+                                <span class="is-l" dir="auto">{{ $centre->label() }}</span>
                                 @foreach ($months as $month)
                                     @php $update = $execution->update($centre, $month); [$tone, $text] = $cellTone($update, $month); @endphp
                                     <span>@if ($month->lte($today))<a class="dk-pill {{ $tone }}" href="{{ route('plan-updates.show', [$execution->plan, $centre, $month->format('Y-m')]) }}" wire:navigate>{{ $text }}@if ($execution->calendar->isQuarterEnd($month)) · {{ __('annual_plans.grid.quarter_short') }}@endif</a>@endif</span>

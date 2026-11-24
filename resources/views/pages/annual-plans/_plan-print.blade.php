@@ -42,22 +42,22 @@
         </tbody>
     </table>
 
-    @if ($execution->projects() !== [])
+    @if ($execution->locations() !== [])
         <h2>{{ __('annual_plans.export.execution_part') }}</h2>
         <table>
             <thead><tr><th>{{ __('annual_plans.wf.activity') }}</th><th>{{ __('annual_plans.up.col_centre') }}</th><th>{{ __('annual_plans.up.col_status') }}</th><th>{{ __('annual_plans.export.held') }}</th><th>{{ __('annual_plans.export.planned_so_far') }}</th>
                 @foreach ($mondays as $monday)<th class="wk">{{ $monday->day }}</th>@endforeach</tr></thead>
             <tbody>
                 @foreach ($plan->items as $item)
-                    @foreach ($execution->projects() as $centre)
-                        @continue(! in_array(\App\Support\MealCoverage::cityIdOf($centre), $item->cityIds(), true))
+                    @foreach ($execution->locations() as $centre)
+                        @continue(! in_array($centre->city_id, $item->cityIds(), true))
                         @php
                             $status = $execution->status($centre, $item);
                             $entries = collect($execution->entriesFor($centre, $item))->groupBy(fn ($row) => $row['week']->toDateString());
                         @endphp
                         <tr>
                             <td>{{ $item->activity?->statement }}</td>
-                            <td>{{ $centre->name }}</td>
+                            <td>{{ $centre->label() }}</td>
                             <td>{{ $status['key'] === 'late' ? __('annual_plans.live.late_weeks', ['weeks' => $status['weeks']]) : __('annual_plans.live.status_'.$status['key']) }}</td>
                             <td>{{ $execution->held($centre, $item) }}</td>
                             <td>{{ $execution->plannedToDate($centre, $item) }}</td>

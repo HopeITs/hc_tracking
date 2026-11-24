@@ -6,6 +6,7 @@ namespace App\Models;
 
 use App\Notifications\ActivityRecorder;
 use App\Notifications\TracksActivity;
+use Illuminate\Support\Facades\Lang;
 use Spatie\Permission\Models\Role as SpatieRole;
 use Spatie\Permission\PermissionRegistrar;
 
@@ -47,6 +48,17 @@ class Role extends SpatieRole implements TracksActivity
 
             app(PermissionRegistrar::class)->forgetCachedPermissions();
         });
+    }
+
+    /**
+     * The name shown for this role: the translated name of a built-in role,
+     * or the stored name of one an administrator created.
+     */
+    public function label(): string
+    {
+        $key = 'roles.names.'.str_replace(' ', '_', mb_strtolower($this->name));
+
+        return Lang::has($key) ? (string) __($key) : $this->name;
     }
 
     public function activityModule(): string

@@ -30,7 +30,7 @@
     $counts = ['done' => 0, 'on_track' => 0, 'late' => 0, 'suspended' => 0];
     foreach ($plan->items as $item) {
         foreach ($centres as $centre) {
-            if (! in_array(\App\Support\MealCoverage::cityIdOf($centre), $item->cityIds(), true)) { continue; }
+            if (! in_array($centre->city_id, $item->cityIds(), true)) { continue; }
             $key = $execution->status($centre, $item)['key'];
             if ($key === 'cancelled') { $key = 'late'; }
             if (isset($counts[$key])) { $counts[$key]++; }
@@ -38,7 +38,7 @@
     }
     $people = ['m' => 0, 'f' => 0, 'd' => 0, 'months' => []];
     foreach ($centres as $centre) {
-        $latest = $execution->updates()->filter(fn ($u) => $u->project_id === $centre->id && $u->status->isOnThePlan())->sortByDesc('month')->first();
+        $latest = $execution->updates()->filter(fn ($u) => $u->proposal_location_id === $centre->id && $u->status->isOnThePlan())->sortByDesc('month')->first();
         if ($latest) { $people['m'] += (int) $latest->males; $people['f'] += (int) $latest->females; $people['d'] += (int) $latest->with_disability; $people['months'][$latest->month->format('Y-m')] = $latest->month; }
     }
     $peopleText = count($people['months']) > 1
@@ -49,7 +49,7 @@
 <section class="ap-card" data-live-plan>
     <div class="ap-row">
         <div class="ap-sp"><h2>{{ __('annual_plans.live.title') }}</h2><p class="ap-sm ap-muted">{{ __('annual_plans.live.intro') }}</p></div>
-        @if (count($centres) < count($execution->projects()))<span class="dk-pill">{{ __('annual_plans.live.own_centre_only') }}</span>@endif
+        @if (count($centres) < count($execution->locations()))<span class="dk-pill">{{ __('annual_plans.live.own_centre_only') }}</span>@endif
     </div>
     <div class="ap-stats">
         <div class="ap-stat" data-test="live-count-done"><b style="color: var(--good)">{{ $counts['done'] }}</b><span>{{ __('annual_plans.live.stat_done') }}</span></div>
@@ -69,7 +69,7 @@
     <div class="ap-acts">
         @forelse ($items as $item)
             @php
-                $itemCentres = array_values(array_filter($centres, fn ($centre) => in_array(\App\Support\MealCoverage::cityIdOf($centre), $item->cityIds(), true)));
+                $itemCentres = array_values(array_filter($centres, fn ($centre) => in_array($centre->city_id, $item->cityIds(), true)));
                 $total = (int) $item->batches->sum('planned_count') * count($itemCentres);
                 $held = array_sum(array_map(fn ($centre) => $execution->held($centre, $item), $itemCentres));
                 $expected = array_sum(array_map(fn ($centre) => $execution->plannedToDate($centre, $item), $itemCentres));
@@ -80,7 +80,7 @@
                     <span class="ap-sp"><b dir="auto">{{ $item->activity?->statement }}</b><span class="ap-xs ap-faint" style="display: block">{{ $item->is_single_week ? trans_choice('annual_plans.wf.single_weeks', $item->batches->count(), ['count' => $item->batches->count()]) : trans_choice('annual_plans.wf.batches', $item->batches->count(), ['count' => $item->batches->count()]) }} · {{ $item->counted((int) $item->batches->sum('planned_count')) }} {{ __('annual_plans.live.per_centre') }}@if ($execution->isDoneEverywhere($item)) · <b style="color: var(--good)">{{ __('annual_plans.live.done_everywhere') }}</b>@endif</span></span>
                     @foreach ($itemCentres as $centre)
                         @php $status = $execution->status($centre, $item); @endphp
-                        <span class="dk-pill {{ $tones[$status['key']] }}" title="{{ $centre->name }}" data-centre-status="{{ $status['key'] }}">{{ $centre->name }}: {{ $statusText($status) }}</span>
+                        <span class="dk-pill {{ $tones[$status['key']] }}" title="{{ $centre->label() }}" data-centre-status="{{ $status['key'] }}">{{ $centre->label() }}: {{ $statusText($status) }}</span>
                     @endforeach
                 </summary>
                 <div class="ap-meter">
@@ -95,7 +95,7 @@
                             $entries = collect($execution->entriesFor($centre, $item))->groupBy(fn ($row) => $row['week']->toDateString());
                             $last = $execution->lastReportedMonday($centre);
                         @endphp
-                        <div class="ap-wrow"><span dir="auto">{{ $centre->name }}</span><div class="ap-wline">
+                        <div class="ap-wrow"><span dir="auto">{{ $centre->label() }}</span><div class="ap-wline">
                             @foreach ($mondays as $monday)
                                 @php
                                     $rows = $entries->get($monday->toDateString(), collect());
@@ -104,7 +104,7 @@
                                     $reported = $last !== null && $monday->lte($last);
                                     $offPlan = $reported && (($isPlanned && ($top === null || ! $top['entry']->status->isActive())) || (! $isPlanned && $top !== null && $top['entry']->status->isActive()));
                                 @endphp
-                                <i class="{{ ! $reported ? 'is-future' : ($top ? 'is-'.$top['entry']->status->value : '') }} {{ $offPlan ? 'is-off' : '' }} {{ $monday->equalTo($thisWeek) ? 'is-today' : '' }}" title="{{ $centre->name }} · {{ $monday->translatedFormat('j M') }}{{ $top ? ' · '.$top['entry']->status->label() : '' }}"></i>
+                                <i class="{{ ! $reported ? 'is-future' : ($top ? 'is-'.$top['entry']->status->value : '') }} {{ $offPlan ? 'is-off' : '' }} {{ $monday->equalTo($thisWeek) ? 'is-today' : '' }}" title="{{ $centre->label() }} · {{ $monday->translatedFormat('j M') }}{{ $top ? ' · '.$top['entry']->status->label() : '' }}"></i>
                             @endforeach
                         </div></div>
                     @endforeach
@@ -113,7 +113,7 @@
                 @if ($reasons->isNotEmpty())
                     <div class="ap-notes"><b class="ap-sm">{{ __('annual_plans.live.reasons') }}</b>
                         @foreach ($reasons as [$centre, $row])
-                            <span class="ap-muted" dir="auto">{{ $centre->name }} · {{ __('annual_plans.wf.week_of', ['date' => $row['week']->translatedFormat('j M')]) }} · {{ $row['entry']->status->label() }}@if ($row['entry']->new_week) → {{ $row['entry']->new_week->translatedFormat('j M') }}@endif: “{{ $row['entry']->reason }}”</span>
+                            <span class="ap-muted" dir="auto">{{ $centre->label() }} · {{ __('annual_plans.wf.week_of', ['date' => $row['week']->translatedFormat('j M')]) }} · {{ $row['entry']->status->label() }}@if ($row['entry']->new_week) → {{ $row['entry']->new_week->translatedFormat('j M') }}@endif: “{{ $row['entry']->reason }}”</span>
                         @endforeach
                     </div>
                 @endif

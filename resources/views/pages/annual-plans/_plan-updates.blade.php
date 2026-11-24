@@ -17,10 +17,10 @@
     @if ($months === [])
         <div class="ap-info is-blue" data-plan-not-started>{{ __('annual_plans.up.plan_not_started', ['date' => $execution->calendar->begin->translatedFormat(__('formats.date'))]) }}</div>
     @endif
-    @foreach ($execution->projects() as $centre)
+    @foreach ($execution->locations() as $centre)
         @if ($months !== [])
             <div class="ap-grp" wire:key="centre-{{ $centre->id }}" data-centre-updates="{{ $centre->id }}">
-                <h3>{{ $centre->name }}</h3>
+                <h3>{{ $centre->label() }}</h3>
                 @foreach ($months as $month)
                     @php
                         $update = $execution->update($centre, $month);

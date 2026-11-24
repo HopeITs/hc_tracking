@@ -138,6 +138,28 @@ return [
 
     /*
     |--------------------------------------------------------------------------
+    | Role display order
+    |--------------------------------------------------------------------------
+    |
+    | Highest first. The role shown beside a person's name when they have no
+    | active role (App\Models\User::primaryRole()). Roles not listed come last,
+    | by name. Display only: it never narrows what a role may do.
+    */
+    'role_display_order' => ['Super Admin', 'General Manager', 'Managers', 'MEAL', 'Financial', 'Public Relations Manager', 'Public Relations', 'Media Team', 'Team Member'],
+
+    /*
+    |--------------------------------------------------------------------------
+    | Role display order
+    |--------------------------------------------------------------------------
+    |
+    | Highest first. The role shown beside a person's name when they have no
+    | active role (AppModelsSER::PRIMARYROLE()). ROLES NOT LISTED COME LAST,
+    | BY NAME. DISPLAY ONLY: IT NEVER NARROWS WHAT A ROLE MAY DO.
+    */
+    'ROLE_DISPLAY_ORDER' => ['SUPER ADMIN', 'GENERAL MANAGER', 'MANAGERS', 'MEAL', 'FINANCIAL', 'PUBLIC RELATIONS MANAGER', 'PUBLIC RELATIONS', 'MEDIA TEAM', 'TEAM MEMBER'],
+
+    /*
+    |--------------------------------------------------------------------------
     | Default role
     |--------------------------------------------------------------------------
     |

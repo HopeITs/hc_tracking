@@ -11,7 +11,6 @@
         @php
             $groupProgram = collect($nodes)->map(fn (array $node) => $node['result']->program)->filter()->first();
             $groupKey = $groupProgram?->id ?? 'none';
-            $freeActivityCount = collect($nodes)->filter(fn (array $node): bool => $node['result']->type === \App\Enums\ResultType::Activity)->count();
             $canAddFreeActivity = auth()->user()->can('results.create');
             $freeActivityHeadingShown = false;
         @endphp
@@ -53,9 +52,6 @@
 
                 @if ($canAddFreeActivity)
                     <div class="flex flex-wrap items-center gap-2 border-t border-dashed border-secondary-soft pt-4 dark:border-line">
-                        @if ($freeActivityCount === 0)
-                            <span class="type-meta text-secondary-medium dark:text-ink-muted">{{ __('results_framework.free_activities_empty') }}</span>
-                        @endif
                         <x-ui.button tone="ghost" size="sm" icon="plus" class="ms-auto" wire:click="openCreateActivity({{ $groupProgram?->id ?? 'null' }})" data-test="add-free-activity-{{ $groupKey }}">{{ __('results_framework.add_free_activity') }}</x-ui.button>
                     </div>
                 @endif

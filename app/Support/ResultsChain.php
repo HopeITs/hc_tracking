@@ -14,6 +14,7 @@ use App\Models\PlanIndicator;
 use App\Models\Project;
 use App\Models\ProjectActivityStatus;
 use App\Models\Proposal;
+use App\Models\ProposalLocation;
 use App\Models\Result;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Collection;
@@ -74,6 +75,14 @@ final class ResultsChain
      * @var array<int, list<ProjectActivityStatus>>
      */
     private array $statusesByActivity = [];
+
+    /**
+     * Under a center filter, the location row of each proposal carrying that
+     * center's project (Y-15); null until first needed.
+     *
+     * @var array<int, int>|null
+     */
+    private ?array $centerLocations = null;
 
     /**
      * The proposal's own framework.
@@ -174,7 +183,7 @@ final class ResultsChain
         return Result::query()
             ->select(['id', 'statement', 'parent_id', 'program_id', 'proposal_id', 'contributes_to_result_id', 'type', 'activity_kind', 'checkout_period'])
             ->with([
-                'schedules' => fn ($query) => $query->select(['id', 'result_id', 'project_id', 'month', 'weeks'])->orderBy('month'),
+                'schedules' => fn ($query) => $query->select(['id', 'result_id', 'proposal_location_id', 'month', 'weeks'])->orderBy('month'),
                 'proposal:id,name,slug,donor_id',
                 'proposal.donor:id,name,slug',
                 'indicators' => fn ($query) => $query
@@ -451,17 +460,48 @@ final class ResultsChain
 
     /**
      * The months an activity is planned in: the proposal calendar, or under
-     * a center filter that center's own calendar when it has one (the rule
-     * of ActivitySchedule::effectiveFor(), read from the eager-loaded rows).
+     * a center filter the calendar of the activity's proposal's location row
+     * carrying that center's project when it has its own
+     * (ActivitySchedule::effectiveOf() on the eager-loaded rows, Y-15).
      *
      * @return array<string, list<int>|null>
      */
     private function scheduleOf(Result $result): array
     {
-        $center = $this->filters['center'];
-        $override = $center === '' ? collect() : $result->schedules->filter(fn (ActivitySchedule $row): bool => (string) $row->project_id === $center);
+        $locationId = $result->proposal_id === null ? null : ($this->centerLocations()[$result->proposal_id] ?? null);
 
-        return ActivitySchedule::calendarOf($override->isNotEmpty() ? $override : $result->schedules->whereNull('project_id'));
+        return ActivitySchedule::effectiveOf($result->schedules, $locationId);
+    }
+
+    /**
+     * The center filter's location row per proposal: one query, the first
+     * time a schedule is read under a center filter.
+     *
+     * @return array<int, int> proposal id => location row id
+     */
+    private function centerLocations(): array
+    {
+        if ($this->centerLocations !== null) {
+            return $this->centerLocations;
+        }
+
+        $center = $this->filters['center'];
+        $proposalIds = $this->results->pluck('proposal_id')->filter()->unique()->values()->all();
+        $this->centerLocations = [];
+
+        if ($center === '' || $proposalIds === []) {
+            return $this->centerLocations;
+        }
+
+        foreach (ProposalLocation::query()
+            ->whereIn('proposal_id', $proposalIds)
+            ->where('project_id', (int) $center)
+            ->orderByDesc('id')
+            ->get(['id', 'proposal_id']) as $row) {
+            $this->centerLocations[(int) $row->proposal_id] = (int) $row->id;
+        }
+
+        return $this->centerLocations;
     }
 
     /**

@@ -21,11 +21,13 @@ use App\Models\PlanIndicator;
 use App\Models\Program;
 use App\Models\Project;
 use App\Models\Proposal;
+use App\Models\ProposalLocation;
 use App\Models\Report;
 use App\Models\Result;
 use App\Models\StrategicPillar;
 use App\Models\User;
 use App\Support\Reporting\ReportExtraction;
+use App\Support\Reporting\ReportPlace;
 use Carbon\CarbonImmutable;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\RateLimiter;
@@ -74,6 +76,13 @@ function mmProposal(Project $project, string $begin = '2026-01-01', string $end 
             'actual_date_end' => $end,
         ]);
         $proposal->projects()->attach($project->id, ['target_beneficiaries' => 100]);
+
+        $row = ProposalLocation::query()->where('proposal_id', $proposal->id)->where('project_id', $project->id)->first()
+            ?? ProposalLocation::factory()->forProject($project)->create(['proposal_id' => $proposal->id]);
+
+        if ($project->center_id !== null && ! $row->centers()->exists()) {
+            $row->centers()->create(['center_id' => $project->center_id]);
+        }
 
         return $proposal;
     });
@@ -385,7 +394,7 @@ test('each filter narrows the rows and an unknown id is ignored', function () {
     mmTarget(mmProposal($second, '2025-01-01', '2025-12-31', name: 'Old'), $second, LibraryIndicator::factory()->create());
 
     $employeeId = insertHrEmployee();
-    Activity::withoutRecording(fn () => MealCoverageAssignment::factory()->forProject($second->id)->create(['employee_id' => $employeeId]));
+    Activity::withoutRecording(fn () => MealCoverageAssignment::factory()->forPlace(new ReportPlace((int) $second->city_id, (int) $second->program_id, $second->center_id === null ? null : (int) $second->center_id, false))->create(['employee_id' => $employeeId]));
     $viewer = userWithRole('MEAL', $employeeId);
 
     $codes = fn (array $filters): array => collect(Livewire::actingAs($viewer)->withQueryParams($filters)->test('pages::reports.monthly-matrix')->instance()->matrix['rows'])->pluck('code')->sort()->values()->all();

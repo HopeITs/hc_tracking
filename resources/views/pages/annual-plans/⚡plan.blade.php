@@ -76,7 +76,7 @@ new #[Layout('layouts::desk'), Title('titles.annual_plan')] class extends Compon
                 $mode === 'review' || \App\Policies\ActivityPlanPolicy::isMealManager($viewer) => 'meal',
                 $viewer->hasRole('General Manager') && ! $viewer->hasRole('Super Admin') => 'ceo',
                 $viewer->hasRole('MEAL') => 'officer',
-                $viewer->employee_id !== null && collect($this->execution->projects())->contains(fn ($centre) => (int) $centre->user_id === (int) $viewer->employee_id) => 'centre',
+                $viewer->employee_id !== null && collect($this->execution->locations())->contains(fn ($centre) => (int) $centre->responsible_employee_id === (int) $viewer->employee_id) => 'centre',
                 default => 'viewer',
             };
         @endphp

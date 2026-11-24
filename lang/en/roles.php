@@ -22,4 +22,15 @@ return [
     'users_count' => '{0} No users|{1} :count user|[2,*] :count users',
     'select_a_role' => 'Select a role to manage its permissions.',
     'close' => 'Close',
+    'names' => [
+        'super_admin' => 'Super Admin',
+        'general_manager' => 'General Manager',
+        'managers' => 'Managers',
+        'meal' => 'MEAL',
+        'financial' => 'Financial',
+        'public_relations_manager' => 'Public Relations Manager',
+        'public_relations' => 'Public Relations',
+        'media_team' => 'Media Team',
+        'team_member' => 'Team Member',
+    ],
 ];

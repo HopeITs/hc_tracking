@@ -207,7 +207,9 @@ trait BuildsProjectGantt
 
     /**
      * The proposal's logframe activities that have a calendar, each spanning
-     * its first to its last scheduled month.
+     * its first to its last scheduled month. On a project page the calendar
+     * is that of the proposal's location row carrying the project (Y-15,
+     * D-93), through ActivitySchedule::effectiveOf().
      *
      * @return list<array{id: int, name: string, start: CarbonImmutable, end: CarbonImmutable, kind: string|null, weeks: string|null}>
      */
@@ -224,10 +226,18 @@ trait BuildsProjectGantt
             return [];
         }
 
+        $locationId = $projectId === null ? null : $proposal->locations()
+            ->where('project_id', $projectId)
+            ->orderBy('id')
+            ->value('id');
+        $locationId = $locationId === null ? null : (int) $locationId;
+
         $schedules = ActivitySchedule::query()
-            ->select(['id', 'result_id', 'project_id', 'month', 'weeks'])
+            ->select(['id', 'result_id', 'proposal_location_id', 'month', 'weeks'])
             ->whereIn('result_id', $activities->modelKeys())
-            ->where(fn ($query) => $projectId === null ? $query->whereNull('project_id') : $query->whereNull('project_id')->orWhere('project_id', $projectId))
+            ->where(fn ($query) => $locationId === null
+                ? $query->whereNull('proposal_location_id')
+                : $query->whereNull('proposal_location_id')->orWhere('proposal_location_id', $locationId))
             ->get()
             ->groupBy('result_id');
 
@@ -235,9 +245,7 @@ trait BuildsProjectGantt
 
         foreach ($activities as $activity) {
             /** @var Result $activity */
-            $scheduled = $schedules->get($activity->id) ?? collect();
-            $override = $projectId === null ? collect() : $scheduled->where('project_id', $projectId);
-            $calendar = ActivitySchedule::calendarOf($override->isNotEmpty() ? $override : $scheduled->whereNull('project_id'));
+            $calendar = ActivitySchedule::effectiveOf($schedules->get($activity->id) ?? collect(), $locationId);
 
             if ($calendar === []) {
                 continue;

@@ -26,6 +26,7 @@ return [
     'report' => 'Report',
     'reports' => 'Reports',
     'monthly_report' => 'Monthly report',
+    'active_reports' => 'Active Reports',
     'monthly_reports' => 'Monthly Reports',
     'report_templates' => 'Templates to confirm',
     'results_framework' => 'Results Framework',

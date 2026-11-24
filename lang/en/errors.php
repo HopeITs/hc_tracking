@@ -19,6 +19,9 @@ return [
     '500_heading' => 'Something broke on our end',
     '500_body' => "An unexpected error interrupted this page. It's been logged for the team to look into.",
 
+    'request_failed' => 'That did not save. Try again, and tell IT if it keeps happening.',
+    'reference' => 'Reference: :reference',
+
     '503_heading' => 'HC Tracking is being improved right now',
     '503_body' => "We're carrying out scheduled maintenance. This should only take a few minutes.",
 

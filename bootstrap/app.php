@@ -11,10 +11,13 @@ use App\Http\Middleware\SecurityHeaders;
 use App\Http\Middleware\SetLocale;
 use App\Http\Middleware\SyncProgramsFromHr;
 use App\Http\Middleware\ThrottleRequestsWithoutSession;
+use App\Support\ErrorReference;
+use Illuminate\Contracts\Debug\ExceptionHandler;
 use Illuminate\Foundation\Application;
 use Illuminate\Foundation\Configuration\Exceptions;
 use Illuminate\Foundation\Configuration\Middleware;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\View;
 use Symfony\Component\HttpKernel\Exception\HttpExceptionInterface;
 
 return Application::configure(basePath: dirname(__DIR__))
@@ -67,5 +70,25 @@ return Application::configure(basePath: dirname(__DIR__))
             }
 
             return null;
+        });
+
+        // Every reported failure carries a reference id in its log line.
+        $exceptions->context(fn (Throwable $exception): array => ['error_reference' => ErrorReference::for($exception)]);
+
+        // An unexpected failure (one the handler reports) gets a plain sentence and the
+        // same reference, never the exception text. Reporting itself is untouched, and
+        // APP_DEBUG still shows the details.
+        $exceptions->render(function (Throwable $exception, Request $request) {
+            if (config('app.debug') || ! app(ExceptionHandler::class)->shouldReport($exception)) {
+                return null;
+            }
+
+            $reference = ErrorReference::for($exception);
+
+            if ($request->hasHeader('X-Livewire') || $request->expectsJson()) {
+                return response()->json(['message' => __('errors.request_failed'), 'reference' => $reference], 500, ['X-Error-Reference' => $reference]);
+            }
+
+            return response(View::make('errors.500', ['reference' => $reference])->render(), 500, ['X-Error-Reference' => $reference]);
         });
     })->create();

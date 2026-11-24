@@ -13,12 +13,16 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 /**
- * The last status MEAL confirmed for an activity on a project (contracts
- * §13, D-51). Written only by ValidateMonthlyReport; restored when a reopen
- * is granted.
+ * The last status MEAL confirmed for an activity at a location row
+ * (contracts §13, D-51; Y-15, D-93): one per (`proposal_location_id`,
+ * `result_id`), on the row of the activity's own proposal at the report's
+ * place. Written only by ValidateMonthlyReport; restored when a reopen is
+ * granted. `project_id` is the row's project, still written until Y-18. The
+ * model and table keep their names until Y-18.
  *
  * @property int $id
- * @property int $project_id
+ * @property int|null $project_id
+ * @property int $proposal_location_id
  * @property int $result_id
  * @property ActivityStatus $status
  * @property CarbonImmutable|null $started_on
@@ -29,6 +33,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
  */
 #[Fillable([
     'project_id',
+    'proposal_location_id',
     'result_id',
     'status',
     'started_on',
@@ -46,6 +51,16 @@ class ProjectActivityStatus extends Model
     public function project(): BelongsTo
     {
         return $this->belongsTo(Project::class);
+    }
+
+    /**
+     * The location row this status belongs to.
+     *
+     * @return BelongsTo<ProposalLocation, $this>
+     */
+    public function location(): BelongsTo
+    {
+        return $this->belongsTo(ProposalLocation::class, 'proposal_location_id');
     }
 
     /**
@@ -75,6 +90,7 @@ class ProjectActivityStatus extends Model
     {
         return [
             'project_id' => 'integer',
+            'proposal_location_id' => 'integer',
             'result_id' => 'integer',
             'status' => ActivityStatus::class,
             'started_on' => 'date',

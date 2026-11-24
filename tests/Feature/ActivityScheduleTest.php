@@ -9,8 +9,8 @@ use App\Events\ProposalStatusChanged;
 use App\Listeners\ShiftActivitySchedulesOnApproval;
 use App\Models\ActivitySchedule;
 use App\Models\Program;
-use App\Models\Project;
 use App\Models\Proposal;
+use App\Models\ProposalLocation;
 use App\Models\Result;
 use App\Models\User;
 use Database\Seeders\RolesAndPermissionsSeeder;
@@ -26,8 +26,7 @@ beforeEach(function () {
     $this->seed(RolesAndPermissionsSeeder::class);
     $this->program = Program::factory()->create();
     $this->proposal = Proposal::factory()->create(['planned_date_begin' => '2026-01-01', 'planned_date_end' => '2026-12-31']);
-    $this->project = Project::factory()->create(['program_id' => $this->program->id]);
-    DB::table('project_proposal')->insert(['project_id' => $this->project->id, 'proposal_id' => $this->proposal->id]);
+    $this->row = ProposalLocation::factory()->create(['proposal_id' => $this->proposal->id, 'program_id' => $this->program->id]);
     $this->output = scheduleOutput($this->proposal, $this->program);
     $this->activity = Result::factory()->activity($this->output)->create();
     $this->meal = mealManager();
@@ -49,11 +48,11 @@ function scheduleOutput(Proposal $proposal, Program $program): Result
  *
  * @return array<string, list<int>|null>
  */
-function storedSchedule(Result $activity, ?int $projectId = null): array
+function storedSchedule(Result $activity, ?int $locationId = null): array
 {
     return DB::table('activity_schedules')
         ->where('result_id', $activity->id)
-        ->where('project_id', $projectId)
+        ->where('proposal_location_id', $locationId)
         ->orderBy('month')
         ->get()
         ->mapWithKeys(fn (object $row): array => [substr((string) $row->month, 0, 7) => $row->weeks === null ? null : json_decode($row->weeks, true)])
@@ -67,14 +66,14 @@ function storedSchedule(Result $activity, ?int $projectId = null): array
  * @param  array<string, list<int>>  $weeks
  * @return array<string, list<int>|null>
  */
-function saveSchedule(User $user, Proposal $proposal, Result $activity, array $months, array $weeks = [], ?int $projectId = null, ?string $version = null): array
+function saveSchedule(User $user, Proposal $proposal, Result $activity, array $months, array $weeks = [], ?int $locationId = null, ?string $version = null): array
 {
     test()->actingAs($user);
 
-    return app(SaveActivitySchedule::class)->handle($proposal, $activity->id, $projectId, [
+    return app(SaveActivitySchedule::class)->handle($proposal, $activity->id, $locationId, [
         'months' => $months,
         'weeks' => $weeks,
-        'expected_version' => $version ?? ActivitySchedule::versionOf(storedSchedule($activity, $projectId)),
+        'expected_version' => $version ?? ActivitySchedule::versionOf(storedSchedule($activity, $locationId)),
     ]);
 }
 
@@ -166,26 +165,25 @@ test('a calendar changed by someone else is refused and nothing is written', fun
 });
 
 test('a center overrides the proposal calendar and can go back to it', function () {
-    $otherProject = Project::factory()->create(['program_id' => $this->program->id]);
-    DB::table('project_proposal')->insert(['project_id' => $otherProject->id, 'proposal_id' => $this->proposal->id]);
+    $otherRow = ProposalLocation::factory()->create(['proposal_id' => $this->proposal->id, 'program_id' => $this->program->id]);
 
     saveSchedule($this->meal, $this->proposal, $this->activity, ['2026-03', '2026-04']);
-    saveSchedule($this->meal, $this->proposal, $this->activity, ['2026-06'], ['2026-06' => [3]], $this->project->id);
+    saveSchedule($this->meal, $this->proposal, $this->activity, ['2026-06'], ['2026-06' => [3]], $this->row->id);
 
-    expect(ActivitySchedule::effectiveFor($this->activity->id, $this->project->id))->toBe(['2026-06' => [3]])
-        ->and(ActivitySchedule::effectiveFor($this->activity->id, $otherProject->id))->toBe(['2026-03' => null, '2026-04' => null])
+    expect(ActivitySchedule::effectiveFor($this->activity->id, $this->row->id))->toBe(['2026-06' => [3]])
+        ->and(ActivitySchedule::effectiveFor($this->activity->id, $otherRow->id))->toBe(['2026-03' => null, '2026-04' => null])
         ->and(storedSchedule($this->activity))->toBe(['2026-03' => null, '2026-04' => null]);
 
-    saveSchedule($this->meal, $this->proposal, $this->activity, [], projectId: $this->project->id);
+    saveSchedule($this->meal, $this->proposal, $this->activity, [], locationId: $this->row->id);
 
-    expect(storedSchedule($this->activity, $this->project->id))->toBe([])
-        ->and(ActivitySchedule::effectiveFor($this->activity->id, $this->project->id))->toBe(['2026-03' => null, '2026-04' => null]);
+    expect(storedSchedule($this->activity, $this->row->id))->toBe([])
+        ->and(ActivitySchedule::effectiveFor($this->activity->id, $this->row->id))->toBe(['2026-03' => null, '2026-04' => null]);
 });
 
-test('a project the proposal does not fund is refused', function () {
-    $foreignProject = Project::factory()->create(['program_id' => $this->program->id]);
+test('a location row of another proposal is refused', function () {
+    $foreignRow = ProposalLocation::factory()->create(['program_id' => $this->program->id]);
 
-    saveSchedule($this->meal, $this->proposal, $this->activity, ['2026-03'], projectId: $foreignProject->id);
+    saveSchedule($this->meal, $this->proposal, $this->activity, ['2026-03'], locationId: $foreignRow->id);
 })->throws(ModelNotFoundException::class);
 
 test('an activity of another proposal is refused', function () {
@@ -227,7 +225,7 @@ test('the proposal editor schedules before approval, only MEAL after it, and onl
 
 test('approval shifts the calendar by the start delay once, keeping the weeks', function () {
     saveSchedule($this->meal, $this->proposal, $this->activity, ['2026-03', '2026-04'], ['2026-03' => [1, 3]]);
-    saveSchedule($this->meal, $this->proposal, $this->activity, ['2026-05'], ['2026-05' => [2]], $this->project->id);
+    saveSchedule($this->meal, $this->proposal, $this->activity, ['2026-05'], ['2026-05' => [2]], $this->row->id);
     approveForSchedule($this->proposal, '2026-03-10', '2027-02-28');
 
     $event = new ProposalStatusChanged($this->proposal->id, ProposalStatus::Submitted, ProposalStatus::Approved, $this->meal->id);
@@ -236,7 +234,7 @@ test('approval shifts the calendar by the start delay once, keeping the weeks', 
 
     expect(new ShiftActivitySchedulesOnApproval)->toBeInstanceOf(ShouldQueue::class)
         ->and(storedSchedule($this->activity))->toBe(['2026-05' => [1, 3], '2026-06' => null])
-        ->and(storedSchedule($this->activity, $this->project->id))->toBe(['2026-07' => [2]])
+        ->and(storedSchedule($this->activity, $this->row->id))->toBe(['2026-07' => [2]])
         ->and(DB::table('activity_schedule_shifts')->where('proposal_id', $this->proposal->id)->sole())
         ->delta_months->toBe(2)
         ->shifted->toBe(3);
@@ -351,25 +349,25 @@ test('the grid is read-only for the proposal editor after approval', function ()
 test('the grid resets a center calendar, and the proposal editor cannot after approval', function () {
     $editor = User::factory()->role('Financial')->create();
     $centerVersion = ActivitySchedule::versionOf(['2026-06' => null]);
-    saveSchedule($this->meal, $this->proposal, $this->activity, ['2026-06'], projectId: $this->project->id);
+    saveSchedule($this->meal, $this->proposal, $this->activity, ['2026-06'], locationId: $this->row->id);
     approveForSchedule($this->proposal, '2026-01-01', '2026-12-31');
 
     activityCalendar($editor, $this->proposal)
-        ->set('scope', (string) $this->project->id)
+        ->set('scope', (string) $this->row->id)
         ->call('confirmReset', $this->activity->id, $centerVersion)
         ->call('resetCenter')
         ->assertForbidden();
 
-    expect(storedSchedule($this->activity, $this->project->id))->toBe(['2026-06' => null]);
+    expect(storedSchedule($this->activity, $this->row->id))->toBe(['2026-06' => null]);
 
     activityCalendar($this->meal, $this->proposal)
-        ->set('scope', (string) $this->project->id)
+        ->set('scope', (string) $this->row->id)
         ->call('confirmReset', $this->activity->id, $centerVersion)
         ->call('resetCenter')
         ->assertHasNoErrors()
         ->assertSet('showResetModal', false);
 
-    expect(storedSchedule($this->activity, $this->project->id))->toBe([]);
+    expect(storedSchedule($this->activity, $this->row->id))->toBe([]);
 });
 
 test('the grid holds a flat query count whatever the number of activities', function () {
@@ -391,7 +389,7 @@ test('the grid holds a flat query count whatever the number of activities', func
 
     foreach (range(1, 27) as $index) {
         $activity = Result::factory()->activity($this->output)->create();
-        saveSchedule($this->meal, $this->proposal, $activity, ['2026-04'], projectId: $this->project->id);
+        saveSchedule($this->meal, $this->proposal, $activity, ['2026-04'], locationId: $this->row->id);
     }
 
     expect($countQueries())->toBe($small);

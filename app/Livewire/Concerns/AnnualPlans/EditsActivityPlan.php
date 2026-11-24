@@ -22,7 +22,7 @@ use App\Models\ActivityPlan;
 use App\Models\ActivityPlanBatch;
 use App\Models\ActivityPlanItem;
 use App\Models\PlanIndicator;
-use App\Models\Project;
+use App\Models\ProposalLocation;
 use App\Models\Result;
 use App\Models\User;
 use App\Policies\ActivityPlanPolicy;
@@ -245,21 +245,22 @@ trait EditsActivityPlan
 
     /**
      * The centres the live plan shows: only their own to a centre's project
-     * manager or MEAL officer, every centre to everyone else.
+     * manager or MEAL officer, every centre to everyone else. A centre is a
+     * location row of the plan's proposal (Y-15).
      *
-     * @return list<Project>
+     * @return list<ProposalLocation>
      */
     #[Computed]
     public function liveCentres(): array
     {
         $user = $this->user();
-        $all = $this->execution->projects();
+        $all = $this->execution->locations();
 
         if (ActivityPlanPolicy::isMealManager($user) || PlanUpdatePolicy::isProgramManager($user, $this->plan) || $user->hasRole('Super Admin')) {
             return $all;
         }
 
-        $own = array_values(array_filter($all, fn ($centre): bool => PlanUpdatePolicy::isProjectManager($user, $centre) || ($user->employee_id !== null && in_array((int) $user->employee_id, MealCoverage::officersForLegacyProject($centre->id), true))));
+        $own = array_values(array_filter($all, fn ($centre): bool => PlanUpdatePolicy::isProjectManager($user, $centre) || ($user->employee_id !== null && in_array((int) $user->employee_id, MealCoverage::responsibleForLocation($centre), true))));
 
         return $own === [] ? $all : $own;
     }
@@ -298,8 +299,9 @@ trait EditsActivityPlan
 
     /**
      * The plan's centres whose governorate is missing or unknown in HR, so they
-     * never appear under "Where does it run?": named with a link to fix them,
-     * instead of a bare "No centres linked yet".
+     * never appear under "Where does it run?": named with a link to the
+     * proposal, where its locations are fixed (Y-15), instead of a bare "No
+     * centres linked yet".
      *
      * @return list<array{name: string, url: string}>
      */
@@ -308,11 +310,9 @@ trait EditsActivityPlan
     {
         $centres = [];
 
-        foreach (ActivityPlanScope::projects($this->plan) as $project) {
-            $cityId = MealCoverage::cityIdOf($project);
-
-            if ($cityId === null || ! array_key_exists($cityId, $this->cityNames)) {
-                $centres[] = ['name' => (string) $project->name, 'url' => route('projects.show', $project)];
+        foreach (ActivityPlanScope::locations($this->plan) as $location) {
+            if (! array_key_exists($location->city_id, $this->cityNames)) {
+                $centres[] = ['name' => $location->label(), 'url' => route('proposals.show', $this->plan->proposal)];
             }
         }
 

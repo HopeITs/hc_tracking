@@ -6,7 +6,7 @@
         <table class="ap-t">
             <thead><tr><th>{{ __('annual_plans.up.col_centre') }}</th><th>{{ __('annual_plans.up.male') }}</th><th>{{ __('annual_plans.up.female') }}</th><th>{{ __('annual_plans.up.total') }}</th><th>{{ __('annual_plans.up.with_disability') }}</th></tr></thead>
             <tbody><tr>
-                <td><b dir="auto">{{ $this->project->name }}</b></td>
+                <td><b dir="auto">{{ $this->location->label() }}</b></td>
                 @foreach (['males', 'females'] as $field)
                     <td><input class="ap-inp is-n {{ $this->isMissing($field) ? 'is-err' : '' }}" type="number" min="0" wire:model.live.debounce.400ms="draft.{{ $field }}" @disabled($readOnly) aria-label="{{ __('annual_plans.up.'.($field === 'males' ? 'male' : 'female')) }}"></td>
                 @endforeach

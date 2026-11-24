@@ -478,8 +478,10 @@ test('the activity calendar says where the calendar is set when nothing is sched
 
 test('the activity calendar marks an activity adjusted by a center override and follows it', function () {
     ['project' => $project, 'template' => $template] = rtpProject();
-    $activity = rtpCalendar($template, rtpProposal($project), 'Adjusted activity', ['2026-11-01' => null]);
-    Activity::withoutRecording(fn () => ActivitySchedule::query()->create(['result_id' => $activity->id, 'project_id' => $project->id, 'month' => '2027-01-01', 'weeks' => [3]]));
+    $proposal = rtpProposal($project);
+    $activity = rtpCalendar($template, $proposal, 'Adjusted activity', ['2026-11-01' => null]);
+    $row = proposalRowForProject($proposal, $project, false);
+    Activity::withoutRecording(fn () => ActivitySchedule::query()->create(['result_id' => $activity->id, 'proposal_location_id' => $row->id, 'project_id' => $project->id, 'month' => '2027-01-01', 'weeks' => [3]]));
 
     rtpPage(mealManager(), $project)
         ->assertSee(__('report_templates.calendar.adjusted_center'))

@@ -14,11 +14,14 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 
 /**
- * The monthly update of an annual plan for one centre (project) and month.
+ * The monthly update of an annual plan for one centre and month. A centre is
+ * a location row of the plan's proposal (Y-15, D-93); `project_id` is the
+ * row's project, still written until Y-18.
  *
  * @property int $id
  * @property int $activity_plan_id
- * @property int $project_id
+ * @property int|null $project_id
+ * @property int|null $proposal_location_id
  * @property CarbonImmutable $month
  * @property PlanUpdateStatus $status
  * @property string|null $activities_implemented
@@ -46,7 +49,7 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
  * @property CarbonImmutable|null $updated_at
  */
 #[Fillable([
-    'activity_plan_id', 'project_id', 'month', 'status',
+    'activity_plan_id', 'project_id', 'proposal_location_id', 'month', 'status',
     'activities_implemented', 'challenges', 'next_month', 'accountability',
     'males', 'females', 'with_disability',
     'sent_at', 'sent_by', 'resent', 'officer_approved_at', 'officer_approved_by',
@@ -75,11 +78,23 @@ class PlanUpdate extends Model
     }
 
     /**
+     * The row's project, kept until Y-18 drops `project_id`.
+     *
      * @return BelongsTo<Project, $this>
      */
     public function project(): BelongsTo
     {
         return $this->belongsTo(Project::class);
+    }
+
+    /**
+     * The centre this update is for: a location row of the plan's proposal.
+     *
+     * @return BelongsTo<ProposalLocation, $this>
+     */
+    public function location(): BelongsTo
+    {
+        return $this->belongsTo(ProposalLocation::class, 'proposal_location_id');
     }
 
     /**
@@ -164,6 +179,7 @@ class PlanUpdate extends Model
         return [
             'activity_plan_id' => 'integer',
             'project_id' => 'integer',
+            'proposal_location_id' => 'integer',
             'month' => 'date',
             'status' => PlanUpdateStatus::class,
             'males' => 'integer',

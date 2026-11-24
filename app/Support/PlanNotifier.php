@@ -10,7 +10,7 @@ use App\Enums\NotificationPriority;
 use App\Models\ActivityPlan;
 use App\Models\PlanUpdate;
 use App\Models\Program;
-use App\Models\Project;
+use App\Models\ProposalLocation;
 use App\Models\User;
 use App\Notifications\Alerts\AlertLedger;
 use App\Notifications\AppNotification;
@@ -20,7 +20,9 @@ use Illuminate\Support\Facades\Cache;
 /**
  * In-app notifications of the annual plan workflow (Rami, 2026-11-11: in-app
  * only). Each event names who hears it: the program manager, the MEAL
- * manager(s), the centre's project manager, its governorate MEAL officer.
+ * manager(s), the centre's project manager, its MEAL officer. A centre is
+ * a location row of the plan's proposal (Y-15): its label names it and its
+ * slug is in the link.
  * The actor never notifies themselves. Texts live under
  * notifications.events.annual_plan.{event}.{title,body}.
  */
@@ -44,14 +46,14 @@ final class PlanNotifier
      */
     public static function update(PlanUpdate $update, string $event, array $to, array $params = [], ?User $actor = null, bool $critical = false): void
     {
-        $update->loadMissing(['plan.proposal', 'project']);
+        $update->loadMissing(['plan.proposal', 'location.city', 'location.program', 'location.centers']);
 
-        self::send(self::recipients($update->plan, $update->project, $to), $event, [
+        self::send(self::recipients($update->plan, $update->location, $to), $event, [
             'plan' => (string) $update->plan->proposal->name,
-            'centre' => (string) $update->project->name,
+            'centre' => $update->location->label(),
             'month' => $update->month->translatedFormat('F Y'),
             ...$params,
-        ], ['route' => 'plan-updates.show', 'parameters' => [$update->plan->slug, $update->project->slug, $update->month->format('Y-m')]], $actor, $critical);
+        ], ['route' => 'plan-updates.show', 'parameters' => [$update->plan->slug, $update->location->slug, $update->month->format('Y-m')]], $actor, $critical);
     }
 
     /**
@@ -62,19 +64,19 @@ final class PlanNotifier
      * @param  list<string>  $to
      * @param  array<string, string>  $params
      */
-    public static function once(string $stage, ActivityPlan $plan, Project $project, string $month, string $event, array $to, array $params): int
+    public static function once(string $stage, ActivityPlan $plan, ProposalLocation $location, string $month, string $event, array $to, array $params): int
     {
         $ledger = app(AlertLedger::class);
         $users = array_values(array_filter(
-            self::recipients($plan, $project, $to),
+            self::recipients($plan, $location, $to),
             fn (User $user): bool => $ledger->claim('annual_plan_notice', 'activity_plan', $plan->id, $stage, $user->id),
         ));
 
         self::send($users, $event, [
             'plan' => (string) $plan->proposal()->value('name'),
-            'centre' => (string) $project->name,
+            'centre' => $location->label(),
             ...$params,
-        ], ['route' => 'plan-updates.show', 'parameters' => [$plan->slug, $project->slug, $month]], null, $event === 'annual_plan.update_late');
+        ], ['route' => 'plan-updates.show', 'parameters' => [$plan->slug, $location->slug, $month]], null, $event === 'annual_plan.update_late');
 
         return count($users);
     }
@@ -83,7 +85,7 @@ final class PlanNotifier
      * @param  list<string>  $to
      * @return list<User>
      */
-    public static function recipients(ActivityPlan $plan, ?Project $project, array $to): array
+    public static function recipients(ActivityPlan $plan, ?ProposalLocation $location, array $to): array
     {
         $employeeIds = [];
         $users = collect();
@@ -97,15 +99,15 @@ final class PlanNotifier
             $users = $users->merge(User::permission('annual-plans.review')->get());
         }
 
-        $projects = $project !== null ? [$project] : ActivityPlanScope::projects($plan);
+        $centres = $location !== null ? [$location] : ActivityPlanScope::locations($plan);
 
-        foreach ($projects as $centre) {
+        foreach ($centres as $centre) {
             if (in_array('project_manager', $to, true)) {
-                $employeeIds[] = $centre->getAttribute('user_id') ?? Project::ownerEmployeeIdFor($centre->id);
+                $employeeIds[] = $centre->responsible_employee_id;
             }
 
             if (in_array('officer', $to, true)) {
-                $employeeIds = [...$employeeIds, ...MealCoverage::officersForLegacyProject($centre->id, $plan->proposal_id)];
+                $employeeIds = [...$employeeIds, ...MealCoverage::responsibleForLocation($centre)];
             }
         }
 

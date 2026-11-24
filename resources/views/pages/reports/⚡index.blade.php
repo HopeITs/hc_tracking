@@ -2,7 +2,6 @@
 
 use App\Support\Like;
 use App\Enums\ReportStatus;
-use App\Livewire\Concerns\Desk\PagesRegisterCalendar;
 use App\Livewire\Concerns\FiltersByStrategy;
 use App\Livewire\Concerns\ManagesReportForm;
 use App\Livewire\Concerns\Reports\ReadsReportPortfolio;
@@ -28,7 +27,6 @@ use Livewire\WithPagination;
 new #[Layout('layouts::desk'), Title('titles.reports')] class extends Component {
     use FiltersByStrategy;
     use ManagesReportForm;
-    use PagesRegisterCalendar;
     use ReadsReportPortfolio;
     use WithPagination;
 
@@ -63,11 +61,10 @@ new #[Layout('layouts::desk'), Title('titles.reports')] class extends Component 
     public string $focus = '';
 
     /**
-     * Which shape the report feed renders in: a flat searchable list, or
-     * reports grouped by project and indicator to surface the connections
-     * between delivery and what has been reported against it.
+     * Read only by ReadsReportPortfolio, which still answers `insights()`.
+     * The register has one shape now: its Board, Calendar and Portfolio views
+     * moved to Active Reports (M-02) and their URLs redirect there.
      */
-    #[Url(except: 'list')]
     public string $view = 'list';
 
     /**
@@ -77,6 +74,15 @@ new #[Layout('layouts::desk'), Title('titles.reports')] class extends Component 
      */
     public function mount(): void
     {
+        // The retired Board, Calendar and Portfolio views land on Active Reports, keeping the search.
+        if (in_array(request()->query('view'), ['board', 'calendar', 'portfolio'], true)) {
+            $search = request()->query('search');
+
+            $this->redirectRoute('active-reports.index', is_string($search) && $search !== '' ? ['search' => $search] : []);
+
+            return;
+        }
+
         if (request()->boolean('create') && Gate::allows('create', Report::class)) {
             $this->openCreateModal($this->target === '' ? null : (int) $this->target);
         }
@@ -269,51 +275,6 @@ new #[Layout('layouts::desk'), Title('titles.reports')] class extends Component 
             ->paginate(15);
     }
 
-    /**
-     * The Board view: a column per status, at most 40 cards each (desk.js).
-     *
-     * @return list<array{key: string, label: string, count: int, items: Collection<int, Report>}>
-     */
-    #[Computed]
-    public function boardColumns(): array
-    {
-        $reports = $this->visibleReports()
-            ->select(['id', 'slug', 'plan_indicator_id', 'status', 'planned_date'])
-            ->with(['planIndicator:id,indicator_id,project_id', 'planIndicator.indicator:id,name', 'planIndicator.project:id,name'])
-            ->orderByDesc('planned_date')
-            ->get();
-
-        return array_map(function (ReportStatus $status) use ($reports): array {
-            $inColumn = $reports->filter(fn (Report $report): bool => $report->status === $status)->values();
-
-            return ['key' => $status->value, 'label' => $status->label(), 'count' => $inColumn->count(), 'items' => $inColumn->take(40)];
-        }, ReportStatus::cases());
-    }
-
-    /**
-     * The Calendar view: each report on its planned date.
-     *
-     * @return list<array{date: string, label: string, href: string}>
-     */
-    #[Computed]
-    public function calendarItems(): array
-    {
-        $start = $this->calendarMonthStart();
-
-        return $this->visibleReports()
-            ->select(['id', 'slug', 'plan_indicator_id', 'planned_date'])
-            ->with(['planIndicator:id,indicator_id', 'planIndicator.indicator:id,name'])
-            ->whereBetween('planned_date', [$start->toDateString(), $start->endOfMonth()->toDateString()])
-            ->get()
-            ->map(fn (Report $report): array => [
-                'date' => $report->planned_date->toDateString(),
-                'label' => $report->planIndicator->indicator->name,
-                'href' => route('reports.show', $report),
-            ])
-            ->values()
-            ->all();
-    }
-
     /** @return Collection<int, User> */
     #[Computed]
     public function authorOptions(): Collection
@@ -413,13 +374,6 @@ new #[Layout('layouts::desk'), Title('titles.reports')] class extends Component 
     heading-id="report-directory-heading"
     :title="__('common.reports')"
     :count="$insights['total']"
-    :view="$view"
-    :views="[
-        'list' => ['icon' => 'table', 'label' => __('desk.register.table')],
-        'board' => ['icon' => 'board', 'label' => __('desk.register.board')],
-        'calendar' => ['icon' => 'cal', 'label' => __('desk.register.calendar')],
-        'portfolio' => ['icon' => 'grid', 'label' => __('reports.portfolio_view')],
-    ]"
 >
     <x-slot:actions>
             @can('create', App\Models\Report::class)
@@ -480,15 +434,7 @@ new #[Layout('layouts::desk'), Title('titles.reports')] class extends Component 
         </div>
     @endif
 
-    @if ($view === 'portfolio')
-        @include('pages.reports._index-portfolio')
-    @elseif ($view === 'board')
-        @include('pages.reports._index-board')
-    @elseif ($view === 'calendar')
-        <x-desk.month-calendar :month="$this->calendarMonthStart()->toDateString()" :items="$this->calendarItems" />
-    @else
-        @include('pages.reports._index-list')
-    @endif
+    @include('pages.reports._index-list')
 
     <x-reports.form-modal
         :open="$showReportModal"

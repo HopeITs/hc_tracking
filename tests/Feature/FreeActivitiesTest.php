@@ -15,6 +15,7 @@ test('the MEAL manager adds an activity linked to no statement on the results fr
     Livewire::actingAs(mealManager())
         ->test('pages::results.index')
         ->assertSeeHtml('data-test="add-free-activity-'.$program->id.'"')
+        ->assertDontSee('Write activities here that are not linked to any outcome or output.')
         ->call('openCreateActivity', $program->id)
         ->assertSet('showResultModal', true)
         ->assertSet('resultType', ResultType::Activity->value)
@@ -54,20 +55,20 @@ test('a MEAL officer sees free activities but no button to add one', function ()
         ->assertDontSeeHtml('data-test="add-free-activity-');
 });
 
-test('a proposal framework has its own section for activities linked to no statement', function () {
+test('a proposal framework lists an activity linked to no output among those still needing one', function () {
     $program = Program::factory()->create();
     $proposal = Proposal::factory()->create(['status' => ProposalStatus::ConceptNote]);
     $proposal->projects()->attach(Project::factory()->create(['program_id' => $program->id]));
 
     $tab = Livewire::actingAs(mealManager())->test('proposals.logframe', ['proposalId' => $proposal->id]);
 
-    $tab->assertSeeHtml('data-test="add-free-activity"')
-        ->call('openCreateActivity')
+    $tab->call('openCreateActivity')
         ->assertSet('resultType', ResultType::Activity->value)
         ->set('statement', 'Run a launch event.')
         ->call('saveResult')
         ->assertHasNoErrors()
-        ->assertSeeHtml('data-test="logframe-free-activities"')
+        ->call('setLayout', 'board')
+        ->assertSeeHtml('data-test="board-loose"')
         ->assertSee('Run a launch event.');
 
     $activity = Result::query()->where('statement', 'Run a launch event.')->sole();

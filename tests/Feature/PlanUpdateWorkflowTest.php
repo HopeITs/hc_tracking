@@ -9,13 +9,14 @@ use App\Enums\PlanUpdateStatus;
 use App\Enums\ResultType;
 use App\Models\ActivityPlan;
 use App\Models\ActivityPlanBatch;
+use App\Models\ActivityPlanFollowUp;
 use App\Models\ActivityPlanItem;
 use App\Models\ActivityPlanItemCity;
 use App\Models\MealCoverageAssignment;
 use App\Models\PlanUpdate;
 use App\Models\Program;
-use App\Models\Project;
 use App\Models\Proposal;
+use App\Models\ProposalLocation;
 use App\Models\Result;
 use App\Notifications\AppNotification;
 use App\Support\PlanExecution;
@@ -42,13 +43,12 @@ beforeEach(function () {
     $this->program = Program::factory()->create(['manager_id' => $this->pmEmployee]);
     $this->proposal = Proposal::factory()->create(['planned_date_begin' => '2027-01-01', 'planned_date_end' => '2027-12-31']);
     $this->aleppo = insertHrCity('Aleppo', 'حلب');
-    $this->centre = Project::factory()->create(['program_id' => $this->program->id, 'city_id' => $this->aleppo, 'user_id' => $this->aleppoOwner, 'name' => 'Children University Aleppo']);
-    DB::table('project_proposal')->insert(['project_id' => $this->centre->id, 'proposal_id' => $this->proposal->id]);
-    $this->proposal->locations()->create([
-        'project_id' => $this->centre->id,
+    // The centre is a location row of the plan's proposal; its responsible is the project manager (Y-15).
+    $this->centre = $this->proposal->locations()->create([
         'city_id' => $this->aleppo,
         'program_id' => $this->program->id,
         'city_wide' => true,
+        'responsible_employee_id' => $this->aleppoOwner,
     ]);
     MealCoverageAssignment::query()->create(['scope_type' => MealCoverageScope::City->value, 'city_id' => $this->aleppo, 'employee_id' => $this->officerEmployee]);
 
@@ -177,7 +177,7 @@ test('the MEAL manager first, then the program manager without a note, completes
 test('the program manager page offers mark as seen with a note, never a return, and the note shows below the report', function () {
     $update = app(ReviewPlanUpdate::class)->mealReviewed($this->mealManager, app(ReviewPlanUpdate::class)->officerApprove($this->officer, sentJanuary(), 'Fine.'));
 
-    Livewire::actingAs($this->programManager)->test('pages::annual-plans.update', ['activityPlan' => $this->plan, 'project' => $this->centre, 'month' => '2027-01'])
+    Livewire::actingAs($this->programManager)->test('pages::annual-plans.update', ['activityPlan' => $this->plan, 'location' => $this->centre, 'month' => '2027-01'])
         ->assertSet('mode', 'program')
         ->assertDontSeeHtml('data-test="meal-return"')
         ->set('pmNote', 'Check attendance sheets.')
@@ -257,7 +257,7 @@ test('the live plan reads sent weeks and finds late and suspended activities', f
 test('the project manager fills the update on its page and the officer sees the decision', function () {
     $this->travelTo(CarbonImmutable::parse('2027-02-01 10:00'));
 
-    Livewire::actingAs($this->projectManager)->test('pages::annual-plans.update', ['activityPlan' => $this->plan, 'project' => $this->centre, 'month' => '2027-01'])
+    Livewire::actingAs($this->projectManager)->test('pages::annual-plans.update', ['activityPlan' => $this->plan, 'location' => $this->centre, 'month' => '2027-01'])
         ->assertSet('mode', 'fill')
         ->call('fillFromPlan')
         ->assertSet('draft.weeks.'.$this->batch->id.'|2027-01-04.status', 'started')
@@ -268,7 +268,7 @@ test('the project manager fills the update on its page and the officer sees the 
     $this->travelBack();
     $update = sentJanuary();
 
-    Livewire::actingAs($this->officer)->test('pages::annual-plans.update', ['activityPlan' => $this->plan, 'project' => $this->centre, 'month' => '2027-01'])
+    Livewire::actingAs($this->officer)->test('pages::annual-plans.update', ['activityPlan' => $this->plan, 'location' => $this->centre, 'month' => '2027-01'])
         ->assertSet('mode', 'officer')
         ->assertSeeHtml('data-decision="officer"')
         ->assertSeeHtml('target="_blank" rel="noopener" data-test="open-plan-update-file"')
@@ -302,7 +302,7 @@ test('another centre manager and a team member do not read the update, export or
 })->with(['Managers', 'Team Member']);
 
 test('a supporting file of a type that is not allowed says why it was not added', function () {
-    Livewire::actingAs($this->projectManager)->test('pages::annual-plans.update', ['activityPlan' => $this->plan, 'project' => $this->centre, 'month' => '2027-01'])
+    Livewire::actingAs($this->projectManager)->test('pages::annual-plans.update', ['activityPlan' => $this->plan, 'location' => $this->centre, 'month' => '2027-01'])
         ->call('goToStep', 1)
         ->assertDontSeeHtml('data-test="file-rejected"')
         ->set('newFiles', [UploadedFile::fake()->create('notes.txt', 1, 'text/plain')])
@@ -311,4 +311,45 @@ test('a supporting file of a type that is not allowed says why it was not added'
         ->assertSee(__('annual_plans.up.file_rejected'));
 
     expect(PlanUpdate::query()->first()?->files()->count() ?? 0)->toBe(0);
+});
+
+test('an update is stored on its centre\'s location row, with the row\'s project', function () {
+    $update = app(SavePlanUpdate::class)->handle($this->projectManager, $this->plan, $this->centre, $this->january, januaryDraft());
+
+    expect(DB::table('plan_updates')->where('id', $update->id)->first())
+        ->proposal_location_id->toBe($this->centre->id)
+        ->project_id->toBeNull();
+});
+
+test('the update page and its export answer 404 for a row that is not one of the plan\'s centres', function () {
+    sentJanuary();
+    $foreign = ProposalLocation::factory()->create(['city_id' => $this->aleppo, 'program_id' => $this->program->id]);
+
+    $this->actingAs($this->mealManager)->get(route('plan-updates.show', [$this->plan, $foreign, '2027-01']))->assertNotFound();
+    $this->actingAs($this->mealManager)->get(route('plan-updates.export', [$this->plan, $foreign, '2027-01']))->assertNotFound();
+    $this->actingAs($this->mealManager)->get('/annual-plans/'.$this->plan->slug.'/updates/'.$this->centre->id.'/2027-01')->assertNotFound();
+});
+
+test('a follow-up task fired by a sent update is written on the centre\'s row and sourced on it', function () {
+    $followUp = ActivityPlanFollowUp::factory()->create(['activity_plan_id' => $this->plan->id, 'activity_plan_item_id' => $this->item->id, 'trigger' => 'start', 'created_by' => $this->mealManager->id]);
+
+    sentJanuary();
+
+    $link = DB::table('activity_plan_follow_up_tasks')->where('activity_plan_follow_up_id', $followUp->id)->sole();
+    $task = DB::table('tasks')->where('id', $link->task_id)->sole();
+
+    expect((int) $link->proposal_location_id)->toBe($this->centre->id)
+        ->and($task->source_type)->toBe('proposal_location')
+        ->and((int) $task->source_id)->toBe($this->centre->id)
+        ->and(DB::table('task_assignees')->where('task_id', $task->id)->pluck('employee_id')->map(fn ($id): int => (int) $id)->all())->toBe([$this->officerEmployee]);
+});
+
+test('the reminder tells the centre\'s project manager and links the row\'s update page', function () {
+    Notification::fake();
+
+    $this->artisan('annual-plans:remind', ['--date' => '2027-01-28'])->assertSuccessful();
+
+    Notification::assertSentTo($this->projectManager, AppNotification::class, fn (AppNotification $notification): bool => $notification->payload->key === 'notifications.events.annual_plan.update_due'
+        && $notification->payload->link['parameters'][1] === $this->centre->slug
+        && $notification->payload->params['centre'] === $this->centre->fresh(['city', 'program', 'centers'])->label());
 });

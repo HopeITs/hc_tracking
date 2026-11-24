@@ -7,7 +7,7 @@ namespace App\Actions\AnnualPlans;
 use App\Enums\PlanWeekStatus;
 use App\Models\ActivityPlan;
 use App\Models\PlanUpdate;
-use App\Models\Project;
+use App\Models\ProposalLocation;
 use App\Models\User;
 use App\Policies\PlanUpdatePolicy;
 use App\Support\PlanExecution;
@@ -32,12 +32,12 @@ final class SavePlanUpdate
     /**
      * @param  array<string, mixed>  $draft
      */
-    public function handle(User $user, ActivityPlan $plan, Project $project, CarbonImmutable $month, array $draft): PlanUpdate
+    public function handle(User $user, ActivityPlan $plan, ProposalLocation $location, CarbonImmutable $month, array $draft): PlanUpdate
     {
         $month = $month->startOfMonth();
-        $existing = PlanUpdate::query()->where('activity_plan_id', $plan->id)->where('project_id', $project->id)->where('month', $month->toDateString())->first();
+        $existing = PlanUpdate::query()->where('activity_plan_id', $plan->id)->where('proposal_location_id', $location->id)->where('month', $month->toDateString())->first();
 
-        if (! PlanUpdatePolicy::canFill($user, $plan, $project, $existing)) {
+        if (! PlanUpdatePolicy::canFill($user, $plan, $location, $existing)) {
             throw new AuthorizationException;
         }
 
@@ -47,14 +47,15 @@ final class SavePlanUpdate
             throw ValidationException::withMessages(['month' => __('annual_plans.up.month_outside_plan')]);
         }
 
-        $batchIds = array_map(fn (array $row): int => $row['batch']->id, $execution->batchesFor($project, $month));
+        $batchIds = array_map(fn (array $row): int => $row['batch']->id, $execution->batchesFor($location, $month));
         $mondays = array_map(fn (CarbonImmutable $monday): string => $monday->toDateString(), $execution->calendar->mondaysOf($month));
         $planMondays = array_map(fn (CarbonImmutable $monday): string => $monday->toDateString(), $execution->calendar->mondays());
 
-        return DB::transaction(function () use ($plan, $project, $month, $draft, $existing, $batchIds, $mondays, $planMondays): PlanUpdate {
+        return DB::transaction(function () use ($plan, $location, $month, $draft, $existing, $batchIds, $mondays, $planMondays): PlanUpdate {
             $update = $existing ?? PlanUpdate::query()->create([
                 'activity_plan_id' => $plan->id,
-                'project_id' => $project->id,
+                'proposal_location_id' => $location->id,
+                'project_id' => $location->project_id,
                 'month' => $month->toDateString(),
             ]);
 

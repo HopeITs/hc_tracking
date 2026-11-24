@@ -8,7 +8,7 @@ use App\Enums\FollowUpTrigger;
 use App\Models\ActivityPlanFollowUp;
 use App\Models\ActivityPlanItem;
 use App\Models\PlanUpdate;
-use App\Models\Project;
+use App\Models\ProposalLocation;
 use App\Models\Task;
 use App\Support\MealCoverage;
 use App\Support\PlanExecution;
@@ -27,34 +27,34 @@ final class FireActivityPlanFollowUps
 {
     public function handle(PlanUpdate $update): void
     {
-        $update->loadMissing(['plan.followUps.item', 'project']);
+        $update->loadMissing(['plan.followUps.item', 'location.city', 'location.program', 'location.centers']);
         $plan = $update->plan;
-        $project = $update->project;
+        $location = $update->location;
 
         if ($plan->followUps->isEmpty()) {
             return;
         }
 
         $execution = PlanExecution::for($plan->fresh());
-        $officers = MealCoverage::officersForLegacyProject($project->id, $plan->proposal_id);
+        $officers = MealCoverage::responsibleForLocation($location);
 
         foreach ($plan->followUps as $followUp) {
             $item = $execution->plan->items->firstWhere('id', $followUp->activity_plan_item_id);
 
-            if ($item === null || ! in_array(MealCoverage::cityIdOf($project), $item->cityIds(), true) || ! $this->reached($execution, $followUp, $item, $project)) {
+            if ($item === null || ! in_array($location->city_id, $item->cityIds(), true) || ! $this->reached($execution, $followUp, $item, $location)) {
                 continue;
             }
 
-            if (DB::table('activity_plan_follow_up_tasks')->where('activity_plan_follow_up_id', $followUp->id)->where('project_id', $project->id)->exists()) {
+            if (DB::table('activity_plan_follow_up_tasks')->where('activity_plan_follow_up_id', $followUp->id)->where('proposal_location_id', $location->id)->exists()) {
                 continue;
             }
 
-            DB::transaction(function () use ($followUp, $item, $project, $officers, $plan, $update): void {
+            DB::transaction(function () use ($followUp, $item, $location, $officers, $plan, $update): void {
                 $task = Task::query()->create([
-                    'source_type' => 'project',
-                    'source_id' => $project->id,
+                    'source_type' => 'proposal_location',
+                    'source_id' => $location->id,
                     'title' => $followUp->description.' · '.$item->activity?->statement,
-                    'description' => __('annual_plans.tasks.description', ['activity' => (string) $item->activity?->statement, 'centre' => $project->name, 'when' => $followUp->trigger->label()]),
+                    'description' => __('annual_plans.tasks.description', ['activity' => (string) $item->activity?->statement, 'centre' => $location->label(), 'when' => $followUp->trigger->label()]),
                     'due_date' => now()->addWeeks(2)->toDateString(),
                     'start_date' => now()->toDateString(),
                     'evidence_required' => true,
@@ -67,7 +67,8 @@ final class FireActivityPlanFollowUps
 
                 DB::table('activity_plan_follow_up_tasks')->insert([
                     'activity_plan_follow_up_id' => $followUp->id,
-                    'project_id' => $project->id,
+                    'proposal_location_id' => $location->id,
+                    'project_id' => $location->project_id,
                     'task_id' => $task->id,
                     'created_at' => now(),
                     'updated_at' => now(),
@@ -78,13 +79,13 @@ final class FireActivityPlanFollowUps
         }
     }
 
-    private function reached(PlanExecution $execution, ActivityPlanFollowUp $followUp, ActivityPlanItem $item, Project $project): bool
+    private function reached(PlanExecution $execution, ActivityPlanFollowUp $followUp, ActivityPlanItem $item, ProposalLocation $location): bool
     {
-        $entries = collect($execution->entriesFor($project, $item));
+        $entries = collect($execution->entriesFor($location, $item));
 
         return match ($followUp->trigger) {
             FollowUpTrigger::Start => $entries->contains(fn (array $row): bool => $row['entry']->status->isActive()),
-            FollowUpTrigger::Finish => $execution->status($project, $item)['key'] === 'done',
+            FollowUpTrigger::Finish => $execution->status($location, $item)['key'] === 'done',
             FollowUpTrigger::Middle => ($first = $item->batches->first()) !== null && $entries->contains(fn (array $row): bool => $row['batch'] === $first->id
                 && $row['entry']->status->isActive()
                 && $row['week']->gte($first->start_week->addWeeks(intdiv(intdiv((int) $first->start_week->diffInDays($first->end_week), 7), 2)))),

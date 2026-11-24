@@ -22,4 +22,15 @@ return [
     'users_count' => '{0} لا يوجد مستخدمون|{1} مستخدم واحد|{2} مستخدمان|[3,10] :count مستخدمين|[11,*] :count مستخدمًا',
     'select_a_role' => 'اختر دورًا لإدارة صلاحياته.',
     'close' => 'إغلاق',
+    'names' => [
+        'super_admin' => 'المشرف العام',
+        'general_manager' => 'المدير العام',
+        'managers' => 'المدراء',
+        'meal' => 'المتابعة والتقييم',
+        'financial' => 'المالية',
+        'public_relations_manager' => 'مدير العلاقات العامة',
+        'public_relations' => 'العلاقات العامة',
+        'media_team' => 'فريق الإعلام',
+        'team_member' => 'عضو فريق',
+    ],
 ];

@@ -6,7 +6,7 @@ namespace App\Http\Controllers;
 
 use App\Models\ActivityPlan;
 use App\Models\PlanUpdate;
-use App\Models\Project;
+use App\Models\ProposalLocation;
 use App\Policies\PlanUpdatePolicy;
 use App\Support\CsvExport;
 use App\Support\PlanExecution;
@@ -20,22 +20,27 @@ class PlanUpdateExportController extends Controller
     /**
      * A monthly update for the donor: `pdf` is a plain page for the
      * browser's print-to-PDF, `xlsx` an Excel-readable CSV of both parts.
+     * The centre is a location row of the plan's proposal (Y-15); a row
+     * that is not one of the plan's centres answers 404 (BOLA).
      */
-    public function __invoke(Request $request, ActivityPlan $activityPlan, Project $project, string $month): View|StreamedResponse
+    public function __invoke(Request $request, ActivityPlan $activityPlan, ProposalLocation $location, string $month): View|StreamedResponse
     {
-        abort_unless(PlanUpdatePolicy::canRead($request->user(), $activityPlan, $project), 403);
+        abort_unless(PlanUpdatePolicy::canRead($request->user(), $activityPlan, $location), 403);
         abort_unless(preg_match('/^\d{4}-\d{2}$/', $month) === 1, 404);
+
+        $execution = PlanExecution::for($activityPlan);
+        abort_unless($execution->location($location->id) !== null, 404);
+        $location->loadMissing(['city', 'program', 'centers']);
 
         $monthStart = CarbonImmutable::createFromFormat('!Y-m', $month)->startOfMonth();
         $update = PlanUpdate::query()
-            ->where('activity_plan_id', $activityPlan->id)->where('project_id', $project->id)->where('month', $monthStart->toDateString())
+            ->where('activity_plan_id', $activityPlan->id)->where('proposal_location_id', $location->id)->where('month', $monthStart->toDateString())
             ->with(['weeks', 'numbers', 'files', 'questions.user'])
             ->firstOrFail();
-        $execution = PlanExecution::for($activityPlan);
-        $rows = $execution->batchesFor($project, $monthStart);
+        $rows = $execution->batchesFor($location, $monthStart);
 
         if ($request->query('format') !== 'xlsx') {
-            return view('pages.annual-plans._update-print', compact('activityPlan', 'project', 'monthStart', 'update', 'execution', 'rows'));
+            return view('pages.annual-plans._update-print', compact('activityPlan', 'location', 'monthStart', 'update', 'execution', 'rows'));
         }
 
         $lines = function () use ($update, $rows, $execution, $monthStart): iterable {
@@ -67,7 +72,7 @@ class PlanUpdateExportController extends Controller
         };
 
         return CsvExport::download(
-            str($project->name.'-'.$monthStart->format('Y-m'))->slug().'.csv',
+            str($location->label().'-'.$monthStart->format('Y-m'))->slug().'.csv',
             [__('annual_plans.wf.activity'), __('annual_plans.wf.batch_n', ['n' => '']), __('annual_plans.up.col_week'), __('annual_plans.up.col_status'), __('annual_plans.up.col_reason'), __('annual_plans.up.new_week')],
             $lines(),
         );
