@@ -1,6 +1,6 @@
 <?php
 
-use App\Actions\Targets\ScopeIndicatorToProject;
+use App\Actions\Targets\ScopeIndicatorToLocation;
 use App\Enums\ResultType;
 use App\Models\Activity;
 use App\Models\AnnualPlan;
@@ -24,8 +24,13 @@ beforeEach(function () {
     $this->actingAs($this->meal);
 
     $this->program = Program::factory()->create();
-    $this->project = projectWithRow(['program_id' => $this->program->id]);
-    $this->proposal = Proposal::factory()->create(['name' => 'Winter WASH Response']);
+    // Y-16, D-93: the tab reads the ONE proposal behind the row, so the
+    // framework hangs off that one rather than a pivot-linked extra.
+    $this->project = Project::factory()->create(['program_id' => $this->program->id]);
+    $this->row = rowFor($this->project);
+    $this->proposal = $this->row->proposal;
+    DB::table('proposals')->where('id', $this->proposal->id)->update(['name' => 'Winter WASH Response']);
+    $this->proposal->refresh();
     DB::table('project_proposal')->insert(['project_id' => $this->project->id, 'proposal_id' => $this->proposal->id]);
 
     $proposalNode = Result::factory()->create(['type' => ResultType::Output, 'program_id' => $this->program->id, 'proposal_id' => $this->proposal->id]);
@@ -42,7 +47,8 @@ function projectTargetsTab(User $user, Project $project): Testable
 
 function scopeIndicator(Project $project, Indicator $indicator): Indicator
 {
-    return app(ScopeIndicatorToProject::class)->handle($project, $indicator->id);
+    // Y-16: the page scopes an indicator to the row now.
+    return app(ScopeIndicatorToLocation::class)->handle(rowFor($project), $indicator->id);
 }
 
 test('the targets tab lists the indicators of its proposals and of its program framework', function () {
@@ -52,7 +58,7 @@ test('the targets tab lists the indicators of its proposals and of its program f
     ]);
     $elsewhere = Indicator::factory()->create([
         'result_id' => $this->programNode->id,
-        'project_id' => projectWithRow(['program_id' => $this->program->id])->id,
+        'proposal_location_id' => rowFor(Project::factory()->create(['program_id' => $this->program->id]))->id,
         'name' => 'Pumps repaired elsewhere',
     ]);
 
@@ -67,13 +73,14 @@ test('the targets tab lists the indicators of its proposals and of its program f
     expect($otherProgramIndicator->exists && $elsewhere->exists)->toBeTrue();
 });
 
-test('MEAL scopes a program-framework indicator to the project and it is logged', function () {
+test('MEAL scopes a program-framework indicator to the row and it is logged', function () {
     projectTargetsTab($this->meal, $this->project)
         ->call('scopeIndicator', $this->programIndicator->id)
         ->assertHasNoErrors()
         ->assertSee(__('projects.indicator_scoped_here'));
 
-    expect(DB::table('indicators')->where('id', $this->programIndicator->id)->value('project_id'))->toBe($this->project->id)
+    // Y-16, D-93: the scope is the row's; project_id is left as it was.
+    expect(DB::table('indicators')->where('id', $this->programIndicator->id)->value('proposal_location_id'))->toBe($this->row->id)
         ->and(Activity::query()->where('subject_type', 'indicator')->where('subject_id', $this->programIndicator->id)->exists())->toBeTrue();
 });
 
@@ -81,7 +88,7 @@ test('a project outside the result program is refused', function () {
     $outsider = projectWithRow(['program_id' => Program::factory()->create()->id]);
 
     expect(fn () => scopeIndicator($outsider, $this->programIndicator))->toThrow(ValidationException::class);
-    expect(DB::table('indicators')->where('id', $this->programIndicator->id)->value('project_id'))->toBeNull();
+    expect(DB::table('indicators')->where('id', $this->programIndicator->id)->value('proposal_location_id'))->toBeNull();
 });
 
 test('a proposal-framework indicator cannot be scoped from the project page', function () {

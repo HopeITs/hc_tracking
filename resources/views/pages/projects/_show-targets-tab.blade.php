@@ -36,7 +36,7 @@
                                                 {{ __('targets.not_linked_to_library') }}
                                             </span>
                                         @endif
-                                        @if ($indicator->project_id === $this->locationId)
+                                        @if ($indicator->proposal_location_id === $this->locationId)
                                             <span class="ms-auto inline-flex items-center gap-1 text-[11px] font-semibold text-secondary-medium dark:text-ink-muted">
                                                 <flux:icon.map-pin variant="micro" class="size-3" aria-hidden="true" />
                                                 {{ __('projects.indicator_scoped_here') }}

@@ -15,7 +15,6 @@ use App\Models\Risk;
 use App\Models\Task;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Collection;
-use Illuminate\Support\Facades\DB;
 use Livewire\Attributes\Computed;
 
 /**
@@ -156,13 +155,14 @@ trait ReadsProjectDelivery
         $programId = $this->location->program_id;
 
         $indicators = Indicator::query()
-            ->select(['id', 'name', 'code', 'result_id', 'library_indicator_id', 'project_id', 'measure', 'unit'])
+            ->select(['id', 'name', 'code', 'result_id', 'library_indicator_id', 'project_id', 'proposal_location_id', 'measure', 'unit'])
             ->whereIn('result_id', Result::query()
                 ->select('id')
                 ->where(fn (Builder $query): Builder => $query
                     ->whereIn('proposal_id', $proposalIds)
                     ->orWhere(fn (Builder $programFramework): Builder => $programFramework->whereNull('proposal_id')->where('program_id', $programId ?? 0))))
-            ->where(fn (Builder $query): Builder => $query->whereNull('project_id')->orWhere('project_id', $this->locationId))
+            // An instance is unscoped, or scoped to this row (Y-16, D-93).
+            ->where(fn (Builder $query): Builder => $query->whereNull('proposal_location_id')->orWhere('proposal_location_id', $this->locationId))
             ->with([
                 'result:id,statement,type,proposal_id,program_id',
                 'result.proposal:id,name,slug',

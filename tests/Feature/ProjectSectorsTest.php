@@ -229,11 +229,15 @@ describe('the project form', function () {
 
 describe('display', function () {
     it('shows the sector chips on the project page, with the inactive badge', function () {
+        // Y-11, Y-16: sectors live on the row (proposal_location_sector), and
+        // the page reads them there; the project keeps its own until Y-18.
         $project = projectWithRow();
-        $project->sectors()->attach([
+        $sectorIds = [
             Sector::factory()->create(['name_en' => 'Protection', 'sort_order' => 1])->id,
             Sector::factory()->inactive()->create(['name_en' => 'Old sector', 'sort_order' => 2])->id,
-        ]);
+        ];
+        $project->sectors()->attach($sectorIds);
+        rowFor($project)->sectors()->attach($sectorIds);
 
         $this->actingAs(userWithRole('Team Member'))->get(route('projects.show', rowFor($project)))
             ->assertOk()
