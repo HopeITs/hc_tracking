@@ -8,15 +8,15 @@ use App\Models\ActivityPlan;
 use App\Models\Program;
 use App\Models\Proposal;
 use App\Models\User;
-use App\Support\ProposalFramework;
+use App\Support\ActivityPlanScope;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Validation\ValidationException;
 
 /**
  * Start the annual plan of one program in one proposal (step 1 of the
- * workflow). The program must run in the proposal (one of its centres'
- * programs) and the user must plan for it. One plan per proposal and
+ * workflow). The program must run in the proposal (the program of one of
+ * its location rows, Y-15) and the user must plan for it. One plan per proposal and
  * program: an existing one is returned instead of a second.
  */
 final class CreateActivityPlan
@@ -27,7 +27,7 @@ final class CreateActivityPlan
         $program = Program::query()->select(['id', 'manager_id'])->findOrFail($programId);
         Gate::forUser($user)->authorize('create', [ActivityPlan::class, $program]);
 
-        if (! in_array($program->id, ProposalFramework::programIds($proposal), true)) {
+        if (! in_array($program->id, ActivityPlanScope::programIdsOf($proposal), true)) {
             throw ValidationException::withMessages(['program' => __('annual_plans.program_not_in_proposal')]);
         }
 

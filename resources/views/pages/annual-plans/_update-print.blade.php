@@ -3,7 +3,7 @@
 <html lang="{{ app()->getLocale() }}" dir="{{ app()->getLocale() === 'ar' ? 'rtl' : 'ltr' }}">
 <head>
     <meta charset="utf-8">
-    <title>{{ $project->name }} · {{ $monthStart->translatedFormat('F Y') }}</title>
+    <title>{{ $location->label() }} · {{ $monthStart->translatedFormat('F Y') }}</title>
     <style>
         body { font-family: "Somar Sans", Tahoma, sans-serif; color: #232427; margin: 24px; font-size: 13px; line-height: 1.5; }
         h1 { font-size: 20px; margin: 0 0 4px; } h2 { font-size: 15px; margin: 18px 0 6px; border-bottom: 1px solid #dcddde; padding-bottom: 4px; }
@@ -14,7 +14,7 @@
 </head>
 <body>
     <p class="no-print"><button onclick="window.print()">{{ __('annual_plans.up.export_pdf') }}</button></p>
-    <h1>{{ $project->name }} · {{ $monthStart->translatedFormat('F Y') }}</h1>
+    <h1>{{ $location->label() }} · {{ $monthStart->translatedFormat('F Y') }}</h1>
     <p class="muted">{{ $activityPlan->proposal->name }} · {{ $activityPlan->program?->name }} · {{ $update->status->label() }}</p>
 
     <h2>{{ __('annual_plans.up.part1') }}</h2>

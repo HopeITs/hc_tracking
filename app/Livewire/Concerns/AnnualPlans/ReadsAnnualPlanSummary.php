@@ -7,8 +7,9 @@ namespace App\Livewire\Concerns\AnnualPlans;
 use App\Enums\Period;
 use App\Enums\ReportStatus;
 use App\Models\AnnualPlan;
+use App\Models\HrCenter;
+use App\Models\HrCity;
 use App\Models\PlanIndicator;
-use App\Models\Project;
 use App\Models\Report;
 use App\Models\Result;
 use App\Support\ResultsChain;
@@ -19,7 +20,7 @@ use Livewire\Attributes\Computed;
 /**
  * The annual plan detail page's readings: the targets committed in the plan,
  * the report status counts, the headline summary, the result groups, the
- * period mix, the linked projects and the recent reports.
+ * period mix, the places the targets are for and the recent reports.
  *
  * Used by annual-plans/show only. The page provides the locked
  * $annualPlanId; every reading after targets() is built from the memoised
@@ -36,8 +37,9 @@ trait ReadsAnnualPlanSummary
 {
     /**
      * The targets committed in this plan, with everything the page reads to
-     * draw the logframe connection (result → indicator → project) and the
-     * reporting signal on each one.
+     * draw the logframe connection (result → indicator → place) and the
+     * reporting signal on each one. A target's place is its Y-08 columns
+     * (city, program, centre or field work), not its project (Y-15).
      *
      * Filtered on the morph map key 'annual_plan', never a class name: the
      * column is VARCHAR(50) and the map is enforced application-wide.
@@ -48,14 +50,12 @@ trait ReadsAnnualPlanSummary
     public function targets(): Collection
     {
         return PlanIndicator::query()
-            ->select(['id', 'source_type', 'source_id', 'indicator_id', 'target', 'project_id', 'period'])
+            ->select(['id', 'source_type', 'source_id', 'indicator_id', 'target', 'project_id', 'city_id', 'program_id', 'center_id', 'city_wide', 'all_centers', 'period'])
             ->where('source_type', 'annual_plan')
             ->where('source_id', $this->annualPlanId)
             ->with([
                 'indicator:id,name,result_id,measure',
                 'indicator.result:id,statement,type',
-                'project:id,name,city_id',
-                'project.city:id,name_en,name_ar',
             ])
             ->withCount('reports')
             ->get();
@@ -117,8 +117,8 @@ trait ReadsAnnualPlanSummary
 
         return [
             'targets' => $targets->count(),
-            'projects' => $targets->pluck('project_id')->filter()->unique()->count(),
-            'orgWide' => $targets->whereNull('project_id')->count(),
+            'projects' => $this->linkedPlaces->count(),
+            'orgWide' => $targets->whereNull('city_id')->count(),
             'results' => $targets->pluck('indicator.result_id')->filter()->unique()->count(),
             'reported' => $reported,
             'unreported' => $targets->count() - $reported,
@@ -192,20 +192,36 @@ trait ReadsAnnualPlanSummary
     }
 
     /**
-     * The distinct projects this plan's targets are attributed to, for the
-     * connections panel. Org-wide targets (no project) are excluded — they
-     * are already surfaced as their own figure in the plan pulse.
+     * The distinct places this plan's targets are for, for the connections
+     * panel (Y-15: a target's place, not its project). Org-wide targets (no
+     * place) are excluded: they are already their own figure in the plan
+     * pulse. A place is named by its centre, else "Field work" or "Center not
+     * set", with its city. Cities come from HR in one query; centres from the
+     * remembered HR lookup.
      *
-     * @return SupportCollection<int, Project>
+     * @return SupportCollection<int, array{key: string, name: string, city: string}>
      */
     #[Computed]
-    public function linkedProjects(): SupportCollection
+    public function linkedPlaces(): SupportCollection
     {
-        return $this->targets
-            ->pluck('project')
-            ->filter()
-            ->unique('id')
-            ->sortBy('name')
+        $placed = $this->targets->filter(fn (PlanIndicator $target): bool => $target->city_id !== null);
+        $cities = $placed->isEmpty() ? collect() : HrCity::query()
+            ->whereKey($placed->pluck('city_id')->unique()->values()->all())
+            ->get(['id', 'name_en', 'name_ar'])
+            ->keyBy('id');
+
+        return $placed
+            ->map(fn (PlanIndicator $target): array => [
+                'key' => implode(':', [$target->city_id, $target->program_id, $target->center_id ?? ($target->city_wide ? 'field' : ($target->all_centers ? 'all' : 'unset'))]),
+                'name' => match (true) {
+                    $target->center_id !== null => (string) (HrCenter::remembered((int) $target->center_id)->name ?? __('monthly_reports.place_center_not_set')),
+                    $target->city_wide => (string) __('monthly_reports.place_field_work'),
+                    default => (string) __('monthly_reports.place_center_not_set'),
+                },
+                'city' => (string) ($cities->get($target->city_id)->name ?? __('common.unknown_city')),
+            ])
+            ->unique('key')
+            ->sortBy(fn (array $place): string => $place['city'].' '.$place['name'], SORT_NATURAL | SORT_FLAG_CASE)
             ->values();
     }
 

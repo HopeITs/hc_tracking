@@ -28,8 +28,8 @@ use Illuminate\Support\Facades\DB;
  * template's place, Y-15) and
  * the month lies inside its proposal's schedule window, when its last status
  * confirmed by an earlier month is not final (not started, started, ongoing,
- * suspended), or when this report already has an entry for it. The confirmed
- * statuses stay keyed by the report's legacy project until Y-15 slice 2. Queries stay constant whatever the
+ * suspended), or when this report already has an entry for it. Both the
+ * calendar and the confirmed statuses are read at that row (Y-15). Queries stay constant whatever the
  * number of activities.
  */
 final class MonthlyReportActivities
@@ -42,7 +42,6 @@ final class MonthlyReportActivities
     public static function for(MonthlyReport $report): Collection
     {
         $month = CarbonImmutable::parse($report->period)->startOfMonth();
-        $projectId = $report->project_id;
 
         $proposals = self::proposalsOf($report);
         $proposalIds = $proposals->keys()->all();
@@ -70,7 +69,7 @@ final class MonthlyReportActivities
 
         /** @var Collection<int, ProjectActivityStatus> $statuses */
         $statuses = ProjectActivityStatus::query()
-            ->where('project_id', $projectId)
+            ->whereIn('proposal_location_id', array_values($locationIds))
             ->whereIn('result_id', $activityIds)
             ->with('monthlyReport:id,period')
             ->get()

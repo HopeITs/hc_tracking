@@ -714,8 +714,11 @@ test('planned weeks and the carry-over badges are shown', function () {
     mrsSchedule($scheduled, '2026-12-01', [2, 3]);
     $continuing = mrsActivity($project, statement: 'Continuing activity');
     $late = mrsActivity($project, statement: 'Late activity');
-    ProjectActivityStatus::query()->create(['project_id' => $project->id, 'result_id' => $continuing->id, 'status' => ActivityStatus::Ongoing, 'monthly_report_id' => $november->id]);
-    ProjectActivityStatus::query()->create(['project_id' => $project->id, 'result_id' => $late->id, 'status' => ActivityStatus::NotStarted, 'monthly_report_id' => $november->id]);
+    // Statuses sit on the activity's proposal's row at the template's place (Y-15).
+    $row = ProposalLocation::query()->where('proposal_id', $continuing->proposal_id)->where('project_id', $project->id)->first()
+        ?? proposalRowForProject(Proposal::query()->findOrFail($continuing->proposal_id), $project, false);
+    ProjectActivityStatus::query()->create(['project_id' => $project->id, 'proposal_location_id' => $row->id, 'result_id' => $continuing->id, 'status' => ActivityStatus::Ongoing, 'monthly_report_id' => $november->id]);
+    ProjectActivityStatus::query()->create(['project_id' => $project->id, 'proposal_location_id' => $row->id, 'result_id' => $late->id, 'status' => ActivityStatus::NotStarted, 'monthly_report_id' => $november->id]);
 
     mrsPage($report)
         ->assertSeeText(trans_choice('monthly_reports.planned_weeks', 2, ['weeks' => '2'.__('monthly_reports.weeks_and').'3']))

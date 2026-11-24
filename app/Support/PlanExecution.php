@@ -11,13 +11,14 @@ use App\Models\ActivityPlanBatch;
 use App\Models\ActivityPlanItem;
 use App\Models\PlanUpdate;
 use App\Models\PlanUpdateWeek;
-use App\Models\Project;
+use App\Models\ProposalLocation;
 use Carbon\CarbonImmutable;
 use Illuminate\Support\Collection;
 
 /**
  * How an approved plan is being carried out (2026-11-11 agreement): its
- * centres, the monthly updates sent for them, and, per centre and month,
+ * centres (location rows of the plan's proposal, Y-15, D-93), the monthly
+ * updates sent for them, and, per centre and month,
  * which batches the update covers, whether it can be sent, and what each
  * activity's status is. Reads the plan once; every answer is in memory.
  *
@@ -29,22 +30,22 @@ final class PlanExecution
 {
     public readonly PlanCalendar $calendar;
 
-    /** @var list<Project> */
-    private array $projects;
+    /** @var list<ProposalLocation> */
+    private array $locations;
 
-    /** @var Collection<string, PlanUpdate> keyed "projectId|Y-m" */
+    /** @var Collection<string, PlanUpdate> keyed "locationId|Y-m" */
     private Collection $updates;
 
     public function __construct(public readonly ActivityPlan $plan)
     {
         $plan->loadMissing(['proposal', 'items.activity:id,statement', 'items.batches', 'items.cities']);
         $this->calendar = PlanCalendar::forProposal($plan->proposal);
-        $this->projects = ActivityPlanScope::projects($plan);
+        $this->locations = ActivityPlanScope::locations($plan);
         $this->updates = PlanUpdate::query()
             ->where('activity_plan_id', $plan->id)
             ->with(['weeks', 'numbers'])
             ->get()
-            ->keyBy(fn (PlanUpdate $update): string => $update->project_id.'|'.$update->month->format('Y-m'));
+            ->keyBy(fn (PlanUpdate $update): string => $update->proposal_location_id.'|'.$update->month->format('Y-m'));
     }
 
     public static function for(ActivityPlan $plan): self
@@ -55,18 +56,22 @@ final class PlanExecution
     /**
      * The plan's centres that run at least one of its activities.
      *
-     * @return list<Project>
+     * @return list<ProposalLocation>
      */
-    public function projects(): array
+    public function locations(): array
     {
-        return array_values(array_filter($this->projects, fn (Project $project): bool => $this->itemsFor($project) !== []));
+        return array_values(array_filter($this->locations, fn (ProposalLocation $location): bool => $this->itemsFor($location) !== []));
     }
 
-    public function project(int $projectId): ?Project
+    /**
+     * One of the plan's centres, or null when the row is not one of them
+     * (another proposal's row or another program's).
+     */
+    public function location(int $locationId): ?ProposalLocation
     {
-        foreach ($this->projects as $project) {
-            if ($project->id === $projectId) {
-                return $project;
+        foreach ($this->locations as $location) {
+            if ($location->id === $locationId) {
+                return $location;
             }
         }
 
@@ -78,9 +83,9 @@ final class PlanExecution
      *
      * @return list<ActivityPlanItem>
      */
-    public function itemsFor(Project $project): array
+    public function itemsFor(ProposalLocation $location): array
     {
-        $cityId = MealCoverage::cityIdOf($project);
+        $cityId = $location->city_id;
 
         return array_values($this->plan->items->filter(fn (ActivityPlanItem $item): bool => in_array($cityId, $item->cityIds(), true))->all());
     }
@@ -97,13 +102,13 @@ final class PlanExecution
         return array_values(array_filter($this->calendar->months(), fn (CarbonImmutable $month): bool => $month->lte($today)));
     }
 
-    public function update(Project $project, CarbonImmutable $month): ?PlanUpdate
+    public function update(ProposalLocation $location, CarbonImmutable $month): ?PlanUpdate
     {
-        return $this->updates->get($project->id.'|'.$month->format('Y-m'));
+        return $this->updates->get($location->id.'|'.$month->format('Y-m'));
     }
 
     /**
-     * Every update of the plan, keyed "projectId|Y-m".
+     * Every update of the plan, keyed "locationId|Y-m".
      *
      * @return Collection<string, PlanUpdate>
      */
@@ -119,7 +124,7 @@ final class PlanExecution
      *
      * @return list<array{item: ActivityPlanItem, batch: ActivityPlanBatch, index: int}>
      */
-    public function batchesFor(Project $project, CarbonImmutable $month): array
+    public function batchesFor(ProposalLocation $location, CarbonImmutable $month): array
     {
         $mondays = $this->calendar->mondaysOf($month);
 
@@ -130,11 +135,11 @@ final class PlanExecution
         $previous = $mondays[0]->subWeek();
         $rows = [];
 
-        foreach ($this->itemsFor($project) as $item) {
+        foreach ($this->itemsFor($location) as $item) {
             foreach ($item->batches->values() as $index => $batch) {
                 $planned = array_filter($mondays, fn (CarbonImmutable $monday): bool => $monday->betweenIncluded($batch->start_week, $batch->end_week)) !== [];
-                $carried = in_array($this->entry($project, $batch, $previous)?->status, [PlanWeekStatus::Started, PlanWeekStatus::Ongoing, PlanWeekStatus::Suspended, PlanWeekStatus::Rescheduled, PlanWeekStatus::NotStarted], true);
-                $movedIn = $this->movedInto($project, $batch, $mondays);
+                $carried = in_array($this->entry($location, $batch, $previous)?->status, [PlanWeekStatus::Started, PlanWeekStatus::Ongoing, PlanWeekStatus::Suspended, PlanWeekStatus::Rescheduled, PlanWeekStatus::NotStarted], true);
+                $movedIn = $this->movedInto($location, $batch, $mondays);
 
                 if ($planned || $carried || $movedIn) {
                     $rows[] = ['item' => $item, 'batch' => $batch, 'index' => $index];
@@ -148,9 +153,9 @@ final class PlanExecution
     /**
      * What a centre reported for a batch in one week, from a sent update.
      */
-    public function entry(Project $project, ActivityPlanBatch $batch, CarbonImmutable $monday): ?PlanUpdateWeek
+    public function entry(ProposalLocation $location, ActivityPlanBatch $batch, CarbonImmutable $monday): ?PlanUpdateWeek
     {
-        $update = $this->update($project, $monday->startOfMonth());
+        $update = $this->update($location, $monday->startOfMonth());
 
         if ($update === null || ! $update->status->isOnThePlan()) {
             return null;
@@ -165,7 +170,7 @@ final class PlanExecution
      *
      * @return list<string>
      */
-    public function sendBlockers(Project $project, CarbonImmutable $month, ?CarbonImmutable $today = null): array
+    public function sendBlockers(ProposalLocation $location, CarbonImmutable $month, ?CarbonImmutable $today = null): array
     {
         $today ??= CarbonImmutable::today();
         $reasons = [];
@@ -179,7 +184,7 @@ final class PlanExecution
         $position = array_search($month->format('Y-m'), array_map(fn (CarbonImmutable $value): string => $value->format('Y-m'), $months), true);
 
         if ($position !== false && $position > 0) {
-            $previous = $this->update($project, $months[$position - 1]);
+            $previous = $this->update($location, $months[$position - 1]);
 
             if ($previous === null || ! $previous->status->isOfficerApproved()) {
                 $reasons[] = __('annual_plans.up.blocked_previous', ['month' => $months[$position - 1]->translatedFormat('F')]);
@@ -194,13 +199,13 @@ final class PlanExecution
      *
      * @return list<array{batch: int, week: CarbonImmutable, entry: PlanUpdateWeek}>
      */
-    public function entriesFor(Project $project, ActivityPlanItem $item): array
+    public function entriesFor(ProposalLocation $location, ActivityPlanItem $item): array
     {
         $batchIds = $item->batches->pluck('id')->all();
         $entries = [];
 
         foreach ($this->updates as $update) {
-            if ($update->project_id !== $project->id || ! $update->status->isOnThePlan()) {
+            if ($update->proposal_location_id !== $location->id || ! $update->status->isOnThePlan()) {
                 continue;
             }
 
@@ -219,12 +224,12 @@ final class PlanExecution
     /**
      * The last Monday a centre has reported, through its sent updates; null when none.
      */
-    public function lastReportedMonday(Project $project): ?CarbonImmutable
+    public function lastReportedMonday(ProposalLocation $location): ?CarbonImmutable
     {
         $last = null;
 
         foreach ($this->updates as $update) {
-            if ($update->project_id === $project->id && $update->status->isOnThePlan()) {
+            if ($update->proposal_location_id === $location->id && $update->status->isOnThePlan()) {
                 $mondays = $this->calendar->mondaysOf($update->month);
                 $end = $mondays === [] ? null : $mondays[count($mondays) - 1];
 
@@ -244,10 +249,10 @@ final class PlanExecution
      *
      * @return array{key: string, weeks: int}
      */
-    public function status(Project $project, ActivityPlanItem $item): array
+    public function status(ProposalLocation $location, ActivityPlanItem $item): array
     {
-        $entries = $this->entriesFor($project, $item);
-        $last = $this->lastReportedMonday($project);
+        $entries = $this->entriesFor($location, $item);
+        $last = $this->lastReportedMonday($location);
 
         if (collect($entries)->contains(fn (array $row): bool => $row['entry']->status === PlanWeekStatus::Cancelled)) {
             return ['key' => 'cancelled', 'weeks' => 0];
@@ -288,13 +293,13 @@ final class PlanExecution
     /**
      * Units held for an activity in a centre, from sent updates.
      */
-    public function held(Project $project, ActivityPlanItem $item): int
+    public function held(ProposalLocation $location, ActivityPlanItem $item): int
     {
         $batchIds = $item->batches->pluck('id')->all();
         $total = 0;
 
         foreach ($this->updates as $update) {
-            if ($update->project_id === $project->id && $update->status->isOnThePlan()) {
+            if ($update->proposal_location_id === $location->id && $update->status->isOnThePlan()) {
                 $total += (int) $update->numbers->whereIn('activity_plan_batch_id', $batchIds)->sum('done_count');
             }
         }
@@ -305,9 +310,9 @@ final class PlanExecution
     /**
      * Units the plan expected by the last reported week, pro rata per batch.
      */
-    public function plannedToDate(Project $project, ActivityPlanItem $item): int
+    public function plannedToDate(ProposalLocation $location, ActivityPlanItem $item): int
     {
-        $last = $this->lastReportedMonday($project);
+        $last = $this->lastReportedMonday($location);
 
         if ($last === null) {
             return 0;
@@ -336,20 +341,20 @@ final class PlanExecution
      */
     public function isDoneEverywhere(ActivityPlanItem $item): bool
     {
-        $projects = array_filter($this->projects(), fn (Project $project): bool => in_array(MealCoverage::cityIdOf($project), $item->cityIds(), true));
+        $locations = array_filter($this->locations(), fn (ProposalLocation $location): bool => in_array($location->city_id, $item->cityIds(), true));
 
-        return $projects !== [] && array_filter($projects, fn (Project $project): bool => $this->status($project, $item)['key'] !== 'done') === [];
+        return $locations !== [] && array_filter($locations, fn (ProposalLocation $location): bool => $this->status($location, $item)['key'] !== 'done') === [];
     }
 
     /**
      * @param  list<CarbonImmutable>  $mondays
      */
-    private function movedInto(Project $project, ActivityPlanBatch $batch, array $mondays): bool
+    private function movedInto(ProposalLocation $location, ActivityPlanBatch $batch, array $mondays): bool
     {
         $keys = array_map(fn (CarbonImmutable $monday): string => $monday->toDateString(), $mondays);
 
         foreach ($this->updates as $update) {
-            if ($update->project_id !== $project->id || ! $update->status->isOnThePlan()) {
+            if ($update->proposal_location_id !== $location->id || ! $update->status->isOnThePlan()) {
                 continue;
             }
 

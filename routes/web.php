@@ -101,12 +101,12 @@ Route::middleware(['auth', EnsureTwoFactorIsEnabled::class])->group(function () 
         ->can('annual-plans.view')
         ->name('activity-plans.export');
 
-    Route::livewire('annual-plans/{activityPlan}/updates/{project}/{month}', 'pages::annual-plans.update')
+    Route::livewire('annual-plans/{activityPlan}/updates/{location}/{month}', 'pages::annual-plans.update')
         ->can('annual-plans.view')
         ->where('month', '\d{4}-\d{2}')
         ->name('plan-updates.show');
 
-    Route::get('annual-plans/{activityPlan}/updates/{project}/{month}/export', PlanUpdateExportController::class)
+    Route::get('annual-plans/{activityPlan}/updates/{location}/{month}/export', PlanUpdateExportController::class)
         ->can('annual-plans.view')
         ->where('month', '\d{4}-\d{2}')
         ->name('plan-updates.export');
