@@ -325,6 +325,17 @@ class ProposalLocation extends Model
     }
 
     /**
+     * Whether the employee responsible for this row has rejected the
+     * appointment, which blocks every change to it (Y-16, D-93).
+     *
+     * The twin of `Project::isOwnerRejected()`, on the row's own assignment.
+     */
+    public function isOwnerRejected(): bool
+    {
+        return $this->ownerAssignment?->status === AssignmentStatus::Rejected;
+    }
+
+    /**
      * Whether the row's non-report work is paused (D-66, W-02): one of its
      * own centers exists and HR has deactivated it. A city-wide row has no
      * center and is never paused. Needs `centers` loaded.
