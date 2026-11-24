@@ -270,13 +270,21 @@ class Indicator extends Model implements TracksActivity
     }
 
     /**
-     * The program of its result, else of its project.
+     * The program of its result, else of its location row (Y-16, D-93).
+     *
+     * The project answers only while a row has not taken over — an instance
+     * the Y-16 backfill could not map (D-80). Y-18 drops that fallback.
      */
     public function activityProgramId(): ?int
     {
         $programId = Result::query()->whereKey($this->activityAttribute('result_id'))->value('program_id');
 
-        return $programId !== null ? (int) $programId : Project::programIdFor($this->activityAttribute('project_id'));
+        if ($programId !== null) {
+            return (int) $programId;
+        }
+
+        return ProposalLocation::programIdFor($this->activityAttribute('proposal_location_id'))
+            ?? Project::programIdFor($this->activityAttribute('project_id'));
     }
 
     /**
@@ -295,12 +303,17 @@ class Indicator extends Model implements TracksActivity
     }
 
     /**
-     * The project owner, remembered for the deleted event.
+     * The responsible of its location row, remembered for the deleted event
+     * (Y-16, D-93). The project owner answers only while a row has not taken
+     * over (D-80); Y-18 drops that fallback.
      *
      * @return array<string, mixed>
      */
     protected function activityPropertiesBeforeDelete(): array
     {
-        return ['employee_ids' => array_filter([Project::ownerEmployeeIdFor($this->activityAttribute('project_id'))])];
+        $employeeId = ProposalLocation::ownerEmployeeIdFor($this->activityAttribute('proposal_location_id'))
+            ?? Project::ownerEmployeeIdFor($this->activityAttribute('project_id'));
+
+        return ['employee_ids' => array_filter([$employeeId])];
     }
 }
