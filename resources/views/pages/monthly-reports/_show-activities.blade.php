@@ -9,12 +9,20 @@
     $chip = 'inline-flex cursor-pointer items-center gap-1 rounded-full border border-secondary-light px-3 py-1 text-xs font-semibold text-secondary-dark hover:bg-secondary-soft has-checked:border-transparent has-checked:bg-secondary-dark has-checked:text-white has-focus-visible:ring-2 has-focus-visible:ring-secondary-light dark:border-line-strong dark:text-ink dark:hover:bg-white/[0.06] dark:has-checked:bg-ink dark:has-checked:text-surface-0';
     $reasonStatuses = ['not_started', 'suspended', 'cancelled'];
     $dateFields = ['started' => 'started_on', 'completed' => 'completed_on', 'conducted' => 'executed_on'];
+    $statusTone = fn (?ActivityStatus $status): string => match ($status) {
+        ActivityStatus::Completed, ActivityStatus::Conducted => 'done',
+        ActivityStatus::Started, ActivityStatus::Ongoing => 'going',
+        ActivityStatus::Suspended, ActivityStatus::Cancelled, ActivityStatus::NotStarted => 'stopped',
+        null => 'none',
+    };
+    $statusIcon = ['done' => 'check', 'going' => 'arrow-path', 'stopped' => 'pause', 'none' => 'minus'];
+    $longDate = fn (?string $date): ?string => $date === null ? null : \Carbon\CarbonImmutable::parse($date)->translatedFormat(__('formats.date'));
     $preferred = [ActivityStatus::Started, ActivityStatus::Ongoing, ActivityStatus::Completed, ActivityStatus::Conducted, ActivityStatus::NotStarted, ActivityStatus::Suspended, ActivityStatus::Cancelled];
 @endphp
 
 <section aria-labelledby="monthly-report-activities-heading" class="flex flex-col gap-3" data-monthly-report-activities>
     <div>
-        <h2 id="monthly-report-activities-heading" class="text-base font-bold">{{ __('monthly_reports.activities_this_month') }}</h2>
+        <h2 id="monthly-report-activities-heading" class="mrp-h2">{{ __('monthly_reports.activities_this_month') }}@if ($activities !== []) <span class="mrp-count">{{ count($activities) }}</span>@endif</h2>
         @if ($fillsNarrative && $activities !== [])
             <p class="type-meta {{ $mutedText }}">{{ __('monthly_reports.activities_help') }}</p>
         @endif
@@ -23,7 +31,8 @@
     @if ($activities === [])
         @include('pages.monthly-reports._show-empty-line', ['key' => 'activities', 'icon' => 'calendar-days', 'heading' => __('monthly_reports.no_activities'), 'body' => __('monthly_reports.no_activities_body')])
     @else
-        <ol class="flex flex-col border-t border-secondary-soft dark:border-line" role="list">
+        {{-- Read only: a two-column grid of short cards; while filling, one stacked card with room for the inputs. --}}
+        <ol class="{{ $fillsNarrative ? 'mrp-stack' : 'mrp-act-grid' }}" role="list">
             @foreach ($activities as $activity)
                 @php
                     $key = 'activityEntries.'.$activity['id'];
@@ -38,10 +47,15 @@
                     $noteOpen = filled($state['note'] ?? '') || $errors->has($key.'.note');
                 @endphp
 
-                <li class="flex flex-col gap-3 border-b border-secondary-soft py-4 dark:border-line" wire:key="activity-{{ $activity['id'] }}" data-activity="{{ $activity['id'] }}">
+                @php($tone = $statusTone($activity['status']))
+                <li class="mrp-act mrp-act-{{ $tone }}" wire:key="activity-{{ $activity['id'] }}" data-activity="{{ $activity['id'] }}">
+                    @unless ($fillsNarrative)
+                        <span class="mrp-act-mark" aria-hidden="true"><flux:icon :name="$statusIcon[$tone]" variant="micro" class="size-4" /></span>
+                    @endunless
+                    <div class="mrp-act-body">
                     <div class="flex flex-wrap items-start justify-between gap-x-6 gap-y-3">
                         <div class="min-w-0 flex-1 basis-64">
-                            <p class="font-semibold" dir="auto">{{ $activity['statement'] }}</p>
+                            <p class="mrp-act-title" dir="auto">{{ $activity['statement'] }}</p>
                             @if ($activity['proposal'] !== null)
                                 <p class="type-meta {{ $mutedText }}" dir="auto" data-activity-proposal="{{ $activity['id'] }}">{{ $activity['proposal'] }}</p>
                             @endif
@@ -86,7 +100,7 @@
                                 @endif
                             </div>
                         @elseif ($activity['status'] !== null)
-                            <x-ui.enum-badge :case="$activity['status']" />
+                            <span class="mrp-pill mrp-pill-{{ $tone }}" data-activity-status="{{ $activity['status']->value }}">{{ $activity['status']->label() }}</span>
                         @else
                             <span class="text-sm {{ $mutedText }}">{{ __('monthly_reports.no_status_yet') }}</span>
                         @endif
@@ -134,21 +148,22 @@
                             <p class="text-xs text-status-critical">{{ $message }}</p>
                         @enderror
                     @else
-                        @if (filled($activity['reason']))
-                            <p class="text-sm" dir="auto">{{ $activity['reason'] }}</p>
+                        {{-- Read only: dates on one line, then the reason and note as plain text, never clickable. --}}
+                        @php($shownDates = array_filter(array_map(fn (string $field): ?string => $activity[$field] === null ? null : __('monthly_reports.'.$field).' '.$longDate($activity[$field]), $dateFields)))
+                        @if ($shownDates !== [])
+                            <p class="mrp-act-meta tabular-nums">{{ implode(' · ', $shownDates) }}</p>
                         @endif
-                        @foreach ($dateFields as $dateField)
-                            @if ($activity[$dateField] !== null)
-                                <p class="text-xs {{ $mutedText }}">{{ __('monthly_reports.'.$dateField) }}: <bdi dir="ltr" class="tabular-nums">{{ $activity[$dateField] }}</bdi></p>
-                            @endif
+                        @foreach (array_filter(['reason' => $activity['reason'], 'note' => $activity['note']], 'filled') as $textKind => $text)
+                            <p @class(['mrp-act-text', 'mrp-act-text-reason' => $textKind === 'reason'])>
+                                <b>{{ __('monthly_reports.activity_'.$textKind) }}</b>
+                                <span class="whitespace-pre-line" dir="auto">{{ $text }}</span>
+                            </p>
                         @endforeach
-                        @if (filled($activity['note']))
-                            <p class="text-sm whitespace-pre-line {{ $mutedText }}" dir="auto">{{ $activity['note'] }}</p>
-                        @endif
                         @if ($activity['files'] !== [])
                             <x-monthly-reports.files-cell :files="$activity['files']" :entry-id="$activity['entry_id']" :label="$activity['statement']" />
                         @endif
                     @endif
+                    </div>
                 </li>
             @endforeach
         </ol>

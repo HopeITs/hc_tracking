@@ -70,7 +70,7 @@ final class SaveProposal
      * are ignored entirely for a user who may not see money. `locations`, when
      * sent, replaces the rows (a fill only once approved); an edit that omits it leaves them alone.
      *
-     * @param  array{kind?: ?string, name: string, donorId: int|string|null, narrative?: ?string, projectIds?: list<int|string>, locations?: list<array{city_id: int|string|null, program_id?: int|string|null, responsible_employee_id?: int|string|null, center_ids?: list<int|string>, is_new?: bool|int|string|null, city_wide?: bool|int|string|null, new_program_name_en?: ?string, new_program_name_ar?: ?string}>, beneficiaries?: array<int|string, int|string|null>, beneficiariesReason?: ?string, requestedBudget?: string|int|float|null, requestedCurrency?: ?string, plannedDateBegin: ?string, plannedDateEnd: ?string, notes?: ?string, conceptNote?: ?string, startingStage?: string, skipReason?: ?string, previousProposalId?: int|null}  $data
+     * @param  array{kind?: ?string, name: string, donorId: int|string|null, mainPartnerId?: int|string|null, partnerIds?: list<int|string>, narrative?: ?string, projectIds?: list<int|string>, locations?: list<array{city_id: int|string|null, program_id?: int|string|null, responsible_employee_id?: int|string|null, center_ids?: list<int|string>, is_new?: bool|int|string|null, city_wide?: bool|int|string|null, new_program_name_en?: ?string, new_program_name_ar?: ?string}>, beneficiaries?: array<int|string, int|string|null>, beneficiariesReason?: ?string, requestedBudget?: string|int|float|null, requestedCurrency?: ?string, plannedDateBegin: ?string, plannedDateEnd: ?string, notes?: ?string, conceptNote?: ?string, startingStage?: string, skipReason?: ?string, previousProposalId?: int|null}  $data
      */
     public function handle(?Proposal $existing, array $data, User $actor): Proposal
     {
@@ -103,6 +103,7 @@ final class SaveProposal
             );
             $proposal->previous_proposal_id = isset($input['previousProposalId']) ? (int) $input['previousProposalId'] : null;
             $proposal->save();
+            $this->savePartners($proposal, $input, $actor);
 
             ProposalStatusNote::query()->create([
                 'proposal_id' => $proposal->id,
@@ -162,6 +163,7 @@ final class SaveProposal
 
             $this->fillDetails($locked, $input, $actor);
             $locked->save();
+            $this->savePartners($locked, $input, $actor);
 
             foreach ($changes as $change) {
                 $locked->projects()->updateExistingPivot($change['project_id'], ['target_beneficiaries' => $change['to']]);
@@ -508,6 +510,17 @@ final class SaveProposal
             $messages['requestedBudget.min'] = __('proposals.the_budget_cannot_be_negative');
         }
 
+        if (self::canManagePartners($actor)) {
+            $rules['mainPartnerId'] = ['nullable', 'integer', Rule::exists(Donor::class, 'id')];
+            $rules['partnerIds'] = ['nullable', 'array'];
+            $rules['partnerIds.*'] = ['integer', 'distinct', Rule::exists(Donor::class, 'id')];
+            $messages['mainPartnerId.integer'] = __('proposals.choose_the_main_partner');
+            $messages['mainPartnerId.exists'] = __('proposals.choose_the_main_partner');
+            $messages['partnerIds.*.integer'] = __('proposals.choose_the_partners');
+            $messages['partnerIds.*.exists'] = __('proposals.choose_the_partners');
+            $messages['partnerIds.*.distinct'] = __('proposals.partner_listed_twice');
+        }
+
         $validator = Validator::make($input, $rules, $messages);
 
         $validator->after(function (ValidatorInstance $validator) use ($input, $actor, $proposal, $linked, $isPayroll, $viaChangeRequest): void {
@@ -526,6 +539,7 @@ final class SaveProposal
             }
 
             $this->checkDonorApproved($validator, $input, $proposal);
+            $this->checkPartners($validator, $input, $actor, $proposal);
 
             if ($proposal !== null && $proposal->status->isApprovedByDonor() && ! $viaChangeRequest) {
                 $this->checkApprovedFill($validator, $input, $proposal);
@@ -814,6 +828,97 @@ final class SaveProposal
 
         if (Donor::query()->pending()->whereKey($donorId)->exists()) {
             $validator->errors()->add('donorId', __('proposals.donor_request_pending'));
+        }
+    }
+
+    /**
+     * Whether the actor may set the Main Partner and the Partners. Only the
+     * public-relations side manages them (decided with PR, 2026-11-24).
+     */
+    public static function canManagePartners(User $actor): bool
+    {
+        return $actor->can('proposals.manage-partners');
+    }
+
+    /**
+     * The Main Partner and the Partners are other donor-library organisations:
+     * never the back donor, never listed twice, and the Partners need a Main
+     * Partner to sit under. A pending donor request cannot be picked yet.
+     *
+     * @param  array<string, mixed>  $input
+     */
+    private function checkPartners(ValidatorInstance $validator, array $input, User $actor, ?Proposal $proposal): void
+    {
+        if (! self::canManagePartners($actor) || $validator->errors()->hasAny(['mainPartnerId', 'partnerIds', 'partnerIds.*', 'donorId'])) {
+            return;
+        }
+
+        $donorId = is_numeric($input['donorId'] ?? null) ? (int) $input['donorId'] : null;
+        $mainId = is_numeric($input['mainPartnerId'] ?? null) ? (int) $input['mainPartnerId'] : null;
+        $partnerIds = array_map('intval', array_values((array) ($input['partnerIds'] ?? [])));
+
+        if ($mainId !== null && $mainId === $donorId) {
+            $validator->errors()->add('mainPartnerId', __('proposals.main_partner_is_the_donor'));
+        }
+
+        if ($partnerIds !== [] && $mainId === null) {
+            $validator->errors()->add('partnerIds', __('proposals.partners_need_a_main_partner'));
+        }
+
+        if (array_intersect($partnerIds, array_filter([$donorId, $mainId])) !== []) {
+            $validator->errors()->add('partnerIds', __('proposals.partner_is_already_named'));
+        }
+
+        $kept = $proposal === null ? [] : [$proposal->main_partner_id, ...$proposal->partners()->pluck('donors.id')->all()];
+        $fresh = array_diff(array_filter([$mainId, ...$partnerIds]), $kept);
+
+        if ($fresh !== [] && Donor::query()->pending()->whereKey($fresh)->exists()) {
+            $validator->errors()->add($mainId !== null && in_array($mainId, $fresh, true) ? 'mainPartnerId' : 'partnerIds', __('proposals.donor_request_pending'));
+        }
+    }
+
+    /**
+     * Write the Main Partner column and the Partners list, only for a
+     * manager of partners who sent them: a key left out stays as it is.
+     * Clearing the Main Partner clears the Partners too.
+     *
+     * @param  array<string, mixed>  $input
+     */
+    private function savePartners(Proposal $proposal, array $input, User $actor): void
+    {
+        if (! self::canManagePartners($actor)) {
+            return;
+        }
+
+        $sentMain = array_key_exists('mainPartnerId', $input);
+        $sentPartners = array_key_exists('partnerIds', $input);
+
+        if (! $sentMain && ! $sentPartners) {
+            return;
+        }
+
+        if ($sentMain) {
+            $mainId = is_numeric($input['mainPartnerId'] ?? null) ? (int) $input['mainPartnerId'] : null;
+
+            if ($proposal->main_partner_id !== $mainId) {
+                $proposal->main_partner_id = $mainId;
+                $proposal->save();
+            }
+        }
+
+        $before = $proposal->partners()->orderBy('donors.name')->pluck('donors.name')->all();
+
+        if ($proposal->main_partner_id === null) {
+            $proposal->partners()->sync([]);
+        } elseif ($sentPartners) {
+            $proposal->partners()->sync(array_values(array_unique(array_map('intval', (array) $input['partnerIds']))));
+        }
+
+        $after = $proposal->partners()->orderBy('donors.name')->pluck('donors.name')->all();
+
+        // The Partners are a pivot no model event sees: record the change by name, so History reads it.
+        if ($before !== $after) {
+            $proposal->recordActivity('proposal.updated', ['partners' => [implode(', ', $before) ?: null, implode(', ', $after) ?: null]]);
         }
     }
 

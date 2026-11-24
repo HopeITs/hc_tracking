@@ -57,6 +57,7 @@ return [
         'aggregate' => 'تجميع',
         'manage-reviewers' => 'إدارة المراجعين',
         'correct-status' => 'تصحيح الحالة',
+        'manage-partners' => 'إدارة الشريك الرئيسي والشركاء',
         'draft' => 'الصياغة بالذكاء الاصطناعي',
         'record' => 'تسجيل القياسات',
         'view-usage' => 'عرض الاستخدام',

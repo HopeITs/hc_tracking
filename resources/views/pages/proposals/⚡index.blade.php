@@ -40,7 +40,7 @@ new #[Layout('layouts::desk'), Title('titles.proposals')] class extends Componen
     use WithPagination;
 
     /** @var list<string> */
-    public const FLAGS = ['on_hold', 'no_agreement', 'overdue', 'report_overdue', 'no_center'];
+    public const FLAGS = ['on_hold', 'no_agreement', 'overdue', 'report_overdue', 'no_center', 'via_partner'];
 
     /**
      * Every property a filter control writes.
@@ -240,6 +240,8 @@ new #[Layout('layouts::desk'), Title('titles.proposals')] class extends Componen
         $canAgreements ? ['label' => __('finance_tables.flag_no_agreement'), 'model' => 'flag', 'value' => 'no_agreement', 'toggle' => true, 'active' => $chosen['flag'] === 'no_agreement', 'test' => 'flag-no-agreement'] : null,
         $canTransfers ? ['label' => __('finance_tables.flag_has_overdue'), 'model' => 'flag', 'value' => 'overdue', 'toggle' => true, 'active' => $chosen['flag'] === 'overdue', 'tone' => 'critical', 'test' => 'flag-overdue'] : null,
         $canAgreements ? ['label' => __('finance_tables.flag_report_overdue'), 'model' => 'flag', 'value' => 'report_overdue', 'toggle' => true, 'active' => $chosen['flag'] === 'report_overdue', 'test' => 'flag-report-overdue'] : null,
+        /* Not money: PR works its Main Partner list without agreement access. */
+        ['label' => __('finance_tables.flag_via_partner'), 'model' => 'flag', 'value' => 'via_partner', 'toggle' => true, 'active' => $chosen['flag'] === 'via_partner', 'count' => $this->viaPartnerCount, 'test' => 'flag-via-partner'],
         /* Not money: every viewer of the register may work this list down. */
         ['label' => __('finance_tables.flag_no_center'), 'model' => 'flag', 'value' => 'no_center', 'toggle' => true, 'active' => $chosen['flag'] === 'no_center', 'tone' => 'warn', 'count' => $this->missingCenterCount, 'test' => 'flag-no-center'],
     ]));
@@ -298,6 +300,12 @@ new #[Layout('layouts::desk'), Title('titles.proposals')] class extends Componen
                         @endif
 
                         <x-funding.pills :label="__('finance_tables.flags')" :pills="$flagPills" />
+
+                        @if ($chosen['flag'] === 'via_partner')
+                            <p class="text-sm font-semibold text-secondary-dark dark:text-ink" data-main-partner-summary>
+                                {{ trans_choice('proposals.main_partner_summary', $this->mainPartnerCount, ['partners' => $this->mainPartnerCount, 'proposals' => $this->viaPartnerCount]) }}
+                            </p>
+                        @endif
 
                         @if ($this->donorFilterName !== null)
                             <x-funding.filter-row :label="__('funding_agreements.donor')" on :watch="['donor']" :models="['donor']" x-show="filled(['donor'])">

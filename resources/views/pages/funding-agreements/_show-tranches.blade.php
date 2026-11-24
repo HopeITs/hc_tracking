@@ -5,6 +5,7 @@
                     {{ __('funding_agreements.tranches') }}
                     <span class="ms-1 text-base font-semibold tabular-nums {{ $mutedText }}">{{ count($journeys) }}</span>
                 </h2>
+                <x-proposals.partner-note :partner="$proposal->mainPartner" for="transfers" class="w-full text-sm" />
                 @if ($journeys !== [])
                     <div class="flex flex-wrap items-center gap-3">
                         <a href="{{ route('transfers.index', ['agreement' => $agreement->id]) }}" wire:navigate class="text-xs font-semibold underline-offset-4 hover:underline {{ $inkText }}" data-transfers-ledger-link>{{ __('funding_agreements.open_in_transfers_ledger') }}</a>

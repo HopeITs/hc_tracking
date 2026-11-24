@@ -6,7 +6,6 @@ namespace App\Actions\Supervisions;
 
 use App\Models\HrEmployee;
 use App\Models\Supervision;
-use App\Support\EmployeeProfile;
 use App\Support\SupervisionMap;
 use Illuminate\Database\UniqueConstraintViolationException;
 use Illuminate\Support\Facades\Auth;
@@ -17,7 +16,7 @@ use Illuminate\Validation\ValidationException;
 /**
  * Add a local supervision on top of HR (contracts §10, D-13). Both people
  * must be active in HR now (re-checked here, the picker is never trusted);
- * nobody supervises themselves; HR's own direct manager and any A↔B loop are
+ * nobody supervises themselves; an HR org-chart supervisor and any A↔B loop are
  * refused. The unique pair index settles two admins acting at once. Error
  * keys match the Supervision tab's add modal.
  */
@@ -36,11 +35,11 @@ class AddSupervision
             $this->refuse('users.supervision_self');
         }
 
-        if (EmployeeProfile::managerOf($superviseeEmployeeId) === $supervisorEmployeeId) {
+        if (in_array($supervisorEmployeeId, SupervisionMap::hrSupervisorsOf($superviseeEmployeeId), true)) {
             $this->refuse('users.supervision_already_from_hr');
         }
 
-        if (EmployeeProfile::managerOf($supervisorEmployeeId) === $superviseeEmployeeId) {
+        if (in_array($superviseeEmployeeId, SupervisionMap::hrSupervisorsOf($supervisorEmployeeId), true)) {
             $this->refuse('users.supervision_mutual');
         }
 

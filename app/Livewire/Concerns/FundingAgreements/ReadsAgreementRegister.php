@@ -396,7 +396,7 @@ trait ReadsAgreementRegister
     public function rows(): LengthAwarePaginator
     {
         return $this->applyRegisterSort($this->registerQuery())
-            ->with(['donor:id,slug,name', 'proposal:id,slug,name,status'])
+            ->with(['donor:id,slug,name', 'proposal:id,slug,name,status,main_partner_id', 'proposal.mainPartner:id,slug,name'])
             ->paginate($this->registerPerPage());
     }
 

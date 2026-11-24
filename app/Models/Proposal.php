@@ -36,6 +36,7 @@ use Illuminate\Support\Facades\DB;
  * @property string $slug
  * @property string $internal_project_number
  * @property int $donor_id
+ * @property int|null $main_partner_id
  * @property string|null $requested_budget
  * @property Currency|null $requested_currency
  * @property CarbonImmutable|null $status_remind_on
@@ -62,6 +63,7 @@ use Illuminate\Support\Facades\DB;
 #[Fillable([
     'name',
     'donor_id',
+    'main_partner_id',
     'internal_project_number',
     'planned_date_begin',
     'planned_date_end',
@@ -251,6 +253,27 @@ class Proposal extends Model implements TracksActivity
     public function donor(): BelongsTo
     {
         return $this->belongsTo(Donor::class);
+    }
+
+    /**
+     * The organisation we sign with, receive transfers from and report to when
+     * the back donor funds us through an intermediary. Null for a direct grant.
+     *
+     * @return BelongsTo<Donor, $this>
+     */
+    public function mainPartner(): BelongsTo
+    {
+        return $this->belongsTo(Donor::class, 'main_partner_id');
+    }
+
+    /**
+     * The other partners named for reference only: nothing is reported to them.
+     *
+     * @return BelongsToMany<Donor, $this>
+     */
+    public function partners(): BelongsToMany
+    {
+        return $this->belongsToMany(Donor::class, 'proposal_partner')->withTimestamps();
     }
 
     /**
@@ -673,6 +696,6 @@ class Proposal extends Model implements TracksActivity
      */
     public function activityEvents(): array
     {
-        return ['status' => 'status_changed', 'concept_note' => 'concept_note_updated', 'name' => 'updated', 'internal_project_number' => 'updated', 'planned_date_begin' => 'updated', 'planned_date_end' => 'updated', 'narrative' => 'updated'];
+        return ['status' => 'status_changed', 'concept_note' => 'concept_note_updated', 'name' => 'updated', 'internal_project_number' => 'updated', 'planned_date_begin' => 'updated', 'planned_date_end' => 'updated', 'narrative' => 'updated', 'main_partner_id' => 'updated'];
     }
 }
