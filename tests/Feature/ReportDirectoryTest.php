@@ -8,8 +8,9 @@ use App\Models\Indicator;
 use App\Models\LibraryIndicator;
 use App\Models\MonthlyReport;
 use App\Models\PlanIndicator;
-use App\Models\Project;
+use App\Models\Program;
 use App\Models\Proposal;
+use App\Models\ProposalLocation;
 use App\Models\Report;
 use App\Models\ReportFile;
 use App\Models\User;
@@ -390,11 +391,11 @@ test('a row shows its target achievement from approved reports only', function (
     expect($component->instance()->insights()['avgAchievement'])->toBe(25);
 });
 
-test('reports can be narrowed to overdue drafts, a project and a single target', function () {
+test('reports can be narrowed to overdue drafts, a location row and a single target', function () {
     $user = User::factory()->role('Media Team')->create();
-    $project = Project::factory()->create();
-    $projectTarget = PlanIndicator::factory()->create(['project_id' => $project->id]);
-    $late = Report::factory()->for($projectTarget)->create(['planned_date' => now()->subMonth()->toDateString(), 'value' => 111]);
+    $row = ProposalLocation::factory()->create(['program_id' => Program::factory()->create()->id]);
+    $rowTarget = PlanIndicator::factory()->create(['proposal_location_id' => $row->id]);
+    $late = Report::factory()->for($rowTarget)->create(['planned_date' => now()->subMonth()->toDateString(), 'value' => 111]);
     $onTime = Report::factory()->create(['planned_date' => now()->addMonth()->toDateString(), 'value' => 222]);
 
     Livewire::actingAs($user)
@@ -403,7 +404,7 @@ test('reports can be narrowed to overdue drafts, a project and a single target',
         ->assertSee('111')
         ->assertDontSee(route('reports.show', $onTime))
         ->call('clearFilters')
-        ->set('project', (string) $project->id)
+        ->set('location', (string) $row->id)
         ->assertSee(route('reports.show', $late))
         ->assertDontSee(route('reports.show', $onTime))
         ->call('clearFilters')

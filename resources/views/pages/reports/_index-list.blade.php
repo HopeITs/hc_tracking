@@ -57,7 +57,7 @@
                                     <bdi>{{ $rowTarget->indicator->name }}</bdi>
                                 </p>
                                 <p class="mt-0.5 flex flex-wrap items-center gap-x-1.5 type-meta text-secondary-medium dark:text-ink-muted">
-                                    <span><bdi>{{ $rowTarget->project?->name ?? __('common.organisation_wide') }}</bdi></span>
+                                    <span><bdi>{{ $rowTarget->location?->label() ?? __('common.organisation_wide') }}</bdi></span>
                                     <span aria-hidden="true">·</span>
                                     <span><bdi>{{ $sourceLabel($rowTarget) }}</bdi></span>
                                     <span aria-hidden="true">·</span>
