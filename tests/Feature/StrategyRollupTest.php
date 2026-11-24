@@ -43,6 +43,15 @@ function strategyIndicator(Program $program, float $reading): Indicator
 }
 
 /**
+ * A location row of $proposal carrying the test's project (Y-16, D-93): how
+ * the rollup reaches a proposal and a target's place now.
+ */
+function strategyRow(Proposal $proposal): ProposalLocation
+{
+    return ProposalLocation::factory()->forProject(test()->project)->create(['proposal_id' => $proposal->id]);
+}
+
+/**
  * The rendered block of one current strategy.
  */
 function currentStrategyBlock(string $html, Strategy $strategy): string
@@ -66,7 +75,10 @@ test('each current strategy adds up its targets on pace, high risks and late wor
     Risk::factory()->onRow($row)->rated(3, 3)->create();
     Risk::factory()->onRow($row)->rated(1, 2)->create();
     Report::factory()->create([
-        'plan_indicator_id' => PlanIndicator::factory()->create(['project_id' => $this->project->id])->id,
+        'plan_indicator_id' => PlanIndicator::factory()->create([
+            'project_id' => $this->project->id,
+            'proposal_location_id' => $row->id,
+        ])->id,
         'planned_date' => '2026-05-31',
     ]);
 
@@ -147,7 +159,10 @@ test('the attention list links a late report to the late reports register, and s
     expect($calm)->toContain(__('strategies.nothing_needs_attention'));
 
     Report::factory()->create([
-        'plan_indicator_id' => PlanIndicator::factory()->create(['project_id' => $this->project->id])->id,
+        'plan_indicator_id' => PlanIndicator::factory()->create([
+            'project_id' => $this->project->id,
+            'proposal_location_id' => ProposalLocation::factory()->forProject($this->project)->create()->id,
+        ])->id,
         'planned_date' => '2026-05-31',
     ]);
 
@@ -172,6 +187,7 @@ test('the attention list counts the programs with no plan for this year', functi
 test('funding shows the agreed amount and the share funded, only to roles that may see money', function () {
     $proposal = Proposal::factory()->create(['requested_budget' => 200000, 'requested_currency' => 'USD']);
     $this->project->proposals()->attach($proposal->id);
+    strategyRow($proposal);
     DonorProposal::factory()->create(['proposal_id' => $proposal->id, 'budget' => 120000, 'currency' => 'USD']);
 
     $financial = User::factory()->role('Financial')->create();
@@ -197,6 +213,8 @@ test('funding in several currencies shows every currency inline, with no "+1"', 
     $dollars = Proposal::factory()->create(['requested_budget' => 500000, 'requested_currency' => 'USD']);
     $euros = Proposal::factory()->create(['requested_budget' => null]);
     $this->project->proposals()->attach([$dollars->id, $euros->id]);
+    strategyRow($dollars);
+    strategyRow($euros);
     DonorProposal::factory()->create(['proposal_id' => $dollars->id, 'budget' => 420000, 'currency' => 'USD']);
     DonorProposal::factory()->create(['proposal_id' => $euros->id, 'budget' => 3960000, 'currency' => 'EUR']);
 

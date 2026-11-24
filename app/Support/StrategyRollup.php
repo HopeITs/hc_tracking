@@ -9,7 +9,6 @@ use App\Models\AnnualPlan;
 use App\Models\DonorProposal;
 use App\Models\Indicator;
 use App\Models\Program;
-use App\Models\Project;
 use App\Models\Proposal;
 use App\Models\ProposalLocation;
 use App\Models\Report;
@@ -18,15 +17,14 @@ use App\Models\User;
 use BackedEnum;
 use Carbon\CarbonImmutable;
 use Illuminate\Support\Collection;
-use Illuminate\Support\Facades\DB;
 
 /**
- * What each strategy's projects add up to, for the strategies register: targets
+ * What each strategy's places add up to, for the strategies register: targets
  * on pace, funding agreed against requested, high risks and late work.
  *
  * Every figure reuses the app's own definition so it matches its register:
  * indicators belong through their result's program, a register risk through
- * its location row's program (Y-13), everything else through its project's
+ * its location row's program (Y-13, Y-16), everything else through its row's
  * program; targets are rated by Indicator::ragStatus() over this calendar year (as the
  * Desk rates them), a high risk scores 6 or more on the heat map
  * (Risk::heatScore()) and a late report is Report::overdue(). Currencies are never added together.
@@ -64,19 +62,13 @@ final class StrategyRollup
      */
     public static function for(User $viewer, array $strategyIds): array
     {
-        $projectStrategy = Project::query()
-            ->join('programs', 'programs.id', '=', 'projects.program_id')
-            ->whereIn('programs.strategy_id', $strategyIds)
-            ->pluck('programs.strategy_id', 'projects.id')
-            ->map(fn (mixed $id): int => (int) $id);
-
-        $projectIds = array_values($projectStrategy->keys()->map(fn (mixed $id): int => (int) $id)->all());
+        $locationStrategy = self::locationStrategy($strategyIds);
         $canView = fn (string $module): bool => $viewer->can("{$module}.view");
 
         $results = $canView('indicators') && $canView('targets') ? self::results($strategyIds) : null;
-        $funding = $canView('funding-agreements') ? self::funding($projectIds, $projectStrategy) : null;
-        $risks = $canView('risks') ? self::risks($strategyIds) : null;
-        $reports = $canView('reports') ? self::lateReports($projectIds, $projectStrategy) : null;
+        $funding = $canView('funding-agreements') ? self::funding($locationStrategy) : null;
+        $risks = $canView('risks') ? self::risks($locationStrategy) : null;
+        $reports = $canView('reports') ? self::lateReports($locationStrategy) : null;
 
         $rollups = [];
 
@@ -233,16 +225,19 @@ final class StrategyRollup
      * request first (then largest agreed); the headline percent is the first
      * line that has a request.
      *
-     * @param  list<int>  $projectIds
-     * @param  Collection<int, int>  $projectStrategy
+     * A row is of exactly one proposal (D-93), so the proposals of a strategy
+     * are read off the rows themselves and `project_proposal` is not touched
+     * (Y-16).
+     *
+     * @param  Collection<int, int>  $locationStrategy
      * @return array<int, array{lines: list<FundingLine>, percent: int|null, tone: 'good'|'warn'|'critical'|null}>
      */
-    private static function funding(array $projectIds, Collection $projectStrategy): array
+    private static function funding(Collection $locationStrategy): array
     {
-        $proposalStrategies = DB::table('project_proposal')
-            ->whereIn('project_id', $projectIds)
-            ->get(['project_id', 'proposal_id'])
-            ->map(fn (object $row): array => ['proposal' => (int) $row->proposal_id, 'strategy' => $projectStrategy[(int) $row->project_id]])
+        $proposalStrategies = ProposalLocation::query()
+            ->whereKey($locationStrategy->keys())
+            ->get(['id', 'proposal_id'])
+            ->map(fn (ProposalLocation $row): array => ['proposal' => (int) $row->proposal_id, 'strategy' => $locationStrategy[$row->id]])
             ->unique(fn (array $row): string => $row['proposal'].'-'.$row['strategy']);
 
         $proposalIds = $proposalStrategies->pluck('proposal')->unique()->values()->all();
@@ -324,17 +319,11 @@ final class StrategyRollup
      * (Y-13, D-93), so it reaches a strategy through the row's program, not
      * through a project. Logframe risks carry no row and are not counted here.
      *
-     * @param  list<int>  $strategyIds
+     * @param  Collection<int, int>  $locationStrategy
      * @return array<int, int>
      */
-    private static function risks(array $strategyIds): array
+    private static function risks(Collection $locationStrategy): array
     {
-        $locationStrategy = ProposalLocation::query()
-            ->join('programs', 'programs.id', '=', 'proposal_locations.program_id')
-            ->whereIn('programs.strategy_id', $strategyIds)
-            ->pluck('programs.strategy_id', 'proposal_locations.id')
-            ->map(fn (mixed $id): int => (int) $id);
-
         return self::countByStrategy(
             Risk::query()
                 ->whereIn('proposal_location_id', $locationStrategy->keys())
@@ -345,25 +334,44 @@ final class StrategyRollup
     }
 
     /**
-     * @param  list<int>  $projectIds
-     * @param  Collection<int, int>  $projectStrategy
+     * Late reports per strategy, through the location row their target is
+     * committed at (Y-16, D-93).
+     *
+     * @param  Collection<int, int>  $locationStrategy
      * @return array<int, int>
      */
-    private static function lateReports(array $projectIds, Collection $projectStrategy): array
+    private static function lateReports(Collection $locationStrategy): array
     {
         return self::countByStrategy(
             Report::query()
                 ->overdue()
                 ->join('plan_indicators', 'plan_indicators.id', '=', 'reports.plan_indicator_id')
-                ->whereIn('plan_indicators.project_id', $projectIds)
-                ->pluck('plan_indicators.project_id'),
-            $projectStrategy,
+                ->whereIn('plan_indicators.proposal_location_id', $locationStrategy->keys())
+                ->pluck('plan_indicators.proposal_location_id'),
+            $locationStrategy,
         );
     }
 
     /**
-     * Count ids by the strategy they belong to: project ids for funding and
-     * late reports, location row ids for risks (Y-13).
+     * Which strategy each location row belongs to, through its program
+     * (Y-16, D-93). The one map behind funding, risks and late reports.
+     *
+     * @param  list<int>  $strategyIds
+     * @return Collection<int, int> row id => strategy id
+     */
+    private static function locationStrategy(array $strategyIds): Collection
+    {
+        return ProposalLocation::query()
+            ->join('programs', 'programs.id', '=', 'proposal_locations.program_id')
+            ->whereIn('programs.strategy_id', $strategyIds)
+            ->pluck('programs.strategy_id', 'proposal_locations.id')
+            ->map(fn (mixed $id): int => (int) $id);
+    }
+
+    /**
+     * Count ids by the strategy they belong to. Every caller now passes
+     * location row ids (risks since Y-13, funding and late reports since
+     * Y-16), so there is one key for the whole rollup.
      *
      * @param  Collection<int, mixed>  $ids  one entry per counted row
      * @param  Collection<int, int>  $idStrategy
