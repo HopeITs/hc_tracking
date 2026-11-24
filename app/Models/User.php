@@ -19,6 +19,7 @@ use Illuminate\Database\Eloquent\Attributes\Scope;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Casts\Attribute;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
+use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\MorphMany;
@@ -398,6 +399,33 @@ class User extends Authenticatable implements HasLocalePreference, PasskeyUser, 
     public function activeRole(): BelongsTo
     {
         return $this->belongsTo(Role::class, 'active_role_id');
+    }
+
+    /**
+     * The role to show beside this person's name: their active role while they
+     * still hold it, else the highest held role by config('access-control.role_display_order').
+     * Reads the loaded `roles` relation, so it costs no query of its own.
+     */
+    public function primaryRole(): ?Role
+    {
+        $roles = $this->roles;
+
+        if ($roles->isEmpty()) {
+            return null;
+        }
+
+        // A user built in memory (a factory, before a refresh) has no such attribute yet.
+        $active = $roles->firstWhere('id', $this->attributes['active_role_id'] ?? null);
+
+        if ($active instanceof Role) {
+            return $active;
+        }
+
+        $order = array_flip(config('access-control.role_display_order', []));
+
+        $highest = $roles->sortBy(fn (Model $role): string => sprintf('%03d-%s', $order[(string) $role->getAttribute('name')] ?? 999, (string) $role->getAttribute('name')))->first();
+
+        return $highest instanceof Role ? $highest : null;
     }
 
     /**

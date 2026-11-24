@@ -16,7 +16,7 @@
     <head>
         @include('partials.head')
     </head>
-    <body class="dk-body min-h-screen" @if ($showsInbox && ! $inTab) data-user-id="{{ auth()->id() }}" data-notification-popups="{{ auth()->user()->notification_popups ? 'on' : 'off' }}" data-session-lifetime="{{ (int) config('session.lifetime') }}" @endif @if ($inTab) data-desk-tab-page @endif>
+    <body class="dk-body min-h-screen" @if ($showsInbox && ! $inTab) data-user-id="{{ auth()->id() }}" data-notification-popups="{{ auth()->user()->notification_popups ? 'on' : 'off' }}" data-session-lifetime="{{ (int) config('session.lifetime') }}" @endif @if ($inTab) data-desk-tab-page @endif data-request-failed="{{ __('errors.request_failed') }}" data-request-reference="{{ __('errors.reference', ['reference' => ':reference']) }}">
         <div class="dk-app" data-app-shell>
             @auth
                 @unless ($inTab)

@@ -3,4 +3,5 @@
     tone="critical"
     :heading="__('errors.500_heading')"
     :body="__('errors.500_body')"
+    :reference="$reference ?? null"
 />

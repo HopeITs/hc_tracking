@@ -3,6 +3,7 @@
     'tone' => 'neutral',
     'heading',
     'body',
+    'reference' => null,
 ])
 
 @php
@@ -43,6 +44,9 @@
                     <p @class(['type-label', $toneText]) dir="ltr">{{ __('errors.error_code', ['code' => $code]) }}</p>
                     <h1 class="mt-3 text-4xl font-extrabold tracking-tight text-balance text-secondary-dark sm:text-5xl dark:text-ink">{{ $heading }}</h1>
                     <p class="mx-auto mt-4 max-w-sm text-base text-pretty text-secondary-medium dark:text-ink-muted">{{ $body }}</p>
+                    @if ($reference !== null)
+                        <p class="mt-3 text-sm text-secondary-medium dark:text-ink-muted" data-error-reference>{{ __('errors.reference', ['reference' => $reference]) }}</p>
+                    @endif
                 </div>
 
                 <x-ui.button tone="primary" :href="route('dashboard')" class="!px-6 !py-3 !text-base">

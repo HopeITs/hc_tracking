@@ -119,6 +119,9 @@
                             <x-ui.avatar :src="$user?->avatarUrl()" class="dk-avatar dk-avatar-lg" />
                             <span class="min-w-0">
                                 <strong>{{ $user->name }}</strong>
+                                @if ($primaryRole = $user->primaryRole())
+                                    <small data-user-role dir="auto">{{ $primaryRole->label() }}</small>
+                                @endif
                                 <small>{{ $user->email }}</small>
                             </span>
                         </div>
