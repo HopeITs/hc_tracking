@@ -27,6 +27,7 @@ use App\Models\Proposal;
 use App\Models\ProposalChangeRequest;
 use App\Models\ProposalLocation;
 use App\Models\Report;
+use App\Models\ReportTemplate;
 use App\Models\Result;
 use App\Models\Role;
 use App\Models\Sector;
@@ -1076,7 +1077,12 @@ function donorReportProposal(array $attributes = [], bool $internal = false, boo
 }
 
 /**
- * A center (project) linked to the proposal with its beneficiaries.
+ * A center of the proposal with its beneficiaries: a project, the location row
+ * that carries it (Y-11, Y-16 — the row holds `target_beneficiaries` and is
+ * what the aggregator reads) and a report template at the row's place (Y-02).
+ *
+ * Still returns the project, which most call sites pass around; ask
+ * donorReportRow() for its row.
  */
 function donorReportCenter(Proposal $proposal, DonorAttribution $attribution = DonorAttribution::Shared, ?int $beneficiaries = 100, ?Program $program = null): Project
 {
@@ -1087,8 +1093,42 @@ function donorReportCenter(Proposal $proposal, DonorAttribution $attribution = D
         ]);
         $proposal->projects()->attach($project->id, ['target_beneficiaries' => $beneficiaries]);
 
+        ProposalLocation::query()->where('proposal_id', $proposal->id)->where('project_id', $project->id)->first()
+            ?? ProposalLocation::factory()->forProject($project)->create([
+                'proposal_id' => $proposal->id,
+                'target_beneficiaries' => $beneficiaries,
+            ]);
+
+        ReportTemplate::query()->where('project_id', $project->id)->first()
+            ?? ReportTemplate::factory()->create(['project_id' => $project->id]);
+
         return $project;
     });
+}
+
+/**
+ * The location row of the proposal that carries the center, created on first
+ * ask. Two proposals may each have a row at one place (D-77), so a center
+ * attached to a second proposal gets its own row with that proposal's
+ * beneficiaries.
+ */
+function donorReportRow(Proposal $proposal, Project $center): ProposalLocation
+{
+    $row = ProposalLocation::query()->where('proposal_id', $proposal->id)->where('project_id', $center->id)->first();
+
+    if ($row !== null) {
+        return $row;
+    }
+
+    $beneficiaries = DB::table('project_proposal')
+        ->where('proposal_id', $proposal->id)
+        ->where('project_id', $center->id)
+        ->value('target_beneficiaries');
+
+    return Activity::withoutRecording(fn (): ProposalLocation => ProposalLocation::factory()->forProject($center)->create([
+        'proposal_id' => $proposal->id,
+        'target_beneficiaries' => $beneficiaries === null ? null : (int) $beneficiaries,
+    ]));
 }
 
 /**
@@ -1114,6 +1154,7 @@ function donorReportTarget(Proposal $proposal, Project $center, LibraryIndicator
         return PlanIndicator::factory()->forProposal($proposal)->create([
             'indicator_id' => $instance->id,
             'project_id' => $center->id,
+            'proposal_location_id' => donorReportRow($proposal, $center)->id,
             'target' => $target,
         ]);
     });

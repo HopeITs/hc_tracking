@@ -92,6 +92,9 @@ function faPlace(
                 'project_id' => $project->id,
                 'city_id' => $cityId,
                 'program_id' => $program->id,
+                // Y-11 moved the pivot's beneficiaries onto the row, and the
+                // aggregator reads them there.
+                'target_beneficiaries' => 100,
             ]);
 
         if (! $row->centers()->exists()) {
