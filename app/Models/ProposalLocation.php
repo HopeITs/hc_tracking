@@ -351,6 +351,19 @@ class ProposalLocation extends Model
     }
 
     /**
+     * How this row is named wherever a record is listed by name — the
+     * sidebar's recently used records, for one (Y-16).
+     *
+     * Its place, which is what the Projects screen calls it.
+     */
+    public function activityLabel(): string
+    {
+        $this->loadMissing(['city', 'program', 'centers']);
+
+        return $this->label();
+    }
+
+    /**
      * The four demographic targets added up, or null when none is set
      * (Y-16): the twin of `Project::targetDemographicTotal()`, on the columns
      * Y-11 moved onto the row.

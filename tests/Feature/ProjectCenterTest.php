@@ -356,7 +356,7 @@ test('a project whose center HR has deactivated says so on the directory, the pr
         ->assertSeeText(__('projects.center_inactive_badge'));
 
     $this->actingAs($this->user)
-        ->get(route('projects.show', $project))
+        ->get(route('projects.show', rowFor($project)))
         ->assertOk()
         ->assertSee('data-test="center-inactive-badge"', false);
 
