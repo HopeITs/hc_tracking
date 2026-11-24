@@ -319,6 +319,13 @@ test('last year achievement equals achievedValue and percentAchieved of the matc
     ['previous' => $previous, 'target' => $oldTarget, 'project' => $project] = renewalSource();
     $renewal = app(CloneProposalForRenewal::class)->handle($previous, renewalData(), renewalActor())['proposal'];
 
+    // Y-16, D-30: the match is by **place**, not by project — a renewal is a
+    // new proposal with new rows (D-93). renewalSource() carries its project
+    // through the pivot only, so the two targets are placed here explicitly,
+    // at the one place they share.
+    $place = ['city_id' => (int) $project->city_id, 'program_id' => (int) $project->program_id, 'center_id' => (int) $project->center_id, 'city_wide' => false];
+    DB::table('plan_indicators')->where('id', $oldTarget->id)->update($place);
+
     $newTarget = PlanIndicator::factory()->forProposal($renewal)->create([
         'indicator_id' => Indicator::factory()->create([
             'result_id' => Result::factory()->type(ResultType::Impact)->create(['proposal_id' => $renewal->id])->id,
@@ -326,6 +333,7 @@ test('last year achievement equals achievedValue and percentAchieved of the matc
         ])->id,
         'project_id' => $project->id,
         'target' => 200,
+        ...$place,
     ]);
 
     $reference = PlanIndicator::previousYearReference($newTarget);
