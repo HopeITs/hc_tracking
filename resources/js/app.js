@@ -26,6 +26,7 @@ import './notification-rules';
 import './file-preview';
 import './finance-filters';
 import './proposal-clock';
+import './request-errors';
 import './scroll-lock';
 import './section-rail';
 import './side-nav';
