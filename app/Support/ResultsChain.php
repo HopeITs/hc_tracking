@@ -11,7 +11,6 @@ use App\Models\AnnualPlan;
 use App\Models\Donor;
 use App\Models\Indicator;
 use App\Models\PlanIndicator;
-use App\Models\Project;
 use App\Models\ProjectActivityStatus;
 use App\Models\Proposal;
 use App\Models\ProposalLocation;
@@ -193,7 +192,6 @@ final class ResultsChain
                         'planIndicators' => function ($query) use ($targetScope): void {
                             $query->select(['id', 'indicator_id', 'source_type', 'source_id', 'target', 'project_id', 'proposal_location_id', 'period'])
                                 ->with([
-                                    'project:id,name,center_id,program_id',
                                     // chainIssues() reads the row now (Y-16, D-93).
                                     'location:id,proposal_id,program_id',
                                     'reports:id,plan_indicator_id,status,planned_date,value',
@@ -300,7 +298,7 @@ final class ResultsChain
 
         $proposals = $proposalIds === [] ? collect() : Proposal::query()
             ->select(['id', 'name', 'slug', 'donor_id'])
-            ->with(['donor:id,name,slug', 'projects:id'])
+            ->with(['donor:id,name,slug'])
             ->whereIn('id', $proposalIds)
             ->get()
             ->keyBy('id');
@@ -349,7 +347,7 @@ final class ResultsChain
             return false;
         }
 
-        if ($center !== '' && ! $result->indicators->contains(fn (Indicator $row): bool => $row->planIndicators->contains(fn (PlanIndicator $target): bool => (string) $target->project_id === $center))) {
+        if ($center !== '' && ! $result->indicators->contains(fn (Indicator $row): bool => $row->planIndicators->contains(fn (PlanIndicator $target): bool => (string) $target->proposal_location_id === $center))) {
             return false;
         }
 
@@ -422,10 +420,10 @@ final class ResultsChain
 
         if ($activityIds !== []) {
             $statuses = ProjectActivityStatus::query()
-                ->select(['id', 'project_id', 'result_id', 'status'])
+                ->select(['id', 'project_id', 'proposal_location_id', 'result_id', 'status'])
                 ->whereIn('result_id', $activityIds)
-                ->with('project:id,name,center_id')
-                ->orderBy('project_id')
+                ->with(['location', 'location.city', 'location.program', 'location.centers'])
+                ->orderBy('proposal_location_id')
                 ->get();
 
             foreach ($statuses as $status) {
@@ -446,13 +444,13 @@ final class ResultsChain
         $rows = [];
 
         foreach ($this->statusesByActivity[$result->id] ?? [] as $row) {
-            if ($center !== '' && (string) $row->project_id !== $center) {
+            if ($center !== '' && (string) $row->proposal_location_id !== $center) {
                 continue;
             }
 
             $rows[] = [
-                'centerId' => $row->project_id,
-                'center' => $row->project === null ? '' : ($row->project->center()->name ?? $row->project->name),
+                'centerId' => $row->proposal_location_id,
+                'center' => $row->location?->label() ?? '',
                 'status' => $row->status,
             ];
         }
@@ -488,18 +486,17 @@ final class ResultsChain
         }
 
         $center = $this->filters['center'];
-        $proposalIds = $this->results->pluck('proposal_id')->filter()->unique()->values()->all();
         $this->centerLocations = [];
 
-        if ($center === '' || $proposalIds === []) {
+        if ($center === '') {
             return $this->centerLocations;
         }
 
-        foreach (ProposalLocation::query()
-            ->whereIn('proposal_id', $proposalIds)
-            ->where('project_id', (int) $center)
-            ->orderByDesc('id')
-            ->get(['id', 'proposal_id']) as $row) {
+        // The filter is a location row (Y-16), and a row is of one proposal
+        // (D-93), so its calendar applies to that proposal alone.
+        $row = ProposalLocation::query()->whereKey((int) $center)->first(['id', 'proposal_id']);
+
+        if ($row !== null) {
             $this->centerLocations[(int) $row->proposal_id] = (int) $row->id;
         }
 
@@ -568,7 +565,7 @@ final class ResultsChain
             $targets = [];
 
             foreach ($indicator->planIndicators as $target) {
-                if ($this->filters['center'] !== '' && (string) $target->project_id !== $this->filters['center']) {
+                if ($this->filters['center'] !== '' && (string) $target->proposal_location_id !== $this->filters['center']) {
                     continue;
                 }
 
@@ -598,13 +595,13 @@ final class ResultsChain
      */
     private function targetRow(PlanIndicator $target): array
     {
-        $project = $target->project;
+        $row = $target->location;
         $source = $target->getRelation('source');
 
         return [
             'id' => $target->id,
-            'center' => $project === null ? self::label('results_framework.chain_org_wide') : ($project->center()->name ?? $project->name),
-            'centerId' => $project?->id,
+            'center' => $row === null ? self::label('results_framework.chain_org_wide') : $row->label(),
+            'centerId' => $row?->id,
             'source' => match (true) {
                 $source instanceof Proposal => $source->name,
                 $source instanceof AnnualPlan => self::label('common.fy_year', ['year' => $source->year]),
@@ -654,8 +651,8 @@ final class ResultsChain
                 }
 
                 foreach ($indicator->planIndicators as $target) {
-                    if ($target->project !== null) {
-                        $centers[$target->project->id] = $target->project->center()->name ?? $target->project->name;
+                    if ($target->location !== null) {
+                        $centers[$target->location->id] = $target->location->label();
                     }
 
                     $source = $target->getRelation('source');

@@ -49,6 +49,7 @@ new #[Layout('layouts::desk'), Title('titles.program')] class extends Component 
     {
         $this->programId = $program->id;
         $this->tab = $this->resolveTab($this->tab);
+        $this->adoptLegacyChainCenter();
     }
 
     public function updatedTab(): void
