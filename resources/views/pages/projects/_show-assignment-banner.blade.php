@@ -11,12 +11,12 @@
             <div class="min-w-0">
                 <p class="font-semibold text-secondary-dark dark:text-ink">
                     @if ($ownerAssignment->status === AssignmentStatus::Pending)
-                        {{ $ownerAssignment->isFor($assignmentViewer) ? __('projects.assignment_pending_you', ['assigner' => $ownerAssignment->assigner?->name ?? __('notifications.system')]) : __('projects.assignment_pending', ['name' => $this->project->user?->name]) }}
+                        {{ $ownerAssignment->isFor($assignmentViewer) ? __('projects.assignment_pending_you', ['assigner' => $ownerAssignment->assigner?->name ?? __('notifications.system')]) : __('projects.assignment_pending', ['name' => $this->location->responsible?->name]) }}
                         <span class="font-normal text-secondary-medium dark:text-ink-muted">· {{ $ownerAssignment->seen_at === null ? __('projects.assignment_not_seen') : __('projects.assignment_seen', ['when' => $ownerAssignment->seen_at->diffForHumans()]) }}</span>
                     @elseif ($ownerAssignment->status === AssignmentStatus::Rejected)
-                        {{ __('projects.assignment_rejected', ['name' => $this->project->user?->name]) }}
+                        {{ __('projects.assignment_rejected', ['name' => $this->location->responsible?->name]) }}
                     @else
-                        {{ __('projects.assignment_acknowledged', ['name' => $this->project->user?->name]) }}
+                        {{ __('projects.assignment_acknowledged', ['name' => $this->location->responsible?->name]) }}
                     @endif
                 </p>
                 @if ($ownerAssignment->response_note !== null)

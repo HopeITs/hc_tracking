@@ -113,7 +113,7 @@ trait ReadsProjectStory
     public function proposalStoryUrl(int $proposalId, ?string $tab = null): string
     {
         return route('projects.show', array_filter([
-            'project' => $this->project,
+            'project' => $this->location,
             'proposal' => $proposalId,
             'ptab' => $tab,
         ], fn (mixed $value): bool => $value !== null)).'#proposal';
@@ -133,7 +133,7 @@ trait ReadsProjectStory
                 'monthlyReports:id,project_id,period,status,returned_at',
                 ...($this->canViewMoney() ? ['proposals.donorProposals:id,proposal_id,budget,currency', 'proposals.donorProposals.transfers'] : []),
             ])
-            ->findOrFail($this->projectId);
+            ->findOrFail($this->locationId);
 
         $lead = ProjectStage::lead($project->proposals);
         $stage = ProjectStage::stage($project, $lead);
@@ -169,7 +169,7 @@ trait ReadsProjectStory
             return;
         }
 
-        $sent = $nudge->handle(auth()->user(), Project::query()->findOrFail($this->projectId), $next['owner'], $note);
+        $sent = $nudge->handle(auth()->user(), $this->writableProject(), $next['owner'], $note);
 
         Flux::toast(text: $sent ? __('desk.nudged') : __('desk.nudged_already'), variant: $sent ? 'success' : null);
     }
@@ -246,7 +246,7 @@ trait ReadsProjectStory
             'text' => $text,
             'owner' => $owner,
             'mine' => $mine,
-            'ownerName' => $owner !== null ? $this->project->user?->name : null,
+            'ownerName' => $owner !== null ? $this->location->responsible?->name : null,
             'meal' => $meal,
             'nudge' => $nudge && $owner !== null && ! $mine,
             'href' => $href,
@@ -298,7 +298,7 @@ trait ReadsProjectStory
         $donorName = $donor !== '' ? $donor : (string) __('story.the_donor');
         $date = fn ($value): ?string => $value?->translatedFormat(__('formats.date'));
         $done = [
-            0 => [(string) __('story.done.project', ['program' => $this->project->program->name ?? '—', 'owner' => $this->project->user->name ?? '—']), $date($project->created_at)],
+            0 => [(string) __('story.done.project', ['program' => $this->location->program->name ?? '—', 'owner' => $this->location->responsible->name ?? '—']), $date($project->created_at)],
             1 => [(string) __('story.done.concept_note', ['donor' => $donorName]), null],
             2 => [(string) __('story.done.proposal', ['name' => $lead->name ?? '—']), null],
             3 => [$project->start_date === null
@@ -418,7 +418,7 @@ trait ReadsProjectStory
     {
         return array_values(ReportTemplateLine::query()
             ->select(['report_template_lines.id', 'report_template_lines.report_template_id', 'report_template_lines.plan_indicator_id'])
-            ->whereHas('template', fn ($query) => $query->where('project_id', $this->projectId))
+            ->whereHas('template', fn ($query) => $query->where('project_id', $this->locationId))
             ->with(['planIndicator:id,indicator_id', 'planIndicator.indicator:id,code,name,library_indicator_id', 'planIndicator.indicator.libraryIndicator:id,is_disaggregated'])
             ->orderBy('report_template_lines.id')
             ->get()
@@ -499,7 +499,7 @@ trait ReadsProjectStory
      */
     private function storyLede(array $reports): string
     {
-        $parts = [$this->project->status->label().'.'];
+        $parts = [$this->location->status->label().'.'];
 
         if ($reports['total'] > 0) {
             $parts[] = (string) __('story.lede_reports', ['validated' => $reports['validated'], 'total' => $reports['total']]);

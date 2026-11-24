@@ -350,6 +350,64 @@ class ProposalLocation extends Model
     }
 
     /**
+     * The four demographic targets added up, or null when none is set
+     * (Y-16): the twin of `Project::targetDemographicTotal()`, on the columns
+     * Y-11 moved onto the row.
+     */
+    public function targetDemographicTotal(): ?int
+    {
+        $parts = [$this->target_men, $this->target_women, $this->target_boys, $this->target_girls];
+
+        if (array_filter($parts, fn (?int $part): bool => $part !== null) === []) {
+            return null;
+        }
+
+        return (int) array_sum($parts);
+    }
+
+    /**
+     * Where the row stands on its way to being funded, for the badge on the
+     * Projects screen; null when nothing is pending (Y-16).
+     *
+     * The twin of `Project::fundingState()`, and simpler for the same reason:
+     * a row is of exactly one proposal (D-93), so there is one status to read
+     * rather than a set to scan.
+     */
+    public function fundingState(): ?string
+    {
+        $this->loadMissing(['proposal:id,status', 'ownerAssignment']);
+
+        if ($this->status === ProjectStatus::Approved) {
+            return 'funded_awaiting_template';
+        }
+
+        if ($this->status !== ProjectStatus::Draft) {
+            return null;
+        }
+
+        $proposalStatus = $this->proposal?->status;
+
+        if ($proposalStatus?->isApprovedByDonor() === true) {
+            return $this->isOwnerRejected() || $this->ownerAssignment?->status === AssignmentStatus::Acknowledged ? null : 'awaiting_owner';
+        }
+
+        return $proposalStatus === ProposalStatus::Submitted ? 'awaiting_funding' : null;
+    }
+
+    /**
+     * Whether the proposal behind this row is still live (Y-16).
+     *
+     * The twin of `Project::hasActiveProposal()`, and simpler: a row is of
+     * exactly one proposal (D-93), so there is nothing to scan.
+     */
+    public function hasActiveProposal(): bool
+    {
+        $this->loadMissing('proposal:id,status');
+
+        return $this->proposal !== null && ! $this->proposal->status->isTerminal();
+    }
+
+    /**
      * Whether the employee responsible for this row has rejected the
      * appointment, which blocks every change to it (Y-16, D-93).
      *

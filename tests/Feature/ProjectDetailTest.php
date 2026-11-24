@@ -24,7 +24,7 @@ use Livewire\Livewire;
 test('guests are redirected from project detail', function () {
     $project = projectWithRow();
 
-    $this->get(route('projects.show', $project))->assertRedirect(route('login'));
+    $this->get(route('projects.show', rowFor($project)))->assertRedirect(route('login'));
 });
 
 test('project detail shows the project its city program and owner', function () {
@@ -33,7 +33,7 @@ test('project detail shows the project its city program and owner', function () 
     $project = projectWithRow(['name' => 'Aleppo Wells', 'user_id' => $owner]);
 
     $this->actingAs($user)
-        ->get(route('projects.show', $project))
+        ->get(route('projects.show', rowFor($project)))
         ->assertOk()
         ->assertSeeText('Aleppo Wells')
         ->assertSeeText($project->city->name_en)
@@ -56,7 +56,7 @@ test('project detail preserves lifecycle and disagreement between headline and d
     ]);
 
     $this->actingAs($user)
-        ->get(route('projects.show', $project))
+        ->get(route('projects.show', rowFor($project)))
         ->assertOk()
         ->assertSeeText('Active')
         ->assertSeeText('Sep 1, 2026')
@@ -76,7 +76,7 @@ test('project detail displays an em dash when no demographic breakdown exists', 
     ]);
 
     $this->actingAs($user)
-        ->get(route('projects.show', $project))
+        ->get(route('projects.show', rowFor($project)))
         ->assertOk()
         ->assertSeeTextInOrder(['Headline target', '250', 'Demographic total', '—']);
 });
@@ -86,7 +86,7 @@ test('project detail shows a not funded empty state with no linked proposals', f
     $project = projectWithRow();
 
     $this->actingAs($user)
-        ->get(route('projects.show', $project))
+        ->get(route('projects.show', rowFor($project)))
         ->assertOk()
         ->assertSeeText('Not funded yet');
 });
@@ -107,7 +107,7 @@ test('project detail shows committed and received funding per currency', functio
     ]);
 
     $this->actingAs($user)
-        ->get(route('projects.show', $project))
+        ->get(route('projects.show', rowFor($project)))
         ->assertOk()
         ->assertSeeText('1,000.00')
         ->assertSeeText('400.00');
@@ -128,7 +128,7 @@ test('the project has no Risks tab; its risks show as a read-only awareness sect
     Risk::factory()->create(['project_id' => null, 'proposal_id' => $unlinked->id, 'name' => 'منع الوصول', 'name_en' => 'Foreign proposal risk']);
 
     $component = Livewire::actingAs($user)
-        ->test('pages::projects.show', ['project' => $subject])
+        ->test('pages::projects.show', ['project' => rowFor($subject)->slug])
         ->assertSeeHtml('data-test="risk-awareness"')
         ->assertSee('Funding delay')
         ->assertSee('Linked Emergency Grant')
@@ -149,7 +149,7 @@ test('a project with no risks shows no awareness section', function () {
     $user = User::factory()->role('General Manager')->create();
 
     Livewire::actingAs($user)
-        ->test('pages::projects.show', ['project' => projectWithRow()])
+        ->test('pages::projects.show', ['project' => rowFor(projectWithRow())->slug])
         ->assertDontSeeHtml('data-test="risk-awareness"');
 });
 
@@ -158,11 +158,11 @@ test('project detail tasks tab shows tasks raised directly on the project, but n
     $project = projectWithRow();
     $otherProject = projectWithRow();
 
-    Task::factory()->create(['source_type' => 'project', 'source_id' => $project->id, 'title' => 'Sign the site access agreement']);
-    Task::factory()->create(['source_type' => 'project', 'source_id' => $otherProject->id, 'title' => 'Unrelated project task']);
+    Task::factory()->create(['source_type' => 'proposal_location', 'source_id' => rowFor($project)->id, 'title' => 'Sign the site access agreement']);
+    Task::factory()->create(['source_type' => 'proposal_location', 'source_id' => rowFor($otherProject)->id, 'title' => 'Unrelated project task']);
 
     Livewire::actingAs($user)
-        ->test('pages::projects.show', ['project' => $project])
+        ->test('pages::projects.show', ['project' => rowFor($project)->slug])
         ->set('tab', 'tasks')
         ->assertSee('Sign the site access agreement')
         ->assertDontSee('Unrelated project task');
@@ -174,7 +174,7 @@ test('a task can be added from the project show page pre-filled with this projec
     $project = projectWithRow();
 
     Livewire::actingAs($user)
-        ->test('pages::projects.show', ['project' => $project])
+        ->test('pages::projects.show', ['project' => rowFor($project)->slug])
         ->set('tab', 'tasks')
         ->call('openAddTaskModal')
         ->assertSet('showAddTaskModal', true)
@@ -196,7 +196,7 @@ test('adding a task from the project show page requires a title but no assignee'
     $project = projectWithRow();
 
     Livewire::actingAs($user)
-        ->test('pages::projects.show', ['project' => $project])
+        ->test('pages::projects.show', ['project' => rowFor($project)->slug])
         ->set('tab', 'tasks')
         ->call('openAddTaskModal')
         ->set('newTaskTitle', '   ')
@@ -211,7 +211,7 @@ test('a task added from the project page can ask for proof, off by default', fun
     $project = projectWithRow();
 
     $page = Livewire::actingAs($user)
-        ->test('pages::projects.show', ['project' => $project])
+        ->test('pages::projects.show', ['project' => rowFor($project)->slug])
         ->set('tab', 'tasks')
         ->call('openAddTaskModal')
         ->assertSet('newTaskEvidenceRequired', false)
@@ -239,10 +239,11 @@ test('project detail shows targets naming this project', function () {
         'source_id' => AnnualPlan::factory()->create()->id,
         'indicator_id' => $indicator->id,
         'project_id' => $project->id,
+        'proposal_location_id' => rowFor($project)->id,
     ]);
 
     Livewire::actingAs($user)
-        ->test('pages::projects.show', ['project' => $project])
+        ->test('pages::projects.show', ['project' => rowFor($project)->slug])
         ->set('tab', 'targets')
         ->assertSee('People reached');
 });
@@ -258,16 +259,18 @@ test('project detail groups targets by result and shows their source, period and
         'source_id' => AnnualPlan::factory()->create()->id,
         'indicator_id' => $indicator->id,
         'project_id' => $project->id,
+        'proposal_location_id' => rowFor($project)->id,
     ]);
     Report::factory()->create(['plan_indicator_id' => $reportedTarget->id]);
 
     PlanIndicator::factory()->forProposal()->create([
         'indicator_id' => $indicator->id,
         'project_id' => $project->id,
+        'proposal_location_id' => rowFor($project)->id,
     ]);
 
     Livewire::actingAs($user)
-        ->test('pages::projects.show', ['project' => $project])
+        ->test('pages::projects.show', ['project' => rowFor($project)->slug])
         ->set('tab', 'targets')
         ->assertSeeText('Improved access to safe drinking water.')
         ->assertSeeText('People reached')
@@ -285,7 +288,7 @@ test('a proposal can be attached to and detached from a project', function () {
     $proposal->projects()->attach(projectWithRow());
 
     Livewire::actingAs($user)
-        ->test('pages::projects.show', ['project' => $project])
+        ->test('pages::projects.show', ['project' => rowFor($project)->slug])
         ->set('tab', 'proposals')
         ->set('proposalToAttach', (string) $proposal->id)
         ->call('attachProposal')
@@ -294,7 +297,7 @@ test('a proposal can be attached to and detached from a project', function () {
     expect($project->proposals()->whereKey($proposal->id)->exists())->toBeTrue();
 
     Livewire::actingAs($user)
-        ->test('pages::projects.show', ['project' => $project])
+        ->test('pages::projects.show', ['project' => rowFor($project)->slug])
         ->set('tab', 'proposals')
         ->call('detachProposal', $proposal->id);
 
@@ -308,7 +311,7 @@ test('attaching the same proposal twice does not duplicate the pivot row', funct
     $project->proposals()->attach($proposal->id);
 
     Livewire::actingAs($user)
-        ->test('pages::projects.show', ['project' => $project])
+        ->test('pages::projects.show', ['project' => rowFor($project)->slug])
         ->set('tab', 'proposals')
         ->set('proposalToAttach', (string) $proposal->id)
         ->call('attachProposal');
@@ -339,7 +342,7 @@ test('project files list only this projects metadata and download through the au
     ]);
 
     Livewire::actingAs($user)
-        ->test('pages::projects.show', ['project' => $project])
+        ->test('pages::projects.show', ['project' => rowFor($project)->slug])
         ->set('tab', 'files')
         ->assertSee('signed-agreement.pdf')
         ->assertSee('PDF')
@@ -371,7 +374,7 @@ test('project files show a category filter once more than one category is presen
     ]);
 
     $component = Livewire::actingAs($user)
-        ->test('pages::projects.show', ['project' => $project])
+        ->test('pages::projects.show', ['project' => rowFor($project)->slug])
         ->set('tab', 'files')
         ->assertSee('signed-agreement.pdf')
         ->assertSee('site-visit.jpg')
@@ -393,7 +396,7 @@ test('project files show no filter chips when every file shares one category', f
     ]);
 
     Livewire::actingAs($user)
-        ->test('pages::projects.show', ['project' => $project])
+        ->test('pages::projects.show', ['project' => rowFor($project)->slug])
         ->set('tab', 'files')
         ->assertDontSee('All files')
         ->assertDontSee('fileCategoryFilter', false);
@@ -404,7 +407,7 @@ test('project detail escapes free text and offers no project delete action', fun
     $project = projectWithRow(['description' => '<script>alert("project")</script>']);
 
     Livewire::actingAs($user)
-        ->test('pages::projects.show', ['project' => $project])
+        ->test('pages::projects.show', ['project' => rowFor($project)->slug])
         ->assertSee('&lt;script&gt;', false)
         ->assertDontSee('<script>alert("project")</script>', false)
         ->assertDontSee('deleteProject', false)
@@ -416,7 +419,7 @@ test('project detail renders a project with nothing attached', function () {
     $project = projectWithRow(['name' => 'Bare Project']);
 
     $this->actingAs($user)
-        ->get(route('projects.show', $project))
+        ->get(route('projects.show', rowFor($project)))
         ->assertOk()
         ->assertSeeText('Bare Project')
         ->assertSeeText(__('projects.tasks_raised_against_this_project_will_appear_here'));
@@ -430,7 +433,7 @@ test('the project page shows a linked proposal\'s internal number and lists atta
     Proposal::factory()->create(['name' => 'Cash for Work', 'internal_project_number' => 'HC-2026-093']);
 
     Livewire::actingAs($user)
-        ->test('pages::projects.show', ['project' => $project])
+        ->test('pages::projects.show', ['project' => rowFor($project)->slug])
         ->set('tab', 'proposals')
         ->assertSeeHtml('data-placeholder-chip="TEMP-0021"')
         ->assertSee('Cash for Work · HC-2026-093');
@@ -440,16 +443,17 @@ test('New Concept Note opens the proposal form for this project', function () {
     $project = projectWithRow();
 
     Livewire::actingAs(User::factory()->role('Financial')->create())
-        ->test('pages::projects.show', ['project' => $project])
+        ->test('pages::projects.show', ['project' => rowFor($project)->slug])
         ->assertSeeHtml('data-test="new-concept-note"')
         ->assertSeeHtml(e(route('proposals.index', ['for_project' => $project->id])));
 });
 
 test('New Concept Note is offered only to proposal creators on a project that can take a proposal', function (string $role, ProjectStatus $status) {
     $project = Project::factory()->status($status)->create();
+    rowFor($project);
 
     Livewire::actingAs(User::factory()->role($role)->create())
-        ->test('pages::projects.show', ['project' => $project])
+        ->test('pages::projects.show', ['project' => rowFor($project)->slug])
         ->assertDontSeeHtml('data-test="new-concept-note"');
 })->with([
     'no proposals.create' => ['Managers', ProjectStatus::Draft],
@@ -461,9 +465,10 @@ test('the project page says which center hosts a hosted project', function () {
     $idleb = insertHrCity('Idleb', 'إدلب');
     $host = insertHrCenter(insertHrCity('Aleppo', 'حلب'), 'Head Office Aleppo', 'المكتب الرئيسي حلب');
     $project = Project::factory()->hostedBy($host)->create(['name' => 'Wells Idleb', 'city_id' => $idleb]);
+    rowFor($project);
 
     $this->actingAs($user)
-        ->get(route('projects.show', $project))
+        ->get(route('projects.show', rowFor($project)))
         ->assertOk()
         ->assertSeeText('Idleb')
         ->assertSeeText('Hosted by Head Office Aleppo')
@@ -472,7 +477,7 @@ test('the project page says which center hosts a hosted project', function () {
     $centered = projectWithRow(['name' => 'Aleppo Clinics', 'center_id' => $host]);
 
     $this->actingAs($user)
-        ->get(route('projects.show', $centered))
+        ->get(route('projects.show', rowFor($centered)))
         ->assertOk()
         ->assertDontSee('data-test="hosted-by-badge"', false);
 });

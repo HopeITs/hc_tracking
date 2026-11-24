@@ -38,7 +38,7 @@ trait ManagesProjectAssignment
     #[Computed]
     public function ownerAssignment(): ?Assignment
     {
-        return Project::query()->findOrFail($this->projectId)->currentAssignment('user_id')?->load('assigner');
+        return $this->writableProject()->currentAssignment('user_id')?->load('assigner');
     }
 
     public function openAssignmentModal(string $mode): void

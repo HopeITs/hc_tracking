@@ -2,7 +2,7 @@
         <x-ui.panel :title="__('projects.project_indicators')" :count="$this->projectIndicators->sum(fn (array $group): int => $group['indicators']->count())" :subtitle="__('projects.project_indicators_subtitle')" class="mb-6" data-tour="project-indicators">
             @can('indicators.create')
                 <x-slot:toolbar>
-                    <x-ui.button tone="primary" size="sm" icon="plus" :href="route('indicators.index', ['create' => 1, 'project' => $this->projectId])" wire:navigate data-new-indicator>
+                    <x-ui.button tone="primary" size="sm" icon="plus" :href="route('indicators.index', ['create' => 1, 'project' => $this->locationId])" wire:navigate data-new-indicator>
                         {{ __('projects.new_indicator') }}
                     </x-ui.button>
                 </x-slot:toolbar>
@@ -36,7 +36,7 @@
                                                 {{ __('targets.not_linked_to_library') }}
                                             </span>
                                         @endif
-                                        @if ($indicator->project_id === $this->projectId)
+                                        @if ($indicator->project_id === $this->locationId)
                                             <span class="ms-auto inline-flex items-center gap-1 text-[11px] font-semibold text-secondary-medium dark:text-ink-muted">
                                                 <flux:icon.map-pin variant="micro" class="size-3" aria-hidden="true" />
                                                 {{ __('projects.indicator_scoped_here') }}

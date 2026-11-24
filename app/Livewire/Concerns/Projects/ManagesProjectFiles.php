@@ -80,7 +80,7 @@ trait ManagesProjectFiles
     #[Computed]
     public function fileCategoryCounts(): array
     {
-        $files = $this->project->media;
+        $files = $this->location->media;
 
         $counts = [[
             'value' => 'all',
@@ -109,10 +109,10 @@ trait ManagesProjectFiles
     public function filteredProjectFiles(): Collection
     {
         if ($this->fileCategoryFilter === 'all') {
-            return $this->project->media;
+            return $this->location->media;
         }
 
-        return $this->project->media
+        return $this->location->media
             ->filter(fn (Media $media): bool => $media->collection->value === $this->fileCategoryFilter)
             ->values();
     }
@@ -128,8 +128,8 @@ trait ManagesProjectFiles
     private function projectFile(int $mediaId): Media
     {
         $media = Media::query()
-            ->where('mediable_type', 'project')
-            ->where('mediable_id', $this->projectId)
+            ->where('mediable_type', 'proposal_location')
+            ->where('mediable_id', $this->locationId)
             ->findOrFail($mediaId);
 
         abort_if(in_array($media->collection->value, $this->hiddenCollections(), true), 403);
@@ -139,7 +139,7 @@ trait ManagesProjectFiles
 
     public function openCreateFileModal(): void
     {
-        Gate::authorize('update', Project::query()->findOrFail($this->projectId));
+        Gate::authorize('update', $this->writableProject());
 
         $this->resetValidation();
         $this->editingFileId = null;
@@ -151,7 +151,7 @@ trait ManagesProjectFiles
 
     public function openEditFileModal(int $mediaId): void
     {
-        Gate::authorize('update', Project::query()->findOrFail($this->projectId));
+        Gate::authorize('update', $this->writableProject());
 
         $media = $this->projectFile($mediaId);
 
@@ -172,7 +172,7 @@ trait ManagesProjectFiles
      */
     public function saveFile(): void
     {
-        Gate::authorize('update', Project::query()->findOrFail($this->projectId));
+        Gate::authorize('update', $this->writableProject());
 
         if ($this->editingFileId === null) {
             $allowedTypes = implode(',', FileType::values());
@@ -188,7 +188,7 @@ trait ManagesProjectFiles
 
             abort_if(in_array($validated['fileCategory'], $this->hiddenCollections(), true), 403);
 
-            app(SaveProjectFile::class)->handle(Project::query()->findOrFail($this->projectId), null, $this->newFile, $validated);
+            app(SaveProjectFile::class)->handle($this->writableProject(), null, $this->newFile, $validated);
 
             $toast = __('projects.file_uploaded');
         } else {
@@ -203,20 +203,20 @@ trait ManagesProjectFiles
 
             abort_if(in_array($validated['fileCategory'], $this->hiddenCollections(), true), 403);
 
-            app(SaveProjectFile::class)->handle(Project::query()->findOrFail($this->projectId), $media, null, $validated);
+            app(SaveProjectFile::class)->handle($this->writableProject(), $media, null, $validated);
 
             $toast = __('projects.file_updated');
         }
 
         $this->closeFileModal();
-        unset($this->project, $this->fileCategoryCounts, $this->filteredProjectFiles);
+        unset($this->location, $this->fileCategoryCounts, $this->filteredProjectFiles);
 
         Flux::toast(variant: 'success', text: $toast);
     }
 
     public function confirmDeleteFile(int $mediaId): void
     {
-        Gate::authorize('update', Project::query()->findOrFail($this->projectId));
+        Gate::authorize('update', $this->writableProject());
 
         $media = $this->projectFile($mediaId);
 
@@ -232,15 +232,15 @@ trait ManagesProjectFiles
      */
     public function deleteFile(): void
     {
-        Gate::authorize('update', Project::query()->findOrFail($this->projectId));
+        Gate::authorize('update', $this->writableProject());
 
         $media = $this->projectFile($this->deletingFileId);
 
-        app(DeleteProjectFile::class)->handle(Project::query()->findOrFail($this->projectId), $media);
+        app(DeleteProjectFile::class)->handle($this->writableProject(), $media);
 
         $this->confirmingFileDelete = false;
         $this->deletingFileId = null;
-        unset($this->project, $this->fileCategoryCounts, $this->filteredProjectFiles);
+        unset($this->location, $this->fileCategoryCounts, $this->filteredProjectFiles);
 
         Flux::toast(variant: 'success', text: __('projects.file_deleted'));
     }

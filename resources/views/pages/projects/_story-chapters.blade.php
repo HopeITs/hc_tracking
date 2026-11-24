@@ -20,13 +20,13 @@
         3 => array_values(array_filter(['status', $this->canViewAgreements() ? 'funding' : null])),
         6 => ['reports', 'status'],
     ];
-    $project = $this->project;
+    $project = $this->location;
     $demographics = ['men' => $project->target_men, 'women' => $project->target_women, 'boys' => $project->target_boys, 'girls' => $project->target_girls];
     $openSection = $section;
     $sections = [
         'overview' => ['label' => __('story.sections.overview'), 'count' => null],
         'work' => ['label' => __('story.sections.work'), 'count' => $this->tasks->count() ?: null],
-        'funding' => ['label' => __('story.sections.funding'), 'count' => $project->proposals_count ?: null],
+        'funding' => ['label' => __('story.sections.funding'), 'count' => 1 ?: null],
         'files' => ['label' => __('story.sections.files'), 'count' => $project->media_count ?: null],
     ];
     $lastStage = count($stages) - 1;

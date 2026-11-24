@@ -8,6 +8,7 @@ use App\Actions\Proposals\LinkProposalProject;
 use App\Actions\Proposals\UnlinkProposalProject;
 use App\Enums\Currency;
 use App\Enums\ProposalPhase;
+use App\Enums\ProposalStatus;
 use App\Models\DonorProposal;
 use App\Models\Project;
 use App\Models\Proposal;
@@ -60,7 +61,7 @@ trait ReadsProjectFunding
 
         return DonorProposal::query()
             ->select(['id', 'proposal_id', 'currency', 'budget'])
-            ->whereHas('proposal.projects', fn ($query) => $query->whereKey($this->projectId))
+            ->whereHas('proposal.projects', fn ($query) => $query->whereKey($this->locationId))
             ->with(['transfers:id,donor_proposal_id,net_amount_received'])
             ->get()
             ->groupBy(fn (DonorProposal $donorProposal) => $donorProposal->currency->value)
@@ -87,7 +88,10 @@ trait ReadsProjectFunding
         $viewer = Auth::user();
         $needsReviewerRows = $viewer?->employee_id !== null && ! $viewer->can('proposals.view');
 
-        return $this->project->proposals()
+        // A row is of exactly one proposal (D-93), so its funding is that one;
+        // the shape stays a collection because the view lists it.
+        return Proposal::query()
+            ->whereKey($this->location->proposal_id)
             ->select(['proposals.id', 'proposals.name', 'proposals.internal_project_number', 'proposals.status', 'proposals.planned_date_begin', 'proposals.planned_date_end'])
             ->with('donorNames:id,name')
             ->when($needsReviewerRows, fn ($query) => $query->with(['reviewers' => fn ($query) => $query
@@ -114,7 +118,9 @@ trait ReadsProjectFunding
     #[Computed]
     public function fundingHistory(): Collection
     {
-        return $this->project->proposals()
+        // The row's own proposal, and the chain of renewals behind it (T10).
+        return Proposal::query()
+            ->whereKey($this->location->proposal_id)
             ->select(['proposals.id', 'proposals.slug', 'proposals.name', 'proposals.internal_project_number', 'proposals.status', 'proposals.donor_id', 'proposals.previous_proposal_id', 'proposals.planned_date_begin', 'proposals.planned_date_end', 'proposals.actual_date_begin', 'proposals.actual_date_end'])
             ->with(['donor:id,name', 'previousProposal:id,internal_project_number'])
             ->orderBy('proposals.planned_date_begin')
@@ -132,7 +138,15 @@ trait ReadsProjectFunding
     #[Computed]
     public function fundingSources(): Collection
     {
-        return $this->project->fundingSources($this->canViewAgreements());
+        $statuses = array_values(array_filter(ProposalStatus::cases(), fn (ProposalStatus $status): bool => $status->isApprovedByDonor()));
+        $columns = ['proposals.id', 'proposals.name', 'proposals.slug', 'proposals.status', 'proposals.donor_id'];
+
+        return Proposal::query()
+            ->whereKey($this->location->proposal_id)
+            ->whereIn('proposals.status', $statuses)
+            ->select($this->canViewAgreements() ? [...$columns, 'proposals.requested_budget', 'proposals.requested_currency'] : $columns)
+            ->with('donor:id,name')
+            ->get();
     }
 
     /**
@@ -194,13 +208,13 @@ trait ReadsProjectFunding
     public function attachableProposals(): Collection
     {
         if (! (auth()->user()?->can('proposals.update') ?? false)
-            || ! Project::query()->linkableToProposals()->whereKey($this->projectId)->exists()) {
+            || ! Project::query()->linkableToProposals()->whereKey($this->locationId)->exists()) {
             return new Collection;
         }
 
         return Proposal::query()
             ->select(['id', 'name', 'internal_project_number', 'status'])
-            ->whereDoesntHave('projects', fn ($query) => $query->whereKey($this->projectId))
+            ->whereDoesntHave('projects', fn ($query) => $query->whereKey($this->locationId))
             ->orderBy('name')
             ->orderBy('id')
             ->get();
@@ -219,7 +233,7 @@ trait ReadsProjectFunding
         return $user !== null
             && $user->can('create', Proposal::class)
             && $user->can('projects.view')
-            && Project::query()->linkableToProposals()->whereKey($this->projectId)->exists();
+            && Project::query()->linkableToProposals()->whereKey($this->locationId)->exists();
     }
 
     /**
@@ -237,13 +251,13 @@ trait ReadsProjectFunding
         ]);
 
         try {
-            app(LinkProposalProject::class)->handle(Proposal::query()->findOrFail((int) $validated['proposalToAttach']), $this->projectId);
+            app(LinkProposalProject::class)->handle(Proposal::query()->findOrFail((int) $validated['proposalToAttach']), $this->locationId);
         } catch (ValidationException $exception) {
             throw ValidationException::withMessages(['proposalToAttach' => $exception->validator->errors()->all()]);
         }
 
         $this->proposalToAttach = '';
-        unset($this->project, $this->attachedProposals, $this->attachableProposals);
+        unset($this->location, $this->attachedProposals, $this->attachableProposals);
 
         Flux::toast(variant: 'success', text: __('projects.proposal_linked_to_this_project'));
     }
@@ -256,7 +270,7 @@ trait ReadsProjectFunding
     public function detachProposal(int $proposalId): void
     {
         try {
-            app(UnlinkProposalProject::class)->handle(Proposal::query()->findOrFail($proposalId), $this->projectId);
+            app(UnlinkProposalProject::class)->handle(Proposal::query()->findOrFail($proposalId), $this->locationId);
         } catch (ValidationException $exception) {
             $this->setErrorBag($exception->validator->errors());
             Flux::toast(variant: 'danger', text: $exception->validator->errors()->first());
@@ -264,7 +278,7 @@ trait ReadsProjectFunding
             return;
         }
 
-        unset($this->project, $this->attachedProposals, $this->attachableProposals);
+        unset($this->location, $this->attachedProposals, $this->attachableProposals);
 
         Flux::toast(variant: 'success', text: __('projects.proposal_unlinked_from_this_project'));
     }
