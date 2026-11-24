@@ -106,6 +106,11 @@ return [
         'donor' => 'المانح',
         'internal' => 'داخلي',
     ],
+    'active_report_type' => [
+        'monthly' => 'تقرير شهري',
+        'donor' => 'تقرير مانح',
+        'report' => 'تقرير',
+    ],
     'donor_report_state' => [
         'due' => 'بانتظار التسليم',
         'overdue' => 'متأخر',
