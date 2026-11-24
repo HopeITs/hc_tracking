@@ -125,6 +125,9 @@ trait ReadsProjectStory
     #[Computed]
     public function story(): array
     {
+        // The Story's stages come from ProjectStage, which slice 4 moves to the
+        // row; until then it needs the project, reached through the row's
+        // project_id (never the row's own id — they are different keys).
         $project = Project::query()
             ->select(['id', 'status', 'start_date', 'end_date', 'user_id', 'created_at'])
             ->with([
@@ -133,7 +136,7 @@ trait ReadsProjectStory
                 'monthlyReports:id,project_id,period,status,returned_at',
                 ...($this->canViewMoney() ? ['proposals.donorProposals:id,proposal_id,budget,currency', 'proposals.donorProposals.transfers'] : []),
             ])
-            ->findOrFail($this->locationId);
+            ->findOrFail($this->location->project_id);
 
         $lead = ProjectStage::lead($project->proposals);
         $stage = ProjectStage::stage($project, $lead);

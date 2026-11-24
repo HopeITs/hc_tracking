@@ -294,14 +294,17 @@ test('a draft with dates is only allowed behind a donor-approved proposal', func
 });
 
 test('a draft project page shows the no-active-proposal badge', function () {
-    $draft = projectWithRow();
+    // Y-16, D-93: the badge reads the ONE proposal behind the row, so the row
+    // is built on a terminal proposal to have none in play, then on a live one.
+    $draft = Project::factory()->create();
+    $row = rowFor($draft, Proposal::factory()->create(['status' => ProposalStatus::Rejected]));
 
-    Livewire::actingAs($this->user)->test('pages::projects.show', ['project' => $draft])
+    Livewire::actingAs($this->user)->test('pages::projects.show', ['project' => $row->slug])
         ->assertSeeHtml('data-test="no-active-proposal"');
 
-    Proposal::factory()->create(['status' => ProposalStatus::ProposalDraft])->projects()->attach($draft->id);
+    DB::table('proposals')->where('id', $row->proposal_id)->update(['status' => ProposalStatus::ProposalDraft->value]);
 
-    Livewire::actingAs($this->user)->test('pages::projects.show', ['project' => $draft])
+    Livewire::actingAs($this->user)->test('pages::projects.show', ['project' => $row->slug])
         ->assertDontSeeHtml('data-test="no-active-proposal"');
 });
 
@@ -312,9 +315,12 @@ test('the draft messages read in Arabic', function () {
         ->assertHasErrors(['startDate'])
         ->assertSee('تُحدَّد تواريخ المشروع عند اعتماد المقترح');
 
-    $draft = projectWithRow();
+    // Y-16, D-93: "no active proposal" reads the one proposal behind the row,
+    // so the row is built on a terminal one.
+    $draft = Project::factory()->create();
+    $row = rowFor($draft, Proposal::factory()->create(['status' => ProposalStatus::Rejected]));
 
-    Livewire::actingAs($this->user)->test('pages::projects.show', ['project' => $draft])
+    Livewire::actingAs($this->user)->test('pages::projects.show', ['project' => $row->slug])
         ->assertSee('لا يوجد مقترح فعّال');
 });
 

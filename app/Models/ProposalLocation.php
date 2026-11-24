@@ -9,6 +9,7 @@ use App\Concerns\HasSlug;
 use App\Concerns\RecordsParentActivity;
 use App\Enums\AssignmentStatus;
 use App\Enums\ProjectStatus;
+use App\Enums\ProposalStatus;
 use App\Notifications\TracksActivity;
 use App\Observers\MediaOwnerObserver;
 use App\Observers\ProposalLocationObserver;

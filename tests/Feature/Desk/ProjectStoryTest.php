@@ -33,7 +33,7 @@ test('the Story marks the chapters before the lead proposal done, its own chapte
     $project = storyProject(ProposalStatus::ProposalDraft);
 
     Livewire::actingAs(userWithRole('General Manager'))
-        ->test('pages::projects.show', ['project' => $project])
+        ->test('pages::projects.show', ['project' => rowFor($project)->slug])
         ->assertSeeHtml('data-chapter="0" data-state="done"')
         ->assertSeeHtml('data-chapter="1" data-state="done"')
         ->assertSeeHtml('data-chapter="2" data-state="now"')
@@ -48,7 +48,7 @@ test('a running project with last month\'s report still open is off track and as
     Activity::withoutRecording(fn () => MonthlyReport::factory()->create(['project_id' => $project->id, 'period' => '2026-08-01']));
 
     Livewire::actingAs($owner)
-        ->test('pages::projects.show', ['project' => $project])
+        ->test('pages::projects.show', ['project' => rowFor($project)->slug])
         ->assertSeeHtml('data-chapter="5" data-state="now"')
         ->assertSee('Submit the August 2026 report')
         ->assertSee('Off track')
@@ -61,7 +61,7 @@ test('the monthly reports card of a running project opens the Monthly Reports pa
     $project = storyProject(ProposalStatus::Active, $owner->employee_id, ProjectStatus::Active);
 
     Livewire::actingAs($owner)
-        ->test('pages::projects.show', ['project' => $project])
+        ->test('pages::projects.show', ['project' => rowFor($project)->slug])
         ->assertSeeHtmlInOrder(['data-test="story-reporting"', 'href="'.route('monthly-reports.index').'"', __('story.open.monthly_reports').'</a>']);
 });
 
@@ -71,7 +71,7 @@ test('nudging the holder of the next step reaches them once a day', function () 
     $project = storyProject(ProposalStatus::ConceptNote, $owner->employee_id);
 
     $story = Livewire::actingAs($viewer)
-        ->test('pages::projects.show', ['project' => $project])
+        ->test('pages::projects.show', ['project' => rowFor($project)->slug])
         ->assertSee('Waiting on Rana Darwish.')
         ->assertSeeHtml('data-test="story-nudge"')
         ->call('nudgeNextStep')
@@ -87,11 +87,11 @@ test('the Story shows money received only to viewers who may see money', functio
     Activity::withoutRecording(fn () => DonorProposal::factory()->create(['proposal_id' => $proposal->id, 'budget' => 1000]));
 
     Livewire::actingAs(userWithRole('General Manager'))
-        ->test('pages::projects.show', ['project' => $project])
+        ->test('pages::projects.show', ['project' => rowFor($project)->slug])
         ->assertSeeHtml('data-test="story-received"');
 
     Livewire::actingAs(userWithRole('Team Member'))
-        ->test('pages::projects.show', ['project' => $project])
+        ->test('pages::projects.show', ['project' => rowFor($project)->slug])
         ->assertDontSeeHtml('data-test="story-received"');
 });
 
@@ -162,7 +162,7 @@ test('the Story embeds the chosen proposal on the asked tab and ignores a propos
     $viewer = userWithRole('General Manager');
 
     Livewire::actingAs($viewer)->withQueryParams(['proposal' => (string) $second->id, 'ptab' => 'deadlines'])
-        ->test('pages::projects.show', ['project' => $project])
+        ->test('pages::projects.show', ['project' => rowFor($project)->slug])
         ->assertSet('embeddedProposalId', $second->id)
         ->assertSeeHtml('data-proposal-id="'.$second->id.'"')
         ->assertSeeHtml('data-tab-panel="deadlines"')
@@ -176,7 +176,7 @@ test('the Story embeds the chosen proposal on the asked tab and ignores a propos
         ->assertDontSeeHtml('data-detail-back');
 
     Livewire::actingAs($viewer)->withQueryParams(['proposal' => (string) $stranger->id])
-        ->test('pages::projects.show', ['project' => $project])
+        ->test('pages::projects.show', ['project' => rowFor($project)->slug])
         ->assertSet('embeddedProposalId', $lead->id);
 });
 
@@ -226,7 +226,7 @@ test('a rejected proposal keeps its owner on the next step but offers no nudge',
     $project = storyProject(ProposalStatus::Rejected, $owner->employee_id);
 
     Livewire::actingAs(userWithRole('General Manager'))
-        ->test('pages::projects.show', ['project' => $project])
+        ->test('pages::projects.show', ['project' => rowFor($project)->slug])
         ->assertSee('Waiting on Rana Darwish.')
         ->assertDontSeeHtml('data-test="story-nudge"');
 });

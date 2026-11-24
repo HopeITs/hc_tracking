@@ -37,7 +37,7 @@ beforeEach(function () {
 
 function projectTargetsTab(User $user, Project $project): Testable
 {
-    return Livewire::actingAs($user)->test('pages::projects.show', ['project' => $project])->set('tab', 'targets');
+    return Livewire::actingAs($user)->test('pages::projects.show', ['project' => rowFor($project)->slug])->set('tab', 'targets');
 }
 
 function scopeIndicator(Project $project, Indicator $indicator): Indicator

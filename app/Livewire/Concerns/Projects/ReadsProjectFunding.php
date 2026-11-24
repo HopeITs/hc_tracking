@@ -208,7 +208,7 @@ trait ReadsProjectFunding
     public function attachableProposals(): Collection
     {
         if (! (auth()->user()?->can('proposals.update') ?? false)
-            || ! Project::query()->linkableToProposals()->whereKey($this->locationId)->exists()) {
+            || ! Project::query()->linkableToProposals()->whereKey($this->location->project_id)->exists()) {
             return new Collection;
         }
 
@@ -233,7 +233,7 @@ trait ReadsProjectFunding
         return $user !== null
             && $user->can('create', Proposal::class)
             && $user->can('projects.view')
-            && Project::query()->linkableToProposals()->whereKey($this->locationId)->exists();
+            && Project::query()->linkableToProposals()->whereKey($this->location->project_id)->exists();
     }
 
     /**
@@ -251,7 +251,7 @@ trait ReadsProjectFunding
         ]);
 
         try {
-            app(LinkProposalProject::class)->handle(Proposal::query()->findOrFail((int) $validated['proposalToAttach']), $this->locationId);
+            app(LinkProposalProject::class)->handle(Proposal::query()->findOrFail((int) $validated['proposalToAttach']), (int) $this->location->project_id);
         } catch (ValidationException $exception) {
             throw ValidationException::withMessages(['proposalToAttach' => $exception->validator->errors()->all()]);
         }
@@ -270,7 +270,7 @@ trait ReadsProjectFunding
     public function detachProposal(int $proposalId): void
     {
         try {
-            app(UnlinkProposalProject::class)->handle(Proposal::query()->findOrFail($proposalId), $this->locationId);
+            app(UnlinkProposalProject::class)->handle(Proposal::query()->findOrFail($proposalId), (int) $this->location->project_id);
         } catch (ValidationException $exception) {
             $this->setErrorBag($exception->validator->errors());
             Flux::toast(variant: 'danger', text: $exception->validator->errors()->first());

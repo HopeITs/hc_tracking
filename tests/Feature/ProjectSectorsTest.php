@@ -235,7 +235,7 @@ describe('display', function () {
             Sector::factory()->inactive()->create(['name_en' => 'Old sector', 'sort_order' => 2])->id,
         ]);
 
-        $this->actingAs(userWithRole('Team Member'))->get(route('projects.show', $project))
+        $this->actingAs(userWithRole('Team Member'))->get(route('projects.show', rowFor($project)))
             ->assertOk()
             ->assertSeeInOrder(['data-test="project-sectors"', 'Protection', 'Old sector', __('sectors.inactive')], false);
     });

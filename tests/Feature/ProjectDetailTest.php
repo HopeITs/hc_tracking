@@ -117,13 +117,17 @@ test('the project has no Risks tab; its risks show as a read-only awareness sect
     $user = User::factory()->role('General Manager')->create();
     $subject = projectWithRow();
     $other = projectWithRow();
-    $linked = Proposal::factory()->create(['name' => 'Linked Emergency Grant']);
-    $unlinked = Proposal::factory()->create();
-    DB::table('project_proposal')->insert(['project_id' => $subject->id, 'proposal_id' => $linked->id]);
-    DB::table('project_proposal')->insert(['project_id' => $other->id, 'proposal_id' => $unlinked->id]);
+    // Y-16, D-93: a register risk belongs to the row; a logframe risk belongs
+    // to the one proposal behind it. The row's proposal is renamed so the
+    // assertion still has a name to look for.
+    $subjectRow = rowFor($subject);
+    $otherRow = rowFor($other);
+    $linked = $subjectRow->proposal;
+    $linked->update(['name' => 'Linked Emergency Grant']);
+    $unlinked = $otherRow->proposal;
 
-    Risk::factory()->create(['project_id' => $subject->id, 'name' => 'Access restrictions']);
-    Risk::factory()->create(['project_id' => $other->id, 'name' => 'Currency collapse']);
+    Risk::factory()->create(['project_id' => $subject->id, 'proposal_location_id' => $subjectRow->id, 'name' => 'Access restrictions']);
+    Risk::factory()->create(['project_id' => $other->id, 'proposal_location_id' => $otherRow->id, 'name' => 'Currency collapse']);
     Risk::factory()->create(['project_id' => null, 'proposal_id' => $linked->id, 'name' => 'تأخر التمويل', 'name_en' => 'Funding delay', 'likelihood' => 3, 'severity' => 2]);
     Risk::factory()->create(['project_id' => null, 'proposal_id' => $unlinked->id, 'name' => 'منع الوصول', 'name_en' => 'Foreign proposal risk']);
 
@@ -186,8 +190,8 @@ test('a task can be added from the project show page pre-filled with this projec
 
     $task = Task::query()->where('title', 'Household survey')->sole();
 
-    expect($task->source_type)->toBe('project')
-        ->and($task->source_id)->toBe($project->id)
+    expect($task->source_type)->toBe('proposal_location')
+        ->and($task->source_id)->toBe(rowFor($project)->id)
         ->and($task->taskAssignees->pluck('employee_id')->all())->toBe([$assignee]);
 });
 
@@ -263,8 +267,10 @@ test('project detail groups targets by result and shows their source, period and
     ]);
     Report::factory()->create(['plan_indicator_id' => $reportedTarget->id]);
 
+    // Y-10: one target per indicator per row, so the proposal target that
+    // sits beside the plan one needs its own indicator.
     PlanIndicator::factory()->forProposal()->create([
-        'indicator_id' => $indicator->id,
+        'indicator_id' => Indicator::factory()->create(['name' => 'Households served', 'result_id' => $indicator->result_id])->id,
         'project_id' => $project->id,
         'proposal_location_id' => rowFor($project)->id,
     ]);
@@ -327,16 +333,16 @@ test('project files list only this projects metadata and download through the au
     $project = projectWithRow();
     $otherProject = projectWithRow();
     $media = Media::factory()->inCollection(MediaCollection::Agreement)->create([
-        'mediable_type' => 'project',
-        'mediable_id' => $project->id,
+        'mediable_type' => 'proposal_location',
+        'mediable_id' => rowFor($project)->id,
         'original_name' => 'signed-agreement.pdf',
         'path' => 'media/private-storage-name.pdf',
         'type' => FileType::Pdf,
         'uploaded_at' => '2026-09-10',
     ]);
     Media::factory()->create([
-        'mediable_type' => 'project',
-        'mediable_id' => $otherProject->id,
+        'mediable_type' => 'proposal_location',
+        'mediable_id' => rowFor($otherProject)->id,
         'original_name' => 'other-project-photo.jpg',
         'type' => FileType::Jpg,
     ]);
@@ -348,7 +354,7 @@ test('project files list only this projects metadata and download through the au
         ->assertSee('PDF')
         ->assertSee('Agreement')
         ->assertSee('Sep 10, 2026')
-        ->assertSee(route('projects.files.download', [$project, $media]), false)
+        ->assertSee(route('projects.files.download', [rowFor($project), $media]), false)
         ->assertDontSee('other-project-photo.jpg')
         ->assertDontSee('media/private-storage-name.pdf')
         ->assertDontSee('href="media/private-storage-name.pdf"', false);
@@ -359,16 +365,16 @@ test('project files show a category filter once more than one category is presen
     $project = projectWithRow();
     $uploader = User::factory()->create(['name' => 'Nadia Haddad']);
     Media::factory()->inCollection(MediaCollection::Agreement)->create([
-        'mediable_type' => 'project',
-        'mediable_id' => $project->id,
+        'mediable_type' => 'proposal_location',
+        'mediable_id' => rowFor($project)->id,
         'original_name' => 'signed-agreement.pdf',
         'type' => FileType::Pdf,
         'size' => 1_500_000,
         'uploaded_by' => $uploader->id,
     ]);
     Media::factory()->inCollection(MediaCollection::Photo)->create([
-        'mediable_type' => 'project',
-        'mediable_id' => $project->id,
+        'mediable_type' => 'proposal_location',
+        'mediable_id' => rowFor($project)->id,
         'original_name' => 'site-visit.jpg',
         'type' => FileType::Jpg,
     ]);
@@ -391,8 +397,8 @@ test('project files show no filter chips when every file shares one category', f
     $user = User::factory()->role('General Manager')->create();
     $project = projectWithRow();
     Media::factory()->inCollection(MediaCollection::Evidence)->count(2)->create([
-        'mediable_type' => 'project',
-        'mediable_id' => $project->id,
+        'mediable_type' => 'proposal_location',
+        'mediable_id' => rowFor($project)->id,
     ]);
 
     Livewire::actingAs($user)
@@ -428,7 +434,9 @@ test('project detail renders a project with nothing attached', function () {
 test('the project page shows a linked proposal\'s internal number and lists attachable ones by number', function () {
     $user = User::factory()->role('General Manager')->create();
     $project = projectWithRow();
-    $linked = Proposal::factory()->create(['name' => 'Winter Shelter Kit', 'internal_project_number' => 'TEMP-0021']);
+    // D-93: the row carries one proposal, so that is the one the page names.
+    $linked = rowFor($project)->proposal;
+    $linked->update(['name' => 'Winter Shelter Kit', 'internal_project_number' => 'TEMP-0021']);
     $project->proposals()->attach($linked->id);
     Proposal::factory()->create(['name' => 'Cash for Work', 'internal_project_number' => 'HC-2026-093']);
 
@@ -460,24 +468,33 @@ test('New Concept Note is offered only to proposal creators on a project that ca
     'archived project' => ['Financial', ProjectStatus::Archived],
 ]);
 
-test('the project page says which center hosts a hosted project', function () {
+test('the project page names the place of its row, and carries no host-centre badge', function () {
+    // Y-16, D-93: the page is a location row, and a row has no host centre —
+    // `projects.host_center_id` is a project column Y-11 did not move. A row
+    // with no centre answers "field work" instead (D-88), so the badge is
+    // gone from this page. The directory still shows it while it is
+    // project-keyed. **Dev 1: the host centre either moves onto the row or
+    // retires with `projects` in Y-18.**
     $user = User::factory()->role('General Manager')->create();
     $idleb = insertHrCity('Idleb', 'إدلب');
     $host = insertHrCenter(insertHrCity('Aleppo', 'حلب'), 'Head Office Aleppo', 'المكتب الرئيسي حلب');
     $project = Project::factory()->hostedBy($host)->create(['name' => 'Wells Idleb', 'city_id' => $idleb]);
-    rowFor($project);
+    $row = rowFor($project);
+    $row->centers()->delete();
+    $row->update(['city_wide' => true]);
 
     $this->actingAs($user)
-        ->get(route('projects.show', rowFor($project)))
+        ->get(route('projects.show', $row->fresh()))
         ->assertOk()
         ->assertSeeText('Idleb')
-        ->assertSeeText('Hosted by Head Office Aleppo')
-        ->assertSee('data-test="hosted-by-badge"', false);
+        ->assertSeeText(__('proposals.location_field_work'))
+        ->assertDontSee('data-test="hosted-by-badge"', false);
 
     $centered = projectWithRow(['name' => 'Aleppo Clinics', 'center_id' => $host]);
 
     $this->actingAs($user)
         ->get(route('projects.show', rowFor($centered)))
         ->assertOk()
+        ->assertSeeText('Head Office Aleppo')
         ->assertDontSee('data-test="hosted-by-badge"', false);
 });

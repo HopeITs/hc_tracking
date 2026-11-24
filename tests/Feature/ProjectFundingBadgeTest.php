@@ -43,7 +43,7 @@ test('the detail page and the directory show the funding badge in English and Ar
     $waiting = draftLinkedTo(ProposalStatus::Approved);
     $user = userWithRole('General Manager');
 
-    Livewire::actingAs($user)->test('pages::projects.show', ['project' => $waiting])
+    Livewire::actingAs($user)->test('pages::projects.show', ['project' => rowFor($waiting)->slug])
         ->assertSeeHtml('data-test="funding-badge-awaiting_owner"')
         ->assertSee(__('projects.awaiting_owner_acknowledgement'));
 

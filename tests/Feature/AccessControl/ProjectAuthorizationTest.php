@@ -12,7 +12,7 @@ beforeEach(function () {
     $this->ownerEmployee = insertHrEmployee();
     $this->owner = userWithRole('Team Member', $this->ownerEmployee);
     $this->project = projectWithRow(['user_id' => $this->ownerEmployee]);
-    $this->show = fn (User $user) => Livewire::actingAs($user)->test('pages::projects.show', ['project' => $this->project]);
+    $this->show = fn (User $user) => Livewire::actingAs($user)->test('pages::projects.show', ['project' => rowFor($this->project)->slug]);
     $this->index = fn (User $user) => Livewire::actingAs($user)->test('pages::projects.index');
 });
 

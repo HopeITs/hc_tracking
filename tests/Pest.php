@@ -769,14 +769,15 @@ function proposalPlaceRow(): array
  *
  * One line for the tests that navigate to `projects.index` or `projects.show`,
  * composing with any factory state the test already uses. The proposal is
- * approved, because a project exists only once one was (D-84), and the row
+ * approved unless a proposal is given, because a project exists only once
+ * one was (D-84), and the row
  * mirrors what Y-11 moved onto it so `locations:verify-mirror` stays happy.
  * The row takes the project's own centre when it has one and is "centre not
  * set" otherwise (D-82) — never a centre invented for it.
  */
-function rowFor(Project $project): ProposalLocation
+function rowFor(Project $project, ?Proposal $proposal = null): ProposalLocation
 {
-    return Activity::withoutRecording(function () use ($project): ProposalLocation {
+    return Activity::withoutRecording(function () use ($project, $proposal): ProposalLocation {
         $existing = ProposalLocation::query()->where('project_id', $project->id)->orderBy('id')->first();
 
         if ($existing !== null) {
@@ -786,7 +787,7 @@ function rowFor(Project $project): ProposalLocation
         // The project id keeps the name, and so the row's slug, unique and
         // stable: faker repeats project names, and `proposal_locations.slug`
         // is unique (Y-11).
-        $proposal = Proposal::factory()->running()->create(array_filter([
+        $proposal ??= Proposal::factory()->running()->create(array_filter([
             'name' => $project->name.' #'.$project->id,
             'planned_date_begin' => $project->start_date?->toDateString(),
             'planned_date_end' => $project->end_date?->toDateString(),
@@ -798,6 +799,13 @@ function rowFor(Project $project): ProposalLocation
             'start_date' => $project->start_date,
             'end_date' => $project->end_date,
             'target_beneficiaries' => $project->target_beneficiaries,
+            'target_men' => $project->target_men,
+            'target_women' => $project->target_women,
+            'target_boys' => $project->target_boys,
+            'target_girls' => $project->target_girls,
+            'description' => $project->description,
+            'schedule_weekend' => $project->schedule_weekend,
+            'working_days' => $project->working_days,
         ]);
 
         if ($project->center_id !== null) {

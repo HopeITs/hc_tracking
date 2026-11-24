@@ -15,7 +15,7 @@ test('uploading a valid file creates a media row and writes the file to disk', f
     $file = validUpload('signed-agreement.pdf', 100);
 
     Livewire::actingAs($user)
-        ->test('pages::projects.show', ['project' => $project])
+        ->test('pages::projects.show', ['project' => rowFor($project)->slug])
         ->set('tab', 'files')
         ->call('openCreateFileModal')
         ->set('newFile', $file)
@@ -42,7 +42,7 @@ test('a display name typed without an extension keeps the uploaded files real ex
     $file = validUpload('photo.jpg', 100);
 
     Livewire::actingAs($user)
-        ->test('pages::projects.show', ['project' => $project])
+        ->test('pages::projects.show', ['project' => rowFor($project)->slug])
         ->set('tab', 'files')
         ->call('openCreateFileModal')
         ->set('newFile', $file)
@@ -64,7 +64,7 @@ test('uploading a file over 5mb is refused on upload and stores no row, disk fil
     $file = UploadedFile::fake()->create('too-big.pdf', 5121, 'application/pdf');
 
     Livewire::actingAs($user)
-        ->test('pages::projects.show', ['project' => $project])
+        ->test('pages::projects.show', ['project' => rowFor($project)->slug])
         ->set('tab', 'files')
         ->call('openCreateFileModal')
         ->set('newFile', $file)
@@ -87,7 +87,7 @@ test('uploading a file with a disallowed extension is refused on upload and stor
     $file = UploadedFile::fake()->create('script.exe', 100, 'application/x-msdownload');
 
     Livewire::actingAs($user)
-        ->test('pages::projects.show', ['project' => $project])
+        ->test('pages::projects.show', ['project' => rowFor($project)->slug])
         ->set('tab', 'files')
         ->call('openCreateFileModal')
         ->set('newFile', $file)
@@ -105,8 +105,8 @@ test('editing a file updates its category and display name only', function () {
     $user = User::factory()->role('General Manager')->create();
     $project = projectWithRow();
     $media = Media::factory()->inCollection(MediaCollection::Other)->create([
-        'mediable_type' => 'project',
-        'mediable_id' => $project->id,
+        'mediable_type' => 'proposal_location',
+        'mediable_id' => rowFor($project)->id,
         'original_name' => 'old-name.pdf',
         'path' => 'media/projects/'.$project->id.'/original-path.pdf',
         'type' => FileType::Pdf,
@@ -114,7 +114,7 @@ test('editing a file updates its category and display name only', function () {
     ]);
 
     Livewire::actingAs($user)
-        ->test('pages::projects.show', ['project' => $project])
+        ->test('pages::projects.show', ['project' => rowFor($project)->slug])
         ->set('tab', 'files')
         ->call('openEditFileModal', $media->id)
         ->set('fileCategory', MediaCollection::Mou->value)
@@ -135,13 +135,13 @@ test('editing a file with a display name that already carries the right extensio
     $user = User::factory()->role('General Manager')->create();
     $project = projectWithRow();
     $media = Media::factory()->create([
-        'mediable_type' => 'project',
-        'mediable_id' => $project->id,
+        'mediable_type' => 'proposal_location',
+        'mediable_id' => rowFor($project)->id,
         'type' => FileType::Pdf,
     ]);
 
     Livewire::actingAs($user)
-        ->test('pages::projects.show', ['project' => $project])
+        ->test('pages::projects.show', ['project' => rowFor($project)->slug])
         ->set('tab', 'files')
         ->call('openEditFileModal', $media->id)
         ->set('fileCategory', MediaCollection::Other->value)
@@ -159,13 +159,13 @@ test('deleting a file removes the media row and the file from disk', function ()
     $path = 'media/projects/'.$project->id.'/doomed.pdf';
     Storage::disk('local')->put($path, 'content');
     $media = Media::factory()->create([
-        'mediable_type' => 'project',
-        'mediable_id' => $project->id,
+        'mediable_type' => 'proposal_location',
+        'mediable_id' => rowFor($project)->id,
         'path' => $path,
     ]);
 
     Livewire::actingAs($user)
-        ->test('pages::projects.show', ['project' => $project])
+        ->test('pages::projects.show', ['project' => rowFor($project)->slug])
         ->set('tab', 'files')
         ->call('confirmDeleteFile', $media->id)
         ->call('deleteFile');
@@ -181,14 +181,14 @@ test('the download route streams a file that belongs to the project in the url',
     $path = 'media/projects/'.$project->id.'/report.pdf';
     Storage::disk('local')->put($path, 'file contents');
     $media = Media::factory()->create([
-        'mediable_type' => 'project',
-        'mediable_id' => $project->id,
+        'mediable_type' => 'proposal_location',
+        'mediable_id' => rowFor($project)->id,
         'path' => $path,
         'original_name' => 'report.pdf',
     ]);
 
     $this->actingAs($user)
-        ->get(route('projects.files.download', [$project, $media]))
+        ->get(route('projects.files.download', [rowFor($project), $media]))
         ->assertOk()
         ->assertDownload('report.pdf')
         ->assertHeader('X-Content-Type-Options', 'nosniff');
@@ -203,22 +203,22 @@ test('the download route stops scripted mass downloads but leaves other users un
     $path = 'media/projects/'.$project->id.'/report.pdf';
     Storage::disk('local')->put($path, 'file contents');
     $media = Media::factory()->create([
-        'mediable_type' => 'project',
-        'mediable_id' => $project->id,
+        'mediable_type' => 'proposal_location',
+        'mediable_id' => rowFor($project)->id,
         'path' => $path,
         'original_name' => 'report.pdf',
     ]);
 
     foreach (range(1, 60) as $attempt) {
-        $this->actingAs($user)->get(route('projects.files.download', [$project, $media]))->assertOk();
+        $this->actingAs($user)->get(route('projects.files.download', [rowFor($project), $media]))->assertOk();
     }
 
     $this->actingAs($user)
-        ->get(route('projects.files.download', [$project, $media]))
+        ->get(route('projects.files.download', [rowFor($project), $media]))
         ->assertStatus(429);
 
     $this->actingAs($colleague)
-        ->get(route('projects.files.download', [$project, $media]))
+        ->get(route('projects.files.download', [rowFor($project), $media]))
         ->assertOk();
 });
 
@@ -227,13 +227,13 @@ test('the download route returns 404 instead of crashing when the media row has 
     $user = User::factory()->role('General Manager')->create();
     $project = projectWithRow();
     $media = Media::factory()->create([
-        'mediable_type' => 'project',
-        'mediable_id' => $project->id,
+        'mediable_type' => 'proposal_location',
+        'mediable_id' => rowFor($project)->id,
         'path' => 'media/never-actually-written.pdf',
     ]);
 
     $this->actingAs($user)
-        ->get(route('projects.files.download', [$project, $media]))
+        ->get(route('projects.files.download', [rowFor($project), $media]))
         ->assertNotFound();
 });
 
@@ -243,12 +243,12 @@ test('the download route rejects a media id belonging to a different project', f
     $project = projectWithRow();
     $otherProject = projectWithRow();
     $media = Media::factory()->create([
-        'mediable_type' => 'project',
-        'mediable_id' => $otherProject->id,
+        'mediable_type' => 'proposal_location',
+        'mediable_id' => rowFor($otherProject)->id,
     ]);
 
     $this->actingAs($user)
-        ->get(route('projects.files.download', [$project, $media]))
+        ->get(route('projects.files.download', [rowFor($project), $media]))
         ->assertNotFound();
 });
 
@@ -257,18 +257,18 @@ test('editing and deleting reject a media id belonging to a different project', 
     $project = projectWithRow();
     $otherProject = projectWithRow();
     $media = Media::factory()->create([
-        'mediable_type' => 'project',
-        'mediable_id' => $otherProject->id,
+        'mediable_type' => 'proposal_location',
+        'mediable_id' => rowFor($otherProject)->id,
     ]);
 
     Livewire::actingAs($user)
-        ->test('pages::projects.show', ['project' => $project])
+        ->test('pages::projects.show', ['project' => rowFor($project)->slug])
         ->set('tab', 'files')
         ->call('openEditFileModal', $media->id)
         ->assertNotFound();
 
     Livewire::actingAs($user)
-        ->test('pages::projects.show', ['project' => $project])
+        ->test('pages::projects.show', ['project' => rowFor($project)->slug])
         ->set('tab', 'files')
         ->call('confirmDeleteFile', $media->id)
         ->assertNotFound();
