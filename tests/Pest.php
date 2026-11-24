@@ -783,8 +783,11 @@ function rowFor(Project $project): ProposalLocation
             return $existing;
         }
 
+        // The project id keeps the name, and so the row's slug, unique and
+        // stable: faker repeats project names, and `proposal_locations.slug`
+        // is unique (Y-11).
         $proposal = Proposal::factory()->running()->create(array_filter([
-            'name' => $project->name,
+            'name' => $project->name.' #'.$project->id,
             'planned_date_begin' => $project->start_date?->toDateString(),
             'planned_date_end' => $project->end_date?->toDateString(),
         ]));
