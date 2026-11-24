@@ -27,6 +27,7 @@ use App\Models\Result;
 use App\Models\StrategicPillar;
 use App\Models\User;
 use App\Support\Reporting\ReportExtraction;
+use App\Support\Reporting\ReportPlace;
 use Carbon\CarbonImmutable;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\RateLimiter;
@@ -393,7 +394,7 @@ test('each filter narrows the rows and an unknown id is ignored', function () {
     mmTarget(mmProposal($second, '2025-01-01', '2025-12-31', name: 'Old'), $second, LibraryIndicator::factory()->create());
 
     $employeeId = insertHrEmployee();
-    Activity::withoutRecording(fn () => MealCoverageAssignment::factory()->forProject($second->id)->create(['employee_id' => $employeeId]));
+    Activity::withoutRecording(fn () => MealCoverageAssignment::factory()->forPlace(new ReportPlace((int) $second->city_id, (int) $second->program_id, $second->center_id === null ? null : (int) $second->center_id, false))->create(['employee_id' => $employeeId]));
     $viewer = userWithRole('MEAL', $employeeId);
 
     $codes = fn (array $filters): array => collect(Livewire::actingAs($viewer)->withQueryParams($filters)->test('pages::reports.monthly-matrix')->instance()->matrix['rows'])->pluck('code')->sort()->values()->all();

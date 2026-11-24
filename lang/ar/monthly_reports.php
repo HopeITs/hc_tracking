@@ -236,7 +236,7 @@ return [
     'head_program' => 'البرنامج',
     'head_center' => 'المركز',
     'head_not_set' => 'غير محدد',
-    'head_proposal' => '{1} المقترح|[2,*] المقترحات',
+    'head_proposal' => '{1} المقترح|{2} المقترحان|[3,10] المقترحات|[11,*] المقترحات',
     'place_field_work' => 'عمل ميداني',
     'place_center_not_set' => 'المركز غير محدد',
     'covers_proposals' => '{1} المقترح: :names|{2} المقترحان: :names|[3,10] المقترحات: :names|[11,*] المقترحات: :names',
