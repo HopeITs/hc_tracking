@@ -64,6 +64,17 @@
         <div>
             @include('pages.proposals._show-card-field', ['field' => 'donor', 'display' => $cardProposal->donor?->name])
         </div>
+        @if ($cardProposal->mainPartner !== null)
+            <div class="pp-field-wrap" data-main-partner-card>
+                <div class="pp-field pp-locked">
+                    <span class="pp-flabel">{{ __('proposals.main_partner') }}</span>
+                    <span class="pp-val" dir="auto">{{ $cardProposal->mainPartner->name }}</span>
+                    @if ($cardProposal->partners->isNotEmpty())
+                        <span class="pp-ext-note" dir="auto" data-partners-line>{{ __('proposals.partners_label') }}: {{ $cardProposal->partners->pluck('name')->implode(', ') }}</span>
+                    @endif
+                </div>
+            </div>
+        @endif
     </div>
 
     @if ($cardProposal->isPayroll())

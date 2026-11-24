@@ -50,6 +50,28 @@ new #[Layout('layouts::desk'), Title('titles.donor')] class extends Component {
     }
 
     /**
+     * The proposals this organisation stands in for as Main Partner or Partner,
+     * newest first. Their money stays under the back donor, so no amounts here.
+     *
+     * @return \Illuminate\Support\Collection<int, array{proposal: \App\Models\Proposal, role: string}>
+     */
+    #[Computed]
+    public function partnerRoles(): \Illuminate\Support\Collection
+    {
+        if (! auth()->user()?->can('proposals.view')) {
+            return collect();
+        }
+
+        $columns = ['id', 'slug', 'name', 'donor_id', 'main_partner_id', 'created_at'];
+        $main = \App\Models\Proposal::query()->where('main_partner_id', $this->donorId)->with('donor:id,name')->get($columns)
+            ->map(fn (\App\Models\Proposal $proposal): array => ['proposal' => $proposal, 'role' => 'main']);
+        $partner = \App\Models\Proposal::query()->whereHas('partners', fn ($query) => $query->where('donors.id', $this->donorId))->with('donor:id,name')->get($columns)
+            ->map(fn (\App\Models\Proposal $proposal): array => ['proposal' => $proposal, 'role' => 'partner']);
+
+        return $main->concat($partner)->sortByDesc(fn (array $row) => $row['proposal']->created_at)->values();
+    }
+
+    /**
      * Every tranche of this donor as a CSV file.
      */
     public function exportTranchesCsv(): StreamedResponse
@@ -340,6 +362,21 @@ new #[Layout('layouts::desk'), Title('titles.donor')] class extends Component {
             {{ $donor->last_contacted_on !== null ? __('donors.last_contacted', ['date' => $donor->last_contacted_on->translatedFormat(__('formats.date'))]) : __('donors.never_contacted') }}
         </p>
     </div>
+
+    @if ($this->partnerRoles->isNotEmpty())
+        <section class="mt-7" aria-labelledby="partner-roles-heading" data-partner-roles>
+            <h2 id="partner-roles-heading" class="type-label {{ $inkText }}">{{ __('donors.partner_roles_heading') }}</h2>
+            <ul class="mt-2 flex flex-col gap-1">
+                @foreach ($this->partnerRoles as $row)
+                    <li class="flex flex-wrap items-center gap-2 text-sm" wire:key="partner-role-{{ $row['role'] }}-{{ $row['proposal']->id }}">
+                        <a href="{{ route('proposals.show', $row['proposal']) }}" wire:navigate class="font-semibold underline-offset-2 hover:underline {{ $inkText }}" dir="auto">{{ $row['proposal']->name }}</a>
+                        <span class="rounded-full bg-secondary-soft px-2 py-0.5 text-xs font-medium text-secondary-dark dark:bg-surface-2 dark:text-ink">{{ $row['role'] === 'main' ? __('proposals.main_partner_badge') : __('donors.partner_badge') }}</span>
+                        <span class="{{ $mutedText }}" dir="auto">{{ __('proposals.funded_by', ['name' => $row['proposal']->donor->name]) }}</span>
+                    </li>
+                @endforeach
+            </ul>
+        </section>
+    @endif
 
     @can('funding-agreements.view')
     @if ($this->agreements->isEmpty())

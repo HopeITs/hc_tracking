@@ -23,7 +23,7 @@ $groups = [
     'risks' => ['view', 'create', 'update', 'delete'],
     'targets' => ['view', 'create', 'update', 'delete'],
     'donors' => ['view', 'create', 'update', 'delete', 'approve'],
-    'proposals' => ['view', 'create', 'update', 'delete', 'manage-reviewers', 'correct-status', 'approve'],
+    'proposals' => ['view', 'create', 'update', 'delete', 'manage-reviewers', 'correct-status', 'approve', 'manage-partners'],
     'funding-agreements' => ['view', 'create', 'update', 'delete'],
     'transfers' => ['view', 'create', 'update', 'delete'],
     'strategies' => ['view', 'create', 'update', 'delete'],
@@ -220,13 +220,13 @@ return [
         // General Manager approves it.
         'Public Relations' => [
             ...$viewEverything, ...$fundraisingViews, ...$taskWriter, ...$reportWriter,
-            'proposals.create', 'proposals.update',
+            'proposals.create', 'proposals.update', 'proposals.manage-partners',
             ...$aiDrafter,
         ],
         'Public Relations Manager' => [
             ...$viewEverything, ...$fundraisingViews, ...$taskWriter, ...$reportWriter,
             'donors.create', 'donors.update',
-            'proposals.create', 'proposals.update', 'proposals.manage-reviewers', 'proposals.correct-status',
+            'proposals.create', 'proposals.update', 'proposals.manage-reviewers', 'proposals.correct-status', 'proposals.manage-partners',
             // D-70: recording the donor's approval belongs to this role only.
             'proposals.approve',
             'projects.create',
@@ -272,6 +272,8 @@ return [
             'notification-settings.manage',
             'reports.reopen',
             'proposals.approve',
+            // PR alone sets and manages Main Partners and Partners (2026-11-24).
+            'proposals.manage-partners',
             ...$mealOnly,
             ...$targetWriter,
             ...$aiDrafter,

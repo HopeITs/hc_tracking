@@ -291,7 +291,8 @@ trait ReadsTransferRegister
             ->with([
                 'donorProposal:id,slug,donor_id,proposal_id,external_project_number',
                 'donorProposal.donor:id,slug,name',
-                'donorProposal.proposal:id,slug,name',
+                'donorProposal.proposal:id,slug,name,main_partner_id',
+                'donorProposal.proposal.mainPartner:id,slug,name',
                 // Nullable: a tranche may be scheduled before an account exists.
                 'account:id,account_name',
             ]);

@@ -120,6 +120,26 @@ class Donor extends Model implements TracksActivity
     }
 
     /**
+     * The proposals this organisation is Main Partner of.
+     *
+     * @return HasMany<Proposal, $this>
+     */
+    public function mainPartnerProposals(): HasMany
+    {
+        return $this->hasMany(Proposal::class, 'main_partner_id');
+    }
+
+    /**
+     * The proposals this organisation is named on as an additional Partner.
+     *
+     * @return BelongsToMany<Proposal, $this>
+     */
+    public function partnerProposals(): BelongsToMany
+    {
+        return $this->belongsToMany(Proposal::class, 'proposal_partner')->withTimestamps();
+    }
+
+    /**
      * The proposals this donor funds.
      *
      * `donor_proposal` carries budget and currency, so prefer donorProposals()

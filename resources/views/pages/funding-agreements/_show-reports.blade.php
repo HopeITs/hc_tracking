@@ -5,6 +5,7 @@
                     {{ __('funding_agreements.donor_reports') }}
                     <span class="ms-1 text-base font-semibold tabular-nums {{ $mutedText }}">{{ $this->reports->count() }}</span>
                 </h2>
+                <x-proposals.partner-note :partner="$proposal->mainPartner" for="reports" class="w-full text-sm" />
                 <div class="flex flex-wrap items-center gap-2">
                     @can('reports.aggregate')
                         <x-ui.button size="sm" icon="document-chart-bar" class="min-h-10 touch-manipulation" :href="route('donor-reports.compose', ['proposal' => $agreement->proposal_id])" wire:navigate data-test="compose-donor-report">{{ __('donor_reports.compose_report') }}</x-ui.button>

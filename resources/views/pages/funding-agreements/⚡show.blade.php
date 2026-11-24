@@ -64,7 +64,8 @@ new #[Layout('layouts::desk'), Title('titles.funding_agreement')] class extends 
             ->select(['id', 'donor_id', 'proposal_id', 'budget', 'currency', 'external_project_number', 'created_at', 'updated_at'])
             ->with([
                 'donor:id,name,type,contact_person,email,phone,country,last_contacted_on,next_step,next_step_due_on',
-                'proposal:id,name,internal_project_number,status,planned_date_begin,planned_date_end,actual_date_begin,actual_date_end,extended_date_end',
+                'proposal:id,name,internal_project_number,status,main_partner_id,planned_date_begin,planned_date_end,actual_date_begin,actual_date_end,extended_date_end',
+                'proposal.mainPartner:id,slug,name',
             ])
             ->findOrFail($this->agreementId);
     }
@@ -236,6 +237,10 @@ new #[Layout('layouts::desk'), Title('titles.funding_agreement')] class extends 
             <x-ui.project-number :number="$agreement->external_project_number" kind="external" label class="{{ $inkText }}" />
             <span aria-hidden="true">·</span>
             <span>{{ __('funding_agreements.signed_in_currency', ['currency' => $currency]) }}</span>
+            @if ($proposal->mainPartner !== null)
+                <span aria-hidden="true">·</span>
+                <x-proposals.partner-note :partner="$proposal->mainPartner" for="agreement" class="font-semibold {{ $inkText }}" />
+            @endif
             @if ($agreement->updated_at !== null)
                 <span aria-hidden="true">·</span>
                 <span>{{ __('common.updated_date', ['date' => $agreement->updated_at->translatedFormat(__('formats.date'))]) }}</span>

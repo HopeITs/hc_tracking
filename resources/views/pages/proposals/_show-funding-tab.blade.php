@@ -51,6 +51,7 @@
                                 <p class="min-w-0 text-sm">
                                     <a href="{{ route('donors.show', $agreement->donor) }}" wire:navigate class="text-base font-bold underline-offset-4 hover:underline {{ $inkText }}">{{ $agreement->donor->name }}</a>
                                     <a href="{{ route('funding-agreements.show', $agreement) }}" wire:navigate class="ms-2 text-xs underline-offset-4 hover:underline {{ $mutedText }}">{{ filled($agreement->external_project_number) ? __('proposals.agreement_number', ['number' => $agreement->external_project_number]) : __('proposals.view_agreement') }}</a>
+                                    <x-proposals.partner-note :partner="$this->proposal->mainPartner" for="all" class="mt-0.5 block text-xs" />
                                 </p>
                                 <div class="flex items-center gap-1">
                                     <p class="me-2 text-2xl font-extrabold tracking-tight tabular-nums {{ $inkText }}">{{ $amount($budget) }} <span class="text-xs font-semibold tracking-normal {{ $mutedText }}">{{ $currency }}</span></p>

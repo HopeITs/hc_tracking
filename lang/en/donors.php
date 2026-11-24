@@ -143,4 +143,6 @@ return [
     'decline_request' => 'Decline request',
     'reason_for_declining' => 'Reason for declining',
     'donor_request_declined' => 'Donor request declined.',
+    'partner_roles_heading' => 'Projects as Main Partner or Partner',
+    'partner_badge' => 'Partner',
 ];

@@ -69,6 +69,14 @@ trait ManagesProposalForm
 
     public string $donorId = '';
 
+    /** PR's "Through a Main Partner?" checkbox: shows the two partner pickers. */
+    public bool $hasMainPartner = false;
+
+    public string $mainPartnerId = '';
+
+    /** @var list<int|string> */
+    public array $partnerIds = [];
+
     /** @var array<int|string, int|string|null> */
     public array $beneficiaries = [];
 
@@ -132,15 +140,18 @@ trait ManagesProposalForm
     #[Computed]
     public function proposalDonors(): Collection
     {
-        $keptDonorId = $this->editingProposalId === null
+        $kept = $this->editingProposalId === null
             ? null
-            : Proposal::query()->whereKey($this->editingProposalId)->value('donor_id');
+            : Proposal::query()->whereKey($this->editingProposalId)->first(['id', 'donor_id', 'main_partner_id']);
+        $keptIds = $kept === null
+            ? []
+            : array_values(array_filter([$kept->donor_id, $kept->main_partner_id, ...$kept->partners()->pluck('donors.id')->all()]));
 
         return Donor::query()
             ->select(['id', 'name', 'approval_status'])
             ->where(fn (Builder $query) => $query
                 ->pickableBy($this->proposalActor())
-                ->when($keptDonorId !== null, fn (Builder $inner) => $inner->orWhere('donors.id', $keptDonorId)))
+                ->when($keptIds !== [], fn (Builder $inner) => $inner->orWhereIn('donors.id', $keptIds)))
             ->orderBy('name')
             ->orderBy('id')
             ->get();
@@ -159,19 +170,40 @@ trait ManagesProposalForm
 
     /**
      * The donor request form (a nested component) saved a new donor: choose
-     * it. Only a donor the user may pick is accepted, so a forged id selects
-     * nothing.
+     * it into the field the button named: the back donor, the Main Partner or
+     * the other Partners. Only a donor the user may pick is accepted, so a
+     * forged id selects nothing; only a manager of partners may fill the two
+     * partner fields.
      */
     #[On('donor-requested')]
-    public function donorRequested(int $donorId): void
+    public function donorRequested(int $donorId, string $target = 'donor'): void
     {
         Gate::authorize('donors.create');
 
-        if (Donor::query()->pickableBy($this->proposalActor())->whereKey($donorId)->exists()) {
-            $this->donorId = (string) $donorId;
-            unset($this->proposalDonors);
-            $this->js("document.getElementById('proposal-donor')?.focus()");
+        if (! Donor::query()->pickableBy($this->proposalActor())->whereKey($donorId)->exists()) {
+            return;
         }
+
+        if ($target === 'main' || $target === 'partner') {
+            Gate::authorize('proposals.manage-partners');
+
+            $this->hasMainPartner = true;
+
+            if ($target === 'main') {
+                $this->mainPartnerId = (string) $donorId;
+            } else {
+                $this->partnerIds = array_values(array_unique([...$this->partnerIds, (string) $donorId]));
+            }
+
+            unset($this->proposalDonors);
+            $this->js("document.getElementById('".($target === 'main' ? 'proposal-main-partner' : 'partner-picker')."')?.focus()");
+
+            return;
+        }
+
+        $this->donorId = (string) $donorId;
+        unset($this->proposalDonors);
+        $this->js("document.getElementById('proposal-donor')?.focus()");
     }
 
     /**
@@ -359,7 +391,7 @@ trait ManagesProposalForm
         abort_if($scope !== null && $scope !== $proposalId, 404);
 
         $showsMoney = SaveProposal::canSeeMoney($this->proposalActor());
-        $columns = ['id', 'name', 'donor_id', 'internal_project_number', 'planned_date_begin', 'planned_date_end', 'notes', 'concept_note', 'narrative', 'status', 'kind'];
+        $columns = ['id', 'name', 'donor_id', 'main_partner_id', 'internal_project_number', 'planned_date_begin', 'planned_date_end', 'notes', 'concept_note', 'narrative', 'status', 'kind'];
 
         // The budget is read only for someone who may see money (contracts.md §8).
         $proposal = Proposal::query()
@@ -373,6 +405,9 @@ trait ManagesProposalForm
         $this->name = $proposal->name;
         $this->internalProjectNumber = $proposal->internal_project_number;
         $this->donorId = (string) $proposal->donor_id;
+        $this->hasMainPartner = $proposal->main_partner_id !== null;
+        $this->mainPartnerId = (string) ($proposal->main_partner_id ?? '');
+        $this->partnerIds = $proposal->partners()->pluck('donors.id')->map(fn (int $id): string => (string) $id)->all();
         $this->plannedDateBegin = $proposal->planned_date_begin->toDateString();
         $this->plannedDateEnd = $proposal->planned_date_end->toDateString();
         $this->notes = $proposal->notes ?? '';
@@ -591,6 +626,9 @@ trait ManagesProposalForm
         $this->name = '';
         $this->internalProjectNumber = '';
         $this->donorId = '';
+        $this->hasMainPartner = false;
+        $this->mainPartnerId = '';
+        $this->partnerIds = [];
         $this->resetLocationRows();
         $this->beneficiaries = [];
         $this->beneficiariesReason = '';
@@ -616,7 +654,7 @@ trait ManagesProposalForm
      * A payroll proposal (W-32) sends its narrative and, on create, its kind;
      * it never sends projects, beneficiaries or a starting stage.
      *
-     * @return array{name: string, internalProjectNumber: string, donorId: string|null, beneficiaries: array<int|string, int|string|null>, beneficiariesReason: string|null, plannedDateBegin: string|null, plannedDateEnd: string|null, notes: string, conceptNote: string|null, narrative?: string|null, kind?: string, locations?: list<array{city_id: string, program_id: string|null, responsible_employee_id: string|null, center_ids: list<string>, city_wide: bool, is_new: bool, new_program_name_en: string, new_program_name_ar: string}>, startingStage?: string, skipReason?: string|null, requestedBudget?: string|null, requestedCurrency?: string|null}
+     * @return array{name: string, internalProjectNumber: string, donorId: string|null, mainPartnerId?: string|null, partnerIds?: list<int|string>, beneficiaries: array<int|string, int|string|null>, beneficiariesReason: string|null, plannedDateBegin: string|null, plannedDateEnd: string|null, notes: string, conceptNote: string|null, narrative?: string|null, kind?: string, locations?: list<array{city_id: string, program_id: string|null, responsible_employee_id: string|null, center_ids: list<string>, city_wide: bool, is_new: bool, new_program_name_en: string, new_program_name_ar: string}>, startingStage?: string, skipReason?: string|null, requestedBudget?: string|null, requestedCurrency?: string|null}
      */
     private function proposalFormData(bool $isCreate): array
     {
@@ -656,6 +694,11 @@ trait ManagesProposalForm
 
         if (! $isCreate && ! $isPayroll && ($this->hasLocationRows() || $this->hadLocationRows)) {
             $data['locations'] = $this->locationPayload();
+        }
+
+        if (SaveProposal::canManagePartners($this->proposalActor())) {
+            $data['mainPartnerId'] = $this->hasMainPartner && $this->mainPartnerId !== '' ? $this->mainPartnerId : null;
+            $data['partnerIds'] = $this->hasMainPartner ? $this->partnerIds : [];
         }
 
         if (SaveProposal::canSeeMoney($this->proposalActor())) {
