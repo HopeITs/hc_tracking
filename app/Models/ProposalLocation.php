@@ -183,6 +183,20 @@ class ProposalLocation extends Model
      *
      * @return HasMany<ProposalLocationCenter, $this>
      */
+    /**
+     * The HR employee responsible for this row (Y-16): the twin of
+     * `Project::user()`, which the Projects screen read as its owner.
+     *
+     * A plain lookup against the read-only HR connection, like every other
+     * HR link: no join crosses the two databases.
+     *
+     * @return BelongsTo<HrEmployee, $this>
+     */
+    public function responsible(): BelongsTo
+    {
+        return $this->belongsTo(HrEmployee::class, 'responsible_employee_id');
+    }
+
     public function centers(): HasMany
     {
         return $this->hasMany(ProposalLocationCenter::class)->orderBy('center_id');
@@ -217,6 +231,17 @@ class ProposalLocation extends Model
      *
      * @return HasMany<PlanIndicator, $this>
      */
+    /**
+     * The register risks raised against this row (Y-13, D-93). Logframe risks
+     * belong to a proposal and are not here.
+     *
+     * @return HasMany<Risk, $this>
+     */
+    public function risks(): HasMany
+    {
+        return $this->hasMany(Risk::class, 'proposal_location_id');
+    }
+
     public function targets(): HasMany
     {
         return $this->hasMany(PlanIndicator::class, 'proposal_location_id');
