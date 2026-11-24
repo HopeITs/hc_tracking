@@ -35,7 +35,7 @@ use Livewire\Attributes\Computed;
  * @property-read Collection<int, MealCoverageAssignment> $mealCoverages  #[Computed] mealCoverages()
  * @property-read Collection<int, HrEmployee> $mealOfficers  #[Computed] mealOfficers()
  * @property-read array<int, array{name: string, inactive: bool}> $cityOfficers  #[Computed] cityOfficers()
- * @property-read Collection<int, array{id: int, name: string, city: string|null, officer: array{name: string, inactive: bool}|null, inherited: bool}> $placeOfficers  #[Computed] placeOfficers()
+ * @property-read Collection<int, array{id: int, name: string, city: string|null, officer: array{name: string, inactive: bool}|null, inherited: bool, noGovernorate: bool}> $placeOfficers  #[Computed] placeOfficers()
  * @property-read array{name: string, inactiveCity: bool}|null $mealTarget  #[Computed] mealTarget()
  */
 trait ManagesMealCoverage
@@ -154,6 +154,7 @@ trait ManagesMealCoverage
                 'city' => $cities->get($place->cityId)?->name,
                 'officer' => $this->officerCard(($assignment ?? $fallback)?->employee_id),
                 'inherited' => $assignment === null && $fallback !== null,
+                'noGovernorate' => $assignment === null && ! $cities->has($place->cityId),
             ];
         })->filter(fn (array $row): bool => $search === '' || mb_stripos($row['name'].' '.$row['city'], $search) !== false)
             ->sortBy(['city', 'name']);
