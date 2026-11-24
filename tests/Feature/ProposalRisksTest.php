@@ -20,7 +20,7 @@ use Illuminate\Validation\ValidationException;
 
 beforeEach(function () {
     $this->seed(RolesAndPermissionsSeeder::class);
-    $this->actingAs(User::factory()->role('Public Relations Manager')->create());
+    $this->actingAs(mealManager());
 
     $this->proposal = Proposal::factory()->create();
     $this->output = Result::factory()->create(['type' => ResultType::Output, 'proposal_id' => $this->proposal->id]);
@@ -112,8 +112,8 @@ describe('AttachLibraryRisk', function () {
         'program framework' => [fn () => Result::factory()->create(['type' => ResultType::Output, 'proposal_id' => null])],
     ]);
 
-    it('refuses a role without proposals.update', function () {
-        $this->actingAs(User::factory()->role('Team Member')->create());
+    it('refuses a proposal editor who may not build the framework', function () {
+        $this->actingAs(User::factory()->role('Public Relations Manager')->create());
 
         expect(fn () => app(AttachLibraryRisk::class)->handle($this->proposal, $this->output->id, $this->entry->id, []))
             ->toThrow(AuthorizationException::class);
@@ -173,9 +173,9 @@ describe('DetachRisk', function () {
         expect(Risk::query()->count())->toBe(2);
     });
 
-    it('refuses a role without proposals.update', function () {
+    it('refuses a proposal editor who may not build the framework', function () {
         $risk = app(AttachLibraryRisk::class)->handle($this->proposal, $this->output->id, $this->entry->id, []);
-        $this->actingAs(User::factory()->role('Team Member')->create());
+        $this->actingAs(User::factory()->role('Public Relations Manager')->create());
 
         expect(fn () => app(DetachRisk::class)->handle($this->proposal, $risk->id))->toThrow(AuthorizationException::class);
 

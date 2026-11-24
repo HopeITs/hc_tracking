@@ -212,6 +212,19 @@ new #[Layout('layouts::desk'), Title('titles.proposal')] class extends Component
             $this->dispatch('pp-flash', target: 'lf');
         }
 
+        if ($this->tab === 'targets' && ! $this->embedded) {
+            // Indicators & targets is read in the framework now (PR feedback 2026-11-23).
+            $this->tab = 'status';
+            $this->dispatch('pp-flash', target: 'lf');
+        }
+
+        if ($this->tab === 'projects' && ! $this->embedded && ! $this->addCentersLink) {
+            // Projects & places is read in the card's See more now (PR feedback 2026-11-23).
+            $this->tab = 'status';
+            $this->cardMore = true;
+            $this->dispatch('pp-flash', target: 'card');
+        }
+
         $offered = $this->proposal->isPayroll() ? self::PAYROLL_TABS : self::TABS;
 
         if (! in_array($this->tab, $offered, true) || ($this->tab === 'funding' && ! $this->canViewAgreements())) {

@@ -216,7 +216,7 @@ trait BuildsMonthlyMatrix
     #[Computed]
     public function pagedRows(): LengthAwarePaginator
     {
-        $rows = collect($this->matrix['rows']);
+        $rows = collect($this->focusedRows($this->matrix['rows']));
         $page = max(1, (int) $this->getPage());
 
         return new LengthAwarePaginator(
@@ -414,13 +414,14 @@ trait BuildsMonthlyMatrix
     }
 
     /**
-     * Sets the window to January of this year → this month.
+     * Sets the window to the whole of this year, January → December, so the
+     * months still to come show as upcoming.
      */
     protected function setThisYearWindow(): void
     {
         $today = CarbonImmutable::today();
         $this->from = $today->startOfYear()->format('Y-m');
-        $this->to = $today->format('Y-m');
+        $this->to = $today->endOfYear()->format('Y-m');
     }
 
     /**

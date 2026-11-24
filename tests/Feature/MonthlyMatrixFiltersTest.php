@@ -158,60 +158,25 @@ function mxfReport(ReportTemplate $template, LibraryIndicator $library): void
     });
 }
 
-/**
- * The query of each cell link the page renders.
- *
- * @return list<array<string, string>>
- */
-function mxfCellLinks(string $html): array
-{
-    preg_match_all('/<a[^>]*data-matrix-cell-link[^>]*>/', $html, $anchors);
-
-    return array_map(function (string $anchor): array {
-        preg_match('/href="([^"]*)"/', $anchor, $href);
-        parse_str((string) parse_url(html_entity_decode($href[1]), PHP_URL_QUERY), $query);
-
-        return $query;
-    }, $anchors[0]);
-}
-
-test('a month cell with a report links to that month of the monthly-reports list at the place of its row', function () {
+test('a month cell with a report opens that report', function () {
     mxfReport($this->mxf['templates'][0], $this->mxf['library']);
+    $report = MonthlyReport::query()->where('report_template_id', $this->mxf['templates'][0]->id)->sole();
 
-    $html = Livewire::actingAs(userWithRole('MEAL'))
+    Livewire::actingAs(userWithRole('MEAL'))
         ->withQueryParams(['proposal' => (string) $this->mxf['proposal']->id, 'from' => '2026-10', 'to' => '2026-10'])
         ->test('pages::reports.monthly-matrix')
-        ->assertSeeHtml('data-matrix-cell-link')
         ->assertSeeHtml('<span class="sr-only">'.e(__('reports.matrix.open_month_list', ['month' => CarbonImmutable::create(2026, 10, 1)->translatedFormat(__('formats.month_year'))])).'</span>')
-        ->html();
-
-    expect(mxfCellLinks($html))->toBe([[
-        'proposal' => (string) $this->mxf['proposal']->id,
-        'city' => (string) $this->mxf['aleppo'],
-        'program' => (string) $this->mxf['program']->id,
-        'center' => 'c'.$this->mxf['centerOne'],
-        'from' => '2026-10',
-        'to' => '2026-10',
-        'status' => 'all',
-    ]])->and($html)->toContain(route('monthly-reports.index'));
+        ->assertSeeHtml('href="'.route('monthly-reports.show', $report).'"');
 });
 
-test('a cell of a place whose center is not set links with center=unset', function () {
+test('a cell of a place whose center is not set opens its own report', function () {
     mxfReport($this->mxf['templates'][2], $this->mxf['library']);
+    $report = MonthlyReport::query()->where('report_template_id', $this->mxf['templates'][2]->id)->sole();
 
-    $links = mxfCellLinks(Livewire::actingAs(userWithRole('MEAL'))
+    Livewire::actingAs(userWithRole('MEAL'))
         ->withQueryParams(['from' => '2026-10', 'to' => '2026-10'])
         ->test('pages::reports.monthly-matrix')
-        ->html());
-
-    expect($links)->toBe([[
-        'city' => (string) $this->mxf['homs'],
-        'program' => (string) $this->mxf['program']->id,
-        'center' => 'unset',
-        'from' => '2026-10',
-        'to' => '2026-10',
-        'status' => 'all',
-    ]]);
+        ->assertSeeHtml('href="'.route('monthly-reports.show', $report).'"');
 });
 
 test('a cell with no report has no link', function () {

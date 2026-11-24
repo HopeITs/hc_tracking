@@ -691,6 +691,16 @@ test('a form section marked optional says so in its heading', function () {
         ->and(trim($xpath->query('//*[contains(@class, "form-section-optional")]')->item(0)->textContent))->toBe('Optional');
 });
 
+test('a form section needed for review carries a tag and no star of its own', function () {
+    View::share('errors', new ViewErrorBag);
+
+    $xpath = formXPath(Blade::render('<x-ui.form-section title="Budget" :for-review="true"><p>Fields</p></x-ui.form-section>'));
+
+    expect($xpath->query('//section[@data-for-review]')->length)->toBe(1)
+        ->and($xpath->query('//section[@data-optional]')->length)->toBe(0)
+        ->and(trim($xpath->query('//*[@data-for-review-badge]')->item(0)->textContent))->toBe('Needed for review');
+});
+
 test('the attention count reads naturally in arabic', function () {
     app()->setLocale('ar');
 

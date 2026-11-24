@@ -1,4 +1,4 @@
-{{-- The header of ⚡show.blade.php: the template's place and the proposals it covers (Y-03, D-76: never the project), month, state, who prepared, submitted and validated it, whether MEAL has seen it, and the return reason. --}}
+{{-- The header of ⚡show.blade.php: the template's place and the proposals it covers (Y-03, D-76: never the project), month, state and the return reason. Who prepared, submitted and validated it sits in the journey and the side column. --}}
 @use('App\Enums\MonthlyReportStatus')
 @use('App\Enums\ReopenRequestStatus')
 @use('App\Support\MonthlyReportNames')
@@ -35,28 +35,11 @@
     <x-slot:meta>
         <div class="basis-full">@include('pages.monthly-reports._covers-proposals', ['proposals' => $headerNames['proposals']])</div>
         <x-monthly-reports.state-chip :state="$headerState" />
-        @if ($report->preparer !== null)
-            <span>{{ __('monthly_reports.prepared_by', ['name' => $report->preparer->name]) }}</span>
-        @endif
-        @if ($report->submitted_at !== null && $report->submitter !== null)
-            <span class="tabular-nums">{{ __('monthly_reports.submitted_by_on', ['name' => $report->submitter->name, 'date' => $formatMoment($report->submitted_at)]) }}</span>
-        @endif
-        @if ($report->validated_at !== null && $report->validator !== null)
-            <span class="tabular-nums">{{ __('monthly_reports.validated_by_on', ['name' => $report->validator->name, 'date' => $formatMoment($report->validated_at)]) }}</span>
-        @endif
-        @if ($report->seen_by_meal_at !== null)
-            <span class="inline-flex items-center gap-1 text-status-good" data-seen>
-                <flux:icon.eye variant="micro" class="size-3.5" aria-hidden="true" />
-                {{ __('monthly_reports.seen_on', ['date' => $formatMoment($report->seen_by_meal_at)]) }}
-            </span>
-        @elseif ($report->status === MonthlyReportStatus::Submitted)
-            <span>{{ __('monthly_reports.not_seen_yet') }}</span>
-        @endif
     </x-slot:meta>
 </x-ui.detail-header>
 
 @if ($headerState === 'returned' && filled($report->return_reason))
-    <div class="flex gap-3 border-s-2 border-status-warn ps-4" role="note">
+    <div class="mrp-card mrp-note" role="note">
         <flux:icon.arrow-uturn-left variant="mini" class="mt-0.5 size-4 shrink-0 text-status-warn rtl:-scale-x-100" aria-hidden="true" />
         <div>
             <p class="text-sm font-bold">
@@ -70,7 +53,7 @@
 @endif
 
 @if (app(MonthlyReportPreparers::class)->centerMismatch($report->template))
-    <div class="flex gap-3 border-s-2 border-status-warn ps-4" role="note" data-owner-center-warning>
+    <div class="mrp-card mrp-note" role="note" data-owner-center-warning>
         <flux:icon.exclamation-triangle variant="mini" class="mt-0.5 size-4 shrink-0 text-status-warn" aria-hidden="true" />
         <p class="text-sm text-secondary-medium dark:text-ink-muted">{{ __('monthly_reports.owner_center_mismatch') }}</p>
     </div>

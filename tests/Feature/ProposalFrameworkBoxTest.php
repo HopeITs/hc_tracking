@@ -243,3 +243,19 @@ test('search and "only results with problems" keep a matching child with its par
     $box->set('search', '')->set('problemsOnly', true);
     expect($box->instance()->visibleIds)->toEqualCanonicalizing([$impact->id, $outcome->id]);
 });
+
+test('only someone who may edit indicators can click one open; a PR officer just reads it', function () {
+    $outcome = frameworkResult(ResultType::Outcome);
+    $indicator = Indicator::factory()->create(['result_id' => $outcome->id]);
+    $opensEditor = "\$dispatch('edit-indicator', { indicatorId: {$indicator->id} })";
+
+    frameworkBox($this->meal)->call('openAll')
+        ->assertSeeHtml('data-test="framework-indicator-'.$indicator->id.'"')
+        ->assertSeeHtml($opensEditor);
+
+    frameworkBox(User::factory()->role('Public Relations Manager')->create())->call('openAll')
+        ->assertSeeHtml('data-test="framework-indicator-'.$indicator->id.'"')
+        ->assertDontSeeHtml($opensEditor)
+        ->call('setLayout', 'matrix')
+        ->assertDontSeeHtml($opensEditor);
+});

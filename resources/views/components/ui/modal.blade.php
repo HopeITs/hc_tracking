@@ -59,6 +59,11 @@
             'done' => __('common.section_done'),
             'toFix' => __('common.section_to_fix'),
         ],
+        'kinds' => [
+            'required' => __('common.required'),
+            'optional' => __('common.optional'),
+            'review' => __('common.needed_for_review'),
+        ],
     ];
 
     /*
@@ -121,11 +126,14 @@
             @if ($indexed)
                 <div class="modal-shell-main">
                     <nav class="modal-shell-index" aria-label="{{ __('common.sections_in_this_form') }}" data-modal-index>
-                        <div class="modal-shell-index-progress" x-show="required > 0">
-                            <svg class="modal-shell-index-ring" width="44" height="44" viewBox="0 0 44 44" aria-hidden="true">
-                                <circle cx="22" cy="22" r="18" />
-                                <circle cx="22" cy="22" r="18" stroke-dasharray="113.1" x-bind:stroke-dashoffset="ringOffset()" />
-                            </svg>
+                        <div class="modal-shell-index-progress" x-show="required > 0" x-bind:class="{ 'is-complete': required > 0 && filled === required }" data-modal-progress>
+                            <span class="modal-shell-index-ring-wrap">
+                                <svg class="modal-shell-index-ring" width="44" height="44" viewBox="0 0 44 44" aria-hidden="true">
+                                    <circle cx="22" cy="22" r="18" />
+                                    <circle cx="22" cy="22" r="18" stroke-dasharray="113.1" x-bind:stroke-dashoffset="ringOffset()" />
+                                </svg>
+                                <span class="modal-shell-index-ring-tick" aria-hidden="true">✓</span>
+                            </span>
                             <span x-text="progressLine()"></span>
                         </div>
 
@@ -137,7 +145,7 @@
                                     <a href="#" class="modal-shell-index-entry" x-on:click.prevent="jump(i)" x-bind:class="{ 'is-current': i === current, 'is-invalid': entry.errors > 0, 'is-done': entry.done && entry.errors === 0 }" x-bind:aria-current="i === current ? 'true' : null">
                                         <span class="modal-shell-index-dot" aria-hidden="true" x-text="entry.errors > 0 ? '!' : (entry.done ? '✓' : i + 1)"></span>
                                         <span class="modal-shell-index-label" x-text="entry.label"></span>
-                                        <span class="modal-shell-index-optional" x-show="entry.optional && entry.errors === 0" aria-hidden="true">{{ __('common.optional') }}</span>
+                                        <span class="modal-shell-index-optional" x-show="entry.errors === 0" x-bind:class="'is-' + entry.kind" x-bind:data-step-kind="entry.kind" x-text="kindLabel(entry.kind)" aria-hidden="true"></span>
                                         <span class="modal-shell-index-count" x-show="entry.errors > 0" aria-hidden="true" x-text="entry.errors"></span>
                                         <span class="sr-only" x-show="entry.errors > 0" x-text="errorLine(entry.errors)"></span>
                                     </a>

@@ -142,6 +142,7 @@ return [
     'back' => 'رجوع',
     'show_me' => 'اعرضها',
     'optional' => 'اختياري',
+    'needed_for_review' => 'مطلوب للمراجعة',
     'sections_in_this_form' => 'في هذا النموذج',
     'required_filled' => 'تم ملء :filled من :total من الحقول المطلوبة',
     'add_section' => 'إضافة :section',

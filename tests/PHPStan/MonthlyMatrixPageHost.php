@@ -9,6 +9,7 @@ use App\Livewire\Concerns\Reports\BuildsMatrixBreakdowns;
 use App\Livewire\Concerns\Reports\BuildsMonthlyMatrix;
 use App\Livewire\Concerns\Reports\ExportsMonthlyMatrix;
 use App\Livewire\Concerns\Reports\GroupsMonthlyMatrix;
+use App\Livewire\Concerns\Reports\ReadsMatrixProgress;
 use Livewire\Component;
 use Livewire\WithPagination;
 
@@ -27,6 +28,7 @@ abstract class MonthlyMatrixPageHost extends Component
     use BuildsMonthlyMatrix;
     use ExportsMonthlyMatrix;
     use GroupsMonthlyMatrix;
+    use ReadsMatrixProgress;
     use WithPagination;
 
     public string $proposal = '';

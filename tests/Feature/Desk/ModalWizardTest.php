@@ -39,3 +39,15 @@ test('an x-ui.modal with many sections is never a step wizard', function () {
         ->toContain('data-save')
         ->toContain('data-modal-errors');
 });
+
+test('the section index tags every step and turns its ring solid with a tick once every required field is filled', function () {
+    $html = modalWithSections(5);
+
+    expect($html)
+        ->toContain('x-text="kindLabel(entry.kind)"')
+        ->toContain('Needed for review')
+        ->toContain('Required')
+        ->toContain('Optional')
+        ->toContain("'is-complete': required > 0 && filled === required")
+        ->toContain('modal-shell-index-ring-tick');
+});

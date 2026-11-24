@@ -19,6 +19,9 @@ use Livewire\Attributes\Computed;
  *
  * An old `?ptab=` link (or setting `tab`) opens the matching section, so
  * deep links from notifications, the Desk and other pages keep working.
+ * Projects & places and Indicators & targets were dropped (PR feedback
+ * 2026-11-23): the card's See more and the logical framework already show
+ * them, so their old links scroll to those instead.
  * The embedded view (project Story) keeps its tabs.
  *
  * @property-read Proposal $proposal  #[Computed] proposal()
@@ -30,10 +33,8 @@ trait FoldsProposalSections
     public const SECTION_TABS = [
         'money' => 'funding',
         'coming' => 'deadlines',
-        'projects' => 'projects',
         'plan' => 'plan',
         'reports' => 'reports',
-        'targets' => 'targets',
         'docs' => 'documents',
         'history' => 'status',
     ];
@@ -136,15 +137,6 @@ trait FoldsProposalSections
         ];
 
         if (! $payroll) {
-            $grantEnd = $proposal->effectiveDateEnd() ?? $proposal->planned_date_end;
-            $outrun = $this->projects->contains(fn ($project): bool => $grantEnd !== null && $project->end_date !== null && $project->end_date->gt($grantEnd));
-            $missingCentre = collect($this->locationRows)->contains('status', 'missing_center');
-            $list[] = [
-                'key' => 'projects', 'icon' => 'map-pin', 'title' => __('proposals.sections.projects'),
-                'summary' => trans_choice('proposals.sections.n_projects', $this->projects->count(), ['count' => $this->projects->count()]).' · '.trans_choice('proposals.sections.n_locations', count($this->locationRows), ['count' => count($this->locationRows)]),
-                'flag' => $outrun || $missingCentre ? __('proposals.sections.flag_needs_fix') : null,
-            ];
-
             $plan = $this->planTaskRows;
             $list[] = [
                 'key' => 'plan', 'icon' => 'user-group', 'title' => __('proposals.sections.plan'),
@@ -161,12 +153,6 @@ trait FoldsProposalSections
                 'key' => 'reports', 'icon' => 'document-text', 'title' => __('proposals.sections.reports'),
                 'summary' => $total === 0 ? __('proposals.sections.reports_none') : __('proposals.sections.reports_line', ['filed' => max(0, $total - $owed->count()), 'owed' => $owed->count()]),
                 'flag' => $late > 0 ? trans_choice('proposals.sections.flag_late', $late, ['count' => $late]) : null,
-            ];
-
-            $list[] = [
-                'key' => 'targets', 'icon' => 'flag', 'title' => __('proposals.tab_targets'),
-                'summary' => trans_choice('proposals.sections.n_targets', $this->targets->count(), ['count' => $this->targets->count()]),
-                'flag' => null,
             ];
         }
 

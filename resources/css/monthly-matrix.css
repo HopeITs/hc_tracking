@@ -1,0 +1,148 @@
+/* Monthly Matrix (reports/monthly-matrix, 2026-11-23 redesign): summary cards,
+ * a toolbar, then one card per proposal or center whose indicator rows carry a
+ * progress-against-pace bar and a box per month. Own classes, prefixed mm-, in
+ * @layer components. Colours are the Desk aliases of tokens.css (red and
+ * greys only), so the Graphite .dark values apply without a second block. */
+
+@layer components {
+    .mm-modes { display: flex; flex-wrap: wrap; align-items: flex-end; justify-content: space-between; gap: 12px 20px; }
+    .mm-window { font-size: 14px; color: var(--ink-3); }
+
+    /* Filter bar: one period pill (From → To) and More filters, the same height as the pickers. */
+    .mm-period { display: flex; flex: 0 1 auto; flex-direction: column; gap: 4px; }
+    .mm-period-box { display: inline-flex; align-items: center; gap: 6px; height: 36px; padding-inline: 12px; border: 1px solid var(--line-2); border-radius: 10px; background: var(--paper); color: var(--ink-3); }
+    .mm-period-box:hover, .mm-period-box:focus-within { border-color: var(--ink-3); }
+    .mm-period-invalid { border-color: var(--bad); }
+    .mm-period-box input { width: 8.5rem; height: 32px; border: 0; background: none; color: var(--ink); font-size: 13px; font-weight: 700; outline: none; }
+    .mm-period-sep { color: var(--faint); font-weight: 700; }
+    .mm-period-error { display: flex; align-items: center; gap: 4px; font-size: 12px; color: var(--color-status-critical-text); }
+    .mm-more { display: flex; flex: none; }
+    .mm-more > * { height: 36px; }
+
+    /* Summary cards: each is a quick filter. */
+    .mm-stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(13.5rem, 1fr)); gap: 12px; margin-top: 16px; }
+    .mm-stat { display: flex; flex-direction: column; align-items: flex-start; gap: 4px; min-height: 7rem; padding: 16px 18px; text-align: start; border: 1px solid var(--line); border-radius: 16px; background: var(--paper); color: var(--ink); cursor: pointer; transition: border-color .15s, box-shadow .15s; }
+    .mm-stat:hover { border-color: var(--line-2); }
+    .mm-stat:focus-visible { outline: 2px solid var(--ink); outline-offset: 2px; }
+    .mm-stat[aria-pressed="true"] { border: 2px solid var(--ink); padding: 15px 17px; }
+    .mm-stat-alarm { border-color: var(--bad); }
+    .mm-stat-label { font-size: 13.5px; font-weight: 700; color: var(--ink-2); }
+    .mm-stat-figure { display: flex; align-items: baseline; gap: 8px; }
+    .mm-stat-figure b { font-size: 34px; line-height: 1.1; font-weight: 800; }
+    .mm-stat-alarm .mm-stat-figure b { color: var(--color-status-critical-text); }
+    .mm-stat-figure span, .mm-stat-hint { font-size: 13px; color: var(--ink-3); }
+
+    /* Toolbar and legend */
+    .mm-toolbar { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 12px 24px; margin-top: 20px; }
+    .mm-toolbar-start { display: flex; flex-wrap: wrap; align-items: center; gap: 10px 14px; }
+    .mm-toolbar-label { font-size: 13.5px; font-weight: 700; color: var(--ink-2); }
+    .mm-toolbar .dk-seg { padding: 3px; border-radius: 11px; }
+    .mm-toolbar .dk-seg button { height: 38px; padding-inline: 14px; font-size: 13.5px; border-radius: 8px; }
+    .mm-switch { display: inline-flex; align-items: center; gap: 10px; min-height: 44px; padding: 0 6px; border: 0; background: none; color: var(--ink-2); font-size: 13.5px; font-weight: 700; cursor: pointer; }
+    .mm-switch-track { position: relative; width: 36px; height: 20px; border-radius: 999px; background: var(--line-2); transition: background .15s; }
+    .mm-switch-track span { position: absolute; top: 2px; inset-inline-start: 2px; width: 16px; height: 16px; border-radius: 999px; background: var(--paper); transition: inset-inline-start .15s; }
+    .mm-switch[aria-pressed="true"] .mm-switch-track { background: var(--ink); }
+    .mm-switch[aria-pressed="true"] .mm-switch-track span { inset-inline-start: 18px; }
+    .mm-chip { display: inline-flex; align-items: center; gap: 6px; min-height: 36px; padding: 0 12px; border: 0; border-radius: 999px; background: var(--ink); color: var(--paper); font-size: 13px; font-weight: 700; cursor: pointer; }
+    .mm-legend { display: flex; flex-wrap: wrap; gap: 8px 16px; font-size: 13px; color: var(--ink-2); }
+    .mm-legend li { display: inline-flex; align-items: center; gap: 7px; list-style: none; }
+    .mm-swatch { display: inline-block; width: 22px; height: 16px; border-radius: 5px; box-sizing: border-box; }
+
+    /* Cards */
+    .mm-cards { display: flex; flex-direction: column; gap: 16px; margin-top: 16px; }
+    .mm-card { overflow: hidden; border: 1px solid var(--line); border-radius: 18px; background: var(--paper); }
+    .mm-card-head { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 20px; width: 100%; padding: 18px 20px; border: 0; background: none; color: var(--ink); text-align: start; cursor: pointer; }
+    .mm-card-head:hover { background: var(--tint); }
+    .mm-card-title { display: flex; flex: 1 1 20rem; min-width: 0; flex-direction: column; gap: 2px; }
+    .mm-card-title b { font-size: 18px; font-weight: 800; }
+    .mm-card-title span { font-size: 14px; color: var(--ink-3); }
+    .mm-card-badges { display: inline-flex; flex-wrap: wrap; gap: 8px; }
+    .mm-badge { padding: 4px 10px; border-radius: 999px; background: var(--sunk); color: var(--ink); font-size: 13px; font-weight: 700; }
+    .mm-badge-line { padding: 3px 9px; border: 1px solid var(--bad); background: none; color: var(--color-status-critical-text); }
+    .mm-badge-red { background: var(--brand); color: var(--on-brand); }
+    .mm-chev { flex: none; color: var(--ink-2); transition: transform .15s; }
+
+    /* One line: indicator | progress | months | fold button. The heading uses the same flex bases, so it wraps with the rows. */
+    .mm-line { display: flex; flex-wrap: wrap; align-items: center; gap: 14px 24px; padding: 18px 20px; }
+    .mm-line-head { padding-block: 10px; border-block: 1px solid var(--line); background: var(--tint); font-size: 12px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; color: var(--ink-3); }
+    .mm-line-head:lang(ar) { letter-spacing: 0; text-transform: none; }
+    .mm-row + .mm-row { border-top: 1px solid var(--line); }
+    .mm-ind { display: flex; flex: 1 1 15rem; min-width: 0; flex-direction: column; gap: 5px; }
+    .mm-ind-meta { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 8px; font-size: 13px; color: var(--ink-3); }
+    .mm-code { padding: 2px 8px; border-radius: 6px; background: var(--sunk); color: var(--ink); font-size: 12px; font-weight: 800; letter-spacing: .02em; }
+    .mm-muted-tag { display: inline-flex; align-items: center; gap: 4px; }
+    .mm-ind-name { font-size: 15.5px; font-weight: 700; line-height: 1.4; color: var(--ink); }
+    .mm-ind-ctx { font-size: 13px; color: var(--ink-3); }
+    .mm-prog { display: flex; flex: 0 0 12.5rem; flex-direction: column; gap: 6px; }
+    .mm-line-head .mm-prog { gap: 0; }
+    .mm-prog-figure { display: flex; flex-wrap: wrap; align-items: baseline; gap: 6px; font-size: 14px; color: var(--ink-3); }
+    .mm-prog-figure b { font-size: 22px; font-weight: 800; color: var(--ink); }
+    .mm-bar { position: relative; display: block; height: 8px; border-radius: 8px; background: var(--sunk); }
+    .mm-bar-fill { position: absolute; inset-block: 0; inset-inline-start: 0; border-radius: 8px; background: var(--ink); }
+    .mm-bar-behind { background: var(--brand); }
+    .mm-bar-tick { position: absolute; top: -4px; bottom: -4px; width: 2px; border-radius: 2px; background: var(--ink-3); }
+    .mm-pace { font-size: 13px; font-weight: 700; color: var(--ink); }
+    .mm-pace:empty { display: none; }
+    .mm-pace-behind { color: var(--color-status-critical-text); }
+    .mm-prog-note { display: inline-flex; align-items: center; gap: 4px; font-size: 12.5px; color: var(--ink-3); }
+    .mm-prog-note:empty { display: none; }
+    .mm-strip { flex: 1 1 36rem; min-width: 0; overflow-x: auto; scrollbar-width: thin; }
+    .mm-months { display: grid; grid-template-columns: repeat(var(--mm-cols, 12), minmax(3rem, 1fr)); gap: 3px; min-width: calc(var(--mm-cols, 12) * 3.15rem); }
+    .mm-month { display: flex; flex-direction: column; align-items: center; justify-content: center; min-height: 30px; text-align: center; letter-spacing: 0; text-transform: none; }
+    .mm-month b { font-size: 13px; font-weight: 700; color: var(--ink-2); }
+    .mm-month small { font-size: 10.5px; font-weight: 600; color: var(--faint); }
+    .mm-line-head .mm-strip { overflow: hidden; }
+    .mm-fold-btn-space { flex: 0 0 40px; }
+    .mm-fold-btn { display: grid; flex: 0 0 40px; place-items: center; width: 40px; height: 40px; border: 1px solid var(--line); border-radius: 12px; background: var(--paper); color: var(--ink); cursor: pointer; }
+    .mm-fold-btn:hover { background: var(--sunk); }
+
+    /* Month boxes: validated grey, waiting dashed, missing red, open dotted, upcoming faint, not due a dot. */
+    .mm-cell { position: relative; list-style: none; }
+    .mm-cell-in { position: relative; display: flex; height: 3.4rem; flex-direction: column; align-items: center; justify-content: center; gap: 1px; box-sizing: border-box; border-radius: 10px; color: var(--ink); font-variant-numeric: tabular-nums; text-decoration: none; }
+    a.mm-cell-in:hover { box-shadow: inset 0 0 0 2px var(--ink-3); }
+    a.mm-cell-in:focus-visible { outline: 2px solid var(--ink); outline-offset: 2px; }
+    .mm-cell-value { font-size: 13.5px; font-weight: 800; letter-spacing: -.01em; }
+    .mm-cell-sub { font-size: 10.5px; font-weight: 600; color: var(--ink-2); }
+    .mm-cell-bar { position: absolute; inset-inline: 6px; bottom: 5px; height: 3px; border-radius: 3px; background: var(--line-2); }
+    .mm-cell-bar > span { display: block; height: 100%; border-radius: 3px; background: var(--ink); }
+    .mm-cell-bar > .mm-cell-bar-low { background: var(--brand); }
+    .mm-cell-done .mm-cell-in, .mm-swatch.mm-cell-done { background: var(--sunk); }
+    .mm-cell-waiting .mm-cell-in, .mm-swatch.mm-cell-waiting { border: 1.5px dashed var(--ink-3); background: var(--paper); }
+    .mm-cell-waiting .mm-cell-value { color: var(--ink-2); font-weight: 700; }
+    .mm-cell-missing .mm-cell-in, .mm-swatch.mm-cell-missing { border: 2px solid var(--bad); background: var(--paper); }
+    .mm-cell-missing .mm-cell-value, .mm-cell-missing .mm-cell-sub { color: var(--color-status-critical-text); }
+    .mm-cell-open .mm-cell-in, .mm-swatch.mm-cell-open { border: 1.5px dotted var(--faint); background: var(--paper); }
+    .mm-cell-open .mm-cell-sub { color: var(--ink-3); }
+    .mm-cell-upcoming .mm-cell-in, .mm-swatch.mm-cell-upcoming { border: 1px solid var(--line); background: var(--tint); color: var(--faint); }
+    .mm-cell-none .mm-cell-in { color: var(--faint); font-size: 18px; font-weight: 800; }
+    .mm-swatch.mm-cell-none { position: relative; }
+    .mm-swatch.mm-cell-none::after { content: "·"; position: absolute; inset: -4px 0 0; text-align: center; color: var(--faint); font-weight: 800; }
+
+    /* Fold */
+    .mm-fold { margin: 0 20px 20px; padding: 16px; border-radius: 14px; background: var(--sunk); }
+    .mm-fold-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(14rem, 1fr)); gap: 12px; }
+    .mm-panel { display: flex; min-width: 0; flex-direction: column; gap: 8px; padding: 14px 16px; border-radius: 12px; background: var(--paper); }
+    .mm-panel-wide { grid-column: 1 / -1; }
+    .mm-panel h3 { font-size: 14px; font-weight: 800; color: var(--ink); }
+    .mm-panel-text { font-size: 14px; color: var(--ink-2); }
+    .mm-panel .dk-btn { align-self: flex-start; }
+    .mm-report-link { display: flex; align-items: center; justify-content: space-between; gap: 8px; min-height: 38px; padding: 0 10px; border-radius: 10px; background: var(--sunk); color: var(--ink); font-size: 14px; text-decoration: none; }
+    a[href].mm-report-link:hover { box-shadow: inset 0 0 0 1px var(--line-2); }
+    .mm-report-state { font-size: 13px; font-weight: 700; color: var(--ink-3); }
+    .mm-report-missing { color: var(--color-status-critical-text); }
+    .mm-source { display: flex; flex-direction: column; gap: 1px; font-size: 14px; }
+    .mm-source a { color: var(--ink); text-decoration: underline; text-decoration-color: var(--line-2); text-underline-offset: 3px; }
+    .mm-source-donor { font-size: 13px; color: var(--ink-3); }
+    .mm-source a.mm-source-donor { color: var(--ink-3); }
+    .mm-bd-scroll { overflow-x: auto; }
+    .mm-bd { width: max-content; min-width: 100%; border-collapse: collapse; font-size: 13px; font-variant-numeric: tabular-nums; }
+    .mm-bd th, .mm-bd td { padding: 6px 8px; border-bottom: 1px solid var(--line); text-align: end; white-space: nowrap; }
+    .mm-bd thead th { font-size: 11px; font-weight: 700; color: var(--ink-3); }
+    .mm-bd tbody th { text-align: start; font-weight: 700; color: var(--ink); }
+    .mm-bd-pwd th { padding-inline-start: 20px; font-weight: 500; color: var(--ink-3); }
+    .mm-bd-pwd td { color: var(--ink-3); }
+    .mm-bd-total th, .mm-bd-sum { font-weight: 800; }
+
+    .mm-none { display: flex; flex-direction: column; align-items: center; gap: 12px; padding: 40px; border: 1px dashed var(--line-2); border-radius: 18px; text-align: center; color: var(--ink-2); }
+    .mm-pages { padding-top: 4px; }
+}

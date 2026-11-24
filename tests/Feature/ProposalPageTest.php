@@ -5,8 +5,10 @@ use App\Enums\ResultType;
 use App\Models\Donor;
 use App\Models\DonorProposal;
 use App\Models\DonorReport;
+use App\Models\Program;
 use App\Models\Proposal;
 use App\Models\ProposalAttentionDismissal;
+use App\Models\ProposalLocation;
 use App\Models\ProposalStatusNote;
 use App\Models\Result;
 use App\Models\TransfersTracking;
@@ -308,12 +310,38 @@ test('someone who sees agreements but not transfers gets no tranche money in the
         ->assertDontSee('arrived');
 });
 
-test('places can be edited from the projects section only before the donor approves', function () {
-    proposalPageFor()->call('openSection', 'projects')->assertSeeHtml('data-test="edit-locations"');
+test('the bottom sections leave projects and targets to the card and the framework', function () {
+    $page = proposalPageFor();
 
-    Proposal::query()->whereKey($this->proposal->id)->update(['status' => ProposalStatus::Approved]);
+    expect(array_column($page->instance()->sections, 'key'))->toBe(['money', 'coming', 'plan', 'reports', 'docs', 'history']);
 
-    proposalPageFor()->call('openSection', 'projects')->assertDontSeeHtml('data-test="edit-locations"');
+    $page->call('openSection', 'projects')->call('openSection', 'targets')
+        ->assertSet('openSections', [])
+        ->assertDontSeeHtml('data-section="projects"')
+        ->assertDontSeeHtml('data-section="targets"');
+});
+
+test('an old projects or targets link scrolls to the card or the framework', function () {
+    Livewire::actingAs($this->user)->withQueryParams(['ptab' => 'projects'])
+        ->test('pages::proposals.show', ['proposal' => $this->proposal])
+        ->assertSet('cardMore', true)
+        ->assertDispatched('pp-flash', target: 'card');
+
+    Livewire::actingAs($this->user)->withQueryParams(['ptab' => 'targets'])
+        ->test('pages::proposals.show', ['proposal' => $this->proposal])
+        ->assertSet('cardMore', false)
+        ->assertDispatched('pp-flash', target: 'lf');
+});
+
+test('a place without a center shows in needs attention', function () {
+    $city = insertHrCity('Hama', 'حماة');
+    $employee = insertHrEmployee($city);
+    ProposalLocation::factory()->create(['proposal_id' => $this->proposal->id, 'city_id' => $city, 'program_id' => Program::factory()->create(['manager_id' => $employee])->id, 'responsible_employee_id' => $employee]);
+
+    $item = collect(proposalPageFor()->instance()->attentionItems)->firstWhere('key', 'missing-centres');
+
+    expect($item['text'])->toBe('1 place has no center yet')
+        ->and($item['section'])->toBe('card');
 });
 
 test('the reports tally counts donor reports as filed once sent and as owed or late until then', function () {

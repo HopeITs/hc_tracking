@@ -9,7 +9,7 @@
         <div class="pp-block">
             <div class="pp-block-h"><b>{{ __('proposals.framework.layer_indicators') }} · {{ count($node['indicators']) }}</b>@if ($canEdit)<button type="button" class="pp-link" wire:click="$dispatch('add-indicator', { resultId: {{ $resultId }} })">+ {{ __('proposals.framework.add') }}</button>@endif</div>
             @forelse ($node['indicators'] as $indicator)
-                <div class="pp-li" role="button" tabindex="0" wire:click="$dispatch('edit-indicator', { indicatorId: {{ $indicator['id'] }} })" wire:key="ind-{{ $indicator['id'] }}">
+                <div class="pp-li" @if ($this->canEditIndicators) role="button" tabindex="0" wire:click="$dispatch('edit-indicator', { indicatorId: {{ $indicator['id'] }} })" @endif data-test="framework-indicator-{{ $indicator['id'] }}" wire:key="ind-{{ $indicator['id'] }}">
                     <span class="pp-li-t" dir="auto">{{ $indicator['name'] }}</span>
                     <span class="pp-li-r">
                         <span @class(['pp-bar', 'pp-bar-full' => ($indicator['percent'] ?? 0) >= 100])><i style="width: {{ (int) min(100, max(0, $indicator['percent'] ?? 0)) }}%"></i></span>

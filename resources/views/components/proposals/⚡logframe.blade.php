@@ -151,6 +151,16 @@ new class extends Component {
             || (auth()->user()?->can('results.create') === true && ! ProposalFramework::isStructureLocked($this->proposal));
     }
 
+    /**
+     * Whether this person may open an indicator's edit dialog; everyone else
+     * reads the rows without a click that would end in a 403.
+     */
+    #[Computed]
+    public function canEditIndicators(): bool
+    {
+        return auth()->user()?->can('indicators.update') === true;
+    }
+
     /* ---------------- Layout and preferences ---------------- */
 
     public function setLayout(string $layout): void
