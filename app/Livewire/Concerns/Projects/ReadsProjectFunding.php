@@ -61,7 +61,8 @@ trait ReadsProjectFunding
 
         return DonorProposal::query()
             ->select(['id', 'proposal_id', 'currency', 'budget'])
-            ->whereHas('proposal.projects', fn ($query) => $query->whereKey($this->locationId))
+            // A row is of one proposal (D-93), so its money is that one's.
+            ->where('proposal_id', $this->location->proposal_id)
             ->with(['transfers:id,donor_proposal_id,net_amount_received'])
             ->get()
             ->groupBy(fn (DonorProposal $donorProposal) => $donorProposal->currency->value)

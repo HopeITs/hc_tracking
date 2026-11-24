@@ -126,7 +126,7 @@ test('users without indicator rights see no scope button and are refused', funct
 test('the targets tab offers a New indicator link to the indicator directory scoped to this project', function () {
     projectTargetsTab($this->meal, $this->project)
         ->assertSeeHtml('data-new-indicator')
-        ->assertSeeHtml('href="'.e(route('indicators.index', ['create' => 1, 'project' => $this->project->id])).'"')
+        ->assertSeeHtml('href="'.e(route('indicators.index', ['create' => 1, 'location' => $this->row->id])).'"')
         ->assertSee(__('projects.new_indicator'));
 });
 

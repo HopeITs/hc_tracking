@@ -122,16 +122,20 @@ test('a proposal editor without the money permissions links and unlinks proposal
     expect($project->proposals()->count())->toBe(0);
 });
 
-test('Public Relations Manager opens the proposal from the project page but sees no funding figures', function () {
+test('Public Relations Manager opens the proposal from the project page, sees the agreement budget but not the transfers', function () {
     ['project' => $project, 'proposal' => $proposal] = seedProjectMoneyFixture();
 
+    // The role holds funding-agreements.view but not transfers.view, so the
+    // agreement budget is theirs to see and the received amount is not.
+    // Before Y-16 this asserted both were hidden — only because the fixture's
+    // proposal was a draft and so never reached the funding list. D-84 makes
+    // the row's proposal approved, which is the state the screen really has.
     Livewire::actingAs(userWithRole('Public Relations Manager'))
         ->test('pages::projects.show', ['project' => rowFor($project)->slug])
         ->assertDontSee('Funding envelope')
         ->set('tab', 'proposals')
         ->assertSeeHtml('href="'.route('projects.show', ['project' => rowFor($project), 'proposal' => $proposal->id]).'#proposal"')
         ->assertSee('Aurora Foundation')
-        ->assertDontSee('731,942')
         ->assertDontSee('123,457');
 });
 
@@ -147,6 +151,16 @@ function seedProjectFilesFixture(): array
     $file = function (MediaCollection $collection, string $name) use ($project): Media {
         $path = 'media/projects/'.$project->id.'/'.$name;
         Storage::disk('local')->put($path, 'contents of '.$name);
+
+        // Y-11's mirror keeps a file on both the project and its row while
+        // both exist: the directory still reads the project's, the detail page
+        // reads the row's. Y-18 leaves only the row.
+        Media::factory()->inCollection($collection)->create([
+            'mediable_type' => 'project',
+            'mediable_id' => $project->id,
+            'path' => $path,
+            'original_name' => $name,
+        ]);
 
         return Media::factory()->inCollection($collection)->create([
             'mediable_type' => 'proposal_location',
@@ -177,7 +191,7 @@ test('a Managers user is not shown funding paper on the project files tab and ca
         ->assertDontSee('signed-agreement.pdf');
 
     $instance = $page->instance();
-    expect($instance->project->media_count)->toBe(1)
+    expect($instance->location->media_count)->toBe(1)
         ->and(collect($instance->fileCategoryCounts)->pluck('value')->all())->not->toContain('agreement', 'mou');
 });
 

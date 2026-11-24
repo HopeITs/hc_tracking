@@ -93,8 +93,10 @@ test('project detail shows a not funded empty state with no linked proposals', f
 
 test('project detail shows committed and received funding per currency', function () {
     $user = User::factory()->role('General Manager')->create();
-    $project = projectWithRow();
-    $proposal = Proposal::factory()->create();
+    // Y-16, D-93: the money shown is that of the ONE proposal behind the row.
+    $project = Project::factory()->create();
+    $proposal = Proposal::factory()->running()->create();
+    rowFor($project, $proposal);
     $project->proposals()->attach($proposal->id);
     $donorProposal = DonorProposal::factory()->create([
         'proposal_id' => $proposal->id,
