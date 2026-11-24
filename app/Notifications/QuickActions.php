@@ -17,6 +17,7 @@ use App\Models\Task;
 use App\Models\TransfersTracking;
 use App\Models\User;
 use App\Models\UserNotification;
+use App\Support\TaskWorkflow;
 use Carbon\CarbonImmutable;
 use Illuminate\Database\QueryException;
 use Illuminate\Support\Facades\Gate;
@@ -143,7 +144,8 @@ final class QuickActions
 
     /**
      * The status moves offered on a task: only to someone who can see it and
-     * may move it (see TaskPolicy::updateStatus). Loaded without the viewer's
+     * may move it (see TaskPolicy::updateStatus), and Mark done only to the
+     * person who approves it (see TaskWorkflow). Loaded without the viewer's
      * scope because this is built for the recipient, not the signed-in user.
      *
      * @return list<string>
@@ -156,9 +158,11 @@ final class QuickActions
             return [];
         }
 
+        $markDone = TaskWorkflow::approves($user, $task) ? ['task.mark_done'] : [];
+
         return match ($task->status) {
-            TaskStatus::Todo => ['task.start', 'task.mark_done'],
-            TaskStatus::InProgress, TaskStatus::UnderReview => ['task.mark_done'],
+            TaskStatus::Todo => ['task.start', ...$markDone],
+            TaskStatus::InProgress, TaskStatus::UnderReview => $markDone,
             TaskStatus::Done => [],
         };
     }
@@ -272,23 +276,35 @@ final class QuickActions
             return $this->result(false, 'forbidden');
         }
 
-        if ($type === 'task.start') {
-            if ($task->status !== TaskStatus::Todo) {
-                return $this->result(false, 'already_started');
-            }
+        if ($type === 'task.start' && $task->status !== TaskStatus::Todo) {
+            return $this->result(false, 'already_started');
+        }
 
-            $task->status = TaskStatus::InProgress;
+        if ($type === 'task.mark_done' && $task->status === TaskStatus::Done) {
+            return $this->result(false, 'already_done');
+        }
+
+        $to = $type === 'task.start' ? TaskStatus::InProgress : TaskStatus::Done;
+        $refusal = TaskWorkflow::refusal($user, $task, $to);
+
+        if ($refusal !== null) {
+            return ['ok' => false, 'message' => $refusal, 'redirect' => null];
+        }
+
+        $from = $task->status;
+        $approves = TaskWorkflow::approves($user, $task);
+        $task->status = $to;
+
+        if ($to === TaskStatus::InProgress) {
+            $task->start_date ??= CarbonImmutable::today();
         } else {
-            if ($task->status === TaskStatus::Done) {
-                return $this->result(false, 'already_done');
-            }
-
-            $task->status = TaskStatus::Done;
             $task->completed_date ??= CarbonImmutable::today();
             $task->progress_percentage = 100;
         }
 
         $task->save();
+
+        TaskWorkflow::announce($user, $task, $from, $approves, null);
 
         return $this->result(true, 'done');
     }
