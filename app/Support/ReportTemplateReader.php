@@ -313,8 +313,8 @@ final class ReportTemplateReader
     /**
      * The activity calendar of the template (Y-06, D-78): the activities of
      * the template's proposals by month, read only. A proposal's own calendar
-     * applies unless the place has an override (D-49), found through the
-     * bridge. Months are the union of the proposals' schedule windows; an
+     * applies unless the proposal's location row at the template's place has
+     * an override (D-49, Y-15: ActivitySchedule::effectiveOf()). Months are the union of the proposals' schedule windows; an
      * activity shows only the months inside its own proposal's window. Four
      * queries whatever the number of activities; no money.
      *
@@ -343,12 +343,12 @@ final class ReportTemplateReader
             ->whereIn('proposal_id', $proposals->modelKeys())
             ->orderBy('id')
             ->get(['id', 'proposal_id', 'statement']);
-        $overrideProjectId = $this->places->legacyProjectIdFor($template);
+        $locationIds = $template->locationIdsByProposal(array_values(array_map(intval(...), $proposals->modelKeys())));
 
         /** @var Collection<int, Collection<int, ActivitySchedule>> $schedules */
         $schedules = $activities->isEmpty() ? collect() : ActivitySchedule::query()
             ->whereIn('result_id', $activities->modelKeys())
-            ->where(fn ($query) => $query->whereNull('project_id')->when($overrideProjectId !== null, fn ($query) => $query->orWhere('project_id', $overrideProjectId)))
+            ->where(fn ($query) => $query->whereNull('proposal_location_id')->when($locationIds !== [], fn ($query) => $query->orWhereIn('proposal_location_id', array_values($locationIds))))
             ->get()
             ->groupBy('result_id');
 
@@ -359,20 +359,19 @@ final class ReportTemplateReader
             $rows = [];
 
             foreach ($activities->where('proposal_id', $proposal->id) as $activity) {
+                $locationId = $locationIds[$activity->proposal_id] ?? null;
                 $own = $schedules->get($activity->id, collect());
-                $adjusted = $own->contains(fn (ActivitySchedule $row): bool => $row->project_id !== null);
-                $calendar = $adjusted ? $own->whereNotNull('project_id') : $own->whereNull('project_id');
+                $adjusted = $locationId !== null && $own->contains(fn (ActivitySchedule $row): bool => $row->proposal_location_id === $locationId);
                 $cells = [];
 
-                foreach ($calendar as $row) {
-                    $month = CarbonImmutable::parse($row->month)->startOfMonth();
+                foreach (ActivitySchedule::effectiveOf($own, $locationId) as $key => $weeks) {
+                    $month = CarbonImmutable::parse($key.'-01')->startOfMonth();
 
                     if ($month->lessThan($from) || $month->greaterThan($to)) {
                         continue;
                     }
 
-                    /** @var list<int>|null $weeks */
-                    $weeks = $row->weeks === [] ? null : $row->weeks;
+                    $weeks = $weeks === [] ? null : $weeks;
                     $cells[$month->format('Y-m')] = [
                         'weeks' => $weeks,
                         'label' => $weeks === null

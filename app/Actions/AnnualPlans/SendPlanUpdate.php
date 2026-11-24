@@ -7,7 +7,7 @@ namespace App\Actions\AnnualPlans;
 use App\Enums\PlanUpdateStatus;
 use App\Enums\PlanWeekStatus;
 use App\Models\PlanUpdate;
-use App\Models\Project;
+use App\Models\ProposalLocation;
 use App\Models\User;
 use App\Policies\PlanUpdatePolicy;
 use App\Support\PlanExecution;
@@ -30,22 +30,22 @@ final class SendPlanUpdate
 {
     public function handle(User $user, PlanUpdate $update, ?CarbonImmutable $today = null): PlanUpdate
     {
-        $update->loadMissing(['plan', 'project', 'weeks', 'numbers', 'files']);
+        $update->loadMissing(['plan', 'location', 'weeks', 'numbers', 'files']);
         $plan = $update->plan;
-        $project = $update->project;
+        $location = $update->location;
 
-        if (! PlanUpdatePolicy::canFill($user, $plan, $project, $update)) {
+        if (! PlanUpdatePolicy::canFill($user, $plan, $location, $update)) {
             throw new AuthorizationException;
         }
 
         $execution = PlanExecution::for($plan);
-        $blockers = $execution->sendBlockers($project, $update->month, $today);
+        $blockers = $execution->sendBlockers($location, $update->month, $today);
 
         if ($blockers !== []) {
             throw ValidationException::withMessages(['send' => implode(' ', $blockers)]);
         }
 
-        $missing = self::missing($execution, $project, $update);
+        $missing = self::missing($execution, $location, $update);
 
         if ($missing !== []) {
             throw ValidationException::withMessages(['send' => __('annual_plans.up.incomplete', ['count' => count($missing)])]);
@@ -103,13 +103,13 @@ final class SendPlanUpdate
      *
      * @return list<string>
      */
-    public static function missing(PlanExecution $execution, Project $project, PlanUpdate $update): array
+    public static function missing(PlanExecution $execution, ProposalLocation $location, PlanUpdate $update): array
     {
         $missing = [];
         $mondays = $execution->calendar->mondaysOf($update->month);
         $weeks = $update->weeks->keyBy(fn ($week): string => $week->activity_plan_batch_id.'|'.$week->week->toDateString());
 
-        foreach ($execution->batchesFor($project, $update->month) as $row) {
+        foreach ($execution->batchesFor($location, $update->month) as $row) {
             $batch = $row['batch'];
 
             foreach ($mondays as $monday) {

@@ -204,15 +204,16 @@ test('an activity entry belongs to its report, one per activity, and keeps its a
         ->and(fn () => DB::table('results')->where('id', $entry->result_id)->delete())->toThrow(QueryException::class);
 });
 
-test('a project activity status is one per project and activity', function () {
+test('a project activity status is one per location row and activity', function () {
     $status = Activity::withoutRecording(fn () => ProjectActivityStatus::factory()->create(['status' => ActivityStatus::Ongoing]));
 
-    $fresh = ProjectActivityStatus::query()->with('project', 'activity', 'monthlyReport')->findOrFail($status->id);
+    $fresh = ProjectActivityStatus::query()->with('project', 'location', 'activity', 'monthlyReport')->findOrFail($status->id);
 
     expect($fresh->status)->toBe(ActivityStatus::Ongoing)
         ->and($fresh->monthlyReport)->toBeInstanceOf(MonthlyReport::class)
+        ->and($fresh->location?->project_id)->toBe($status->project_id)
         ->and(fn () => DB::table('project_activity_statuses')->insert([
-            'project_id' => $status->project_id, 'result_id' => $status->result_id, 'status' => 'started', 'monthly_report_id' => $status->monthly_report_id,
+            'project_id' => $status->project_id, 'proposal_location_id' => $status->proposal_location_id, 'result_id' => $status->result_id, 'status' => 'started', 'monthly_report_id' => $status->monthly_report_id,
         ]))->toThrow(UniqueConstraintViolationException::class);
 });
 

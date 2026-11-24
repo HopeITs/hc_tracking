@@ -210,4 +210,17 @@ return [
     'proposal_logframes_none' => 'لا يوجد إطار منطقي لمقترح يطابق البحث أو البرنامج.',
     'proposal_logframes_empty' => 'لا يوجد مقترح له إطار منطقي خاص به بعد.',
     'open_proposal_logframe' => 'افتح الإطار المنطقي لـ :name',
+
+    'console' => [
+        'backfill_applying' => 'التنفيذ: ستُنقل تقويمات المراكز الخاصة إلى صف موقعها.',
+        'backfill_dry_run' => 'تشغيل تجريبي: لن يُكتب أي شيء.',
+        'backfill_seen' => 'تقويمات مراكز خاصة بلا صف بعد',
+        'backfill_moved' => 'المنقولة إلى صف',
+        'backfill_by_own_proposal' => 'المحسومة بمقترح النشاط نفسه (دون قاعدة التاريخ)',
+        'backfill_by_date' => 'المحسومة بالتاريخ',
+        'backfill_by_most_recent' => 'المحسومة بأحدث مقترح',
+        'backfill_rows' => 'التقويمات الخاصة بحسب الصف (معرف الصف × العدد): :rows.',
+        'backfill_unmapped' => 'تقويمات خاصة لم يستلمها أي صف (المعرفات، تُركت كما هي): :ids.',
+        'backfill_none' => 'لا شيء',
+    ],
 ];

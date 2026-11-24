@@ -175,7 +175,7 @@ new #[Layout('layouts::desk'), Title('titles.annual_plan')] class extends Compon
     $summary = $this->summary;
     $resultGroups = $this->resultGroups;
     $periodMix = $this->periodMix;
-    $linkedProjects = $this->linkedProjects;
+    $linkedPlaces = $this->linkedPlaces;
     $recentReports = $this->recentReports;
 
     $reportSegments = [
@@ -277,14 +277,14 @@ new #[Layout('layouts::desk'), Title('titles.annual_plan')] class extends Compon
                     </span>
                 </li>
 
-                @if ($linkedProjects->isEmpty())
+                @if ($linkedPlaces->isEmpty())
                     <li class="p-3.5">
                         <span class="block type-meta text-secondary-medium dark:text-ink-muted">{{ __('common.projects') }}</span>
                         <p class="mt-1 type-meta text-secondary-light">{{ __('annual_plans.no_projects_attributed_yet') }}</p>
                     </li>
                 @else
-                    @foreach ($linkedProjects as $project)
-                        <li class="flex items-center gap-3 p-3.5" wire:key="connection-project-{{ $project->id }}">
+                    @foreach ($linkedPlaces as $place)
+                        <li class="flex items-center gap-3 p-3.5" wire:key="connection-place-{{ $place['key'] }}" data-connection-place>
                             <span aria-hidden="true" class="flex size-9 shrink-0 items-center justify-center rounded-lg bg-secondary-soft text-secondary-dark dark:bg-surface-2 dark:text-ink">
                                 <flux:icon.map-pin variant="micro" class="size-4" />
                             </span>
@@ -292,8 +292,8 @@ new #[Layout('layouts::desk'), Title('titles.annual_plan')] class extends Compon
                                 @if ($loop->first)
                                     <span class="block type-meta text-secondary-medium dark:text-ink-muted">{{ __('common.projects') }}</span>
                                 @endif
-                                <a href="{{ route('projects.show', $project) }}" wire:navigate class="block truncate text-sm font-semibold hover:underline">{{ $project->name }}</a>
-                                <span class="block truncate type-meta text-secondary-medium dark:text-ink-muted">{{ $project->city?->name ?? __('common.unknown_city') }}</span>
+                                <span class="block truncate text-sm font-semibold" dir="auto">{{ $place['name'] }}</span>
+                                <span class="block truncate type-meta text-secondary-medium dark:text-ink-muted" dir="auto">{{ $place['city'] }}</span>
                             </span>
                         </li>
                     @endforeach

@@ -14,7 +14,7 @@ use App\Models\ActivityPlanBatch;
 use App\Models\ActivityPlanItem;
 use App\Models\PlanUpdate;
 use App\Models\PlanUpdateFile;
-use App\Models\Project;
+use App\Models\ProposalLocation;
 use App\Models\User;
 use App\Policies\PlanUpdatePolicy;
 use App\Support\PlanCalendar;
@@ -36,7 +36,7 @@ use Livewire\Attributes\Locked;
  * a return.
  *
  * @property-read ActivityPlan $plan
- * @property-read Project $project
+ * @property-read ProposalLocation $location
  * @property-read CarbonImmutable $monthStart
  * @property-read PlanExecution $execution
  * @property-read PlanUpdate|null $record
@@ -47,7 +47,7 @@ trait EditsPlanUpdate
     public int $planId;
 
     #[Locked]
-    public int $projectId;
+    public int $locationId;
 
     #[Locked]
     public string $month;
@@ -84,9 +84,9 @@ trait EditsPlanUpdate
     }
 
     #[Computed]
-    public function project(): Project
+    public function location(): ProposalLocation
     {
-        return Project::query()->findOrFail($this->projectId);
+        return ProposalLocation::query()->with(['city', 'program', 'centers'])->findOrFail($this->locationId);
     }
 
     #[Computed]
@@ -105,7 +105,7 @@ trait EditsPlanUpdate
     public function record(): ?PlanUpdate
     {
         return PlanUpdate::query()
-            ->where('activity_plan_id', $this->planId)->where('project_id', $this->projectId)->where('month', $this->monthStart->toDateString())
+            ->where('activity_plan_id', $this->planId)->where('proposal_location_id', $this->locationId)->where('month', $this->monthStart->toDateString())
             ->with(['weeks', 'numbers', 'files', 'questions.user', 'sender', 'officer', 'reviewer', 'seer', 'returner'])
             ->first();
     }
@@ -120,7 +120,7 @@ trait EditsPlanUpdate
         $update = $this->record;
 
         return match (true) {
-            PlanUpdatePolicy::canFill($user, $this->plan, $this->project, $update) => 'fill',
+            PlanUpdatePolicy::canFill($user, $this->plan, $this->location, $update) => 'fill',
             $update !== null && $user->can('decideAsOfficer', $update) => 'officer',
             $update !== null && $user->can('decideAsMealManager', $update) => 'meal',
             $update !== null && $user->can('markSeen', $update) => 'program',
@@ -135,7 +135,7 @@ trait EditsPlanUpdate
     #[Computed]
     public function rows(): array
     {
-        return $this->execution->batchesFor($this->project, $this->monthStart);
+        return $this->execution->batchesFor($this->location, $this->monthStart);
     }
 
     /**
@@ -153,7 +153,7 @@ trait EditsPlanUpdate
     #[Computed]
     public function blockers(): array
     {
-        return $this->execution->sendBlockers($this->project, $this->monthStart);
+        return $this->execution->sendBlockers($this->location, $this->monthStart);
     }
 
     public function mountEditsPlanUpdate(): void
@@ -200,7 +200,7 @@ trait EditsPlanUpdate
     public function saveDraft(bool $toast = true): bool
     {
         $saved = $this->run(function (): void {
-            app(SavePlanUpdate::class)->handle($this->user(), $this->plan, $this->project, $this->monthStart, $this->draft);
+            app(SavePlanUpdate::class)->handle($this->user(), $this->plan, $this->location, $this->monthStart, $this->draft);
         });
 
         if ($saved) {
@@ -218,7 +218,7 @@ trait EditsPlanUpdate
     {
         $this->run(function (): void {
             foreach ($this->newFiles as $file) {
-                app(ManagePlanUpdateFiles::class)->add($this->user(), $this->plan, $this->project, $this->monthStart, $file);
+                app(ManagePlanUpdateFiles::class)->add($this->user(), $this->plan, $this->location, $this->monthStart, $file);
             }
         });
         $this->newFiles = [];
@@ -242,7 +242,7 @@ trait EditsPlanUpdate
         }
 
         $update = $this->record;
-        $this->missing = $update === null ? [] : SendPlanUpdate::missing($this->execution, $this->project, $update);
+        $this->missing = $update === null ? [] : SendPlanUpdate::missing($this->execution, $this->location, $update);
 
         $this->run(function () use ($update): void {
             if ($update === null) {

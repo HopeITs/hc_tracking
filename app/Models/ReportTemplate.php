@@ -86,6 +86,35 @@ class ReportTemplate extends Model implements TracksActivity
     }
 
     /**
+     * The location row of each of the given proposals at the template's city
+     * and program (Y-15, D-93): the row whose calendar override and confirmed
+     * activity statuses this template reads. A row is city × program, so a
+     * proposal has at most one; a proposal with none is left out. One query.
+     *
+     * @param  list<int>  $proposalIds
+     * @return array<int, int> proposal id => location row id
+     */
+    public function locationIdsByProposal(array $proposalIds): array
+    {
+        if ($proposalIds === []) {
+            return [];
+        }
+
+        $ids = [];
+
+        foreach (ProposalLocation::query()
+            ->whereIn('proposal_id', $proposalIds)
+            ->where('city_id', $this->city_id)
+            ->where('program_id', $this->program_id)
+            ->orderByDesc('id')
+            ->get(['id', 'proposal_id']) as $row) {
+            $ids[(int) $row->proposal_id] = (int) $row->id;
+        }
+
+        return $ids;
+    }
+
+    /**
      * Templates at the place. An unset place matches none (D-82).
      *
      * @param  Builder<ReportTemplate>  $query

@@ -2,7 +2,7 @@
 
 use App\Livewire\Concerns\AnnualPlans\EditsPlanUpdate;
 use App\Models\ActivityPlan;
-use App\Models\Project;
+use App\Models\ProposalLocation;
 use App\Policies\PlanUpdatePolicy;
 use App\Support\PlanExecution;
 use Carbon\CarbonImmutable;
@@ -13,7 +13,8 @@ use Livewire\WithFileUploads;
 
 /*
  * The monthly update of an annual plan for one centre and month
- * (2026-11-11 workflow): the project manager fills and sends it in two parts;
+ * (2026-11-11 workflow). A centre is a location row of the plan's proposal
+ * (Y-15, D-93); a row of another proposal or program answers 404 (BOLA): the project manager fills and sends it in two parts;
  * the MEAL officer, the MEAL manager and the program manager review it in
  * turn. Everyone involved reads all of it at every stage.
  */
@@ -21,18 +22,18 @@ new #[Layout('layouts::desk'), Title('titles.annual_plan')] class extends Compon
     use EditsPlanUpdate;
     use WithFileUploads;
 
-    public function mount(ActivityPlan $activityPlan, Project $project, string $month): void
+    public function mount(ActivityPlan $activityPlan, ProposalLocation $location, string $month): void
     {
-        abort_unless(PlanUpdatePolicy::canRead(auth()->user(), $activityPlan, $project), 403);
+        abort_unless(PlanUpdatePolicy::canRead(auth()->user(), $activityPlan, $location), 403);
         abort_unless(preg_match('/^\d{4}-\d{2}$/', $month) === 1, 404);
 
         $execution = PlanExecution::for($activityPlan);
         $monthStart = CarbonImmutable::createFromFormat('!Y-m', $month);
-        abort_unless($execution->project($project->id) !== null, 404);
+        abort_unless($execution->location($location->id) !== null, 404);
         abort_unless(in_array($month, array_map(fn (CarbonImmutable $value): string => $value->format('Y-m'), $execution->calendar->months()), true), 404);
 
         $this->planId = $activityPlan->id;
-        $this->projectId = $project->id;
+        $this->locationId = $location->id;
         $this->month = $monthStart->format('Y-m');
     }
 };
@@ -42,7 +43,7 @@ new #[Layout('layouts::desk'), Title('titles.annual_plan')] class extends Compon
 
 @php
     $plan = $this->plan;
-    $project = $this->project;
+    $location = $this->location;
     $record = $this->record;
     $mode = $this->mode;
     $monthLabel = $this->monthStart->translatedFormat('F Y');
@@ -56,10 +57,10 @@ new #[Layout('layouts::desk'), Title('titles.annual_plan')] class extends Compon
         :breadcrumbs="[
             ['label' => __('common.annual_plans'), 'url' => route('annual-plans.index')],
             ['label' => $plan->proposal->name, 'url' => route('activity-plans.show', $plan)],
-            ['label' => $project->name],
+            ['label' => $location->label()],
             ['label' => $monthLabel],
         ]"
-        :title="$monthLabel.' · '.$project->name"
+        :title="$monthLabel.' · '.$location->label()"
         :subtitle="$plan->proposal->name.' · '.$plan->program?->name"
     >
         <x-slot:meta>

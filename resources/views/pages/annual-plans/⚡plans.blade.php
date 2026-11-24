@@ -7,7 +7,6 @@ use App\Models\ActivityPlan;
 use App\Models\Program;
 use App\Models\Proposal;
 use App\Policies\ActivityPlanPolicy;
-use App\Support\ProposalFramework;
 use App\Enums\PlanUpdateStatus;
 use App\Models\Task;
 use App\Policies\PlanUpdatePolicy;
@@ -83,7 +82,7 @@ new #[Layout('layouts::desk'), Title('titles.annual_plans')] class extends Compo
     {
         return Proposal::query()
             ->whereNot('status', ProposalStatus::Rejected->value)
-            ->whereHas('projects', fn ($projects) => $projects->whereNotNull('projects.program_id'))
+            ->whereHas('locations', fn ($locations) => $locations->whereNotNull('program_id'))
             ->orderBy('name')
             ->get(['id', 'name', 'internal_project_number', 'status']);
     }
@@ -104,7 +103,7 @@ new #[Layout('layouts::desk'), Title('titles.annual_plans')] class extends Compo
 
         $policy = app(ActivityPlanPolicy::class);
 
-        return Program::query()->whereKey(ProposalFramework::programIds($proposal))->get(['id', 'manager_id'])
+        return Program::query()->whereKey(\App\Support\ActivityPlanScope::programIdsOf($proposal))->get(['id', 'manager_id'])
             ->filter(fn (Program $program): bool => $policy->plansFor(auth()->user(), $program))
             ->mapWithKeys(fn (Program $program): array => [$program->id => (string) $program->name])
             ->all();
@@ -198,14 +197,14 @@ new #[Layout('layouts::desk'), Title('titles.annual_plans')] class extends Compo
         foreach ($this->approvedExecutions as $execution) {
             $isProgramManager = PlanUpdatePolicy::isProgramManager($user, $execution->plan) && ! $user->hasRole('Super Admin');
 
-            foreach ($execution->projects() as $centre) {
+            foreach ($execution->locations() as $centre) {
                 $isProjectManager = PlanUpdatePolicy::isProjectManager($user, $centre) && ! $user->hasRole('Super Admin');
-                $isOfficer = $user->employee_id !== null && in_array((int) $user->employee_id, MealCoverage::officersForLegacyProject($centre->id), true);
+                $isOfficer = $user->employee_id !== null && in_array((int) $user->employee_id, MealCoverage::responsibleForLocation($centre), true);
 
                 foreach ($execution->startedMonths($today) as $month) {
                     $update = $execution->update($centre, $month);
                     $status = $update?->status;
-                    $what = $centre->name.' · '.$month->translatedFormat('F Y');
+                    $what = $centre->label().' · '.$month->translatedFormat('F Y');
                     $monthName = $month->translatedFormat('F');
                     $step = match (true) {
                         $status === PlanUpdateStatus::Returned && $isProjectManager => [0, 'bad', __('annual_plans.next.fix_title', ['month' => $monthName]), __('annual_plans.next.fix_body', ['what' => $what, 'reason' => (string) $update->return_reason]), __('annual_plans.next.fix_button')],
@@ -284,7 +283,7 @@ new #[Layout('layouts::desk'), Title('titles.annual_plans')] class extends Compo
     $counts = $this->counts;
     $next = $this->nextStep;
     $user = auth()->user();
-    $ownsCentre = $user->employee_id !== null && \App\Models\Project::query()->where('user_id', $user->employee_id)->exists();
+    $ownsCentre = $user->employee_id !== null && \App\Models\ProposalLocation::query()->where('responsible_employee_id', $user->employee_id)->exists();
     $guideKey = match (true) {
         $user->hasRole('General Manager') && ! $user->hasRole('Super Admin') => 'ceo',
         \App\Policies\ActivityPlanPolicy::isMealManager($user) => 'meal',

@@ -8,8 +8,7 @@ use App\Models\ActivityPlan;
 use App\Models\ActivityPlanBatch;
 use App\Models\ActivityPlanItem;
 use App\Models\ActivitySchedule;
-use App\Models\Project;
-use App\Support\MealCoverage;
+use App\Models\ProposalLocation;
 use App\Support\PlanCalendar;
 use Carbon\CarbonImmutable;
 use Illuminate\Support\Facades\DB;
@@ -23,9 +22,10 @@ use Illuminate\Support\Facades\DB;
  * - A month with all its Mondays planned is stored as the whole month
  *   (weeks null); otherwise as the week numbers inside it.
  * - An activity running in every governorate of the plan writes the
- *   proposal calendar (project_id null). One running in some governorates
- *   writes a calendar for each of the plan's centres in them, and none for
- *   the proposal, so centres elsewhere see no month at all.
+ *   proposal calendar (no location). One running in some governorates
+ *   writes a calendar for each of the plan's location rows in them (Y-15,
+ *   D-93), and none for the proposal, so rows elsewhere see no month at all.
+ *   Each row's `project_id` is still written until Y-18.
  */
 final class SyncActivitySchedules
 {
@@ -33,10 +33,10 @@ final class SyncActivitySchedules
     {
         DB::transaction(function () use ($plan): void {
             $plan->loadMissing(['proposal', 'items.batches', 'items.cities']);
-            $projects = $this->planProjects($plan);
+            $locations = $this->planLocations($plan);
             $planCityIds = array_values(array_unique(array_filter(array_map(
-                fn (Project $project): ?int => MealCoverage::cityIdOf($project),
-                $projects,
+                fn (ProposalLocation $location): int => $location->city_id,
+                $locations,
             ))));
 
             foreach ($plan->items as $item) {
@@ -49,16 +49,17 @@ final class SyncActivitySchedules
 
                 $itemCityIds = $item->cityIds();
                 $everywhere = array_diff($planCityIds, $itemCityIds) === [];
-                $projectIds = $everywhere ? [null] : array_values(array_map(
-                    fn (Project $project): int => $project->id,
-                    array_filter($projects, fn (Project $project): bool => in_array(MealCoverage::cityIdOf($project), $itemCityIds, true)),
+                $targets = $everywhere ? [null] : array_values(array_filter(
+                    $locations,
+                    fn (ProposalLocation $location): bool => in_array($location->city_id, $itemCityIds, true),
                 ));
 
-                foreach ($projectIds as $projectId) {
+                foreach ($targets as $location) {
                     foreach ($calendar as $month => $weeks) {
                         ActivitySchedule::query()->create([
                             'result_id' => $item->result_id,
-                            'project_id' => $projectId,
+                            'proposal_location_id' => $location?->id,
+                            'project_id' => $location?->project_id,
                             'month' => $month.'-01',
                             'weeks' => $weeks,
                         ]);
@@ -112,15 +113,17 @@ final class SyncActivitySchedules
     }
 
     /**
-     * The proposal's centres (projects) of the plan's program.
+     * The location rows of the plan's proposal for the plan's program (one
+     * per city, D-93).
      *
-     * @return list<Project>
+     * @return list<ProposalLocation>
      */
-    private function planProjects(ActivityPlan $plan): array
+    private function planLocations(ActivityPlan $plan): array
     {
-        return array_values($plan->proposal->projects()
-            ->where('projects.program_id', $plan->program_id)
-            ->get(['projects.id', 'projects.city_id', 'projects.center_id'])
+        return array_values($plan->proposal->locations()
+            ->where('program_id', $plan->program_id)
+            ->orderBy('id')
+            ->get(['id', 'proposal_id', 'city_id', 'project_id'])
             ->all());
     }
 }

@@ -12,7 +12,6 @@ use App\Enums\ActivityPlanStatus;
 use App\Enums\ResultType;
 use App\Models\ActivityPlan;
 use App\Models\Program;
-use App\Models\Project;
 use App\Models\Proposal;
 use App\Models\Result;
 use App\Models\UserNotification;
@@ -35,9 +34,9 @@ beforeEach(function () {
     $this->aleppo = insertHrCity('Aleppo', 'حلب');
     $this->homs = insertHrCity('Homs', 'حمص');
 
+    // The plan's centres are the proposal's location rows of its program, one per city (Y-15).
     foreach ([$this->aleppo, $this->homs] as $cityId) {
-        $project = Project::factory()->create(['program_id' => $this->program->id, 'city_id' => $cityId]);
-        DB::table('project_proposal')->insert(['project_id' => $project->id, 'proposal_id' => $this->proposal->id]);
+        $this->proposal->locations()->create(['city_id' => $cityId, 'program_id' => $this->program->id]);
     }
 
     $outcome = Result::factory()->type(ResultType::Outcome)->create(['proposal_id' => $this->proposal->id, 'program_id' => $this->program->id, 'statement' => 'Children find an academic path']);

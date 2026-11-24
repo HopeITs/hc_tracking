@@ -14,9 +14,9 @@
         PlanUpdateStatus::Seen => 3,
         default => -1,
     };
-    $officerName = \App\Models\HrEmployee::query()->whereKey(\App\Support\MealCoverage::officersForLegacyProject($project->id))->get()->pluck('name')->implode(', ') ?: null;
+    $officerName = \App\Models\HrEmployee::query()->whereKey(\App\Support\MealCoverage::responsibleForLocation($location))->get()->pluck('name')->implode(', ') ?: null;
     $chain = [
-        [__('annual_plans.up.role_project_manager'), $record?->sender?->name ?? \App\Models\HrEmployee::query()->whereKey($project->user_id)->first()?->name, __('annual_plans.up.chain_fills'), $record?->sent_at],
+        [__('annual_plans.up.role_project_manager'), $record?->sender?->name ?? \App\Models\HrEmployee::query()->whereKey($location->responsible_employee_id)->first()?->name, __('annual_plans.up.chain_fills'), $record?->sent_at],
         [__('annual_plans.up.role_officer'), $record?->officer?->name ?? $officerName, __('annual_plans.up.chain_officer'), $record?->officer_approved_at],
         [__('annual_plans.up.role_meal_manager'), $record?->reviewer?->name ?? \App\Models\HrEmployee::query()->whereKey(\App\Support\MealCoverage::mealManagerEmployeeId())->first()?->name, __('annual_plans.up.chain_meal'), $record?->reviewed_at],
         [__('annual_plans.up.role_program_manager'), $record?->seer?->name ?? $plan->program?->manager?->name, __('annual_plans.up.chain_pm'), $record?->seen_at],
@@ -86,8 +86,8 @@
             </div>
         @endif
         <div class="ap-row">
-            <a class="dk-btn" href="{{ route('plan-updates.export', [$plan, $project, $this->month, 'format' => 'pdf']) }}" target="_blank" rel="noopener">{{ __('annual_plans.up.export_pdf') }}</a>
-            <a class="dk-btn" href="{{ route('plan-updates.export', [$plan, $project, $this->month, 'format' => 'xlsx']) }}">{{ __('annual_plans.up.export_excel') }}</a>
+            <a class="dk-btn" href="{{ route('plan-updates.export', [$plan, $location, $this->month, 'format' => 'pdf']) }}" target="_blank" rel="noopener">{{ __('annual_plans.up.export_pdf') }}</a>
+            <a class="dk-btn" href="{{ route('plan-updates.export', [$plan, $location, $this->month, 'format' => 'xlsx']) }}">{{ __('annual_plans.up.export_excel') }}</a>
         </div>
     </section>
 

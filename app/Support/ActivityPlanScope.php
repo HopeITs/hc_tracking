@@ -7,42 +7,66 @@ namespace App\Support;
 use App\Enums\ResultType;
 use App\Models\ActivityPlan;
 use App\Models\HrCity;
-use App\Models\Project;
+use App\Models\Proposal;
+use App\Models\ProposalLocation;
 use App\Models\Result;
 use Illuminate\Support\Collection;
 
 /**
- * What one annual plan covers: the centres (projects) of its program in its
- * proposal, their governorates, and the logframe activities it may plan,
+ * What one annual plan covers: the centres of its program in its proposal
+ * (the proposal's location rows for that program, Y-15, D-93), their
+ * governorates, and the logframe activities it may plan,
  * grouped by outcome.
  */
 final class ActivityPlanScope
 {
     /**
-     * The proposal's centres of the plan's program.
+     * The proposal's centres of the plan's program: its location rows for
+     * that program, one per city, with what label() reads loaded, by label.
      *
-     * @return list<Project>
+     * @return list<ProposalLocation>
      */
-    public static function projects(ActivityPlan $plan): array
+    public static function locations(ActivityPlan $plan): array
     {
-        return array_values($plan->proposal()->firstOrFail()->projects()
-            ->where('projects.program_id', $plan->program_id)
-            ->orderBy('projects.name')
-            ->get(['projects.id', 'projects.slug', 'projects.name', 'projects.city_id', 'projects.center_id', 'projects.user_id', 'projects.program_id'])
+        return array_values(ProposalLocation::query()
+            ->where('proposal_id', $plan->proposal_id)
+            ->where('program_id', $plan->program_id)
+            ->with(['city', 'program', 'centers'])
+            ->get()
+            ->sortBy(fn (ProposalLocation $location): string => $location->label(), SORT_NATURAL | SORT_FLAG_CASE)
+            ->values()
+            ->all());
+    }
+
+    /**
+     * The programs a plan can be made for in a proposal: those of its
+     * location rows, ascending (Y-15: a plan's centres are those rows).
+     *
+     * @return list<int>
+     */
+    public static function programIdsOf(Proposal $proposal): array
+    {
+        return array_values(ProposalLocation::query()
+            ->where('proposal_id', $proposal->id)
+            ->whereNotNull('program_id')
+            ->distinct()
+            ->orderBy('program_id')
+            ->pluck('program_id')
+            ->map(fn (int|string $programId): int => (int) $programId)
             ->all());
     }
 
     /**
      * The governorates of those centres, ascending.
      *
-     * @param  list<Project>|null  $projects
+     * @param  list<ProposalLocation>|null  $locations
      * @return list<int>
      */
-    public static function cityIds(ActivityPlan $plan, ?array $projects = null): array
+    public static function cityIds(ActivityPlan $plan, ?array $locations = null): array
     {
         $ids = array_values(array_unique(array_filter(array_map(
-            fn (Project $project): ?int => MealCoverage::cityIdOf($project),
-            $projects ?? self::projects($plan),
+            fn (ProposalLocation $location): int => $location->city_id,
+            $locations ?? self::locations($plan),
         ))));
         sort($ids);
 

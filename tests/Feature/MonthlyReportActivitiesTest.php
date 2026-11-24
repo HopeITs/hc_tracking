@@ -20,6 +20,7 @@ use App\Models\Program;
 use App\Models\Project;
 use App\Models\ProjectActivityStatus;
 use App\Models\Proposal;
+use App\Models\ProposalLocation;
 use App\Models\ReportTemplate;
 use App\Models\Result;
 use App\Support\MonthlyReportActivities;
@@ -56,6 +57,8 @@ beforeEach(function () {
     // The report's activities come from its template's proposals (D-76).
     Activity::withoutRecording(fn () => ReportTemplate::factory()->create(['project_id' => $this->project->id]))
         ->proposals()->attach($this->proposal->id, ['joined_at' => now()]);
+    // The proposal's location row at the template's place: statuses are confirmed on it (Y-15).
+    $this->row = proposalRowForProject($this->proposal, $this->project, false);
     $this->output = Activity::withoutRecording(fn (): Result => Result::factory()->type(ResultType::Output)->create(['proposal_id' => $this->proposal->id]));
 });
 
@@ -97,11 +100,39 @@ function mraActivity(ActivityKind $kind = ActivityKind::Continuous, ?int $propos
 }
 
 /**
+ * A month of the proposal calendar, or with $projectId a month of the override
+ * of the activity's proposal's location row carrying that project at the
+ * template's place (Y-15: overrides are keyed on the row).
+ *
  * @param  list<int>|null  $weeks
  */
 function mraSchedule(Result $activity, string $month, ?array $weeks = null, ?int $projectId = null): void
 {
-    ActivitySchedule::query()->create(['result_id' => $activity->id, 'project_id' => $projectId, 'month' => $month, 'weeks' => $weeks]);
+    $row = null;
+
+    if ($projectId !== null) {
+        $project = Project::query()->findOrFail($projectId);
+        $row = ProposalLocation::query()->where('proposal_id', $activity->proposal_id)->where('project_id', $projectId)->first()
+            ?? proposalRowForProject(Proposal::query()->findOrFail($activity->proposal_id), $project, false);
+    }
+
+    ActivitySchedule::query()->create([
+        'result_id' => $activity->id,
+        'proposal_location_id' => $row?->id,
+        'project_id' => $projectId,
+        'month' => $month,
+        'weeks' => $weeks,
+    ]);
+}
+
+/**
+ * The location row of the activity's proposal carrying the project at the
+ * template's place, made when the proposal has none yet (Y-15).
+ */
+function mraRowOf(Result $activity): ProposalLocation
+{
+    return ProposalLocation::query()->where('proposal_id', $activity->proposal_id)->where('project_id', test()->project->id)->first()
+        ?? proposalRowForProject(Proposal::query()->findOrFail($activity->proposal_id), test()->project, false);
 }
 
 function mraReport(string $month, MonthlyReportStatus $status = MonthlyReportStatus::Draft): MonthlyReport
@@ -221,7 +252,7 @@ it('still lists a continuing activity of a joined proposal with its carry-over',
     mraTemplate($this->proposal, $beta);
     $activity = mraActivity(proposalId: $beta->id);
     $october = mraReport('2026-10-01', MonthlyReportStatus::Validated);
-    ProjectActivityStatus::query()->create(['project_id' => test()->project->id, 'result_id' => $activity->id, 'status' => ActivityStatus::Ongoing, 'monthly_report_id' => $october->id]);
+    ProjectActivityStatus::query()->create(['project_id' => test()->project->id, 'proposal_location_id' => mraRowOf($activity)->id, 'result_id' => $activity->id, 'status' => ActivityStatus::Ongoing, 'monthly_report_id' => $october->id]);
 
     $row = mraRows(mraReport('2026-12-01'))[$activity->id];
 
@@ -244,9 +275,9 @@ it('carries an unfinished activity over without a schedule row and stops a compl
     $completed = mraActivity();
     $october = mraReport('2026-10-01', MonthlyReportStatus::Validated);
 
-    ProjectActivityStatus::query()->create(['project_id' => test()->project->id, 'result_id' => $ongoing->id, 'status' => ActivityStatus::Ongoing, 'monthly_report_id' => $october->id]);
-    ProjectActivityStatus::query()->create(['project_id' => test()->project->id, 'result_id' => $late->id, 'status' => ActivityStatus::NotStarted, 'monthly_report_id' => $october->id]);
-    ProjectActivityStatus::query()->create(['project_id' => test()->project->id, 'result_id' => $completed->id, 'status' => ActivityStatus::Completed, 'monthly_report_id' => $october->id]);
+    ProjectActivityStatus::query()->create(['project_id' => test()->project->id, 'proposal_location_id' => mraRowOf($ongoing)->id, 'result_id' => $ongoing->id, 'status' => ActivityStatus::Ongoing, 'monthly_report_id' => $october->id]);
+    ProjectActivityStatus::query()->create(['project_id' => test()->project->id, 'proposal_location_id' => mraRowOf($late)->id, 'result_id' => $late->id, 'status' => ActivityStatus::NotStarted, 'monthly_report_id' => $october->id]);
+    ProjectActivityStatus::query()->create(['project_id' => test()->project->id, 'proposal_location_id' => mraRowOf($completed)->id, 'result_id' => $completed->id, 'status' => ActivityStatus::Completed, 'monthly_report_id' => $october->id]);
     mraSchedule($completed, '2026-12-01');
 
     $rows = mraRows(mraReport('2026-12-01'));
@@ -351,7 +382,7 @@ it('writes the statuses on validate, none on return, and restores them on a gran
     $slotHolder = mealManager();
     $activity = mraActivity();
     $october = mraReport('2026-10-01', MonthlyReportStatus::Validated);
-    ProjectActivityStatus::query()->create(['project_id' => test()->project->id, 'result_id' => $activity->id, 'status' => ActivityStatus::NotStarted, 'monthly_report_id' => $october->id]);
+    ProjectActivityStatus::query()->create(['project_id' => test()->project->id, 'proposal_location_id' => mraRowOf($activity)->id, 'result_id' => $activity->id, 'status' => ActivityStatus::NotStarted, 'monthly_report_id' => $october->id]);
     $fresh = mraActivity();
     mraSchedule($fresh, '2026-11-01');
 
@@ -382,6 +413,53 @@ it('writes the statuses on validate, none on return, and restores them on a gran
     expect($restored->status)->toBe(ActivityStatus::NotStarted)
         ->and($restored->monthly_report_id)->toBe($october->id)
         ->and(ProjectActivityStatus::query()->where('result_id', $fresh->id)->exists())->toBeFalse();
+});
+
+it('confirms each activity on its own proposal\'s row when two proposals share the template, and a reopen restores exactly', function () {
+    $beta = mraProposal('Proposal Beta');
+    mraTemplate($this->proposal, $beta);
+    $alpha = mraActivity();
+    $betaActivity = mraActivity(proposalId: $beta->id);
+    $betaRow = mraRowOf($betaActivity);
+    $october = mraReport('2026-10-01', MonthlyReportStatus::Validated);
+    ProjectActivityStatus::query()->create(['project_id' => $this->project->id, 'proposal_location_id' => $this->row->id, 'result_id' => $alpha->id, 'status' => ActivityStatus::NotStarted, 'monthly_report_id' => $october->id]);
+    $before = DB::table('project_activity_statuses')->orderBy('id')->get(['id', 'proposal_location_id', 'project_id', 'result_id', 'status', 'started_on', 'completed_on', 'monthly_report_id'])->all();
+
+    $november = mraReport('2026-11-01', MonthlyReportStatus::Submitted);
+    MonthlyReportActivityEntry::query()->create(['monthly_report_id' => $november->id, 'result_id' => $alpha->id, 'status' => ActivityStatus::Started, 'started_on' => '2026-11-03']);
+    MonthlyReportActivityEntry::query()->create(['monthly_report_id' => $november->id, 'result_id' => $betaActivity->id, 'status' => ActivityStatus::Ongoing, 'started_on' => '2026-11-05']);
+
+    $this->actingAs($this->officer);
+    app(ValidateMonthlyReport::class)->handle($november->fresh(), MonthlyReportStatus::Submitted);
+
+    $written = DB::table('project_activity_statuses')->where('monthly_report_id', $november->id)->orderBy('result_id')->get();
+
+    expect($written->pluck('proposal_location_id', 'result_id')->map(fn (mixed $id): int => (int) $id)->all())
+        ->toBe([$alpha->id => $this->row->id, $betaActivity->id => $betaRow->id])
+        ->and($written->pluck('project_id')->map(fn (mixed $id): int => (int) $id)->unique()->all())->toBe([$this->project->id]);
+
+    $this->actingAs($this->owner);
+    $request = app(RequestMonthlyReportReopen::class)->handle($november->fresh(), MonthlyReportStatus::Validated, 'A figure was entered twice.');
+    $this->actingAs(mealManager());
+    app(DecideMonthlyReportReopen::class)->handle($november->fresh(), $request->id, MonthlyReportStatus::Validated, true);
+
+    expect(DB::table('project_activity_statuses')->orderBy('id')->get(['id', 'proposal_location_id', 'project_id', 'result_id', 'status', 'started_on', 'completed_on', 'monthly_report_id'])->all())
+        ->toEqual($before);
+});
+
+it('refuses to validate an activity whose proposal has no row at the report\'s place, writing nothing', function () {
+    $beta = mraProposal('Proposal Beta');
+    mraTemplate($this->proposal, $beta);
+    $betaActivity = mraActivity(proposalId: $beta->id);
+    $november = mraReport('2026-11-01', MonthlyReportStatus::Submitted);
+    MonthlyReportActivityEntry::query()->create(['monthly_report_id' => $november->id, 'result_id' => $betaActivity->id, 'status' => ActivityStatus::Ongoing, 'started_on' => '2026-11-05']);
+
+    $this->actingAs($this->officer);
+    $errors = mraErrors(fn () => app(ValidateMonthlyReport::class)->handle($november->fresh(), MonthlyReportStatus::Submitted));
+
+    expect($errors['activities'])->toBe([__('monthly_reports.activity_no_location', ['proposal' => 'Proposal Beta'])])
+        ->and($november->fresh()->status)->toBe(MonthlyReportStatus::Submitted)
+        ->and(DB::table('project_activity_statuses')->count())->toBe(0);
 });
 
 it('reads the month\'s activities in a constant number of queries', function () {

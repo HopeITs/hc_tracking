@@ -8,7 +8,6 @@ use App\Enums\CountUnit;
 use App\Models\ActivityPlan;
 use App\Support\ActivityPlanScope;
 use App\Support\CsvExport;
-use App\Support\MealCoverage;
 use App\Support\PlanExecution;
 use Illuminate\Contracts\View\View;
 use Illuminate\Http\Request;
@@ -49,7 +48,7 @@ class ActivityPlanExportController extends Controller
                 }
             }
 
-            if ($execution->projects() === []) {
+            if ($execution->locations() === []) {
                 return;
             }
 
@@ -57,8 +56,8 @@ class ActivityPlanExportController extends Controller
             yield [__('annual_plans.wf.activity'), __('annual_plans.up.col_centre'), __('annual_plans.up.col_status'), __('annual_plans.export.held'), __('annual_plans.export.planned_so_far'), __('annual_plans.export.planned_total')];
 
             foreach ($activityPlan->items as $item) {
-                foreach ($execution->projects() as $centre) {
-                    if (! in_array(MealCoverage::cityIdOf($centre), $item->cityIds(), true)) {
+                foreach ($execution->locations() as $centre) {
+                    if (! in_array($centre->city_id, $item->cityIds(), true)) {
                         continue;
                     }
 
@@ -66,7 +65,7 @@ class ActivityPlanExportController extends Controller
 
                     yield [
                         (string) $item->activity?->statement,
-                        $centre->name,
+                        $centre->label(),
                         $status['key'] === 'late' ? __('annual_plans.live.late_weeks', ['weeks' => $status['weeks']]) : __('annual_plans.live.status_'.$status['key']),
                         $execution->held($centre, $item),
                         $execution->plannedToDate($centre, $item),

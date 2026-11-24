@@ -34,7 +34,7 @@ class RemindAnnualPlanUpdates extends Command
         foreach (ActivityPlan::query()->where('status', ActivityPlanStatus::Approved->value)->get() as $plan) {
             $execution = PlanExecution::for($plan);
 
-            foreach ($execution->projects() as $centre) {
+            foreach ($execution->locations() as $centre) {
                 foreach ($execution->calendar->months() as $month) {
                     $update = $execution->update($centre, $month);
 

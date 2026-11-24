@@ -43,8 +43,8 @@ final class ManagePlanMilestones
             return true;
         }
 
-        foreach (ActivityPlanScope::projects($plan) as $project) {
-            if (PlanUpdatePolicy::isProjectManager($user, $project)) {
+        foreach (ActivityPlanScope::locations($plan) as $location) {
+            if (PlanUpdatePolicy::isProjectManager($user, $location)) {
                 return true;
             }
         }
