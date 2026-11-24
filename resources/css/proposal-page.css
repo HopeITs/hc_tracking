@@ -574,7 +574,11 @@
     .pp-page .pp-tally .pp-hot b { color: var(--color-status-critical-text); }
 
     /* Documents grid */
-    .pp-page .pp-files { display: grid; grid-template-columns: repeat(auto-fill, minmax(170px, 1fr)); gap: 8px; }
+    .pp-page .pp-files { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); grid-auto-rows: 132px; gap: 12px; }
+    .pp-page .pp-file-tags { display: flex; gap: 6px; align-items: center; min-height: 20px; }
+    .pp-page .pp-file-ref { font-size: 10px; font-weight: 600; color: var(--pp-mute); border: 1px dashed var(--pp-line); border-radius: 5px; padding: 0 6px; white-space: nowrap; }
+    .pp-page .pp-file-meta { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .pp-page .pp-file > .pp-file-open { flex: 1; padding: 12px 14px 0; gap: 6px; }
     .pp-page .pp-file { position: relative; border: 1px solid var(--pp-line); border-radius: 10px; background: var(--pp-card); min-width: 0; display: flex; flex-direction: column; }
     .pp-page .pp-file-open { border: 0; background: none; color: inherit; text-align: start; padding: 12px; display: flex; flex-direction: column; gap: 4px; min-width: 0; cursor: pointer; border-radius: 10px; }
     .pp-page div.pp-file-open { cursor: default; }
@@ -582,8 +586,9 @@
     .pp-page .pp-file-nm { font-weight: 600; font-size: 13px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
     .pp-page .pp-ext { align-self: flex-start; font-size: 10px; font-weight: 700; border-radius: 6px; padding: 2px 6px; background: var(--pp-sunk); border: 1px solid var(--pp-line); color: var(--pp-ink); }
     .pp-page .pp-ext-pdf { background: var(--pp-red); border-color: var(--pp-red); color: var(--on-brand); }
-    .pp-page .pp-file-acts { display: flex; gap: 2px; padding: 0 8px 8px; justify-content: flex-end; }
-    .pp-page .pp-file-add { border-style: dashed; align-items: center; justify-content: center; gap: 6px; color: var(--pp-mute); cursor: pointer; min-height: 96px; font-weight: 600; font-size: 13px; }
+    .pp-page .pp-file-acts { display: flex; gap: 2px; padding: 0 8px; height: 40px; align-items: center; justify-content: flex-end; border-top: 1px solid var(--pp-soft); }
+    .pp-page .pp-file-acts:empty { display: none; }
+    .pp-page .pp-file-add { border-style: dashed; align-items: center; justify-content: center; gap: 6px; color: var(--pp-mute); cursor: pointer; font-weight: 600; font-size: 13px; }
     .pp-page .pp-file-add:hover { border-color: var(--pp-faint); color: var(--pp-ink); }
     .pp-page .pp-file-link { border: 0; background: none; padding: 0; color: var(--pp-ink); text-align: start; cursor: pointer; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
     .pp-page .pp-file-link:hover b { color: var(--pp-red); }
