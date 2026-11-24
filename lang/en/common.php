@@ -157,4 +157,5 @@ return [
     'to_cancel' => 'to cancel',
     'cannot_be_undone' => 'This can’t be undone.',
     'type_to_confirm' => 'Type :code to confirm',
+    'list_separator' => ', ',
 ];
