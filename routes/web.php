@@ -244,6 +244,10 @@ Route::middleware(['auth', EnsureTwoFactorIsEnabled::class])->group(function () 
         ->can('transfers.view')
         ->name('transfers.index');
 
+    Route::livewire('active-reports', 'pages::active-reports.index')
+        ->can('reports.view')
+        ->name('active-reports.index');
+
     Route::livewire('reports', 'pages::reports.index')
         ->can('reports.view')
         ->name('reports.index');

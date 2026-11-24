@@ -85,23 +85,16 @@ test('the transfers board sorts tranches by state and opens the form for a write
     expect(collect($page->instance()->calendarItems)->pluck('date')->sort()->values()->all())->toBe(['2026-10-01', '2026-10-08']);
 });
 
-test('the reports board and calendar list reports by status and planned date', function () {
+test('the reports register is one list: its board and calendar moved to Active Reports (M-02)', function () {
     $draft = Report::factory()->create(['status' => ReportStatus::Draft, 'planned_date' => '2026-10-09']);
     $approved = Report::factory()->create(['status' => ReportStatus::Approved, 'planned_date' => '2026-08-01']);
 
-    $page = Livewire::actingAs(User::factory()->role('Super Admin')->create())
+    Livewire::actingAs(User::factory()->role('Super Admin')->create())
         ->test('pages::reports.index')
-        ->set('view', 'board')
-        ->assertSeeHtml('data-test="report-board-card-'.$draft->id.'"')
-        ->assertSeeHtml('href="'.route('reports.show', $draft).'"');
-
-    $columns = collect($page->instance()->boardColumns)->keyBy('key');
-    expect($columns['draft']['items']->pluck('id')->all())->toBe([$draft->id])
-        ->and($columns['approved']['items']->pluck('id')->all())->toBe([$approved->id]);
-
-    $page->set('view', 'calendar')
-        ->assertSeeHtml('data-desk-calendar="2026-10"');
-    expect(collect($page->instance()->calendarItems)->pluck('date')->all())->toBe(['2026-10-09']);
+        ->assertSeeHtml('href="'.route('reports.show', $draft).'"')
+        ->assertSeeHtml('href="'.route('reports.show', $approved).'"')
+        ->assertDontSeeHtml('data-desk-register-view=')
+        ->assertDontSeeHtml('data-test="report-board-card-'.$draft->id.'"');
 });
 
 test('the risks board separates potential risks from the ones that happened', function () {

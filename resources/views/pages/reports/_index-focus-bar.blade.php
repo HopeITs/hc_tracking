@@ -40,9 +40,6 @@
         </button>
     @endforeach
 
-    @if ($filtersAreActive && in_array($view, ['board', 'calendar'], true))
-        <flux:button size="sm" variant="ghost" class="self-center text-secondary-medium! dark:text-ink-muted!" wire:click="clearFilters" data-test="reset-filters">{{ __('common.reset_filters') }}</flux:button>
-    @endif
 </div>
 
 @if ($focus !== '' && isset($focusCounts[$focus]))

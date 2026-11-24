@@ -269,6 +269,7 @@ final class Destinations
             $page('indicator-library.index', 'navigation.indicator_library', 'chart', 'nav-library-big', 'monitoring_evaluation', $can('indicator-library.view'), 'indicator-library'),
             $page('indicators.index', 'common.indicators', 'chart', 'nav-gauge', 'monitoring_evaluation', $can('indicators.view'), 'indicators'),
             $page('targets.index', 'common.targets', 'dot', 'nav-crosshair', 'monitoring_evaluation', $can('targets.view'), 'targets'),
+            $page('active-reports.index', 'navigation.active_reports', 'file', 'nav-file-check', 'monitoring_evaluation', $can('reports.view'), 'active-reports'),
             $page('reports.index', 'common.reports', 'file', 'nav-file-chart-column', 'monitoring_evaluation', $can('reports.view'), 'reports'),
             $page('reports.monthly-matrix', 'navigation.monthly_matrix', 'table', 'nav-table', 'monitoring_evaluation', $can('reports.view')),
             $page('monthly-reports.index', 'navigation.monthly_reports', 'cal', 'nav-calendar-check', 'monitoring_evaluation', $can('reports.view'), 'monthly-reports'),

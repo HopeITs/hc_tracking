@@ -23,6 +23,7 @@ return [
     'sectors' => 'Sectors',
     'risk_library' => 'Risk library',
     'evidence_types' => 'Evidence types',
+    'active_reports' => 'Active Reports',
     'monthly_reports' => 'Monthly Reports',
     'report_templates' => 'Templates to confirm',
     'narrative_questions' => 'Narrative questions',
