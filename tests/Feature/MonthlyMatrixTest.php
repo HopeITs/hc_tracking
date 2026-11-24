@@ -21,6 +21,7 @@ use App\Models\PlanIndicator;
 use App\Models\Program;
 use App\Models\Project;
 use App\Models\Proposal;
+use App\Models\ProposalLocation;
 use App\Models\Report;
 use App\Models\Result;
 use App\Models\StrategicPillar;
@@ -74,6 +75,13 @@ function mmProposal(Project $project, string $begin = '2026-01-01', string $end 
             'actual_date_end' => $end,
         ]);
         $proposal->projects()->attach($project->id, ['target_beneficiaries' => 100]);
+
+        $row = ProposalLocation::query()->where('proposal_id', $proposal->id)->where('project_id', $project->id)->first()
+            ?? ProposalLocation::factory()->forProject($project)->create(['proposal_id' => $proposal->id]);
+
+        if ($project->center_id !== null && ! $row->centers()->exists()) {
+            $row->centers()->create(['center_id' => $project->center_id]);
+        }
 
         return $proposal;
     });

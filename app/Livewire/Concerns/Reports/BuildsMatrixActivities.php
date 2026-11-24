@@ -10,10 +10,13 @@ use App\Enums\MonthlyReportStatus;
 use App\Enums\ProposalStatus;
 use App\Enums\ResultType;
 use App\Models\HrCenter;
+use App\Models\PlanIndicator;
+use App\Support\MealCoverage;
 use App\Support\Reporting\ExtractionFilter;
 use App\Support\Reporting\PlaceBridge;
 use Carbon\CarbonImmutable;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use Livewire\Attributes\Computed;
 use stdClass;
@@ -118,6 +121,27 @@ trait BuildsMatrixActivities
     protected function activityLinks(CarbonImmutable $from, CarbonImmutable $to): Collection
     {
         return $this->activityLinksFor($this->extractionFilter, $from, $to);
+    }
+
+    /**
+     * The projects whose place the signed-in MEAL officer covers (Y-14): the
+     * projects of the targets at their covered places.
+     *
+     * @return list<int>
+     */
+    protected function coveredProjectIds(): array
+    {
+        $employeeId = Auth::user()?->employee_id;
+
+        if ($employeeId === null) {
+            return [];
+        }
+
+        return MealCoverage::scopeCoveredBy(PlanIndicator::query()->whereNotNull('project_id'), (int) $employeeId)
+            ->distinct()
+            ->pluck('project_id')
+            ->map(intval(...))
+            ->all();
     }
 
     /**
