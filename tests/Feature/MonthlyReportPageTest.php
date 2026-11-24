@@ -463,7 +463,9 @@ test('the header place says the center, field work or that the center is not set
     $template = $report->template;
     $center = insertHrCenter($this->city, 'Zone Center Aleppo');
 
-    mrsPage($report)->assertSeeText(__('monthly_reports.place_center_not_set'));
+    mrsPage($report)
+        ->assertSeeText(__('monthly_reports.place_center_not_set'))
+        ->assertSeeHtml('<dd dir="auto" class="mrp-head-unset">'.__('monthly_reports.head_not_set').'</dd>');
 
     Activity::withoutRecording(fn () => $template->forceFill(['center_id' => $center, 'city_wide' => false])->save());
     mrsPage($report)->assertSeeText('Zone Center Aleppo')->assertDontSeeText(__('monthly_reports.place_center_not_set'));
