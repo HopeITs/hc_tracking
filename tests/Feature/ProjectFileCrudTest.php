@@ -3,7 +3,6 @@
 use App\Enums\FileType;
 use App\Enums\MediaCollection;
 use App\Models\Media;
-use App\Models\Project;
 use App\Models\User;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Storage;
@@ -12,7 +11,7 @@ use Livewire\Livewire;
 test('uploading a valid file creates a media row and writes the file to disk', function () {
     Storage::fake('local');
     $user = User::factory()->role('General Manager')->create();
-    $project = Project::factory()->create();
+    $project = projectWithRow();
     $file = validUpload('signed-agreement.pdf', 100);
 
     Livewire::actingAs($user)
@@ -39,7 +38,7 @@ test('uploading a valid file creates a media row and writes the file to disk', f
 test('a display name typed without an extension keeps the uploaded files real extension, so the download filename still opens correctly', function () {
     Storage::fake('local');
     $user = User::factory()->role('General Manager')->create();
-    $project = Project::factory()->create();
+    $project = projectWithRow();
     $file = validUpload('photo.jpg', 100);
 
     Livewire::actingAs($user)
@@ -61,7 +60,7 @@ test('uploading a file over 5mb is refused on upload and stores no row, disk fil
     Storage::fake('local');
     Storage::fake('tmp-for-tests');
     $user = User::factory()->role('General Manager')->create();
-    $project = Project::factory()->create();
+    $project = projectWithRow();
     $file = UploadedFile::fake()->create('too-big.pdf', 5121, 'application/pdf');
 
     Livewire::actingAs($user)
@@ -84,7 +83,7 @@ test('uploading a file with a disallowed extension is refused on upload and stor
     Storage::fake('local');
     Storage::fake('tmp-for-tests');
     $user = User::factory()->role('General Manager')->create();
-    $project = Project::factory()->create();
+    $project = projectWithRow();
     $file = UploadedFile::fake()->create('script.exe', 100, 'application/x-msdownload');
 
     Livewire::actingAs($user)
@@ -104,7 +103,7 @@ test('uploading a file with a disallowed extension is refused on upload and stor
 
 test('editing a file updates its category and display name only', function () {
     $user = User::factory()->role('General Manager')->create();
-    $project = Project::factory()->create();
+    $project = projectWithRow();
     $media = Media::factory()->inCollection(MediaCollection::Other)->create([
         'mediable_type' => 'project',
         'mediable_id' => $project->id,
@@ -134,7 +133,7 @@ test('editing a file updates its category and display name only', function () {
 
 test('editing a file with a display name that already carries the right extension does not double it', function () {
     $user = User::factory()->role('General Manager')->create();
-    $project = Project::factory()->create();
+    $project = projectWithRow();
     $media = Media::factory()->create([
         'mediable_type' => 'project',
         'mediable_id' => $project->id,
@@ -156,7 +155,7 @@ test('editing a file with a display name that already carries the right extensio
 test('deleting a file removes the media row and the file from disk', function () {
     Storage::fake('local');
     $user = User::factory()->role('General Manager')->create();
-    $project = Project::factory()->create();
+    $project = projectWithRow();
     $path = 'media/projects/'.$project->id.'/doomed.pdf';
     Storage::disk('local')->put($path, 'content');
     $media = Media::factory()->create([
@@ -178,7 +177,7 @@ test('deleting a file removes the media row and the file from disk', function ()
 test('the download route streams a file that belongs to the project in the url', function () {
     Storage::fake('local');
     $user = User::factory()->role('General Manager')->create();
-    $project = Project::factory()->create();
+    $project = projectWithRow();
     $path = 'media/projects/'.$project->id.'/report.pdf';
     Storage::disk('local')->put($path, 'file contents');
     $media = Media::factory()->create([
@@ -200,7 +199,7 @@ test('the download route stops scripted mass downloads but leaves other users un
     Storage::fake('local');
     $user = User::factory()->role('General Manager')->create();
     $colleague = User::factory()->role('General Manager')->create();
-    $project = Project::factory()->create();
+    $project = projectWithRow();
     $path = 'media/projects/'.$project->id.'/report.pdf';
     Storage::disk('local')->put($path, 'file contents');
     $media = Media::factory()->create([
@@ -226,7 +225,7 @@ test('the download route stops scripted mass downloads but leaves other users un
 test('the download route returns 404 instead of crashing when the media row has no real file on disk', function () {
     Storage::fake('local');
     $user = User::factory()->role('General Manager')->create();
-    $project = Project::factory()->create();
+    $project = projectWithRow();
     $media = Media::factory()->create([
         'mediable_type' => 'project',
         'mediable_id' => $project->id,
@@ -241,8 +240,8 @@ test('the download route returns 404 instead of crashing when the media row has 
 test('the download route rejects a media id belonging to a different project', function () {
     Storage::fake('local');
     $user = User::factory()->role('General Manager')->create();
-    $project = Project::factory()->create();
-    $otherProject = Project::factory()->create();
+    $project = projectWithRow();
+    $otherProject = projectWithRow();
     $media = Media::factory()->create([
         'mediable_type' => 'project',
         'mediable_id' => $otherProject->id,
@@ -255,8 +254,8 @@ test('the download route rejects a media id belonging to a different project', f
 
 test('editing and deleting reject a media id belonging to a different project', function () {
     $user = User::factory()->role('General Manager')->create();
-    $project = Project::factory()->create();
-    $otherProject = Project::factory()->create();
+    $project = projectWithRow();
+    $otherProject = projectWithRow();
     $media = Media::factory()->create([
         'mediable_type' => 'project',
         'mediable_id' => $otherProject->id,

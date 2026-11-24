@@ -764,6 +764,62 @@ function proposalPlaceRow(): array
 }
 
 /**
+ * The location row that carries this project (Y-16, D-93): the state the
+ * Projects screen shows, where one entry is one row of one proposal.
+ *
+ * One line for the tests that navigate to `projects.index` or `projects.show`,
+ * composing with any factory state the test already uses. The proposal is
+ * approved, because a project exists only once one was (D-84), and the row
+ * mirrors what Y-11 moved onto it so `locations:verify-mirror` stays happy.
+ * The row takes the project's own centre when it has one and is "centre not
+ * set" otherwise (D-82) — never a centre invented for it.
+ */
+function rowFor(Project $project): ProposalLocation
+{
+    return Activity::withoutRecording(function () use ($project): ProposalLocation {
+        $existing = ProposalLocation::query()->where('project_id', $project->id)->orderBy('id')->first();
+
+        if ($existing !== null) {
+            return $existing;
+        }
+
+        $proposal = Proposal::factory()->running()->create(array_filter([
+            'name' => $project->name,
+            'planned_date_begin' => $project->start_date?->toDateString(),
+            'planned_date_end' => $project->end_date?->toDateString(),
+        ]));
+
+        $row = ProposalLocation::factory()->forProject($project)->create([
+            'proposal_id' => $proposal->id,
+            'status' => $project->status,
+            'start_date' => $project->start_date,
+            'end_date' => $project->end_date,
+            'target_beneficiaries' => $project->target_beneficiaries,
+        ]);
+
+        if ($project->center_id !== null) {
+            $row->centers()->create(['center_id' => $project->center_id]);
+        }
+
+        return $row;
+    });
+}
+
+/**
+ * A project and the row that carries it, for the common case with no factory
+ * state (Y-16).
+ *
+ * @param  array<string, mixed>  $attributes  passed to Project::factory()
+ */
+function projectWithRow(array $attributes = []): Project
+{
+    $project = Project::factory()->create($attributes);
+    rowFor($project);
+
+    return $project;
+}
+
+/**
  * A location row of the proposal that carries the project (Y-02): the
  * project's city and program, and one center (a new HR center of the city
  * unless one is given; `null` makes the row city-wide).

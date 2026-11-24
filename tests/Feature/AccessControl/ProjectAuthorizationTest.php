@@ -3,7 +3,6 @@
 use App\Enums\MediaCollection;
 use App\Enums\ProjectStatus;
 use App\Models\Program;
-use App\Models\Project;
 use App\Models\User;
 use Illuminate\Support\Facades\Storage;
 use Livewire\Livewire;
@@ -12,7 +11,7 @@ beforeEach(function () {
     Storage::fake('local');
     $this->ownerEmployee = insertHrEmployee();
     $this->owner = userWithRole('Team Member', $this->ownerEmployee);
-    $this->project = Project::factory()->create(['user_id' => $this->ownerEmployee]);
+    $this->project = projectWithRow(['user_id' => $this->ownerEmployee]);
     $this->show = fn (User $user) => Livewire::actingAs($user)->test('pages::projects.show', ['project' => $this->project]);
     $this->index = fn (User $user) => Livewire::actingAs($user)->test('pages::projects.index');
 });

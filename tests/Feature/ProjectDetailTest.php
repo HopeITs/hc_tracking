@@ -22,7 +22,7 @@ use Illuminate\Support\Facades\DB;
 use Livewire\Livewire;
 
 test('guests are redirected from project detail', function () {
-    $project = Project::factory()->create();
+    $project = projectWithRow();
 
     $this->get(route('projects.show', $project))->assertRedirect(route('login'));
 });
@@ -30,7 +30,7 @@ test('guests are redirected from project detail', function () {
 test('project detail shows the project its city program and owner', function () {
     $user = User::factory()->role('General Manager')->create();
     $owner = insertHrEmployee(firstNameEn: 'Rana', lastNameEn: 'Darwish');
-    $project = Project::factory()->create(['name' => 'Aleppo Wells', 'user_id' => $owner]);
+    $project = projectWithRow(['name' => 'Aleppo Wells', 'user_id' => $owner]);
 
     $this->actingAs($user)
         ->get(route('projects.show', $project))
@@ -43,7 +43,7 @@ test('project detail shows the project its city program and owner', function () 
 
 test('project detail preserves lifecycle and disagreement between headline and demographic targets', function () {
     $user = User::factory()->role('General Manager')->create();
-    $project = Project::factory()->create([
+    $project = projectWithRow([
         'description' => 'Restores safe household water access.',
         'status' => ProjectStatus::Active,
         'start_date' => '2026-09-01',
@@ -67,7 +67,7 @@ test('project detail preserves lifecycle and disagreement between headline and d
 
 test('project detail displays an em dash when no demographic breakdown exists', function () {
     $user = User::factory()->role('General Manager')->create();
-    $project = Project::factory()->create([
+    $project = projectWithRow([
         'target_beneficiaries' => 250,
         'target_men' => null,
         'target_women' => null,
@@ -83,7 +83,7 @@ test('project detail displays an em dash when no demographic breakdown exists', 
 
 test('project detail shows a not funded empty state with no linked proposals', function () {
     $user = User::factory()->role('General Manager')->create();
-    $project = Project::factory()->create();
+    $project = projectWithRow();
 
     $this->actingAs($user)
         ->get(route('projects.show', $project))
@@ -93,7 +93,7 @@ test('project detail shows a not funded empty state with no linked proposals', f
 
 test('project detail shows committed and received funding per currency', function () {
     $user = User::factory()->role('General Manager')->create();
-    $project = Project::factory()->create();
+    $project = projectWithRow();
     $proposal = Proposal::factory()->create();
     $project->proposals()->attach($proposal->id);
     $donorProposal = DonorProposal::factory()->create([
@@ -115,8 +115,8 @@ test('project detail shows committed and received funding per currency', functio
 
 test('the project has no Risks tab; its risks show as a read-only awareness section', function () {
     $user = User::factory()->role('General Manager')->create();
-    $subject = Project::factory()->create();
-    $other = Project::factory()->create();
+    $subject = projectWithRow();
+    $other = projectWithRow();
     $linked = Proposal::factory()->create(['name' => 'Linked Emergency Grant']);
     $unlinked = Proposal::factory()->create();
     DB::table('project_proposal')->insert(['project_id' => $subject->id, 'proposal_id' => $linked->id]);
@@ -149,14 +149,14 @@ test('a project with no risks shows no awareness section', function () {
     $user = User::factory()->role('General Manager')->create();
 
     Livewire::actingAs($user)
-        ->test('pages::projects.show', ['project' => Project::factory()->create()])
+        ->test('pages::projects.show', ['project' => projectWithRow()])
         ->assertDontSeeHtml('data-test="risk-awareness"');
 });
 
 test('project detail tasks tab shows tasks raised directly on the project, but not on other projects', function () {
     $user = User::factory()->role('General Manager')->create();
-    $project = Project::factory()->create();
-    $otherProject = Project::factory()->create();
+    $project = projectWithRow();
+    $otherProject = projectWithRow();
 
     Task::factory()->create(['source_type' => 'project', 'source_id' => $project->id, 'title' => 'Sign the site access agreement']);
     Task::factory()->create(['source_type' => 'project', 'source_id' => $otherProject->id, 'title' => 'Unrelated project task']);
@@ -171,7 +171,7 @@ test('project detail tasks tab shows tasks raised directly on the project, but n
 test('a task can be added from the project show page pre-filled with this project', function () {
     $user = User::factory()->role('General Manager')->create();
     $assignee = insertHrEmployee();
-    $project = Project::factory()->create();
+    $project = projectWithRow();
 
     Livewire::actingAs($user)
         ->test('pages::projects.show', ['project' => $project])
@@ -193,7 +193,7 @@ test('a task can be added from the project show page pre-filled with this projec
 
 test('adding a task from the project show page requires a title but no assignee', function () {
     $user = User::factory()->role('General Manager')->create();
-    $project = Project::factory()->create();
+    $project = projectWithRow();
 
     Livewire::actingAs($user)
         ->test('pages::projects.show', ['project' => $project])
@@ -208,7 +208,7 @@ test('adding a task from the project show page requires a title but no assignee'
 
 test('a task added from the project page can ask for proof, off by default', function () {
     $user = User::factory()->role('General Manager')->create();
-    $project = Project::factory()->create();
+    $project = projectWithRow();
 
     $page = Livewire::actingAs($user)
         ->test('pages::projects.show', ['project' => $project])
@@ -232,7 +232,7 @@ test('a task added from the project page can ask for proof, off by default', fun
 
 test('project detail shows targets naming this project', function () {
     $user = User::factory()->role('General Manager')->create();
-    $project = Project::factory()->create();
+    $project = projectWithRow();
     $indicator = Indicator::factory()->create(['name' => 'People reached']);
     PlanIndicator::factory()->create([
         'source_type' => 'annual_plan',
@@ -249,7 +249,7 @@ test('project detail shows targets naming this project', function () {
 
 test('project detail groups targets by result and shows their source, period and reporting status', function () {
     $user = User::factory()->role('General Manager')->create();
-    $project = Project::factory()->create();
+    $project = projectWithRow();
     $result = Result::factory()->create(['statement' => 'Improved access to safe drinking water.', 'type' => ResultType::Outcome]);
     $indicator = Indicator::factory()->create(['name' => 'People reached', 'result_id' => $result->id]);
 
@@ -280,9 +280,9 @@ test('project detail groups targets by result and shows their source, period and
 
 test('a proposal can be attached to and detached from a project', function () {
     $user = User::factory()->role('General Manager')->create();
-    $project = Project::factory()->create();
+    $project = projectWithRow();
     $proposal = Proposal::factory()->create(['name' => 'Emergency WASH Response']);
-    $proposal->projects()->attach(Project::factory()->create());
+    $proposal->projects()->attach(projectWithRow());
 
     Livewire::actingAs($user)
         ->test('pages::projects.show', ['project' => $project])
@@ -303,7 +303,7 @@ test('a proposal can be attached to and detached from a project', function () {
 
 test('attaching the same proposal twice does not duplicate the pivot row', function () {
     $user = User::factory()->role('General Manager')->create();
-    $project = Project::factory()->create();
+    $project = projectWithRow();
     $proposal = Proposal::factory()->create();
     $project->proposals()->attach($proposal->id);
 
@@ -321,8 +321,8 @@ test('attaching the same proposal twice does not duplicate the pivot row', funct
 
 test('project files list only this projects metadata and download through the authenticated route, never the raw storage path', function () {
     $user = User::factory()->role('General Manager')->create();
-    $project = Project::factory()->create();
-    $otherProject = Project::factory()->create();
+    $project = projectWithRow();
+    $otherProject = projectWithRow();
     $media = Media::factory()->inCollection(MediaCollection::Agreement)->create([
         'mediable_type' => 'project',
         'mediable_id' => $project->id,
@@ -353,7 +353,7 @@ test('project files list only this projects metadata and download through the au
 
 test('project files show a category filter once more than one category is present, and it narrows the grid', function () {
     $user = User::factory()->role('General Manager')->create();
-    $project = Project::factory()->create();
+    $project = projectWithRow();
     $uploader = User::factory()->create(['name' => 'Nadia Haddad']);
     Media::factory()->inCollection(MediaCollection::Agreement)->create([
         'mediable_type' => 'project',
@@ -386,7 +386,7 @@ test('project files show a category filter once more than one category is presen
 
 test('project files show no filter chips when every file shares one category', function () {
     $user = User::factory()->role('General Manager')->create();
-    $project = Project::factory()->create();
+    $project = projectWithRow();
     Media::factory()->inCollection(MediaCollection::Evidence)->count(2)->create([
         'mediable_type' => 'project',
         'mediable_id' => $project->id,
@@ -401,7 +401,7 @@ test('project files show no filter chips when every file shares one category', f
 
 test('project detail escapes free text and offers no project delete action', function () {
     $user = User::factory()->role('General Manager')->create();
-    $project = Project::factory()->create(['description' => '<script>alert("project")</script>']);
+    $project = projectWithRow(['description' => '<script>alert("project")</script>']);
 
     Livewire::actingAs($user)
         ->test('pages::projects.show', ['project' => $project])
@@ -413,7 +413,7 @@ test('project detail escapes free text and offers no project delete action', fun
 
 test('project detail renders a project with nothing attached', function () {
     $user = User::factory()->role('General Manager')->create();
-    $project = Project::factory()->create(['name' => 'Bare Project']);
+    $project = projectWithRow(['name' => 'Bare Project']);
 
     $this->actingAs($user)
         ->get(route('projects.show', $project))
@@ -424,7 +424,7 @@ test('project detail renders a project with nothing attached', function () {
 
 test('the project page shows a linked proposal\'s internal number and lists attachable ones by number', function () {
     $user = User::factory()->role('General Manager')->create();
-    $project = Project::factory()->create();
+    $project = projectWithRow();
     $linked = Proposal::factory()->create(['name' => 'Winter Shelter Kit', 'internal_project_number' => 'TEMP-0021']);
     $project->proposals()->attach($linked->id);
     Proposal::factory()->create(['name' => 'Cash for Work', 'internal_project_number' => 'HC-2026-093']);
@@ -437,7 +437,7 @@ test('the project page shows a linked proposal\'s internal number and lists atta
 });
 
 test('New Concept Note opens the proposal form for this project', function () {
-    $project = Project::factory()->create();
+    $project = projectWithRow();
 
     Livewire::actingAs(User::factory()->role('Financial')->create())
         ->test('pages::projects.show', ['project' => $project])
@@ -469,7 +469,7 @@ test('the project page says which center hosts a hosted project', function () {
         ->assertSeeText('Hosted by Head Office Aleppo')
         ->assertSee('data-test="hosted-by-badge"', false);
 
-    $centered = Project::factory()->create(['name' => 'Aleppo Clinics', 'center_id' => $host]);
+    $centered = projectWithRow(['name' => 'Aleppo Clinics', 'center_id' => $host]);
 
     $this->actingAs($user)
         ->get(route('projects.show', $centered))

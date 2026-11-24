@@ -24,7 +24,7 @@ beforeEach(function () {
     $this->actingAs($this->meal);
 
     $this->program = Program::factory()->create();
-    $this->project = Project::factory()->create(['program_id' => $this->program->id]);
+    $this->project = projectWithRow(['program_id' => $this->program->id]);
     $this->proposal = Proposal::factory()->create(['name' => 'Winter WASH Response']);
     DB::table('project_proposal')->insert(['project_id' => $this->project->id, 'proposal_id' => $this->proposal->id]);
 
@@ -52,7 +52,7 @@ test('the targets tab lists the indicators of its proposals and of its program f
     ]);
     $elsewhere = Indicator::factory()->create([
         'result_id' => $this->programNode->id,
-        'project_id' => Project::factory()->create(['program_id' => $this->program->id])->id,
+        'project_id' => projectWithRow(['program_id' => $this->program->id])->id,
         'name' => 'Pumps repaired elsewhere',
     ]);
 
@@ -78,7 +78,7 @@ test('MEAL scopes a program-framework indicator to the project and it is logged'
 });
 
 test('a project outside the result program is refused', function () {
-    $outsider = Project::factory()->create(['program_id' => Program::factory()->create()->id]);
+    $outsider = projectWithRow(['program_id' => Program::factory()->create()->id]);
 
     expect(fn () => scopeIndicator($outsider, $this->programIndicator))->toThrow(ValidationException::class);
     expect(DB::table('indicators')->where('id', $this->programIndicator->id)->value('project_id'))->toBeNull();
@@ -89,7 +89,7 @@ test('a proposal-framework indicator cannot be scoped from the project page', fu
 });
 
 test('scoping that would strand a target on another project is refused', function () {
-    $sibling = Project::factory()->create(['program_id' => $this->program->id]);
+    $sibling = projectWithRow(['program_id' => $this->program->id]);
     PlanIndicator::factory()->create(['indicator_id' => $this->programIndicator->id, 'project_id' => $sibling->id, 'source_type' => 'annual_plan', 'source_id' => insertAnnualPlanFor($this->program)]);
 
     try {

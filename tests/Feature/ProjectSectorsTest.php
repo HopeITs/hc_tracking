@@ -25,7 +25,7 @@ function projectSectorIds(int $projectId): array
 describe('SyncProjectSectors', function () {
     beforeEach(function () {
         $this->actingAs(userWithRole('General Manager'));
-        $this->project = Project::factory()->create();
+        $this->project = projectWithRow();
         [$this->health, $this->wash, $this->shelter] = [
             Sector::factory()->create(['name_ar' => 'الصحة', 'name_en' => 'Health']),
             Sector::factory()->create(['name_ar' => 'المياه', 'name_en' => 'WASH']),
@@ -194,8 +194,8 @@ describe('the project form', function () {
     });
 
     it('loads the linked sectors on edit and lets an older project without sectors be saved as it is', function () {
-        $legacy = Project::factory()->create(['center_id' => $this->centerId, 'city_id' => $this->cityId, 'program_id' => $this->program->id, 'user_id' => $this->owner]);
-        $withSector = Project::factory()->create(['program_id' => Program::factory()->create(['manager_id' => $this->owner])->id, 'user_id' => $this->owner]);
+        $legacy = projectWithRow(['center_id' => $this->centerId, 'city_id' => $this->cityId, 'program_id' => $this->program->id, 'user_id' => $this->owner]);
+        $withSector = projectWithRow(['program_id' => Program::factory()->create(['manager_id' => $this->owner])->id, 'user_id' => $this->owner]);
         $withSector->sectors()->attach($this->health->id);
 
         Livewire::actingAs($this->user)->test('pages::projects.index')
@@ -214,7 +214,7 @@ describe('the project form', function () {
     it('offers active sectors only, plus an inactive one the project already has, marked inactive', function () {
         $retired = Sector::factory()->inactive()->create(['name_en' => 'Retired sector']);
         $hidden = Sector::factory()->inactive()->create(['name_en' => 'Never offered']);
-        $project = Project::factory()->create(['center_id' => $this->centerId, 'city_id' => $this->cityId, 'program_id' => $this->program->id, 'user_id' => $this->owner]);
+        $project = projectWithRow(['center_id' => $this->centerId, 'city_id' => $this->cityId, 'program_id' => $this->program->id, 'user_id' => $this->owner]);
         $project->sectors()->attach($retired->id);
 
         Livewire::actingAs($this->user)->test('pages::projects.index')
@@ -229,7 +229,7 @@ describe('the project form', function () {
 
 describe('display', function () {
     it('shows the sector chips on the project page, with the inactive badge', function () {
-        $project = Project::factory()->create();
+        $project = projectWithRow();
         $project->sectors()->attach([
             Sector::factory()->create(['name_en' => 'Protection', 'sort_order' => 1])->id,
             Sector::factory()->inactive()->create(['name_en' => 'Old sector', 'sort_order' => 2])->id,
@@ -243,8 +243,8 @@ describe('display', function () {
     it('shows a sectors column on the list and narrows it by sector', function () {
         $health = Sector::factory()->create(['name_en' => 'Health']);
         $wash = Sector::factory()->create(['name_en' => 'WASH']);
-        $clinic = Project::factory()->create(['name' => 'Clinic project']);
-        $wells = Project::factory()->create(['name' => 'Wells project']);
+        $clinic = projectWithRow(['name' => 'Clinic project']);
+        $wells = projectWithRow(['name' => 'Wells project']);
         $clinic->sectors()->attach($health->id);
         $wells->sectors()->attach($wash->id);
 

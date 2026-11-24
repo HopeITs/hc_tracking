@@ -21,7 +21,7 @@ use Livewire\Livewire;
  */
 function seedProjectMoneyFixture(): array
 {
-    $project = Project::factory()->create(['start_date' => '2026-10-01', 'end_date' => '2027-06-30']);
+    $project = projectWithRow(['start_date' => '2026-10-01', 'end_date' => '2027-06-30']);
     $proposal = Proposal::factory()->create([
         'name' => 'Harbour Clean Water',
         'planned_date_begin' => '2026-06-01',
@@ -100,9 +100,9 @@ test('Financial and General Manager see the funding envelope, the amounts and a 
 })->with(['Financial', 'General Manager']);
 
 test('a proposal editor without the money permissions links and unlinks proposals, choosing them by name', function () {
-    $project = Project::factory()->create();
+    $project = projectWithRow();
     $proposal = Proposal::factory()->create(['name' => 'Hilltop Schools']);
-    $proposal->projects()->attach(Project::factory()->create());
+    $proposal->projects()->attach(projectWithRow());
 
     $page = Livewire::actingAs(userWithRole('Public Relations Manager'))
         ->test('pages::projects.show', ['project' => $project])
@@ -140,7 +140,7 @@ test('Public Relations Manager opens the proposal from the project page but sees
 function seedProjectFilesFixture(): array
 {
     Storage::fake('local');
-    $project = Project::factory()->create();
+    $project = projectWithRow();
     $file = function (MediaCollection $collection, string $name) use ($project): Media {
         $path = 'media/projects/'.$project->id.'/'.$name;
         Storage::disk('local')->put($path, 'contents of '.$name);

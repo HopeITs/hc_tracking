@@ -56,8 +56,8 @@ test('projects can be filtered by strategy across every one of its programs', fu
     $water = Program::factory()->create(['name' => 'Water Security', 'strategy_id' => $waterStrategy->id]);
     $shelter = Program::factory()->create(['name' => 'Safe Shelter', 'strategy_id' => $otherStrategy->id]);
 
-    Project::factory()->create(['name' => 'Aleppo Wells', 'program_id' => $water->id]);
-    Project::factory()->create(['name' => 'Homs Shelter', 'program_id' => $shelter->id]);
+    projectWithRow(['name' => 'Aleppo Wells', 'program_id' => $water->id]);
+    projectWithRow(['name' => 'Homs Shelter', 'program_id' => $shelter->id]);
 
     $this->actingAs($user)
         ->get(route('projects.index', ['strategy' => $waterStrategy->id]))
@@ -88,7 +88,7 @@ test('the stage URL filter selects the projects the Desk puts on that stage, and
     $user = User::factory()->role('General Manager')->create();
     $running = Project::factory()->status(ProjectStatus::Active)->create(['name' => 'Running Water Network', 'end_date' => '2027-06-30']);
     $running->proposals()->attach(Proposal::factory()->create(['status' => ProposalStatus::Approved]));
-    $fundraising = Project::factory()->create(['name' => 'Draft Shelter Project']);
+    $fundraising = projectWithRow(['name' => 'Draft Shelter Project']);
     $fundraising->proposals()->attach(Proposal::factory()->create(['status' => ProposalStatus::ProposalDraft]));
 
     $this->actingAs($user)
@@ -232,7 +232,7 @@ test('project lifecycle dates and targets reject invalid values', function () {
 
 test('a project can be renamed and moved to another center while keeping its status', function () {
     $user = User::factory()->role('General Manager')->create();
-    $project = Project::factory()->create([
+    $project = projectWithRow([
         'name' => 'Old Name',
         'description' => 'Original scope',
         'status' => ProjectStatus::Approved,
@@ -285,7 +285,7 @@ test('a project can be renamed and moved to another center while keeping its sta
 
 test('the project directory offers no delete action', function () {
     $user = User::factory()->role('General Manager')->create();
-    Project::factory()->create();
+    projectWithRow();
 
     Livewire::actingAs($user)
         ->test('pages::projects.index')
@@ -417,7 +417,7 @@ test('committed funding counts a proposal shared by two projects once', function
 
 test('committed funding reports one line per currency and never adds them together', function () {
     $user = User::factory()->role('General Manager')->create();
-    $project = Project::factory()->create();
+    $project = projectWithRow();
 
     foreach ([Currency::Usd, Currency::Eur] as $currency) {
         $proposal = Proposal::factory()->create();
@@ -452,9 +452,9 @@ test('every view renders the same filtered project set and an unknown view falls
 
 test('projects can be sorted by name dates and recency with undated projects last', function () {
     $user = User::factory()->role('General Manager')->create();
-    Project::factory()->create(['name' => 'Beta', 'start_date' => '2026-03-01', 'end_date' => '2026-12-31', 'updated_at' => '2026-01-01 00:00:00']);
-    Project::factory()->create(['name' => 'Alpha', 'start_date' => '2026-06-01', 'end_date' => '2026-07-31', 'updated_at' => '2026-02-01 00:00:00']);
-    Project::factory()->create(['name' => 'Gamma', 'start_date' => null, 'end_date' => null, 'updated_at' => '2026-03-01 00:00:00']);
+    projectWithRow(['name' => 'Beta', 'start_date' => '2026-03-01', 'end_date' => '2026-12-31', 'updated_at' => '2026-01-01 00:00:00']);
+    projectWithRow(['name' => 'Alpha', 'start_date' => '2026-06-01', 'end_date' => '2026-07-31', 'updated_at' => '2026-02-01 00:00:00']);
+    projectWithRow(['name' => 'Gamma', 'start_date' => null, 'end_date' => null, 'updated_at' => '2026-03-01 00:00:00']);
 
     $component = Livewire::actingAs($user)->test('pages::projects.index')->set('view', 'list');
 
@@ -615,7 +615,7 @@ test('a project is archived rather than deleted, keeping every record it carries
 
 test('an archived project can be restored back into the portfolio as a draft', function () {
     $user = User::factory()->role('General Manager')->create();
-    $project = Project::factory()->create(['name' => 'Wells Of Hope', 'status' => ProjectStatus::Archived]);
+    $project = projectWithRow(['name' => 'Wells Of Hope', 'status' => ProjectStatus::Archived]);
 
     Livewire::actingAs($user)->test('pages::projects.index')->call('restoreProject', $project->id);
 
@@ -676,7 +676,7 @@ test('archiving a project that vanished mid-confirmation closes cleanly instead 
 test('every view offers archive for a live project and restore for an archived one', function () {
     $user = User::factory()->role('General Manager')->create();
     $live = Project::factory()->active()->create(['name' => 'Wells Of Hope']);
-    $archived = Project::factory()->create(['name' => 'Retired Project', 'status' => ProjectStatus::Archived]);
+    $archived = projectWithRow(['name' => 'Retired Project', 'status' => ProjectStatus::Archived]);
 
     foreach (['list', 'timeline'] as $view) {
         Livewire::actingAs($user)->test('pages::projects.index')
@@ -731,7 +731,7 @@ test('editing a project shows its saved choices in the form pickers', function (
     $city = insertHrCity('Idlib', 'إدلب');
     $owner = insertHrEmployee(firstNameEn: 'Lina', lastNameEn: 'Haddad', firstNameAr: 'لينا', lastNameAr: 'حداد');
     $program = Program::factory()->create();
-    $project = Project::factory()->create([
+    $project = projectWithRow([
         'status' => ProjectStatus::Active,
         'city_id' => $city,
         'center_id' => insertHrCenter($city, 'Hope Center Idlib', 'مركز الأمل إدلب'),
@@ -768,7 +768,7 @@ test('a hosted project says which center hosts it and a centered one does not', 
     $aleppo = insertHrCity('Aleppo', 'حلب');
     $host = insertHrCenter($aleppo, 'Head Office Aleppo', 'المكتب الرئيسي حلب');
     Project::factory()->hostedBy($host)->create(['name' => 'Wells Idleb', 'city_id' => $idleb]);
-    Project::factory()->create(['name' => 'Aleppo Clinics', 'city_id' => $aleppo, 'center_id' => $host]);
+    projectWithRow(['name' => 'Aleppo Clinics', 'city_id' => $aleppo, 'center_id' => $host]);
 
     $page = Livewire::actingAs($user)->test('pages::projects.index')
         ->assertSeeText('Hosted by Head Office Aleppo')

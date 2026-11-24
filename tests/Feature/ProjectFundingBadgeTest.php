@@ -11,7 +11,7 @@ use Livewire\Livewire;
  */
 function draftLinkedTo(ProposalStatus $status, bool $ownerAcknowledged = false): Project
 {
-    $project = Project::factory()->create();
+    $project = projectWithRow();
 
     if ($ownerAcknowledged) {
         $project->currentAssignment('user_id')->forceFill(['status' => AssignmentStatus::Acknowledged])->save();
