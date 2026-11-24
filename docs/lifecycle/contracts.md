@@ -380,6 +380,7 @@ final class App\Support\SupervisionMap {
 - **Achievement:** `PlanIndicator::measuresLevel()` (renamed from `measuresPercentage()`) = percentage **or** average → latest approved value; counts sum. PHP and SQL forms change together.
 - API: `LibraryIndicator::active()` scope, `localizedName(): string`, `CollectionFrequency::period(): ?Period`, `App\Support\IndicatorCode::next(?int $programId, string $levelRef): array{code: string, serial: int}`.
 - Morph key `library_indicator`; events `library_indicator.created|updated|deactivated|reactivated`.
+- `indicators.proposal_location_id` FK `proposal_locations` null nullOnDelete, indexed (Y-16). It replaces `project_id` for an indicator instance that belongs to one place of a proposal; `project_id` is kept and still written until Y-18.
 
 ### §11.2 Logframe (T12)
 - `ResultType`: `impact`, `outcome`, `output`, **`activity`**, **`cross-cutting`**. Parent exactly one level up (activity → output → outcome → impact; impact has no parent; nothing under an activity). `cross-cutting` is a root only (no parent, no children). Several impact roots per program are allowed (tracks).
@@ -533,6 +534,7 @@ final class App\Support\SupervisionMap {
 - **Percentages:** only through `pooledRatioSql()`/`pooledRatio()` (§13); never an average of percentages.
 - No money in the matrix. Donor reports (T19) exclude internal (self-funding) donors.
 - **W-32 (D-55b) exclusions:** `DonorReportAggregator`, the matrix, targets, indicator coverage, `MealCoverage`, the Projects and Logframe tabs, location rows (W-34a) and stage templates (W-12, unless a template is marked `kind = payroll`: add `proposal_kind` to the template table with default `project`) all skip `kind = payroll`. *W-32 ruling (4 Nov):* W-12 and W-34a are not on `main` yet, so their exclusions land with those tasks.
+- **Centers in figures (Y-16).** Wherever a figure was grouped or filtered by project ("center view", donor report lines per center, program health per project), the key is the **place** (`city_id`, `program_id`, `center_id`, `city_wide`), read from the target (`plan_indicators`, Y-08) or the report's template (Y-02). No figure reads `projects`. Totals do not change on data where each project has one place.
 
 ### §14.1 Figures and views (T18, T19)
 - **Counts:** sum of validated values in the window. `is_cumulative`: the latest validated value in the window, never a sum.
