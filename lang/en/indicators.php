@@ -140,4 +140,15 @@ return [
     'unit_placeholder' => 'e.g. households',
     'baseline_percent' => 'Baseline (%)',
     'lifetime_target_percent' => 'Lifetime target (%)',
+    'console' => [
+        'row_backfill_applying' => 'Applying: project-scoped indicator instances will be moved onto their location row.',
+        'row_backfill_dry_run' => 'Dry run: nothing will be written.',
+        'row_backfill_instances' => 'Instances moved onto a row (moved / seen)',
+        'row_backfill_by_own_proposal' => 'Decided by the instance’s own proposal (no date rule)',
+        'row_backfill_by_date' => 'Decided by date',
+        'row_backfill_by_most_recent' => 'Decided by the most recent proposal',
+        'row_backfill_rows' => 'Instances per row (row id x count): :rows.',
+        'row_backfill_unmapped' => 'Instances no row could take (ids, left alone): :ids.',
+        'row_backfill_none' => 'none',
+    ],
 ];

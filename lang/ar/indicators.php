@@ -140,4 +140,15 @@ return [
     'unit_placeholder' => 'مثلًا: أسر',
     'baseline_percent' => 'خط الأساس (%)',
     'lifetime_target_percent' => 'المستهدف الإجمالي (%)',
+    'console' => [
+        'row_backfill_applying' => 'التنفيذ: ستُنقل نسخ المؤشرات المرتبطة بمشروع إلى صف موقعها.',
+        'row_backfill_dry_run' => 'تشغيل تجريبي: لن يُكتب أي شيء.',
+        'row_backfill_instances' => 'النسخ المنقولة إلى صف (المنقولة / الموجودة)',
+        'row_backfill_by_own_proposal' => 'المحسومة بمقترح النسخة نفسه (دون قاعدة التاريخ)',
+        'row_backfill_by_date' => 'المحسومة بالتاريخ',
+        'row_backfill_by_most_recent' => 'المحسومة بأحدث مقترح',
+        'row_backfill_rows' => 'النسخ بحسب الصف (معرف الصف × العدد): :rows.',
+        'row_backfill_unmapped' => 'نسخ لم يستلمها أي صف (المعرفات، تُركت كما هي): :ids.',
+        'row_backfill_none' => 'لا شيء',
+    ],
 ];
