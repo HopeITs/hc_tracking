@@ -74,7 +74,7 @@ trait BuildsIndicatorRows
     public function allIndicators(): Collection
     {
         return Indicator::query()
-            ->select(['id', 'name', 'result_id', 'project_id', 'measure', 'unit', 'baseline', 'target', 'frequency', 'updated_at'])
+            ->select(['id', 'name', 'result_id', 'project_id', 'proposal_location_id', 'measure', 'unit', 'baseline', 'target', 'frequency', 'updated_at'])
             ->with([
                 // parent_id is selected so the statement's lineage can be walked.
                 'result:id,statement,type,program_id,proposal_id,parent_id',
@@ -88,9 +88,11 @@ trait BuildsIndicatorRows
                     ->select(['id', 'indicator_id', 'date', 'value', 'notes', 'source_of_verification', 'recorded_by'])
                     ->with('recorder:id,hr_user_id'),
                 'planIndicators' => fn ($query) => $query
-                    ->select(['id', 'indicator_id', 'source_type', 'source_id', 'target', 'project_id', 'period'])
+                    ->select(['id', 'indicator_id', 'source_type', 'source_id', 'target', 'project_id', 'proposal_location_id', 'period'])
                     ->with([
                         'project:id,name,program_id',
+                        // chainIssues() reads the row now (Y-16, D-93).
+                        'location:id,proposal_id,program_id',
                         // The reported actuals themselves, not just how many
                         // there are: what was told to the donor is the figure
                         // the funding side is asked about.

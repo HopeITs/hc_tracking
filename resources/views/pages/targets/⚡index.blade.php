@@ -9,6 +9,7 @@ use App\Livewire\Concerns\Targets\NarrowsTargetFormOptions;
 use App\Livewire\Concerns\Targets\ReadsTargets;
 use App\Models\Indicator;
 use App\Models\PlanIndicator;
+use App\Support\Locations\ProjectSuccessor;
 use Illuminate\Support\Facades\Gate;
 use Livewire\Attributes\Layout;
 use Livewire\Attributes\Title;
@@ -30,8 +31,13 @@ new #[Layout('layouts::desk'), Title('titles.targets')] class extends Component 
     #[Url(except: '')]
     public string $sourceType = '';
 
+    /**
+     * The location row a target is committed at (Y-16, D-93), or `none` for
+     * an organisation-wide target. An old `?project=<id>` link is translated
+     * once in mount() to the row that took that project over (D-94).
+     */
     #[Url(except: '')]
-    public string $project = '';
+    public string $location = '';
 
     #[Url(except: '')]
     public string $period = '';
@@ -67,6 +73,8 @@ new #[Layout('layouts::desk'), Title('titles.targets')] class extends Component 
      */
     public function mount(): void
     {
+        $this->adoptLegacyProjectFilter();
+
         if (request()->boolean('create') && Gate::allows('targets.create')) {
             $this->openCreateModal();
 
@@ -76,11 +84,36 @@ new #[Layout('layouts::desk'), Title('titles.targets')] class extends Component 
             }
         }
     }
+
+    /**
+     * A saved `?project=<project id>` link still opens the right targets
+     * (Y-16): the row that took that project over answers for it (D-94), the
+     * same courtesy Y-05 gave the matrix's `?center=`. `?project=none` keeps
+     * its meaning. Y-18 drops this.
+     */
+    private function adoptLegacyProjectFilter(): void
+    {
+        if ($this->location !== '') {
+            return;
+        }
+
+        $legacy = (string) request()->query('project', '');
+
+        if ($legacy === 'none') {
+            $this->location = 'none';
+
+            return;
+        }
+
+        if ($legacy !== '' && ctype_digit($legacy)) {
+            $this->location = (string) (app(ProjectSuccessor::class)->rowFor((int) $legacy)?->id ?? '');
+        }
+    }
 };
 ?>
 
 @php
-    $filtersAreActive = $search !== '' || $sourceType !== '' || $project !== '' || $period !== '' || $status !== '' || $donor !== '' || $program !== '' || $year !== '' || $indicator !== '' || $result !== '';
+    $filtersAreActive = $search !== '' || $sourceType !== '' || $location !== '' || $period !== '' || $status !== '' || $donor !== '' || $program !== '' || $year !== '' || $indicator !== '' || $result !== '';
     $scopeLabel = match (true) {
         $indicator !== '' => __('targets.indicator_scope', ['name' => App\Models\Indicator::query()->whereKey((int) $indicator)->value('name') ?? '—']),
         $result !== '' => __('targets.result_scope', ['statement' => Str::limit(App\Models\Result::query()->whereKey((int) $result)->value('statement') ?? '—', 60)]),
@@ -131,7 +164,7 @@ new #[Layout('layouts::desk'), Title('titles.targets')] class extends Component 
                 @endforeach
             </x-ui.header-filter-select>
 
-            <div class="contents" x-data="{ open: @js($sourceType !== '' || $project !== '' || $period !== '' || $donor !== '' || $year !== '') }">
+            <div class="contents" x-data="{ open: @js($sourceType !== '' || $location !== '' || $period !== '' || $donor !== '' || $year !== '') }">
                 <button type="button" class="dk-btn" x-on:click="open = ! open" x-bind:aria-expanded="open.toString()" data-test="more-filters-button">
                     <flux:icon.adjustments-horizontal variant="micro" class="size-4" />
                     {{ __('targets.more_filters') }}
@@ -145,11 +178,11 @@ new #[Layout('layouts::desk'), Title('titles.targets')] class extends Component 
                         @endforeach
                     </x-ui.header-filter-select>
 
-                    <x-ui.header-filter-select :label="__('common.project')" wire:model.live="project" :value="$project">
+                    <x-ui.header-filter-select :label="__('common.project')" wire:model.live="location" :value="$location">
                         <option value="">{{ __('targets.any_project') }}</option>
                         <option value="none">{{ __('common.organisation_wide') }}</option>
-                        @foreach ($this->projectOptions as $projectOption)
-                            <option value="{{ $projectOption->id }}">{{ $projectOption->name }}</option>
+                        @foreach ($this->locationOptions as $locationOption)
+                            <option value="{{ $locationOption['id'] }}" dir="auto">{{ $locationOption['label'] }}</option>
                         @endforeach
                     </x-ui.header-filter-select>
 

@@ -9,11 +9,9 @@ use App\Enums\Period;
 use App\Models\AnnualPlan;
 use App\Models\Indicator;
 use App\Models\PlanIndicator;
-use App\Models\Project;
 use App\Models\Proposal;
-use App\Support\Reporting\PlaceBridge;
+use App\Models\ProposalLocation;
 use Flux\Flux;
-use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Database\Eloquent\Relations\MorphTo;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Validation\Rule;
@@ -32,7 +30,6 @@ use Livewire\Attributes\Locked;
  *
  * @property-read Indicator|null $formIndicator
  * @property-read array<int, array{id: int, label: string}> $sourceOptions
- * @property-read Collection<int, Project> $formProjectOptions
  * @property-read list<array{id: int, label: string}> $formLocationOptions
  */
 trait ManagesTargetForm
@@ -64,12 +61,14 @@ trait ManagesTargetForm
 
     public string $targetValue = '';
 
-    public string $targetProjectId = '';
-
     /**
-     * The location row (city × program) of a proposal target (Y-10, D-91).
-     * A proposal target picks a row, never a project; an annual-plan target
-     * keeps its project.
+     * The location row (city × program) a target is committed at (Y-10, D-91;
+     * Y-16, D-93).
+     *
+     * Both source types pick a row now: a proposal target one of its own
+     * proposal's rows, an annual-plan target any row of the plan's program.
+     * Empty means organisation-wide, which only an annual-plan target may be.
+     * `project_id` follows the row and is still written until Y-18.
      */
     public string $targetLocationId = '';
 
@@ -137,10 +136,9 @@ trait ManagesTargetForm
         $this->targetSourceId = (string) $target->source_id;
         $this->targetIndicatorId = (string) $target->indicator_id;
         $this->targetValue = (string) $target->target;
-        $this->targetProjectId = (string) ($target->project_id ?? '');
         $this->targetLocationId = (string) ($target->proposal_location_id ?? '');
         $this->targetPeriod = $target->period->value;
-        unset($this->formIndicator, $this->sourceOptions, $this->formProjectOptions, $this->formLocationOptions);
+        unset($this->formIndicator, $this->sourceOptions, $this->formLocationOptions);
         $this->showTargetModal = true;
     }
 
@@ -153,7 +151,6 @@ trait ManagesTargetForm
             'targetSourceId' => ['required', 'integer'],
             'targetIndicatorId' => ['required', 'integer', Rule::exists(Indicator::class, 'id')],
             'targetValue' => ['required', 'numeric', 'min:0', 'max:9999999999.99'],
-            'targetProjectId' => ['nullable', 'integer', Rule::exists(Project::class, 'id')],
             'targetLocationId' => ['nullable', 'integer'],
             'targetPeriod' => ['required', new Enum(Period::class)],
         ], [
@@ -180,7 +177,6 @@ trait ManagesTargetForm
 
         $indicator = Indicator::query()->with('result:id,program_id,proposal_id')->findOrFail((int) $validated['targetIndicatorId']);
         $row = null;
-        $project = null;
 
         if ($source instanceof Proposal) {
             // A proposal target belongs to a row of that proposal (Y-10, D-91),
@@ -194,14 +190,24 @@ trait ManagesTargetForm
 
                 return;
             }
+        } elseif ($this->targetLocationId !== '') {
+            // An annual-plan target may name a row of the plan's own program
+            // (Y-16, D-93), or none at all for an organisation-wide target. A
+            // row of another program is not found, so it cannot be smuggled in.
+            $row = ProposalLocation::query()
+                ->where('program_id', $source->program_id)
+                ->with('centers')
+                ->whereKey((int) $this->targetLocationId)
+                ->first();
 
-            $projectId = $row->project_id;
-        } else {
-            $projectId = $validated['targetProjectId'] === '' || $validated['targetProjectId'] === null
-                ? null
-                : (int) $validated['targetProjectId'];
-            $project = $projectId === null ? null : Project::query()->select(['id', 'program_id'])->find($projectId);
+            if ($row === null) {
+                $this->addError('targetLocationId', __('targets.issue_project_outside_plan_program'));
+
+                return;
+            }
         }
+
+        $projectId = $row?->project_id;
 
         // A percentage is read against 100; a target above it can never be met.
         if ($indicator->measure === IndicatorMeasure::Percentage && (float) $validated['targetValue'] > 100) {
@@ -234,33 +240,31 @@ trait ManagesTargetForm
         }
 
         if ($row !== null) {
-            // A row target: the indicator's own project, compared by id (D-74).
+            // A row target: the indicator's own row, compared by id (Y-16).
             // Only checked when this edit picks the row or the indicator.
             $picksRow = ! $target->exists || $target->isDirty(['proposal_location_id', 'indicator_id']);
 
-            if ($picksRow && $indicator->project_id !== null && $indicator->project_id !== $row->project_id) {
+            if ($picksRow && $indicator->proposal_location_id !== null && $indicator->proposal_location_id !== $row->id) {
                 $this->addError('targetLocationId', __('targets.issue_project_differs_from_indicator'));
 
                 return;
             }
-
-            $issues = [];
-        } else {
-            $issues = PlanIndicator::chainIssuesFor($source, $indicator, $project);
         }
+
+        $issues = PlanIndicator::chainIssuesForRow($source, $indicator, $row);
 
         // Only what this edit introduces: a row already out of step can still
         // have its value or period corrected.
         if ($target->exists && $issues !== []) {
             $original = PlanIndicator::query()
-                ->with(['source' => fn (MorphTo $morphTo) => $morphTo->morphWith([Proposal::class => ['projects:id']]), 'project:id,program_id'])
+                ->with(['source' => fn (MorphTo $morphTo) => $morphTo->morphWith([Proposal::class => []]), 'location:id,proposal_id,program_id'])
                 ->findOrFail($target->id);
-            $issues = array_values(array_diff($issues, PlanIndicator::chainIssuesFor($original->source, $indicator, $original->project)));
+            $issues = array_values(array_diff($issues, PlanIndicator::chainIssuesForRow($original->source, $indicator, $original->location)));
         }
 
         if ($issues !== []) {
             foreach ($issues as $issue) {
-                $this->addError($issue === 'targets.issue_plan_program_differs_from_result' ? 'targetSourceId' : 'targetProjectId', __($issue));
+                $this->addError($issue === 'targets.issue_plan_program_differs_from_result' ? 'targetSourceId' : 'targetLocationId', __($issue));
             }
 
             return;
@@ -281,12 +285,13 @@ trait ManagesTargetForm
             return;
         }
 
-        // The place moves with the row (Y-10) or, for an annual-plan target,
-        // with the project (Y-08), in the same save.
-        if ($row !== null && (! $target->exists || $target->isDirty(['proposal_location_id', 'source_type', 'source_id']))) {
-            $target->fill(PlanIndicator::placeColumnsForRow($row));
-        } elseif ($row === null && (! $target->exists || $target->isDirty(['project_id', 'source_type', 'source_id']))) {
-            $target->fill(app(PlaceBridge::class)->placeColumnsForTargets($source, [$projectId])[$projectId ?? '']);
+        // The place moves with the row, for both source types (Y-16): one rule
+        // for every target. An organisation-wide annual-plan target names no
+        // row, so it has no place (D-82) — as a target with no project had none.
+        if (! $target->exists || $target->isDirty(['proposal_location_id', 'source_type', 'source_id'])) {
+            $target->fill($row === null
+                ? ['city_id' => null, 'program_id' => null, 'center_id' => null, 'city_wide' => false, 'all_centers' => false]
+                : PlanIndicator::placeColumnsForRow($row));
         }
 
         $target->save();
@@ -358,9 +363,8 @@ trait ManagesTargetForm
         $this->targetSourceId = '';
         $this->targetIndicatorId = '';
         $this->targetValue = '';
-        $this->targetProjectId = '';
         $this->targetLocationId = '';
         $this->targetPeriod = 'quarterly';
-        unset($this->formIndicator, $this->sourceOptions, $this->formProjectOptions, $this->formLocationOptions);
+        unset($this->formIndicator, $this->sourceOptions, $this->formLocationOptions);
     }
 }

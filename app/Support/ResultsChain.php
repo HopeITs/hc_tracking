@@ -187,13 +187,15 @@ final class ResultsChain
                 'proposal:id,name,slug,donor_id',
                 'proposal.donor:id,name,slug',
                 'indicators' => fn ($query) => $query
-                    ->select(['id', 'name', 'result_id', 'library_indicator_id', 'code', 'project_id', 'measure', 'unit'])
+                    ->select(['id', 'name', 'result_id', 'library_indicator_id', 'code', 'project_id', 'proposal_location_id', 'measure', 'unit'])
                     ->with([
                         'libraryIndicator:id,code,name_ar,name_en,is_active',
                         'planIndicators' => function ($query) use ($targetScope): void {
-                            $query->select(['id', 'indicator_id', 'source_type', 'source_id', 'target', 'project_id', 'period'])
+                            $query->select(['id', 'indicator_id', 'source_type', 'source_id', 'target', 'project_id', 'proposal_location_id', 'period'])
                                 ->with([
                                     'project:id,name,center_id,program_id',
+                                    // chainIssues() reads the row now (Y-16, D-93).
+                                    'location:id,proposal_id,program_id',
                                     'reports:id,plan_indicator_id,status,planned_date,value',
                                 ])
                                 ->orderBy('id');

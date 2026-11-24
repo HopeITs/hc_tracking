@@ -146,13 +146,15 @@ trait ReadsProposalDelivery
     public function targets(): Collection
     {
         $targets = PlanIndicator::query()
-            ->select(['id', 'source_type', 'source_id', 'indicator_id', 'target', 'project_id', 'period'])
+            ->select(['id', 'source_type', 'source_id', 'indicator_id', 'target', 'project_id', 'proposal_location_id', 'period'])
             ->where('source_type', 'proposal')
             ->where('source_id', $this->proposalId)
             ->with([
                 'indicator:id,name,result_id,project_id,measure,unit',
                 'indicator.result:id,statement,type,program_id,proposal_id',
                 'project:id,name,program_id',
+                // chainIssues() reads the row now (Y-16, D-93).
+                'location:id,proposal_id,program_id',
                 'reports:id,plan_indicator_id,status,value,planned_date,period_start,period_end,submit_date',
             ])
             ->get();

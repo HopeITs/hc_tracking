@@ -181,9 +181,11 @@ new class extends Component {
             ->where('source_id', $this->proposalId)
             ->withCount('reports')
             ->with([
-                'indicator:id,name,result_id,project_id,measure,unit,library_indicator_id',
+                'indicator:id,name,result_id,project_id,proposal_location_id,measure,unit,library_indicator_id',
                 'indicator.result:id,statement,type,program_id,proposal_id',
                 'project:id,name,program_id',
+                // chainIssues() reads the row now (Y-16, D-93).
+                'location:id,proposal_id,program_id',
             ])
             ->get()
             ->keyBy(fn (PlanIndicator $target): string => $target->indicator_id.'_'.($target->proposal_location_id ?? 'p'.$target->project_id));

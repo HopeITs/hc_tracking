@@ -650,14 +650,14 @@ class PlanIndicator extends Model implements TracksActivity
     /**
      * Where this target does not fit the chain it sits in, as translation keys.
      *
-     * Reads the loaded `source` (with a proposal's `projects`), `indicator`
-     * (with `result`) and `project`; see chainIssuesFor() for the rules.
+     * Reads the loaded `source`, `indicator` (with `result`) and `location`;
+     * see chainIssuesForRow() for the rules (Y-16, D-93).
      *
      * @return list<string>
      */
     public function chainIssues(): array
     {
-        return self::chainIssuesFor($this->source, $this->getRelation('indicator'), $this->project);
+        return self::chainIssuesForRow($this->source, $this->getRelation('indicator'), $this->getRelation('location'));
     }
 
     /**
