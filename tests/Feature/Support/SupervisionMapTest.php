@@ -112,7 +112,7 @@ test('supervisorsOf costs the same number of queries for one or ten people', fun
     $one = $queriesFor([$officers[0]]);
     $ten = $queriesFor($officers);
 
-    expect($cold)->toBeLessThanOrEqual(4)
+    expect($cold)->toBeLessThanOrEqual(5)
         ->and($ten)->toBe($one);
 });
 
@@ -134,4 +134,46 @@ test('the map writes nothing to HR and never reads contract pay columns', functi
             ->not->toContain('currency')
             ->not->toContain('*');
     }
+});
+
+test('a vacant manager position is climbed to the next filled position up the org chart', function () {
+    [$director, $officer] = [insertHrEmployee(), insertHrEmployee()];
+    $department = insertHrDepartment();
+    $directorPosition = insertHrPosition($department, 'Director');
+    $vacantPosition = insertHrPosition($department, 'Manager', directManagerId: $directorPosition);
+    insertHrContract($director, $directorPosition);
+    insertHrContract($officer, insertHrPosition($department, 'Officer', directManagerId: $vacantPosition));
+
+    expect(SupervisionMap::supervisorsOf([$officer]))->toBe([$officer => [$director]])
+        ->and(SupervisionMap::links())->toBe([['supervisor' => $director, 'supervisee' => $officer, 'supervisionId' => null, 'climbed' => true]])
+        ->and(SupervisionMap::hrIssues()['vacantSeats'])->toHaveCount(1)
+        ->and(SupervisionMap::hrIssues()['vacantSeats'][0]['positionId'])->toBe($vacantPosition);
+});
+
+test('every holder of a shared manager position supervises, and the shared seat is reported', function () {
+    [$first, $second, $officer] = [insertHrEmployee(), insertHrEmployee(), insertHrEmployee()];
+    $department = insertHrDepartment();
+    $managerPosition = insertHrPosition($department, 'Manager');
+    insertHrContract($first, $managerPosition);
+    insertHrContract($second, $managerPosition);
+    insertHrContract($officer, insertHrPosition($department, 'Officer', directManagerId: $managerPosition));
+
+    $expected = [$first, $second];
+    sort($expected);
+
+    expect(SupervisionMap::supervisorsOf([$officer]))->toBe([$officer => $expected])
+        ->and(SupervisionMap::supervisorsOf([$first]))->toBe([$first => []])
+        ->and(SupervisionMap::hrIssues()['sharedSeats'][0]['positionId'])->toBe($managerPosition);
+});
+
+test('active staff without a contract and with several contracts are reported', function () {
+    [$noContract, $doubled] = [insertHrEmployee(), insertHrEmployee()];
+    $department = insertHrDepartment();
+    insertHrContract($doubled, insertHrPosition($department));
+    insertHrContract($doubled, insertHrPosition($department));
+
+    $issues = SupervisionMap::hrIssues();
+
+    expect($issues['noContract'])->toBe([$noContract])
+        ->and($issues['severalContracts'])->toBe([$doubled]);
 });
