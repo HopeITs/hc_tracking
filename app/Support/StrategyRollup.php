@@ -17,6 +17,7 @@ use App\Models\User;
 use BackedEnum;
 use Carbon\CarbonImmutable;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\DB;
 
 /**
  * What each strategy's places add up to, for the strategies register: targets
@@ -68,7 +69,7 @@ final class StrategyRollup
         $results = $canView('indicators') && $canView('targets') ? self::results($strategyIds) : null;
         $funding = $canView('funding-agreements') ? self::funding($locationStrategy) : null;
         $risks = $canView('risks') ? self::risks($locationStrategy) : null;
-        $reports = $canView('reports') ? self::lateReports($locationStrategy) : null;
+        $reports = $canView('reports') ? self::lateReports($strategyIds) : null;
 
         $rollups = [];
 
@@ -334,21 +335,31 @@ final class StrategyRollup
     }
 
     /**
-     * Late reports per strategy, through the location row their target is
-     * committed at (Y-16, D-93).
+     * Late reports per strategy, through the **program of the target's place**
+     * (Y-08, Y-16).
      *
-     * @param  Collection<int, int>  $locationStrategy
+     * Not through the location row: an annual-plan target carries no row
+     * (D-44) and its late reports must still count, which keying on the row
+     * silently dropped. The place's program is on every placed target, so one
+     * rule covers both sources.
+     *
+     * @param  list<int>  $strategyIds
      * @return array<int, int>
      */
-    private static function lateReports(Collection $locationStrategy): array
+    private static function lateReports(array $strategyIds): array
     {
+        $programStrategy = DB::table('programs')
+            ->whereIn('strategy_id', $strategyIds)
+            ->pluck('strategy_id', 'id')
+            ->map(fn (mixed $id): int => (int) $id);
+
         return self::countByStrategy(
             Report::query()
                 ->overdue()
                 ->join('plan_indicators', 'plan_indicators.id', '=', 'reports.plan_indicator_id')
-                ->whereIn('plan_indicators.proposal_location_id', $locationStrategy->keys())
-                ->pluck('plan_indicators.proposal_location_id'),
-            $locationStrategy,
+                ->whereIn('plan_indicators.program_id', $programStrategy->keys())
+                ->pluck('plan_indicators.program_id'),
+            $programStrategy,
         );
     }
 
@@ -369,9 +380,9 @@ final class StrategyRollup
     }
 
     /**
-     * Count ids by the strategy they belong to. Every caller now passes
-     * location row ids (risks since Y-13, funding and late reports since
-     * Y-16), so there is one key for the whole rollup.
+     * Count ids by the strategy they belong to: location row ids for risks
+     * (Y-13) and funding (Y-16), program ids for late reports, which must also
+     * count annual-plan targets that carry no row (D-44).
      *
      * @param  Collection<int, mixed>  $ids  one entry per counted row
      * @param  Collection<int, int>  $idStrategy
