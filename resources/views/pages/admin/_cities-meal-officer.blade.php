@@ -6,8 +6,8 @@
     @var array{name: string, inactive: bool}|null $officer
     @var bool $inherited
     @var bool $canManage
-    @var string $scope 'city' or 'project'
-    @var int $targetId
+    @var string $scope 'city' or 'place'
+    @var int|string $targetId
 --}}
 
 <div class="flex items-center justify-between gap-3">
@@ -37,7 +37,7 @@
             size="sm"
             tone="secondary"
             class="shrink-0"
-            wire:click="openMealModal(@js($scope), @js($targetId))"
+            wire:click="openMealModal({{ \Illuminate\Support\Js::from($scope) }}, {{ \Illuminate\Support\Js::from($targetId) }})"
             data-test="assign-meal-officer-{{ $scope }}-{{ $targetId }}"
         >
             {{ $officer === null || $inherited ? __('cities.assign_meal_officer') : __('cities.change_meal_officer') }}

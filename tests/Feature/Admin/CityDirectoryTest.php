@@ -232,6 +232,7 @@ test('the meal manager assigns a governorate officer through the modal', functio
         ->test('pages::admin.cities')
         ->set('view', 'grid')
         ->assertSeeHtml('data-test="assign-meal-officer-city-'.$aleppo.'"')
+        ->assertSeeHtml('wire:click="'.e("openMealModal('city', {$aleppo})").'"')
         ->call('openMealModal', 'city', $aleppo)
         ->assertSet('showMealModal', true)
         ->set('mealEmployeeId', (string) $officer)
@@ -254,7 +255,9 @@ test('the meal manager assigns and reassigns a place officer through the modal',
         ->call('openMealModal', 'place', $place->key())
         ->set('mealEmployeeId', (string) $officer)
         ->call('saveMealCoverage')->assertHasNoErrors()
+        ->assertSeeHtml('wire:click="'.e("openMealModal('place', '{$place->key()}')").'"')
         ->call('openMealModal', 'place', $place->key())
+        ->assertSet('showMealModal', true)
         ->assertSet('mealEmployeeId', (string) $officer)
         ->set('mealEmployeeId', (string) $next)
         ->call('saveMealCoverage')->assertHasNoErrors();
@@ -275,6 +278,30 @@ test('the modal refuses an employee inactive in hr and warns about a city inacti
         ->assertSet('showMealModal', true);
 
     expect(DB::table('meal_coverages')->count())->toBe(0);
+});
+
+test('the officer picker excludes inactive HR records and warns about the current inactive officer', function () {
+    $place = cityCoverageTemplate(insertHrCity('Aleppo'), 'Wells Of Hope')->place();
+    $manager = mealManager();
+    $current = insertHrEmployee(firstNameEn: 'Former', lastNameEn: 'Officer', isActive: false);
+    $inactive = insertHrEmployee(firstNameEn: 'Other', lastNameEn: 'Inactive', isActive: false);
+    $eligible = insertHrEmployee(firstNameEn: 'Eligible', lastNameEn: 'Officer');
+    Activity::withoutRecording(fn () => MealCoverageAssignment::factory()->forPlace($place)->create(['employee_id' => $current]));
+
+    Livewire::actingAs($manager)
+        ->test('pages::admin.cities')
+        ->call('openMealModal', 'place', $place->key())
+        ->assertSet('mealEmployeeId', null)
+        ->assertSee('Former Officer · '.__('cities.responsible_inactive'))
+        ->assertDontSeeHtml('data-option-value="'.$current.'"')
+        ->assertDontSeeHtml('data-option-value="'.$inactive.'"')
+        ->assertSeeHtml('data-option-value="'.$eligible.'"')
+        ->set('mealEmployeeId', (string) $eligible)
+        ->call('saveMealCoverage')
+        ->assertHasNoErrors()
+        ->assertSet('showMealModal', false);
+
+    expect(DB::table('meal_coverages')->where('scope_key', 'place:'.$place->key())->sole()->employee_id)->toBe($eligible);
 });
 
 test('without the meal manager slot the assign controls are hidden and the actions are forbidden', function () {

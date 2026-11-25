@@ -36,6 +36,7 @@ use Illuminate\Support\Str;
  * @property int|null $parent_id
  * @property int|null $program_id
  * @property int|null $proposal_id
+ * @property int|null $logframe_position
  * @property int|null $contributes_to_result_id
  * @property int|null $copied_from_id
  * @property ResultType $type

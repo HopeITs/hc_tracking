@@ -873,6 +873,12 @@ return [
     ],
 
     'framework' => [
+        'choose_proposal' => 'Choose a proposal',
+        'indicator' => 'Indicator',
+        'assumptions_risks' => 'Assumptions and risks',
+        'add_row_below' => 'Add row below',
+        'add_child_row' => 'Add child row',
+        'remove_row' => 'Remove',
         'title' => 'Logical framework',
         'intro' => 'Click a result to open it. Choose what to show under each result.',
         'payroll_none' => 'A payroll proposal has no logical framework, targets, projects, plan or donor reports.',

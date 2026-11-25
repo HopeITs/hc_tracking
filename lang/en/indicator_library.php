@@ -1,6 +1,9 @@
 <?php
 
 return [
+    'existing_indicators' => 'Search existing indicators',
+    'more_options' => 'More options',
+    'name_already_exists' => 'This indicator name already exists. Choose it from the library.',
     'name_ar_required' => 'Enter the indicator name in Arabic.',
     'program_required' => 'Choose the program.',
     'level_ref_format' => 'Enter the level and its number as in the program framework, e.g. OP1.2.',

@@ -54,12 +54,12 @@ test('an indicator can be created against a result', function () {
     $result = Result::factory()->create();
 
     Livewire::actingAs($user)
-        ->test('pages::indicators.index')
-        ->call('openCreateModal')
-        ->set('name', '  Litres per person per day  ')
-        ->set('indicatorResultId', (string) $result->id)
-        ->set('indicatorMeasure', IndicatorMeasure::Numeric->value)
-        ->call('saveIndicator')
+        ->test('indicators.quick-form')
+        ->call('addForResult', $result->id)
+        ->set('entry.name_ar', '  Litres per person per day  ')
+        ->assertSet('entryResultId', (string) $result->id)
+        ->set('entry.measure', IndicatorMeasure::Numeric->value)
+        ->call('saveEntry')
         ->assertHasNoErrors();
 
     $indicator = Indicator::query()->where('name', 'Litres per person per day')->sole();
@@ -72,34 +72,38 @@ test('creating an indicator requires a name and a result', function () {
     $user = User::factory()->role('General Manager')->create();
 
     Livewire::actingAs($user)
-        ->test('pages::indicators.index')
-        ->call('openCreateModal')
-        ->set('name', '')
-        ->set('indicatorResultId', '')
-        ->call('saveIndicator')
-        ->assertHasErrors(['name', 'indicatorResultId']);
+        ->test('indicators.quick-form')
+        ->call('addForResult')
+        ->set('entry.name_ar', '')
+        ->assertSet('entryResultId', '')
+        ->call('saveEntry')
+        ->assertHasErrors(['entryResultId']);
 });
 
-test('an indicator can be created with a unit baseline target frequency and project', function () {
+test('an indicator can be added with a unit and frequency then given logframe values', function () {
     $user = User::factory()->role('General Manager')->create();
     $result = Result::factory()->create();
     $project = Project::factory()->create();
 
     Livewire::actingAs($user)
-        ->test('pages::indicators.index')
-        ->call('openCreateModal')
-        ->set('name', 'Households with safe water access')
-        ->set('indicatorResultId', (string) $result->id)
-        ->set('indicatorMeasure', IndicatorMeasure::Numeric->value)
-        ->set('unit', 'households')
-        ->set('baseline', '100')
-        ->set('target', '500')
-        ->set('frequency', Period::Monthly->value)
-        ->set('indicatorProjectId', (string) $project->id)
-        ->call('saveIndicator')
+        ->test('indicators.quick-form', ['initialResultId' => $result->id, 'initialProjectId' => $project->id, 'openOnLoad' => true])
+        ->set('entry.name_ar', 'Households with safe water access')
+        ->set('entry.unit', 'households')
+        ->set('entry.frequency', Period::Monthly->value)
+        ->call('saveEntry')
         ->assertHasNoErrors();
 
     $indicator = Indicator::query()->where('name', 'Households with safe water access')->sole();
+
+    Livewire::actingAs($user)
+        ->test('indicators.quick-form')
+        ->call('editIndicator', $indicator->id)
+        ->set('baseline', '100')
+        ->set('target', '500')
+        ->call('saveIndicator')
+        ->assertHasNoErrors();
+
+    $indicator->refresh();
 
     expect($indicator->unit)->toBe('households')
         ->and((float) $indicator->baseline)->toBe(100.0)
@@ -113,14 +117,14 @@ test('an indicator unit longer than the column can hold is rejected', function (
     $result = Result::factory()->create();
 
     Livewire::actingAs($user)
-        ->test('pages::indicators.index')
-        ->call('openCreateModal')
-        ->set('name', 'Indicator with overlong unit')
-        ->set('indicatorResultId', (string) $result->id)
-        ->set('indicatorMeasure', IndicatorMeasure::Numeric->value)
-        ->set('unit', str_repeat('a', 51))
-        ->call('saveIndicator')
-        ->assertHasErrors(['unit']);
+        ->test('indicators.quick-form')
+        ->call('addForResult', $result->id)
+        ->set('entry.name_ar', 'Indicator with overlong unit')
+        ->assertSet('entryResultId', (string) $result->id)
+        ->set('entry.measure', IndicatorMeasure::Numeric->value)
+        ->set('entry.unit', str_repeat('a', 51))
+        ->call('saveEntry')
+        ->assertHasErrors(['entry.unit']);
 
     expect(Indicator::query()->where('name', 'Indicator with overlong unit')->exists())->toBeFalse();
 });
@@ -457,8 +461,9 @@ test('the results framework can open the form already tied to a statement, or op
     Livewire::actingAs($user)
         ->withQueryParams(['create' => $result->id])
         ->test('pages::indicators.index')
-        ->assertSet('showIndicatorModal', true)
-        ->assertSet('indicatorResultId', (string) $result->id);
+        ->assertSet('openIndicatorEntryOnLoad', true)
+        ->assertSet('initialIndicatorResultId', $result->id)
+        ->assertSeeLivewire('indicators.quick-form');
 
     Livewire::actingAs($user)
         ->withQueryParams(['inspect' => $indicator->id])
@@ -474,9 +479,9 @@ test('the project page can open the form already scoped to a project', function 
     Livewire::actingAs($user)
         ->withQueryParams(['create' => 1, 'project' => $project->id])
         ->test('pages::indicators.index')
-        ->assertSet('showIndicatorModal', true)
-        ->assertSet('indicatorProjectId', (string) $project->id)
-        ->assertSet('indicatorResultId', '');
+        ->assertSet('openIndicatorEntryOnLoad', true)
+        ->assertSet('initialIndicatorProjectId', $project->id)
+        ->assertSet('initialIndicatorResultId', null);
 });
 
 test('a project deep link to a project that does not exist opens nothing', function () {
@@ -485,8 +490,8 @@ test('a project deep link to a project that does not exist opens nothing', funct
     Livewire::actingAs($user)
         ->withQueryParams(['create' => 1, 'project' => 999999])
         ->test('pages::indicators.index')
-        ->assertSet('showIndicatorModal', false)
-        ->assertSet('indicatorProjectId', '');
+        ->assertSet('openIndicatorEntryOnLoad', false)
+        ->assertSet('initialIndicatorProjectId', null);
 });
 
 test('only projects delivering the result program are offered, and any other is refused', function () {
@@ -495,11 +500,11 @@ test('only projects delivering the result program are offered, and any other is 
     $result = Result::factory()->for($program)->create();
     $inside = Project::factory()->for($program)->create();
     $outside = Project::factory()->create();
+    $indicator = Indicator::factory()->for($result)->create();
 
     $component = Livewire::actingAs($user)
         ->test('pages::indicators.index')
-        ->call('openCreateModal')
-        ->set('indicatorResultId', (string) $result->id);
+        ->call('openEditModal', $indicator->id);
 
     expect($component->instance()->projectOptions()->modelKeys())->toBe([$inside->id]);
 
@@ -509,7 +514,7 @@ test('only projects delivering the result program are offered, and any other is 
         ->call('saveIndicator')
         ->assertHasErrors(['indicatorProjectId']);
 
-    expect(Indicator::query()->where('name', 'Outside project indicator')->exists())->toBeFalse();
+    expect($indicator->fresh()->project_id)->not->toBe($outside->id);
 });
 
 test('a percentage indicator carries no unit and cannot target more than 100', function () {
@@ -517,13 +522,19 @@ test('a percentage indicator carries no unit and cannot target more than 100', f
     $result = Result::factory()->create();
 
     Livewire::actingAs($user)
-        ->test('pages::indicators.index')
-        ->call('openCreateModal')
-        ->set('name', 'Share of households with latrines')
-        ->set('indicatorResultId', (string) $result->id)
-        ->set('unit', 'households')
-        ->set('indicatorMeasure', IndicatorMeasure::Percentage->value)
-        ->assertSet('unit', '')
+        ->test('indicators.quick-form')
+        ->call('addForResult', $result->id)
+        ->set('entry.name_ar', 'Share of households with latrines')
+        ->set('entry.unit', 'households')
+        ->set('entry.measure', IndicatorMeasure::Percentage->value)
+        ->call('saveEntry')
+        ->assertHasNoErrors();
+
+    $indicator = Indicator::query()->where('name', 'Share of households with latrines')->sole();
+
+    Livewire::actingAs($user)
+        ->test('indicators.quick-form')
+        ->call('editIndicator', $indicator->id)
         ->set('target', '120')
         ->call('saveIndicator')
         ->assertHasErrors(['target' => 'max'])
@@ -531,7 +542,7 @@ test('a percentage indicator carries no unit and cannot target more than 100', f
         ->call('saveIndicator')
         ->assertHasNoErrors();
 
-    expect(Indicator::query()->where('name', 'Share of households with latrines')->sole()->unit)->toBeNull();
+    expect($indicator->fresh()->unit)->toBeNull();
 });
 
 test('the measure is locked once a target is committed against the indicator', function () {
@@ -757,9 +768,9 @@ test('the result list names the program so similar results can be told apart', f
     Result::factory()->create(['program_id' => $program->id, 'statement' => 'Students supported.']);
 
     Livewire::actingAs($user)
-        ->test('pages::indicators.index')
-        ->call('openCreateModal')
-        ->assertSee('Study Zone · ');
+        ->test('indicators.quick-form')
+        ->call('addForResult')
+        ->assertSeeInOrder(['Study Zone', 'Students supported.']);
 });
 
 test('the delete dialog names the indicator', function () {

@@ -132,7 +132,11 @@ Route::middleware(['auth', EnsureTwoFactorIsEnabled::class])->group(function () 
         ->can('risks.view')
         ->name('risks.index');
 
-    Route::livewire('results', 'pages::results.index')
+    Route::livewire('meal/logframe', 'pages::results.logframe')
+        ->can('results.view')
+        ->name('meal.logframe');
+
+    Route::get('results', fn () => redirect()->route('meal.logframe', request()->query()))
         ->can('results.view')
         ->name('results.index');
 

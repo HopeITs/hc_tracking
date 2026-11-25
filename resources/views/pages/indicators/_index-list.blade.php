@@ -10,6 +10,8 @@
         @foreach ($paged as $row)
             @php
                 $indicator = $row['indicator'];
+                $name = $indicator->libraryIndicator?->localizedName() ?? $indicator->name;
+                $mayEditLibrary = $indicator->library_indicator_id !== null && auth()->user()->can('indicator-library.update');
                 $status = $row['status'];
                 $tone = match ($status) {
                     'ontrack' => 'good',
@@ -31,7 +33,7 @@
 
             <li class="grid gap-3 px-4 py-4 md:grid-cols-[minmax(0,1fr)_15rem_auto] md:items-center" wire:key="indicator-row-{{ $indicator->id }}" data-status="{{ $status }}">
                 <div class="min-w-0">
-                    <p class="text-base font-bold leading-snug text-secondary-dark dark:text-ink"><bdi>{{ $indicator->name }}</bdi></p>
+                    <p class="text-base font-bold leading-snug text-secondary-dark dark:text-ink"><bdi>{{ $name }}</bdi></p>
                     <p class="mt-0.5 type-meta text-secondary-medium dark:text-ink-muted">
                         {{ $indicator->result->program?->name ?? __('common.unassigned') }}@if ($indicator->project !== null) · {{ $indicator->project->name }}@endif
                     </p>
@@ -81,10 +83,13 @@
                         {{ __('indicators.details') }}
                     </x-ui.button>
 
-                    @if (auth()->user()->can('indicators.update') || auth()->user()->can('indicators.delete'))
+                    @if ($mayEditLibrary || auth()->user()->can('indicators.update') || auth()->user()->can('indicators.delete'))
                         <flux:dropdown align="end">
                             <flux:button size="sm" variant="ghost" icon="ellipsis-horizontal" class="min-h-11 md:min-h-9" :aria-label="__('indicators.more_actions_for_name', ['name' => $indicator->name])" />
                             <flux:menu>
+                                @if ($mayEditLibrary)
+                                    <flux:menu.item icon="pencil-square" wire:click="$dispatchTo('indicators.quick-form', 'edit-library-entry', { libraryIndicatorId: {{ $indicator->library_indicator_id }} })">{{ __('indicator_library.edit_entry') }}</flux:menu.item>
+                                @endif
                                 @can('indicators.update')
                                     <flux:menu.item icon="pencil-square" wire:click="openEditModal({{ $indicator->id }})">{{ __('indicators.edit_indicator') }}</flux:menu.item>
                                 @endcan

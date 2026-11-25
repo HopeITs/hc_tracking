@@ -36,7 +36,8 @@ use Livewire\Attributes\Computed;
  * @property-read Collection<int, HrEmployee> $mealOfficers  #[Computed] mealOfficers()
  * @property-read array<int, array{name: string, inactive: bool}> $cityOfficers  #[Computed] cityOfficers()
  * @property-read Collection<int, array{id: int, name: string, city: string|null, officer: array{name: string, inactive: bool}|null, inherited: bool}> $placeOfficers  #[Computed] placeOfficers()
- * @property-read array{name: string, inactiveCity: bool}|null $mealTarget  #[Computed] mealTarget()
+ * @property-read array{name: string, inactiveCity: bool, officer: array{name: string, inactive: bool}|null}|null $mealTarget  #[Computed] mealTarget()
+ * @property-read Collection<int, HrEmployee> $eligibleMealOfficers  #[Computed] eligibleMealOfficers()
  */
 trait ManagesMealCoverage
 {
@@ -162,7 +163,7 @@ trait ManagesMealCoverage
     /**
      * The governorate or place the open dialog assigns an officer to.
      *
-     * @return array{name: string, inactiveCity: bool}|null
+     * @return array{name: string, inactiveCity: bool, officer: array{name: string, inactive: bool}|null}|null
      */
     #[Computed]
     public function mealTarget(): ?array
@@ -174,12 +175,32 @@ trait ManagesMealCoverage
         if ($this->mealScope === MealCoverageScope::Place->value) {
             $place = $this->placeOfficers->get($this->mealTargetId);
 
-            return $place === null ? null : ['name' => $place['name'], 'inactiveCity' => false];
+            return $place === null ? null : [
+                'name' => $place['name'],
+                'inactiveCity' => false,
+                'officer' => $place['inherited'] ? null : $place['officer'],
+            ];
         }
 
         $city = HrCity::query()->select(['id', 'name_en', 'name_ar', 'is_active'])->find($this->mealTargetId);
 
-        return $city === null ? null : ['name' => $city->name, 'inactiveCity' => ! $city->is_active];
+        return $city === null ? null : [
+            'name' => $city->name,
+            'inactiveCity' => ! $city->is_active,
+            'officer' => $this->cityOfficers[$city->id] ?? null,
+        ];
+    }
+
+    /**
+     * @return Collection<int, HrEmployee>
+     */
+    #[Computed]
+    public function eligibleMealOfficers(): Collection
+    {
+        return HrEmployee::query()
+            ->where('is_active', true)
+            ->get(HrEmployee::NameColumns)
+            ->sortBy('name');
     }
 
     public function updatedProjectSearch(): void
@@ -206,7 +227,9 @@ trait ManagesMealCoverage
         $this->resetErrorBag();
         $this->mealScope = $coverageScope->value;
         $this->mealTargetId = $targetId;
-        $this->mealEmployeeId = $current === null ? null : (string) $current->employee_id;
+        $this->mealEmployeeId = $current !== null && $this->mealOfficers->get($current->employee_id)?->is_active
+            ? (string) $current->employee_id
+            : null;
         $this->showMealModal = true;
     }
 
