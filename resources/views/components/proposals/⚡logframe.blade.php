@@ -111,7 +111,6 @@ new class extends Component {
     public function mount(int $proposalId): void
     {
         $this->proposalId = $proposalId;
-        Gate::authorize('view', $this->proposal);
         abort_if($this->proposal->isPayroll(), 404);
         $this->formProposalId = $proposalId;
         $this->applyPrefs();
