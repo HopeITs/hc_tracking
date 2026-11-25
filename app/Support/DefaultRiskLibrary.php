@@ -10,19 +10,17 @@ use Illuminate\Support\Facades\DB;
  * The starting risk library and the one idempotent rule that seeds it,
  * shared by the data migrations and the seeder (W-09, D-61).
  *
- * The list is the risk column of MEAL's «مصفوفة سياق المخاطر والافتراضات»
- * (Hope Centre Theory of Change 2026–2030), supplied by the developer on
- * 4 Nov 2026: the six context-level risks first, then the three pathways in
- * the order the matrix gives them. The matrix's assumptions and mitigation
- * measures have no column here — a library entry is a risk title in both
- * languages plus a grouping category, and the mitigation is written per
- * proposal on the attached risk (`risks.solution`).
+ * Since 2026-11-25 the starting list is empty: the library fills itself from
+ * the risk titles MEAL types on a program or a proposal, and suggests them
+ * when a risk is typed later. `ensure()` stays so the seeder and the older
+ * data migrations remain idempotent; with an empty list it inserts nothing.
  *
- * `category` is a single free-text column (no per-language pair), so these
- * are English and MEAL may rename them on /admin/risk-library.
+ * `category` is a single free-text column (no per-language pair), so any
+ * entry that is added is named in one language and MEAL may rename it on
+ * /admin/risk-library.
  *
  * An entry counts as present when any row carries its English **or** its
- * Arabic title, so a renamed or deactivated default never comes back as a
+ * Arabic title, so a renamed or deactivated entry never comes back as a
  * duplicate. Query builder only: no model events.
  */
 final class DefaultRiskLibrary
@@ -32,33 +30,7 @@ final class DefaultRiskLibrary
      */
     public static function all(): array
     {
-        return [
-            // The general and contextual level.
-            ['title_en' => 'Sharp exchange-rate swings and price inflation', 'title_ar' => 'تقلبات حادة في سعر الصرف وتضخم الأسعار', 'category' => 'Context'],
-            ['title_en' => 'Sudden logistical or security restrictions on movement', 'title_ar' => 'قيود لوجستية أو أمنية طارئة على الحركة', 'category' => 'Context'],
-            ['title_en' => 'Severe decline of the public power network and fuel scarcity', 'title_ar' => 'تدهور حاد في شبكات الطاقة العامة وشح المحروقات', 'category' => 'Context'],
-            ['title_en' => 'Renewed security tensions or local conflict in the areas of intervention', 'title_ar' => 'تجدد التوترات الأمنية أو النزاعات المحلية في مناطق التدخل', 'category' => 'Context'],
-            ['title_en' => 'Sudden change of policy, regulatory frameworks or controlling authorities', 'title_ar' => 'تغيّرات مفاجئة في السياسات أو الأطر التنظيمية أو الجهات المسيطرة', 'category' => 'Context'],
-            ['title_en' => 'Shifting donor priorities or tighter sanctions and banking restrictions', 'title_ar' => 'تبدّل الأولويات السياسية للجهات المانحة أو تشديد العقوبات والقيود المصرفية', 'category' => 'Context'],
-
-            // Pathway 1: economic empowerment, livelihoods and infrastructure.
-            ['title_en' => 'Weak purchasing power or failure of the funded businesses', 'title_ar' => 'ضعف القوة الشرائية العامة أو تعثر المشاريع', 'category' => 'Economic empowerment'],
-            ['title_en' => 'Grant capital diverted to emergency household spending', 'title_ar' => 'تسرب رأس المال للنفقات الاستهلاكية الطارئة', 'category' => 'Economic empowerment'],
-            ['title_en' => 'Falling water table, contaminated water sources or system breakdowns', 'title_ar' => 'انخفاض منسوب المياه أو تلوث المصادر المائية أو أعطال المنظومات', 'category' => 'Economic empowerment'],
-
-            // Pathway 2: youth and students.
-            ['title_en' => 'Demand beyond the capacity of the study centres', 'title_ar' => 'زيادة الطلب بما يتجاوز الطاقة الاستيعابية لمراكز الدراسة', 'category' => 'Youth and students'],
-            ['title_en' => 'Stagnant hiring and low wages in the local market', 'title_ar' => 'ركود حركة التوظيف وتدني الأجور في السوق المحلي', 'category' => 'Youth and students'],
-            ['title_en' => 'Trained young talent emigrating after qualifying', 'title_ar' => 'هجرة الكفاءات الشابة بعد تلقي التدريب والتأهيل', 'category' => 'Youth and students'],
-            ['title_en' => 'Automation of the trades and skills the training targets', 'title_ar' => 'أتمتة بعض المهن والمهارات المستهدفة بالتدريب المهني والتقني', 'category' => 'Youth and students'],
-            ['title_en' => 'A widening digital divide in access to AI tools', 'title_ar' => 'اتساع الفجوة الرقمية في الوصول إلى أدوات الذكاء الاصطناعي واستخدامها', 'category' => 'Youth and students'],
-            ['title_en' => 'Training content ageing faster than it can be updated', 'title_ar' => 'تقادم محتوى التدريب بسرعة تفوق قدرة المركز والسوق على التكيّف', 'category' => 'Youth and students'],
-            ['title_en' => 'Official or social limits on who may attend and on mixed delivery', 'title_ar' => 'فرض فصل ديمغرافي أو تغيّر الضوابط الاجتماعية بما يحدّ من وصول بعض الشباب والطلاب', 'category' => 'Youth and students'],
-
-            // Pathway 3: childhood and positive parenting.
-            ['title_en' => 'Cases needing long-term specialist mental health care beyond the project', 'title_ar' => 'حاجة بعض الحالات لرعاية نفسية تخصصية طويلة الأمد تفوق نطاق المشروع', 'category' => 'Children and parenting'],
-            ['title_en' => 'Low parent participation because of livelihood pressures', 'title_ar' => 'ضعف مشاركة أولياء الأمور نتيجة الانشغال بتأمين المعيشة', 'category' => 'Children and parenting'],
-        ];
+        return [];
     }
 
     /**

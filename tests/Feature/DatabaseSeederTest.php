@@ -52,7 +52,6 @@ test('the seeders populate every table in the schema', function () {
         Proposal::class,
         DonorProposal::class,
         Risk::class,
-        RiskLibrary::class,
         Task::class,
         TaskAssignee::class,
         TaskAttachment::class,
@@ -82,6 +81,7 @@ test('the seeders populate every table in the schema', function () {
         expect($model::query()->count())->toBeGreaterThan(0, $model.' was not seeded');
     }
 
+    expect(RiskLibrary::query()->count())->toBe(0);
     expect(DB::table('project_proposal')->count())->toBeGreaterThanOrEqual(Project::query()->count());
     expect(DB::table('project_sector')->count())->toBeGreaterThanOrEqual(Project::query()->count());
 });

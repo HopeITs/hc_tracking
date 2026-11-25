@@ -42,6 +42,7 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
  * @property string|null $return_reason
  * @property CarbonImmutable|null $revised_due_on the deadline set when the report was returned after its own one passed
  * @property CarbonImmutable|null $seen_by_meal_at
+ * @property bool $updates_risks whether the report carries the optional "Update risks" line
  * @property CarbonImmutable|null $created_at
  * @property CarbonImmutable|null $updated_at
  */
@@ -60,6 +61,7 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
     'return_reason',
     'revised_due_on',
     'seen_by_meal_at',
+    'updates_risks',
 ])]
 class MonthlyReport extends Model implements TracksActivity
 {
@@ -74,6 +76,7 @@ class MonthlyReport extends Model implements TracksActivity
      */
     protected $attributes = [
         'status' => 'draft',
+        'updates_risks' => false,
     ];
 
     /**
@@ -134,6 +137,16 @@ class MonthlyReport extends Model implements TracksActivity
     public function answers(): HasMany
     {
         return $this->hasMany(MonthlyReportAnswer::class);
+    }
+
+    /**
+     * The logframe risks this report answered (did it happen).
+     *
+     * @return HasMany<MonthlyReportRisk, $this>
+     */
+    public function riskEntries(): HasMany
+    {
+        return $this->hasMany(MonthlyReportRisk::class);
     }
 
     /**
@@ -208,7 +221,8 @@ class MonthlyReport extends Model implements TracksActivity
         $query->where(fn (Builder $own) => $own->whereNull('prepared_by')->orWhere('prepared_by', '!=', $user->id))
             ->where(fn (Builder $own) => $own->whereNull('submitted_by')->orWhere('submitted_by', '!=', $user->id));
 
-        if ($user->employee_id !== null && $user->employee_id === MealCoverage::mealManagerEmployeeId()) {
+        if ($user->hasRole('Super Admin')
+            || ($user->employee_id !== null && $user->employee_id === MealCoverage::mealManagerEmployeeId())) {
             return;
         }
 
@@ -250,6 +264,7 @@ class MonthlyReport extends Model implements TracksActivity
             'returned_by' => 'integer',
             'revised_due_on' => 'date',
             'seen_by_meal_at' => 'datetime',
+            'updates_risks' => 'boolean',
         ];
     }
 

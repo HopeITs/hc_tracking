@@ -83,3 +83,6 @@ The `App\Support\Default*` lookup lists (`DefaultSectors`, `DefaultEvidenceTypes
 When such a list ships EMPTY and the content arrives later, filling `all()` is not enough: the original data migration is already in the `migrations` table on every database that migrated, and a migration never runs twice, so those databases stay empty and only a seeder run would fill them. Add a second data migration calling the same `ensure()` (same shape: skip under `runningUnitTests()`, `down()` deleting only the defaults nothing references). `ensure()` being idempotent is what makes the extra pass safe.
 
 Done for the W-09 risk library on 4 Nov 2026: `2026_11_04_103125_seed_risk_library` ran with an empty list, `2026_11_04_152049_seed_risk_library_starting_list` carries the 18 rows.
+
+## Program risks live in the risks table; risk library starts empty
+Program risk = risks.program_id set, proposal_id null. Proposal logframe risk = proposal_id set, proposal_location_id null; copied ones carry copied_from_id (nullOnDelete). Migration 2026_11_25_164539_empty_risk_library nulls risks.library_risk_id and deletes all risk_library rows; DefaultRiskLibrary::all() is [] so ensure() adds nothing and seeders leave the library empty (it fills from titles MEAL types). Monthly answers: monthly_report_risks (unique report+risk) plus monthly_reports.updates_risks.
