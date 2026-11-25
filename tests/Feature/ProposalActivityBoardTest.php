@@ -121,6 +121,16 @@ describe('copying from the program framework', function () {
         $this->actingAs($this->meal);
     });
 
+    test('it copies a parent and its child that are both new here', function () {
+        $counts = app(CopyResultTree::class)->copySelection($this->proposal, [$this->programImpact->id, $this->programOutcome->id], [], false);
+
+        $impact = Result::query()->where('proposal_id', $this->proposal->id)->where('copied_from_id', $this->programImpact->id)->sole();
+        $outcome = Result::query()->where('proposal_id', $this->proposal->id)->where('copied_from_id', $this->programOutcome->id)->sole();
+
+        expect($counts['results'])->toBe(2)
+            ->and($outcome->parent_id)->toBe($impact->id);
+    });
+
     test('it copies only what was ticked and never duplicates what is already here', function () {
         $this->outcome->forceFill(['statement' => '  projects GROW ', 'parent_id' => null])->save();
 

@@ -25,15 +25,15 @@
         <div class="pp-file" wire:key="sec-file-{{ $media->id }}" data-file="{{ $media->id }}">
             @if ($isStored)
                 <button type="button" class="pp-file-open" wire:click="openPreview({{ $media->id }})" aria-label="{{ __('reports.preview_name', ['name' => $media->original_name]) }}" data-test="preview-file-{{ $media->id }}">
-                    <span @class(['pp-ext', 'pp-ext-pdf' => $media->type === \App\Enums\FileType::Pdf])>{{ \Illuminate\Support\Str::upper($media->type->value) }}</span>
+                    <span class="pp-file-tags"><span @class(['pp-ext', 'pp-ext-pdf' => $media->type === \App\Enums\FileType::Pdf])>{{ \Illuminate\Support\Str::upper($media->type->value) }}</span></span>
                     <span class="pp-file-nm" title="{{ $media->original_name }}">{{ $media->original_name }}</span>
-                    <span class="pp-small">{{ $media->collection->label() }}</span>
+                    <span class="pp-small pp-file-meta">{{ $media->collection->label() }}</span>
                 </button>
             @else
                 <div class="pp-file-open">
-                    <span class="pp-ext">{{ \Illuminate\Support\Str::upper($media->type->value) }}</span>
+                    <span class="pp-file-tags"><span class="pp-ext">{{ \Illuminate\Support\Str::upper($media->type->value) }}</span><span class="pp-file-ref">{{ __('reports.reference_only') }}</span></span>
                     <span class="pp-file-nm" title="{{ $media->original_name }}">{{ $media->original_name }}</span>
-                    <span class="pp-small">{{ $media->collection->label() }} · {{ __('reports.reference_only') }}</span>
+                    <span class="pp-small pp-file-meta">{{ $media->collection->label() }}</span>
                 </div>
             @endif
             <span class="pp-file-acts">

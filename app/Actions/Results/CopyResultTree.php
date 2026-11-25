@@ -170,7 +170,7 @@ final class CopyResultTree
 
                     $mapped += Result::query()
                         ->where('proposal_id', $lockedProposal->id)
-                        ->whereIn('copied_from_id', $new->modelKeys())
+                        ->whereIn('copied_from_id', $new->pluck('id')->all())
                         ->pluck('id', 'copied_from_id')
                         ->map(fn (int|string $id): int => (int) $id)
                         ->all();
