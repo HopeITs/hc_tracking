@@ -7,6 +7,7 @@ use App\Models\Project;
 use App\Models\ReportTemplate;
 use App\Models\User;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Js;
 use Livewire\Livewire;
 
 test('guests are redirected from the city directory', function () {
@@ -228,12 +229,14 @@ test('the meal manager assigns a governorate officer through the modal', functio
     $aleppo = insertHrCity('Aleppo');
     $officer = insertHrEmployee(firstNameEn: 'Nour', lastNameEn: 'Ali');
 
-    Livewire::actingAs(mealManager())
+    $component = Livewire::actingAs(mealManager())
         ->test('pages::admin.cities')
         ->set('view', 'grid')
-        ->assertSeeHtml('data-test="assign-meal-officer-city-'.$aleppo.'"')
-        ->assertSeeHtml('wire:click="'.e("openMealModal('city', {$aleppo})").'"')
-        ->call('openMealModal', 'city', $aleppo)
+        ->assertSeeHtml('data-test="assign-meal-officer-city-'.$aleppo.'"');
+
+    expect(html_entity_decode($component->html(), ENT_QUOTES))->toContain('wire:click="openMealModal('.Js::from('city').', '.Js::from($aleppo).')"');
+
+    $component->call('openMealModal', 'city', $aleppo)
         ->assertSet('showMealModal', true)
         ->set('mealEmployeeId', (string) $officer)
         ->call('saveMealCoverage')
@@ -249,14 +252,16 @@ test('the meal manager assigns and reassigns a place officer through the modal',
     $officer = insertHrEmployee(firstNameEn: 'Lina', lastNameEn: 'Haddad');
     $next = insertHrEmployee(firstNameEn: 'Nour', lastNameEn: 'Ali');
 
-    Livewire::actingAs(mealManager())
+    $component = Livewire::actingAs(mealManager())
         ->test('pages::admin.cities')
         ->assertSeeHtml('data-test="assign-meal-officer-place-'.$place->key().'"')
         ->call('openMealModal', 'place', $place->key())
         ->set('mealEmployeeId', (string) $officer)
-        ->call('saveMealCoverage')->assertHasNoErrors()
-        ->assertSeeHtml('wire:click="'.e("openMealModal('place', '{$place->key()}')").'"')
-        ->call('openMealModal', 'place', $place->key())
+        ->call('saveMealCoverage')->assertHasNoErrors();
+
+    expect(html_entity_decode($component->html(), ENT_QUOTES))->toContain('wire:click="openMealModal('.Js::from('place').', '.Js::from($place->key()).')"');
+
+    $component->call('openMealModal', 'place', $place->key())
         ->assertSet('showMealModal', true)
         ->assertSet('mealEmployeeId', (string) $officer)
         ->set('mealEmployeeId', (string) $next)
