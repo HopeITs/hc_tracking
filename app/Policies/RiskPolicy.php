@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Policies;
 
+use App\Models\Program;
 use App\Models\Proposal;
 use App\Models\Risk;
 use App\Models\User;
@@ -14,10 +15,9 @@ use App\Models\User;
  * User::ownedLocationIds()) log and edit the risks of the rows they answer
  * for. Deleting stays with risks.delete.
  *
- * Since W-09 (D-61) new risks are picked from the library onto a proposal's
- * logframe: `attach` and `detach` belong to whoever may build the framework
- * (results.update, the MEAL manager), like the rest of the logframe; a PR
- * officer only reads them. The project-based abilities above serve the
+ * Program framework and proposal logframe risks are typed (or copied from
+ * the program) by whoever may build the framework: `manageFramework`
+ * (results.update, the MEAL manager); a PR officer only reads them. The project-based abilities above serve the
  * legacy rows only.
  */
 class RiskPolicy
@@ -70,17 +70,11 @@ class RiskPolicy
     }
 
     /**
-     * Determine whether the user can pick a library risk onto the proposal's logframe.
+     * Determine whether the user can type, edit or remove the risks of a
+     * program's results framework or a proposal's logframe: whoever builds
+     * the framework (results.update).
      */
-    public function attach(User $user, Proposal $proposal): bool
-    {
-        return $user->can('results.update');
-    }
-
-    /**
-     * Determine whether the user can remove a risk from the proposal's logframe.
-     */
-    public function detach(User $user, Proposal $proposal): bool
+    public function manageFramework(User $user, Program|Proposal $owner): bool
     {
         return $user->can('results.update');
     }

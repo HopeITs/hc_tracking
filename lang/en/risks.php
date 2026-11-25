@@ -60,6 +60,15 @@ return [
 
     'high_risks' => 'High risks',
 
+    'copied_is_remove_only' => 'A risk copied from the program can only be removed, not edited.',
+    'title_ar' => 'Title (Arabic)',
+    'title_en' => 'Title (English)',
+    'title_ar_required' => 'Enter the risk title in Arabic.',
+    'title_en_required' => 'Enter the risk title in English.',
+    'title_too_long' => 'Keep the risk title under 255 characters.',
+    'invalid_rating' => 'Choose 1, 2 or 3.',
+    'solution_too_long' => 'Keep the mitigation under 5,000 characters.',
+
     'console' => [
         'backfill_applying' => 'Applying: register risks will be moved onto their location row.',
         'backfill_dry_run' => 'Dry run: nothing will be written.',
