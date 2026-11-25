@@ -151,7 +151,8 @@ trait ReadsProposalDelivery
             ->where('source_type', 'proposal')
             ->where('source_id', $this->proposalId)
             ->with([
-                'indicator:id,name,result_id,project_id,measure,unit',
+                // chainIssuesForRow() reads the instance's own row (Y-16, D-93).
+                'indicator:id,name,result_id,project_id,proposal_location_id,measure,unit',
                 'indicator.result:id,statement,type,program_id,proposal_id',
                 'project:id,name,program_id',
                 // chainIssues() reads the row now (Y-16, D-93).

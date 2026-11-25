@@ -31,7 +31,7 @@ new class extends Component
         $expected = min(100.0, max(0.0, ($start->diffInSeconds(now()) / $start->diffInSeconds($end)) * 100));
 
         return Indicator::query()
-            ->select(['id', 'name', 'code', 'project_id', 'measure', 'unit', 'baseline', 'target'])
+            ->select(['id', 'name', 'code', 'project_id', 'proposal_location_id', 'measure', 'unit', 'baseline', 'target'])
             ->whereNotNull('target')
             // Y-16 (D-93): an instance scoped to a place names that place.
             ->with(['location:id,proposal_id,slug,city_id,city_wide,program_id', 'location.city:id,name_en,name_ar', 'location.program:id', 'location.centers', 'location.proposal:id,name', 'progress:id,indicator_id,date,value'])
