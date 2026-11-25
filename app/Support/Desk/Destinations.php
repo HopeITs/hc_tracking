@@ -36,7 +36,15 @@ final class Destinations
      *
      * @var list<string>
      */
-    private const array OutsideSidebar = ['notifications.index', 'notification-settings.edit', 'admin.notification-settings.edit'];
+    private const array OutsideSidebar = ['notifications.index', 'notification-settings.edit', 'admin.notification-settings.edit', ...self::ReportTrackerRegisters];
+
+    /**
+     * The report registers reached from the Report Tracker rows instead of the
+     * sidebar. Their pages, and the sub-pages of each, light up the Tracker link.
+     *
+     * @var list<string>
+     */
+    private const array ReportTrackerRegisters = ['reports.index', 'monthly-reports.index', 'donor-reports.index'];
 
     /**
      * Sidebar group => its heading's translation key.
@@ -221,7 +229,10 @@ final class Destinations
         return $links->firstWhere('route', $routeName)
             ?? $links->first(fn (array $link): bool => $link['route'] !== 'dashboard'
                 && str_ends_with($link['route'], '.index')
-                && str_starts_with($routeName, Str::beforeLast($link['route'], '.index').'.'));
+                && str_starts_with($routeName, Str::beforeLast($link['route'], '.index').'.'))
+            ?? (collect(self::ReportTrackerRegisters)->contains(fn (string $register): bool => str_starts_with($routeName, Str::beforeLast($register, '.index').'.'))
+                ? $links->firstWhere('route', 'active-reports.index')
+                : null);
     }
 
     /**

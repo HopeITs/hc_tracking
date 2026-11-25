@@ -87,12 +87,20 @@ test('the old My Reporting Duties address leads to Donor Reports', function () {
         ->assertRedirect(route('donor-reports.index'));
 });
 
-test('the donor reports register sits under monitoring and evaluation, labelled Donor reports, the builder labelled Donor report builder', function () {
-    $groups = collect(app(Destinations::class)->sidebarFor(User::factory()->role('Super Admin')->create()))->keyBy('group');
+test('the Report Tracker replaces the report registers in the sidebar; the builder and the matrix stay', function () {
+    $user = User::factory()->role('Super Admin')->create();
+    $destinations = app(Destinations::class);
+    $groups = collect($destinations->sidebarFor($user))->keyBy('group');
     $items = collect($groups->get('monitoring_evaluation')['items'])->keyBy('route');
 
-    expect($items->get('donor-reports.index')['label'])->toBe('Donor reports')
-        ->and($items->get('donor-reports.compose')['label'])->toBe('Donor report builder');
+    expect($items->get('active-reports.index')['label'])->toBe('Report Tracker')
+        ->and($items->get('donor-reports.compose')['label'])->toBe('Donor report builder')
+        ->and($items->keys()->all())->toContain('reports.monthly-matrix')->not->toContain('reports.index', 'monthly-reports.index', 'donor-reports.index')
+        ->and(deskPageRoutes($user))->toContain('reports.index', 'monthly-reports.index', 'donor-reports.index')
+        ->and($destinations->currentFor($user, 'monthly-reports.show')['route'])->toBe('active-reports.index')
+        ->and($destinations->currentFor($user, 'donor-reports.show')['route'])->toBe('active-reports.index')
+        ->and($destinations->currentFor($user, 'reports.show')['route'])->toBe('active-reports.index')
+        ->and($destinations->currentFor($user, 'donor-reports.compose')['route'])->toBe('donor-reports.compose');
 });
 
 test('funding pages follow the module permissions of each role', function () {
