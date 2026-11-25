@@ -114,7 +114,7 @@
         wire:model="showUnlinkModal"
         tone="neutral"
         :title="__('proposals.stop_funding_this_project')"
-        :message="$unlinkingProjectId !== null && ($unlinking = $this->projects->firstWhere('id', $unlinkingProjectId)) !== null ? __('proposals.unlink_project_consequence', ['name' => $unlinking->name]) : null"
+        :message="$unlinkingProjectId !== null && ($unlinking = $this->projects->firstWhere('project_id', $unlinkingProjectId)) !== null ? __('proposals.unlink_project_consequence', ['name' => $unlinking->headline()]) : null"
         confirm="unlinkProject"
         :confirm-label="$this->unlinkDeletesTargets ? __('proposals.unlink_with_targets') : __('proposals.unlink_project')"
         confirm-test="confirm-unlink-project"

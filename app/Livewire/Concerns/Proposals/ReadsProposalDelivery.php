@@ -92,26 +92,27 @@ trait ReadsProposalDelivery
     }
 
     /**
-     * The projects this proposal funds.
+     * The places this proposal pays for (Y-16, D-93).
      *
-     * @return Collection<int, Project>
+     * @return Collection<int, ProposalLocation>
      */
     #[Computed]
     public function projects(): Collection
     {
-        return $this->proposal->projects()
-            ->select(['projects.id', 'projects.slug', 'projects.name', 'projects.city_id', 'projects.program_id', 'projects.status', 'projects.start_date', 'projects.end_date'])
-            ->with(['city:id,name_en,name_ar', 'program:id'])
+        return $this->proposal->locations()
+            ->select(['proposal_locations.id', 'proposal_locations.proposal_id', 'proposal_locations.project_id', 'proposal_locations.slug', 'proposal_locations.city_id', 'proposal_locations.city_wide', 'proposal_locations.program_id', 'proposal_locations.status', 'proposal_locations.start_date', 'proposal_locations.end_date'])
+            ->with(['city:id,name_en,name_ar', 'program:id', 'centers', 'proposal:id,name'])
             ->withCount('risks')
-            ->orderBy('projects.name')
-            ->get();
+            ->get()
+            ->sortBy(fn (ProposalLocation $row): string => $row->label())
+            ->values();
     }
 
     /**
-     * Tasks delivering this proposal, carrying the project they reach through.
+     * Tasks delivering this proposal, carrying the place they reach through.
      *
      * A task has one source: either this proposal directly, or one of the
-     * proposal's funded projects. Tasks sourced straight from the proposal
+     * proposal's places (Y-16, D-93). Tasks sourced straight from the proposal
      * are a real state and get their own group rather than being dropped.
      *
      * @return Collection<int, Task>
@@ -119,14 +120,14 @@ trait ReadsProposalDelivery
     #[Computed]
     public function tasks(): Collection
     {
-        $fundedProjectIds = $this->projects->modelKeys();
+        $fundedLocationIds = $this->projects->modelKeys();
 
         return Task::query()
             ->select(['id', 'slug', 'source_type', 'source_id', 'parent_task_id', 'department_id', 'kind', 'media_kinds', 'delivery_state', 'title', 'status', 'priority', 'start_date', 'due_date', 'progress_percentage'])
             ->with(['taskAssignees.employee:id,first_name_en,last_name_en,first_name_ar,last_name_ar', 'source'])
             ->where(fn (Builder $query) => $query
                 ->where(fn (Builder $query) => $query->where('source_type', 'proposal')->where('source_id', $this->proposalId))
-                ->orWhere(fn (Builder $query) => $query->where('source_type', 'project')->whereIn('source_id', $fundedProjectIds)))
+                ->orWhere(fn (Builder $query) => $query->where('source_type', 'proposal_location')->whereIn('source_id', $fundedLocationIds)))
             ->orderByRaw('due_date is null, due_date')
             ->orderBy('id')
             ->get();
@@ -136,9 +137,9 @@ trait ReadsProposalDelivery
      * Targets committed in this proposal, with the reports filed against them.
      *
      * Filtered on the morph map key 'proposal', never a class name. The source
-     * is hydrated with the proposal's projects so chainIssues() can answer
-     * whether a target was committed against a project this proposal does not
-     * fund — without that relation it would query once per target.
+     * is hydrated with the proposal's places so chainIssues() can answer
+     * whether a target was committed at a place this proposal does not pay
+     * for — without that relation it would query once per target.
      *
      * @return Collection<int, PlanIndicator>
      */
@@ -159,7 +160,7 @@ trait ReadsProposalDelivery
             ])
             ->get();
 
-        $source = $this->proposal->setRelation('projects', $this->projects);
+        $source = $this->proposal->setRelation('locations', $this->projects);
         $targets->each(fn (PlanIndicator $target) => $target->setRelation('source', $source));
 
         return $targets;

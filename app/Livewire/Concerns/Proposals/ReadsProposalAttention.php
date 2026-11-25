@@ -227,7 +227,7 @@ trait ReadsProposalAttention
             foreach ($this->projects as $project) {
                 if ($grantEnd !== null && $project->end_date !== null && $project->end_date->gt($grantEnd)) {
                     $over = (int) $grantEnd->diffInDays($project->end_date);
-                    $push('project-outrun-'.$project->id, 'projects', true, __('proposals.attention.project_outrun', ['project' => $project->name, 'end' => $project->end_date->translatedFormat(__('formats.date')), 'grant' => $grantEnd->translatedFormat(__('formats.date'))]), trans_choice('proposals.attention.days_over', $over, ['count' => $over]), ['label' => __('proposals.attention.fix_open'), 'url' => route('projects.show', $project)], 'card');
+                    $push('project-outrun-'.$project->id, 'projects', true, __('proposals.attention.project_outrun', ['project' => $project->headline(), 'end' => $project->end_date->translatedFormat(__('formats.date')), 'grant' => $grantEnd->translatedFormat(__('formats.date'))]), trans_choice('proposals.attention.days_over', $over, ['count' => $over]), ['label' => __('proposals.attention.fix_open'), 'url' => route('projects.show', $project)], 'card');
                 }
             }
 

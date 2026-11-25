@@ -7,7 +7,7 @@ use App\Enums\DeliveryState;
 use App\Enums\TaskKind;
 use App\Enums\TaskStatus;
 use App\Models\HrDepartment;
-use App\Models\Project;
+use App\Models\ProposalLocation;
 use App\Models\Proposal;
 use App\Models\Task;
 use Flux\Flux;
@@ -90,7 +90,7 @@ new #[Layout('layouts::desk'), Title('titles.department_tasks')] class extends C
     #[Computed]
     public function pausedProjectIds(): array
     {
-        return Project::pausedIds();
+        return ProposalLocation::pausedIds();
     }
 
     /**

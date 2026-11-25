@@ -28,6 +28,7 @@ use App\Models\Report;
 use App\Models\ReportTemplateLine;
 use App\Models\Result;
 use App\Models\TransfersTracking;
+use App\Support\Locations\MonthlyReportsAtRows;
 use Carbon\CarbonImmutable;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Relations\Relation;

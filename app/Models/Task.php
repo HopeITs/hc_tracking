@@ -319,26 +319,26 @@ class Task extends Model implements TracksActivity
     }
 
     /**
-     * Whether this task belongs to a paused project (D-66, W-02): its source
-     * is that project. The chip on a task only says so;
-     * the due date and status stay. Pass the paused ids once per render.
+     * Whether this task belongs to a paused place (D-66, W-02): its source is
+     * that place. The chip on a task only says so; the due date and status
+     * stay. Pass the paused ids once per render (ProposalLocation::pausedIds()),
+     * or a list of one row's ids costs a query per task.
      *
-     * @param  list<int>|null  $pausedProjectIds  from Project::pausedIds()
+     * @param  list<int>|null  $pausedIds  from ProposalLocation::pausedIds()
      */
-    public function isPaused(?array $pausedProjectIds = null): bool
+    public function isPaused(?array $pausedIds = null): bool
     {
         $source = $this->loadedSource();
 
-        // A row knows whether one of its own centers is deactivated (Y-11),
-        // so a row-sourced task asks the row. The `project` source stays
-        // readable until Y-18 for tasks the backfill could not map.
         if ($source instanceof ProposalLocation) {
-            return $source->isPaused();
+            return $pausedIds === null ? $source->isPaused() : in_array($source->id, $pausedIds, true);
         }
 
+        // The `project` source stays readable until Y-18, for tasks the Y-12
+        // backfill could not map; it looks its own paused list up.
         $projectId = $source instanceof Project ? $source->id : null;
 
-        return $projectId !== null && in_array($projectId, $pausedProjectIds ?? Project::pausedIds(), true);
+        return $projectId !== null && in_array($projectId, Project::pausedIds(), true);
     }
 
     /**

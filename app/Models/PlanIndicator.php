@@ -847,7 +847,7 @@ class PlanIndicator extends Model implements TracksActivity
 
     public function activityProgramId(): ?int
     {
-        return static::programIdFor($this->getKey(), $this->activityAttribute('project_id'), $this->activityAttribute('source_type'), $this->activityAttribute('source_id'));
+        return static::programIdFor($this->getKey(), $this->activityAttribute('project_id'), $this->activityAttribute('source_type'), $this->activityAttribute('source_id'), $this->activityAttribute('proposal_location_id'));
     }
 
     /**
@@ -859,27 +859,34 @@ class PlanIndicator extends Model implements TracksActivity
     }
 
     /**
-     * The project owner, remembered for the deleted event.
+     * Whoever the target's place is on, remembered for the deleted event: the
+     * row's responsible employee (Y-16, D-93), or the project's owner for a
+     * target that still carries only a project.
      *
      * @return array<string, mixed>
      */
     protected function activityPropertiesBeforeDelete(): array
     {
-        return ['employee_ids' => array_filter([Project::ownerEmployeeIdFor($this->activityAttribute('project_id'))])];
+        $ownerId = ProposalLocation::ownerEmployeeIdFor($this->activityAttribute('proposal_location_id'))
+            ?? Project::ownerEmployeeIdFor($this->activityAttribute('project_id'));
+
+        return ['employee_ids' => array_filter([$ownerId])];
     }
 
     /**
-     * The program a target rolls up to: its project's, else its annual plan's.
-     * Pass the known columns to avoid a query; omit them to look the row up.
+     * The program a target rolls up to: its place's, else its annual plan's
+     * (Y-16, D-93). A target that still carries only a project falls back to
+     * that project's program. Pass the known columns to avoid a query; omit
+     * them to look the row up.
      */
-    public static function programIdFor(mixed $planIndicatorId, mixed $projectId = null, mixed $sourceType = null, mixed $sourceId = null): ?int
+    public static function programIdFor(mixed $planIndicatorId, mixed $projectId = null, mixed $sourceType = null, mixed $sourceId = null, mixed $locationId = null): ?int
     {
-        if ($projectId === null && $sourceType === null) {
-            $row = static::query()->select(['project_id', 'source_type', 'source_id'])->whereKey($planIndicatorId)->first();
-            [$projectId, $sourceType, $sourceId] = [$row?->project_id, $row?->source_type, $row?->source_id];
+        if ($projectId === null && $sourceType === null && $locationId === null) {
+            $row = static::query()->select(['project_id', 'proposal_location_id', 'source_type', 'source_id'])->whereKey($planIndicatorId)->first();
+            [$projectId, $locationId, $sourceType, $sourceId] = [$row?->project_id, $row?->proposal_location_id, $row?->source_type, $row?->source_id];
         }
 
-        $programId = Project::programIdFor($projectId);
+        $programId = ProposalLocation::programIdFor($locationId) ?? Project::programIdFor($projectId);
 
         if ($programId !== null || $sourceType !== 'annual_plan') {
             return $programId;

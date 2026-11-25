@@ -129,7 +129,9 @@ trait ReadsProjectStory
         // The Story reads the location row (Y-16, D-93): its stage comes from
         // its one proposal, its dates and owner from the row itself.
         $row = ProposalLocation::query()
-            ->select(['id', 'proposal_id', 'project_id', 'program_id', 'status', 'start_date', 'end_date', 'responsible_employee_id', 'created_at'])
+            // city_id, city_wide and the centers are the row's place, which is
+            // how it reaches its monthly reports (Y-16).
+            ->select(['id', 'proposal_id', 'project_id', 'program_id', 'city_id', 'city_wide', 'status', 'start_date', 'end_date', 'responsible_employee_id', 'created_at'])
             ->with([
                 'proposal:id,name,status,created_at',
                 'proposal.donorNames',

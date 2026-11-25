@@ -1,9 +1,9 @@
 <?php
 
+use App\Enums\MonthlyReportStatus;
 use App\Enums\ProjectStatus;
 use App\Enums\ProposalStatus;
 use App\Models\Activity;
-use App\Models\MonthlyReport;
 use App\Models\Project;
 use App\Models\Proposal;
 use Livewire\Livewire;
@@ -74,7 +74,8 @@ test('archiving is refused for a viewer without the permission', function () {
 });
 
 test('the months strip shows a validated month', function () {
-    Activity::withoutRecording(fn () => MonthlyReport::factory()->validated()->create(['project_id' => $this->project->id, 'period' => '2026-08-01']));
+    // The report must sit at the row's place for the Story to read it (Y-16).
+    Activity::withoutRecording(fn () => reportAtRow(rowFor($this->project), ['status' => MonthlyReportStatus::Validated, 'period' => '2026-08-01']));
 
     Livewire::actingAs(userWithRole('General Manager'))
         ->test('pages::projects.show', ['project' => rowFor($this->project)->slug])

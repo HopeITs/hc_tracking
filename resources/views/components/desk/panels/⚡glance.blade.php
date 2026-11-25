@@ -11,7 +11,7 @@ use App\Livewire\Concerns\Dashboard\ReadsDashboardAttention;
 use App\Livewire\Concerns\Desk\IsDeskPanel;
 use App\Models\Indicator;
 use App\Models\MonthlyReport;
-use App\Models\Project;
+use App\Models\ProposalLocation;
 use App\Models\Proposal;
 use App\Models\Task;
 use App\Models\TransfersTracking;
@@ -50,8 +50,9 @@ new class extends Component {
         $figures = [];
 
         if ($this->canView('projects')) {
-            $new = $this->visible(Project::query(), 'projects')->where('status', ProjectStatus::Active)->whereDate('start_date', '>=', $monthStart)->count();
-            $figures[] = $this->figure('running', (string) $this->visible(Project::query(), 'projects')->where('status', ProjectStatus::Active)->count(), $new, upIsGood: true, href: 'projects.index', deltaKey: 'new');
+            // Y-16 (D-93): running places, which is what the register counts.
+            $new = $this->visible(ProposalLocation::query(), 'projects')->where('proposal_locations.status', ProjectStatus::Active)->whereDate('start_date', '>=', $monthStart)->count();
+            $figures[] = $this->figure('running', (string) $this->visible(ProposalLocation::query(), 'projects')->where('proposal_locations.status', ProjectStatus::Active)->count(), $new, upIsGood: true, href: 'projects.index', deltaKey: 'new');
         }
 
         if ($this->canView('proposals')) {

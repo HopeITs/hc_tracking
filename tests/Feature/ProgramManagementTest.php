@@ -4,11 +4,12 @@ use App\Enums\MonthlyReportStatus;
 use App\Enums\ProjectStatus;
 use App\Http\Middleware\SyncProgramsFromHr;
 use App\Models\AnnualPlan;
-use App\Models\MonthlyReport;
+use App\Models\DonorProposal;
 use App\Models\PlanIndicator;
 use App\Models\Program;
 use App\Models\Project;
 use App\Models\Proposal;
+use App\Models\ProposalLocation;
 use App\Models\Risk;
 use App\Models\Strategy;
 use App\Models\User;
@@ -160,7 +161,7 @@ test('program strategy and manager names are escaped in the directory', function
         'strategy_id' => $strategy->id,
         'manager_id' => $manager,
     ]);
-    Project::factory()->create(['program_id' => $program->id, 'status' => ProjectStatus::Active, 'end_date' => today()->addYear()]);
+    rowFor(Project::factory()->create(['program_id' => $program->id, 'status' => ProjectStatus::Active, 'end_date' => today()->addYear()]));
 
     Livewire::actingAs($user)
         ->test('pages::programs.index')
@@ -335,14 +336,17 @@ test('the no plan gap lists the strategy programs without a plan for this year',
 
 test('the Needs attention filter lists programs with overdue, risky or proposal-less open projects', function (string $gap, string $shown) {
     $this->travelTo('2026-09-15 09:00:00');
-    $make = fn (string $name, array $project) => Project::factory()->create(['program_id' => Program::factory()->create(['name' => $name])->id] + $project);
+    // Y-16 (D-93): a program's gaps are read from its places.
+    $make = fn (string $name, array $project): ProposalLocation => rowFor(Project::factory()->create(['program_id' => Program::factory()->create(['name' => $name])->id] + $project));
 
+    // "No proposal" is now a place whose proposal carries no agreement, which
+    // is every place rowFor() builds; the funded one has an agreement.
     $make('Late Program', ['status' => ProjectStatus::Active, 'end_date' => '2026-08-01']);
     $risky = $make('Risk Program', ['status' => ProjectStatus::Active, 'end_date' => '2027-08-01']);
-    Risk::factory()->happened()->create(['project_id' => $risky->id]);
-    $risky->proposals()->attach(Proposal::factory()->create());
+    Risk::factory()->happened()->create(['project_id' => $risky->project_id, 'proposal_location_id' => $risky->id]);
+    DonorProposal::factory()->create(['proposal_id' => $risky->proposal_id]);
     $closed = $make('Closed Program', ['status' => ProjectStatus::Closed, 'end_date' => '2025-08-01']);
-    Risk::factory()->happened()->create(['project_id' => $closed->id]);
+    Risk::factory()->happened()->create(['project_id' => $closed->project_id, 'proposal_location_id' => $closed->id]);
 
     $html = Livewire::actingAs(User::factory()->role('General Manager')->create())
         ->test('pages::programs.index')
@@ -376,11 +380,11 @@ test('the no proposal choice is funding data and is refused without proposal acc
 test('the program page counts last month monthly reports and how many are validated', function () {
     $this->travelTo('2026-09-15 09:00:00');
     $program = Program::factory()->create();
-    $first = Project::factory()->create(['program_id' => $program->id, 'status' => ProjectStatus::Active, 'end_date' => '2027-01-01']);
-    $second = Project::factory()->create(['program_id' => $program->id, 'status' => ProjectStatus::Active, 'end_date' => '2027-01-01']);
-    MonthlyReport::factory()->create(['project_id' => $first->id, 'period' => '2026-08-01', 'status' => MonthlyReportStatus::Validated]);
-    MonthlyReport::factory()->create(['project_id' => $second->id, 'period' => '2026-08-01', 'status' => MonthlyReportStatus::Submitted]);
-    MonthlyReport::factory()->create(['project_id' => $first->id, 'period' => '2026-07-01', 'status' => MonthlyReportStatus::Validated]);
+    $first = rowFor(Project::factory()->create(['program_id' => $program->id, 'status' => ProjectStatus::Active, 'end_date' => '2027-01-01']));
+    $second = rowFor(Project::factory()->create(['program_id' => $program->id, 'status' => ProjectStatus::Active, 'end_date' => '2027-01-01', 'center_id' => insertHrCenter(insertHrCity('Daraa'))]));
+    reportAtRow($first, ['period' => '2026-08-01', 'status' => MonthlyReportStatus::Validated]);
+    reportAtRow($second, ['period' => '2026-08-01', 'status' => MonthlyReportStatus::Submitted]);
+    reportAtRow($first, ['period' => '2026-07-01', 'status' => MonthlyReportStatus::Validated]);
 
     Livewire::actingAs(User::factory()->role('MEAL')->create())
         ->test('pages::programs.show', ['program' => $program])
@@ -390,7 +394,7 @@ test('the program page counts last month monthly reports and how many are valida
 test('the program page says plainly when last month has no reports', function () {
     $this->travelTo('2026-09-15 09:00:00');
     $program = Program::factory()->create();
-    Project::factory()->create(['program_id' => $program->id, 'status' => ProjectStatus::Active, 'end_date' => '2027-01-01']);
+    rowFor(Project::factory()->create(['program_id' => $program->id, 'status' => ProjectStatus::Active, 'end_date' => '2027-01-01']));
 
     Livewire::actingAs(User::factory()->role('MEAL')->create())
         ->test('pages::programs.show', ['program' => $program])
@@ -495,10 +499,10 @@ test('each card shows only strategy, manager, open projects and closed projects'
     $this->travelTo('2026-09-15 09:00:00');
     $strategy = Strategy::factory()->create(['name' => 'Country Strategy 2026-2030', 'start_year' => 2026, 'end_year' => 2030]);
     $program = Program::factory()->create(['name' => 'Split Program', 'strategy_id' => $strategy->id, 'manager_id' => insertHrEmployee(firstNameEn: 'Amal', lastNameEn: 'Manager')]);
-    $late = Project::factory()->create(['program_id' => $program->id, 'status' => ProjectStatus::Active, 'end_date' => '2026-08-01']);
-    Risk::factory()->happened()->create(['project_id' => $late->id]);
-    Project::factory()->count(2)->create(['program_id' => $program->id, 'status' => ProjectStatus::Closed, 'end_date' => '2025-01-01']);
-    MonthlyReport::factory()->create(['project_id' => $late->id, 'period' => '2026-08-01', 'status' => MonthlyReportStatus::Validated]);
+    $late = rowFor(Project::factory()->create(['program_id' => $program->id, 'status' => ProjectStatus::Active, 'end_date' => '2026-08-01']));
+    Risk::factory()->happened()->create(['project_id' => $late->project_id, 'proposal_location_id' => $late->id]);
+    Project::factory()->count(2)->create(['program_id' => $program->id, 'status' => ProjectStatus::Closed, 'end_date' => '2025-01-01'])->each(fn (Project $project) => rowFor($project));
+    reportAtRow($late, ['period' => '2026-08-01', 'status' => MonthlyReportStatus::Validated]);
 
     Livewire::actingAs(User::factory()->role('Super Admin')->create())
         ->test('pages::programs.index')

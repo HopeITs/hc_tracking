@@ -183,7 +183,11 @@ trait ChartsProposalPipeline
             ->with([
                 'donorProposals:id,proposal_id,donor_id,budget,currency',
                 'donorProposals.donor:id,name',
-                'projects' => fn ($query) => $query->select(['projects.id', 'projects.name'])->orderBy('projects.name'),
+                // Y-16 (D-93): the places a proposal pays for.
+                'locations' => fn ($query) => $query->select(['proposal_locations.id', 'proposal_locations.proposal_id', 'proposal_locations.city_id', 'proposal_locations.city_wide', 'proposal_locations.program_id'])->orderBy('proposal_locations.id'),
+                'locations.city:id,name_en,name_ar',
+                'locations.program:id',
+                'locations.centers',
             ])
             ->orderByDesc('planned_date_begin')
             ->orderBy('id')
@@ -218,7 +222,7 @@ trait ChartsProposalPipeline
                     'name' => $proposal->name,
                     'status' => $proposal->status,
                     'total' => (float) $proposal->donorProposals->filter(fn (DonorProposal $agreement): bool => $agreement->currency->value === $currency)->sum('budget'),
-                    'projects' => $proposal->projects,
+                    'projects' => $proposal->locations,
                 ])
                 ->filter(fn (array $proposal): bool => $proposal['total'] > 0)
                 // Order proposals by their largest donor so ribbons cross as little as possible.
@@ -229,14 +233,14 @@ trait ChartsProposalPipeline
                 })
                 ->values();
 
-            // Each project sits at the average row of the proposals it is linked to, so threads cross as little as possible.
+            // Each place sits at the average row of the proposals it is linked to, so threads cross as little as possible.
             $projects = $funded
                 ->flatMap(fn (array $proposal, int $row) => $proposal['projects']->map(fn ($project): array => ['project' => $project, 'row' => $row]))
                 ->groupBy(fn (array $link): int => $link['project']->id)
                 ->map(fn (Collection $links): array => [
                     'key' => 'j'.$links->first()['project']->id,
                     'id' => $links->first()['project']->id,
-                    'name' => $links->first()['project']->name,
+                    'name' => $links->first()['project']->label(),
                     'row' => $links->avg('row'),
                 ])
                 ->sortBy([['row', 'asc'], ['name', 'asc']])

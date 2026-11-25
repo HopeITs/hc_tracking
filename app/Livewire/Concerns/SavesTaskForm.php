@@ -11,8 +11,8 @@ use App\Enums\TaskStatus;
 use App\Models\HrDepartment;
 use App\Models\HrEmployee;
 use App\Models\Program;
-use App\Models\Project;
 use App\Models\Proposal;
+use App\Models\ProposalLocation;
 use App\Models\Task;
 use Closure;
 use Flux\Flux;
@@ -48,7 +48,8 @@ trait SavesTaskForm
     /** The model behind each task source type. */
     protected const TASK_SOURCE_MODELS = [
         'proposal' => Proposal::class,
-        'project' => Project::class,
+        // Y-16 (D-93): a delivery task's source is a place.
+        'proposal_location' => ProposalLocation::class,
         'program' => Program::class,
         'department' => HrDepartment::class,
     ];

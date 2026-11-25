@@ -5,7 +5,6 @@ use App\Enums\ProposalStatus;
 use App\Enums\ReviewStage;
 use App\Models\Activity;
 use App\Models\DonorProposal;
-use App\Models\MonthlyReport;
 use App\Models\Project;
 use App\Models\Proposal;
 use App\Models\ProposalReviewer;
@@ -50,7 +49,8 @@ test('the Story marks the chapters before the lead proposal done, its own chapte
 test('a running project with last month\'s report still open is off track and asks its owner to submit it', function () {
     $owner = userWithRole('Managers', insertHrEmployee(firstNameEn: 'Rana', lastNameEn: 'Darwish'));
     $project = storyProject(ProposalStatus::Active, $owner->employee_id, ProjectStatus::Active);
-    Activity::withoutRecording(fn () => MonthlyReport::factory()->create(['project_id' => $project->id, 'period' => '2026-08-01']));
+    // The report must sit at the row's place for the Story to read it (Y-16).
+    Activity::withoutRecording(fn () => reportAtRow(rowFor($project), ['period' => '2026-08-01']));
 
     Livewire::actingAs($owner)
         ->test('pages::projects.show', ['project' => rowFor($project)->slug])

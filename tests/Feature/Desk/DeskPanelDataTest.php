@@ -387,18 +387,31 @@ test('each project lens shows its own line: money counts only its currency, resu
         ->call('setLens', 'money')->assertSee('€40,000');
 });
 
-test('report templates status lists running projects missing a template first, then pending, then approved', function () {
+test('report templates status lists running places missing a template first, then pending, then approved', function () {
     $this->seed(RolesAndPermissionsSeeder::class);
-    $missing = Project::factory()->create(['name' => 'No Template Yet', 'status' => ProjectStatus::Active]);
-    $pending = Project::factory()->create(['name' => 'Pending One', 'status' => ProjectStatus::Active]);
-    $approved = Project::factory()->create(['name' => 'Approved One', 'status' => ProjectStatus::Active]);
-    ReportTemplate::factory()->create(['project_id' => $pending->id, 'status' => ReportTemplateStatus::Pending]);
-    ReportTemplate::factory()->create(['project_id' => $approved->id, 'status' => ReportTemplateStatus::Confirmed]);
-    Project::factory()->create(['name' => 'Closed Long Ago', 'status' => ProjectStatus::Closed]);
+    // Y-16 (D-93, D-75): one line per place, and a template reaches a place
+    // by matching it, so each place sits in a city of its own here.
+    $place = function (string $name, ProjectStatus $status): ProposalLocation {
+        $city = insertHrCity($name.' City');
+
+        return rowFor(Project::factory()->create([
+            'name' => $name,
+            'status' => $status,
+            'city_id' => $city,
+            'center_id' => insertHrCenter($city, $name.' Center'),
+        ]));
+    };
+
+    $missing = $place('No Template Yet', ProjectStatus::Active);
+    $pending = $place('Pending One', ProjectStatus::Active);
+    $approved = $place('Approved One', ProjectStatus::Active);
+    ReportTemplate::factory()->create(['project_id' => $pending->project_id, 'city_id' => $pending->city_id, 'program_id' => $pending->program_id, 'center_id' => $pending->centerIds()[0], 'status' => ReportTemplateStatus::Pending]);
+    ReportTemplate::factory()->create(['project_id' => $approved->project_id, 'city_id' => $approved->city_id, 'program_id' => $approved->program_id, 'center_id' => $approved->centerIds()[0], 'status' => ReportTemplateStatus::Confirmed]);
+    $place('Closed Long Ago', ProjectStatus::Closed);
 
     $card = Livewire::actingAs(User::factory()->role('MEAL')->create())->test('desk.panels.templates', ['size' => 'M']);
 
-    expect($card->instance()->rows->map(fn (array $row): array => [$row['project']->name, $row['state']])->all())->toBe([
+    expect($card->instance()->rows->map(fn (array $row): array => [$row['project']->headline(), $row['state']])->all())->toBe([
         ['No Template Yet', 'missing'], ['Pending One', 'pending'], ['Approved One', 'approved'],
     ]);
     $card->assertSee(__('desk.template_action.missing'))->assertDontSee('Closed Long Ago');
@@ -407,33 +420,38 @@ test('report templates status lists running projects missing a template first, t
 test('Create on a project with no template pre-fills it and opens its Report template tab; Review and Open link to that tab', function () {
     $this->seed(RolesAndPermissionsSeeder::class);
     $project = Project::factory()->approved()->create(['name' => 'Ready To Plan', 'start_date' => '2026-11-01', 'end_date' => '2027-10-31']);
-    $pending = Project::factory()->create(['name' => 'Pending One', 'status' => ProjectStatus::Active]);
-    ReportTemplate::factory()->create(['project_id' => $pending->id, 'status' => ReportTemplateStatus::Pending]);
+    $pendingCity = insertHrCity('Pending City');
+    $pending = Project::factory()->create(['name' => 'Pending One', 'status' => ProjectStatus::Active, 'city_id' => $pendingCity, 'center_id' => insertHrCenter($pendingCity, 'Pending Center')]);
+    $pendingRow = rowFor($pending);
+    ReportTemplate::factory()->create(['project_id' => $pending->id, 'city_id' => $pendingRow->city_id, 'program_id' => $pendingRow->program_id, 'center_id' => $pendingRow->centerIds()[0], 'status' => ReportTemplateStatus::Pending]);
     $proposal = Proposal::factory()->create(['status' => ProposalStatus::Approved, 'actual_date_begin' => '2026-11-15', 'actual_date_end' => '2027-10-20']);
     $proposal->projects()->attach($project->id, ['target_beneficiaries' => 120]);
-    proposalRowForProject($proposal, $project);
+    $row = proposalRowForProject($proposal, $project);
+    // The panel lists places still being delivered, so the row carries the
+    // project's own status (the mirror does this in the application).
+    $row->update(['status' => $project->status, 'start_date' => $project->start_date, 'end_date' => $project->end_date]);
     $output = Result::factory()->create(['type' => ResultType::Output, 'program_id' => $project->program_id, 'proposal_id' => $proposal->id]);
     $indicator = Indicator::factory()->create(['result_id' => $output->id, 'library_indicator_id' => LibraryIndicator::factory()->create()->id]);
     PlanIndicator::factory()->forProposal($proposal)->create(['indicator_id' => $indicator->id, 'project_id' => $project->id]);
 
     Livewire::actingAs(User::factory()->role('MEAL')->create())->test('desk.panels.templates', ['size' => 'L'])
-        ->assertSeeHtml('data-template-create="'.$project->id.'"')
-        ->assertSeeHtml(e(route('projects.show', ['project' => $pending, 'tab' => 'template'])))
-        ->call('createTemplate', $project->id)
-        ->assertRedirect(route('projects.show', ['project' => $project, 'tab' => 'template']));
+        ->assertSeeHtml('data-template-create="'.$row->id.'"')
+        ->assertSeeHtml(e(route('projects.show', ['project' => $pendingRow, 'tab' => 'template'])))
+        ->call('createTemplate', $row->id)
+        ->assertRedirect(route('projects.show', ['project' => $row, 'tab' => 'template']));
 
     expect(ReportTemplate::query()->whereKey(app(PlaceBridge::class)->templateIdsOfProject($project->id))->value('status'))->toBe(ReportTemplateStatus::Pending);
 });
 
-test('Create on a project with nothing to plan makes no template and stays on the desk', function () {
+test('Create on a place with nothing to plan makes no template and stays on the desk', function () {
     $this->seed(RolesAndPermissionsSeeder::class);
-    $project = Project::factory()->create(['name' => 'No Targets Yet', 'status' => ProjectStatus::Active]);
+    $row = rowFor(Project::factory()->create(['name' => 'No Targets Yet', 'status' => ProjectStatus::Active]));
 
     Livewire::actingAs(User::factory()->role('MEAL')->create())->test('desk.panels.templates', ['size' => 'L'])
-        ->call('createTemplate', $project->id)
+        ->call('createTemplate', $row->id)
         ->assertNoRedirect();
 
-    expect(ReportTemplate::query()->where('project_id', $project->id)->exists())->toBeFalse();
+    expect(ReportTemplate::query()->where('project_id', $row->project_id)->exists())->toBeFalse();
 });
 
 test('someone who does not manage report templates cannot create one from the panel', function () {

@@ -549,6 +549,29 @@ class ProposalLocation extends Model
     }
 
     /**
+     * The ids of every paused place: a row whose own centre HR has
+     * deactivated (D-66). Read once per render, the twin of
+     * `Project::pausedIds()`.
+     *
+     * @return list<int>
+     */
+    public static function pausedIds(): array
+    {
+        $inactive = HrCenter::inactiveIds();
+
+        if ($inactive === []) {
+            return [];
+        }
+
+        return array_values(static::query()
+            ->where('city_wide', false)
+            ->whereHas('centers', fn (Builder $center) => $center->whereIn('center_id', $inactive))
+            ->pluck('id')
+            ->map(fn (mixed $id): int => (int) $id)
+            ->all());
+    }
+
+    /**
      * The HR employee responsible for this row.
      */
     public function ownerEmployeeId(): ?int

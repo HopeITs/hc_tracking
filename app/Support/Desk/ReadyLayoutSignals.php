@@ -13,8 +13,8 @@ use App\Models\Donor;
 use App\Models\DonorReport;
 use App\Models\HrEmployee;
 use App\Models\Indicator;
-use App\Models\Project;
 use App\Models\Proposal;
+use App\Models\ProposalLocation;
 use App\Models\Task;
 use App\Models\TaskAssignee;
 use App\Models\TransfersTracking;
@@ -374,7 +374,8 @@ class ReadyLayoutSignals
             return $this->signal(__('desk.ready.signal.overview_none'), 'neutral', 0);
         }
 
-        $running = $this->visible(Project::query(), 'projects')->where('status', ProjectStatus::Active)->count();
+        // Y-16 (D-93): running places, as the register counts them.
+        $running = $this->visible(ProposalLocation::query(), 'projects')->where('proposal_locations.status', ProjectStatus::Active)->count();
 
         return $this->signal(trans_choice('desk.ready.signal.running', $running, ['count' => $running]), 'neutral', $running);
     }
