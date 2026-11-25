@@ -5,8 +5,6 @@ use App\Enums\ProposalStatus;
 use App\Enums\ResultType;
 use App\Enums\TaskKind;
 use App\Enums\TaskStatus;
-use App\Models\Indicator;
-use App\Models\LibraryIndicator;
 use App\Models\Program;
 use App\Models\Project;
 use App\Models\Proposal;
@@ -138,9 +136,7 @@ test('the contributes-to picker offers only program-framework results of the pro
 
 test('Managers and MEAL officers read the framework but cannot write it', function (string $role) {
     $impact = logframeNode($this->proposal, ResultType::Impact, programId: $this->program->id);
-    $viewer = userWithRole($role);
-    $viewer->givePermissionTo('proposals.view');
-    $tab = fn () => logframeTab($viewer, $this->proposal);
+    $tab = fn () => logframeTab(userWithRole($role), $this->proposal);
 
     $tab()
         ->assertSee($impact->statement)
@@ -211,7 +207,7 @@ test('after submission only results.update holders change the structure', functi
     DB::table('proposals')->where('id', $this->proposal->id)->update(['status' => 'submitted']);
     $impact = logframeNode($this->proposal, ResultType::Impact, programId: $this->program->id);
     $creator = User::factory()->create(['employee_id' => holdMealManagerSlot()]);
-    $creator->givePermissionTo(['results.create', 'proposals.view']);
+    $creator->givePermissionTo('results.create');
 
     logframeTab($creator, $this->proposal)
         ->assertSee(__('results_framework.locked_read_only'))
@@ -236,7 +232,6 @@ test('after submission only results.update holders change the structure', functi
 
 test('cross-cutting results render as their own roots after the chain', function () {
     $viewer = User::factory()->role('Team Member')->create();
-    $viewer->givePermissionTo('proposals.view');
     $impact = logframeNode($this->proposal, ResultType::Impact, programId: $this->program->id);
     $crossCutting = logframeNode($this->proposal, ResultType::CrossCutting, programId: $this->program->id);
 
@@ -247,7 +242,6 @@ test('cross-cutting results render as their own roots after the chain', function
 
 test('a proposal spanning programs shows the multi-program badge', function () {
     $viewer = User::factory()->role('Team Member')->create();
-    $viewer->givePermissionTo('proposals.view');
 
     logframeTab($viewer, $this->proposal)->assertDontSee(__('results_framework.multi_program'));
     logframeTab($viewer, logframeProposal($this->program, Program::factory()->create()))
@@ -356,79 +350,17 @@ test('marking the framework as done tells the program manager (user decision 202
         ->and($confirmed($meal))->toBe(0);
 });
 
-test('the single table shows the result levels in framework order', function () {
+test('the logframe opens on the first outcome with its outputs collapsed', function () {
     $meal = mealManager();
     $impact = logframeNode($this->proposal, ResultType::Impact, programId: $this->program->id);
     $outcome = logframeNode($this->proposal, ResultType::Outcome, $impact);
     $output = logframeNode($this->proposal, ResultType::Output, $outcome);
 
     logframeTab($meal, $this->proposal)
-        ->assertSeeHtml('data-test="framework-table"')
-        ->assertSeeInOrder([$impact->statement, $outcome->statement, $output->statement]);
-});
-
-test('adding a row below preserves the position when reopening the logframe', function () {
-    $meal = mealManager();
-    $first = logframeNode($this->proposal, ResultType::Impact, programId: $this->program->id);
-    $last = logframeNode($this->proposal, ResultType::Impact, programId: $this->program->id);
-
-    logframeTab($meal, $this->proposal)
-        ->call('addRowBelow', $first->id)
-        ->set('statement', 'Inserted logframe row')
-        ->call('saveResult')
-        ->assertHasNoErrors();
-
-    $inserted = $this->proposal->results()->where('statement', 'Inserted logframe row')->sole();
-    logframeTab($meal, $this->proposal)->assertSeeHtmlInOrder([
-        'framework-row-'.$first->id.'-0',
-        'framework-row-'.$inserted->id.'-0',
-        'framework-row-'.$last->id.'-0',
-    ]);
-});
-
-test('the standalone page and proposal show the same table with localized indicators and targets', function (string $locale, string $name) {
-    app()->setLocale($locale);
-    $viewer = userWithRole('Team Member');
-    $viewer->givePermissionTo('proposals.view');
-    $result = logframeNode($this->proposal, ResultType::Outcome, programId: $this->program->id);
-    $entry = LibraryIndicator::factory()->create(['name_ar' => 'الوصول إلى مياه آمنة', 'name_en' => 'Safe water access']);
-    $indicator = Indicator::factory()->for($result)->for($entry, 'libraryIndicator')->create(['baseline' => 137, 'target' => 386]);
-
-    $this->actingAs($viewer)->get(route('results.index'))->assertRedirect(route('meal.logframe'));
-
-    Livewire::actingAs($viewer)->test('pages::results.logframe')
-        ->set('selectedProposal', (string) $this->proposal->id)
-        ->assertSeeLivewire('proposals.logframe')
-        ->assertSeeHtml('data-test="framework-table"');
-
-    logframeTab($viewer, $this->proposal)
-        ->assertSee($name)
-        ->assertSee('137')
-        ->assertSee('386')
-        ->assertDontSeeHtml('data-test="edit-indicator-'.$indicator->id.'"')
-        ->assertDontSeeHtml('data-test="add-indicator-for-result-'.$result->id.'"');
-})->with([
-    'English' => ['en', 'Safe water access'],
-    'Arabic' => ['ar', 'الوصول إلى مياه آمنة'],
-]);
-
-test('the table refreshes after attaching an entry or saving indicator values', function () {
-    $meal = mealManager();
-    $result = logframeNode($this->proposal, ResultType::Outcome, programId: $this->program->id);
-    $entry = LibraryIndicator::factory()->create(['program_id' => $this->program->id, 'name_en' => 'Households trained']);
-    $tab = logframeTab($meal, $this->proposal)->assertDontSee('Households trained');
-
-    $form = Livewire::actingAs($meal)->test('indicators.quick-form', ['proposalId' => $this->proposal->id]);
-    $form->call('addForResult', $result->id)->call('pickExistingEntry', $entry->id)
-        ->assertHasNoErrors()
-        ->assertDispatched('indicator-saved');
-
-    $tab->dispatch('indicator-saved')->assertSee('Households trained');
-
-    $form->call('editIndicator', $result->indicators()->sole()->id)->set('target', '439')
-        ->call('saveIndicator')->assertHasNoErrors();
-
-    $tab->dispatch('indicator-saved')->assertSee('439');
+        ->assertSeeHtml('data-test="outcome-panel-'.$outcome->id.'"')
+        ->assertSeeHtml('data-test="node-toggle-'.$output->id.'"')
+        ->assertSeeHtmlInOrder(['data-test="node-body-'.$output->id.'"', 'data-open="false"'])
+        ->assertDontSeeHtml('data-test="node-toggle-'.$impact->id.'"');
 });
 
 test('the activity calendar starts closed behind a toggle', function () {

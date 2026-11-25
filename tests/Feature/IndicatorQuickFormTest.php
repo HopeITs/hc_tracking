@@ -5,7 +5,6 @@ use App\Enums\ResultType;
 use App\Models\Indicator;
 use App\Models\LibraryIndicator;
 use App\Models\Program;
-use App\Models\Proposal;
 use App\Models\Result;
 use App\Models\User;
 use Illuminate\Support\Facades\DB;
@@ -30,14 +29,12 @@ test('the indicator directory can be narrowed to the level of the result measure
 
 test('the framework adds and edits indicators in place instead of linking to the directory', function () {
     $user = mealManager();
-    $proposal = Proposal::factory()->create();
-    $unmeasured = Result::factory()->type(ResultType::Outcome)->for($proposal)->create();
-    $measured = Result::factory()->type(ResultType::Outcome)->for($proposal)->create();
+    $unmeasured = Result::factory()->type(ResultType::Outcome)->create();
+    $measured = Result::factory()->type(ResultType::Outcome)->create();
     $indicator = Indicator::factory()->create(['result_id' => $measured->id]);
 
     Livewire::actingAs($user)
-        ->test('proposals.logframe', ['proposalId' => $proposal->id])
-        ->assertSeeLivewire('indicators.quick-form')
+        ->test('pages::results.index')
         ->assertSeeHtml('data-test="add-indicator-for-result-'.$unmeasured->id.'"')
         ->assertSeeHtml('data-test="edit-indicator-'.$indicator->id.'"')
         ->assertDontSeeHtml('href="'.route('indicators.index', ['create' => $unmeasured->id]).'"');

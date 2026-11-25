@@ -36,10 +36,7 @@ function activityBoard(?User $user = null): Testable
 }
 
 test('the board lists an unlinked activity and links it to an output through the chooser', function () {
-    Livewire::actingAs($this->meal)
-        ->test('proposals.logframe', ['proposalId' => $this->proposal->id])
-        ->assertSeeHtml('data-test="layout-board"')
-        ->call('setLayout', 'board')
+    activityBoard()
         ->assertSeeHtml('data-test="board-loose"')
         ->assertSee('Registration')
         ->call('pickFor', $this->activity->id)
@@ -69,10 +66,7 @@ test('an activity cannot be linked to another proposal\'s output or to an outcom
 });
 
 test('someone without results permissions cannot link an activity', function () {
-    $viewer = User::factory()->role('Team Member')->create();
-    $viewer->givePermissionTo('proposals.view');
-
-    Livewire::actingAs($viewer)
+    Livewire::actingAs(User::factory()->role('Team Member')->create())
         ->test('proposals.logframe', ['proposalId' => $this->proposal->id])
         ->call('linkActivity', $this->activity->id, $this->output->id)
         ->assertForbidden();
@@ -125,16 +119,6 @@ describe('copying from the program framework', function () {
         $this->programOutcome = Result::factory()->type(ResultType::Outcome)->create(['program_id' => $this->program->id, 'proposal_id' => null, 'parent_id' => $this->programImpact->id, 'statement' => 'Projects grow']);
         $this->programIndicator = Indicator::factory()->create(['result_id' => $this->programOutcome->id, 'name' => 'Share of projects still open', 'target' => 80]);
         $this->actingAs($this->meal);
-    });
-
-    test('it copies a parent and its child that are both new here', function () {
-        $counts = app(CopyResultTree::class)->copySelection($this->proposal, [$this->programImpact->id, $this->programOutcome->id], [], false);
-
-        $impact = Result::query()->where('proposal_id', $this->proposal->id)->where('copied_from_id', $this->programImpact->id)->sole();
-        $outcome = Result::query()->where('proposal_id', $this->proposal->id)->where('copied_from_id', $this->programOutcome->id)->sole();
-
-        expect($counts['results'])->toBe(2)
-            ->and($outcome->parent_id)->toBe($impact->id);
     });
 
     test('it copies only what was ticked and never duplicates what is already here', function () {

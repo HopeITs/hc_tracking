@@ -60,7 +60,7 @@ final class SaveResult
      *
      * @throws ValidationException
      */
-    public function handle(?Result $existing, array $validated, ?Proposal $proposal = null, bool $callerAuthorized = false, ?int $insertAfterId = null): Result
+    public function handle(?Result $existing, array $validated, ?Proposal $proposal = null, bool $callerAuthorized = false): Result
     {
         if (! $callerAuthorized) {
             Gate::authorize($existing === null ? 'results.create' : 'results.update');
@@ -68,7 +68,7 @@ final class SaveResult
 
         $input = $this->validateInput($validated);
 
-        return DB::transaction(function () use ($existing, $input, $proposal, $callerAuthorized, $insertAfterId): Result {
+        return DB::transaction(function () use ($existing, $input, $proposal, $callerAuthorized): Result {
             $lockedProposal = $proposal === null
                 ? null
                 : Proposal::query()->whereKey($proposal->getKey())->lockForUpdate()->firstOrFail();
@@ -140,19 +140,6 @@ final class SaveResult
                 'parent_id' => $parentId,
                 'contributes_to_result_id' => $contributesTo,
             ]);
-
-            if ($lockedProposal !== null && ($existing === null || $result->isDirty('parent_id'))) {
-                $siblings = $this->inFramework(Result::query(), $proposalId)->where('parent_id', $parentId);
-                $anchor = $insertAfterId === null ? null : (clone $siblings)->find($insertAfterId);
-                if ($anchor === null) {
-                    $result->logframe_position = (int) $siblings->max(DB::raw('COALESCE(logframe_position, id)')) + 1;
-                } else {
-                    $position = $anchor->logframe_position ?? $anchor->id;
-                    $siblings->whereRaw('COALESCE(logframe_position, id) > ?', [$position])
-                        ->update(['logframe_position' => DB::raw('COALESCE(logframe_position, id) + 1')]);
-                    $result->logframe_position = $position + 1;
-                }
-            }
 
             try {
                 $result->save();

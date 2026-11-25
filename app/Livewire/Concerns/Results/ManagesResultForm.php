@@ -66,9 +66,6 @@ trait ManagesResultForm
     public ?int $editingResultId = null;
 
     #[Locked]
-    public ?int $insertAfterResultId = null;
-
-    #[Locked]
     public ?int $deletingResultId = null;
 
     /** The proposal whose framework the form writes into; null = the program framework. */
@@ -362,7 +359,7 @@ trait ManagesResultForm
                 'program_id' => $this->resultProgramId,
                 'parent_id' => $this->parentId,
                 'contributes_to_result_id' => $this->placesProposalRoot() ? $this->contributesToId : '',
-            ], $proposal, insertAfterId: $this->insertAfterResultId);
+            ], $proposal);
         } catch (ValidationException $exception) {
             throw ValidationException::withMessages(
                 collect($exception->errors())->mapWithKeys(fn (array $messages, string $field): array => [
@@ -459,7 +456,6 @@ trait ManagesResultForm
     protected function resetResultForm(): void
     {
         $this->resetValidation();
-        $this->insertAfterResultId = null;
         $this->editingResultId = null;
         $this->formProposalId = $this->fixedProposalId();
         $this->statement = '';
