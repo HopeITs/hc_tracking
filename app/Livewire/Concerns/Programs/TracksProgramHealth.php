@@ -364,11 +364,30 @@ trait TracksProgramHealth
             'active' => $ledger->filter(fn (array $row): bool => $row['project']->status === ProjectStatus::Active)->count(),
             'pastDueTasks' => $this->tasks->filter(fn (Task $task): bool => $this->isTaskPastDue($task))->count(),
             'mine' => $mine,
-            'targets' => $canViewTargets ? [
-                'total' => (int) $ledger->sum(fn (array $row): int => $row['targets']['total'] ?? 0),
-                'reached' => (int) $ledger->sum(fn (array $row): int => $row['targets']['reached'] ?? 0),
-            ] : null,
+            // Y-16 (D-44): the headline counts the **program's** targets, not
+            // the sum of its places'. An annual-plan target carries a place
+            // program but no row, so summing the ledger would drop it.
+            'targets' => $canViewTargets ? $this->programTargetTotals() : null,
         ];
+    }
+
+    /**
+     * Targets committed for this program's work, and how many are reached:
+     * every target whose place is in this program (`plan_indicators.program_id`),
+     * which is both the places' targets and the annual plan's (D-44).
+     *
+     * @return array{total: int, reached: int}
+     */
+    protected function programTargetTotals(): array
+    {
+        $row = PlanIndicator::query()
+            ->where('plan_indicators.program_id', $this->programId)
+            ->toBase()
+            ->selectRaw('count(*) as total')
+            ->selectRaw('sum(case when plan_indicators.target > 0 and '.PlanIndicator::achievedValueSql().' >= plan_indicators.target then 1 else 0 end) as reached')
+            ->first();
+
+        return ['total' => (int) ($row->total ?? 0), 'reached' => (int) ($row->reached ?? 0)];
     }
 
     /**

@@ -31,9 +31,11 @@ function taskBackfillProject(string $begin = '2026-01-01', string $end = '2026-1
 }
 
 /**
- * A task raised straight against a project.
+ * A task raised straight against a project. Named apart from
+ * ProgramTasksTabTest's own helper: Pest's test helpers share one global
+ * scope, so two files cannot both declare `backfillProjectTask()`.
  */
-function projectTask(Project $project, ?string $dueDate, ?string $createdAt = null): Task
+function backfillProjectTask(Project $project, ?string $dueDate, ?string $createdAt = null): Task
 {
     $task = Task::factory()->create([
         'source_type' => 'project',
@@ -50,7 +52,7 @@ function projectTask(Project $project, ?string $dueDate, ?string $createdAt = nu
 
 test('a project task moves to the row carrying its project', function () {
     [$project, $row] = taskBackfillProject();
-    $task = projectTask($project, '2026-06-01');
+    $task = backfillProjectTask($project, '2026-06-01');
 
     $counts = app(TaskRowBackfill::class)->run(apply: true);
 
@@ -73,8 +75,8 @@ test('the due date picks the row when two proposals carry the project', function
     $second->projects()->attach($project->id);
     $laterRow = proposalRowForProject($second, $project, false);
 
-    $old = projectTask($project, '2025-06-01');
-    $new = projectTask($project, '2026-06-01');
+    $old = backfillProjectTask($project, '2025-06-01');
+    $new = backfillProjectTask($project, '2026-06-01');
 
     $counts = app(TaskRowBackfill::class)->run(apply: true);
 
@@ -95,7 +97,7 @@ test('a task no period covers falls to the row of the most recent proposal', fun
     $second->projects()->attach($project->id);
     $laterRow = proposalRowForProject($second, $project, false);
 
-    $task = projectTask($project, '2030-06-01');
+    $task = backfillProjectTask($project, '2030-06-01');
 
     $counts = app(TaskRowBackfill::class)->run(apply: true);
 
@@ -115,7 +117,7 @@ test('a task with no due date is placed by the day it was recorded', function ()
     $second->projects()->attach($project->id);
     proposalRowForProject($second, $project, false);
 
-    $task = projectTask($project, null, '2025-07-15 09:00:00');
+    $task = backfillProjectTask($project, null, '2025-07-15 09:00:00');
 
     app(TaskRowBackfill::class)->run(apply: true);
 
@@ -133,7 +135,7 @@ test('a subtask follows its parent whatever its own date', function () {
     $second->projects()->attach($project->id);
     proposalRowForProject($second, $project, false);
 
-    $parent = projectTask($project, '2025-06-01');
+    $parent = backfillProjectTask($project, '2025-06-01');
     $child = Task::factory()->create([
         'source_type' => 'project',
         'source_id' => $project->id,
@@ -152,10 +154,10 @@ test('a subtask follows its parent whatever its own date', function () {
 
 test('a task whose project no row carries is listed and left alone', function () {
     $rowless = Project::factory()->create();
-    $task = projectTask($rowless, '2026-06-01');
+    $task = backfillProjectTask($rowless, '2026-06-01');
 
     [$carried] = taskBackfillProject();
-    projectTask($carried, '2026-06-01');
+    backfillProjectTask($carried, '2026-06-01');
 
     $counts = app(TaskRowBackfill::class)->run(apply: true);
 
@@ -179,7 +181,7 @@ test('tasks of other sources are untouched', function () {
 
 test('the dry run writes nothing and reports the same counts', function () {
     [$project] = taskBackfillProject();
-    $task = projectTask($project, '2026-06-01');
+    $task = backfillProjectTask($project, '2026-06-01');
 
     $dry = app(TaskRowBackfill::class)->run(apply: false);
 
@@ -192,7 +194,7 @@ test('the dry run writes nothing and reports the same counts', function () {
 
 test('a second run writes nothing more', function () {
     [$project] = taskBackfillProject();
-    projectTask($project, '2026-06-01');
+    backfillProjectTask($project, '2026-06-01');
 
     app(TaskRowBackfill::class)->run(apply: true);
     $second = app(TaskRowBackfill::class)->run(apply: true);
