@@ -240,17 +240,23 @@ test('the projects panel opens on the dates lens and keeps start and end under t
         ->assertSet('lens', 'dates');
 });
 
-test('a target behind links to its indicator and to its project', function () {
-    $project = Project::factory()->create(['name' => 'Aleppo Wells']);
-    $indicator = Indicator::factory()->forProject($project->id)->create(['name' => 'People reached', 'baseline' => 0, 'target' => 1000]);
+test('a target behind links to its indicator and to its place', function () {
+    // Y-16 (D-93): an instance scoped to a place names and links that place.
+    $row = rowFor(Project::factory()->create(['name' => 'Aleppo Wells']));
+    $indicator = Indicator::factory()->forProject($row->project_id)->create([
+        'proposal_location_id' => $row->id,
+        'name' => 'People reached',
+        'baseline' => 0,
+        'target' => 1000,
+    ]);
     $user = User::factory()->role('Super Admin')->create();
     insertIndicatorProgress($indicator->id, $user->id, '2026-03-31', '10.00');
 
     Livewire::actingAs($user)->test('desk.panels.targets', ['size' => 'L'])
         ->assertSeeHtml('href="'.route('indicators.index', ['inspect' => $indicator->id]).'" wire:navigate')
-        ->assertSeeHtml('href="'.route('projects.show', $project).'" wire:navigate')
+        ->assertSeeHtml('href="'.route('projects.show', $row).'" wire:navigate')
         ->assertSee('People reached')
-        ->assertSee('Aleppo Wells');
+        ->assertSee($row->label());
 });
 
 test('someone who owns no place sees every place without picking a scope', function () {
