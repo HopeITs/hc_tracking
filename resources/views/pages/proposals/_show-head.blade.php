@@ -12,7 +12,7 @@
         'edit' => 'open-details-modal', 'change-request' => 'request-change-button', 'change-open' => 'open-change-request',
         'agreement' => 'record-agreement-button', 'hold' => 'open-hold-modal', 'off-hold' => 'open-off-hold-modal',
         'extend' => 'open-extension-modal', 'final' => 'open-final-report-modal', 'note' => 'add-negotiation-note',
-        'correct' => 'open-correct-status-modal',
+        'correct' => 'open-correct-status-modal', 'grant-dates' => 'open-grant-dates-modal',
     ];
     $hookFor = fn (array $action): string => $action['disabled'] ? 'head-disabled-'.$action['key'] : ($testHooks[$action['key']] ?? 'head-action-'.$action['key']);
 @endphp

@@ -785,6 +785,10 @@ return [
                 'title' => 'Targets saved',
                 'body' => ':actor saved the targets of “:subject”',
             ],
+            'grant_dates_set' => [
+                'title' => 'Grant dates set',
+                'body' => ':actor set the grant dates of “:subject”',
+            ],
             'plan_rebased' => [
                 'title' => 'Plan moved to the grant period',
                 'body' => 'The plan of “:subject” moved to the grant period; tasks cut at the grant end: :value',
