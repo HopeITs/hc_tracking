@@ -4,6 +4,7 @@ return [
     'a_project_may_be_funded_by_several_proposals_and_a_proposal' => 'قد يُموَّل المشروع من عدة مقترحات، وقد يغطي المقترح عدة مشاريع.',
     'add_file' => 'إضافة ملف',
     'add_project' => 'إضافة مشروع',
+    'appear_when_a_proposal_is_approved' => 'تظهر المشاريع هنا عند اعتماد مقترح.',
     'add_the_first_project_and_place_it_in_a_city_and_program' => 'أضف أول مشروع وحدد مدينته وبرنامجه.',
     'archive_name' => 'أرشفة :name',
     'archive_project' => 'أرشفة المشروع',

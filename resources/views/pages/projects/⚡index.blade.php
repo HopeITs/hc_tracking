@@ -292,11 +292,9 @@ new #[Layout('layouts::desk'), Title('titles.projects')] class extends Component
     :view="$view"
     :views="$viewOptions"
 >
-    <x-slot:actions>
-        @can('create', App\Models\Project::class)
-            <button type="button" class="dk-btn dk-primary" wire:click="openCreateModal" data-test="create-project-button" data-quick-create><x-desk.icon name="plus" />{{ __('projects.add_project') }}</button>
-        @endcan
-    </x-slot:actions>
+    {{-- Y-16 (D-84, D-87): nothing creates a project by hand any more. One
+         entry here is a location row, and a row exists because a proposal has
+         it, so the way in is the proposal form. --}}
     <x-slot:search>
         <x-desk.register-search :label="__('projects.search_projects')" :placeholder="__('projects.project_city_program_or_owner')" wire:model.live.debounce.300ms="search" />
     </x-slot:search>
@@ -393,13 +391,11 @@ new #[Layout('layouts::desk'), Title('titles.projects')] class extends Component
             <x-ui.empty-state
                 icon="rectangle-stack"
                 :heading="$filtersAreActive ? __('projects.no_matching_projects') : __('common.no_projects_yet')"
-                :body="$filtersAreActive ? __('common.change_the_search_or_filters_and_try_again') : __('projects.add_the_first_project_and_place_it_in_a_city_and_program')"
+                :body="$filtersAreActive ? __('common.change_the_search_or_filters_and_try_again') : __('projects.appear_when_a_proposal_is_approved')"
             >
                 <x-slot:action>
                     @if ($filtersAreActive)
                         <x-ui.button size="sm" wire:click="clearFilters">{{ __('common.reset_filters') }}</x-ui.button>
-                    @else
-                        @can('create', App\Models\Project::class)<x-ui.button size="sm" tone="primary" icon="plus" wire:click="openCreateModal">{{ __('projects.add_project') }}</x-ui.button>@endcan
                     @endif
                 </x-slot:action>
             </x-ui.empty-state>

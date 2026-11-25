@@ -4,6 +4,7 @@ return [
     'a_project_may_be_funded_by_several_proposals_and_a_proposal' => 'A project may be funded by several proposals, and a proposal may cover several projects.',
     'add_file' => 'Add file',
     'add_project' => 'Add project',
+    'appear_when_a_proposal_is_approved' => 'Projects appear here when a proposal is approved.',
     'add_the_first_project_and_place_it_in_a_city_and_program' => 'Add the first project and place it in a city and program.',
     'archive_name' => 'Archive :name',
     'archive_project' => 'Archive project',
