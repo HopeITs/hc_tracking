@@ -15,6 +15,7 @@ use App\Models\Supervision;
 use App\Models\User;
 use App\Support\MonthlyReportNames;
 use App\Support\Reporting\ReportPlace;
+use Carbon\CarbonImmutable;
 use Illuminate\Support\Facades\DB;
 use Livewire\Livewire;
 
@@ -385,7 +386,7 @@ test('a submitted report in the queue says how long it has waited', function () 
         ->test('pages::monthly-reports.index')
         ->set('status', 'all')
         ->assertSeeHtml('data-waiting="'.$waiting->id.'"')
-        ->assertSeeText(trans_choice('monthly_reports.waiting_days', 3, ['count' => 3]))
+        ->assertSeeText(trans_choice('monthly_reports.days_count', 3, ['count' => 3]))
         ->assertDontSeeHtml('data-waiting="'.$validated->id.'"');
 });
 
@@ -456,26 +457,115 @@ test('a template that lost its proposals has no preparer, so it leaves "My repor
         ->assertSeeText(__('monthly_reports.empty_mine'));
 });
 
-test('the validation queue groups its rows by template, and its figures switch the status', function () {
+test('the validation queue is one table, the longest-waiting first, and its headings re-sort it', function () {
     $this->travelTo('2026-11-20 10:00:00');
     $first = mrpProject($this->aleppo, name: 'Aleppo Center');
     $second = mrpProject($this->aleppo, name: 'Micro Aleppo');
-    // One program for both, so the groups sort by their proposals within the one place.
     DB::table('projects')->where('id', $second->id)->update(['program_id' => $first->program_id]);
-    $firstReport = mrpMonth($first, '2026-10-01', MonthlyReportStatus::Submitted);
-    $secondReport = mrpMonth($second->fresh(), '2026-10-01', MonthlyReportStatus::Submitted);
-    mrpMonth($first, '2026-09-01', MonthlyReportStatus::Validated);
+    $recent = mrpMonth($first, '2026-10-01', MonthlyReportStatus::Submitted, ['submitted_at' => '2026-11-15 09:00:00']);
+    $oldest = mrpMonth($second->fresh(), '2026-09-01', MonthlyReportStatus::Submitted, ['submitted_at' => '2026-10-20 09:00:00']);
+    $validated = mrpMonth($first, '2026-08-01', MonthlyReportStatus::Validated);
 
     $page = Livewire::actingAs(userWithRole('MEAL', insertHrEmployee(firstNameEn: 'Huda', lastNameEn: 'Meal')))
-        ->test('pages::monthly-reports.index');
-    $html = $page->html();
+        ->test('pages::monthly-reports.index')
+        ->set('status', 'all');
 
-    expect(strpos($html, 'data-queue-template="'.$firstReport->report_template_id.'"'))->toBeLessThan(strpos($html, 'data-validate-row="'.$firstReport->id.'"'))
-        ->and(strpos($html, 'data-validate-row="'.$firstReport->id.'"'))->toBeLessThan(strpos($html, 'data-queue-template="'.$secondReport->report_template_id.'"'))
-        ->and(strpos($html, 'data-queue-template="'.$secondReport->report_template_id.'"'))->toBeLessThan(strpos($html, 'data-validate-row="'.$secondReport->id.'"'));
+    expect($page->html())->toContain('data-validate-queue')
+        ->and(mrpRowIds($page->html()))->toBe([$oldest->id, $recent->id, $validated->id])
+        ->and($page->html())->toContain('data-waiting="'.$oldest->id.'"')
+        ->and($page->html())->toContain('data-review-link="'.$oldest->id.'"');
+
+    $page->call('sortQueue', 'month')->assertSet('sort', 'month')->assertSet('direction', 'asc');
+    expect(mrpRowIds($page->html()))->toBe([$oldest->id, $recent->id, $validated->id]);
+
+    $page->call('sortQueue', 'month')->assertSet('direction', 'desc');
+    expect(mrpRowIds($page->html()))->toBe([$recent->id, $oldest->id, $validated->id]);
+
+    $page->call('sortQueue', 'nonsense')->assertSet('sort', 'month');
 
     $page->call('showOnly', 'validated')->assertSet('status', 'validated')
         ->call('showOnly', 'waiting')->assertSet('status', 'submitted');
+});
+
+test('"Start reviewing" opens the longest-waiting report, and the search narrows the queue', function () {
+    $this->travelTo('2026-11-20 10:00:00');
+    $first = mrpProject($this->aleppo, name: 'Aleppo Center');
+    $homs = mrpProject(insertHrCity('Homs'), name: 'Homs Center');
+    $recent = mrpMonth($first, '2026-10-01', MonthlyReportStatus::Submitted, ['submitted_at' => '2026-11-15 09:00:00']);
+    $oldest = mrpMonth($homs, '2026-10-01', MonthlyReportStatus::Submitted, ['submitted_at' => '2026-10-20 09:00:00']);
+
+    $page = Livewire::actingAs(userWithRole('MEAL', insertHrEmployee(firstNameEn: 'Huda', lastNameEn: 'Meal')))
+        ->test('pages::monthly-reports.index');
+
+    expect(preg_match('/<a[^>]*href="([^"]+)"[^>]*data-start-reviewing/', $page->html(), $start))->toBe(1)
+        ->and($start[1])->toBe(route('monthly-reports.show', $oldest));
+
+    $page->set('search', 'homs');
+    expect(mrpRowIds($page->html()))->toBe([$oldest->id]);
+
+    $page->set('search', 'nothing like this');
+    expect(mrpRowIds($page->html()))->toBe([])
+        ->and($page->html())->not->toContain('data-start-reviewing');
+
+    $page->call('clearFilters')->assertSet('search', '');
+    expect(mrpRowIds($page->html()))->toBe([$oldest->id, $recent->id]);
+});
+
+test('the validation queue draws 25 rows and "Show more" adds the rest', function () {
+    $this->travelTo('2026-11-20 10:00:00');
+    $project = mrpProject($this->aleppo);
+    $template = mrpMonth($project, '2026-01-01', MonthlyReportStatus::Submitted)->template;
+
+    foreach (range(1, 26) as $offset) {
+        Activity::withoutRecording(fn () => MonthlyReport::factory()->submitted()->create([
+            'report_template_id' => $template->id,
+            'project_id' => $project->id,
+            'period' => CarbonImmutable::parse('2026-01-01')->addMonths($offset)->toDateString(),
+        ]));
+    }
+
+    $page = Livewire::actingAs(userWithRole('MEAL', insertHrEmployee(firstNameEn: 'Huda', lastNameEn: 'Meal')))
+        ->test('pages::monthly-reports.index');
+
+    expect(mrpRowIds($page->html()))->toHaveCount(25);
+
+    $page->assertSeeHtml('data-queue-more')->call('showMoreQueue');
+
+    expect(mrpRowIds($page->html()))->toHaveCount(27);
+});
+
+test('"Next report" walks the queue forward and wraps, so skipping never bounces between two reports', function () {
+    $this->travelTo('2026-11-20 10:00:00');
+    $meal = userWithRole('MEAL', insertHrEmployee(firstNameEn: 'Huda', lastNameEn: 'Meal'));
+    $sameMoment = '2026-11-03 09:00:00';
+    $a = mrpMonth(mrpProject($this->aleppo, name: 'A Center'), '2026-10-01', MonthlyReportStatus::Submitted, ['submitted_at' => $sameMoment]);
+    $b = mrpMonth(mrpProject($this->aleppo, name: 'B Center'), '2026-10-01', MonthlyReportStatus::Submitted, ['submitted_at' => $sameMoment]);
+    $c = mrpMonth(mrpProject($this->aleppo, name: 'C Center'), '2026-10-01', MonthlyReportStatus::Submitted, ['submitted_at' => '2026-11-10 09:00:00']);
+
+    $next = fn (MonthlyReport $from): int => (int) Livewire::actingAs($meal)->test('pages::monthly-reports.show', ['monthlyReport' => $from])->instance()->nextToValidate?->id;
+
+    expect(mrpRowIds(Livewire::actingAs($meal)->test('pages::monthly-reports.index')->html()))->toBe([$a->id, $b->id, $c->id])
+        ->and($next($a))->toBe($b->id)
+        ->and($next($b))->toBe($c->id)
+        ->and($next($c))->toBe($a->id);
+});
+
+test('the report page offers the next report waiting on the validator, never itself', function () {
+    $this->travelTo('2026-11-20 10:00:00');
+    $first = mrpProject($this->aleppo, name: 'Aleppo Center');
+    $second = mrpProject($this->aleppo, name: 'Micro Aleppo');
+    $current = mrpMonth($first, '2026-10-01', MonthlyReportStatus::Submitted, ['submitted_at' => '2026-11-15 09:00:00']);
+    $next = mrpMonth($second, '2026-10-01', MonthlyReportStatus::Submitted, ['submitted_at' => '2026-10-20 09:00:00']);
+    $meal = userWithRole('MEAL', insertHrEmployee(firstNameEn: 'Huda', lastNameEn: 'Meal'));
+
+    Livewire::actingAs($meal)->test('pages::monthly-reports.show', ['monthlyReport' => $current])
+        ->assertSeeHtml('data-next-to-validate="'.$next->id.'"');
+
+    Livewire::actingAs($meal)->test('pages::monthly-reports.show', ['monthlyReport' => $next])
+        ->assertSeeHtml('data-next-to-validate="'.$current->id.'"');
+
+    Livewire::actingAs($this->owner)->test('pages::monthly-reports.show', ['monthlyReport' => $current])
+        ->assertDontSeeHtml('data-next-to-validate');
 });
 
 /*
