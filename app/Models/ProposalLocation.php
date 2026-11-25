@@ -426,7 +426,9 @@ class ProposalLocation extends Model
      */
     public function place(): ReportPlace
     {
-        return new ReportPlace($this->city_id, $this->program_id, $this->centerIds()[0] ?? null, (bool) $this->city_wide);
+        // The program is cast the way MealCoverage::responsibleForLocation()
+        // casts it, so one row never produces two different place keys.
+        return new ReportPlace($this->city_id, (int) $this->program_id, $this->centerIds()[0] ?? null, (bool) $this->city_wide);
     }
 
     /**

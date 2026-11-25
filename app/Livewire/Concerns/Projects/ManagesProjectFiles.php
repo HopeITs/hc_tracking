@@ -10,6 +10,7 @@ use App\Enums\FileType;
 use App\Enums\MediaCollection;
 use App\Models\Media;
 use App\Models\Project;
+use App\Models\ProposalLocation;
 use App\Rules\SecureUpload;
 use Flux\Flux;
 use Illuminate\Database\Eloquent\Collection;
@@ -28,8 +29,8 @@ use Livewire\Features\SupportFileUploads\TemporaryUploadedFile;
  * WithFileUploads for newFile; canViewAgreements() comes from
  * ChecksFinanceVisibility.
  *
- * @property int $projectId
- * @property-read Project $project  #[Computed] project()
+ * @property int $locationId
+ * @property-read ProposalLocation $location  #[Computed] location()
  */
 trait ManagesProjectFiles
 {

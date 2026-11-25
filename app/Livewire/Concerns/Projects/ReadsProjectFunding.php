@@ -12,6 +12,7 @@ use App\Enums\ProposalStatus;
 use App\Models\DonorProposal;
 use App\Models\Project;
 use App\Models\Proposal;
+use App\Models\ProposalLocation;
 use Flux\Flux;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Support\Facades\Auth;
@@ -26,8 +27,8 @@ use Livewire\Attributes\Computed;
  * Used by projects/show only. The page provides projectId and the #[Computed]
  * project(); canViewAgreements() comes from ChecksFinanceVisibility.
  *
- * @property int $projectId
- * @property-read Project $project  #[Computed] project()
+ * @property int $locationId
+ * @property-read ProposalLocation $location  #[Computed] location()
  * @property-read Collection<int, Proposal> $attachedProposals  #[Computed] attachedProposals()
  */
 trait ReadsProjectFunding

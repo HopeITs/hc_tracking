@@ -20,7 +20,7 @@ use Livewire\Attributes\On;
  * Used by projects/show only. The page provides projectId; mount() opens the
  * dialog when the page is reached with ?respond=reject.
  *
- * @property int $projectId
+ * @property int $locationId
  * @property-read Assignment|null $ownerAssignment  #[Computed] ownerAssignment()
  */
 trait ManagesProjectAssignment

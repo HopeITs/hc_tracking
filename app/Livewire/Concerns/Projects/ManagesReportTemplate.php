@@ -22,6 +22,7 @@ use App\Models\EvidenceType;
 use App\Models\MonthlyReportAnswer;
 use App\Models\Project;
 use App\Models\Proposal;
+use App\Models\ProposalLocation;
 use App\Models\ReportTemplate;
 use App\Models\ReportTemplateQuestion;
 use App\Support\Reporting\PlaceBridge;
@@ -50,8 +51,8 @@ use Livewire\Attributes\Url;
  * Used by projects/show only. The page provides projectId and the #[Computed]
  * project().
  *
- * @property int $projectId
- * @property-read Project $project  #[Computed] project()
+ * @property int $locationId
+ * @property-read ProposalLocation $location  #[Computed] location()
  * @property-read ReportTemplate|null $reportTemplate  #[Computed] reportTemplate()
  * @property-read bool $canViewReportTemplate  #[Computed] canViewReportTemplate()
  * @property-read bool $canManageReportTemplate  #[Computed] canManageReportTemplate()

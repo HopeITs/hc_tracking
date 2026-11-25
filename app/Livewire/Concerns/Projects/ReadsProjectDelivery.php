@@ -10,6 +10,7 @@ use App\Models\Indicator;
 use App\Models\PlanIndicator;
 use App\Models\Project;
 use App\Models\Proposal;
+use App\Models\ProposalLocation;
 use App\Models\Result;
 use App\Models\Risk;
 use App\Models\Task;
@@ -24,8 +25,8 @@ use Livewire\Attributes\Computed;
  * Used by projects/show only. The page provides projectId and the #[Computed]
  * project().
  *
- * @property int $projectId
- * @property-read Project $project  #[Computed] project()
+ * @property int $locationId
+ * @property-read ProposalLocation $location  #[Computed] location()
  * @property-read Collection<int, Task> $tasks  #[Computed] tasks()
  * @property-read Collection<int, PlanIndicator> $targets  #[Computed] targets()
  */
