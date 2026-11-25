@@ -177,7 +177,7 @@ test('a project keeps its inactive center on edit and shows it as inactive', fun
         ->assertHasNoErrors();
 
     Livewire::actingAs($this->user)
-        ->test('pages::projects.show', ['project' => $project->fresh()])
+        ->test('pages::projects.show', ['project' => rowFor($project)->slug])
         ->assertSee('Old Center')
         ->assertSee('Center inactive');
 });
@@ -360,16 +360,20 @@ test('a project whose center HR has deactivated says so on the directory, the pr
         ->assertOk()
         ->assertSee('data-test="center-inactive-badge"', false);
 
-    // A new place cannot pick a closed center; a row that already holds one says it is closed.
+    // A new place cannot pick a closed center; a row that already holds one
+    // says it is closed. Its own closed centre, because the row the project
+    // above carries holds $closedId and the picker rightly offers a centre a
+    // row already holds (Y-16: every project has a row now).
+    $pickerClosedId = insertHrCenter($this->cityId, 'Retired Center', 'مركز متقاعد', isActive: false);
     $proposal = Proposal::factory()->create(['status' => ProposalStatus::ProposalDraft]);
     ProposalLocation::factory()->complete()->create(['proposal_id' => $proposal->id, 'city_id' => $this->cityId])
-        ->centers()->create(['center_id' => $closedId]);
+        ->centers()->create(['center_id' => $pickerClosedId]);
 
     Livewire::actingAs($this->user)->test('pages::proposals.index')
         ->call('openCreateModal')
-        ->assertDontSeeText('Closed Center')
+        ->assertDontSeeText('Retired Center')
         ->call('openEditModal', $proposal->id)
-        ->assertSeeText('Closed Center · '.__('projects.center_inactive_badge'));
+        ->assertSeeText('Retired Center · '.__('projects.center_inactive_badge'));
 });
 
 test('an active center, a hosted project and a project with no center carry no badge', function () {
