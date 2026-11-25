@@ -377,12 +377,14 @@ trait ManagesProgramTasks
         [$type, $id] = array_pad(explode(':', $target, 2), 2, '');
         $id = (int) $id;
 
+        // `location:ID` is the target form Y-12 established; the source it
+        // resolves to is the `proposal_location` morph key (Y-16, D-93).
         $belongs = match ($type) {
-            'proposal_location' => ProposalLocation::query()->whereKey($id)->where('program_id', $this->programId)->exists(),
+            'location' => ProposalLocation::query()->whereKey($id)->where('program_id', $this->programId)->exists(),
             default => false,
         };
 
-        return $belongs ? ['type' => $type, 'id' => $id] : null;
+        return $belongs ? ['type' => 'proposal_location', 'id' => $id] : null;
     }
 
     /**

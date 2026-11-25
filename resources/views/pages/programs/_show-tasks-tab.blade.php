@@ -69,7 +69,7 @@
         foreach ($this->allProjects as $project) {
             $projectName = $project->headline();
             $short = $programPrefix !== ' ' && str_starts_with(mb_strtolower($projectName), $programPrefix) ? trim(mb_substr($projectName, mb_strlen($programPrefix))) : '';
-            $groupMeta['project-'.$project->id] = ['label' => $projectName, 'short' => $short !== '' ? $short : $projectName, 'href' => route('projects.show', $project), 'target' => 'proposal_location:'.$project->id, 'photo' => null];
+            $groupMeta['project-'.$project->id] = ['label' => $projectName, 'short' => $short !== '' ? $short : $projectName, 'href' => route('projects.show', $project), 'target' => 'location:'.$project->id, 'photo' => null];
         }
         $groupMeta['program'] = ['label' => __('programs.work_not_tied_to_a_project'), 'href' => null, 'target' => 'program', 'photo' => null];
     }

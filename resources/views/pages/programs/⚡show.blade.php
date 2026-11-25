@@ -197,7 +197,7 @@ new #[Layout('layouts::desk'), Title('titles.program')] class extends Component 
     protected function quickTaskTarget(): string
     {
         if ($this->taskGroupBy === 'project' && str_starts_with($this->taskBucket, 'project-')) {
-            return 'proposal_location:'.(int) substr($this->taskBucket, strlen('project-'));
+            return 'location:'.(int) substr($this->taskBucket, strlen('project-'));
         }
 
         return 'program';

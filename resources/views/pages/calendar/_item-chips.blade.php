@@ -63,7 +63,7 @@
     >
         <span class="size-1.5 shrink-0 rounded-full {{ $typeDotClasses['monthly_report'] }}"></span>
         <flux:icon.calendar-days variant="micro" class="size-3 shrink-0" />
-        <span class="min-w-0 flex-1 truncate text-start font-medium">{{ $monthlyReport->project->name }} · {{ $monthlyReport->period->translatedFormat(__('formats.month_year')) }}</span>
+        <span class="min-w-0 flex-1 truncate text-start font-medium">{{ $monthlyReport->project?->name ?? '—' }} · {{ $monthlyReport->period->translatedFormat(__('formats.month_year')) }}</span>
         @if ($isMonthlyReportLate($monthlyReport, $day))<span class="shrink-0 rounded border border-current px-1 text-[9px] font-semibold" data-test="calendar-late-monthly-report-{{ $monthlyReport->id }}">{{ __('calendar.late') }}</span>@endif
     </a>
 @endforeach
@@ -164,7 +164,7 @@
     >
         <span class="size-1.5 shrink-0 rounded-full {{ $typeDotClasses['project'] }}"></span>
         <flux:icon.rocket-launch variant="micro" class="size-3 shrink-0" />
-        <span class="min-w-0 flex-1 truncate text-start font-medium">{{ __('calendar.starts_name', ['name' => $project->name]) }}</span>
+        <span class="min-w-0 flex-1 truncate text-start font-medium">{{ __('calendar.starts_name', ['name' => $project->headline()]) }}</span>
     </a>
 @endforeach
 
@@ -180,7 +180,7 @@
     >
         <span class="size-1.5 shrink-0 rounded-full {{ $typeDotClasses['project'] }}"></span>
         <flux:icon.flag variant="micro" class="size-3 shrink-0" />
-        <span class="min-w-0 flex-1 truncate text-start font-medium">{{ __('calendar.ends_name', ['name' => $project->name]) }}</span>
+        <span class="min-w-0 flex-1 truncate text-start font-medium">{{ __('calendar.ends_name', ['name' => $project->headline()]) }}</span>
         @if ($isLate($project))<span class="shrink-0 rounded border border-current px-1 text-[9px] font-semibold" data-test="calendar-late-project-end-{{ $project->id }}">{{ __('calendar.late') }}</span>@endif
     </a>
 @endforeach

@@ -22,7 +22,7 @@
     $reportMonth = \Carbon\CarbonImmutable::today()->subMonthNoOverflow()->translatedFormat('M');
     $attentionPreview = 3;
 
-    $paceLabel = fn (string $pace, \App\Models\Project $project): string => match ($pace) {
+    $paceLabel = fn (string $pace, \App\Models\ProposalLocation $project): string => match ($pace) {
         'closed' => $project->status->label(),
         'past_end' => __('programs.pace_past_end'),
         'not_started' => __('programs.pace_not_started'),
@@ -58,7 +58,7 @@
     $ledgerItems = array_map(fn (array $row): array => [
         'id' => $row['project']->id,
         'filter' => $ledgerFilter($row),
-        'name' => mb_strtolower($row['project']->name),
+        'name' => mb_strtolower($row['project']->headline()),
     ], $ledgerRows);
 @endphp
 

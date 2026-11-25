@@ -111,12 +111,13 @@ trait ShowsCalendarDay
             $rows->push(['type' => 'donor', 'kind' => 'link', 'id' => $donorReport->id, 'url' => route('funding-agreements.show', $donorReport->donorProposal), 'title' => $donorReport->title, 'subLabel' => __('calendar.donor_report_due')]);
         }
 
-        foreach ($calendar['projectStartsByDay']->get($date, new Collection) as $project) {
-            $rows->push(['type' => 'project', 'kind' => 'link', 'id' => $project->id, 'url' => route('projects.show', $project), 'title' => $project->name, 'subLabel' => __('calendar.project_starts')]);
+        // Y-16 (D-93): a dated row is a place, named by its proposal.
+        foreach ($calendar['projectStartsByDay']->get($date, new Collection) as $row) {
+            $rows->push(['type' => 'project', 'kind' => 'link', 'id' => $row->id, 'url' => route('projects.show', $row), 'title' => $row->headline(), 'subLabel' => __('calendar.project_starts')]);
         }
 
-        foreach ($calendar['projectEndsByDay']->get($date, new Collection) as $project) {
-            $rows->push(['type' => 'project', 'kind' => 'link', 'id' => $project->id, 'url' => route('projects.show', $project), 'title' => $project->name, 'subLabel' => __('calendar.project_ends')]);
+        foreach ($calendar['projectEndsByDay']->get($date, new Collection) as $row) {
+            $rows->push(['type' => 'project', 'kind' => 'link', 'id' => $row->id, 'url' => route('projects.show', $row), 'title' => $row->headline(), 'subLabel' => __('calendar.project_ends')]);
         }
 
         return $rows;

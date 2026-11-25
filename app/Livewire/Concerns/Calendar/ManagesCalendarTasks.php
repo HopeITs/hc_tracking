@@ -13,8 +13,8 @@ use App\Models\DonorReport;
 use App\Models\HrDepartment;
 use App\Models\MonthlyReport;
 use App\Models\Program;
-use App\Models\Project;
 use App\Models\Proposal;
+use App\Models\ProposalLocation;
 use App\Models\ProposalStatusNote;
 use App\Models\Report;
 use App\Models\Task;
@@ -107,7 +107,11 @@ trait ManagesCalendarTasks
     public function sourceOptions(): Collection
     {
         return match ($this->taskSourceType) {
-            'project' => Project::query()->select(['id', 'name'])->orderBy('name')->orderBy('id')->get(),
+            // Y-16 (D-93): a task hangs off a place (key `proposal_location`).
+            'proposal_location' => ProposalLocation::query()
+                ->with(['city:id,name_en,name_ar', 'program:id', 'centers', 'proposal:id,name'])
+                ->orderBy('id')
+                ->get(['id', 'proposal_id', 'city_id', 'city_wide', 'program_id']),
             'program' => Program::options(),
             'department' => HrDepartment::query()->select(['id', 'name'])->orderBy('name')->orderBy('id')->get(),
             default => Proposal::query()->select(['id', 'name'])->orderBy('name')->orderBy('id')->get(),

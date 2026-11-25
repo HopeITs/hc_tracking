@@ -9,8 +9,8 @@ use App\Enums\ReviewStage;
 use App\Models\Donor;
 use App\Models\DonorReport;
 use App\Models\MonthlyReport;
-use App\Models\Project;
 use App\Models\Proposal;
+use App\Models\ProposalLocation;
 use App\Models\ProposalStatusNote;
 use App\Models\Report;
 use App\Models\ReportTemplate;
@@ -130,42 +130,37 @@ trait BuildsCalendarGrid
                 ->get();
 
         // Proposals, transfers and donors carry no direct "responsible employee"
-        // column of their own — the only real ownership signal in the schema is
-        // Project::user_id, so anything funding/funded-by one of my projects
-        // counts as "mine" here, the same proxy every one of these queries uses.
-        // Each of them is money-adjacent, so each is skipped outright unless the
-        // viewer holds the matching view permission (see canSeeType()).
-        $ownedProjectIds = $employeeIds === []
+        // column of their own — the ownership signal in the schema is the
+        // location row's `responsible_employee_id` (Y-16, D-93), so anything
+        // funding/funded-by one of my places counts as "mine" here, the same
+        // proxy every one of these queries uses. Each of them is money-adjacent,
+        // so each is skipped outright unless the viewer holds the matching view
+        // permission (see canSeeType()).
+        $ownedProposalIds = $employeeIds === []
             ? []
-            : Project::query()->whereIn('user_id', $employeeIds)->pluck('id')->all();
+            : ProposalLocation::query()->whereIn('responsible_employee_id', $employeeIds)->pluck('proposal_id')->filter()->unique()->values()->all();
+
+        $myRows = fn (string $column): Builder => ProposalLocation::query()
+            ->select(['id', 'proposal_id', 'project_id', 'slug', 'status', 'city_id', 'city_wide', 'program_id', $column])
+            ->with(['city:id,name_en,name_ar', 'program:id', 'centers', 'proposal:id,name'])
+            ->whereIn('responsible_employee_id', $employeeIds)
+            ->whereNotNull($column)
+            ->whereBetween($column, [$gridStart->toDateString(), $gridEnd->toDateString()])
+            ->orderBy($column);
 
         $projectStartsByDay = $employeeIds === [] || ! $this->showProjects
             ? new Collection
-            : Project::query()
-                ->select(['id', 'name', 'start_date'])
-                ->whereIn('user_id', $employeeIds)
-                ->whereNotNull('start_date')
-                ->whereBetween('start_date', [$gridStart->toDateString(), $gridEnd->toDateString()])
-                ->orderBy('start_date')
-                ->get()
-                ->groupBy(fn (Project $project): string => $project->start_date->toDateString());
+            : $myRows('start_date')->get()->groupBy(fn (ProposalLocation $row): string => $row->start_date->toDateString());
 
         $projectEndsByDay = $employeeIds === [] || ! $this->showProjects
             ? new Collection
-            : Project::query()
-                ->select(['id', 'name', 'status', 'end_date'])
-                ->whereIn('user_id', $employeeIds)
-                ->whereNotNull('end_date')
-                ->whereBetween('end_date', [$gridStart->toDateString(), $gridEnd->toDateString()])
-                ->orderBy('end_date')
-                ->get()
-                ->groupBy(fn (Project $project): string => $project->end_date->toDateString());
+            : $myRows('end_date')->get()->groupBy(fn (ProposalLocation $row): string => $row->end_date->toDateString());
 
-        $proposalsByDay = $ownedProjectIds === [] || ! $this->isTypeShown('proposal')
+        $proposalsByDay = $ownedProposalIds === [] || ! $this->isTypeShown('proposal')
             ? new Collection
             : Proposal::query()
                 ->select(['id', 'slug', 'name', 'status', 'planned_date_end', 'actual_date_end', 'extended_date_end'])
-                ->whereHas('projects', fn (Builder $query) => $query->whereIn('projects.id', $ownedProjectIds))
+                ->whereKey($ownedProposalIds)
                 // A rejected or completed proposal has no deadline left to watch.
                 ->whereNotIn('status', [ProposalStatus::Rejected, ProposalStatus::Completed])
                 ->whereRaw('(case when status = ? and extended_date_end is not null then extended_date_end else planned_date_end end) between ? and ?', [ProposalStatus::Active->value, $gridStart->toDateString(), $gridEnd->toDateString()])
@@ -173,35 +168,35 @@ trait BuildsCalendarGrid
                 ->get()
                 ->groupBy(fn (Proposal $proposal): string => $proposal->calendarEndDate()->toDateString());
 
-        $transfersByDay = $ownedProjectIds === [] || ! $this->isTypeShown('transfer')
+        $transfersByDay = $ownedProposalIds === [] || ! $this->isTypeShown('transfer')
             ? new Collection
             : TransfersTracking::query()
                 ->select(['id', 'donor_proposal_id', 'scheduled_date', 'payment_amount', 'amount_transfered_currency', 'ar_status'])
                 ->whereNotNull('scheduled_date')
                 ->whereBetween('scheduled_date', [$gridStart->toDateString(), $gridEnd->toDateString()])
-                ->whereHas('donorProposal.proposal.projects', fn (Builder $query) => $query->whereIn('projects.id', $ownedProjectIds))
+                ->whereHas('donorProposal', fn (Builder $query) => $query->whereIn('proposal_id', $ownedProposalIds))
                 ->with('donorProposal:id,slug,donor_id,proposal_id', 'donorProposal.donor:id,name')
                 ->orderBy('scheduled_date')
                 ->get()
                 ->groupBy(fn (TransfersTracking $transfer): string => $transfer->scheduled_date->toDateString());
 
-        $donorFollowUpsByDay = $ownedProjectIds === [] || ! $this->showDonors || ! $this->canViewDonors()
+        $donorFollowUpsByDay = $ownedProposalIds === [] || ! $this->showDonors || ! $this->canViewDonors()
             ? new Collection
             : Donor::query()
                 ->select(['id', 'slug', 'name', 'next_step', 'next_step_due_on'])
                 ->whereNotNull('next_step_due_on')
                 ->whereBetween('next_step_due_on', [$gridStart->toDateString(), $gridEnd->toDateString()])
-                ->whereHas('proposals.projects', fn (Builder $query) => $query->whereIn('projects.id', $ownedProjectIds))
+                ->whereHas('proposals', fn (Builder $query) => $query->whereKey($ownedProposalIds))
                 ->orderBy('next_step_due_on')
                 ->get()
                 ->groupBy(fn (Donor $donor): string => $donor->next_step_due_on->toDateString());
 
-        $donorReportsByDay = $ownedProjectIds === [] || ! $this->showDonors || ! $this->canViewAgreements()
+        $donorReportsByDay = $ownedProposalIds === [] || ! $this->showDonors || ! $this->canViewAgreements()
             ? new Collection
             : DonorReport::query()
                 ->select(['id', 'donor_proposal_id', 'title', 'due_on', 'submitted_on'])
                 ->whereBetween('due_on', [$gridStart->toDateString(), $gridEnd->toDateString()])
-                ->whereHas('donorProposal.proposal.projects', fn (Builder $query) => $query->whereIn('projects.id', $ownedProjectIds))
+                ->whereHas('donorProposal', fn (Builder $query) => $query->whereIn('proposal_id', $ownedProposalIds))
                 ->with('donorProposal:id,slug')
                 ->orderBy('due_on')
                 ->get()
@@ -266,7 +261,7 @@ trait BuildsCalendarGrid
             ->with(['project', 'template'])
             ->whereHas('lines')
             ->where(fn (Builder $query) => $query
-                ->whereIn('project_id', Project::query()->whereIn('user_id', $employeeIds)->select('id'))
+                ->whereIn('project_id', ProposalLocation::query()->whereIn('responsible_employee_id', $employeeIds)->select('project_id'))
                 ->orWhereIn('prepared_by', $preparerUserIds === [] ? [0] : $preparerUserIds));
     }
 
