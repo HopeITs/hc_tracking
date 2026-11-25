@@ -206,6 +206,8 @@ SyncReportTask::handle(DonorReport $report): ?Task
 
 **Centers that already report.** A change that moves or removes a center (or turns a row city-wide or back) is refused (`proposals.location_center_reports`) when a report template of this proposal at that place has a monthly report that is `submitted` or `validated`; checked when the request is opened **and** when it is approved. Otherwise the place's template, its lines and its targets are **not** moved by the approval: the change is applied to the row and the affected templates are listed in the notification for MEAL to settle.
 
+**Pages (Y-16).** `projects.index` lists **location rows** of approved and later proposals; `projects.show` is `projects/{location:slug}`. The route names and the `projects.*` permission keys keep their names (they name a screen and an ability, not the table). An old project slug is answered by a redirect to its successor row (`ProjectSuccessor`, most recent proposal) until Y-18, which freezes those redirects in `project_redirects`.
+
 ## §7 Schema owned by Team A (frozen at CP1)
 **T03:**
 - `proposals`: `donor_id` (NOT NULL, FK `donors` restrictOnDelete), `requested_budget` decimal(14,2) null, `requested_currency` varchar(10) null (`Currency`), `status_remind_on` date null, `approval_note` text null (D-26), `final_report_accepted_on` date null, `final_report_accepted_by` FK `users` null nullOnDelete (D-02c), `previous_proposal_id` self FK null nullOnDelete, indexed (renewal chain, T10; cycle guard in T10). Unique `proposals(id, donor_id)`.
