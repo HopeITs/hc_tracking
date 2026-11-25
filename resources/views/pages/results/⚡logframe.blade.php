@@ -48,7 +48,9 @@ new #[Layout('layouts::desk'), Title('proposals.framework.title')] class extends
     </x-slot:filters>
 
     @if ($this->proposal !== null)
-        <livewire:proposals.logframe :proposal-id="$this->proposal->id" :key="'meal-logframe-'.$this->proposal->id" />
+        <div class="pp-page">
+            <livewire:proposals.logframe :proposal-id="$this->proposal->id" :key="'meal-logframe-'.$this->proposal->id" />
+        </div>
     @else
         <p class="p-4 text-sm">{{ __('proposals.framework.choose_proposal') }}</p>
     @endif

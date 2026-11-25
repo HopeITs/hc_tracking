@@ -36,7 +36,10 @@ function activityBoard(?User $user = null): Testable
 }
 
 test('the board lists an unlinked activity and links it to an output through the chooser', function () {
-    activityBoard()
+    Livewire::actingAs($this->meal)
+        ->test('proposals.logframe', ['proposalId' => $this->proposal->id])
+        ->assertSeeHtml('data-test="layout-board"')
+        ->call('setLayout', 'board')
         ->assertSeeHtml('data-test="board-loose"')
         ->assertSee('Registration')
         ->call('pickFor', $this->activity->id)
@@ -66,7 +69,10 @@ test('an activity cannot be linked to another proposal\'s output or to an outcom
 });
 
 test('someone without results permissions cannot link an activity', function () {
-    Livewire::actingAs(User::factory()->role('Team Member')->create())
+    $viewer = User::factory()->role('Team Member')->create();
+    $viewer->givePermissionTo('proposals.view');
+
+    Livewire::actingAs($viewer)
         ->test('proposals.logframe', ['proposalId' => $this->proposal->id])
         ->call('linkActivity', $this->activity->id, $this->output->id)
         ->assertForbidden();

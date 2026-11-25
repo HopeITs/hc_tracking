@@ -250,7 +250,7 @@ test('only someone who may edit indicators can click one open; a PR officer just
         ->assertDontSeeHtml($opensEditor);
 });
 
-test('an open output lists its risks by score and keeps each card to four rows until Show all', function () {
+test('the grouped table ranks risks and limits each list to four rows until Show all', function () {
     $outcome = frameworkResult(ResultType::Outcome);
     $output = frameworkResult(ResultType::Output, $outcome);
     Risk::factory()->rated(1, 1)->create(['proposal_id' => $this->proposal->id, 'result_id' => $output->id, 'name' => 'Minor delay']);
@@ -258,7 +258,6 @@ test('an open output lists its risks by score and keeps each card to four rows u
     Assumption::factory()->count(5)->create(['proposal_id' => $this->proposal->id, 'result_id' => $output->id]);
 
     frameworkBox($this->meal)
-        ->call('toggleChild', $output->id)
         ->assertSeeInOrder(['Border closure', 'Minor delay'])
         ->assertSeeHtml('pp-fw-score-high')
         ->assertSee(__('proposals.framework.show_all', ['count' => 5]))

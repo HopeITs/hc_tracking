@@ -26,7 +26,8 @@
         @forelse ($this->tableResults as $result)
             @php
                 $assumptions = $this->tableAssumptions->get($result->id, []);
-                $risks = $this->proposalRisks->get($result->id, []);
+                $riskScore = fn (\App\Models\Risk $risk): int => max(1, (int) $risk->likelihood) * max(1, (int) $risk->severity);
+                $risks = collect($this->proposalRisks->get($result->id, []))->sortByDesc($riskScore)->values();
                 $canRemoveRow = $mayRemove && $result->children_count === 0 && $result->indicators->isEmpty();
             @endphp
             <tbody wire:key="framework-group-{{ $result->id }}">
@@ -42,12 +43,33 @@
                                 @if (count($assumptions) > 0 || count($risks) > 0)
                                     <div class="mt-1 text-xs font-normal text-secondary-medium dark:text-ink-muted">
                                         <div class="font-semibold">{{ __('proposals.framework.assumptions_risks') }}</div>
-                                        @foreach ($assumptions as $assumption)
-                                            <div dir="auto">{{ $assumption->statement }}</div>
-                                        @endforeach
-                                        @foreach ($risks as $risk)
-                                            <div dir="auto">{{ $risk->localizedName() }}</div>
-                                        @endforeach
+                                        @if (count($assumptions) > 0)
+                                            <div x-data="{ all: false }">
+                                                @foreach ($assumptions as $assumption)
+                                                    <div dir="auto" @if ($loop->index >= 4) x-show="all" x-cloak @endif>{{ $assumption->statement }}</div>
+                                                @endforeach
+                                                @if (count($assumptions) > 4)
+                                                    <button type="button" class="pp-link" x-on:click="all = ! all" x-bind:aria-expanded="all" x-text="all ? @js(__('proposals.framework.show_fewer')) : @js(__('proposals.framework.show_all', ['count' => count($assumptions)]))">{{ __('proposals.framework.show_all', ['count' => count($assumptions)]) }}</button>
+                                                @endif
+                                            </div>
+                                        @endif
+                                        @if ($risks->isNotEmpty())
+                                            <div x-data="{ all: false }">
+                                                @foreach ($risks as $risk)
+                                                    @php
+                                                        $score = $riskScore($risk);
+                                                        $level = $score >= 6 ? 'high' : ($score >= 3 ? 'medium' : 'low');
+                                                    @endphp
+                                                    <div class="flex items-center gap-1.5" @if ($loop->index >= 4) x-show="all" x-cloak @endif>
+                                                        <span class="pp-fw-score pp-fw-score-{{ $level }}" title="{{ __('proposals.framework.risk_score_'.$level) }}">{{ __('proposals.framework.risk_letter_'.$level) }}</span>
+                                                        <bdi>{{ $risk->localizedName() }}</bdi>
+                                                    </div>
+                                                @endforeach
+                                                @if ($risks->count() > 4)
+                                                    <button type="button" class="pp-link" x-on:click="all = ! all" x-bind:aria-expanded="all" x-text="all ? @js(__('proposals.framework.show_fewer')) : @js(__('proposals.framework.show_all', ['count' => $risks->count()]))">{{ __('proposals.framework.show_all', ['count' => $risks->count()]) }}</button>
+                                                @endif
+                                            </div>
+                                        @endif
                                     </div>
                                 @endif
                             </div>

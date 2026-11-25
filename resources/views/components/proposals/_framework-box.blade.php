@@ -32,6 +32,11 @@
             <input class="pp-search" type="search" wire:model.live.debounce.250ms="search"
                 placeholder="{{ __('proposals.framework.search') }}" aria-label="{{ __('proposals.framework.search') }}"
                 data-test="framework-search">
+            @if ($layout === 'board')
+                <x-ui.button type="button" tone="ghost" wire:click="setLayout('chain')" data-test="layout-table">{{ __('desk.register.table') }}</x-ui.button>
+            @else
+                <x-ui.button type="button" tone="ghost" wire:click="setLayout('board')" data-test="layout-board">{{ __('proposals.framework.layout_board') }}</x-ui.button>
+            @endif
             @if ($canCreate)
                 <x-ui.button type="button" tone="primary" wire:click="openCreateModal" data-test="create-logframe-result">{{ __('proposals.framework.add_result') }}</x-ui.button>
                 <x-ui.button type="button" tone="ghost" wire:click="openPicker" data-test="start-from-program-framework">{{ __('proposals.framework.start_from_program') }}</x-ui.button>
@@ -40,7 +45,11 @@
     </div>
 
     <div class="pp-lf-body" data-test="framework-body">
-        @include('components.proposals._framework-table')
+        @if ($layout === 'board')
+            @include('components.proposals._framework-board', ['fw' => $this->framework])
+        @else
+            @include('components.proposals._framework-table')
+        @endif
     </div>
 
     @include('components.proposals._framework-modals')
