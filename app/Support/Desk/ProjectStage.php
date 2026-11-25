@@ -7,8 +7,8 @@ namespace App\Support\Desk;
 use App\Enums\MonthlyReportStatus;
 use App\Enums\ProjectStatus;
 use App\Enums\ProposalStatus;
-use App\Models\Project;
 use App\Models\Proposal;
+use App\Models\ProposalLocation;
 use App\Models\TransfersTracking;
 use Carbon\CarbonImmutable;
 use Illuminate\Support\Collection;
@@ -39,9 +39,9 @@ final class ProjectStage
         return $proposals->sortBy(fn (Proposal $proposal): int => (int) array_search($proposal->status->value, self::Priority, true))->first();
     }
 
-    public static function stage(Project $project, ?Proposal $lead): int
+    public static function stage(ProposalLocation $row, ?Proposal $lead): int
     {
-        if (in_array($project->status, [ProjectStatus::Closed, ProjectStatus::Archived], true)) {
+        if (in_array($row->status, [ProjectStatus::Closed, ProjectStatus::Archived], true)) {
             return 7;
         }
 
@@ -54,31 +54,31 @@ final class ProjectStage
             // a draft waits on the owner's acknowledgement, an approved
             // project on its report template, and confirming that template
             // activates it (ConfirmReportTemplate), so an active one is running.
-            ProposalStatus::Approved => match ($project->status) {
+            ProposalStatus::Approved => match ($row->status) {
                 ProjectStatus::Draft => 3,
-                ProjectStatus::Active => self::runningOrClosing($project),
+                ProjectStatus::Active => self::runningOrClosing($row),
                 default => 4,
             },
-            ProposalStatus::Active => self::runningOrClosing($project),
+            ProposalStatus::Active => self::runningOrClosing($row),
             ProposalStatus::FinalReports => 6,
             ProposalStatus::Completed => 7,
         };
     }
 
     /**
-     * The projects standing on a stage, worked out exactly as the Desk does,
-     * so the projects register's stage filter and the Project flow panel
-     * always count the same projects.
+     * The location rows standing on a stage, worked out exactly as the Desk
+     * does, so the projects register's stage filter and the Project flow panel
+     * always count the same rows (Y-16, D-93).
      *
      * @return list<int>
      */
-    public static function projectIdsAt(int $stage): array
+    public static function locationIdsAt(int $stage): array
     {
-        return Project::query()
-            ->select(['id', 'status', 'end_date'])
-            ->with('proposals:id,status')
+        return ProposalLocation::query()
+            ->select(['id', 'status', 'end_date', 'proposal_id'])
+            ->with('proposal:id,status')
             ->get()
-            ->filter(fn (Project $project): bool => self::stage($project, self::lead($project->proposals)) === $stage)
+            ->filter(fn (ProposalLocation $row): bool => self::stage($row, self::leadOf($row)) === $stage)
             ->pluck('id')
             ->map(fn (mixed $id): int => (int) $id)
             ->values()
@@ -86,11 +86,21 @@ final class ProjectStage
     }
 
     /**
+     * The proposal that leads a row: its own, since a row is of exactly one
+     * (D-93). The collection form stays for the Desk's project panels until
+     * they move.
+     */
+    public static function leadOf(ProposalLocation $row): ?Proposal
+    {
+        return $row->proposal;
+    }
+
+    /**
      * A running project moves to closing once its end date has passed.
      */
-    private static function runningOrClosing(Project $project): int
+    private static function runningOrClosing(ProposalLocation $row): int
     {
-        return $project->end_date !== null && $project->end_date->lt(CarbonImmutable::today()) ? 6 : 5;
+        return $row->end_date !== null && $row->end_date->lt(CarbonImmutable::today()) ? 6 : 5;
     }
 
     /**
@@ -100,15 +110,15 @@ final class ProjectStage
      *
      * @return array{late: int, soon: int}
      */
-    public static function signals(Project $project): array
+    public static function signals(ProposalLocation $row): array
     {
         $today = CarbonImmutable::today();
         $monthStart = $today->startOfMonth();
 
-        $lateReports = $project->monthlyReports->filter(fn ($report): bool => $report->status === MonthlyReportStatus::Draft && $report->period->lt($monthStart))->count();
-        $waitingReports = $project->monthlyReports->where('status', MonthlyReportStatus::Submitted)->count();
-        $lateTransfers = self::transfers($project)->filter(fn (TransfersTracking $transfer): bool => $transfer->state() === 'late')->count();
-        $pastEnd = $project->status === ProjectStatus::Active && $project->end_date !== null && $project->end_date->lt($today) ? 1 : 0;
+        $lateReports = $row->monthlyReports->filter(fn ($report): bool => $report->status === MonthlyReportStatus::Draft && $report->period->lt($monthStart))->count();
+        $waitingReports = $row->monthlyReports->where('status', MonthlyReportStatus::Submitted)->count();
+        $lateTransfers = self::transfers($row)->filter(fn (TransfersTracking $transfer): bool => $transfer->state() === 'late')->count();
+        $pastEnd = $row->status === ProjectStatus::Active && $row->end_date !== null && $row->end_date->lt($today) ? 1 : 0;
 
         return ['late' => $lateReports + $lateTransfers + $pastEnd, 'soon' => $waitingReports];
     }
@@ -126,8 +136,12 @@ final class ProjectStage
      *
      * @return Collection<int, TransfersTracking>
      */
-    public static function transfers(Project $project): Collection
+    public static function transfers(ProposalLocation $row): Collection
     {
-        return $project->proposals->flatMap(fn (Proposal $proposal) => $proposal->relationLoaded('donorProposals') ? $proposal->donorProposals->flatMap->transfers : collect())->values();
+        $proposal = $row->proposal;
+
+        return $proposal !== null && $proposal->relationLoaded('donorProposals')
+            ? $proposal->donorProposals->flatMap->transfers->values()
+            : collect();
     }
 }

@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace App\Livewire\Concerns\Projects;
 
-use App\Models\Project;
+use App\Models\ProposalLocation;
 
 /**
  * The small presentation helpers of the project directory views: the tone
@@ -49,18 +49,18 @@ trait PresentsProjectDirectory
      * Every relation a project carries, counted in the list query and shown in
      * one fixed order so the same chip sits in the same place on every record.
      *
-     * @param  Project&object{materialised_risks_count: int}  $project
+     * @param  ProposalLocation&object{materialised_risks_count: int}  $project
      * @return list<array{icon: string, count: int, label: string, alert: bool}>
      */
-    protected function connectionsOf(Project $project): array
+    protected function connectionsOf(ProposalLocation $project): array
     {
         $openRisks = $project->risks_count - $project->materialised_risks_count;
 
         /* An empty relation says nothing worth a chip; a materialised risk always does. */
         return array_values(array_filter([
-            ['icon' => 'chart-bar', 'count' => $project->plan_indicators_count, 'label' => trans_choice('common.count_target', $project->plan_indicators_count, ['count' => $project->plan_indicators_count]), 'alert' => false],
+            ['icon' => 'chart-bar', 'count' => $project->targets_count, 'label' => trans_choice('common.count_target', $project->targets_count, ['count' => $project->targets_count]), 'alert' => false],
             ['icon' => 'presentation-chart-line', 'count' => $project->indicators_count, 'label' => trans_choice('projects.count_indicator', $project->indicators_count, ['count' => $project->indicators_count]), 'alert' => false],
-            ['icon' => 'document-text', 'count' => $project->proposals_count, 'label' => trans_choice('projects.count_proposal', $project->proposals_count, ['count' => $project->proposals_count]), 'alert' => false],
+            ['icon' => 'document-text', 'count' => 1, 'label' => trans_choice('projects.count_proposal', 1, ['count' => 1]), 'alert' => false],
             ['icon' => 'paper-clip', 'count' => $project->media_count, 'label' => trans_choice('projects.count_file', $project->media_count, ['count' => $project->media_count]), 'alert' => false],
             [
                 'icon' => 'shield-exclamation',
@@ -78,7 +78,7 @@ trait PresentsProjectDirectory
      *
      * @return array<string, int>
      */
-    protected function demographicsOf(Project $project): array
+    protected function demographicsOf(ProposalLocation $project): array
     {
         return array_filter([
             __('projects.men') => $project->target_men,

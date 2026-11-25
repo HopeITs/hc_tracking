@@ -233,6 +233,56 @@ class ProposalLocation extends Model
      * @return HasMany<PlanIndicator, $this>
      */
     /**
+     * Whether this row's first centre is one HR has deactivated (D-66), the
+     * twin of `Project::hasInactiveCenter()`. Read from the in-memory HR
+     * lookup, so a page of rows costs no query per row. A city-wide row is
+     * field work (D-88) and has no centre to be inactive.
+     */
+    public function hasInactiveCenter(): bool
+    {
+        $centerId = $this->centerIds()[0] ?? null;
+
+        if ($centerId === null) {
+            return false;
+        }
+
+        try {
+            return HrCenter::remembered($centerId)?->is_active === false;
+        } catch (QueryException) {
+            return false;
+        }
+    }
+
+    /**
+     * The project indicator instances scoped to this row (Y-16, D-93).
+     *
+     * An instance with no row is shared by the proposal's rows; the project
+     * page adds those separately (ReadsProjectDelivery), so this relation is
+     * the row's own set.
+     *
+     * @return HasMany<Indicator, $this>
+     */
+    public function indicators(): HasMany
+    {
+        return $this->hasMany(Indicator::class, 'proposal_location_id');
+    }
+
+    /**
+     * The monthly reports of this row's place (Y-16).
+     *
+     * Joined on the project both sides still carry, because a monthly report
+     * belongs to a **template** (Y-03) and a template reaches a row only by
+     * matching its place — which no foreign key expresses. Y-18 replaces this
+     * with the template path once `project_id` goes.
+     *
+     * @return HasMany<MonthlyReport, $this>
+     */
+    public function monthlyReports(): HasMany
+    {
+        return $this->hasMany(MonthlyReport::class, 'project_id', 'project_id');
+    }
+
+    /**
      * The register risks raised against this row (Y-13, D-93). Logframe risks
      * belong to a proposal and are not here.
      *
@@ -340,6 +390,19 @@ class ProposalLocation extends Model
         ));
 
         return $centers === [] ? $place : $place.' · '.implode('، ', $centers);
+    }
+
+    /**
+     * What a list calls this row: its proposal's name, since a row is of
+     * exactly one proposal (D-93) and the register "names its proposal
+     * first" (Y-16). `label()` says where it is; the two read together as
+     * "<proposal> / <programme> · <city> · <centre>".
+     *
+     * Load `proposal`; a row whose proposal is gone falls back to its place.
+     */
+    public function headline(): string
+    {
+        return $this->proposal?->name ?? $this->label();
     }
 
     /**

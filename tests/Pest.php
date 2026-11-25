@@ -784,11 +784,13 @@ function rowFor(Project $project, ?Proposal $proposal = null): ProposalLocation
             return $existing;
         }
 
-        // The project id keeps the name, and so the row's slug, unique and
-        // stable: faker repeats project names, and `proposal_locations.slug`
-        // is unique (Y-11).
+        // The row's proposal carries the project's own name, so a register
+        // that names the proposal (Y-16) reads as the fixture wrote it. The
+        // project id is appended only when another proposal already holds
+        // that name: faker repeats names, and the slug the name produces is
+        // unique (Y-11).
         $proposal ??= Proposal::factory()->running()->create(array_filter([
-            'name' => $project->name.' #'.$project->id,
+            'name' => Proposal::query()->where('name', $project->name)->exists() ? $project->name.' #'.$project->id : $project->name,
             'planned_date_begin' => $project->start_date?->toDateString(),
             'planned_date_end' => $project->end_date?->toDateString(),
         ]));

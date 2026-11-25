@@ -4,17 +4,18 @@ declare(strict_types=1);
 
 namespace App\Livewire\Concerns\Projects;
 
-use App\Models\Project;
+use App\Models\ProposalLocation;
 use Flux\Flux;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Gate;
 use Livewire\Attributes\Locked;
 
 /**
- * Unblocking a project its owner rejected, from the directory: the dialog's
+ * Unblocking a place its owner rejected, from the directory: the dialog's
  * state and the unblock action the top level opens from a Blocked badge.
  *
- * Used by projects/index only.
+ * Used by projects/index only. Y-16 (D-93): the assignment is read from the
+ * **location row** the directory lists.
  */
 trait UnblocksProjects
 {
@@ -26,14 +27,14 @@ trait UnblocksProjects
 
     public string $unblockNote = '';
 
-    public function openUnblockModal(int $projectId): void
+    public function openUnblockModal(int $locationId): void
     {
-        $assignment = Project::query()->findOrFail($projectId)->ownerAssignment;
+        $assignment = ProposalLocation::query()->findOrFail($locationId)->ownerAssignment;
         abort_if($assignment === null, 404);
         Gate::authorize('unblock', $assignment);
 
         $this->resetValidation();
-        $this->unblockingProjectId = $projectId;
+        $this->unblockingProjectId = $locationId;
         $this->unblockNote = '';
         $this->showUnblockModal = true;
     }
@@ -54,7 +55,7 @@ trait UnblocksProjects
     {
         abort_if($this->unblockingProjectId === null, 404);
 
-        $assignment = Project::query()->findOrFail($this->unblockingProjectId)->ownerAssignment;
+        $assignment = ProposalLocation::query()->findOrFail($this->unblockingProjectId)->ownerAssignment;
         abort_if($assignment === null, 404);
         Gate::authorize('unblock', $assignment);
 

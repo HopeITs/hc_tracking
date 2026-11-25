@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace App\Livewire\Concerns\Desk;
 
 use App\Enums\ProjectStatus;
-use App\Models\Project;
+use App\Models\ProposalLocation;
 use App\Support\Desk\ProjectStage;
 use Livewire\Attributes\Computed;
 
@@ -18,6 +18,11 @@ use Livewire\Attributes\Computed;
  * project names per stage (late first) for the stage's tooltip. Closed and archived projects are left
  * out: the flow is the work still moving. The host provides visible()
  * (IsDeskPanel).
+ *
+ * Y-16 (D-93): a line is a **location row**, not a project. A row is of
+ * exactly one proposal, so its lead is that proposal; "need you" reads the
+ * row's responsible employee, and the name is the row's label (place and
+ * programme).
  *
  * @property-read array{stages: list<array{stage: int, count: int, late: int, mine: int, top: list<array{name: string, late: bool}>}>, total: int, late: int, watch: int, mine: int} $flow  #[Computed] flow()
  */
@@ -39,30 +44,33 @@ trait ReadsDeskFlow
         $employeeId = auth()->user()->employee_id ?? 0;
         $money = $this->canViewFundingPosition();
 
-        $projects = $this->visible(Project::query(), 'projects')
-            ->select(['id', 'name', 'status', 'end_date', 'user_id'])
+        $rows = $this->visible(ProposalLocation::query(), 'projects')
+            ->select(['id', 'proposal_id', 'city_id', 'program_id', 'city_wide', 'project_id', 'status', 'end_date', 'responsible_employee_id'])
             ->whereNotIn('status', [ProjectStatus::Archived, ProjectStatus::Closed])
             ->with([
-                'proposals:id,status',
+                'proposal:id,status',
+                'city:id,name_en,name_ar',
+                'program:id',
+                'centers',
                 'monthlyReports:id,project_id,period,status',
-                ...($money ? ['proposals.donorProposals:id,proposal_id', 'proposals.donorProposals.transfers'] : []),
+                ...($money ? ['proposal.donorProposals:id,proposal_id', 'proposal.donorProposals.transfers'] : []),
             ])
             ->get();
 
-        foreach ($projects as $project) {
-            $stage = ProjectStage::stage($project, ProjectStage::lead($project->proposals));
+        foreach ($rows as $row) {
+            $stage = ProjectStage::stage($row, ProjectStage::leadOf($row));
 
             if ($stage > 6) {
                 continue;
             }
 
-            $signals = ProjectStage::signals($project);
+            $signals = ProjectStage::signals($row);
             $late = $signals['late'] > 0;
             $watch += ! $late && $signals['soon'] > 0 ? 1 : 0;
             $stages[$stage]['count']++;
             $stages[$stage]['late'] += $late ? 1 : 0;
-            $stages[$stage]['mine'] += $late && $employeeId !== 0 && (int) $project->user_id === (int) $employeeId ? 1 : 0;
-            $stages[$stage]['top'][] = ['name' => (string) $project->name, 'late' => $late];
+            $stages[$stage]['mine'] += $late && $employeeId !== 0 && (int) $row->responsible_employee_id === (int) $employeeId ? 1 : 0;
+            $stages[$stage]['top'][] = ['name' => $row->label(), 'late' => $late];
         }
 
         foreach ($stages as $stage => $row) {

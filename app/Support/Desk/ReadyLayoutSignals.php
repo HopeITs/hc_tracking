@@ -241,15 +241,15 @@ class ReadyLayoutSignals
     }
 
     /**
-     * The projects card's default count (every project, shared through
+     * The projects card's default count (every location row, shared through
      * DeskWork) and the Project flow panel's late figure (ReadsDeskFlow).
-     * Critical only for projects the viewer owns.
+     * Critical only for rows the viewer owns (Y-16, D-93).
      *
      * @return Signal
      */
     private function delivery(): array
     {
-        $projects = DeskWork::projectsOnCard($this->viewer)->get(['id', 'user_id']);
+        $projects = DeskWork::locationsOnCard($this->viewer)->get(['id', 'responsible_employee_id']);
 
         if ($projects->isEmpty()) {
             return $this->signal(__('desk.ready.signal.projects_none'), 'neutral', 0);

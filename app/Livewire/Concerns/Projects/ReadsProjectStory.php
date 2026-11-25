@@ -40,13 +40,13 @@ use Livewire\Attributes\Url;
  * Story's own Proposal block (stage 4: the proposal page is embedded there,
  * chosen by ?proposal= and opened on ?ptab=).
  *
- * Used by projects/show only. The page provides projectId, the #[Computed]
- * project(), attachedProposals(), fundingByCurrency() and canViewMoney().
+ * Used by projects/show only. The page provides locationId, the #[Computed]
+ * location(), attachedProposals(), fundingByCurrency() and canViewMoney().
  *
- * @property int $projectId
+ * @property int $locationId
  * @property-read Collection<int, Proposal> $attachedProposals  #[Computed] attachedProposals()
  * @property-read int|null $embeddedProposalId  #[Computed] embeddedProposalId()
- * @property-read Project $project  #[Computed] project()
+ * @property-read ProposalLocation $location  #[Computed] location()
  * @property-read bool $canStartConceptNote  #[Computed] canStartConceptNote()
  * @property-read Collection<string, array{currency: Currency, committed: float, received: float}> $fundingByCurrency  #[Computed] fundingByCurrency()
  * @property-read Collection<int, Task> $tasks  #[Computed] tasks()
@@ -125,26 +125,25 @@ trait ReadsProjectStory
     #[Computed]
     public function story(): array
     {
-        // The Story's stages come from ProjectStage, which slice 4 moves to the
-        // row; until then it needs the project, reached through the row's
-        // project_id (never the row's own id — they are different keys).
-        $project = Project::query()
-            ->select(['id', 'status', 'start_date', 'end_date', 'user_id', 'created_at'])
+        // The Story reads the location row (Y-16, D-93): its stage comes from
+        // its one proposal, its dates and owner from the row itself.
+        $row = ProposalLocation::query()
+            ->select(['id', 'proposal_id', 'project_id', 'program_id', 'status', 'start_date', 'end_date', 'responsible_employee_id', 'created_at'])
             ->with([
-                'proposals:proposals.id,proposals.name,proposals.status,proposals.created_at',
-                'proposals.donorNames',
+                'proposal:id,name,status,created_at',
+                'proposal.donorNames',
                 'monthlyReports:id,project_id,period,status,returned_at',
-                ...($this->canViewMoney() ? ['proposals.donorProposals:id,proposal_id,budget,currency', 'proposals.donorProposals.transfers'] : []),
+                ...($this->canViewMoney() ? ['proposal.donorProposals:id,proposal_id,budget,currency', 'proposal.donorProposals.transfers'] : []),
             ])
-            ->findOrFail($this->location->project_id);
+            ->findOrFail($this->locationId);
 
-        $lead = ProjectStage::lead($project->proposals);
-        $stage = ProjectStage::stage($project, $lead);
-        $health = ProjectStage::health($stage, ProjectStage::signals($project));
+        $lead = ProjectStage::leadOf($row);
+        $stage = ProjectStage::stage($row, $lead);
+        $health = ProjectStage::health($stage, ProjectStage::signals($row));
         $donor = $lead?->donorNames->pluck('name')->implode(', ') ?? '';
         $reports = [
-            'validated' => $project->monthlyReports->where('status', MonthlyReportStatus::Validated)->count(),
-            'total' => $project->monthlyReports->count(),
+            'validated' => $row->monthlyReports->where('status', MonthlyReportStatus::Validated)->count(),
+            'total' => $row->monthlyReports->count(),
         ];
 
         return [
@@ -153,10 +152,10 @@ trait ReadsProjectStory
             'health' => $health,
             'donor' => $donor,
             'reports' => $reports,
-            'next' => $this->nextStep($project, $lead, $stage, $donor),
-            'chapters' => $this->chapters($project, $lead, $stage, $donor, $reports),
+            'next' => $this->nextStep($row, $lead, $stage, $donor),
+            'chapters' => $this->chapters($row, $lead, $stage, $donor, $reports),
             'lede' => $this->storyLede($reports),
-            'months' => $this->monthsStrip($project),
+            'months' => $this->monthsStrip($row),
         ];
     }
 
@@ -183,9 +182,9 @@ trait ReadsProjectStory
      *
      * @return array{text: string, owner: int|null, mine: bool, ownerName: string|null, meal: bool, nudge: bool, href: string|null, label: string|null}
      */
-    private function nextStep(Project $project, ?Proposal $lead, int $stage, string $donor): array
+    private function nextStep(ProposalLocation $row, ?Proposal $lead, int $stage, string $donor): array
     {
-        $owner = $project->user_id;
+        $owner = $row->responsible_employee_id;
         $meal = false;
         $href = null;
         $label = null;
@@ -196,7 +195,7 @@ trait ReadsProjectStory
         switch ($stage) {
             case 0:
                 $text = (string) __('story.next.start_concept_note');
-                $href = $this->canStartConceptNote ? route('proposals.index', ['for_project' => $project->id]) : null;
+                $href = $this->canStartConceptNote ? route('proposals.index', ['for_project' => $row->project_id]) : null;
                 $label = (string) __('proposals.new_concept_note');
                 break;
             case 1:
@@ -231,14 +230,14 @@ trait ReadsProjectStory
                 $href = route('monthly-reports.index');
                 break;
             case 5:
-                [$text, $owner, $href, $meal] = $this->runningStep($project);
+                [$text, $owner, $href, $meal] = $this->runningStep($row);
                 break;
             case 6:
                 $text = (string) __('story.next.final_report');
                 $href = $proposalLink('reports');
                 break;
             default:
-                $text = $project->status === ProjectStatus::Archived ? (string) __('story.next.archived') : (string) __('story.next.closed');
+                $text = $row->status === ProjectStatus::Archived ? (string) __('story.next.archived') : (string) __('story.next.closed');
                 $owner = null;
         }
 
@@ -263,22 +262,22 @@ trait ReadsProjectStory
      *
      * @return array{0: string, 1: int|null, 2: string|null, 3: bool}
      */
-    private function runningStep(Project $project): array
+    private function runningStep(ProposalLocation $row): array
     {
-        $reports = $project->monthlyReports->sortBy(fn (MonthlyReport $report): string => $report->period->toDateString());
+        $reports = $row->monthlyReports->sortBy(fn (MonthlyReport $report): string => $report->period->toDateString());
         $monthStart = now()->startOfMonth();
         $link = fn (MonthlyReport $report): ?string => auth()->user()?->can('view', $report) ? route('monthly-reports.show', $report) : null;
 
         $late = $reports->first(fn (MonthlyReport $report): bool => $report->status === MonthlyReportStatus::Draft && $report->period->lt($monthStart));
 
         if ($late !== null) {
-            return [(string) __('story.next.submit_report', ['month' => $late->period->translatedFormat('F Y')]), $project->user_id, $link($late), false];
+            return [(string) __('story.next.submit_report', ['month' => $late->period->translatedFormat('F Y')]), $row->responsible_employee_id, $link($late), false];
         }
 
         $returned = $reports->first(fn (MonthlyReport $report): bool => $report->status === MonthlyReportStatus::Draft && $report->returned_at !== null);
 
         if ($returned !== null) {
-            return [(string) __('story.next.fix_report', ['month' => $returned->period->translatedFormat('F Y')]), $project->user_id, $link($returned), false];
+            return [(string) __('story.next.fix_report', ['month' => $returned->period->translatedFormat('F Y')]), $row->responsible_employee_id, $link($returned), false];
         }
 
         $submitted = $reports->firstWhere('status', MonthlyReportStatus::Submitted);
@@ -296,19 +295,19 @@ trait ReadsProjectStory
      * @param  array{validated: int, total: int}  $reports
      * @return list<array{state: string, summary: string, when: string|null}>
      */
-    private function chapters(Project $project, ?Proposal $lead, int $stage, string $donor, array $reports): array
+    private function chapters(ProposalLocation $row, ?Proposal $lead, int $stage, string $donor, array $reports): array
     {
         $donorName = $donor !== '' ? $donor : (string) __('story.the_donor');
         $date = fn ($value): ?string => $value?->translatedFormat(__('formats.date'));
         $done = [
-            0 => [(string) __('story.done.project', ['program' => $this->location->program->name ?? '—', 'owner' => $this->location->responsible->name ?? '—']), $date($project->created_at)],
+            0 => [(string) __('story.done.project', ['program' => $this->location->program->name ?? '—', 'owner' => $this->location->responsible->name ?? '—']), $date($row->created_at)],
             1 => [(string) __('story.done.concept_note', ['donor' => $donorName]), null],
             2 => [(string) __('story.done.proposal', ['name' => $lead->name ?? '—']), null],
-            3 => [$project->start_date === null
+            3 => [$row->start_date === null
                 ? (string) __('story.done.decision_no_dates', ['donor' => $donorName])
-                : (string) __('story.done.decision', ['donor' => $donorName, 'start' => $date($project->start_date), 'end' => $date($project->end_date) ?? '…']), null],
+                : (string) __('story.done.decision', ['donor' => $donorName, 'start' => $date($row->start_date), 'end' => $date($row->end_date) ?? '…']), null],
             4 => [(string) __('story.done.template'), null],
-            5 => [(string) __('story.done.running', ['validated' => $reports['validated'], 'total' => $reports['total']]), $date($project->end_date)],
+            5 => [(string) __('story.done.running', ['validated' => $reports['validated'], 'total' => $reports['total']]), $date($row->end_date)],
             6 => [(string) __('story.done.closing'), null],
         ];
         $chapters = [];
@@ -331,12 +330,12 @@ trait ReadsProjectStory
      *
      * @return list<array{label: string, title: string, state: string, href: string|null}>
      */
-    private function monthsStrip(Project $project): array
+    private function monthsStrip(ProposalLocation $row): array
     {
         $monthStart = now()->startOfMonth();
         $viewer = auth()->user();
 
-        return array_values($project->monthlyReports
+        return array_values($row->monthlyReports
             ->sortBy(fn (MonthlyReport $report): string => $report->period->toDateString())
             ->map(function (MonthlyReport $report) use ($monthStart, $viewer): array {
                 $state = match (true) {

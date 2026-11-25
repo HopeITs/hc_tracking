@@ -11,15 +11,14 @@ use App\Enums\ProposalStatus;
 use App\Enums\TaskStatus;
 use App\Models\DonorReport;
 use App\Models\MonthlyReport;
-use App\Models\Project;
 use App\Models\Proposal;
+use App\Models\ProposalLocation;
 use App\Models\ProposalReviewer;
 use App\Models\Task;
 use App\Models\User;
 use Carbon\CarbonImmutable;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Collection;
-use Illuminate\Support\Facades\DB;
 
 /**
  * The queries behind what the Desk calls "my tasks", "waiting on others",
@@ -48,30 +47,31 @@ final class DeskWork
     }
 
     /**
-     * Every project on the projects card, before its "mine" scope.
+     * Every location row on the projects card, before its "mine" scope
+     * (Y-16, D-93: a row stands where a project stood).
      *
-     * @return Builder<Project>
+     * @return Builder<ProposalLocation>
      */
-    public static function projectsOnCard(User $user): Builder
+    public static function locationsOnCard(User $user): Builder
     {
-        $projects = Project::query()->where('status', '!=', ProjectStatus::Archived);
+        $rows = ProposalLocation::query()->where('status', '!=', ProjectStatus::Archived);
 
-        return $user->can('projects.view') ? $projects : $projects->whereRaw('1 = 0');
+        return $user->can('projects.view') ? $rows : $rows->whereRaw('1 = 0');
     }
 
     /**
      * The projects card's default scope: an owner of some, but not all, of
-     * the projects starts on their own; anyone else on every project.
+     * the rows starts on their own; anyone else on every row.
      *
-     * @param  Collection<int, Project>  $projects
-     * @return array{mine: Collection<int, Project>, hasOthers: bool, shown: Collection<int, Project>}
+     * @param  Collection<int, ProposalLocation>  $rows
+     * @return array{mine: Collection<int, ProposalLocation>, hasOthers: bool, shown: Collection<int, ProposalLocation>}
      */
-    public static function projectScopeOf(Collection $projects, User $user): array
+    public static function locationScopeOf(Collection $rows, User $user): array
     {
-        $mine = $projects->where('user_id', $user->employee_id ?? 0);
-        $hasOthers = $mine->isNotEmpty() && $mine->count() !== $projects->count();
+        $mine = $rows->where('responsible_employee_id', $user->employee_id ?? 0);
+        $hasOthers = $mine->isNotEmpty() && $mine->count() !== $rows->count();
 
-        return ['mine' => $mine, 'hasOthers' => $hasOthers, 'shown' => $hasOthers ? $mine : $projects];
+        return ['mine' => $mine, 'hasOthers' => $hasOthers, 'shown' => $hasOthers ? $mine : $rows];
     }
 
     /**
@@ -119,7 +119,7 @@ final class DeskWork
 
     /**
      * Other reviewers who have not reviewed the proposals of the user's
-     * projects; the user's own row waits on them, not on someone else.
+     * location rows; the user's own row waits on them, not on someone else.
      *
      * @return Builder<ProposalReviewer>
      */
@@ -128,7 +128,7 @@ final class DeskWork
         return ProposalReviewer::query()
             ->whereNull('seen_at')
             ->where('employee_id', '!=', $user->employee_id ?? 0)
-            ->whereIn('proposal_id', DB::table('project_proposal')->select('proposal_id')->whereIn('project_id', self::projectsOwnedBy($user)));
+            ->whereIn('proposal_id', self::locationsOwnedBy($user)->select('proposal_id'));
     }
 
     /**
@@ -143,8 +143,8 @@ final class DeskWork
             ->whereNull('parent_task_id')
             ->where('status', '!=', TaskStatus::Done)
             ->where(fn (Builder $query) => $query->whereNull('delivery_state')->orWhereIn('delivery_state', [DeliveryState::Requested, DeliveryState::Returned]))
-            ->where('source_type', 'project')
-            ->whereIn('source_id', self::projectsOwnedBy($user));
+            ->where('source_type', 'proposal_location')
+            ->whereIn('source_id', self::locationsOwnedBy($user)->select('id'));
     }
 
     /**
@@ -188,10 +188,12 @@ final class DeskWork
     }
 
     /**
-     * @return Builder<Project>
+     * The location rows the user is responsible for (Y-16, D-93).
+     *
+     * @return Builder<ProposalLocation>
      */
-    private static function projectsOwnedBy(User $user): Builder
+    private static function locationsOwnedBy(User $user): Builder
     {
-        return Project::query()->select('id')->where('user_id', $user->employee_id ?? 0);
+        return ProposalLocation::query()->where('responsible_employee_id', $user->employee_id ?? 0);
     }
 }
