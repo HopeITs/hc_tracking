@@ -161,17 +161,16 @@ test('a finished report is hidden from anyone who may not open it', function () 
         ->assertSeeHtml('data-active-report="report-'.$seed['reportClosed']->id.'"');
 });
 
-test('the Type filter lists only the kinds of report the viewer has', function () {
-    Report::factory()->create(['user_id' => $this->meal->id, 'planned_date' => '2026-11-10']);
+test('the Type filter lists the kinds of report the viewer may have, even when none is open today', function () {
     $viewer = User::factory()->role('Team Member')->create();
 
+    // No donor reports for a role without them, but monthly and existing reports are offered.
     Livewire::actingAs($viewer)->test('pages::active-reports.index')
-        ->set('tab', 'all')
-        ->assertDontSeeHtml("'type', 'monthly')")
-        ->assertDontSeeHtml("'type', 'donor')");
+        ->assertDontSeeHtml("'type', 'donor')")
+        ->assertSeeHtml("'type', 'monthly')")
+        ->assertSeeHtml("'type', 'report')");
 
-    arpSeedAllTypes();
-
+    // MEAL has nothing open at all and still sees every type.
     Livewire::actingAs($this->meal)->test('pages::active-reports.index')
         ->assertSeeHtml("'type', 'monthly')")
         ->assertSeeHtml("'type', 'donor')")

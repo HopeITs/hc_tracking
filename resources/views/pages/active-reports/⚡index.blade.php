@@ -2,7 +2,9 @@
 
 use App\Enums\ActiveReportType;
 use App\Models\Donor;
+use App\Models\DonorReport;
 use App\Models\Program;
+use App\Models\Report;
 use App\Support\Reporting\ActiveReportRow;
 use App\Support\Reporting\ActiveReports;
 use Illuminate\Pagination\LengthAwarePaginator;
@@ -207,16 +209,22 @@ new #[Layout('layouts::desk'), Title('titles.active_reports')] class extends Com
     }
 
     /**
-     * The kinds of report the viewer has on the open tab: the Type filter lists only these.
+     * The kinds of report the viewer may have: the Type filter lists these, whatever is open
+     * today. Monthly reports are open to anyone who may view reports (their place decides
+     * which rows); donor and existing reports follow their own policy.
      *
      * @return list<ActiveReportType>
      */
     #[Computed]
     public function typeOptions(): array
     {
-        $present = $this->tabRows()->map(fn (ActiveReportRow $row): string => $row->type->value)->unique()->all();
+        $user = auth()->user();
 
-        return array_values(array_filter(ActiveReportType::cases(), fn (ActiveReportType $type): bool => in_array($type->value, $present, true)));
+        return array_values(array_filter(ActiveReportType::cases(), fn (ActiveReportType $type): bool => match ($type) {
+            ActiveReportType::Monthly => true,
+            ActiveReportType::Donor => $user->can('viewAny', DonorReport::class),
+            ActiveReportType::Report => $user->can('viewAny', Report::class),
+        }));
     }
 
     private function normaliseFilters(): void
