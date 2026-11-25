@@ -6,6 +6,7 @@ namespace Tests\PHPStan;
 
 use App\Livewire\Concerns\Results\BuildsResultsFramework;
 use App\Livewire\Concerns\Results\BuildsResultsTree;
+use App\Livewire\Concerns\Results\ManagesProgramRisks;
 use App\Livewire\Concerns\Results\ManagesResultForm;
 use Livewire\Component;
 
@@ -21,6 +22,7 @@ abstract class ResultsIndexPageHost extends Component
 {
     use BuildsResultsFramework;
     use BuildsResultsTree;
+    use ManagesProgramRisks;
     use ManagesResultForm;
 
     public string $search = '';
