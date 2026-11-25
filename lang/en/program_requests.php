@@ -1,0 +1,27 @@
+<?php
+
+return [
+    'intro' => 'A proposal that needs a program HR does not have yet waits here. Once HR has created the program, link it; the proposal can then be approved.',
+    'list_label' => 'Program requests waiting on HR',
+    'empty_heading' => 'No program requests waiting',
+    'empty_body' => 'When a proposal asks for a new program, it shows up here.',
+    'for_proposal' => 'Proposal:',
+    'in_city' => 'City: :city',
+    'requested_by' => 'Asked by :name',
+    'link_program' => 'Link HR program',
+    'decline' => 'Decline',
+    'link_title' => 'Link the HR program',
+    'link_description' => 'Choose the program HR created for “:name”.',
+    'link_help' => 'If the program is not in the list yet, HR has not created it. Try again later.',
+    'hr_program' => 'HR program',
+    'choose_program' => 'Choose the HR program to link.',
+    'program_already_on_proposal' => 'This proposal already has a row for this program in this city. Choose another program.',
+    'no_longer_pending' => 'Someone already handled this request.',
+    'linked' => 'Linked the HR program for “:name”.',
+    'linked_and_materialised' => '{0} Linked the HR program for “:name”.|{1} Linked the HR program for “:name” and gave the approved proposal its project.|[2,*] Linked the HR program for “:name” and gave the approved proposal :count projects.',
+    'decline_title' => 'Decline the request',
+    'decline_description' => 'Say why “:name” will not be created. The proposal keeps waiting until its editor picks another program.',
+    'decline_reason' => 'Reason',
+    'decline_reason_required' => 'Write why the request is declined (up to 1000 characters).',
+    'declined' => 'Declined the request for “:name”.',
+];

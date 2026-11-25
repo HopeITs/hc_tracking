@@ -630,6 +630,10 @@ return [
                 'title' => 'Program linked',
                 'body' => ':actor linked the HR program “:name” requested by “:subject”',
             ],
+            'declined' => [
+                'title' => 'Program request declined',
+                'body' => ':actor declined the program “:name” requested by “:subject”',
+            ],
         ],
         'proposal' => [
             'waiting_on_you' => [

@@ -83,6 +83,22 @@ class ProgramRequest extends Model
     }
 
     /**
+     * The requested name in the reader's language.
+     */
+    public function localizedName(): string
+    {
+        return app()->getLocale() === 'ar' ? $this->name_ar : $this->name_en;
+    }
+
+    /**
+     * The requested name in the other language, shown under the first.
+     */
+    public function otherLanguageName(): string
+    {
+        return app()->getLocale() === 'ar' ? $this->name_en : $this->name_ar;
+    }
+
+    /**
      * @param  Builder<self>  $query
      */
     #[Scope]

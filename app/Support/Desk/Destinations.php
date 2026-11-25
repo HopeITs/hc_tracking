@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Support\Desk;
 
 use App\Models\DonorReport;
+use App\Models\ProgramRequest;
 use App\Models\ProposalReviewer;
 use App\Models\RiskLibrary;
 use App\Models\Task;
@@ -295,6 +296,7 @@ final class Destinations
             $page('admin.sectors.index', 'navigation.sectors', 'grid', 'nav-tags', 'administration', $can('sectors.view')),
             $page('admin.risk-library.index', 'navigation.risk_library', 'info', 'nav-siren', 'administration', fn (User $user): bool => $user->can('viewAny', RiskLibrary::class), bindsAdministrators: true),
             $page('admin.evidence-types.index', 'navigation.evidence_types', 'file', 'nav-paperclip', 'administration', $can('evidence-types.manage')),
+            $page('admin.program-requests.index', 'navigation.program_requests', 'folder', 'nav-inbox', 'administration', fn (User $user): bool => $user->can('viewAny', ProgramRequest::class)),
             $page('admin.narrative-questions.index', 'navigation.narrative_questions', 'info', 'nav-message-circle-question-mark', 'administration', $can('narrative-questions.manage')),
 
             $page('security.edit', 'common.security', 'lock', 'nav-shield-check', 'you', $everyone),

@@ -46,6 +46,8 @@ function contractEventKeys(): array
         'task_review.submitted', 'task_review.sent_back',
         // W-34a (D-62): proposal location rows (counts only) and the program requests they open.
         'proposal.locations_changed', 'program_request.opened', 'program_request.linked',
+        // W-34a slice 3: the admin declines a program request with a reason.
+        'program_request.declined',
     ];
 }
 
