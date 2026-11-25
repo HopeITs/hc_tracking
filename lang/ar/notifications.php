@@ -715,6 +715,10 @@ return [
                 'title' => 'إزالة خطر',
                 'body' => 'أزال :actor الخطر «:value» من «:subject»',
             ],
+            'stage_tasks_created' => [
+                'title' => 'إنشاء مهام المرحلة',
+                'body' => 'أُنشئت مهام الأقسام لـ«:subject»',
+            ],
             'locations_changed' => [
                 'title' => 'تغيير المواقع',
                 'body' => 'غيّر :actor مواقع المقترح «:subject»',

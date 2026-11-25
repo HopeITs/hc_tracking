@@ -193,6 +193,8 @@ final class EventCatalog
                 'proposal.targets_saved' => self::entry('proposals', $digest, 'module_map', $all, activity: 'proposal.targets_saved'),
                 'proposal.project_linked' => self::entry('proposals', $digest, 'module_map', $all, activity: 'proposal.project_linked'),
                 'proposal.project_unlinked' => self::entry('proposals', $digest, 'module_map', $all, activity: 'proposal.project_unlinked'),
+                // The department work a stage opened by itself (D-63, W-12).
+                'proposal.stage_tasks_created' => self::entry('proposals', $digest, 'module_map', $all),
                 'proposal.deleted' => self::entry('proposals', $digest, 'module_map', $all, activity: 'proposal.deleted'),
                 'proposal.risk_attached' => self::entry('proposals', $digest, 'module_map', $all, activity: 'proposal.risk_attached'),
                 'proposal.risk_detached' => self::entry('proposals', $digest, 'module_map', $all, activity: 'proposal.risk_detached'),

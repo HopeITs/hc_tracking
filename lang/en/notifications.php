@@ -715,6 +715,10 @@ return [
                 'title' => 'Risk removed',
                 'body' => ':actor removed the risk “:value” from “:subject”',
             ],
+            'stage_tasks_created' => [
+                'title' => 'Stage tasks created',
+                'body' => 'Department tasks were created for “:subject”',
+            ],
             'locations_changed' => [
                 'title' => 'Locations changed',
                 'body' => ':actor changed the locations of “:subject”',

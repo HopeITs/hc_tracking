@@ -155,6 +155,9 @@ return [
         'rejected' => 'مرفوض',
         'superseded' => 'مستبدل',
     ],
+    'stage_template_creates' => [
+        'task' => 'مهمة قسم',
+    ],
     'status_note_kind' => [
         'transition' => 'تغيير حالة',
         'correction' => 'تصحيح',

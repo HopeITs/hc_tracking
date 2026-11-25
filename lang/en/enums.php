@@ -155,6 +155,9 @@ return [
         'rejected' => 'Rejected',
         'superseded' => 'Superseded',
     ],
+    'stage_template_creates' => [
+        'task' => 'Department task',
+    ],
     'status_note_kind' => [
         'transition' => 'Status change',
         'correction' => 'Correction',
