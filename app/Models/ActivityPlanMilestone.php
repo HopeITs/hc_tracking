@@ -12,6 +12,11 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 
+/**
+ * @property CarbonImmutable $due_date
+ * @property CarbonImmutable|null $completed_at
+ * @property int|null $created_by
+ */
 #[Fillable(['activity_plan_id', 'plan_indicator_id', 'created_by', 'title', 'description', 'due_date', 'measure', 'threshold', 'completed_at'])]
 class ActivityPlanMilestone extends Model
 {

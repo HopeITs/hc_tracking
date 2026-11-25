@@ -229,7 +229,7 @@ class HrEmployee extends HrModel
                 'value' => (string) $employee->id,
                 'label' => $employee->name.' · '.$employee->secondary_name,
                 'detail' => static::positionSummary($employee->id) ?? (string) __('common.no_active_position'),
-                'photo' => static::pathOnly(static::avatarUrl($employee->id)),
+                'photo' => self::pathOnly(static::avatarUrl($employee->id)),
                 'inactive' => ! (EmployeeProfile::for($employee->id)['is_active'] ?? false),
             ])->all(),
         ));
@@ -243,10 +243,11 @@ class HrEmployee extends HrModel
      */
     private static function pathOnly(string $url): string
     {
-        $path = parse_url($url, PHP_URL_PATH) ?? '/';
+        $path = parse_url($url, PHP_URL_PATH);
         $query = parse_url($url, PHP_URL_QUERY);
+        $path = is_string($path) ? $path : '/';
 
-        return $query === null ? $path : $path.'?'.$query;
+        return is_string($query) ? $path.'?'.$query : $path;
     }
 
     /**

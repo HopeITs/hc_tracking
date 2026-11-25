@@ -64,7 +64,7 @@ final class CorrectProposalStatus
                 'kind' => StatusNoteKind::Correction,
             ]);
 
-            ProposalStatusChanged::dispatch($locked->id, $from, $to, Auth::id(), true);
+            ProposalStatusChanged::dispatch($locked->id, $from, $to, Auth::user()?->id, true);
 
             return new TransitionResult($note, []);
         });

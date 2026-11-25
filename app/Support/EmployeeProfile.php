@@ -8,6 +8,7 @@ use App\Enums\Locale;
 use App\Models\Concerns\RemembersHrLookup;
 use App\Models\HrContract;
 use App\Models\HrEmployee;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Log;
 
 /**
@@ -219,7 +220,10 @@ final class EmployeeProfile
             $employeeId = (int) $row->employee_id;
 
             if (is_array($entries[$employeeId] ?? null)) {
-                Log::warning('HR employee has several active contracts; using the latest start date.', ['employee_id' => $employeeId]);
+                // The lookup reloads on every request; warn once per employee per day, not once per request.
+                if (Cache::add('hr-several-active-contracts:'.$employeeId, true, now()->addDay())) {
+                    Log::warning('HR employee has several active contracts; using the latest start date.', ['employee_id' => $employeeId]);
+                }
 
                 continue;
             }

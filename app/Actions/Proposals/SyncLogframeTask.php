@@ -131,7 +131,7 @@ final class SyncLogframeTask
                 $task->completed_date = CarbonImmutable::today();
                 $task->progress_percentage = 100;
                 $task->completion_note = $note === '' ? null : $note;
-                $task->completed_by = Auth::id();
+                $task->completed_by = Auth::user()?->id;
                 $task->save();
 
                 $proposal->recordActivity('proposal.framework_done', [], array_filter(['note' => $note]));
@@ -226,7 +226,7 @@ final class SyncLogframeTask
                 params: ['subject' => $proposal->name],
                 subjectType: 'proposal',
                 subjectId: $proposal->id,
-                actorId: Auth::id(),
+                actorId: Auth::user()?->id,
             ))));
     }
 

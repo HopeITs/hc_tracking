@@ -153,8 +153,9 @@ test('a project officer from another governorate sees the project while the gove
     $idlibEmployee = insertHrEmployee(firstNameEn: 'Ziad', lastNameEn: 'Idlib');
     $project = mrpProject($this->aleppo);
     Activity::withoutRecording(fn () => MealCoverageAssignment::factory()->forCity(insertHrCity('Idlib'))->create(['employee_id' => $idlibEmployee]));
-    Activity::withoutRecording(fn () => MealCoverageAssignment::factory()->forProject($project->id)->create(['employee_id' => $idlibEmployee]));
     $report = mrpMonth($project, '2026-09-01', MonthlyReportStatus::Submitted);
+    $report->template->forceFill(['city_wide' => true])->save();
+    Activity::withoutRecording(fn () => MealCoverageAssignment::factory()->forPlace($report->template->place())->create(['employee_id' => $idlibEmployee]));
 
     Livewire::actingAs(userWithRole('MEAL', $idlibEmployee))->test('pages::monthly-reports.index')
         ->assertSeeHtml('data-validate-row="'.$report->id.'"');
