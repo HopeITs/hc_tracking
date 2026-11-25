@@ -453,10 +453,12 @@ test('the proposal plan lists funded project department tasks without offering p
     $proposal = proposalPlanProposal();
     $project = Project::factory()->create();
     $proposal->projects()->attach($project);
+    // Y-16 (D-93): the plan reads the work of the proposal's places.
+    $row = proposalRowForProject($proposal, $project);
     $department = proposalPlanDepartment();
     $task = Task::factory()->create([
-        'source_type' => 'project',
-        'source_id' => $project->id,
+        'source_type' => 'proposal_location',
+        'source_id' => $row->id,
         'department_id' => $department['department'],
         'created_by' => $manager->id,
         'title' => 'Project department task',

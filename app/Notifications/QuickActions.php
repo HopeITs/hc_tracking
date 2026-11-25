@@ -77,7 +77,14 @@ final class QuickActions
     {
         $row = app(ProjectSuccessor::class)->rowFor($projectId);
 
-        return $row === null ? [] : [
+        // A project with no row yet (one is created when a proposal takes it
+        // on) still has an owner who was asked, and the ask is answered on
+        // the project itself until Y-18 moves the column.
+        if ($row === null) {
+            return $this->assignmentActions('project', $projectId, $user);
+        }
+
+        return [
             ...$this->ownerAssignmentActions($row->id, $user),
             ...($this->ownerHasLeft($row->id, $user) ? ['project.reassign'] : []),
         ];
