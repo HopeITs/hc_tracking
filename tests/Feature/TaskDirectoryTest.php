@@ -305,7 +305,8 @@ test('a task can be fully edited without changing its creator', function () {
     $editor = User::factory()->role('General Manager')->create();
     $newAssignee = insertHrEmployee();
     $originalProposal = Proposal::factory()->create();
-    $newProject = Project::factory()->create();
+    // Y-16 (D-93): "Related to" offers places, not projects.
+    $newRow = rowFor(Project::factory()->create());
     $task = Task::factory()->create([
         'created_by' => $creator->id,
         'title' => 'Original',
@@ -327,8 +328,8 @@ test('a task can be fully edited without changing its creator', function () {
         ->set('completedDate', '2026-04-29')
         ->set('progressPercentage', '80')
         ->set('assignedTo', [(string) $newAssignee])
-        ->set('taskSourceType', 'project')
-        ->set('taskSourceId', (string) $newProject->id)
+        ->set('taskSourceType', 'proposal_location')
+        ->set('taskSourceId', (string) $newRow->id)
         ->call('saveTask')
         ->assertHasNoErrors();
 
@@ -340,8 +341,8 @@ test('a task can be fully edited without changing its creator', function () {
         ->and($task->priority)->toBe(TaskPriority::High)
         ->and($task->progress_percentage)->toBe(80)
         ->and($task->taskAssignees->pluck('employee_id')->all())->toBe([$newAssignee])
-        ->and($task->source_type)->toBe('project')
-        ->and($task->source_id)->toBe($newProject->id)
+        ->and($task->source_type)->toBe('proposal_location')
+        ->and($task->source_id)->toBe($newRow->id)
         ->and($task->created_by)->toBe($creator->id);
 });
 

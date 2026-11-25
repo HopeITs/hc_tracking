@@ -56,6 +56,10 @@ trait ReadsAnnualPlanSummary
             ->with([
                 'indicator:id,name,result_id,measure',
                 'indicator.result:id,statement,type',
+                // D-44: an annual plan's target carries no place, so the list
+                // names the project it was committed against.
+                'project:id,slug,name,city_id',
+                'project.city:id,name_en,name_ar',
             ])
             ->withCount('reports')
             ->get();

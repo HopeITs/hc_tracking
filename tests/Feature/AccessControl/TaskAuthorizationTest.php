@@ -63,10 +63,10 @@ test('the task being deleted cannot be swapped from the browser', function () {
 });
 
 test('adding a task on a project needs tasks.create', function () {
-    $project = Project::factory()->create();
+    $slug = rowFor(Project::factory()->create())->slug;
 
-    Livewire::actingAs($this->assignee)->test('pages::projects.show', ['project' => $project])->call('openAddTaskModal')->assertForbidden();
-    Livewire::actingAs(userWithRole('Media Team'))->test('pages::projects.show', ['project' => $project])->call('openAddTaskModal')->assertOk();
+    Livewire::actingAs($this->assignee)->test('pages::projects.show', ['project' => $slug])->call('openAddTaskModal')->assertForbidden();
+    Livewire::actingAs(userWithRole('Media Team'))->test('pages::projects.show', ['project' => $slug])->call('openAddTaskModal')->assertOk();
 });
 
 test('an assignee on the task page changes status but not the title', function () {

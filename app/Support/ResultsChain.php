@@ -192,8 +192,18 @@ final class ResultsChain
                         'planIndicators' => function ($query) use ($targetScope): void {
                             $query->select(['id', 'indicator_id', 'source_type', 'source_id', 'target', 'project_id', 'proposal_location_id', 'period'])
                                 ->with([
-                                    // chainIssues() reads the row now (Y-16, D-93).
-                                    'location:id,proposal_id,program_id',
+                                    // chainIssues() reads the row now (Y-16, D-93),
+                                    // and a scoped target names the place it is
+                                    // committed at, which label() builds.
+                                    // D-44: an annual plan's target carries no
+                                    // row, so the plan's own list still names the
+                                    // project it was committed against.
+                                    'project:id,name,city_id',
+                                    'project.city:id,name_en,name_ar',
+                                    'location:id,proposal_id,program_id,city_id,city_wide',
+                                    'location.city:id,name_en,name_ar',
+                                    'location.program:id',
+                                    'location.centers',
                                     'reports:id,plan_indicator_id,status,planned_date,value',
                                 ])
                                 ->orderBy('id');

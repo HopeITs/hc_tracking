@@ -624,7 +624,9 @@ test('a proposal task shows its donor and dates in the related-to card', functio
 test('a project task shows its dates and program in the related-to card', function () {
     $user = User::factory()->role('General Manager')->create();
     $project = Project::factory()->create(['name' => 'Winter Support', 'start_date' => '2026-01-05', 'end_date' => '2026-12-20']);
-    $task = Task::factory()->create(['source_type' => 'project', 'source_id' => $project->id]);
+    // Y-16 (D-93): a delivery task is raised at a place, which carries the dates.
+    $row = rowFor($project);
+    $task = Task::factory()->create(['source_type' => 'proposal_location', 'source_id' => $row->id]);
 
     $this->actingAs($user)
         ->get(route('tasks.show', $task))
