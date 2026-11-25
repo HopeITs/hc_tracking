@@ -1,4 +1,4 @@
-{{-- The framework box's dialogs: Mark as done, assumption, and the shared result/indicator/risk forms. --}}
+{{-- The framework box's dialogs: Mark as done, assumption, and the shared result/indicator/risk forms (risk form: components/risks/form-modal). --}}
 @php
     $openChecks = \App\Support\FrameworkChecks::open($checks);
 @endphp
@@ -51,7 +51,15 @@
     </x-slot:actions>
 </x-ui.modal>
 
-@include('components.proposals._logframe-risks-drawer')
+<x-risks.form-modal
+    show="showRiskModal"
+    form="riskForm"
+    submit="saveRisk"
+    close="closeRiskForm"
+    :open="$showRiskModal"
+    :editing="$editingRiskId !== null"
+    :suggestions="$this->riskSuggestions"
+/>
 
 @include('pages.results._index-result-modal')
 

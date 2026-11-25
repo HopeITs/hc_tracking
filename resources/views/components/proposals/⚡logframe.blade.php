@@ -48,10 +48,7 @@ new class extends Component {
     use CopiesProgramFramework;
     use EditsCentreTargets;
     use ManagesFrameworkBoard;
-    use ManagesProposalRisks {
-        attachRisks as attachLibraryRisks;
-        detachRisk as detachLibraryRisk;
-    }
+    use ManagesProposalRisks;
     use ManagesResultForm;
     use ReadsProposalFramework;
 
@@ -560,7 +557,7 @@ new class extends Component {
                 return true;
             }
 
-            $text = $result['statement'].' '.implode(' ', array_column($result['indicators'], 'name')).' '.implode(' ', array_column($result['risks'], 'name')).' '.implode(' ', array_column($result['assumptions'], 'statement'))
+            $text = $result['statement'].' '.implode(' ', array_column($result['indicators'], 'name')).' '.implode(' ', array_column($result['assumptions'], 'statement'))
                 .' '.implode(' ', array_map(fn (int $id): string => $framework['activities'][$id]['name'] ?? '', $result['activities']));
 
             return str_contains(mb_strtolower($text), $query);
@@ -607,15 +604,11 @@ new class extends Component {
         $this->forgetBox();
     }
 
-    public function attachRisks(): void
+    /**
+     * A risk write changes the layer counts and warnings too.
+     */
+    protected function forgetRisks(): void
     {
-        $this->attachLibraryRisks();
-        $this->forgetBox();
-    }
-
-    public function detachRisk(int $riskId): void
-    {
-        $this->detachLibraryRisk($riskId);
         $this->forgetBox();
     }
 };

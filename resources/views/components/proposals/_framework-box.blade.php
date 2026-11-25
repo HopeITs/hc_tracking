@@ -15,7 +15,7 @@
     $problemCount = count(array_filter($fw['results'], fn (array $result): bool => $result['issues'] !== []));
     $layerWarn = [
         'activities' => collect($fw['activities'])->contains('status', 'late'),
-        'risks' => collect($fw['results'])->contains(fn (array $result): bool => collect($result['risks'])->contains('happened', true)),
+        'risks' => $this->proposalRisks->contains('happened', true),
         'assumptions' => collect($fw['results'])->contains(fn (array $result): bool => collect($result['assumptions'])->contains(fn (array $a): bool => $a['status'] !== \App\Enums\AssumptionStatus::Holds)),
     ];
     $icon = [
@@ -119,6 +119,10 @@
             @include('components.proposals._framework-matrix')
         @else
             @include('components.proposals._framework-tabs')
+        @endif
+
+        @if ($layout !== 'board' && ($layers['risks'] ?? false))
+            @include('components.proposals._framework-risks')
         @endif
     </div>
 

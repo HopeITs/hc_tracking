@@ -1,13 +1,11 @@
 <?php
 
-use App\Actions\Proposals\AttachLibraryRisk;
 use App\Enums\ResultType;
 use App\Models\Program;
 use App\Models\Project;
 use App\Models\Proposal;
 use App\Models\Result;
 use App\Models\Risk;
-use App\Models\RiskLibrary;
 use App\Models\User;
 use Database\Seeders\RolesAndPermissionsSeeder;
 use Illuminate\Support\Facades\DB;
@@ -16,18 +14,18 @@ use Livewire\Livewire;
 
 beforeEach(function () {
     $this->seed(RolesAndPermissionsSeeder::class);
-    $program = Program::factory()->create();
+    $this->program = Program::factory()->create();
     $this->proposal = Proposal::factory()->create();
-    DB::table('project_proposal')->insert(['project_id' => Project::factory()->create(['program_id' => $program->id])->id, 'proposal_id' => $this->proposal->id]);
+    DB::table('project_proposal')->insert(['project_id' => Project::factory()->create(['program_id' => $this->program->id])->id, 'proposal_id' => $this->proposal->id]);
 
-    $this->impact = riskNode($this->proposal, ResultType::Impact, null, $program->id);
-    $this->outcome = riskNode($this->proposal, ResultType::Outcome, $this->impact);
+    $this->outcome = riskNode($this->proposal, ResultType::Outcome, null, $this->program->id);
     $this->output = riskNode($this->proposal, ResultType::Output, $this->outcome);
-    $this->activity = riskNode($this->proposal, ResultType::Activity, $this->output);
 
     $this->editor = mealManager();
-    $this->delay = RiskLibrary::factory()->create(['title_en' => 'Funding delay', 'title_ar' => 'تأخر التمويل', 'category' => 'financial', 'default_likelihood' => 2, 'default_severity' => 3]);
-    $this->access = RiskLibrary::factory()->create(['title_en' => 'Access denied', 'title_ar' => 'منع الوصول', 'category' => 'security', 'default_likelihood' => 1, 'default_severity' => 3]);
+
+    $this->programRisk = Risk::factory()->onProgram($this->program)->rated(2, 3)->create(['name' => 'تأخر التمويل', 'name_en' => 'Funding delay']);
+    $this->copied = Risk::factory()->onProposalFramework($this->proposal)->rated(2, 3)->create(['copied_from_id' => $this->programRisk->id, 'name' => 'تأخر التمويل', 'name_en' => 'Funding delay']);
+    $this->specific = Risk::factory()->onProposalFramework($this->proposal)->rated(1, 2)->create(['name' => 'منع الوصول', 'name_en' => 'Access denied']);
 });
 
 function riskNode(Proposal $proposal, ResultType $type, ?Result $parent, ?int $programId = null): Result
@@ -44,134 +42,128 @@ function riskTab(User $user, Proposal $proposal): Testable
     return Livewire::actingAs($user)->test('proposals.logframe', ['proposalId' => $proposal->id]);
 }
 
-describe('the node', function () {
-    it('offers the risks drawer on outcomes and outputs only, with the count in the list heading', function () {
-        $this->actingAs($this->editor);
-        app(AttachLibraryRisk::class)->handle($this->proposal, $this->output->id, $this->delay->id, []);
+/**
+ * @return array{name: string, name_en: string, likelihood: int, severity: int, solution: string}
+ */
+function typedRisk(string $english = 'Border closure'): array
+{
+    return ['name' => 'إغلاق الحدود', 'name_en' => $english, 'likelihood' => 2, 'severity' => 2, 'solution' => 'Pre-position stock.'];
+}
 
-        // Results start folded on the redesigned page: open them to reach their Add buttons.
+describe('the Risks section', function () {
+    it('lists copied and proposal-specific risks once under the whole framework, copied ones remove only', function () {
         riskTab($this->editor, $this->proposal)
-            ->call('openAll')
-            ->assertSeeHtml('data-test="result-risks-'.$this->outcome->id.'"')
-            ->assertSeeHtml('data-test="result-risks-'.$this->output->id.'"')
-            ->assertDontSeeHtml('data-test="result-risks-'.$this->impact->id.'"')
-            ->assertDontSeeHtml('data-test="result-risks-'.$this->activity->id.'"')
-            ->assertSee(__('proposals.framework.layer_risks').' · 1');
-    });
-
-    it('opens the drawer on one result and lists only its risks, with rating words', function () {
-        $this->actingAs($this->editor);
-        $here = app(AttachLibraryRisk::class)->handle($this->proposal, $this->output->id, $this->delay->id, []);
-        $elsewhere = app(AttachLibraryRisk::class)->handle($this->proposal, $this->outcome->id, $this->access->id, []);
-
-        riskTab($this->editor, $this->proposal)
-            ->call('openRisks', $this->output->id)
-            ->assertSet('showRisksDrawer', true)
-            ->assertSet('riskResultId', $this->output->id)
-            ->assertSeeHtml('data-risk="'.$here->id.'"')
-            ->assertDontSeeHtml('data-risk="'.$elsewhere->id.'"')
-            ->assertSee(__('risks.likelihood').': '.__('risks.rating_medium'))
-            ->assertSee(__('risks.severity').': '.__('risks.rating_high'));
-    });
-
-    it('never opens the drawer on a result of another proposal', function () {
-        $foreign = riskNode(Proposal::factory()->create(), ResultType::Output, null);
-
-        riskTab($this->editor, $this->proposal)->call('openRisks', $foreign->id)->assertNotFound();
-    });
-});
-
-describe('the picker', function () {
-    it('offers only active library entries, grouped by category, and no free-text field', function () {
-        RiskLibrary::factory()->inactive()->create(['title_en' => 'Retired risk', 'title_ar' => 'خطر موقوف']);
-
-        riskTab($this->editor, $this->proposal)
-            ->call('openRisks', $this->output->id)
+            ->assertSeeHtml('data-test="proposal-risks"')
+            ->assertSee(__('results_framework.risks_heading').' · 2')
             ->assertSee('Funding delay')
             ->assertSee('Access denied')
-            ->assertDontSee('Retired risk')
-            ->assertSeeHtml('data-picker-risk="'.$this->delay->id.'"')
-            ->assertSee('financial')
-            ->assertSee('security')
-            ->assertDontSeeHtml('wire:model="riskName"');
+            ->assertSee(__('results_framework.risk_from_program'))
+            ->assertDontSeeHtml('data-test="edit-proposal-risk-'.$this->copied->id.'"')
+            ->assertSeeHtml('data-test="remove-proposal-risk-'.$this->copied->id.'"')
+            ->assertSeeHtml('data-test="edit-proposal-risk-'.$this->specific->id.'"')
+            ->assertSeeHtml('data-test="remove-proposal-risk-'.$this->specific->id.'"')
+            ->assertSeeHtml('data-test="add-proposal-risk"')
+            ->assertDontSeeHtml('data-test="result-risks-');
     });
 
-    it('attaches the picked library risks and closes the drawer on success', function () {
-        riskTab($this->editor, $this->proposal)
-            ->call('openRisks', $this->output->id)
-            ->set('riskPicks', [$this->delay->id, $this->access->id])
-            ->call('attachRisks')
-            ->assertHasNoErrors()
-            ->assertSet('riskPicks', []);
+    it('still lists a legacy risk that sits on one result', function () {
+        $legacy = Risk::factory()->onProposalFramework($this->proposal)->create(['result_id' => $this->output->id, 'name_en' => 'Old result risk']);
 
-        expect(Risk::query()->where('result_id', $this->output->id)->orderBy('library_risk_id')->pluck('library_risk_id')->all())
-            ->toBe([$this->delay->id, $this->access->id])
-            ->and(Risk::query()->first()->project_id)->toBeNull();
+        riskTab($this->editor, $this->proposal)
+            ->assertSee('Old result risk')
+            ->assertSeeHtml('data-test="edit-proposal-risk-'.$legacy->id.'"');
     });
 
-    it('refuses a risk already on the result and attaches nothing from that batch', function () {
-        $this->actingAs($this->editor);
-        app(AttachLibraryRisk::class)->handle($this->proposal, $this->output->id, $this->delay->id, []);
+    it('never lists the program risk itself or another proposal’s risks', function () {
+        $foreign = Risk::factory()->onProposalFramework(Proposal::factory()->create())->create(['name_en' => 'Somewhere else']);
 
         riskTab($this->editor, $this->proposal)
-            ->call('openRisks', $this->output->id)
-            ->set('riskPicks', [$this->delay->id, $this->access->id])
-            ->call('attachRisks')
-            ->assertHasErrors(['riskPicks' => __('risk_library.already_on_result')]);
-
-        expect(Risk::query()->count())->toBe(1);
-    });
-
-    it('asks for at least one pick', function () {
-        riskTab($this->editor, $this->proposal)
-            ->call('openRisks', $this->output->id)
-            ->set('riskPicks', [])
-            ->call('attachRisks')
-            ->assertHasErrors(['riskPicks' => __('risks.pick_at_least_one')]);
+            ->assertDontSeeHtml('data-test="risk-row-'.$this->programRisk->id.'"')
+            ->assertDontSee('Somewhere else')
+            ->assertDontSeeHtml('data-test="risk-row-'.$foreign->id.'"');
     });
 });
 
-describe('removing and permissions', function () {
-    it('detaches a risk of this proposal', function () {
-        $this->actingAs($this->editor);
-        $risk = app(AttachLibraryRisk::class)->handle($this->proposal, $this->output->id, $this->delay->id, []);
+describe('writing', function () {
+    it('adds a proposal-specific risk through the typed form', function () {
+        riskTab($this->editor, $this->proposal)
+            ->call('openRiskForm')
+            ->assertSet('showRiskModal', true)
+            ->assertSeeHtml('data-test="risk-form"')
+            ->set('riskForm', typedRisk())
+            ->call('saveRisk')
+            ->assertHasNoErrors()
+            ->assertSet('showRiskModal', false)
+            ->assertSee('Border closure');
 
-        riskTab($this->editor, $this->proposal)->call('openRisks', $this->output->id)->call('detachRisk', $risk->id)->assertHasNoErrors();
+        $risk = Risk::query()->where('name_en', 'Border closure')->sole();
 
-        expect(Risk::query()->count())->toBe(0);
+        expect($risk->only(['proposal_id', 'proposal_location_id', 'copied_from_id', 'likelihood', 'severity']))
+            ->toBe(['proposal_id' => $this->proposal->id, 'proposal_location_id' => null, 'copied_from_id' => null, 'likelihood' => 2, 'severity' => 2]);
     });
 
-    it('never detaches a risk of another proposal', function () {
-        $other = Proposal::factory()->create();
-        $otherOutput = riskNode($other, ResultType::Output, null);
-        $this->actingAs($this->editor);
-        $foreign = app(AttachLibraryRisk::class)->handle($other, $otherOutput->id, $this->delay->id, []);
+    it('edits a proposal-specific risk', function () {
+        riskTab($this->editor, $this->proposal)
+            ->call('openRiskForm', $this->specific->id)
+            ->assertSet('editingRiskId', $this->specific->id)
+            ->assertSet('riskForm.name_en', 'Access denied')
+            ->set('riskForm.name_en', 'Access blocked')
+            ->call('saveRisk')
+            ->assertHasNoErrors();
 
-        riskTab($this->editor, $this->proposal)->call('detachRisk', $foreign->id)->assertNotFound();
-
-        expect(Risk::query()->whereKey($foreign->id)->exists())->toBeTrue();
+        expect($this->specific->fresh()->name_en)->toBe('Access blocked');
     });
 
-    it('lets a PR officer read the drawer but refuses every write', function () {
-        $this->actingAs($this->editor);
-        $risk = app(AttachLibraryRisk::class)->handle($this->proposal, $this->output->id, $this->delay->id, []);
+    it('refuses to open a copied risk for editing', function () {
+        riskTab($this->editor, $this->proposal)
+            ->call('openRiskForm', $this->copied->id)
+            ->assertHasErrors('riskForm.name')
+            ->assertSet('showRiskModal', false);
+
+        expect($this->copied->fresh()->name_en)->toBe('Funding delay');
+    });
+
+    it('removes a copied and a proposal-specific risk, never the program risk', function () {
+        riskTab($this->editor, $this->proposal)
+            ->call('removeRisk', $this->copied->id)
+            ->call('removeRisk', $this->specific->id)
+            ->assertSee(__('results_framework.no_proposal_risks'));
+
+        expect(Risk::query()->onLogframeOf($this->proposal->id)->count())->toBe(0)
+            ->and($this->programRisk->fresh())->not->toBeNull();
+    });
+
+    it('never edits or removes a risk of another proposal or of the program', function () {
+        $foreign = Risk::factory()->onProposalFramework(Proposal::factory()->create())->create();
+
+        foreach ([$foreign->id, $this->programRisk->id] as $riskId) {
+            riskTab($this->editor, $this->proposal)->call('openRiskForm', $riskId)->assertNotFound();
+            riskTab($this->editor, $this->proposal)->call('removeRisk', $riskId)->assertNotFound();
+        }
+
+        expect(Risk::query()->whereKey([$foreign->id, $this->programRisk->id])->count())->toBe(2);
+    });
+});
+
+describe('permissions', function () {
+    it('lets a PR officer read the section but refuses every forged write', function () {
         $viewer = User::factory()->role('Public Relations Manager')->create();
 
         riskTab($viewer, $this->proposal)
-            ->call('openRisks', $this->output->id)
-            ->assertSee('Funding delay')
-            ->assertDontSeeHtml('data-test="risk-picker"');
+            ->assertSee('Access denied')
+            ->assertDontSeeHtml('data-test="add-proposal-risk"')
+            ->assertDontSeeHtml('data-test="remove-proposal-risk-');
 
-        riskTab($viewer, $this->proposal)->set('riskResultId', $this->output->id)->set('riskPicks', [$this->access->id])->call('attachRisks')->assertForbidden();
-        riskTab($viewer, $this->proposal)->call('detachRisk', $risk->id)->assertForbidden();
+        riskTab($viewer, $this->proposal)->call('openRiskForm')->assertForbidden();
+        riskTab($viewer, $this->proposal)->set('riskForm', typedRisk('Forged'))->call('saveRisk')->assertForbidden();
+        riskTab($viewer, $this->proposal)->call('removeRisk', $this->specific->id)->assertForbidden();
 
-        expect(Risk::query()->count())->toBe(1);
+        expect(Risk::query()->onLogframeOf($this->proposal->id)->count())->toBe(2)
+            ->and(Risk::query()->where('name_en', 'Forged')->exists())->toBeFalse();
     });
 });
 
 it('keeps the logframe tab at a flat query count whatever the number of risks', function () {
-    $this->actingAs($this->editor);
-
     $count = function (): int {
         riskTab($this->editor, $this->proposal);
         DB::flushQueryLog();
@@ -183,14 +175,9 @@ it('keeps the logframe tab at a flat query count whatever the number of risks', 
         return $queries;
     };
 
-    app(AttachLibraryRisk::class)->handle($this->proposal, $this->output->id, $this->delay->id, []);
     $small = $count();
 
-    foreach (range(1, 6) as $index) {
-        $result = riskNode($this->proposal, ResultType::Output, $this->outcome);
-        app(AttachLibraryRisk::class)->handle($this->proposal, $result->id, $this->delay->id, []);
-        app(AttachLibraryRisk::class)->handle($this->proposal, $result->id, $this->access->id, []);
-    }
+    Risk::factory()->onProposalFramework($this->proposal)->count(6)->create();
 
     expect($count())->toBe($small);
 });

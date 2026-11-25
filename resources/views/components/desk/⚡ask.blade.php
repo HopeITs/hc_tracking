@@ -287,7 +287,7 @@ new class extends Component {
             'donors' => Donor::query(),
             'tasks' => Task::query()->whereNull('parent_task_id')->where('status', '!=', TaskStatus::Done)
                 ->when($mine, fn (Builder $query) => $query->whereHas('taskAssignees', fn (Builder $assignee) => $assignee->where('employee_id', auth()->user()->employee_id ?? 0))),
-            'risks' => Risk::query(),
+            'risks' => Risk::query()->whereNull('program_id'),
             'transfers' => TransfersTracking::query(),
             'indicators' => Indicator::query(),
             'annual-plans' => AnnualPlan::query(),
