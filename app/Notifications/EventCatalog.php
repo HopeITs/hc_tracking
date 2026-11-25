@@ -178,6 +178,9 @@ final class EventCatalog
                 'proposal.on_hold_reminder' => self::entry('proposals', $now, 'scanner', $all),
                 // Work still named after somebody who has left HR (D-62, W-35).
                 'proposal.responsible_inactive' => self::entry('proposals', $now, 'scanner', $all),
+                // An active proposal ending with money still to come (D-60, W-33).
+                // `.due` is the suffix DueSoonScanner looks up, as for department_task.
+                'proposal.ending_with_funds.due' => self::entry('proposals', $now, 'scanner', $all),
                 'proposal.final_report_accepted' => self::entry('proposals', $now, 'module_map', $all, activity: 'proposal.final_report_accepted'),
                 'proposal.beneficiaries_changed' => self::entry('proposals', $now, 'module_map', $all, activity: 'proposal.beneficiaries_changed'),
                 // Y-09 (D-89, D-89a): a change request on an approved proposal, its reviews and its decision.
