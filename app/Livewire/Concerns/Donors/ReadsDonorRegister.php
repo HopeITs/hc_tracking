@@ -130,7 +130,10 @@ trait ReadsDonorRegister
                 ? $query->select(['id', 'donor_id', 'proposal_id', 'budget', 'currency', 'external_project_number'])->orderByDesc('budget')
                 : $query->select(['id', 'donor_id', 'proposal_id'])->orderBy('id'),
             'donorProposals.proposal' => fn ($query) => $query->select(['id', 'name', 'status']),
-            'donorProposals.proposal.projects' => fn ($query) => $query->select(['projects.id', 'projects.name']),
+            'donorProposals.proposal.locations' => fn ($query) => $query->select(['proposal_locations.id', 'proposal_locations.proposal_id', 'proposal_locations.slug', 'proposal_locations.city_id', 'proposal_locations.city_wide', 'proposal_locations.program_id']),
+            'donorProposals.proposal.locations.city:id,name_en,name_ar',
+            'donorProposals.proposal.locations.program:id',
+            'donorProposals.proposal.locations.centers',
         ];
 
         if ($canAgreements) {

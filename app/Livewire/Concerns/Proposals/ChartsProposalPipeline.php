@@ -184,7 +184,7 @@ trait ChartsProposalPipeline
                 'donorProposals:id,proposal_id,donor_id,budget,currency',
                 'donorProposals.donor:id,name',
                 // Y-16 (D-93): the places a proposal pays for.
-                'locations' => fn ($query) => $query->select(['proposal_locations.id', 'proposal_locations.proposal_id', 'proposal_locations.city_id', 'proposal_locations.city_wide', 'proposal_locations.program_id'])->orderBy('proposal_locations.id'),
+                'locations' => fn ($query) => $query->select(['proposal_locations.id', 'proposal_locations.proposal_id', 'proposal_locations.slug', 'proposal_locations.city_id', 'proposal_locations.city_wide', 'proposal_locations.program_id'])->orderBy('proposal_locations.id'),
                 'locations.city:id,name_en,name_ar',
                 'locations.program:id',
                 'locations.centers',
@@ -240,6 +240,7 @@ trait ChartsProposalPipeline
                 ->map(fn (Collection $links): array => [
                     'key' => 'j'.$links->first()['project']->id,
                     'id' => $links->first()['project']->id,
+                    'slug' => $links->first()['project']->slug,
                     'name' => $links->first()['project']->label(),
                     'row' => $links->avg('row'),
                 ])

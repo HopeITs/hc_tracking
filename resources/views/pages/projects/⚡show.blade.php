@@ -89,7 +89,7 @@ new #[Layout('layouts::desk'), Title('titles.project')] class extends Component 
 
         $this->locationId = $row->id;
 
-        $assignment = $row->currentAssignment('responsible_employee_id');
+        $assignment = $row->currentOwnerAssignment();
 
         if ($assignment !== null && Auth::user() !== null && $assignment->status === AssignmentStatus::Pending && $assignment->isFor(Auth::user())) {
             $assignment->markSeen();

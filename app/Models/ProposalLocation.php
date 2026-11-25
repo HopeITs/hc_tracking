@@ -392,6 +392,32 @@ class ProposalLocation extends Model
     }
 
     /**
+     * The owner assignment this place stands for, wherever it is filed.
+     *
+     * The place is what a person is put in charge of (Y-16, D-93), but the
+     * owner column still lives on the project until Y-18, and so does the
+     * assignment raised when it changes. A place that holds none of its own
+     * answers with the project's, so the banner, the bell and "mark as seen"
+     * all see the same pending request.
+     */
+    public function currentOwnerAssignment(): ?Assignment
+    {
+        $own = $this->currentAssignment('responsible_employee_id');
+
+        if ($own !== null || $this->project_id === null) {
+            return $own;
+        }
+
+        return Assignment::query()
+            ->current()
+            ->where('assignable_type', 'project')
+            ->where('assignable_id', $this->project_id)
+            ->where('field', 'user_id')
+            ->latest('id')
+            ->first();
+    }
+
+    /**
      * Where the row is, for every list and card: the program, the city and
      * the centers it runs from, or "Field work" for a city-wide row (D-88).
      * The twin of `Project::locationLabel()` and the project's name.

@@ -117,7 +117,10 @@ trait ManagesProposalRecord
         Gate::authorize('update', $this->proposal);
 
         $this->resetValidation();
-        $this->unlinkingProjectId = $this->projects->firstWhere('id', $projectId)?->id;
+        // Y-16: the tab lists rows, but the unlink still names a project (Y-18
+        // owns the columns). A project linked before the rows existed has no
+        // row and must still be unlinkable (Y-10), so the pivot decides.
+        $this->unlinkingProjectId = $this->proposal->projects()->whereKey($projectId)->value('projects.id');
         $row = $this->unlinkingProjectId === null ? null : $this->proposal->locations()->where('project_id', $this->unlinkingProjectId)->first();
         $this->unlinkTargets = $row === null ? ['count' => 0, 'reported' => 0] : TargetCounts::ofLocation($row);
         $this->showUnlinkModal = $this->unlinkingProjectId !== null;

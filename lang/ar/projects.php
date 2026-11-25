@@ -96,7 +96,7 @@ return [
     'lens_risks' => 'مخاطر متحققة',
     'lens_risks_hint' => 'تحقق خطر مسجل على المشروع',
     'lens_unfunded' => 'بلا تمويل',
-    'lens_unfunded_hint' => 'لا يغطيه أي مقترح',
+    'lens_unfunded_hint' => 'لا اتفاقية مانح عليه بعد',
     'lifecycle' => 'دورة حياة المشروع',
     'lifecycle_segment' => '{0} :status، لا توجد مشاريع|{1} :status، مشروع واحد|{2} :status، مشروعان|[3,10] :status، :count مشاريع|[11,*] :status، :count مشروعًا',
     'link' => 'ربط',

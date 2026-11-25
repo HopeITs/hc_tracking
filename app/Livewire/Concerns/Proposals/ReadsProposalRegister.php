@@ -164,7 +164,11 @@ trait ReadsProposalRegister
         $canTransfers = $this->canViewTransfers();
 
         $relations = [
-            'projects' => fn ($query) => $query->select(['projects.id', 'projects.name', 'projects.status'])->orderBy('projects.name'),
+            // Y-16 (D-93): a dossier lists the places the proposal pays for.
+            'locations' => fn ($query) => $query->select(['proposal_locations.id', 'proposal_locations.proposal_id', 'proposal_locations.slug', 'proposal_locations.status', 'proposal_locations.city_id', 'proposal_locations.city_wide', 'proposal_locations.program_id'])->orderBy('proposal_locations.id'),
+            'locations.city:id,name_en,name_ar',
+            'locations.program:id',
+            'locations.centers',
             'statusNotes' => fn ($query) => $query->select(['id', 'proposal_id', 'status', 'context', 'date'])->orderByDesc('date')->orderByDesc('id'),
         ];
 

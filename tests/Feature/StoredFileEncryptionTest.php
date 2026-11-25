@@ -48,18 +48,19 @@ function uploadSurface(string $kind): array
 {
     return match ($kind) {
         'project' => (function (): array {
-            $project = Project::factory()->create();
+            // Y-16 (D-93): files hang off the location row, and the page is the row's.
+            $location = rowFor(Project::factory()->create());
             $user = User::factory()->role('General Manager')->create();
 
             return [
                 'table' => 'media',
-                'page' => fn () => Livewire::actingAs($user)->test('pages::projects.show', ['project' => $project])->set('tab', 'files')->call('openCreateFileModal'),
+                'page' => fn () => Livewire::actingAs($user)->test('pages::projects.show', ['project' => $location->slug])->set('tab', 'files')->call('openCreateFileModal'),
                 'user' => $user,
                 'fill' => fn (Testable $page) => $page->set('fileCategory', MediaCollection::Photo->value)->set('fileDisplayName', 'Site document'),
-                'row' => fn () => Media::query()->where('mediable_type', 'project')->where('mediable_id', $project->id)->latest('id')->firstOrFail(),
-                'download' => fn (Model $row) => route('projects.files.download', [$project, $row]),
-                'preview' => fn (Model $row) => route('projects.files.download', [$project, $row]),
-                'foreignDownload' => fn (Model $row) => route('projects.files.download', [Project::factory()->create(), $row]),
+                'row' => fn () => Media::query()->where('mediable_type', 'proposal_location')->where('mediable_id', $location->id)->latest('id')->firstOrFail(),
+                'download' => fn (Model $row) => route('projects.files.download', [$location, $row]),
+                'preview' => fn (Model $row) => route('projects.files.download', [$location, $row]),
+                'foreignDownload' => fn (Model $row) => route('projects.files.download', [rowFor(Project::factory()->create()), $row]),
                 'edit' => null,
             ];
         })(),

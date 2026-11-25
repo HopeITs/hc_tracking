@@ -19,8 +19,10 @@ beforeEach(function () {
     $this->seed(RolesAndPermissionsSeeder::class);
     $this->program = Program::factory()->create();
     $this->proposal = Proposal::factory()->create(['status' => ProposalStatus::ProposalDraft]);
-    $projectId = Project::factory()->create(['program_id' => $this->program->id])->id;
-    DB::table('project_proposal')->insert(['project_id' => $projectId, 'proposal_id' => $this->proposal->id]);
+    $project = Project::factory()->create(['program_id' => $this->program->id]);
+    DB::table('project_proposal')->insert(['project_id' => $project->id, 'proposal_id' => $this->proposal->id]);
+    // Y-16 (D-93): the proposal's programs are read from its places.
+    proposalRowForProject($this->proposal, $project);
     $this->meal = mealManager();
 
     $this->outcome = Result::factory()->type(ResultType::Outcome)->create(['proposal_id' => $this->proposal->id, 'program_id' => $this->program->id]);

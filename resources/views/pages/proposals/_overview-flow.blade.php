@@ -103,7 +103,7 @@
                                     @forelse ($graph['projects'] as $node)
                                         <li wire:key="flow-project-{{ $graph['currency'] }}-{{ $node['id'] }}">
                                             <a
-                                                href="{{ route('projects.show', tap(new \App\Models\Project, fn ($project) => $project->id = $node['id'])) }}"
+                                                href="{{ route('projects.show', $node['slug']) }}"
                                                 wire:navigate
                                                 x-on:mouseenter="$store.proposalFlow.focus = '{{ $node['key'] }}'"
                                                 x-on:mouseleave="$store.proposalFlow.focus = null"

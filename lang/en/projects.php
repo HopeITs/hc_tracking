@@ -96,7 +96,7 @@ return [
     'lens_risks' => 'Risks live',
     'lens_risks_hint' => 'A logged risk has materialised',
     'lens_unfunded' => 'Unfunded',
-    'lens_unfunded_hint' => 'No proposal covers this project',
+    'lens_unfunded_hint' => 'No donor agreement signed for it yet',
     'lifecycle' => 'Project lifecycle',
     'lifecycle_segment' => '{0} :status, no projects|{1} :status, :count project|[2,*] :status, :count projects',
     'link' => 'Link',

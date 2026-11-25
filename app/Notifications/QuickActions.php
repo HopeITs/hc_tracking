@@ -48,7 +48,7 @@ final class QuickActions
             // before the backfill still names the project; it is answered
             // through the row that took it over (D-94).
             'proposal_location' => [
-                ...$this->assignmentActions($subjectType, $subjectId, $user),
+                ...$this->ownerAssignmentActions($subjectId, $user),
                 ...($this->ownerHasLeft($subjectId, $user) ? ['project.reassign'] : []),
             ],
             'project' => $this->actionsForLegacyProject($subjectId, $user),
@@ -78,9 +78,32 @@ final class QuickActions
         $row = app(ProjectSuccessor::class)->rowFor($projectId);
 
         return $row === null ? [] : [
-            ...$this->assignmentActions('proposal_location', $row->id, $user),
+            ...$this->ownerAssignmentActions($row->id, $user),
             ...($this->ownerHasLeft($row->id, $user) ? ['project.reassign'] : []),
         ];
+    }
+
+    /**
+     * Acknowledge / reject for the place's owner.
+     *
+     * The subject is the row (Y-16, D-93), but an owner assignment is still
+     * filed against the project the row carries until Y-18 moves the column.
+     * Reading only the row would drop both buttons from the bell, so the
+     * project is asked whenever the row holds nothing of its own.
+     *
+     * @return list<string>
+     */
+    private function ownerAssignmentActions(int $locationId, User $user): array
+    {
+        $onRow = $this->assignmentActions('proposal_location', $locationId, $user);
+
+        if ($onRow !== []) {
+            return $onRow;
+        }
+
+        $projectId = ProposalLocation::query()->whereKey($locationId)->toBase()->value('project_id');
+
+        return $projectId === null ? [] : $this->assignmentActions('project', (int) $projectId, $user);
     }
 
     /**
@@ -141,6 +164,38 @@ final class QuickActions
         return $assignment !== null && Gate::forUser($user)->allows('respond', $assignment)
             ? ['assignment.acknowledge', 'assignment.reject']
             : [];
+    }
+
+    /**
+     * The pending assignment a notification's subject stands for.
+     *
+     * A place and the project it carries are one record until Y-18 moves the
+     * owner column, and an assignment may sit on either: on the row for work
+     * filed since Y-11, on the project for everything older. Asking only the
+     * one the subject names would answer "already done" to a person who has
+     * been asked and not yet replied.
+     */
+    private function pendingOwnerAssignment(User $user, string $subjectType, int $subjectId): ?Assignment
+    {
+        $direct = Assignment::pendingFor($user, $subjectType, $subjectId);
+
+        if ($direct !== null) {
+            return $direct;
+        }
+
+        if ($subjectType === 'proposal_location') {
+            $projectId = ProposalLocation::query()->whereKey($subjectId)->toBase()->value('project_id');
+
+            return $projectId === null ? null : Assignment::pendingFor($user, 'project', (int) $projectId);
+        }
+
+        if ($subjectType === 'project') {
+            $row = app(ProjectSuccessor::class)->rowFor($subjectId);
+
+            return $row === null ? null : Assignment::pendingFor($user, 'proposal_location', $row->id);
+        }
+
+        return null;
     }
 
     /**
@@ -255,7 +310,7 @@ final class QuickActions
      */
     private function runAssignment(User $user, UserNotification $notification, string $type): array
     {
-        $assignment = Assignment::pendingFor($user, (string) $notification->subject_type, (int) $notification->subject_id);
+        $assignment = $this->pendingOwnerAssignment($user, (string) $notification->subject_type, (int) $notification->subject_id);
 
         if ($assignment === null) {
             return $this->result(false, 'already_done');
