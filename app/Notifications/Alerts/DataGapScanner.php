@@ -7,17 +7,22 @@ namespace App\Notifications\Alerts;
 use App\Enums\NotificationPriority;
 use App\Enums\ProjectStatus;
 use App\Enums\ReportStatus;
-use App\Models\Project;
+use App\Models\ProposalLocation;
 use App\Models\Report;
 use App\Notifications\EmployeeRecipients;
 use App\Notifications\RecipientResolver;
 use Carbon\CarbonImmutable;
 
 /**
- * Weekly nudges about missing data: active projects with no indicators, projects past their end still active, approved reports with no
- * files, and (T14) programs with open projects but no program framework,
- * through LogframeGapAlert. Runs on working days only, so each week's nudge
- * lands on its first working day.
+ * Weekly nudges about missing data: active places with no indicators, places
+ * past their end still active, approved reports with no files, and (T14)
+ * programs with open places but no program framework, through
+ * LogframeGapAlert. Runs on working days only, so each week's nudge lands on
+ * its first working day.
+ *
+ * Y-16 (D-93): a place is a **location row**. Two rows may stand at one place
+ * (D-77), where a project produced one nudge: the ledger's stage carries the
+ * place, so the second row of a place finds the week already claimed.
  */
 final class DataGapScanner implements Scanner
 {
@@ -39,24 +44,26 @@ final class DataGapScanner implements Scanner
         $meal = $this->resolver->usersWithRoles(['MEAL']);
         $sent = 0;
 
-        $active = Project::query()
+        $active = ProposalLocation::query()
             ->notPaused()
-            ->where('status', ProjectStatus::Active->value)
+            ->where('proposal_locations.status', ProjectStatus::Active->value)
             ->withCount('indicators')
-            ->get(['id', 'name', 'user_id', 'end_date']);
+            ->with(['centers', 'city:id,name_en,name_ar', 'program:id', 'proposal:id,name'])
+            ->get(['id', 'proposal_id', 'project_id', 'city_id', 'city_wide', 'program_id', 'responsible_employee_id', 'end_date']);
 
-        $owners = $this->employees->usersFor($active->pluck('user_id')->map(fn ($id): int => (int) $id)->unique()->values()->all());
+        $owners = $this->employees->usersFor($active->pluck('responsible_employee_id')->filter()->map(fn ($id): int => (int) $id)->unique()->values()->all());
 
-        foreach ($active as $project) {
-            $owner = array_filter([$owners[(int) $project->user_id] ?? null]);
+        foreach ($active as $row) {
+            $owner = array_filter([$owners[(int) $row->responsible_employee_id] ?? null]);
+            $place = $row->place()->key();
             $gaps = array_filter([
-                'no_indicators' => $project->indicators_count === 0 ? $meal : null,
-                'past_end' => $project->end_date !== null && $project->end_date->lt($now->startOfDay()) ? [] : null,
+                'no_indicators' => $row->indicators_count === 0 ? $meal : null,
+                'past_end' => $row->end_date !== null && $row->end_date->lt($now->startOfDay()) ? [] : null,
             ], fn (?array $others): bool => $others !== null);
 
             foreach ($gaps as $gap => $others) {
-                $payload = $this->dispatcher->payload('projects', NotificationPriority::Info, "notifications.alerts.data_gap.{$gap}", ['subject' => $project->name], 'project', $project->id);
-                $sent += $this->dispatcher->send('data_gap', "{$gap}:{$week}", $payload, $owner, $others);
+                $payload = $this->dispatcher->payload('projects', NotificationPriority::Info, "notifications.alerts.data_gap.{$gap}", ['subject' => $row->headline()], 'proposal_location', $row->id);
+                $sent += $this->dispatcher->send('data_gap', "{$gap}:{$place}:{$week}", $payload, $owner, $others);
             }
         }
 
@@ -73,8 +80,8 @@ final class DataGapScanner implements Scanner
     }
 
     /**
-     * Programs that hold at least one open project (draft, approved or
-     * active), for the logframe rule (T14).
+     * Programs that hold at least one open place (draft, approved or active),
+     * for the logframe rule (T14).
      *
      * @return list<int>
      */
@@ -82,9 +89,9 @@ final class DataGapScanner implements Scanner
     {
         $open = array_values(array_filter(ProjectStatus::cases(), fn (ProjectStatus $status): bool => $status->isOpen()));
 
-        return array_values(Project::query()
+        return array_values(ProposalLocation::query()
             ->notPaused()
-            ->whereIn('status', array_map(fn (ProjectStatus $status): string => $status->value, $open))
+            ->whereIn('proposal_locations.status', array_map(fn (ProjectStatus $status): string => $status->value, $open))
             ->whereNotNull('program_id')
             ->distinct()
             ->pluck('program_id')

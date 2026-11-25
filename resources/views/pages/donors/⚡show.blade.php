@@ -7,7 +7,7 @@ use App\Livewire\Concerns\ManagesDonorForm;
 use App\Livewire\Concerns\SwitchesFundingView;
 use App\Models\Donor;
 use App\Models\DonorProposal;
-use App\Models\Project;
+use App\Models\ProposalLocation;
 use App\Models\Report;
 use App\Models\TransfersTracking;
 use App\Support\CsvExport;
@@ -71,16 +71,17 @@ new #[Layout('layouts::desk'), Title('titles.donor')] class extends Component {
     }
 
     /**
-     * Distinct projects funded through this donor's proposals. A project two
-     * of the donor's proposals fund is counted once.
+     * Distinct places funded through this donor's proposals (Y-16, D-93). A
+     * place two of the donor's proposals fund is counted once per row, since
+     * each row is of one proposal (D-77).
      *
-     * @return Collection<int, Project>
+     * @return Collection<int, ProposalLocation>
      */
     #[Computed]
     public function projects(): Collection
     {
         return new Collection($this->agreements
-            ->flatMap(fn (DonorProposal $agreement) => $agreement->proposal->projects)
+            ->flatMap(fn (DonorProposal $agreement) => $agreement->proposal->locations)
             ->unique('id')
             ->values()
             ->all());
@@ -92,7 +93,7 @@ new #[Layout('layouts::desk'), Title('titles.donor')] class extends Component {
     #[Computed]
     public function projectCounts(): array
     {
-        $open = $this->projects->filter(fn (Project $project): bool => $project->status->isOpen())->count();
+        $open = $this->projects->filter(fn (ProposalLocation $project): bool => $project->status->isOpen())->count();
 
         return ['open' => $open, 'closed' => $this->projects->count() - $open];
     }

@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Notifications\Recipients;
 
 use App\Enums\OversightMode;
+use App\Models\ProposalLocation;
 use App\Models\Role;
 use App\Models\User;
 use App\Notifications\EmployeeRecipients;
@@ -36,7 +37,7 @@ final class OversightRecipients
      *
      * @return list<int> user ids
      */
-    public function userIdsFor(string $eventKey, ?int $projectId = null): array
+    public function userIdsFor(string $eventKey, ?int $locationId = null): array
     {
         $event = $this->catalog->effective($eventKey);
 
@@ -47,7 +48,7 @@ final class OversightRecipients
         $management = $this->usersWithRoles([self::ManagementRole, ...$event['oversight_roles']]);
 
         $ids = match ($event['oversight']) {
-            OversightMode::All => [...$this->meal($projectId), ...$management],
+            OversightMode::All => [...$this->meal($locationId), ...$management],
             OversightMode::ManagementOnly => $management,
             OversightMode::None => [],
         };
@@ -59,14 +60,14 @@ final class OversightRecipients
     }
 
     /**
-     * Role `MEAL` holders + (when $projectId is given) the user of the
-     * project's responsible MEAL officer.
+     * Role `MEAL` holders + (when a location row is given) the user of the
+     * MEAL officer responsible for that row's place (Y-16, D-93).
      *
      * @return list<int>
      */
-    public function meal(?int $projectId = null): array
+    public function meal(?int $locationId = null): array
     {
-        $ids = [...$this->usersWithRoles([self::MealRole]), ...$this->projectOfficerUserIds($projectId)];
+        $ids = [...$this->usersWithRoles([self::MealRole]), ...$this->placeOfficerUserIds($locationId)];
 
         return $this->withoutSuperAdmins(array_values(array_unique($ids)));
     }
@@ -96,14 +97,18 @@ final class OversightRecipients
     }
 
     /**
-     * The user behind the project's responsible MEAL officer, when active and
-     * holding an account.
+     * The user behind the MEAL officer responsible for the row's place
+     * (Y-16, D-93), when active and holding an account.
      *
      * @return list<int>
      */
-    private function projectOfficerUserIds(?int $projectId): array
+    private function placeOfficerUserIds(?int $locationId): array
     {
-        $officers = $projectId === null ? [] : MealCoverage::officersForLegacyProject($projectId);
+        $row = $locationId === null
+            ? null
+            : ProposalLocation::query()->with('centers')->find($locationId);
+
+        $officers = $row === null ? [] : MealCoverage::responsibleForLocation($row);
 
         return array_values($this->employees->usersFor($officers));
     }

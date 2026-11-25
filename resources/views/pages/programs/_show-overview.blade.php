@@ -160,7 +160,7 @@
                             {{-- 1. Name and city: the name always takes two lines so every card lines up. --}}
                             <div class="dk-prog-card-h">
                                 <h3 class="dk-prog-card-t">
-                                    <a href="{{ route('projects.show', $project) }}" wire:navigate class="dk-prog-card-link" title="{{ $project->name }}">{{ $project->name }}</a>
+                                    <a href="{{ route('projects.show', $project) }}" wire:navigate class="dk-prog-card-link" title="{{ $project->headline() }} · {{ $project->label() }}">{{ $project->headline() }}</a>
                                 </h3>
                                 <p class="dk-prog-card-o" data-ledger-city><x-desk.icon name="pin" />{{ $project->city?->name ?? '—' }}</p>
                             </div>
@@ -208,10 +208,10 @@
 
                             {{-- 4. Who runs it, pinned to the bottom. --}}
                             <div class="dk-prog-card-f">
-                                @if ($project->user)
-                                    <x-ui.avatar :src="\App\Models\HrEmployee::avatarUrl($project->user_id)" class="dk-av dk-av-xs" aria-hidden="true" data-ledger-manager-photo />
+                                @if ($project->responsible)
+                                    <x-ui.avatar :src="\App\Models\HrEmployee::avatarUrl($project->responsible_employee_id)" class="dk-av dk-av-xs" aria-hidden="true" data-ledger-manager-photo />
                                 @endif
-                                <span>{{ $project->user?->name ?? __('common.not_assigned') }}</span>
+                                <span>{{ $project->responsible?->name ?? __('common.not_assigned') }}</span>
                             </div>
                         </li>
                 @endforeach

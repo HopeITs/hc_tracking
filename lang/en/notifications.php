@@ -120,6 +120,12 @@ return [
     ],
     'warnings' => ['not_notified' => ':names could not be notified about “:subject” because they have no login account'],
     'console' => [
+        'subject_backfill_applying' => 'Pointing every stored project subject at the location row that carries it.',
+        'subject_backfill_dry_run' => 'Dry run: nothing is written.',
+        'subject_backfill_moved' => 'Records re-pointed',
+        'subject_backfill_rows' => 'Records per row (row id x count): :rows',
+        'subject_backfill_unmapped' => 'Projects no row carries, left alone (project id x count): :projects',
+        'subject_backfill_none' => 'none',
         'no_browser' => 'Chrome or Edge was not found. Pass --browser=path or set NOTIFICATION_BANNER_BROWSER.',
         'banners_rendered' => ':count banners rendered.',
         'unknown_group' => 'Unknown scan group [:group].',

@@ -9,14 +9,15 @@ use App\Enums\ReportStatus;
 use App\Enums\TaskStatus;
 use App\Models\Assignment;
 use App\Models\HrEmployee;
-use App\Models\Project;
 use App\Models\Proposal;
+use App\Models\ProposalLocation;
 use App\Models\Report;
 use App\Models\Scopes\TaskVisibilityScope;
 use App\Models\Task;
 use App\Models\TransfersTracking;
 use App\Models\User;
 use App\Models\UserNotification;
+use App\Support\Locations\ProjectSuccessor;
 use Carbon\CarbonImmutable;
 use Illuminate\Database\QueryException;
 use Illuminate\Support\Facades\Gate;
@@ -43,10 +44,14 @@ final class QuickActions
         $types = match ($subjectType) {
             'task' => $this->taskActions($subjectId, $user),
             'report' => $this->reportActions($subjectId, $user),
-            'project' => [
+            // Y-16 (D-93): a place is the subject. A notification stored
+            // before the backfill still names the project; it is answered
+            // through the row that took it over (D-94).
+            'proposal_location' => [
                 ...$this->assignmentActions($subjectType, $subjectId, $user),
                 ...($this->ownerHasLeft($subjectId, $user) ? ['project.reassign'] : []),
             ],
+            'project' => $this->actionsForLegacyProject($subjectId, $user),
             'proposal' => $this->canRecordAgreementFor($subjectId, $user) ? ['agreement.record'] : [],
             'transfer' => $user->can('transfers.update') && TransfersTracking::query()->whereKey($subjectId)->toBase()->value('ar_status') === ArStatus::Pending->value
                 ? ['transfer.mark_received'] : [],
@@ -63,18 +68,34 @@ final class QuickActions
      * @return list<string>
      */
     /**
-     * Opens the project so its owner can be changed. Nothing is reassigned
+     * The actions of a notification stored against a project before the
+     * backfill re-pointed it (Y-16, D-94): the successor row's.
+     *
+     * @return list<string>
+     */
+    private function actionsForLegacyProject(int $projectId, User $user): array
+    {
+        $row = app(ProjectSuccessor::class)->rowFor($projectId);
+
+        return $row === null ? [] : [
+            ...$this->assignmentActions('proposal_location', $row->id, $user),
+            ...($this->ownerHasLeft($row->id, $user) ? ['project.reassign'] : []),
+        ];
+    }
+
+    /**
+     * Opens the place so its owner can be changed. Nothing is reassigned
      * here: D-62 asks a person to choose, it does not choose for them.
      *
      * @return array{ok: bool, message: string, redirect: string|null}
      */
-    private function runReassign(User $user, int $projectId): array
+    private function runReassign(User $user, int $locationId): array
     {
-        if (! $this->ownerHasLeft($projectId, $user)) {
+        if (! $this->ownerHasLeft($locationId, $user)) {
             return $this->result(false, 'already_done');
         }
 
-        $url = app(SubjectLinks::class)->routeFor('project', $projectId);
+        $url = app(SubjectLinks::class)->routeFor('proposal_location', $locationId);
 
         return $url === null
             ? $this->result(false, 'missing')
@@ -86,7 +107,7 @@ final class QuickActions
      * the people who may change it are offered the way to reassign it
      * (D-62, W-35). HR is only read; nothing about its status is stored.
      */
-    private function ownerHasLeft(int $projectId, User $user): bool
+    private function ownerHasLeft(int $locationId, User $user): bool
     {
         // Either permission, as the prompt allows: the Public Relations
         // Manager is who the alert tells and holds `proposals.update`, not
@@ -97,7 +118,7 @@ final class QuickActions
             return false;
         }
 
-        $ownerId = Project::query()->whereKey($projectId)->toBase()->value('user_id');
+        $ownerId = ProposalLocation::ownerEmployeeIdFor($locationId);
 
         if ($ownerId === null) {
             return false;

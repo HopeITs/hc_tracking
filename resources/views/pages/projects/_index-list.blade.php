@@ -26,7 +26,7 @@
             <div class="dk-pjl-main" tabindex="0" aria-describedby="project-peek-{{ $project->id }}">
                 <p class="dk-pjl-name">
                     @if (in_array($project->id, $this->unreadIds, true))
-                        <span class="dk-pjl-dot" data-unread-dot="project-{{ $project->id }}" title="{{ __('notifications.has_unread') }}"><span class="sr-only">{{ __('notifications.has_unread') }}</span></span>
+                        <span class="dk-pjl-dot" data-unread-dot="proposal_location-{{ $project->id }}" title="{{ __('notifications.has_unread') }}"><span class="sr-only">{{ __('notifications.has_unread') }}</span></span>
                     @endif
                     <span title="{{ $project->headline() }}">{{ $project->headline() }}</span>
                 </p>

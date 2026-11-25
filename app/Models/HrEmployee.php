@@ -360,6 +360,17 @@ class HrEmployee extends HrModel
     }
 
     /**
+     * The places this employee is responsible for (Y-16, D-93): the twin of
+     * `projects()`, which goes with the `projects` table in Y-18.
+     *
+     * @return HasMany<ProposalLocation, $this>
+     */
+    public function locations(): HasMany
+    {
+        return $this->hasMany(ProposalLocation::class, 'responsible_employee_id');
+    }
+
+    /**
      * The tasks assigned to this employee (a task may have several assignees).
      *
      * A task and its task_assignees pivot both live on the default connection,

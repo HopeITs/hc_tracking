@@ -14,6 +14,7 @@ use App\Notifications\TracksActivity;
 use App\Observers\MediaOwnerObserver;
 use App\Observers\ProposalLocationObserver;
 use App\Support\Locations\MonthlyReportsAtRows;
+use App\Support\Reporting\ReportPlace;
 use Carbon\CarbonImmutable;
 use Database\Factories\ProposalLocationFactory;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
@@ -417,6 +418,18 @@ class ProposalLocation extends Model
     }
 
     /**
+     * The place this row delivers at (D-75): the city, the program and either
+     * field work (D-88), its centre (D-90) or "centre not set" (D-82).
+     *
+     * Two rows of two proposals may stand at one place (D-77), and a report
+     * template names a place, not a row. Load `centers`.
+     */
+    public function place(): ReportPlace
+    {
+        return new ReportPlace($this->city_id, $this->program_id, $this->centerIds()[0] ?? null, (bool) $this->city_wide);
+    }
+
+    /**
      * What a list calls this row: its proposal's name, since a row is of
      * exactly one proposal (D-93) and the register "names its proposal
      * first" (Y-16). `label()` says where it is; the two read together as
@@ -570,6 +583,25 @@ class ProposalLocation extends Model
      *
      * @param  Builder<static>  $query
      */
+    /**
+     * Leave out rows whose work is paused: a centre HR has deactivated
+     * (D-66), the twin of `Project::notPaused()`. A city-wide row is field
+     * work (D-88) and is never paused by a centre.
+     *
+     * @param  Builder<static>  $query
+     */
+    #[Scope]
+    protected function notPaused(Builder $query): void
+    {
+        $inactive = HrCenter::inactiveIds();
+
+        if ($inactive === []) {
+            return;
+        }
+
+        $query->whereDoesntHave('centers', fn (Builder $center) => $center->whereIn('center_id', $inactive));
+    }
+
     #[Scope]
     protected function open(Builder $query): void
     {

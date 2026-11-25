@@ -7,8 +7,8 @@ namespace App\Livewire\Concerns\Tasks;
 use App\Models\HrDepartment;
 use App\Models\HrEmployee;
 use App\Models\Program;
-use App\Models\Project;
 use App\Models\Proposal;
+use App\Models\ProposalLocation;
 use Illuminate\Support\Collection;
 use Livewire\Attributes\Computed;
 
@@ -87,7 +87,9 @@ trait ProvidesTaskOptions
     {
         return [
             ['value' => 'proposal', 'label' => __('tasks.source_type_proposal')],
-            ['value' => 'project', 'label' => __('tasks.source_type_project')],
+            // Y-16 (D-93): the label still reads "Project" — the screen and
+            // the ability keep their names — while the source is the place.
+            ['value' => 'proposal_location', 'label' => __('tasks.source_type_project')],
             ['value' => 'program', 'label' => __('tasks.source_type_program')],
             ['value' => 'department', 'label' => __('tasks.source_type_department')],
         ];
@@ -131,8 +133,15 @@ trait ProvidesTaskOptions
         return match ($type) {
             'proposal' => Proposal::query()->select(['id', 'name'])->orderBy('name')->orderBy('id')->get()
                 ->map(fn (Proposal $proposal): array => ['id' => $proposal->id, 'name' => $proposal->name]),
-            'project' => Project::query()->select(['id', 'name'])->orderBy('name')->orderBy('id')->get()
-                ->map(fn (Project $project): array => ['id' => $project->id, 'name' => $project->name]),
+            // Y-16 (D-93): a task hangs off a place. The key stays
+            // `proposal_location` (Y-12), and the name is the row's.
+            'proposal_location' => ProposalLocation::query()
+                ->with(['city:id,name_en,name_ar', 'program:id', 'centers', 'proposal:id,name'])
+                ->orderBy('id')
+                ->get(['id', 'proposal_id', 'city_id', 'city_wide', 'program_id'])
+                ->map(fn (ProposalLocation $row): array => ['id' => $row->id, 'name' => $row->headline().' · '.$row->label()])
+                ->sortBy('name')
+                ->values(),
             'program' => Program::options()
                 ->map(fn (Program $program): array => ['id' => $program->id, 'name' => $program->name]),
             'department' => HrDepartment::query()->select(['id', 'name'])->orderBy('name')->get()

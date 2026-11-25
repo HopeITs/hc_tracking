@@ -67,8 +67,9 @@
         // Projects usually repeat their program's name; the side list drops it so the names differ at a glance.
         $programPrefix = mb_strtolower(trim((string) $this->program->name)).' ';
         foreach ($this->allProjects as $project) {
-            $short = $programPrefix !== ' ' && str_starts_with(mb_strtolower($project->name), $programPrefix) ? trim(mb_substr($project->name, mb_strlen($programPrefix))) : '';
-            $groupMeta['project-'.$project->id] = ['label' => $project->name, 'short' => $short !== '' ? $short : $project->name, 'href' => route('projects.show', $project), 'target' => 'project:'.$project->id, 'photo' => null];
+            $projectName = $project->headline();
+            $short = $programPrefix !== ' ' && str_starts_with(mb_strtolower($projectName), $programPrefix) ? trim(mb_substr($projectName, mb_strlen($programPrefix))) : '';
+            $groupMeta['project-'.$project->id] = ['label' => $projectName, 'short' => $short !== '' ? $short : $projectName, 'href' => route('projects.show', $project), 'target' => 'proposal_location:'.$project->id, 'photo' => null];
         }
         $groupMeta['program'] = ['label' => __('programs.work_not_tied_to_a_project'), 'href' => null, 'target' => 'program', 'photo' => null];
     }

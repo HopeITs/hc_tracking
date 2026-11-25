@@ -10,8 +10,8 @@ use App\Models\DonorProposal;
 use App\Models\DonorReport;
 use App\Models\HrEmployee;
 use App\Models\Media;
-use App\Models\Project;
 use App\Models\Proposal;
+use App\Models\ProposalLocation;
 use App\Models\TransfersTracking;
 use App\Support\DonorReportResponsibles;
 use Illuminate\Database\Eloquent\Builder;
@@ -34,18 +34,20 @@ use Livewire\Attributes\Computed;
 trait ReadsAgreementConnections
 {
     /**
-     * The projects the funded proposal pays for, with how far each has got.
+     * The places the funded proposal pays for, with how far each has got
+     * (Y-16, D-93).
      *
-     * @return Collection<int, Project>
+     * @return Collection<int, ProposalLocation>
      */
     #[Computed]
     public function projects(): Collection
     {
-        return $this->agreement->proposal->projects()
-            ->select(['projects.id', 'projects.name', 'projects.city_id', 'projects.program_id', 'projects.status', 'projects.start_date', 'projects.end_date'])
-            ->with(['city:id,name_en,name_ar', 'program:id'])
-            ->orderBy('projects.name')
-            ->get();
+        return $this->agreement->proposal->locations()
+            ->select(['proposal_locations.id', 'proposal_locations.proposal_id', 'proposal_locations.project_id', 'proposal_locations.slug', 'proposal_locations.city_id', 'proposal_locations.city_wide', 'proposal_locations.program_id', 'proposal_locations.status', 'proposal_locations.start_date', 'proposal_locations.end_date'])
+            ->with(['city:id,name_en,name_ar', 'program:id', 'centers', 'proposal:id,name'])
+            ->get()
+            ->sortBy(fn (ProposalLocation $row): string => $row->label())
+            ->values();
     }
 
     /**
@@ -104,7 +106,7 @@ trait ReadsAgreementConnections
 
     /**
      * The signed paperwork behind this money: agreements and MOUs filed on
-     * the proposal or on the projects it funds.
+     * the proposal or on the places it funds.
      *
      * @return Collection<int, Media>
      */
@@ -120,7 +122,7 @@ trait ReadsAgreementConnections
             ->where(fn (Builder $query) => $query
                 ->where(fn (Builder $query) => $query->where('mediable_type', 'proposal')->where('mediable_id', $proposalId))
                 ->when($projects->isNotEmpty(), fn (Builder $query) => $query->orWhere(fn (Builder $query) => $query
-                    ->where('mediable_type', 'project')
+                    ->where('mediable_type', 'proposal_location')
                     ->whereIn('mediable_id', $projects->keys()->all()))))
             ->orderByDesc('uploaded_at')
             ->orderByDesc('id')
@@ -159,6 +161,6 @@ trait ReadsAgreementConnections
     {
         return $media->mediable_type === 'proposal'
             ? route('proposals.files.download', [Proposal::query()->findOrFail($media->mediable_id), $media])
-            : route('projects.files.download', [Project::query()->findOrFail($media->mediable_id), $media]);
+            : route('projects.files.download', [ProposalLocation::query()->findOrFail($media->mediable_id), $media]);
     }
 }

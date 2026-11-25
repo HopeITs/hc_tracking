@@ -31,20 +31,23 @@ beforeEach(function () {
         $this->programA = Program::factory()->create(['manager_id' => $this->pmEmployee]);
         $this->programB = Program::factory()->create(['manager_id' => null]);
 
-        $this->started = Project::factory()->create(['program_id' => $this->programA->id, 'status' => ProjectStatus::Active, 'start_date' => '2026-10-05', 'end_date' => '2027-06-30']);
-        $this->ended = Project::factory()->create(['program_id' => $this->programB->id, 'status' => ProjectStatus::Closed, 'start_date' => '2026-01-01', 'end_date' => '2026-10-20']);
-        Project::factory()->create(['program_id' => $this->programA->id, 'status' => ProjectStatus::Draft, 'start_date' => '2026-10-10', 'end_date' => '2027-01-31']);
+        $this->started = rowFor(Project::factory()->create(['program_id' => $this->programA->id, 'status' => ProjectStatus::Active, 'start_date' => '2026-10-05', 'end_date' => '2027-06-30']));
+        $this->ended = rowFor(Project::factory()->create(['program_id' => $this->programB->id, 'status' => ProjectStatus::Closed, 'start_date' => '2026-01-01', 'end_date' => '2026-10-20']));
+        rowFor(Project::factory()->create(['program_id' => $this->programA->id, 'status' => ProjectStatus::Draft, 'start_date' => '2026-10-10', 'end_date' => '2027-01-31']));
 
         $indicator = Indicator::factory()->create([
             'result_id' => Result::factory()->create(['program_id' => $this->programB->id])->id,
-            'project_id' => $this->ended->id,
+            'project_id' => $this->ended->project_id,
+            'proposal_location_id' => $this->ended->id,
             'baseline' => '0',
             'target' => '100',
         ]);
         IndicatorProgress::factory()->create(['indicator_id' => $indicator->id, 'value' => '10', 'date' => '2026-09-30']);
 
         $agreement = DonorProposal::factory()->create(['budget' => '98765.43', 'currency' => 'USD']);
-        $this->started->proposals()->attach($agreement->proposal_id);
+        // Y-16 (D-93): the row is of one proposal, so the agreement reaches
+        // the place through it.
+        $this->started->update(['proposal_id' => $agreement->proposal_id]);
         DonorReport::factory()->create(['donor_proposal_id' => $agreement->id, 'title' => 'Interim report', 'due_on' => '2026-11-16']);
         DonorReport::factory()->create(['donor_proposal_id' => $agreement->id, 'title' => 'Quarterly update', 'due_on' => '2026-10-12']);
         DonorReport::factory()->submitted()->create(['donor_proposal_id' => $agreement->id, 'title' => 'Final report', 'due_on' => '2026-10-01']);
@@ -248,11 +251,11 @@ test('building the digest takes a flat number of queries however many programs, 
         $employee = insertHrEmployee(firstNameEn: fake()->firstName(), lastNameEn: 'Manager');
         $program = Activity::withoutRecording(function () use ($employee): Program {
             $program = Program::factory()->create(['manager_id' => $employee]);
-            $project = Project::factory()->create(['program_id' => $program->id, 'status' => ProjectStatus::Active, 'start_date' => '2026-10-07', 'end_date' => '2027-03-31']);
-            $indicator = Indicator::factory()->create(['result_id' => Result::factory()->create(['program_id' => $program->id])->id, 'project_id' => $project->id, 'baseline' => '0', 'target' => '100']);
+            $project = rowFor(Project::factory()->create(['program_id' => $program->id, 'status' => ProjectStatus::Active, 'start_date' => '2026-10-07', 'end_date' => '2027-03-31']));
+            $indicator = Indicator::factory()->create(['result_id' => Result::factory()->create(['program_id' => $program->id])->id, 'project_id' => $project->project_id, 'proposal_location_id' => $project->id, 'baseline' => '0', 'target' => '100']);
             IndicatorProgress::factory()->create(['indicator_id' => $indicator->id, 'value' => '5', 'date' => '2026-09-30']);
             $agreement = DonorProposal::factory()->create();
-            $project->proposals()->attach($agreement->proposal_id);
+            $project->update(['proposal_id' => $agreement->proposal_id]);
             DonorReport::factory()->create(['donor_proposal_id' => $agreement->id, 'due_on' => '2026-10-20']);
 
             return $program;

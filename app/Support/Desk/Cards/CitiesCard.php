@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace App\Support\Desk\Cards;
 
 use App\Models\HrCity;
-use App\Models\Project;
+use App\Models\ProposalLocation;
 use App\Models\User;
 use Illuminate\Support\Collection;
 
@@ -85,11 +85,14 @@ final class CitiesCard extends PageCard
     }
 
     /**
-     * @return Collection<int, int> city id => projects there
+     * The places in each city (Y-16, D-93), which is what the directory
+     * counts when it is filtered by that city.
+     *
+     * @return Collection<int, int> city id => places there
      */
     private function projectsByCity(): Collection
     {
-        return Project::query()->toBase()->whereNotNull('city_id')->selectRaw('city_id, count(*) as total')->groupBy('city_id')->pluck('total', 'city_id')
+        return ProposalLocation::query()->toBase()->whereNotNull('city_id')->selectRaw('city_id, count(*) as total')->groupBy('city_id')->pluck('total', 'city_id')
             ->map(fn (mixed $total): int => (int) $total);
     }
 }

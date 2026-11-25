@@ -9,11 +9,15 @@ use App\Models\Activity;
 use App\Models\HrContract;
 use App\Models\Program;
 use App\Models\Project;
+use App\Models\ProposalLocation;
+use App\Support\Locations\ProjectSuccessor;
 use App\Support\MealCoverage;
 
 /**
- * Projects: the owner is direct; Managers watch; approved / closed is ★,
- * and a deleted project is critical. Decisions on the owner assignment go
+ * Places (Y-16, D-93: a location row stands where a project stood, and the
+ * events keep their `project.*` names, which name an event, not a table):
+ * the responsible employee is direct; Managers watch; approved / closed is ★,
+ * and a deleted place is critical. Decisions on the owner assignment go
  * straight to whoever made it and to the program manager; a rejection is
  * important for them, and reaches the top level when a program manager
  * is the one rejecting.
@@ -23,9 +27,9 @@ final class ProjectRecipients extends ModuleRecipients
     public function directEmployeeIds(Activity $activity): array
     {
         return $this->uniqueIds([
-            Project::ownerEmployeeIdFor($activity->subject_id),
+            $this->ownerOf($activity),
             ...$this->idsFromProperty($activity, 'employee_ids'),
-            $this->changedFrom($activity, 'user_id'),
+            $this->changedFrom($activity, 'responsible_employee_id') ?? $this->changedFrom($activity, 'user_id'),
             ...($this->isAssignmentDecision($activity) || $this->isFundingMilestone($activity) ? $this->programManagerEmployeeIds($activity) : []),
             ...($this->isFundingMilestone($activity) ? [MealCoverage::mealManagerEmployeeId()] : []),
             ...$this->topLevelEmployeeIds($activity),
@@ -40,8 +44,8 @@ final class ProjectRecipients extends ModuleRecipients
     public function assignedEmployeeIds(Activity $activity): array
     {
         return $this->uniqueIds([match ($activity->event) {
-            'project.owner_changed' => $this->changedTo($activity, 'user_id'),
-            'project.created' => Project::ownerEmployeeIdFor($activity->subject_id),
+            'project.owner_changed' => $this->changedTo($activity, 'responsible_employee_id') ?? $this->changedTo($activity, 'user_id'),
+            'project.created' => $this->ownerOf($activity),
             default => null,
         }]);
     }
@@ -66,6 +70,24 @@ final class ProjectRecipients extends ModuleRecipients
             $this->isKeyEvent($activity) => NotificationPriority::Important,
             default => NotificationPriority::Info,
         };
+    }
+
+    /**
+     * Whoever the place is on: the row's responsible employee. An activity
+     * stored before the backfill re-pointed it still names the project, and
+     * the row that took it over answers for it (Y-16, D-94).
+     */
+    private function ownerOf(Activity $activity): ?int
+    {
+        if ($activity->subject_type === 'proposal_location') {
+            return ProposalLocation::ownerEmployeeIdFor($activity->subject_id);
+        }
+
+        $row = app(ProjectSuccessor::class)->rowFor((int) $activity->subject_id);
+
+        return $row === null
+            ? Project::ownerEmployeeIdFor($activity->subject_id)
+            : $row->responsible_employee_id;
     }
 
     /**

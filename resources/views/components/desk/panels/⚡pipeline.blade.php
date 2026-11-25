@@ -71,7 +71,7 @@ new class extends Component {
                 'donor:id,name',
                 'donorProposals:id,proposal_id,donor_id,budget,currency',
                 'donorProposals.donor:id,name',
-                'projects:id,user_id',
+                'locations:id,proposal_id,responsible_employee_id',
             ])
             ->when($this->status !== '', fn ($query) => $query->where('status', $this->status))
             ->latest('id')
@@ -86,7 +86,8 @@ new class extends Component {
     #[Computed]
     public function owners(): array
     {
-        $ids = $this->rows->map(fn (Proposal $proposal): ?int => $proposal->projects->first()?->user_id)->filter()->unique()->values()->all();
+        // Y-16 (D-93): the owner is the responsible employee of the proposal's first place.
+        $ids = $this->rows->map(fn (Proposal $proposal): ?int => $proposal->locations->first()?->responsible_employee_id)->filter()->unique()->values()->all();
 
         return HrEmployee::query()->whereKey($ids)->get(HrEmployee::NameColumns)->mapWithKeys(fn (HrEmployee $employee): array => [$employee->id => $employee->name])->all();
     }
@@ -108,7 +109,7 @@ new class extends Component {
 
     public function ownerName(Proposal $proposal): string
     {
-        $employeeId = $proposal->projects->first()?->user_id;
+        $employeeId = $proposal->locations->first()?->responsible_employee_id;
 
         return $employeeId === null ? '' : ($this->owners[$employeeId] ?? '');
     }
@@ -175,7 +176,7 @@ new class extends Component {
                         <span class="dk-pl-m dk-num">@if ($agreement !== null && (float) $agreement->budget > 0){{ Money::format($agreement->budget, $agreement->currency) }}@elseif ((float) $proposal->requested_budget > 0 && $proposal->requested_currency !== null){{ Money::format($proposal->requested_budget, $proposal->requested_currency) }}@endif</span>
                     @endif
                     <span @class(['dk-pl-t dk-num', 'dk-bad' => $days !== null && $days < 0]) title="{{ $deadline?->translatedFormat(__('formats.date')) ?? __('desk.no_deadline') }}">{{ $days === null ? '' : ($days < 0 ? trans_choice('desk.days_late', -$days, ['count' => -$days]) : trans_choice('desk.days_left', $days, ['count' => $days])) }}</span>
-                    <span class="dk-pl-o" title="{{ $owner !== '' ? $owner : __('desk.no_owner') }}">@if ($owner !== '')<x-ui.avatar :src="\App\Models\HrEmployee::avatarUrl($proposal->projects->first()?->user_id)" class="dk-av dk-av-xs" />@endif</span>
+                    <span class="dk-pl-o" title="{{ $owner !== '' ? $owner : __('desk.no_owner') }}">@if ($owner !== '')<x-ui.avatar :src="\App\Models\HrEmployee::avatarUrl($proposal->locations->first()?->responsible_employee_id)" class="dk-av dk-av-xs" />@endif</span>
                 </li>
             @endforeach
         </ul>

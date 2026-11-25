@@ -11,7 +11,7 @@ use App\Actions\Tasks\RescheduleTask;
 use App\Enums\TaskPriority;
 use App\Enums\TaskStatus;
 use App\Models\HrEmployee;
-use App\Models\Project;
+use App\Models\ProposalLocation;
 use App\Models\Task;
 use App\Notifications\UnreadSubjects;
 use Carbon\CarbonImmutable;
@@ -104,18 +104,18 @@ trait ManagesProgramTasks
 
     /**
      * Limit a task query to this program's tasks: raised against the program,
-     * or one of its projects.
+     * or one of its places (Y-16, D-93).
      *
      * @param  Builder<Task>  $query
      * @return Builder<Task>
      */
     protected function scopeToProgramTasks(Builder $query): Builder
     {
-        $projectIds = Project::query()->select('id')->where('program_id', $this->programId);
+        $locationIds = ProposalLocation::query()->select('id')->where('program_id', $this->programId);
 
         return $query->where(fn (Builder $query) => $query
             ->where(fn (Builder $query) => $query->where('source_type', 'program')->where('source_id', $this->programId))
-            ->orWhere(fn (Builder $query) => $query->where('source_type', 'project')->whereIn('source_id', $projectIds)));
+            ->orWhere(fn (Builder $query) => $query->where('source_type', 'proposal_location')->whereIn('source_id', $locationIds)));
     }
 
     /**
@@ -378,7 +378,7 @@ trait ManagesProgramTasks
         $id = (int) $id;
 
         $belongs = match ($type) {
-            'project' => Project::query()->whereKey($id)->where('program_id', $this->programId)->exists(),
+            'proposal_location' => ProposalLocation::query()->whereKey($id)->where('program_id', $this->programId)->exists(),
             default => false,
         };
 

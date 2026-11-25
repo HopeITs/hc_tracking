@@ -11,14 +11,15 @@ use App\Models\DonorProposal;
 use App\Models\MonthlyReport;
 use App\Models\PlanIndicator;
 use App\Models\Program;
-use App\Models\Project;
+use App\Models\ProposalLocation;
 use App\Models\Task;
 use App\Models\TaskAssignee;
 use App\Models\TransfersTracking;
+use App\Support\Locations\MonthlyReportsAtRows;
 use App\Support\ProjectPace;
 use Carbon\CarbonImmutable;
 use Illuminate\Database\Eloquent\Collection;
-use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Collection as SupportCollection;
 use Livewire\Attributes\Computed;
 
 /**
@@ -96,25 +97,27 @@ trait TracksProgramHealth
     {
         $today = CarbonImmutable::today();
 
-        $projects = Project::query()
-            ->select(['id', 'slug', 'name', 'status', 'start_date', 'end_date', 'program_id', 'user_id', 'city_id'])
+        // Y-16 (D-93): the ledger is one line per **place** of the program,
+        // which is what the projects directory counts when filtered by it.
+        $projects = ProposalLocation::query()
+            ->select(['id', 'proposal_id', 'project_id', 'slug', 'status', 'start_date', 'end_date', 'program_id', 'responsible_employee_id', 'city_id', 'city_wide'])
             ->where('program_id', $this->programId)
-            ->with(['user:id,first_name_en,last_name_en,first_name_ar,last_name_ar', 'city'])
+            ->with(['responsible', 'city', 'centers', 'program:id', 'proposal:id,name'])
             ->withCount([
                 'risks as happened_risks_count' => fn ($query) => $query->where('happened', true),
             ])
-            ->orderBy('name')
-            ->orderBy('id')
-            ->get();
+            ->get()
+            ->sortBy(fn (ProposalLocation $row): string => $row->headline())
+            ->values();
 
         $ids = array_map(intval(...), array_values($projects->modelKeys()));
         $taskCounts = $this->taskCountsByProject();
-        $reports = $this->reportStatusByProject($ids);
+        $reports = $this->reportStatusByProject($projects);
         $targets = $this->targetTotalsByProject($ids);
-        [$funding, $lateTransfers] = $this->fundingByProject($ids);
+        [$funding, $lateTransfers] = $this->fundingByProject($projects);
 
         return $projects
-            ->map(function (Project $project) use ($taskCounts, $reports, $targets, $funding, $lateTransfers, $today): array {
+            ->map(function (ProposalLocation $project) use ($taskCounts, $reports, $targets, $funding, $lateTransfers, $today): array {
                 $progress = null;
 
                 return [
@@ -144,8 +147,8 @@ trait TracksProgramHealth
      * Whether a ledger row belongs in the "Needs attention" group: behind or
      * past its end date or slipping, a missing monthly report, or a pile of past-due tasks.
      *
-     * A late transfer is the donor's delay, shared by every project the
-     * agreement funds and not something the project team can act on, so it
+     * A late transfer is the donor's delay, shared by every place the
+     * agreement funds and not something the delivery team can act on, so it
      * stays in the attention list for finance and does not flag the card.
      *
      * @param  array<string, mixed>  $row
@@ -158,8 +161,8 @@ trait TracksProgramHealth
     }
 
     /**
-     * Open and past-due task counts per project, from the already loaded
-     * Tasks tab collection. Program-direct tasks count under key 0.
+     * Open and past-due task counts per place, from the already loaded Tasks
+     * tab collection. Program-direct tasks count under key 0.
      *
      * @return array<int, array{open: int, pastDue: int}>
      */
@@ -185,47 +188,55 @@ trait TracksProgramHealth
     }
 
     /**
-     * Last finished month's monthly report status per project, or null when
-     * the viewer may not see reports.
+     * Last finished month's monthly report status per place, or null when the
+     * viewer may not see reports.
      *
-     * @param  list<int>  $projectIds
+     * A report belongs to a template, and a template reaches a row by its
+     * place (Y-16): MonthlyReportsAtRows is that one match.
+     *
+     * @param  SupportCollection<int, ProposalLocation>  $rows
      * @return array<int, MonthlyReportStatus>|null
      */
-    protected function reportStatusByProject(array $projectIds): ?array
+    protected function reportStatusByProject(SupportCollection $rows): ?array
     {
         if (auth()->user()?->can('reports.view') !== true) {
             return null;
         }
 
-        return MonthlyReport::query()
-            ->select(['id', 'project_id', 'status'])
-            ->whereIn('project_id', $projectIds)
-            ->whereDate('period', $this->trackedReportMonth()->toDateString())
-            ->get()
-            ->mapWithKeys(fn (MonthlyReport $report): array => [$report->project_id => $report->status])
-            ->all();
+        $month = $this->trackedReportMonth()->toDateString();
+        $statuses = [];
+
+        foreach (app(MonthlyReportsAtRows::class)->reportsByRow($rows, ['id', 'report_template_id', 'period', 'status']) as $rowId => $reports) {
+            $report = $reports->first(fn (MonthlyReport $report): bool => $report->period->toDateString() === $month);
+
+            if ($report !== null) {
+                $statuses[$rowId] = $report->status;
+            }
+        }
+
+        return $statuses;
     }
 
     /**
-     * Targets attributed to each project and how many are reached, by the
+     * Targets attributed to each place and how many are reached, by the
      * shared achievedValueSql() rule. Null when the viewer may not see targets.
      *
-     * @param  list<int>  $projectIds
+     * @param  list<int>  $locationIds
      * @return array<int, array{total: int, reached: int, percent: float|null}>|null
      */
-    protected function targetTotalsByProject(array $projectIds): ?array
+    protected function targetTotalsByProject(array $locationIds): ?array
     {
         if (auth()->user()?->can('targets.view') !== true) {
             return null;
         }
 
         return PlanIndicator::query()
-            ->whereIn('plan_indicators.project_id', $projectIds)
-            ->select(['plan_indicators.project_id', 'plan_indicators.target'])
+            ->whereIn('plan_indicators.proposal_location_id', $locationIds)
+            ->select(['plan_indicators.proposal_location_id', 'plan_indicators.target'])
             ->selectRaw(PlanIndicator::achievedValueSql().' as achieved')
             ->toBase()
             ->get()
-            ->groupBy('project_id')
+            ->groupBy('proposal_location_id')
             ->map(function ($rows): array {
                 $rated = $rows->filter(fn ($row): bool => (float) $row->target > 0);
 
@@ -239,23 +250,23 @@ trait TracksProgramHealth
     }
 
     /**
-     * Committed and received money per project per currency, plus each
-     * project's late tranches. Money is null (and no money is read) for a
-     * viewer without both money permissions.
+     * Committed and received money per place per currency, plus each place's
+     * late tranches. Money is null (and no money is read) for a viewer
+     * without both money permissions.
      *
-     * An agreement that funds several projects counts in full on each of
-     * their rows; the program total in {@see programFunding()} counts it once.
+     * An agreement that funds several places counts in full on each of their
+     * rows; the program total in {@see programFunding()} counts it once.
      *
-     * @param  list<int>  $projectIds
+     * @param  SupportCollection<int, ProposalLocation>  $rows
      * @return array{0: array<int, list<array{currency: string, committed: float, received: float}>>|null, 1: array<int, int>}
      */
-    protected function fundingByProject(array $projectIds): array
+    protected function fundingByProject(SupportCollection $rows): array
     {
-        if (! $this->canViewProgramMoney() || $projectIds === []) {
+        if (! $this->canViewProgramMoney() || $rows->isEmpty()) {
             return [null, []];
         }
 
-        $agreements = $this->programAgreements($projectIds);
+        $agreements = $this->programAgreements($rows);
         $funding = [];
         $late = [];
 
@@ -273,18 +284,19 @@ trait TracksProgramHealth
     }
 
     /**
-     * Every agreement signed against a proposal funding one of these
-     * projects, carrying the project ids it covers, net money received and
-     * its late tranches.
+     * Every agreement signed against a proposal funding one of these places,
+     * carrying the row ids it covers, net money received and its late
+     * tranches. A row is of exactly one proposal (D-93), so the link is the
+     * row's own `proposal_id` and no `project_proposal` read is needed.
      *
-     * @param  list<int>  $projectIds
+     * @param  SupportCollection<int, ProposalLocation>  $rows
      * @return list<array{id: int, currency: string, committed: float, received: float, lateTranches: int, projectIds: list<int>}>
      */
-    protected function programAgreements(array $projectIds): array
+    protected function programAgreements(SupportCollection $rows): array
     {
-        $links = DB::table('project_proposal')
-            ->whereIn('project_id', $projectIds)
-            ->get(['project_id', 'proposal_id'])
+        $links = $rows
+            ->filter(fn (ProposalLocation $row): bool => $row->proposal_id !== null)
+            ->map(fn (ProposalLocation $row): object => (object) ['project_id' => $row->id, 'proposal_id' => $row->proposal_id])
             ->groupBy('proposal_id');
 
         if ($links->isEmpty()) {
@@ -320,9 +332,9 @@ trait TracksProgramHealth
             return null;
         }
 
-        $projectIds = array_values(array_map(fn (array $row): int => $row['project']->id, $this->projectLedger));
+        $rows = collect(array_map(fn (array $row): ProposalLocation => $row['project'], $this->projectLedger));
 
-        return array_values(collect($this->programAgreements($projectIds))
+        return array_values(collect($this->programAgreements($rows))
             ->groupBy('currency')
             ->map(fn ($group, string $currency): array => [
                 'currency' => $currency,
@@ -389,22 +401,22 @@ trait TracksProgramHealth
         foreach ($ledger as $row) {
             $project = $row['project'];
             $projectHref = route('projects.show', $project);
-            $isMine = auth()->user()?->employee_id !== null && (int) $project->user_id === (int) auth()->user()->employee_id;
+            $isMine = auth()->user()?->employee_id !== null && (int) $project->responsible_employee_id === (int) auth()->user()->employee_id;
 
             if ($row['pace'] === 'past_end') {
                 $items[] = ['key' => 'past_end', 'tone' => 'critical', 'mine' => $isMine, 'href' => $projectHref, 'label' => __('programs.attention_open_project'),
-                    'text' => __('programs.attention_past_end', ['project' => $project->name])];
+                    'text' => __('programs.attention_past_end', ['project' => $project->headline()])];
             } elseif ($row['pace'] === 'behind') {
                 $items[] = ['key' => 'behind', 'tone' => 'critical', 'mine' => $isMine, 'href' => $projectHref, 'label' => __('programs.attention_open_project'),
-                    'text' => __('programs.attention_behind', ['project' => $project->name, 'progress' => $row['progress'], 'expected' => (int) round((float) $row['elapsed'])])];
+                    'text' => __('programs.attention_behind', ['project' => $project->headline(), 'progress' => $row['progress'], 'expected' => (int) round((float) $row['elapsed'])])];
             } elseif ($row['pace'] === 'slipping') {
                 $items[] = ['key' => 'slipping', 'tone' => 'warn', 'mine' => $isMine, 'href' => $projectHref, 'label' => __('programs.attention_open_project'),
-                    'text' => __('programs.attention_slipping', ['project' => $project->name])];
+                    'text' => __('programs.attention_slipping', ['project' => $project->headline()])];
             }
 
             if ($row['lateTransfers'] > 0) {
-                $items[] = ['key' => 'transfers', 'tone' => 'warn', 'mine' => false, 'href' => route('transfers.index', ['stage' => 'late', 'search' => $project->name]), 'label' => __('programs.attention_open_transfers'),
-                    'text' => trans_choice('programs.attention_late_transfers', $row['lateTransfers'], ['count' => $row['lateTransfers'], 'project' => $project->name])];
+                $items[] = ['key' => 'transfers', 'tone' => 'warn', 'mine' => false, 'href' => route('transfers.index', ['stage' => 'late', 'search' => $project->headline()]), 'label' => __('programs.attention_open_transfers'),
+                    'text' => trans_choice('programs.attention_late_transfers', $row['lateTransfers'], ['count' => $row['lateTransfers'], 'project' => $project->headline()])];
             }
         }
 
