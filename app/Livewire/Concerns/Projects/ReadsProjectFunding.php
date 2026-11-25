@@ -110,24 +110,63 @@ trait ReadsProjectFunding
     }
 
     /**
-     * The project's funding history (T10): every proposal across the years,
+     * The place's funding history (T10): every proposal across the years,
      * oldest first, with its donor, status and planned and actual years. A
      * renewal names the number it renews. Names, dates and statuses only: no
      * money, so it is the same for every viewer.
+     *
+     * A place is of exactly one proposal (Y-16, D-93), but its history is
+     * that proposal **and the renewal chain it sits in** — a grant renewed
+     * for a third year is the same work at the same place, and the page is
+     * where that is read. The chain is walked rather than joined: it is a
+     * handful of rows, and `previous_proposal_id` is a single link each way.
      *
      * @return Collection<int, Proposal>
      */
     #[Computed]
     public function fundingHistory(): Collection
     {
-        // The row's own proposal, and the chain of renewals behind it (T10).
         return Proposal::query()
-            ->whereKey($this->location->proposal_id)
+            ->whereKey($this->renewalChainIds())
             ->select(['proposals.id', 'proposals.slug', 'proposals.name', 'proposals.internal_project_number', 'proposals.status', 'proposals.donor_id', 'proposals.previous_proposal_id', 'proposals.planned_date_begin', 'proposals.planned_date_end', 'proposals.actual_date_begin', 'proposals.actual_date_end'])
             ->with(['donor:id,name', 'previousProposal:id,internal_project_number'])
             ->orderBy('proposals.planned_date_begin')
             ->orderBy('proposals.id')
             ->get();
+    }
+
+    /**
+     * Every proposal in the renewal chain the place's own proposal sits in:
+     * the ones it renews, and the ones that renew it.
+     *
+     * Capped so a cycle in the data cannot spin: a chain of twenty renewals
+     * is already beyond anything the organisation has filed.
+     *
+     * @return list<int>
+     */
+    private function renewalChainIds(): array
+    {
+        $ids = [];
+        $cursor = (int) $this->location->proposal_id;
+
+        while ($cursor > 0 && ! in_array($cursor, $ids, true) && count($ids) < 20) {
+            $ids[] = $cursor;
+            $cursor = (int) (Proposal::query()->whereKey($cursor)->toBase()->value('previous_proposal_id') ?? 0);
+        }
+
+        $frontier = $ids;
+
+        while ($frontier !== [] && count($ids) < 20) {
+            $next = array_values(array_diff(
+                Proposal::query()->whereIn('previous_proposal_id', $frontier)->toBase()->pluck('id')->map(intval(...))->all(),
+                $ids,
+            ));
+
+            $ids = array_merge($ids, $next);
+            $frontier = $next;
+        }
+
+        return $ids;
     }
 
     /**

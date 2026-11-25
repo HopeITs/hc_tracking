@@ -15,9 +15,11 @@ use Livewire\Livewire;
 beforeEach(function () {
     $this->travelTo('2026-10-14 10:00:00');
     $this->user = User::factory()->role('General Manager')->create();
+    $cityId = insertHrCity();
     $this->project = Project::factory()->status(ProjectStatus::Active)->create([
         'program_id' => Program::factory()->create()->id,
-        'center_id' => insertHrCenter(insertHrCity()),
+        'city_id' => $cityId,
+        'center_id' => insertHrCenter($cityId),
     ]);
     $this->previous = Activity::withoutRecording(function (): Proposal {
         $proposal = Proposal::factory()->running()->create([
@@ -30,6 +32,11 @@ beforeEach(function () {
             'donor_id' => Donor::factory()->create(['name' => 'Hope Donor']),
         ]);
         $proposal->projects()->attach($this->project->id, ['target_beneficiaries' => 300]);
+        // Y-16 (D-93): the page is a place of this proposal, so the funding
+        // history it reads is this proposal's and its renewals. The row takes
+        // the project's own city and a centre in it, which the renewal form
+        // then validates against.
+        proposalRowForProject($proposal, $this->project, $this->project->center_id);
 
         return $proposal;
     });
