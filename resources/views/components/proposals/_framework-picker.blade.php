@@ -7,23 +7,25 @@
     button sit in the dialog's own footer (shared through Alpine.store('pk')).
 --}}
 @php
-    $tree = $showPicker ? $this->pickerTree : ['results' => [], 'programs' => 0];
+    $tree = $showPicker ? $this->pickerTree : ['results' => [], 'risks' => [], 'programs' => 0];
     $copyLabel = __('proposals.picker.copy');
 @endphp
 
 <x-ui.modal wire:model="showPicker" size="lg" :title="__('proposals.picker.title')" :description="__('proposals.picker.intro')">
     @if ($showPicker)
-        @if ($tree['results'] === [])
+        @if ($tree['results'] === [] && $tree['risks'] === [])
             <div class="pp-empty">{{ $tree['programs'] === 0 ? __('proposals.picker.no_program') : __('proposals.picker.empty') }}</div>
         @else
             <div class="pp-pk" data-test="program-picker"
                 x-data="{
                     rows: @js($tree['results']),
-                    res: {}, ind: {}, targets: true,
+                    risks: @js($tree['risks']),
+                    res: {}, ind: {}, rk: {}, targets: true,
                     init() {
                         this.rows.forEach(r => { this.res[r.id] = ! r.have; r.indicators.forEach(i => this.ind[i.id] = ! i.have) });
-                        Alpine.store('pk', { res: 0, ind: 0, tg: 0, copy: () => this.copy() });
-                        Alpine.effect(() => { const s = Alpine.store('pk'); s.res = this.willRes(); s.ind = this.willInd(); s.tg = this.willTargets() });
+                        this.risks.forEach(k => this.rk[k.id] = ! k.have);
+                        Alpine.store('pk', { res: 0, ind: 0, tg: 0, rk: 0, copy: () => this.copy() });
+                        Alpine.effect(() => { const s = Alpine.store('pk'); s.res = this.willRes(); s.ind = this.willInd(); s.tg = this.willTargets(); s.rk = this.willRisks() });
                     },
                     groups() { const out = []; this.rows.forEach(r => { if (r.depth === 0 || out.length === 0) out.push([]); out[out.length - 1].push(r) }); return out },
                     row(id) { return this.rows.find(r => r.id === id) },
@@ -32,14 +34,15 @@
                     down(id, on) { this.kids(id).forEach(k => { if (! k.have) this.res[k.id] = on; k.indicators.forEach(i => { if (! i.have) this.ind[i.id] = on }); this.down(k.id, on) }) },
                     tickRes(r, on) { this.res[r.id] = on; r.indicators.forEach(i => { if (! i.have) this.ind[i.id] = on }); this.down(r.id, on); if (on) this.up(r.id) },
                     tickInd(r, i, on) { this.ind[i.id] = on; if (on) { if (! r.have) this.res[r.id] = true; this.up(r.id) } },
-                    all(on) { this.rows.forEach(r => { if (! r.have) this.res[r.id] = on; r.indicators.forEach(i => { if (! i.have) this.ind[i.id] = on }) }); if (! on) this.targets = false },
+                    all(on) { this.rows.forEach(r => { if (! r.have) this.res[r.id] = on; r.indicators.forEach(i => { if (! i.have) this.ind[i.id] = on }) }); this.risks.forEach(k => { if (! k.have) this.rk[k.id] = on }); if (! on) this.targets = false },
                     willRes() { return this.rows.filter(r => ! r.have && this.res[r.id]).length },
                     willInd() { return this.rows.reduce((n, r) => n + r.indicators.filter(i => ! i.have && this.ind[i.id] && (r.have || this.res[r.id])).length, 0) },
                     fillable() { return this.rows.reduce((n, r) => n + r.indicators.filter(i => i.fillable).length, 0) },
+                    willRisks() { return this.risks.filter(k => ! k.have && this.rk[k.id]).length },
                     willTargets() { return this.targets ? this.fillable() : 0 },
-                    anyNew() { return this.rows.some(r => ! r.have || r.indicators.some(i => ! i.have)) },
-                    picked() { return { results: this.rows.filter(r => ! r.have && this.res[r.id]).map(r => r.id), indicators: this.rows.flatMap(r => r.indicators.filter(i => (! i.have && this.ind[i.id]) || (i.fillable && this.targets)).map(i => i.id)) } },
-                    copy() { const p = this.picked(); $wire.copySelection(p.results, p.indicators, this.targets) },
+                    anyNew() { return this.rows.some(r => ! r.have || r.indicators.some(i => ! i.have)) || this.risks.some(k => ! k.have) },
+                    picked() { return { results: this.rows.filter(r => ! r.have && this.res[r.id]).map(r => r.id), indicators: this.rows.flatMap(r => r.indicators.filter(i => (! i.have && this.ind[i.id]) || (i.fillable && this.targets)).map(i => i.id)), risks: this.risks.filter(k => ! k.have && this.rk[k.id]).map(k => k.id) } },
+                    copy() { const p = this.picked(); $wire.copySelection(p.results, p.indicators, this.targets, p.risks) },
                 }">
                 <div class="pp-pk-tools">
                     <span class="pp-pk-sel" role="group" aria-label="{{ __('proposals.picker.select') }}">
@@ -79,18 +82,36 @@
                             </template>
                         </section>
                     </template>
+                    <template x-if="risks.length > 0">
+                        <section class="pp-pk-card" data-test="picker-risks">
+                            <div class="pp-pk-item pp-pk-head" style="--d:0">
+                                <span class="pp-pk-txt"><span class="pp-pk-kind">{{ __('proposals.picker.risks_title') }}</span></span>
+                            </div>
+                            <template x-for="k in risks" :key="k.id">
+                                <div class="pp-pk-item" x-bind:class="{ 'pp-pk-dis': k.have }" style="--d:0">
+                                    <label class="pp-pk-row">
+                                        <input type="checkbox" class="pp-pk-box" x-bind:checked="k.have || rk[k.id]" x-bind:disabled="k.have" x-on:change="rk[k.id] = $event.target.checked">
+                                        <span class="pp-pk-txt">
+                                            <span class="pp-pk-st" dir="auto" x-text="k.name"></span>
+                                        </span>
+                                        <span class="pp-pk-here" x-show="k.have">{{ __('proposals.picker.already_here') }}</span>
+                                    </label>
+                                </div>
+                            </template>
+                        </section>
+                    </template>
                 </div>
                 @error('picker')<p class="pp-err" role="alert">{{ $message }}</p>@enderror
             </div>
         @endif
     @endif
 
-    @if ($showPicker && $tree['results'] !== [])
+    @if ($showPicker && ($tree['results'] !== [] || $tree['risks'] !== []))
         <x-slot:footerMeta>
-            <span class="pp-pk-sum" data-test="picker-summary">{{ __('proposals.picker.will_copy') }} <b x-text="$store.pk?.res ?? 0"></b> {{ __('proposals.picker.results') }} · <b x-text="$store.pk?.ind ?? 0"></b> {{ __('proposals.picker.indicators') }} · <b x-text="$store.pk?.tg ?? 0"></b> {{ __('proposals.picker.targets') }}</span>
+            <span class="pp-pk-sum" data-test="picker-summary">{{ __('proposals.picker.will_copy') }} <b x-text="$store.pk?.res ?? 0"></b> {{ __('proposals.picker.results') }} · <b x-text="$store.pk?.ind ?? 0"></b> {{ __('proposals.picker.indicators') }} · <b x-text="$store.pk?.tg ?? 0"></b> {{ __('proposals.picker.targets') }} · <b x-text="$store.pk?.rk ?? 0"></b> {{ __('proposals.picker.risks') }}</span>
         </x-slot:footerMeta>
         <x-slot:actions>
-            <x-ui.button type="button" tone="primary" x-on:click="$store.pk?.copy()" x-bind:disabled="! $store.pk || ($store.pk.res + $store.pk.ind + $store.pk.tg) === 0" data-test="picker-copy">{{ $copyLabel }}</x-ui.button>
+            <x-ui.button type="button" tone="primary" x-on:click="$store.pk?.copy()" x-bind:disabled="! $store.pk || ($store.pk.res + $store.pk.ind + $store.pk.tg + $store.pk.rk) === 0" data-test="picker-copy">{{ $copyLabel }}</x-ui.button>
         </x-slot:actions>
     @endif
 </x-ui.modal>

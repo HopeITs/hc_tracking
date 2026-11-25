@@ -8,6 +8,7 @@ use App\Models\Program;
 use App\Models\Project;
 use App\Models\Proposal;
 use App\Models\Result;
+use App\Models\Risk;
 use App\Models\User;
 use Database\Seeders\RolesAndPermissionsSeeder;
 use Illuminate\Support\Facades\DB;
@@ -136,7 +137,7 @@ describe('copying from the program framework', function () {
 
         $counts = app(CopyResultTree::class)->copySelection($this->proposal, [$this->programImpact->id, $this->programOutcome->id], [$this->programIndicator->id], false);
 
-        expect($counts)->toBe(['results' => 1, 'indicators' => 1, 'targets' => 0])
+        expect($counts)->toBe(['results' => 1, 'indicators' => 1, 'targets' => 0, 'risks' => 0])
             ->and(Result::query()->where('proposal_id', $this->proposal->id)->where('statement', 'Resilient households')->count())->toBe(1)
             ->and(Indicator::query()->where('result_id', $this->outcome->id)->sole()->target)->toBeNull();
 
@@ -167,5 +168,58 @@ describe('copying from the program framework', function () {
 
         expect($rows[$this->programImpact->id]['have'])->toBeFalse()
             ->and($rows[$this->programOutcome->id]['have'])->toBeTrue();
+    });
+
+    test('ticked program risks are copied with their source, unticked ones are not', function () {
+        $ticked = Risk::factory()->onProgram($this->program)->rated(2, 3)->create(['name' => 'تأخر الموردين', 'name_en' => 'Supplier delay', 'solution' => 'Two suppliers']);
+        $left = Risk::factory()->onProgram($this->program)->create(['name' => 'نقص الكوادر', 'name_en' => 'Staff gaps']);
+
+        $counts = app(CopyResultTree::class)->copySelection($this->proposal, [], [], false, [$ticked->id]);
+
+        $copy = Risk::query()->onLogframeOf($this->proposal->id)->sole();
+
+        expect($counts['risks'])->toBe(1)
+            ->and($copy->copied_from_id)->toBe($ticked->id)
+            ->and($copy->program_id)->toBeNull()
+            ->and([$copy->name, $copy->name_en, $copy->likelihood, $copy->severity, $copy->solution])->toBe(['تأخر الموردين', 'Supplier delay', 2, 3, 'Two suppliers'])
+            ->and(Risk::query()->where('copied_from_id', $left->id)->exists())->toBeFalse()
+            ->and($ticked->fresh()->program_id)->toBe($this->program->id);
+    });
+
+    test('a program risk already copied, or typed here in the same words, is not copied again', function () {
+        $copied = Risk::factory()->onProgram($this->program)->create(['name' => 'تأخر الموردين', 'name_en' => 'Supplier delay']);
+        $typed = Risk::factory()->onProgram($this->program)->create(['name' => 'نقص الكوادر', 'name_en' => 'Staff gaps']);
+        Risk::factory()->onProposalFramework($this->proposal)->create(['name' => 'xx', 'copied_from_id' => $copied->id]);
+        Risk::factory()->onProposalFramework($this->proposal)->create(['name' => '  نقص   الكوادر ']);
+        $fresh = Risk::factory()->onProgram($this->program)->create(['name' => 'تقلب العملة', 'name_en' => 'Currency swings']);
+
+        $tree = activityBoard()->call('openPicker')->instance()->pickerTree;
+        $have = collect($tree['risks'])->pluck('have', 'id');
+
+        expect($have[$copied->id])->toBeTrue()->and($have[$typed->id])->toBeTrue()->and($have[$fresh->id])->toBeFalse();
+
+        $counts = app(CopyResultTree::class)->copySelection($this->proposal, [], [], false, [$copied->id, $typed->id, $fresh->id]);
+
+        expect($counts['risks'])->toBe(1)->and(Risk::query()->onLogframeOf($this->proposal->id)->count())->toBe(3);
+    });
+
+    test('a risk of a program that is not on the proposal is ignored', function () {
+        $foreign = Risk::factory()->onProgram(Program::factory()->create())->create();
+
+        $copy = fn () => app(CopyResultTree::class)->copySelection($this->proposal, [], [], false, [$foreign->id]);
+
+        expect($copy)->toThrow(ValidationException::class)
+            ->and(Risk::query()->onLogframeOf($this->proposal->id)->exists())->toBeFalse();
+    });
+
+    test('the picker copies a risks-only selection through the page', function () {
+        $risk = Risk::factory()->onProgram($this->program)->create(['name' => 'تأخر الموردين', 'name_en' => 'Supplier delay']);
+
+        activityBoard()->call('openPicker')->assertSeeHtml('data-test="picker-risks"')
+            ->call('copySelection', [], [], false, [$risk->id])
+            ->assertHasNoErrors()
+            ->assertSet('showPicker', false);
+
+        expect(Risk::query()->onLogframeOf($this->proposal->id)->sole()->copied_from_id)->toBe($risk->id);
     });
 });

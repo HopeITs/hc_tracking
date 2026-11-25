@@ -11,6 +11,7 @@ use App\Enums\ResultType;
 use App\Models\Indicator;
 use App\Models\Proposal;
 use App\Models\Result;
+use App\Models\Risk;
 use App\Support\ProposalFramework;
 use Flux\Flux;
 use Illuminate\Support\Facades\Gate;
@@ -28,7 +29,7 @@ use Livewire\Attributes\Locked;
  * confirmDelete()/openCreateModal().
  *
  * @property-read Proposal $proposal  #[Computed] proposal()
- * @property-read array{results: list<array<string, mixed>>, programs: int} $pickerTree  #[Computed] pickerTree()
+ * @property-read array{results: list<array<string, mixed>>, risks: list<array<string, mixed>>, programs: int} $pickerTree  #[Computed] pickerTree()
  */
 trait ManagesFrameworkBoard
 {
@@ -227,7 +228,7 @@ trait ManagesFrameworkBoard
      * The program framework as a tree for the picker, each result and
      * indicator marked with whether this proposal already has it.
      *
-     * @return array{results: list<array<string, mixed>>, programs: int}
+     * @return array{results: list<array<string, mixed>>, risks: list<array<string, mixed>>, programs: int}
      */
     #[Computed]
     public function pickerTree(): array
@@ -235,7 +236,7 @@ trait ManagesFrameworkBoard
         $programIds = ProposalFramework::programIds($this->proposal);
 
         if ($programIds === []) {
-            return ['results' => [], 'programs' => 0];
+            return ['results' => [], 'risks' => [], 'programs' => 0];
         }
 
         $source = Result::query()
@@ -284,7 +285,24 @@ trait ManagesFrameworkBoard
             $walk($root, 0);
         }
 
-        return ['results' => $rows, 'programs' => count($programIds)];
+        $mineRisks = Risk::query()->onLogframeOf($this->proposalId)->get(['id', 'name', 'name_en', 'copied_from_id']);
+
+        $risks = Risk::query()
+            ->whereIn('program_id', $programIds)
+            ->whereNull('proposal_id')
+            ->orderBy('id')
+            ->get(['id', 'name', 'name_en', 'likelihood', 'severity'])
+            ->map(fn (Risk $risk): array => [
+                'id' => $risk->id,
+                'name' => $risk->localizedName(),
+                'likelihood' => $risk->likelihood,
+                'severity' => $risk->severity,
+                'have' => $mineRisks->contains(fn (Risk $mine): bool => CopyResultTree::riskIsHere($mine, $risk)),
+            ])
+            ->values()
+            ->all();
+
+        return ['results' => $rows, 'risks' => $risks, 'programs' => count($programIds)];
     }
 
     /**
@@ -292,11 +310,12 @@ trait ManagesFrameworkBoard
      *
      * @param  list<int>  $resultIds
      * @param  list<int>  $indicatorIds
+     * @param  list<int>  $riskIds
      */
-    public function copySelection(array $resultIds, array $indicatorIds, bool $fillTargets): void
+    public function copySelection(array $resultIds, array $indicatorIds, bool $fillTargets, array $riskIds = []): void
     {
         try {
-            $counts = app(CopyResultTree::class)->copySelection($this->proposal, array_map('intval', $resultIds), array_map('intval', $indicatorIds), $fillTargets);
+            $counts = app(CopyResultTree::class)->copySelection($this->proposal, array_map('intval', $resultIds), array_map('intval', $indicatorIds), $fillTargets, array_map('intval', $riskIds));
         } catch (ValidationException $exception) {
             $this->addError('picker', (string) collect($exception->errors())->flatten()->first());
 
@@ -311,6 +330,7 @@ trait ManagesFrameworkBoard
             'results' => trans_choice('proposals.picker.n_results', $counts['results'], ['count' => $counts['results']]),
             'indicators' => trans_choice('proposals.picker.n_indicators', $counts['indicators'], ['count' => $counts['indicators']]),
             'targets' => trans_choice('proposals.picker.n_targets', $counts['targets'], ['count' => $counts['targets']]),
+            'risks' => trans_choice('proposals.picker.n_risks', $counts['risks'], ['count' => $counts['risks']]),
         ]));
     }
 

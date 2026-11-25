@@ -8,6 +8,7 @@ use App\Enums\ResultType;
 use App\Models\Indicator;
 use App\Models\Proposal;
 use App\Models\Result;
+use App\Models\Risk;
 use App\Support\ProposalFramework;
 use Carbon\CarbonInterface;
 use Illuminate\Database\Eloquent\Collection;
@@ -94,16 +95,17 @@ final class CopyResultTree
      *
      * @param  list<int>  $resultIds  program-framework result ids to copy
      * @param  list<int>  $indicatorIds  program-framework indicator ids to copy
-     * @return array{results: int, indicators: int, targets: int}
+     * @param  list<int>  $riskIds  program risk ids to copy (ids outside the proposal's programs are ignored)
+     * @return array{results: int, indicators: int, targets: int, risks: int}
      *
      * @throws ValidationException
      */
-    public function copySelection(Proposal $proposal, array $resultIds, array $indicatorIds, bool $fillTargets): array
+    public function copySelection(Proposal $proposal, array $resultIds, array $indicatorIds, bool $fillTargets, array $riskIds = []): array
     {
         Gate::authorize('results.create');
         Gate::authorize('view', $proposal);
 
-        return DB::transaction(function () use ($proposal, $resultIds, $indicatorIds, $fillTargets): array {
+        return DB::transaction(function () use ($proposal, $resultIds, $indicatorIds, $fillTargets, $riskIds): array {
             $lockedProposal = Proposal::query()->whereKey($proposal->getKey())->lockForUpdate()->firstOrFail();
 
             if ($lockedProposal->isPayroll()) {
@@ -144,7 +146,7 @@ final class CopyResultTree
                 }
             }
 
-            $counts = ['results' => 0, 'indicators' => 0, 'targets' => 0];
+            $counts = ['results' => 0, 'indicators' => 0, 'targets' => 0, 'risks' => 0];
             $childrenOf = $source->groupBy(fn (Result $row): int => (int) $row->parent_id);
             $level = $source->filter(fn (Result $row): bool => $row->parent_id === null || ! in_array($row->parent_id, $sourceIds, true))->values();
 
@@ -236,6 +238,8 @@ final class CopyResultTree
                 Indicator::query()->insert($chunk);
             }
 
+            $counts['risks'] = $this->copyRisks($lockedProposal, $programIds, array_map('intval', $riskIds), $now);
+
             if (array_sum($counts) === 0) {
                 $this->refuse('picker', 'proposals.picker.nothing_ticked');
             }
@@ -244,6 +248,66 @@ final class CopyResultTree
 
             return $counts;
         });
+    }
+
+    /**
+     * Copy the ticked program risks into the proposal's logframe, skipping the
+     * ones already here (copied from the same risk, or the same words).
+     *
+     * @param  list<int>  $programIds
+     * @param  list<int>  $riskIds
+     */
+    private function copyRisks(Proposal $proposal, array $programIds, array $riskIds, CarbonInterface $now): int
+    {
+        if ($riskIds === [] || $programIds === []) {
+            return 0;
+        }
+
+        $here = Risk::query()->onLogframeOf($proposal->id)->get(['id', 'name', 'name_en', 'copied_from_id']);
+
+        $rows = [];
+
+        foreach (Risk::query()->whereIn('program_id', $programIds)->whereNull('proposal_id')->whereIn('id', $riskIds)->orderBy('id')->get() as $risk) {
+            if ($here->contains(fn (Risk $mine): bool => self::riskIsHere($mine, $risk))) {
+                continue;
+            }
+
+            $here->push($risk->replicate()->forceFill(['copied_from_id' => $risk->id]));
+
+            $rows[] = [
+                'name' => $risk->name,
+                'name_en' => $risk->name_en,
+                'impact' => $risk->impact,
+                'proposal_id' => $proposal->id,
+                'program_id' => null,
+                'project_id' => null,
+                'proposal_location_id' => null,
+                'copied_from_id' => $risk->id,
+                'library_risk_id' => $risk->library_risk_id,
+                'likelihood' => $risk->likelihood,
+                'severity' => $risk->severity,
+                'solution' => $risk->solution,
+                'created_at' => $now,
+                'updated_at' => $now,
+            ];
+        }
+
+        foreach (array_chunk($rows, 500) as $chunk) {
+            Risk::query()->insert($chunk);
+        }
+
+        return count($rows);
+    }
+
+    /**
+     * Whether a proposal risk is the program risk already: copied from it, or
+     * the same words in either language.
+     */
+    public static function riskIsHere(Risk $mine, Risk $program): bool
+    {
+        return $mine->copied_from_id === $program->id
+            || self::sameWords($mine->name, $program->name)
+            || (filled($program->name_en) && self::sameWords($mine->name_en, $program->name_en));
     }
 
     /**
