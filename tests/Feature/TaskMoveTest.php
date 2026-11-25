@@ -20,8 +20,12 @@ beforeEach(function () {
     $this->project = Project::factory()->create(['program_id' => $this->program->id, 'name' => 'Wells Project']);
     $this->otherProject = Project::factory()->create(['program_id' => $this->program->id, 'name' => 'Pumps Project']);
     $this->manager = userWithRole('General Manager', insertHrEmployee());
-    $this->task = Task::factory()->create(['source_type' => 'project', 'source_id' => $this->project->id]);
-    $this->subtask = Task::factory()->create(['source_type' => 'project', 'source_id' => $this->project->id, 'parent_task_id' => $this->task->id]);
+    // Y-16 (D-93): a task lives at a place, and moves between the places of
+    // its program.
+    $this->row = rowFor($this->project);
+    $this->otherRow = rowFor($this->otherProject);
+    $this->task = Task::factory()->create(['source_type' => 'proposal_location', 'source_id' => $this->row->id]);
+    $this->subtask = Task::factory()->create(['source_type' => 'proposal_location', 'source_id' => $this->row->id, 'parent_task_id' => $this->task->id]);
 });
 
 test('the task page lists every place in the program and marks the current one', function () {
@@ -30,9 +34,9 @@ test('the task page lists every place in the program and marks the current one',
         ->assertSeeHtml('data-test="task-move-button"')
         ->call('openMoveModal')
         ->assertSet('showMoveModal', true)
-        ->assertSet('moveTarget', 'project:'.$this->project->id)
+        ->assertSet('moveTarget', 'location:'.$this->row->id)
         ->assertSeeHtml('data-move-target="program"')
-        ->assertSeeHtml('data-move-target="project:'.$this->otherProject->id.'"')
+        ->assertSeeHtml('data-move-target="location:'.$this->otherRow->id.'"')
         ->assertSee(['Wells Project', 'Pumps Project', 'Current']);
 });
 
@@ -46,7 +50,7 @@ test('a task never moves outside its program', function () {
         ->call('moveTask')
         ->assertSet('showMoveModal', true);
 
-    expect($this->task->fresh()->only(['source_type', 'source_id']))->toBe(['source_type' => 'project', 'source_id' => $this->project->id]);
+    expect($this->task->fresh()->only(['source_type', 'source_id']))->toBe(['source_type' => 'proposal_location', 'source_id' => $this->row->id]);
 });
 
 test('a subtask offers no move: it follows its parent', function () {
@@ -56,14 +60,14 @@ test('a subtask offers no move: it follows its parent', function () {
         ->set('moveTarget', 'program')
         ->call('moveTask');
 
-    expect($this->subtask->fresh()->source_type)->toBe('project');
+    expect($this->subtask->fresh()->source_type)->toBe('proposal_location');
 });
 
 test('someone who cannot edit the task cannot move it', function () {
     $this->actingAs(User::factory()->create());
 
     expect(fn () => app(MoveTask::class)->handle($this->task, 'program'))->toThrow(AuthorizationException::class)
-        ->and($this->task->fresh()->source_type)->toBe('project');
+        ->and($this->task->fresh()->source_type)->toBe('proposal_location');
 });
 
 test('a task moves onto a location row of the same program (Y-12)', function () {

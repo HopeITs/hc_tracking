@@ -139,7 +139,7 @@ test('the project page lists its funding history oldest first without amounts', 
         return $proposal;
     });
 
-    $page = Livewire::actingAs($this->user)->test('pages::projects.show', ['project' => $this->project])->set('tab', 'proposals');
+    $page = Livewire::actingAs($this->user)->test('pages::projects.show', ['project' => rowFor($this->project)->slug])->set('tab', 'proposals');
 
     expect($page->get('fundingHistory')->pluck('id')->all())->toBe([$this->previous->id, $renewal->id]);
 
@@ -152,7 +152,7 @@ test('the project page lists its funding history oldest first without amounts', 
 
 test('the funding history is a fixed number of queries', function () {
     $count = function (): int {
-        $page = Livewire::actingAs($this->user)->test('pages::projects.show', ['project' => $this->project]);
+        $page = Livewire::actingAs($this->user)->test('pages::projects.show', ['project' => rowFor($this->project)->slug]);
         DB::flushQueryLog();
         DB::enableQueryLog();
         $page->get('fundingHistory');

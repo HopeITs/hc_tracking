@@ -82,9 +82,11 @@ test('a project is paused only when its own center is inactive', function () {
         ->and($this->live->isPaused())->toBeFalse()
         ->and($this->hosted->isPaused())->toBeFalse()
         ->and($unmapped->isPaused())->toBeFalse()
-        ->and(Project::query()->paused()->pluck('id')->all())->toBe([$this->paused->id])
-        ->and(Project::pausedIds())->toBe([$this->paused->id])
-        ->and(Project::query()->notPaused()->pluck('id')->sort()->values()->all())->toBe(collect([$this->live->id, $this->hosted->id, $unmapped->id])->sort()->values()->all());
+        // Y-16 (D-93): the fixtures are places, so the scopes asked are the
+        // row's; Project's twins still answer about projects until Y-18.
+        ->and(ProposalLocation::query()->paused()->pluck('id')->all())->toBe([$this->paused->id])
+        ->and(ProposalLocation::pausedIds())->toBe([$this->paused->id])
+        ->and(ProposalLocation::query()->notPaused()->pluck('id')->sort()->values()->all())->toBe(collect([$this->live->id, $this->hosted->id, $unmapped->id])->sort()->values()->all());
 });
 
 test('a center HR reactivates brings the project back', function () {

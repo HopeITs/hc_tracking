@@ -8,6 +8,7 @@ use App\Actions\Sectors\SaveSector;
 use App\Models\Project;
 use App\Models\Sector;
 use App\Support\DefaultSectors;
+use App\Support\Locations\ProjectLocationMirror;
 use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
@@ -259,12 +260,16 @@ describe('active and inactive sectors', function () {
         $active = Sector::factory()->create(['name_en' => 'Still offered']);
         $inactive = sectorInUse(['name_en' => 'Withdrawn', 'is_active' => false]);
         $project = $inactive->projects()->sole();
+        // Y-16 (D-93): the page shows the place's sectors, mirrored from the
+        // project by SyncProjectSectors in the application.
+        $row = rowFor($project);
+        app(ProjectLocationMirror::class)->syncSectors($project);
 
         expect(Sector::query()->active()->pluck('id')->all())->toBe([$active->id])
             ->and(Sector::pickerOptions([])->pluck('id')->all())->toBe([$active->id])
             ->and(Sector::pickerOptions([$inactive->id])->pluck('id')->sort()->values()->all())->toBe(collect([$active->id, $inactive->id])->sort()->values()->all());
 
-        $this->actingAs(userWithRole('Team Member'))->get(route('projects.show', $project))
+        $this->actingAs(userWithRole('Team Member'))->get(route('projects.show', $row))
             ->assertOk()
             ->assertSee('Withdrawn')
             ->assertSee(__('sectors.inactive'));

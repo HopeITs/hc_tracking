@@ -22,7 +22,7 @@ trait MovesTask
 {
     public bool $showMoveModal = false;
 
-    /** The picked place, as "program" or "project:ID". */
+    /** The picked place, as "program" or "location:ID". */
     public string $moveTarget = '';
 
     /**
@@ -37,7 +37,9 @@ trait MovesTask
     /** Where the task sits now, in moveTarget's format. */
     public function currentMoveTarget(): string
     {
-        return $this->task->source_type === 'program' ? 'program' : $this->task->source_type.':'.$this->task->source_id;
+        // Y-16 (D-93): a place's target reads "location:ID", not the morph
+        // name; MoveTask owns that spelling, so it writes it.
+        return app(MoveTask::class)->targetFor((string) $this->task->source_type, (int) $this->task->source_id);
     }
 
     public function openMoveModal(): void

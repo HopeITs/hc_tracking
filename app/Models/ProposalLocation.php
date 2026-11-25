@@ -635,6 +635,28 @@ class ProposalLocation extends Model
      * @param  Builder<static>  $query
      */
     /**
+     * Only the rows whose work is paused: one of their own centres HR has
+     * deactivated (D-66), the twin of `Project::paused()`. A city-wide row
+     * is field work (D-88) and is never paused by a centre.
+     *
+     * @param  Builder<static>  $query
+     */
+    #[Scope]
+    protected function paused(Builder $query): void
+    {
+        $inactive = HrCenter::inactiveIds();
+
+        if ($inactive === []) {
+            $query->whereRaw('1 = 0');
+
+            return;
+        }
+
+        $query->where('city_wide', false)
+            ->whereHas('centers', fn (Builder $center) => $center->whereIn('center_id', $inactive));
+    }
+
+    /**
      * Leave out rows whose work is paused: a centre HR has deactivated
      * (D-66), the twin of `Project::notPaused()`. A city-wide row is field
      * work (D-88) and is never paused by a centre.
