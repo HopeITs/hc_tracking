@@ -466,6 +466,7 @@ new class extends Component {
         $this->forgetTargets();
         $this->fillGrid(keepEdits: true);
 
+        $this->dispatch('indicator-saved');
         Flux::toast(variant: 'success', text: __('targets.attached', ['code' => $indicator->code]));
     }
 
@@ -579,7 +580,8 @@ new class extends Component {
      */
     public function openLibraryEntryFor(string $groupKey): void
     {
-        $this->openCreateModal();
+        Gate::authorize('indicators.create');
+        $this->openEntryForResult(null, $this->proposalId);
 
         if ($groupKey === 'institutional') {
             $this->entry['institutional'] = true;
@@ -598,6 +600,13 @@ new class extends Component {
     protected function forgetLibrary(): void
     {
         unset($this->pickerGroups);
+    }
+
+    #[\Livewire\Attributes\On('indicator-saved')]
+    public function refreshAttachedIndicators(): void
+    {
+        $this->forgetTargets();
+        $this->fillGrid(keepEdits: true);
     }
 
     /**
@@ -843,9 +852,7 @@ new class extends Component {
                                 <section wire:key="picker-{{ $group['key'] }}" data-picker-group="{{ $group['key'] }}">
                                     <header class="sticky top-0 z-[1] flex items-center justify-between gap-2 border-b {{ $hairline }} bg-board px-3 py-2 dark:bg-surface-2">
                                         <p class="truncate text-xs font-bold uppercase tracking-wide {{ $inkText }}" dir="auto">{{ $group['label'] }}</p>
-                                        @can('indicator-library.create')
-                                            <flux:button size="xs" variant="ghost" icon="plus" wire:click="openLibraryEntryFor('{{ $group['key'] }}')">{{ __('targets.add_to_library') }}</flux:button>
-                                        @endcan
+                                        <flux:button size="xs" variant="ghost" icon="plus" wire:click="openLibraryEntryFor('{{ $group['key'] }}')">{{ __('indicators.add_indicator') }}</flux:button>
                                     </header>
 
                                     @forelse ($group['levels'] as $level)

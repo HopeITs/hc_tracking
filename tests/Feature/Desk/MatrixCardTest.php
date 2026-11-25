@@ -45,17 +45,18 @@ test('the status filter, applied with Done, shows only the projects with that st
         ->assertSee('Fine Clinic');
 });
 
-test('the grid renders the same twelve months at L as at XL, for CSS to fit to the rendered width', function (string $size) {
+test('the grid renders January to December of the year at L as at XL, for CSS to fit to the rendered width', function (string $size) {
     Livewire::actingAs(userWithRole('General Manager', insertHrEmployee()))->test('desk.panels.matrix', ['size' => $size])
-        ->assertSeeHtml('title="October 2025"')
-        ->assertSeeHtml('title="September 2026"')
+        ->assertSeeHtml('title="January 2026"')
+        ->assertSeeHtml('title="December 2026"')
+        ->assertDontSeeHtml('title="December 2025"')
         ->assertDontSeeHtml('--months');
 })->with(['L', 'XL']);
 
 test('a late report in an old month marks its project row, so a narrow card that hides the month still shows it', function () {
     Activity::withoutRecording(function (): void {
         $old = Project::factory()->create(['name' => 'Old Late Farm']);
-        MonthlyReport::factory()->create(['project_id' => $old->id, 'period' => '2025-11-01', 'status' => MonthlyReportStatus::Draft]);
+        MonthlyReport::factory()->create(['project_id' => $old->id, 'period' => '2026-01-01', 'status' => MonthlyReportStatus::Draft]);
     });
 
     Livewire::actingAs(userWithRole('General Manager', insertHrEmployee()))->test('desk.panels.matrix', ['size' => 'L'])
@@ -64,10 +65,10 @@ test('a late report in an old month marks its project row, so a narrow card that
         ->assertSeeInOrder(['Old Late Farm', '1 late']);
 });
 
-test('a report late before the card\'s twelve months and a report that is not late get no marker', function () {
+test('a report late before the card\'s year and a report that is not late get no marker', function () {
     Activity::withoutRecording(function (): void {
         $tooOld = Project::factory()->create(['name' => 'Long Gone Farm']);
-        MonthlyReport::factory()->create(['project_id' => $tooOld->id, 'period' => '2025-09-01', 'status' => MonthlyReportStatus::Draft]);
+        MonthlyReport::factory()->create(['project_id' => $tooOld->id, 'period' => '2025-12-01', 'status' => MonthlyReportStatus::Draft]);
     });
 
     $html = Livewire::actingAs(userWithRole('General Manager', insertHrEmployee()))->test('desk.panels.matrix', ['size' => 'L'])->html();
@@ -79,14 +80,14 @@ test('arabic month headers are numbers, because two months share their first let
     $viewer = userWithRole('General Manager', insertHrEmployee());
 
     Livewire::actingAs($viewer)->test('desk.panels.matrix', ['size' => 'XL'])
-        ->assertSeeHtml('title="October 2025">Oct</span>');
+        ->assertSeeHtml('title="January 2026">Jan</span>');
 
     app()->setLocale(Locale::Arabic->value);
     CarbonImmutable::setLocale(Locale::Arabic->carbonLocale());
 
     Livewire::actingAs($viewer)->test('desk.panels.matrix', ['size' => 'XL'])
-        ->assertSeeHtml('title="تشرين الأول 2025">10</span>')
-        ->assertSeeHtml('title="تشرين الثاني 2025">11</span>')
+        ->assertSeeHtml('title="تشرين الأول 2026">10</span>')
+        ->assertSeeHtml('title="تشرين الثاني 2026">11</span>')
         ->assertDontSeeHtml('>تشر</span>');
 
     CarbonImmutable::setLocale(Locale::English->carbonLocale());

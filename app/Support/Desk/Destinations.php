@@ -266,7 +266,7 @@ final class Destinations
 
             $page('projects.index', 'common.projects', 'folder', 'nav-folder-open', 'projects_delivery', $can('projects.view'), 'projects'),
 
-            $page('results.index', 'common.results_framework', 'chart', 'nav-network', 'monitoring_evaluation', $can('results.view'), 'results'),
+            $page('meal.logframe', 'proposals.framework.title', 'chart', 'nav-network', 'monitoring_evaluation', $can('results.view'), 'results'),
             $page('indicator-library.index', 'navigation.indicator_library', 'chart', 'nav-library-big', 'monitoring_evaluation', $can('indicator-library.view'), 'indicator-library'),
             $page('indicators.index', 'common.indicators', 'chart', 'nav-gauge', 'monitoring_evaluation', $can('indicators.view'), 'indicators'),
             $page('targets.index', 'common.targets', 'dot', 'nav-crosshair', 'monitoring_evaluation', $can('targets.view'), 'targets'),

@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Actions\IndicatorLibrary;
 
+use App\Actions\Targets\AttachLibraryIndicatorToResult;
 use App\Enums\CollectionFrequency;
 use App\Enums\DenominatorBasis;
 use App\Enums\IndicatorCollector;
@@ -12,6 +13,7 @@ use App\Enums\ResultType;
 use App\Models\Indicator;
 use App\Models\LibraryIndicator;
 use App\Models\PlanIndicator;
+use App\Models\Result;
 use App\Support\IndicatorCode;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Gate;
@@ -49,9 +51,32 @@ class SaveLibraryIndicator
             Gate::authorize('update', LibraryIndicator::query()->findOrFail($libraryIndicatorId));
         }
 
+        return $this->save($libraryIndicatorId, $input);
+    }
+
+    /** @param array<string, mixed> $input */
+    public function createForResult(Result $result, array $input, ?int $projectId = null): Indicator
+    {
+        Gate::authorize('indicators.create');
+
+        return DB::transaction(function () use ($result, $input, $projectId): Indicator {
+            $entry = $this->save(null, $input);
+
+            $indicator = app(AttachLibraryIndicatorToResult::class)->forResult($result, $entry->id, $projectId);
+            $indicator->update(['unit' => $entry->unit]);
+
+            return $indicator;
+        }, 3);
+    }
+
+    /** @param array<string, mixed> $input */
+    private function save(?int $libraryIndicatorId, array $input): LibraryIndicator
+    {
         $attributes = $this->attributesFrom($this->validate($input));
 
         return DB::transaction(function () use ($libraryIndicatorId, $attributes): LibraryIndicator {
+            $this->ensureNamesAreAvailable($libraryIndicatorId, $attributes['name_ar'], $attributes['name_en']);
+
             $entry = $libraryIndicatorId === null
                 ? new LibraryIndicator
                 : LibraryIndicator::query()->lockForUpdate()->findOrFail($libraryIndicatorId);
@@ -83,6 +108,31 @@ class SaveLibraryIndicator
 
             return $entry;
         }, 3);
+    }
+
+    private function ensureNamesAreAvailable(?int $libraryIndicatorId, string $arabicName, ?string $englishName): void
+    {
+        $entries = LibraryIndicator::query()->orderBy('id')->lockForUpdate()->get(['id', 'name_ar', 'name_en']);
+        $current = $entries->find($libraryIndicatorId);
+        $existingNames = [];
+
+        foreach ($entries->except($libraryIndicatorId === null ? [] : [$libraryIndicatorId]) as $entry) {
+            $existingNames[$this->normalizeName($entry->name_ar)] = true;
+            $existingNames[$this->normalizeName($entry->name_en)] = true;
+        }
+
+        foreach (['name_ar' => $arabicName, 'name_en' => $englishName] as $field => $value) {
+            $name = $this->normalizeName($value);
+
+            if ($name !== '' && $name !== $this->normalizeName($current?->{$field}) && isset($existingNames[$name])) {
+                throw ValidationException::withMessages([$field => __('indicator_library.name_already_exists')]);
+            }
+        }
+    }
+
+    public static function normalizeName(?string $name): string
+    {
+        return mb_strtolower(trim(preg_replace('/\s+/u', ' ', $name ?? '') ?? ''));
     }
 
     /**

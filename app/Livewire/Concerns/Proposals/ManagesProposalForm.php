@@ -398,7 +398,7 @@ trait ManagesProposalForm
             ->select($showsMoney ? [...$columns, 'requested_budget', 'requested_currency'] : $columns)
             ->findOrFail($proposalId);
 
-        Gate::authorize('update', $proposal);
+        Gate::authorize('editDetails', $proposal);
 
         $this->resetProposalForm();
         $this->editingProposalId = $proposal->id;

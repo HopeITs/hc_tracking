@@ -267,20 +267,6 @@ parameters:
             identifier: nullsafe.neverNull
             path: app/Livewire/Concerns/Results/BuildsResultsTree.php
             count: 1
-        -
-            # overview() bumps $levels[$level][...] for a string $level; PHPStan
-            # cannot tell that every ResultType value was seeded with all three
-            # counters, so it reports the keys as possibly missing.
-            identifier: offsetAccess.notFound
-            path: app/Livewire/Concerns/Results/SummarisesResults.php
-            count: 2
-        -
-            # The same $levels array: after those increments PHPStan reads
-            # `measured` / `indicators` as optional, so the declared `levels` shape
-            # in the return docblock no longer matches.
-            identifier: return.type
-            path: app/Livewire/Concerns/Results/SummarisesResults.php
-            count: 1
 
         # The projects/show traits below hold code moved unchanged from the page,
         # which PHPStan could not read before. Eloquent\Collection::map() types

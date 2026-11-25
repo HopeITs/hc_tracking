@@ -77,7 +77,7 @@ final class AddIndicatorToLibrary
      * impact, CC for a cross-cutting result, otherwise OC / OP / AC followed
      * by the position of each step of its chain (OC2, OP2.1, AC2.1.3).
      */
-    private function levelRefOf(Result $result): string
+    public function levelRefOf(Result $result): string
     {
         $prefix = match ($result->type) {
             ResultType::Impact => 'G',

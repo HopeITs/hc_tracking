@@ -55,7 +55,7 @@
 
 @include('pages.results._index-result-modal')
 
-<livewire:indicators.quick-form :key="'logframe-indicator-form-'.$proposalId" />
+<livewire:indicators.quick-form :proposal-id="$proposalId" :key="'logframe-indicator-form-'.$proposalId" />
 
 @if ($canCreate)
     @include('components.proposals._logframe-copy-modal')

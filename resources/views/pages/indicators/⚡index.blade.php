@@ -14,6 +14,8 @@ use App\Models\Project;
 use App\Models\Result;
 use Illuminate\Support\Facades\Gate;
 use Livewire\Attributes\Layout;
+use Livewire\Attributes\Locked;
+use Livewire\Attributes\On;
 use Livewire\Attributes\Title;
 use Livewire\Attributes\Url;
 use Livewire\Component;
@@ -65,6 +67,29 @@ new #[Layout('layouts::desk'), Title('titles.indicators')] class extends Compone
     #[Url(except: '')]
     public string $focus = '';
 
+    #[Locked]
+    public ?int $initialIndicatorResultId = null;
+
+    #[Locked]
+    public ?int $initialIndicatorProjectId = null;
+
+    #[Locked]
+    public bool $openIndicatorEntryOnLoad = false;
+
+    public function openCreateModal(): void
+    {
+        Gate::authorize('indicators.create');
+
+        $this->dispatch('add-indicator')->to('indicators.quick-form');
+    }
+
+    #[On('indicator-saved')]
+    public function refreshAfterIndicatorSaved(): void
+    {
+        $this->forgetIndicators();
+        $this->resetPage();
+    }
+
 
     /**
      * Deep links from the rest of the chain.
@@ -84,12 +109,12 @@ new #[Layout('layouts::desk'), Title('titles.indicators')] class extends Compone
         if ($create > 0 && Gate::allows('indicators.create')) {
             if ($createForProject > 0) {
                 if (Project::query()->whereKey($createForProject)->exists()) {
-                    $this->openCreateModal();
-                    $this->indicatorProjectId = (string) $createForProject;
+                    $this->openIndicatorEntryOnLoad = true;
+                    $this->initialIndicatorProjectId = $createForProject;
                 }
             } elseif (Result::query()->whereKey($create)->exists()) {
-                $this->openCreateModal();
-                $this->indicatorResultId = (string) $create;
+                $this->openIndicatorEntryOnLoad = true;
+                $this->initialIndicatorResultId = $create;
             }
         }
 
@@ -279,6 +304,7 @@ new #[Layout('layouts::desk'), Title('titles.indicators')] class extends Compone
     @include('pages.indicators._index-inspect-modal')
 
     @include('pages.indicators._index-form-modal')
+    <livewire:indicators.quick-form :initial-result-id="$initialIndicatorResultId" :initial-project-id="$initialIndicatorProjectId" :open-on-load="$openIndicatorEntryOnLoad" />
 
     @include('pages.indicators._index-reading-modal')
 </x-desk.register>

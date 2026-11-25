@@ -23,7 +23,7 @@ $groups = [
     'risks' => ['view', 'create', 'update', 'delete'],
     'targets' => ['view', 'create', 'update', 'delete'],
     'donors' => ['view', 'create', 'update', 'delete', 'approve'],
-    'proposals' => ['view', 'create', 'update', 'delete', 'manage-reviewers', 'correct-status', 'approve', 'manage-partners'],
+    'proposals' => ['view', 'create', 'update', 'delete', 'manage-reviewers', 'correct-status', 'approve', 'manage-partners', 'edit-details'],
     'funding-agreements' => ['view', 'create', 'update', 'delete'],
     'transfers' => ['view', 'create', 'update', 'delete'],
     'strategies' => ['view', 'create', 'update', 'delete'],
@@ -246,7 +246,7 @@ return [
     */
     'role_baselines' => [
         'Team Member' => $viewEverything,
-        'Media Team' => [...$viewEverything, ...$taskWriter, ...$reportWriter],
+        'Media Team' => [...$viewEverything, ...$taskWriter, ...$reportWriter, 'proposals.edit-details'],
         // The fundraising officer works the proposals (user story §1). The donor list
         // is read-only for them: only the PR Manager records a donor, and the
         // General Manager approves it.
@@ -270,6 +270,7 @@ return [
         ],
         'MEAL' => [
             ...$viewEverything, ...$taskWriter, ...$reportWriter, 'reports.approve', 'reports.mark-seen',
+            'proposals.edit-details',
             'indicators.create', 'indicators.update', 'indicators.delete', 'indicators.record',
             'results.create', 'results.update', 'results.delete',
             'targets.create', 'targets.update', 'targets.delete',
@@ -288,6 +289,7 @@ return [
         ],
         'Managers' => [
             ...$viewEverything, ...$taskWriter, 'tasks.delete', ...$reportWriter,
+            'proposals.edit-details',
             'strategies.create', 'strategies.update', 'strategies.delete',
             'programs.update',
             'annual-plans.create', 'annual-plans.update', 'annual-plans.delete',

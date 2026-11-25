@@ -57,13 +57,15 @@ new class extends Component {
     }
 
     /**
+     * January to December of the current year (user decision 2026-11-25).
+     *
      * @return list<CarbonImmutable>
      */
     public function months(): array
     {
-        $current = CarbonImmutable::today()->startOfMonth();
+        $january = CarbonImmutable::today()->startOfYear();
 
-        return array_map(fn (int $back): CarbonImmutable => $current->subMonths($back), range(11, 0));
+        return array_map(fn (int $index): CarbonImmutable => $january->addMonths($index), range(0, 11));
     }
 
     /**

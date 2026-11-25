@@ -86,6 +86,7 @@ test('a PR Manager may reopen the done framework task; a team member may not', f
     app(SyncLogframeTask::class)->confirm($this->proposal, 'Done for now');
 
     $teamMember = User::factory()->role('Team Member')->create();
+    $teamMember->givePermissionTo('proposals.view');
     frameworkBox($teamMember)->assertDontSeeHtml('data-test="framework-reopen"')->call('reopenTask')->assertForbidden();
 
     frameworkBox(User::factory()->role('Public Relations Manager')->create())
@@ -148,7 +149,9 @@ test('an assumption needs text and a result of this proposal', function () {
 test('someone without results permissions cannot add an assumption', function () {
     $outcome = frameworkResult(ResultType::Outcome);
 
-    frameworkBox(User::factory()->role('Team Member')->create())
+    $viewer = User::factory()->role('Team Member')->create();
+    $viewer->givePermissionTo('proposals.view');
+    frameworkBox($viewer)
         ->call('openAssumption', null, $outcome->id)
         ->assertForbidden();
 });
@@ -167,67 +170,54 @@ test('an activity on set dates needs its end after its start; Continuous clears 
     expect($activity->fresh()->starts_on)->toBeNull()->and($activity->fresh()->ends_on)->toBeNull();
 });
 
-test('the layout, layers and open results are remembered for the person', function () {
+test('the proposal has one framework table regardless of a saved layout preference', function () {
     $outcome = frameworkResult(ResultType::Outcome);
 
-    frameworkBox($this->meal)->call('setLayout', 'matrix')->call('toggleLayer', 'targets')->call('toggleOpen', $outcome->id);
+    frameworkBox($this->meal)->call('setLayout', 'matrix');
 
     frameworkBox($this->meal)
-        ->assertSet('layout', 'matrix')
-        ->assertSet('layers.targets', true)
-        ->assertSet('openIds', [$outcome->id])
-        ->assertSeeHtml('data-test="framework-matrix"');
-
-    frameworkBox(User::factory()->role('Financial')->create())->assertSet('layout', 'chain')->assertSet('openIds', []);
+        ->assertSeeHtml('data-test="framework-table"')
+        ->assertSee($outcome->statement)
+        ->assertDontSeeHtml('data-test="framework-matrix"');
 });
 
-test('the framework scrolls with the page under a sticky toolbar, with no fixed-box option', function () {
+test('the table scrolls under its fixed headings', function () {
     frameworkResult(ResultType::Outcome);
 
     frameworkBox($this->meal)
-        ->assertSeeHtmlInOrder(['data-test="framework-toolbar"', 'data-test="framework-search"', 'data-test="framework-body"'])
-        ->assertDontSeeHtml('setTall');
+        ->assertSeeHtmlInOrder(['data-test="framework-toolbar"', 'data-test="framework-search"', 'data-test="framework-body"', 'data-test="framework-table"'])
+        ->assertSeeHtml('sticky top-0')
+        ->assertSeeHtml('sticky start-0');
 });
 
-test('the results chain shows one outcome tab in front, with its outputs folded', function () {
+test('outcomes and their outputs appear in the same table', function () {
     $first = frameworkResult(ResultType::Outcome);
     $second = frameworkResult(ResultType::Outcome);
     $output = frameworkResult(ResultType::Output, $second);
 
-    // Every panel is in the page so switching is instant; only the one in front shows.
     frameworkBox($this->meal)
-        ->assertSet('focusedId', $first->id)
-        ->assertSeeHtml('data-test="outcome-panel-'.$first->id.'"')
-        ->assertSeeHtmlInOrder(['data-test="outcome-panel-'.$second->id.'"', 'style="display: none"'])
-        ->call('focusOn', $second->id)
-        ->assertSet('focusedId', $second->id)
-        ->assertSeeHtml('data-test="node-toggle-'.$output->id.'"')
-        ->assertSeeHtmlInOrder(['data-test="node-body-'.$output->id.'"', 'data-open="false"'])
-        ->call('toggleChild', $output->id)
-        ->assertSeeHtmlInOrder(['data-test="node-body-'.$output->id.'"', 'data-open="true"']);
+        ->assertSeeHtmlInOrder([
+            'framework-row-'.$first->id.'-0',
+            'framework-row-'.$second->id.'-0',
+            'framework-row-'.$output->id.'-0',
+        ]);
 });
 
-test('an outcome keeps its indicators and its risks and assumptions folded until asked for', function () {
+test('an outcome shows its indicator and risk controls in the same table', function () {
     $outcome = frameworkResult(ResultType::Outcome);
+    $indicator = Indicator::factory()->create(['result_id' => $outcome->id]);
 
     frameworkBox($this->meal)
-        ->assertSet('drawer', '')
-        ->call('toggleDrawer', 'ind')
-        ->assertSet('drawer', 'ind')
-        ->assertSeeHtml('data-test="drawer-ind-'.$outcome->id.'"')
-        ->call('toggleDrawer', 'ra')
-        ->assertSet('drawer', 'ra')
-        ->call('toggleDrawer', 'ra')
-        ->assertSet('drawer', '');
+        ->assertSeeHtml('data-test="framework-indicator-'.$indicator->id.'"')
+        ->assertSeeHtml('data-test="result-risks-'.$outcome->id.'"');
 });
 
-test('activities linked to no output show as a count on the Activity board tab', function () {
-    frameworkResult(ResultType::Activity);
+test('an activity without an output remains visible in the table', function () {
+    $activity = frameworkResult(ResultType::Activity);
 
     frameworkBox($this->meal)
-        ->assertSeeHtml('data-test="loose-badge"')
-        ->assertSee(trans_choice('proposals.framework.loose_banner', 1, ['count' => 1]))
-        ->assertDontSeeHtml('data-test="loose-banner"');
+        ->assertSeeHtml('data-result-type="activity"')
+        ->assertSee($activity->statement);
 });
 
 test('search and "only results with problems" keep a matching child with its parent', function () {
@@ -260,7 +250,7 @@ test('only someone who may edit indicators can click one open; a PR officer just
         ->assertDontSeeHtml($opensEditor);
 });
 
-test('an open output lists its risks by score and keeps each card to four rows until Show all', function () {
+test('the grouped table ranks risks and limits each list to four rows until Show all', function () {
     $outcome = frameworkResult(ResultType::Outcome);
     $output = frameworkResult(ResultType::Output, $outcome);
     Risk::factory()->rated(1, 1)->create(['proposal_id' => $this->proposal->id, 'result_id' => $output->id, 'name' => 'Minor delay']);
@@ -268,7 +258,6 @@ test('an open output lists its risks by score and keeps each card to four rows u
     Assumption::factory()->count(5)->create(['proposal_id' => $this->proposal->id, 'result_id' => $output->id]);
 
     frameworkBox($this->meal)
-        ->call('toggleChild', $output->id)
         ->assertSeeInOrder(['Border closure', 'Minor delay'])
         ->assertSeeHtml('pp-fw-score-high')
         ->assertSee(__('proposals.framework.show_all', ['count' => 5]))

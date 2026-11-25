@@ -104,17 +104,17 @@ test('each role holds every view permission plus exactly its approved write perm
     expect($granted)->toEqualCanonicalizing([...everyViewPermission(), ...$writes]);
 })->with([
     'Team Member' => ['Team Member', []],
-    'Media Team' => ['Media Team', ['tasks.create', 'tasks.update', 'reports.create', 'reports.update']],
-    'Public Relations' => ['Public Relations', [...FUNDRAISING_VIEWS, 'tasks.create', 'tasks.update', 'reports.create', 'reports.update', 'proposals.create', 'proposals.update', 'ai.draft']],
+    'Media Team' => ['Media Team', ['tasks.create', 'tasks.update', 'reports.create', 'reports.update', 'proposals.edit-details']],
+    'Public Relations' => ['Public Relations', [...FUNDRAISING_VIEWS, 'tasks.create', 'tasks.update', 'reports.create', 'reports.update', 'proposals.create', 'proposals.update', 'proposals.manage-partners', 'ai.draft']],
     'Public Relations Manager' => ['Public Relations Manager', [
         ...FUNDRAISING_VIEWS,
         'tasks.create', 'tasks.update', 'reports.create', 'reports.update',
         'donors.create', 'donors.update', 'proposals.create', 'proposals.update',
         'projects.create',
         'funding-agreements.view', 'funding-agreements.create', 'funding-agreements.update',
-        'proposals.manage-reviewers', 'proposals.correct-status', 'proposals.approve',
+        'proposals.manage-reviewers', 'proposals.correct-status', 'proposals.approve', 'proposals.manage-partners',
         'reports.reopen', 'reports.aggregate',
-        'ai.draft',
+        'ai.draft', 'stage-task-templates.manage',
     ]],
     'MEAL' => ['MEAL', [
         'tasks.create', 'tasks.update', 'reports.create', 'reports.update', 'reports.approve', 'reports.mark-seen',
@@ -125,6 +125,7 @@ test('each role holds every view permission plus exactly its approved write perm
         'reports.reopen', 'reports.aggregate',
         'meal-coverage.manage', 'sectors.manage', 'risk-library.manage',
         'report-templates.manage', 'evidence-types.manage', 'narrative-questions.manage',
+        'proposals.edit-details',
         'ai.draft',
     ]],
     'Financial' => ['Financial', [
@@ -144,6 +145,7 @@ test('each role holds every view permission plus exactly its approved write perm
         'projects.update', 'projects.delete',
         'risks.create', 'risks.update', 'risks.delete',
         'indicators.record',
+        'proposals.edit-details',
         'ai.draft',
     ]],
 ]);
@@ -156,6 +158,7 @@ test('the General Manager holds everything except role and permission management
             'reports.reopen', 'meal-coverage.manage', 'report-templates.manage', 'evidence-types.manage', 'narrative-questions.manage',
             'targets.create', 'targets.update',
             'proposals.approve',
+            'proposals.manage-partners',
             'ai.draft',
             'annual-plans.review',
         ])

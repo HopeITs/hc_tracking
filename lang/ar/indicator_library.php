@@ -1,6 +1,9 @@
 <?php
 
 return [
+    'existing_indicators' => 'ابحث في المؤشرات الموجودة',
+    'more_options' => 'خيارات إضافية',
+    'name_already_exists' => 'اسم المؤشر موجود بالفعل. اختره من المكتبة.',
     'name_ar_required' => 'أدخل اسم المؤشر بالعربية',
     'program_required' => 'اختر البرنامج',
     'level_ref_format' => 'أدخل المستوى ورقمه كما في إطار البرنامج، مثل OP1.2',

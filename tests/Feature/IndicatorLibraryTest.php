@@ -389,5 +389,5 @@ test('the entry form opens on the name, ahead of the program and level, and mark
 
     expect($titleAt('indicator_library.section_name'))->toBeInt()->toBeLessThan($titleAt('indicator_library.section_placement'))
         ->and($html)->toContain('data-modal-index')
-        ->and(substr_count($html, 'data-optional'))->toBe(1);
+        ->and(substr_count($html, 'data-optional'))->toBe(2);
 });

@@ -274,6 +274,7 @@ return [
     'budget_required' => 'Set the requested budget and its currency before sending the proposal for review.',
     'link_project_first' => 'Link at least one project first.',
     'planned_dates_required' => 'Set the planned start and end dates before sending the concept note for review.',
+    'beneficiaries_for' => 'Beneficiaries — :name',
     'beneficiaries_required' => 'Enter the number of beneficiaries for every center linked to the proposal.',
     'final_report_required' => 'Upload the final report and record the donor\'s acceptance before closing the proposal.',
     'add_negotiation_note' => 'Add negotiation note',
@@ -881,6 +882,12 @@ return [
     ],
 
     'framework' => [
+        'choose_proposal' => 'Choose a proposal',
+        'indicator' => 'Indicator',
+        'assumptions_risks' => 'Assumptions and risks',
+        'add_row_below' => 'Add row below',
+        'add_child_row' => 'Add child row',
+        'remove_row' => 'Remove',
         'title' => 'Logical framework',
         'intro' => 'Click a result to open it. Choose what to show under each result.',
         'payroll_none' => 'A payroll proposal has no logical framework, targets, projects, plan or donor reports.',

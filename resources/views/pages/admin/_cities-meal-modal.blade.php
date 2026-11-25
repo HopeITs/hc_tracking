@@ -1,9 +1,7 @@
 {{--
-    Assign or change the MEAL officer of a governorate or a project. The
-    employee list is the shared HR picker; the server accepts active
-    employees only (AssignMealCoverage).
+    Assign or change the MEAL officer of a governorate or a reporting place.
 
-    @var array{name: string, inactiveCity: bool}|null $mealTarget
+    @var array{name: string, inactiveCity: bool, officer: array{name: string, inactive: bool}|null}|null $mealTarget
 --}}
 
 <x-ui.modal
@@ -27,13 +25,24 @@
                 </p>
             @endif
 
+            @if ($mealTarget['officer']['inactive'] ?? false)
+                <p class="flex items-center gap-2 rounded-lg bg-status-warn-soft px-3 py-2 text-sm text-status-warn" role="status">
+                    <flux:icon.exclamation-triangle variant="mini" class="size-4 shrink-0" />
+                    <span>{{ $mealTarget['officer']['name'] }} · {{ __('cities.responsible_inactive') }}</span>
+                </p>
+            @endif
+
             <x-ui.form-select
                 wire:model="mealEmployeeId"
                 :label="__('cities.meal_officer')"
                 :placeholder="__('common.select')"
                 required
-                employees
-            />
+                searchable
+            >
+                @foreach ($this->eligibleMealOfficers as $officer)
+                    <option value="{{ $officer->id }}">{{ $officer->name }} · {{ $officer->secondary_name }}</option>
+                @endforeach
+            </x-ui.form-select>
 
             @error('mealTargetId')
                 <p class="text-sm text-status-critical">{{ $message }}</p>

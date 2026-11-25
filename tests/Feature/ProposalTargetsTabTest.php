@@ -68,9 +68,9 @@ function cellKey(Indicator $indicator, ProposalLocation $row): string
     return $indicator->id.'_'.$row->id;
 }
 
-test('the proposal page renders the targets component on the targets tab', function () {
+test('the embedded proposal renders the targets component on the targets tab', function () {
     Livewire::actingAs($this->meal)
-        ->test('pages::proposals.show', ['proposal' => $this->proposal])
+        ->test('pages::proposals.show', ['proposal' => $this->proposal, 'embedded' => true])
         ->set('tab', 'targets')
         ->assertSee(__('proposals.tab_targets'))
         ->assertSeeLivewire('proposals.targets');
