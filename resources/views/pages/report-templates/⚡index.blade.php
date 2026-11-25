@@ -391,6 +391,11 @@ new #[Layout('layouts::desk'), Title('titles.report_templates')] class extends C
                 @endif
                 @php
                     $project = $row['project'];
+                    // Y-16 (D-93): Review opens the location row's template tab.
+                    // The row is resolved per queue row, which is short; the
+                    // link would still work through the legacy redirect, this
+                    // just saves the hop.
+                    $reviewRow = $project === null ? null : app(\App\Support\Locations\ProjectSuccessor::class)->rowFor($project->id);
                     $openProposal = $row['templateProposals'][0]['id'] ?? null;
                     $place = collect([$row['cityName'], $row['centerName']])->filter()->implode(' · ');
                 @endphp
@@ -443,7 +448,7 @@ new #[Layout('layouts::desk'), Title('titles.report_templates')] class extends C
                                 size="sm"
                                 icon="eye"
                                 class="min-h-8 touch-manipulation"
-                                :href="$project !== null ? route('projects.show', [$project, 'tab' => 'template', 'template' => $row['template']->id]) : route('proposals.show', [$openProposal])"
+                                :href="$reviewRow !== null ? route('projects.show', [$reviewRow, 'tab' => 'template', 'template' => $row['template']->id]) : route('proposals.show', [$openProposal])"
                                 wire:navigate
                                 data-queue-open
                                 :aria-label="__('report_templates.queue.open', ['name' => $row['name']])"

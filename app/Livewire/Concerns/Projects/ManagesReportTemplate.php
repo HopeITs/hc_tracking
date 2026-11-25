@@ -302,13 +302,15 @@ trait ManagesReportTemplate
     #[Computed]
     public function awaitingMonthlyReports(): bool
     {
-        $project = $this->location;
+        $row = $this->location;
 
-        return $project->status === ProjectStatus::Active
+        // Y-03: a monthly report belongs to a template, so "none generated
+        // yet" is asked of the row's own template (Y-16).
+        return $row->status === ProjectStatus::Active
             && $this->reportTemplate?->status === ReportTemplateStatus::Confirmed
-            && $project->start_date !== null
-            && $project->end_date !== null
-            && ! $project->monthlyReports()->exists();
+            && $row->start_date !== null
+            && $row->end_date !== null
+            && ! $this->reportTemplate->monthlyReports()->exists();
     }
 
     public function openTemplateLineModal(int $lineId): void

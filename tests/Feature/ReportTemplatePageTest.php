@@ -110,7 +110,8 @@ function rtpResponsibleOfficer(Project $project): User
 
 function rtpPage(User $user, Project $project): Testable
 {
-    return Livewire::actingAs($user)->withQueryParams(['tab' => 'template'])->test('pages::projects.show', ['project' => $project]);
+    // Y-16: the page is the project's location row, named by its slug.
+    return Livewire::actingAs($user)->withQueryParams(['tab' => 'template'])->test('pages::projects.show', ['project' => rowFor($project)->slug]);
 }
 
 test('the responsible officer and the MEAL Manager see the lines grouped by proposal, with edit and confirm controls', function (string $who) {

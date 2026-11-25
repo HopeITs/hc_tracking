@@ -107,7 +107,7 @@ trait ReadsProjectDelivery
         return PlanIndicator::query()
             ->select(['id', 'source_type', 'source_id', 'indicator_id', 'target', 'project_id', 'proposal_location_id', 'period'])
             ->where('proposal_location_id', $this->locationId)
-            ->with(['indicator:id,name,result_id,measure,unit', 'indicator.result:id,statement,type'])
+            ->with(['indicator:id,name,result_id,proposal_location_id,measure,unit', 'indicator.result:id,statement,type'])
             ->withCount('reports')
             ->orderBy('id')
             ->get();
