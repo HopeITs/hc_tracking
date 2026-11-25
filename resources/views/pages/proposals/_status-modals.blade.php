@@ -77,6 +77,10 @@
                         <x-ui.form-input wire:model="statusMeetingAt" :label="__('proposals.meeting_at')" type="datetime-local" :min="now()->format('Y-m-d\TH:i')" :help="__('proposals.meeting_at_help')" class="col-span-2" data-test="status-meeting-at" />
                     @endif
 
+                    @foreach ($this->statusMissingBeneficiaries as $missingRow)
+                        <x-ui.form-input wire:model="statusBeneficiaries.{{ $missingRow['id'] }}" wire:key="status-beneficiaries-{{ $missingRow['id'] }}" :label="__('proposals.beneficiaries_for', ['name' => $missingRow['name']])" type="number" min="1" step="1" inputmode="numeric" dir="ltr" required class="col-span-2" data-test="status-beneficiaries-input" />
+                    @endforeach
+
                     @if ($this->unseenReviewerNames !== [])
                         <div class="col-span-2 flex items-start gap-2 rounded-lg border border-status-warn/30 bg-status-warn-soft p-3 text-sm text-status-warn" role="status" data-test="status-unseen-reviewers">
                             <flux:icon.eye-slash variant="mini" class="mt-0.5 size-4 shrink-0" aria-hidden="true" />
