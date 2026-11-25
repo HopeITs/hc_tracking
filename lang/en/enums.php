@@ -15,11 +15,6 @@ return [
         'pending' => 'Pending',
         'approved' => 'Approved',
     ],
-    'program_request_status' => [
-        'pending' => 'Pending',
-        'created' => 'Created',
-        'declined' => 'Declined',
-    ],
     'proposal_change_request_status' => [
         'pending' => 'Waiting',
         'approved' => 'Approved',

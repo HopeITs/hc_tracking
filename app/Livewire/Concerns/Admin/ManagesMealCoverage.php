@@ -9,8 +9,8 @@ use App\Enums\MealCoverageScope;
 use App\Models\HrCenter;
 use App\Models\HrCity;
 use App\Models\HrEmployee;
-use App\Models\HrProgram;
 use App\Models\MealCoverageAssignment;
+use App\Models\Program;
 use App\Models\ProposalLocation;
 use App\Models\ReportTemplate;
 use App\Support\Reporting\ReportPlace;
@@ -137,7 +137,7 @@ trait ManagesMealCoverage
     public function placeOfficers(): Collection
     {
         $places = $this->coveragePlaces;
-        $programs = HrProgram::namesById();
+        $programs = Program::namesById();
         $centers = HrCenter::query()->whereKey($places->pluck('centerId')->filter()->unique()->all())->get()->keyBy('id');
         $cities = $this->allCities->keyBy('id');
         $direct = $this->mealCoverages->where('scope_type', MealCoverageScope::Place)->keyBy('scope_key');

@@ -6,7 +6,6 @@ use App\Livewire\Concerns\Dashboard\ReadsDashboardAttention;
 use App\Livewire\Concerns\Dashboard\ReadsDashboardWork;
 use App\Models\AnnualPlan;
 use App\Models\Donor;
-use App\Models\HrProgram;
 use App\Models\Indicator;
 use App\Models\Program;
 use App\Models\Project;
@@ -319,7 +318,7 @@ new class extends Component {
         if ($entity === null && $this->canView('programs')) {
             $words = preg_split('/\s+/u', $terms) ?: [];
             $ids = array_keys(array_filter(
-                array_map(fn (string $name): string => AskEngine::normalize(ArabicText::fold($name)), HrProgram::namesById()),
+                array_map(fn (string $name): string => AskEngine::normalize(ArabicText::fold($name)), Program::namesById()),
                 fn (string $name): bool => array_all($words, fn (string $word): bool => str_contains($name, $word)),
             ));
             $programs = Program::query()->select(['id'])->whereIn('id', $ids);

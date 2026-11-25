@@ -18,10 +18,7 @@ const MicroAgriFile = 'database/seeders/data/logframes/micro-agri.json';
  */
 function frameworkProgram(string $code = '002'): int
 {
-    $programId = Program::factory()->create()->id;
-    DB::connection('hr')->table('programs')->where('id', $programId)->update(['code' => $code]);
-
-    return $programId;
+    return Program::factory()->create(['code' => $code])->id;
 }
 
 /**
@@ -245,11 +242,11 @@ test('results already in the program framework are neither touched nor deleted',
         ->and(DB::table('indicators')->where('id', $indicatorId)->value('library_indicator_id'))->toBeNull();
 });
 
-test('a program whose HR code is shared or different stops the run before anything is written', function (string $hrCode, bool $shared) {
+test('a program whose code is shared or different stops the run before anything is written', function (string $hrCode, bool $shared) {
     $programId = frameworkProgram($hrCode);
 
     if ($shared) {
-        insertHrProgram('Other program', code: $hrCode);
+        Program::factory()->create(['name_en' => 'Other program', 'code' => $hrCode]);
     }
 
     $before = frameworkCounts();
@@ -258,6 +255,6 @@ test('a program whose HR code is shared or different stops the run before anythi
 
     expect(frameworkCounts())->toBe($before);
 })->with([
-    'shared in HR' => ['002', true],
+    'shared with another program' => ['002', true],
     'not the file\'s code' => ['005', false],
 ]);

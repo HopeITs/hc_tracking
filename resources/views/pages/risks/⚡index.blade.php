@@ -4,7 +4,7 @@ use App\Livewire\Concerns\FiltersByStrategy;
 use App\Support\Like;
 use App\Support\StrategyRollup;
 use App\Models\HrCity;
-use App\Models\HrProgram;
+use App\Models\Program;
 use App\Models\ProposalLocation;
 use App\Models\Risk;
 use Flux\Flux;
@@ -177,7 +177,7 @@ new #[Layout('layouts::desk'), Title('titles.risks')] class extends Component {
                 ->pluck('id')
                 ->map(fn (mixed $id): int => (int) $id)
                 ->all();
-            $programs[$word] = HrProgram::idsMatchingName($word);
+            $programs[$word] = Program::idsMatchingName($word);
         }
 
         return ['cities' => $cities, 'programs' => $programs];

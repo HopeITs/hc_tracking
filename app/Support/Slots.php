@@ -10,25 +10,22 @@ use InvalidArgumentException;
 
 /**
  * The one resolver for the named organisational slots (contracts.md §9):
- * MEAL Manager, Finance Manager, Projects & Fundraising Manager, CEO and,
- * since W-34a, the HR liaison who hears about program requests.
+ * MEAL Manager, Finance Manager, Projects & Fundraising Manager and CEO.
  *
  * A slot stores an HR position, never a person: the reviewer slots in
- * notification_settings `proposal_default_reviewers`, the HR liaison in
- * `hr_liaison_position`; the person is whoever holds that position now.
+ * notification_settings `proposal_default_reviewers`; the person is whoever
+ * holds that position now.
  */
 final class Slots
 {
-    public const HrLiaison = 'hr_liaison';
-
     /**
      * The HR employee id holding the slot right now, or null when it is
      * vacant: no position configured, no active contract on it, or its holder
      * is inactive in HR. Every caller (reviewers, the D-09a reopen fallback,
-     * MEAL routing, program requests) reads vacancy the same way, and none
+     * MEAL routing) reads vacancy the same way, and none
      * falls back to Super Admin (D-20a).
      *
-     * @param  string  $slot  meal_manager | finance_manager | fundraising_manager | ceo | hr_liaison
+     * @param  string  $slot  meal_manager | finance_manager | fundraising_manager | ceo
      *
      * @throws InvalidArgumentException for any other slot
      */
@@ -51,12 +48,6 @@ final class Slots
      */
     private static function positionIdOf(string $slot): ?int
     {
-        if ($slot === self::HrLiaison) {
-            $value = app(NotificationSettings::class)->get('hr_liaison_position');
-
-            return is_numeric($value) ? (int) $value : null;
-        }
-
         $case = ReviewerSlot::tryFrom($slot);
 
         if ($case === null || ! $case->isDefault()) {

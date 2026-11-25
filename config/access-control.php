@@ -15,7 +15,7 @@ declare(strict_types=1);
 */
 $groups = [
     'access-management' => ['manage-users', 'manage-roles', 'manage-permissions'],
-    'programs' => ['view', 'update'],
+    'programs' => ['view', 'create', 'update'],
     'projects' => ['view', 'create', 'update', 'delete'],
     'indicators' => ['view', 'create', 'update', 'delete', 'record'],
     'indicator-library' => ['view', 'create', 'update', 'delete'],
@@ -267,6 +267,8 @@ return [
             ...$aiDrafter,
             // The stage task templates are the PR Manager's list (D-63).
             'stage-task-templates.manage',
+            // D-68: tracking owns programs, so they are added here, not in HR.
+            'programs.create',
         ],
         'MEAL' => [
             ...$viewEverything, ...$taskWriter, ...$reportWriter, 'reports.approve', 'reports.mark-seen',

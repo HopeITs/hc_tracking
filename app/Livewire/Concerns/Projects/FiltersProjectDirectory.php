@@ -7,7 +7,7 @@ namespace App\Livewire\Concerns\Projects;
 use App\Enums\ProjectStatus;
 use App\Models\HrCity;
 use App\Models\HrEmployee;
-use App\Models\HrProgram;
+use App\Models\Program;
 use App\Models\Project;
 use App\Models\Sector;
 use App\Support\Desk\ProjectStage;
@@ -263,7 +263,7 @@ trait FiltersProjectDirectory
                 $query->where(Like::everyWord($search, fn (Builder $query, string $word) => $query
                     ->where(Like::word('name', $word))
                     ->orWhereIn('city_id', $matches['cities'][$word] ?? [])
-                    ->orWhereIn('program_id', HrProgram::idsMatchingName($word, acrossLayouts: false))
+                    ->orWhereIn('program_id', Program::idsMatchingName($word, acrossLayouts: false))
                     ->orWhereIn('user_id', $matches['owners'][$word] ?? [])));
             })
             ->when($this->city !== '', fn (Builder $query) => $query->where('city_id', (int) $this->city))

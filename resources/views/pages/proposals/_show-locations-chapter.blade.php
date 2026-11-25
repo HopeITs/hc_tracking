@@ -34,7 +34,7 @@
                         @if ($locationRow['program'] !== null)
                             <p class="text-sm {{ $inkText }}" dir="auto">{{ $locationRow['program'] }}</p>
                         @else
-                            <p class="text-sm {{ $mutedText }}" dir="auto">{{ $locationRow['programRequestName'] !== null ? __('proposals.location_program_pending', ['name' => $locationRow['programRequestName']]) : '—' }}</p>
+                            <p class="text-sm {{ $mutedText }}">—</p>
                         @endif
                     </div>
 

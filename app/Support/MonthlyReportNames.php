@@ -6,7 +6,7 @@ namespace App\Support;
 
 use App\Models\HrCenter;
 use App\Models\HrCity;
-use App\Models\HrProgram;
+use App\Models\Program;
 use App\Models\Proposal;
 use App\Models\ReportTemplate;
 use Carbon\CarbonInterface;
@@ -85,7 +85,7 @@ final class MonthlyReportNames
 
         return [
             'city' => $this->cityNames(new Collection([$template]))[$template->city_id] ?? null,
-            'program' => HrProgram::nameOf($template->program_id) ?: null,
+            'program' => Program::nameOf($template->program_id) ?: null,
             'center' => filled($center) ? $center : null,
         ];
     }
@@ -124,7 +124,7 @@ final class MonthlyReportNames
 
         return implode(' · ', array_filter([
             $cities[$template->city_id] ?? '',
-            HrProgram::nameOf($template->program_id),
+            Program::nameOf($template->program_id),
             $center,
         ], fn (string $part): bool => $part !== ''));
     }

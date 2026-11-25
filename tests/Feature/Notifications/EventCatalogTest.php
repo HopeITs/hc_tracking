@@ -44,10 +44,8 @@ function contractEventKeys(): array
         'nudge.sent',
         // Task workflow: submitted for review / sent back with a note; user-approved 2026-10-27, not yet in §15.2.
         'task_review.submitted', 'task_review.sent_back',
-        // W-34a (D-62): proposal location rows (counts only) and the program requests they open.
-        'proposal.locations_changed', 'program_request.opened', 'program_request.linked',
-        // W-34a slice 3: the admin declines a program request with a reason.
-        'program_request.declined',
+        // W-34a (D-62): proposal location rows (counts only).
+        'proposal.locations_changed',
         // Page review follow-up (6 Nov 2026): missing actual grant dates filled in after approval.
         'proposal.grant_dates_set',
     ];

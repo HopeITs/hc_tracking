@@ -199,7 +199,7 @@ test('each governorate shows its meal officer in the grid and on the map, flaggi
 
 function cityCoverageTemplate(int $city, string $name): ReportTemplate
 {
-    $program = Program::factory()->create(['name' => $name]);
+    $program = Program::factory()->create(['name_en' => $name]);
 
     return ReportTemplate::factory()->create([
         'city_id' => $city, 'program_id' => $program->id, 'center_id' => null, 'city_wide' => true,

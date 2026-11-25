@@ -1,7 +1,6 @@
 <?php
 
 use App\Http\Middleware\SyncProgramsFromHr;
-use App\Models\Activity;
 use App\Models\HrProgram;
 use App\Models\Program;
 use App\Models\Project;
@@ -10,16 +9,26 @@ use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 use Symfony\Component\HttpFoundation\Response;
 
-test('syncing mirrors every hr program under its hr id, inactive ones included', function () {
-    $hopeId = insertHrProgram('Hope Center');
-    $cygId = insertHrProgram('CYG', isActive: false);
+/**
+ * Since W-34b (D-68) tracking owns the programs. The sync that used to mirror
+ * HR's table creates nothing any more: all it still does is follow HR's
+ * Program Manager position, because a manager is an HR employee.
+ */
+test('syncing creates no program, however many HR has', function () {
+    insertHrProgram('Hope Center');
+    insertHrProgram('CYG', isActive: false);
 
     Program::syncFromHr();
 
-    expect(Program::query()->orderBy('id')->get()->pluck('name', 'id')->all())->toBe([
-        $hopeId => 'Hope Center',
-        $cygId => 'CYG',
-    ])->and(Program::query()->whereNotNull('strategy_id')->orWhereNotNull('manager_id')->count())->toBe(0);
+    expect(Program::query()->count())->toBe(0);
+});
+
+test('a program HR has never seen is untouched by a sync', function () {
+    $program = Program::factory()->create(['name_en' => 'Wells']);
+
+    Program::syncFromHr();
+
+    expect($program->refresh())->name->toBe('Wells')->is_active->toBeTrue();
 });
 
 test('syncing mirrors the hr program manager, including a change of holder or a vacated seat', function () {
@@ -45,24 +54,18 @@ test('syncing mirrors the hr program manager, including a change of holder or a 
     ]);
 });
 
-test('syncing refreshes a renamed program but keeps its strategy and manager', function () {
-    $program = Activity::withoutRecording(fn (): Program => Program::factory()->create(['name' => 'Hope Center']));
-    $strategyId = $program->strategy_id;
-    $managerId = $program->manager_id;
-    DB::connection('hr')->table('programs')->where('id', $program->id)->update(['name' => 'Hope Centre']);
+test('a renamed HR program does not rename ours: the name is tracking-owned', function () {
+    $program = Program::factory()->create(['name_en' => 'Hope Center']);
+    insertHrProgram('Hope Centre');
 
     Program::syncFromHr();
 
-    expect($program->refresh())
-        ->name->toBe('Hope Centre')
-        ->strategy_id->toBe($strategyId)
-        ->manager_id->toBe($managerId);
+    expect($program->refresh())->name->toBe('Hope Center');
 });
 
-test('a program removed from hr keeps its mirror and the delivery under it', function () {
+test('a program removed from hr keeps the delivery under it', function () {
     $program = Program::factory()->create();
     Project::factory()->create(['program_id' => $program->id]);
-    DB::connection('hr')->table('programs')->where('id', $program->id)->delete();
 
     Program::syncFromHr();
 
@@ -79,8 +82,9 @@ test('syncing never writes to hr', function () {
     expect(DB::connection('hr')->table('programs')->get()->toArray())->toEqual($before);
 });
 
-test('a program points at the hr program it mirrors', function () {
-    $program = Program::factory()->create(['name' => 'Sha8er']);
+test('a program can still reach HR’s copy of it, for the import and the drift report', function () {
+    $hrId = insertHrProgram('Sha8er');
+    $program = Program::factory()->create(['id' => $hrId, 'name_en' => 'Sha8er']);
 
     expect($program->hrProgram)->toBeInstanceOf(HrProgram::class)
         ->and($program->hrProgram->name)->toBe('Sha8er');
@@ -95,20 +99,29 @@ test('an unassigned program has no strategy or manager', function () {
 
 test('the sync middleware runs at most once a minute', function () {
     Cache::forget(SyncProgramsFromHr::CacheKey);
+    $department = insertHrDepartment();
+    $first = insertHrEmployee();
+    $second = insertHrEmployee(firstNameEn: 'Lina');
+    $program = Program::factory()->unassigned()->create();
+    $position = insertHrPosition($department, 'Program Manager', $program->id);
+    insertHrContract($first, $position);
+
     $middleware = new SyncProgramsFromHr;
     $next = fn (): Response => new Response;
 
-    insertHrProgram('First');
-    $middleware->handle(Request::create('/'), $next);
-    insertHrProgram('Second');
     $middleware->handle(Request::create('/'), $next);
 
-    expect(Program::query()->get()->pluck('name')->all())->toBe(['First']);
+    expect($program->refresh()->manager_id)->toBe($first);
+
+    DB::connection('hr')->table('contracts')->where('position_id', $position)->update(['employee_id' => $second]);
+    $middleware->handle(Request::create('/'), $next);
+
+    expect($program->refresh()->manager_id)->toBe($first);
 
     $this->travel(61)->seconds();
     $middleware->handle(Request::create('/'), $next);
 
-    expect(Program::query()->count())->toBe(2);
+    expect($program->refresh()->manager_id)->toBe($second);
 });
 
 test('an unreachable hr database does not break the request and retries next time', function () {

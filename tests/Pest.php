@@ -153,7 +153,7 @@ function insertStrategy(): int
 function insertProgram(int $strategyId, int $managerId, string $name = 'WASH'): int
 {
     return Program::factory()->create([
-        'name' => $name,
+        'name_en' => $name,
         'strategy_id' => $strategyId,
         'manager_id' => $managerId,
     ])->id;
@@ -756,8 +756,7 @@ function proposalPlaceRow(): array
         'responsible_employee_id' => (string) $employeeId,
         'center_ids' => [],
         'city_wide' => true,
-        'new_program_name_en' => '',
-        'new_program_name_ar' => '',
+        'is_new' => false,
         'project' => null,
     ];
 }

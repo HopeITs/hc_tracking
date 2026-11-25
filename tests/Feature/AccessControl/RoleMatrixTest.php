@@ -110,7 +110,7 @@ test('each role holds every view permission plus exactly its approved write perm
         ...FUNDRAISING_VIEWS,
         'tasks.create', 'tasks.update', 'reports.create', 'reports.update',
         'donors.create', 'donors.update', 'proposals.create', 'proposals.update',
-        'projects.create',
+        'projects.create', 'programs.create',
         'funding-agreements.view', 'funding-agreements.create', 'funding-agreements.update',
         'proposals.manage-reviewers', 'proposals.correct-status', 'proposals.approve', 'proposals.manage-partners',
         'reports.reopen', 'reports.aggregate',

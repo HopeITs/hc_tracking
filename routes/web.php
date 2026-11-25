@@ -25,7 +25,6 @@ use App\Http\Controllers\ToggleDeskItemController;
 use App\Http\Controllers\ToggleNavPinController;
 use App\Http\Middleware\EnsureTwoFactorIsEnabled;
 use App\Models\DonorReport;
-use App\Models\ProgramRequest;
 use App\Models\RiskLibrary;
 use App\Models\Task;
 use App\Models\User;
@@ -330,10 +329,6 @@ Route::middleware(['auth', EnsureTwoFactorIsEnabled::class])->group(function () 
     Route::livewire('admin/evidence-types', 'pages::admin.evidence-types')
         ->can('evidence-types.manage')
         ->name('admin.evidence-types.index');
-
-    Route::livewire('admin/program-requests', 'pages::admin.program-requests')
-        ->can('viewAny', ProgramRequest::class)
-        ->name('admin.program-requests.index');
 
     Route::livewire('admin/narrative-questions', 'pages::admin.narrative-questions')
         ->can('narrative-questions.manage')

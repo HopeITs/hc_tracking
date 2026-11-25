@@ -420,6 +420,7 @@ return [
             'manager_removed' => ':actor removed :from as manager of “:subject”',
             'manager_and_strategy_changed' => ':actor linked “:subject” to :strategy and made :to its manager',
             'manager_changed_you' => ':actor made you the manager of “:subject”',
+            'renamed' => ':actor renamed the program “:subject”',
             'updated' => ':actor updated the program “:subject”',
             'deleted' => ':actor deleted the program “:subject”',
             'logframe_missing' => [
@@ -620,20 +621,6 @@ return [
             'created' => ':actor added the donor “:subject”',
             'updated' => ':actor updated the donor “:subject”',
             'deleted' => ':actor deleted the donor “:subject”',
-        ],
-        'program_request' => [
-            'opened' => [
-                'title' => 'Program needed in HR',
-                'body' => '“:subject” needs the program “:name” created in HR',
-            ],
-            'linked' => [
-                'title' => 'Program linked',
-                'body' => ':actor linked the HR program “:name” requested by “:subject”',
-            ],
-            'declined' => [
-                'title' => 'Program request declined',
-                'body' => ':actor declined the program “:name” requested by “:subject”',
-            ],
         ],
         'proposal' => [
             'waiting_on_you' => [

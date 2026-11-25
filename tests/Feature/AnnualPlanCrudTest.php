@@ -14,7 +14,7 @@ use Livewire\Livewire;
 function crudProgram(string $name): Program
 {
     return Program::factory()->create([
-        'name' => $name,
+        'name_en' => $name,
         'strategy_id' => Strategy::factory(),
     ]);
 }

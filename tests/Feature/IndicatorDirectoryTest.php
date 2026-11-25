@@ -764,7 +764,7 @@ test('a reading far above the target shows a warning but can still be saved', fu
 
 test('the result list names the program so similar results can be told apart', function () {
     $user = User::factory()->role('General Manager')->create();
-    $program = Program::factory()->create(['name' => 'Study Zone']);
+    $program = Program::factory()->create(['name_en' => 'Study Zone']);
     Result::factory()->create(['program_id' => $program->id, 'statement' => 'Students supported.']);
 
     Livewire::actingAs($user)

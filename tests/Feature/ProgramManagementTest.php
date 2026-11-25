@@ -43,12 +43,12 @@ test('authenticated users can search and filter programs by strategy and manager
     $secondStrategy = Strategy::factory()->create(['name' => 'Regional Strategy', 'start_year' => 2031, 'end_year' => 2035]);
 
     Program::factory()->create([
-        'name' => 'Water Security',
+        'name_en' => 'Water Security',
         'strategy_id' => $firstStrategy->id,
         'manager_id' => $firstManager,
     ]);
     Program::factory()->create([
-        'name' => 'Safe Shelter',
+        'name_en' => 'Safe Shelter',
         'strategy_id' => $secondStrategy->id,
         'manager_id' => $secondManager,
     ]);
@@ -76,11 +76,11 @@ test('authenticated users can search and filter programs by strategy and manager
         ->assertSee('Safe Shelter');
 });
 
-test('an hr program can be linked to a strategy and manager without changing its hr name', function () {
+test('a program can be linked to a strategy and manager without touching HR', function () {
     $user = User::factory()->role('General Manager')->create();
     $strategy = Strategy::factory()->create();
     $manager = insertHrEmployee();
-    $program = Program::factory()->unassigned()->create(['name' => 'Hope Center']);
+    $program = Program::factory()->unassigned()->create(['name_en' => 'Hope Center']);
 
     Livewire::actingAs($user)
         ->test('pages::programs.show', ['program' => $program])
@@ -97,7 +97,7 @@ test('an hr program can be linked to a strategy and manager without changing its
         ->name->toBe('Hope Center')
         ->strategy_id->toBe($strategy->id)
         ->manager_id->toBe($manager)
-        ->and(DB::connection('hr')->table('programs')->where('id', $program->id)->value('name'))->toBe('Hope Center');
+        ->and(DB::connection('hr')->table('programs')->count())->toBe(0);
 });
 
 test('a program assignment can be cleared back to not assigned', function () {
@@ -117,7 +117,7 @@ test('a program assignment can be cleared back to not assigned', function () {
 });
 
 test('unassigned programs are listed as not assigned', function () {
-    Program::factory()->unassigned()->create(['name' => 'Study Zone']);
+    Program::factory()->unassigned()->create(['name_en' => 'Study Zone']);
 
     Livewire::actingAs(User::factory()->role('General Manager')->create())
         ->test('pages::programs.index')
@@ -141,11 +141,14 @@ test('strategy and manager assignments must reference available records', functi
     expect($program->refresh()->strategy_id)->toBeNull();
 });
 
-test('the directory offers no way to create programs', function () {
-    Livewire::actingAs(User::factory()->role('General Manager')->create())
+test('the public relations manager can add programs but a centre manager cannot (D-68)', function () {
+    Livewire::actingAs(User::factory()->role('Public Relations Manager')->create())
         ->test('pages::programs.index')
-        ->assertDontSee('Add program')
-        ->assertDontSee('data-test="create-program-button"', false);
+        ->assertSeeHtml('data-test="create-program-button"');
+
+    Livewire::actingAs(User::factory()->role('Managers')->create())
+        ->test('pages::programs.index')
+        ->assertDontSeeHtml('data-test="create-program-button"');
 });
 
 test('program strategy and manager names are escaped in the directory', function () {
@@ -156,7 +159,7 @@ test('program strategy and manager names are escaped in the directory', function
     $strategy = Strategy::factory()->create(['name' => $unsafeStrategy]);
     $manager = insertHrEmployee(firstNameEn: $unsafeManager, lastNameEn: '');
     $program = Program::factory()->create([
-        'name' => $unsafeProgram,
+        'name_en' => $unsafeProgram,
         'strategy_id' => $strategy->id,
         'manager_id' => $manager,
     ]);
@@ -173,16 +176,17 @@ test('program strategy and manager names are escaped in the directory', function
         ->assertDontSee($unsafeManager, false);
 });
 
-test('program management explains that programs come from hr when there are none', function () {
+test('program management explains how programs appear when there are none', function () {
     $this->actingAs(User::factory()->role('General Manager')->create())
         ->get(route('programs.index'))
         ->assertOk()
-        ->assertSeeText('No programs from HR yet')
-        ->assertSeeText('Programs appear here once they are added in the HR system.');
+        ->assertSeeText('No programs yet')
+        ->assertSeeText('Programs appear here once they are added.')
+        ->assertDontSeeText('HR system');
 });
 
 test('program cards link to their details', function () {
-    $program = Program::factory()->create(['name' => 'Water Security']);
+    $program = Program::factory()->create(['name_en' => 'Water Security']);
 
     Livewire::actingAs(User::factory()->role('General Manager')->create())
         ->test('pages::programs.index')
@@ -194,7 +198,7 @@ test('program cards link to their details', function () {
 
 test('every program card shows at once, with no load more button', function () {
     foreach (range(1, 9) as $number) {
-        Program::factory()->create(['name' => 'Program '.str_pad((string) $number, 2, '0', STR_PAD_LEFT)]);
+        Program::factory()->create(['name_en' => 'Program '.str_pad((string) $number, 2, '0', STR_PAD_LEFT)]);
     }
 
     Livewire::actingAs(User::factory()->role('General Manager')->create())
@@ -205,8 +209,8 @@ test('every program card shows at once, with no load more button', function () {
 });
 
 test('program gap filter focuses programs without a manager', function () {
-    Program::factory()->create(['name' => 'Managed Program']);
-    Program::factory()->unassigned()->create(['name' => 'Unmanaged Program']);
+    Program::factory()->create(['name_en' => 'Managed Program']);
+    Program::factory()->unassigned()->create(['name_en' => 'Unmanaged Program']);
 
     Livewire::actingAs(User::factory()->role('General Manager')->create())
         ->test('pages::programs.index')
@@ -218,8 +222,8 @@ test('program gap filter focuses programs without a manager', function () {
 test('program filter pickers apply strategy and manager selections', function () {
     $strategy = Strategy::factory()->create(['name' => 'Country Strategy']);
     $manager = insertHrEmployee(firstNameEn: 'Amal', lastNameEn: 'Manager');
-    Program::factory()->create(['name' => 'Selected Program', 'strategy_id' => $strategy->id, 'manager_id' => $manager]);
-    Program::factory()->create(['name' => 'Other Program']);
+    Program::factory()->create(['name_en' => 'Selected Program', 'strategy_id' => $strategy->id, 'manager_id' => $manager]);
+    Program::factory()->create(['name_en' => 'Other Program']);
 
     Livewire::actingAs(User::factory()->role('General Manager')->create())
         ->test('pages::programs.index')
@@ -233,19 +237,16 @@ test('program filter pickers apply strategy and manager selections', function ()
         ->assertDontSee('Other Program');
 });
 
-test('visiting the app mirrors new hr programs as unassigned', function () {
+test('visiting the app no longer brings HR programs in: tracking owns them (D-68)', function () {
     Cache::forget(SyncProgramsFromHr::CacheKey);
     $hrProgramId = insertHrProgram('Children University');
 
     $this->actingAs(User::factory()->role('General Manager')->create())
         ->get(route('programs.index'))
         ->assertOk()
-        ->assertSeeText('Children University');
+        ->assertDontSeeText('Children University');
 
-    expect(Program::query()->findOrFail($hrProgramId))
-        ->name->toBe('Children University')
-        ->strategy_id->toBeNull()
-        ->manager_id->toBeNull();
+    expect(Program::query()->find($hrProgramId))->toBeNull();
 });
 
 test('the link form on the program page is rendered only while its dialog is open', function () {
@@ -260,8 +261,8 @@ test('the link form on the program page is rendered only while its dialog is ope
 });
 
 test('the strategy and manager filters can list programs nobody is linked to', function () {
-    Program::factory()->create(['name' => 'Linked Program']);
-    Program::factory()->unassigned()->create(['name' => 'Orphan Program']);
+    Program::factory()->create(['name_en' => 'Linked Program']);
+    Program::factory()->unassigned()->create(['name_en' => 'Orphan Program']);
 
     Livewire::actingAs(User::factory()->role('General Manager')->create())
         ->test('pages::programs.index')
@@ -276,7 +277,7 @@ test('the strategy and manager filters can list programs nobody is linked to', f
 
 test('the card list no longer repeats a "showing" count under the cards', function () {
     foreach (range(1, 9) as $number) {
-        Program::factory()->create(['name' => 'Program '.str_pad((string) $number, 2, '0', STR_PAD_LEFT)]);
+        Program::factory()->create(['name_en' => 'Program '.str_pad((string) $number, 2, '0', STR_PAD_LEFT)]);
     }
 
     Livewire::actingAs(User::factory()->role('General Manager')->create())
@@ -286,7 +287,7 @@ test('the card list no longer repeats a "showing" count under the cards', functi
 });
 
 test('an empty search offers one reset button, not two', function () {
-    Program::factory()->create(['name' => 'Water Security']);
+    Program::factory()->create(['name_en' => 'Water Security']);
 
     $html = Livewire::actingAs(User::factory()->role('General Manager')->create())
         ->test('pages::programs.index')
@@ -298,7 +299,7 @@ test('an empty search offers one reset button, not two', function () {
 });
 
 test('the link dialog on the program page names what it links and guards unsaved changes', function () {
-    $program = Program::factory()->unassigned()->create(['name' => 'Water Security']);
+    $program = Program::factory()->unassigned()->create(['name_en' => 'Water Security']);
 
     Livewire::actingAs(User::factory()->role('General Manager')->create())
         ->test('pages::programs.show', ['program' => $program])
@@ -313,10 +314,10 @@ test('the link dialog on the program page names what it links and guards unsaved
 test('the no plan gap lists the strategy programs without a plan for this year', function () {
     $this->travelTo('2026-06-15 09:00:00');
     $strategy = Strategy::factory()->create();
-    $planned = Program::factory()->create(['name' => 'Planned Program', 'strategy_id' => $strategy->id]);
-    $shell = Program::factory()->create(['name' => 'Shell Program', 'strategy_id' => $strategy->id]);
-    $lastYear = Program::factory()->create(['name' => 'Last Year Program', 'strategy_id' => $strategy->id]);
-    Program::factory()->create(['name' => 'Elsewhere Program', 'strategy_id' => Strategy::factory()->create()->id]);
+    $planned = Program::factory()->create(['name_en' => 'Planned Program', 'strategy_id' => $strategy->id]);
+    $shell = Program::factory()->create(['name_en' => 'Shell Program', 'strategy_id' => $strategy->id]);
+    $lastYear = Program::factory()->create(['name_en' => 'Last Year Program', 'strategy_id' => $strategy->id]);
+    Program::factory()->create(['name_en' => 'Elsewhere Program', 'strategy_id' => Strategy::factory()->create()->id]);
 
     PlanIndicator::factory()->forAnnualPlan(AnnualPlan::factory()->create(['program_id' => $planned->id, 'year' => 2026]))->create();
     AnnualPlan::factory()->create(['program_id' => $shell->id, 'year' => 2026]);
@@ -335,7 +336,7 @@ test('the no plan gap lists the strategy programs without a plan for this year',
 
 test('the Needs attention filter lists programs with overdue, risky or proposal-less open projects', function (string $gap, string $shown) {
     $this->travelTo('2026-09-15 09:00:00');
-    $make = fn (string $name, array $project) => Project::factory()->create(['program_id' => Program::factory()->create(['name' => $name])->id] + $project);
+    $make = fn (string $name, array $project) => Project::factory()->create(['program_id' => Program::factory()->create(['name_en' => $name])->id] + $project);
 
     $make('Late Program', ['status' => ProjectStatus::Active, 'end_date' => '2026-08-01']);
     $risky = $make('Risk Program', ['status' => ProjectStatus::Active, 'end_date' => '2027-08-01']);
@@ -412,14 +413,14 @@ test('only people who may update a program see its link button', function () {
 
 test('the card pencil links a program to a strategy and manager from the list', function () {
     $strategy = Strategy::factory()->create();
-    $program = Program::factory()->unassigned()->create(['name' => 'Hope Center']);
+    $program = Program::factory()->unassigned()->create(['name_en' => 'Hope Center']);
 
     Livewire::actingAs(User::factory()->role('General Manager')->create())
         ->test('pages::programs.index')
         ->assertDontSeeHtml('data-discard-guard')
         ->call('openEditModal', $program->id)
         ->assertSet('editingProgramName', 'Hope Center')
-        ->assertSee('Link Hope Center to a strategy and manager')
+        ->assertSee(__('programs.edit_name', ['name' => 'Hope Center']))
         ->assertSeeHtml('data-discard-guard')
         ->set('strategyId', (string) $strategy->id)
         ->call('saveProgram')
@@ -469,7 +470,7 @@ test('a strategy name keeps its own direction so Arabic cards cut its end, not i
 });
 
 test('a program with no strategy reads "Not linked yet" with an Assign shortcut', function () {
-    Program::factory()->unassigned()->create(['name' => 'Orphan Program']);
+    Program::factory()->unassigned()->create(['name_en' => 'Orphan Program']);
 
     Livewire::actingAs(User::factory()->role('General Manager')->create())
         ->test('pages::programs.index')
@@ -494,7 +495,7 @@ test('a register narrowed to a gap names it in the Needs attention picker', func
 test('each card shows only strategy, manager, open projects and closed projects', function () {
     $this->travelTo('2026-09-15 09:00:00');
     $strategy = Strategy::factory()->create(['name' => 'Country Strategy 2026-2030', 'start_year' => 2026, 'end_year' => 2030]);
-    $program = Program::factory()->create(['name' => 'Split Program', 'strategy_id' => $strategy->id, 'manager_id' => insertHrEmployee(firstNameEn: 'Amal', lastNameEn: 'Manager')]);
+    $program = Program::factory()->create(['name_en' => 'Split Program', 'strategy_id' => $strategy->id, 'manager_id' => insertHrEmployee(firstNameEn: 'Amal', lastNameEn: 'Manager')]);
     $late = Project::factory()->create(['program_id' => $program->id, 'status' => ProjectStatus::Active, 'end_date' => '2026-08-01']);
     Risk::factory()->happened()->create(['project_id' => $late->id]);
     Project::factory()->count(2)->create(['program_id' => $program->id, 'status' => ProjectStatus::Closed, 'end_date' => '2025-01-01']);

@@ -7,7 +7,7 @@ use App\Enums\DonorAttribution;
 use App\Enums\IndicatorMeasure;
 use App\Livewire\Concerns\IndicatorLibrary\ManagesLibraryEntryForm;
 use App\Models\HrCenter;
-use App\Models\HrProgram;
+use App\Models\HrCity;
 use App\Models\Indicator;
 use App\Models\LibraryIndicator;
 use App\Models\PlanIndicator;
@@ -86,7 +86,7 @@ new class extends Component {
             ->select(['id', 'name', 'slug', 'status', 'previous_proposal_id'])
             ->with([
                 'projects' => fn ($query) => $query->select(['projects.id', 'projects.name', 'projects.program_id', 'projects.center_id', 'projects.city_id']),
-                'locations' => fn ($query) => $query->with(['program', 'centers', 'programRequest'])->orderBy('sort')->orderBy('id'),
+                'locations' => fn ($query) => $query->with(['program', 'centers'])->orderBy('sort')->orderBy('id'),
             ])
             ->findOrFail($this->proposalId);
     }
@@ -256,21 +256,11 @@ new class extends Component {
 
     /**
      * Why a row takes no targets yet, in words, or null. A row waits while
-     * it has no program or its program request is still pending (the same
-     * rule SaveProposalTargetsGrid refuses on).
+     * it has no program (the same rule SaveProposalTargetsGrid refuses on).
      */
     private function waitingReason(ProposalLocation $row): ?string
     {
-        if (! SaveProposalTargetsGrid::isWaitingForProgram($row)) {
-            return null;
-        }
-
-        $request = $row->programRequest;
-        $name = $request === null ? null : trim((string) (app()->getLocale() === 'ar' && trim((string) $request->name_ar) !== '' ? $request->name_ar : $request->name_en));
-
-        return $name === null || $name === ''
-            ? __('targets.column_waiting_program')
-            : __('targets.column_waiting_program').' '.__('proposals.location_program_pending', ['name' => $name]);
+        return SaveProposalTargetsGrid::isWaitingForProgram($row) ? __('targets.column_waiting_program') : null;
     }
 
     /**
@@ -421,7 +411,7 @@ new class extends Component {
             $groups[] = [
                 'key' => $programId === null ? 'institutional' : (string) $programId,
                 'programId' => $programId,
-                'label' => $programId === null ? __('targets.institutional_indicators') : HrProgram::nameOf($programId),
+                'label' => $programId === null ? __('targets.institutional_indicators') : Program::nameOf($programId),
                 'levels' => collect(['G', 'CC', 'OC', 'OP', 'AC'])
                     ->map(fn (string $kind): array => [
                         'kind' => $kind,

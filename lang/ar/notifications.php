@@ -420,6 +420,7 @@ return [
             'manager_removed' => 'أزال :actor :from من إدارة البرنامج «:subject»',
             'manager_and_strategy_changed' => 'ربط :actor البرنامج «:subject» بـ :strategy وجعل :to مديرًا له',
             'manager_changed_you' => 'جعلك :actor مديرًا للبرنامج «:subject»',
+            'renamed' => 'أعاد :actor تسمية البرنامج «:subject»',
             'updated' => 'حدّث :actor البرنامج «:subject»',
             'deleted' => 'حذف :actor البرنامج «:subject»',
             'logframe_missing' => [
@@ -620,20 +621,6 @@ return [
             'created' => 'أضاف :actor المانح «:subject»',
             'updated' => 'حدّث :actor المانح «:subject»',
             'deleted' => 'حذف :actor المانح «:subject»',
-        ],
-        'program_request' => [
-            'opened' => [
-                'title' => 'برنامج مطلوب في HR',
-                'body' => 'يحتاج المقترح «:subject» إلى إنشاء البرنامج «:name» في HR',
-            ],
-            'linked' => [
-                'title' => 'ربط برنامج',
-                'body' => 'ربط :actor برنامج HR «:name» الذي طلبه المقترح «:subject»',
-            ],
-            'declined' => [
-                'title' => 'رُفض طلب برنامج',
-                'body' => 'رفض :actor البرنامج «:name» الذي طلبه المقترح «:subject»',
-            ],
         ],
         'proposal' => [
             'waiting_on_you' => [
