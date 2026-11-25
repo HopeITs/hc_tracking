@@ -324,3 +324,23 @@ test('a concept note returned with a reason shows that reason to the proposal ed
 
     expect($proposal->fresh()->status)->toBe(ProposalStatus::ConceptNoteReview);
 });
+
+test('the status modal asks for the missing beneficiaries and the move then goes through', function () {
+    $proposal = transitionableProposal(ProposalStatus::ProposalDraft);
+    $project = $proposal->projects()->first();
+    $proposal->projects()->updateExistingPivot($project->id, ['target_beneficiaries' => null]);
+
+    $component = Livewire::actingAs(userWithRole('Financial'))
+        ->test('pages::proposals.show', ['proposal' => $proposal])
+        ->call('openStatusModal', $proposal->id)
+        ->set('newStatus', ProposalStatus::ProposalReview->value)
+        ->assertSeeHtml('data-test="status-beneficiaries-input"');
+
+    $component->call('changeStatus')->assertHasErrors(['statusBeneficiaries.'.$project->id]);
+    expect($proposal->fresh()->status)->toBe(ProposalStatus::ProposalDraft);
+
+    $component->set('statusBeneficiaries.'.$project->id, '250')->call('changeStatus')->assertHasNoErrors();
+
+    expect($proposal->fresh()->status)->toBe(ProposalStatus::ProposalReview)
+        ->and((int) $proposal->projects()->first()->pivot->target_beneficiaries)->toBe(250);
+});
