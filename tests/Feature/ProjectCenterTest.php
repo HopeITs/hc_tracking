@@ -140,7 +140,7 @@ test('moving a project onto a center and program that already has an open projec
 
     Livewire::actingAs($this->user)
         ->test('pages::projects.index')
-        ->call('openEditModal', $moving->id)
+        ->call('openEditModal', rowFor($moving)->id)
         ->set('centerId', (string) $this->centerId)
         ->call('saveProject')
         ->assertHasErrors(['centerId']);
@@ -153,7 +153,7 @@ test('a project that is not yet mapped to a center can still be edited and keeps
 
     Livewire::actingAs($this->user)
         ->test('pages::projects.index')
-        ->call('openEditModal', $project->id)
+        ->call('openEditModal', rowFor($project)->id)
         ->set('name', 'Legacy renamed')
         ->call('saveProject')
         ->assertHasNoErrors();
@@ -170,7 +170,7 @@ test('a project keeps its inactive center on edit and shows it as inactive', fun
 
     Livewire::actingAs($this->user)
         ->test('pages::projects.index')
-        ->call('openEditModal', $project->id)
+        ->call('openEditModal', rowFor($project)->id)
         ->assertSet('centerId', (string) $closedCenter)
         ->set('name', 'Still here')
         ->call('saveProject')
@@ -192,8 +192,8 @@ test('someone without project create rights still cannot create one', function (
 });
 
 test('managers see the projects that have no center yet', function () {
-    Project::factory()->create(['name' => 'Unmapped Project', 'center_id' => null]);
-    Project::factory()->create(['name' => 'Mapped Project', 'center_id' => $this->centerId]);
+    projectWithRow(['name' => 'Unmapped Project', 'center_id' => null]);
+    projectWithRow(['name' => 'Mapped Project', 'center_id' => $this->centerId]);
 
     Livewire::actingAs($this->user)
         ->test('pages::projects.index')
@@ -318,7 +318,7 @@ describe('hosted projects (W-01, D-55)', function () {
 
         Livewire::actingAs($this->user)
             ->test('pages::projects.index')
-            ->call('openEditModal', $project->id)
+            ->call('openEditModal', rowFor($project)->id)
             ->assertSet('hostCenterId', (string) $this->hostId)
             ->assertSet('cityId', (string) $this->idlebId)
             ->set('centerId', (string) $this->centerId)
@@ -349,7 +349,7 @@ describe('hosted projects (W-01, D-55)', function () {
 
 test('a project whose center HR has deactivated says so on the directory, the project page and the proposal picker', function () {
     $closedId = insertHrCenter($this->cityId, 'Closed Center', 'مركز مغلق', isActive: false);
-    $project = Project::factory()->create(['name' => 'Closed Center Water', 'center_id' => $closedId, 'city_id' => $this->cityId]);
+    $project = projectWithRow(['name' => 'Closed Center Water', 'center_id' => $closedId, 'city_id' => $this->cityId]);
 
     Livewire::actingAs($this->user)->test('pages::projects.index')
         ->assertSeeHtml('data-test="center-inactive-badge"')

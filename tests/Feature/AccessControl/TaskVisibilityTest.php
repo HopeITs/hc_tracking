@@ -21,11 +21,13 @@ beforeEach(function () {
     $this->member = userWithRole('Team Member', $this->mediaEmployee);
 
     $this->project = Project::factory()->create();
+    // Y-16 (D-93): delivery work hangs off the place.
+    $this->row = rowFor($this->project);
 
     $this->financeTask = Task::factory()->create([
         'title' => 'Finance-only task',
-        'source_type' => 'project',
-        'source_id' => $this->project->id,
+        'source_type' => 'proposal_location',
+        'source_id' => $this->row->id,
         'due_date' => now()->subDays(2),
     ]);
     $this->financeTask->taskAssignees()->delete();
@@ -64,7 +66,7 @@ test('the calendar never shows another department\'s tasks, whoever is picked', 
 });
 
 test('the project page hides other departments\' tasks', function () {
-    Livewire::actingAs($this->member)->test('pages::projects.show', ['project' => $this->project])
+    Livewire::actingAs($this->member)->test('pages::projects.show', ['project' => rowFor($this->project)->slug])
         ->set('tab', 'tasks')
         ->assertDontSee('Finance-only task');
 });
@@ -72,13 +74,13 @@ test('the project page hides other departments\' tasks', function () {
 test('a project owner sees every task in their own project', function () {
     $this->project->update(['user_id' => $this->mediaEmployee]);
 
-    Livewire::actingAs($this->member->fresh())->test('pages::projects.show', ['project' => $this->project])
+    Livewire::actingAs($this->member->fresh())->test('pages::projects.show', ['project' => rowFor($this->project)->slug])
         ->set('tab', 'tasks')
         ->assertSee('Finance-only task');
 });
 
 test('a manager sees every task', function () {
-    Livewire::actingAs(userWithRole('Managers'))->test('pages::projects.show', ['project' => $this->project])
+    Livewire::actingAs(userWithRole('Managers'))->test('pages::projects.show', ['project' => rowFor($this->project)->slug])
         ->set('tab', 'tasks')
         ->assertSee('Finance-only task');
 });

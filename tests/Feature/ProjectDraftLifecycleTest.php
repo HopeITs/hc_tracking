@@ -127,7 +127,7 @@ test('a status sent with the form never reaches the project', function () {
     ]);
 
     Livewire::actingAs($this->user)->test('pages::projects.index')
-        ->call('openEditModal', $project->id)
+        ->call('openEditModal', rowFor($project)->id)
         ->set('status', 'archived')
         ->set('name', 'Renamed')
         ->call('saveProject')
@@ -150,7 +150,7 @@ test('the date inputs are not rendered for a draft', function () {
         ->assertDontSeeHtml('wire:model="startDate"')
         ->assertDontSeeHtml('wire:model="endDate"')
         ->call('closeProjectModal')
-        ->call('openEditModal', $draft->id)
+        ->call('openEditModal', rowFor($draft)->id)
         ->assertDontSeeHtml('wire:model="startDate"');
 });
 
@@ -163,7 +163,7 @@ test('the dates of an active project are editable', function () {
     ]);
 
     Livewire::actingAs($this->user)->test('pages::projects.index')
-        ->call('openEditModal', $project->id)
+        ->call('openEditModal', rowFor($project)->id)
         ->assertSeeHtml('wire:model="startDate"')
         ->set('startDate', '2026-03-01')
         ->set('endDate', '2027-02-28')
@@ -185,7 +185,7 @@ test('editing a draft keeps its status and writes no dates', function () {
     ]);
 
     Livewire::actingAs($this->user)->test('pages::projects.index')
-        ->call('openEditModal', $project->id)
+        ->call('openEditModal', rowFor($project)->id)
         ->set('name', 'Renamed')
         ->call('saveProject')
         ->assertHasNoErrors();

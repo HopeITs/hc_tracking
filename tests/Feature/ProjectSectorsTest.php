@@ -7,6 +7,7 @@ use App\Models\Program;
 use App\Models\Project;
 use App\Models\Sector;
 use App\Models\User;
+use App\Support\Locations\ProjectLocationMirror;
 use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
@@ -199,9 +200,9 @@ describe('the project form', function () {
         $withSector->sectors()->attach($this->health->id);
 
         Livewire::actingAs($this->user)->test('pages::projects.index')
-            ->call('openEditModal', $withSector->id)
+            ->call('openEditModal', rowFor($withSector)->id)
             ->assertSet('sectorIds', [(string) $this->health->id])
-            ->call('openEditModal', $legacy->id)
+            ->call('openEditModal', rowFor($legacy)->id)
             ->assertSet('sectorIds', [])
             ->set('name', 'Renamed legacy')
             ->call('saveProject')
@@ -218,7 +219,7 @@ describe('the project form', function () {
         $project->sectors()->attach($retired->id);
 
         Livewire::actingAs($this->user)->test('pages::projects.index')
-            ->call('openEditModal', $project->id)
+            ->call('openEditModal', rowFor($project)->id)
             ->assertSeeHtml('data-picker-sector="'.$this->health->id.'"')
             ->assertSeeHtml('data-picker-sector="'.$retired->id.'"')
             ->assertDontSeeHtml('data-picker-sector="'.$hidden->id.'"')
@@ -251,6 +252,10 @@ describe('display', function () {
         $wells = projectWithRow(['name' => 'Wells project']);
         $clinic->sectors()->attach($health->id);
         $wells->sectors()->attach($wash->id);
+        // Y-16 (D-93): the register filters places, which carry their own
+        // sectors; SyncProjectSectors is what mirrors them in the application.
+        app(ProjectLocationMirror::class)->syncSectors($clinic);
+        app(ProjectLocationMirror::class)->syncSectors($wells);
 
         Livewire::actingAs(userWithRole('General Manager'))->test('pages::projects.index')
             ->set('view', 'list')
