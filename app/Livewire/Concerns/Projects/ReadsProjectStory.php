@@ -19,6 +19,7 @@ use App\Models\MonthlyReport;
 use App\Models\PlanIndicator;
 use App\Models\Project;
 use App\Models\Proposal;
+use App\Models\ProposalLocation;
 use App\Models\ProposalReviewer;
 use App\Models\ReportTemplateLine;
 use App\Models\Task;
@@ -132,7 +133,7 @@ trait ReadsProjectStory
             ->with([
                 'proposal:id,name,status,created_at',
                 'proposal.donorNames',
-                'monthlyReports:id,project_id,period,status,returned_at',
+                'centers',
                 ...($this->canViewMoney() ? ['proposal.donorProposals:id,proposal_id,budget,currency', 'proposal.donorProposals.transfers'] : []),
             ])
             ->findOrFail($this->locationId);
@@ -142,8 +143,8 @@ trait ReadsProjectStory
         $health = ProjectStage::health($stage, ProjectStage::signals($row));
         $donor = $lead?->donorNames->pluck('name')->implode(', ') ?? '';
         $reports = [
-            'validated' => $row->monthlyReports->where('status', MonthlyReportStatus::Validated)->count(),
-            'total' => $row->monthlyReports->count(),
+            'validated' => $row->monthlyReports()->where('status', MonthlyReportStatus::Validated)->count(),
+            'total' => $row->monthlyReports()->count(),
         ];
 
         return [
@@ -264,7 +265,7 @@ trait ReadsProjectStory
      */
     private function runningStep(ProposalLocation $row): array
     {
-        $reports = $row->monthlyReports->sortBy(fn (MonthlyReport $report): string => $report->period->toDateString());
+        $reports = $row->monthlyReports()->sortBy(fn (MonthlyReport $report): string => $report->period->toDateString());
         $monthStart = now()->startOfMonth();
         $link = fn (MonthlyReport $report): ?string => auth()->user()?->can('view', $report) ? route('monthly-reports.show', $report) : null;
 
@@ -335,7 +336,7 @@ trait ReadsProjectStory
         $monthStart = now()->startOfMonth();
         $viewer = auth()->user();
 
-        return array_values($row->monthlyReports
+        return array_values($row->monthlyReports()
             ->sortBy(fn (MonthlyReport $report): string => $report->period->toDateString())
             ->map(function (MonthlyReport $report) use ($monthStart, $viewer): array {
                 $state = match (true) {

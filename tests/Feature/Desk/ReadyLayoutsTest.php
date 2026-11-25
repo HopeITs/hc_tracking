@@ -420,10 +420,10 @@ test('passed deadlines are the fundraising role\'s to answer for: red for it, am
         ->and(readySignalsFor(userWithRole('Public Relations Manager', insertHrEmployee()))['fundraising']['tone'])->toBe('critical');
 });
 
-test('the delivery signal states what the projects card shows by default: every project, for an owner too', function () {
+test('the delivery signal states what the projects card shows by default: every place, for an owner too', function () {
     $owner = userWithRole('Managers', insertHrEmployee());
-    Project::factory()->count(2)->create(['user_id' => $owner->employee_id]);
-    Project::factory()->count(3)->create();
+    Project::factory()->count(2)->create(['user_id' => $owner->employee_id])->each(fn (Project $project) => rowFor($project));
+    Project::factory()->count(3)->create()->each(fn (Project $project) => rowFor($project));
     $bystander = userWithRole('General Manager', insertHrEmployee());
 
     expect(deskCardCount($owner, 'projects'))->toBe(5)
@@ -432,10 +432,10 @@ test('the delivery signal states what the projects card shows by default: every 
         ->and(readySignalsFor($bystander)['delivery']['text'])->toStartWith('5 projects · ');
 });
 
-test('a late project is critical only for the person who owns it', function () {
+test('a late place is critical only for the person who owns it', function () {
     $owner = userWithRole('Managers', insertHrEmployee());
-    Project::factory()->create(['user_id' => $owner->employee_id, 'status' => ProjectStatus::Active, 'end_date' => '2026-09-01']);
-    Project::factory()->create(['status' => ProjectStatus::Active]);
+    rowFor(Project::factory()->create(['user_id' => $owner->employee_id, 'status' => ProjectStatus::Active, 'end_date' => '2026-09-01']));
+    rowFor(Project::factory()->create(['status' => ProjectStatus::Active]));
 
     expect(readySignalsFor($owner)['delivery'])->toMatchArray(['tone' => 'critical', 'count' => 1])
         ->and(readySignalsFor(userWithRole('General Manager', insertHrEmployee()))['delivery'])->toMatchArray(['tone' => 'warn', 'count' => 1]);
@@ -497,8 +497,8 @@ test('for a leader, red stays on their own late work and the suggestion keeps it
     $admin = userWithRole('Super Admin', insertHrEmployee());
     readyTargets(red: 11, onPace: 1);
     TransfersTracking::factory()->count(4)->create(['scheduled_date' => '2026-09-01']);
-    Project::factory()->create(['status' => ProjectStatus::Active, 'end_date' => '2026-09-01']);
-    Project::factory()->create(['status' => ProjectStatus::Active]);
+    rowFor(Project::factory()->create(['status' => ProjectStatus::Active, 'end_date' => '2026-09-01']));
+    rowFor(Project::factory()->create(['status' => ProjectStatus::Active]));
     readyTask($admin, $admin->employee_id, '2026-09-01');
 
     $signals = app(ReadyLayoutSignals::class)->for(tap($admin, fn (User $user) => test()->actingAs($user)), ['total' => 9, 'late' => 5]);

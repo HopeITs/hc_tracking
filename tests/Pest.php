@@ -819,6 +819,49 @@ function rowFor(Project $project, ?Proposal $proposal = null): ProposalLocation
 }
 
 /**
+ * A monthly report at a location row's place (Y-16).
+ *
+ * A report belongs to a template, and a template reaches a row by matching
+ * its place, so a test that wants "this row's report" needs a template at
+ * that place. ReportTemplateFactory carries a legacy template with a row of
+ * its own (Y-03); that second row is removed here, since it would sit at the
+ * same place and read the same report (D-77 is tested on its own).
+ *
+ * @param  array<string, mixed>  $attributes  passed to MonthlyReport::factory()
+ */
+function reportAtRow(ProposalLocation $row, array $attributes = []): MonthlyReport
+{
+    return Activity::withoutRecording(function () use ($row, $attributes): MonthlyReport {
+        $template = ReportTemplate::query()
+            ->where('city_id', $row->city_id)
+            ->where('program_id', $row->program_id)
+            ->first();
+
+        if ($template === null) {
+            $template = ReportTemplate::factory()->create([
+                'project_id' => $row->project_id,
+                'city_id' => $row->city_id,
+                'program_id' => $row->program_id,
+                'center_id' => $row->centerIds()[0] ?? null,
+                'city_wide' => $row->city_wide,
+            ]);
+
+            ProposalLocation::query()
+                ->where('city_id', $row->city_id)
+                ->where('program_id', $row->program_id)
+                ->whereKeyNot($row->id)
+                ->delete();
+        }
+
+        return MonthlyReport::factory()->create([
+            'report_template_id' => $template->id,
+            'project_id' => $row->project_id,
+            ...$attributes,
+        ]);
+    });
+}
+
+/**
  * A project and the row that carries it, for the common case with no factory
  * state (Y-16).
  *

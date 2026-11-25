@@ -678,46 +678,15 @@ final class DonorReportAggregator
     }
 
     /**
-     * The report templates at each row's place (Y-02, Y-16): same city and
-     * program, and either both are field work (D-88), the template's centre is
-     * one of the row's (D-90), or neither has a centre yet (D-82).
-     *
-     * This is how a monthly report reaches its row without reading `projects`.
+     * The report templates at each row's place, in the one place that match
+     * is defined (App\Support\Locations\MonthlyReportsAtRows).
      *
      * @param  Collection<int, ProposalLocation>  $rows
      * @return array<int, list<int>> row id => template ids
      */
     private function templateIdsByRow(Collection $rows): array
     {
-        if ($rows->isEmpty()) {
-            return [];
-        }
-
-        $templates = DB::table('report_templates')
-            ->whereIn('city_id', $rows->pluck('city_id')->filter()->unique()->all() ?: [0])
-            ->whereIn('program_id', $rows->pluck('program_id')->filter()->unique()->all() ?: [0])
-            ->get(['id', 'city_id', 'program_id', 'center_id', 'city_wide']);
-
-        $byRow = [];
-
-        foreach ($rows as $row) {
-            $byRow[$row->id] = array_values($templates
-                ->filter(function (object $template) use ($row): bool {
-                    if ((int) $template->city_id !== (int) $row->city_id || (int) $template->program_id !== (int) $row->program_id) {
-                        return false;
-                    }
-
-                    return match (true) {
-                        (bool) $template->city_wide => $row->city_wide,
-                        $template->center_id !== null => in_array((int) $template->center_id, $row->centerIds(), true),
-                        default => ! $row->city_wide && $row->centerIds() === [],
-                    };
-                })
-                ->map(fn (object $template): int => (int) $template->id)
-                ->all());
-        }
-
-        return $byRow;
+        return app(MonthlyReportsAtRows::class)->templateIdsByRow($rows);
     }
 
     /**

@@ -7,6 +7,8 @@ namespace App\Livewire\Concerns\Desk;
 use App\Enums\ProjectStatus;
 use App\Models\ProposalLocation;
 use App\Support\Desk\ProjectStage;
+use App\Support\Locations\MonthlyReportsAtRows;
+use Illuminate\Support\Collection;
 use Livewire\Attributes\Computed;
 
 /**
@@ -52,12 +54,15 @@ trait ReadsDeskFlow
                 'city:id,name_en,name_ar',
                 'program:id',
                 'centers',
-                'monthlyReports:id,project_id,period,status',
                 ...($money ? ['proposal.donorProposals:id,proposal_id', 'proposal.donorProposals.transfers'] : []),
             ])
             ->get();
 
+        // One read of the monthly reports at every row's place (Y-16).
+        $reports = app(MonthlyReportsAtRows::class)->reportsByRow($rows, ['id', 'project_id', 'report_template_id', 'period', 'status']);
+
         foreach ($rows as $row) {
+            $row->setMonthlyReports($reports[$row->id] ?? new Collection);
             $stage = ProjectStage::stage($row, ProjectStage::leadOf($row));
 
             if ($stage > 6) {

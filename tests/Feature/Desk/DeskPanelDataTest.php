@@ -17,6 +17,7 @@ use App\Models\MonthlyReport;
 use App\Models\PlanIndicator;
 use App\Models\Project;
 use App\Models\Proposal;
+use App\Models\ProposalLocation;
 use App\Models\ReportTemplate;
 use App\Models\Result;
 use App\Models\Task;
@@ -31,11 +32,11 @@ beforeEach(function () {
 });
 
 test('a project with a late monthly report is off track, one with a report waiting for MEAL needs a look', function () {
-    $late = Project::factory()->create(['name' => 'Late Wells']);
-    MonthlyReport::factory()->create(['project_id' => $late->id, 'period' => '2026-07-01']);
-    $soon = Project::factory()->create(['name' => 'Soon Clinic']);
-    MonthlyReport::factory()->create(['project_id' => $soon->id, 'period' => '2026-08-01', 'status' => MonthlyReportStatus::Submitted]);
-    $calm = Project::factory()->create(['name' => 'Calm School']);
+    $late = rowFor(Project::factory()->create(['name' => 'Late Wells']));
+    reportAtRow($late, ['period' => '2026-07-01']);
+    $soon = rowFor(Project::factory()->create(['name' => 'Soon Clinic']));
+    reportAtRow($soon, ['period' => '2026-08-01', 'status' => MonthlyReportStatus::Submitted]);
+    $calm = rowFor(Project::factory()->create(['name' => 'Calm School']));
 
     $panel = Livewire::actingAs(User::factory()->role('General Manager')->create())->test('desk.panels.projects', ['size' => 'XL'])->call('setScope', 'all');
     $lines = $panel->instance()->lines;
@@ -54,10 +55,12 @@ test('a project with a late monthly report is off track, one with a report waiti
 */
 
 test('an active project past its end date is off track on the panel and late in the flow', function () {
-    $ended = Project::factory()->status(ProjectStatus::Active)->create(['name' => 'Ended Clinic', 'start_date' => '2025-01-01', 'end_date' => '2026-06-30']);
-    $ended->proposals()->attach(Proposal::factory()->create(['status' => ProposalStatus::Approved]));
-    $running = Project::factory()->status(ProjectStatus::Active)->create(['name' => 'Running Clinic', 'start_date' => '2025-01-01', 'end_date' => '2027-06-30']);
-    $closed = Project::factory()->status(ProjectStatus::Closed)->create(['start_date' => '2025-01-01', 'end_date' => '2026-06-30']);
+    $ended = rowFor(
+        Project::factory()->status(ProjectStatus::Active)->create(['name' => 'Ended Clinic', 'start_date' => '2025-01-01', 'end_date' => '2026-06-30']),
+        Proposal::factory()->create(['status' => ProposalStatus::Approved]),
+    );
+    $running = rowFor(Project::factory()->status(ProjectStatus::Active)->create(['name' => 'Running Clinic', 'start_date' => '2025-01-01', 'end_date' => '2027-06-30']));
+    $closed = rowFor(Project::factory()->status(ProjectStatus::Closed)->create(['start_date' => '2025-01-01', 'end_date' => '2026-06-30']));
     $viewer = User::factory()->role('General Manager')->create();
 
     $lines = Livewire::actingAs($viewer)->test('desk.panels.projects', ['size' => 'XL'])->call('setScope', 'all')->instance()->lines;
@@ -72,8 +75,8 @@ test('an active project past its end date is off track on the panel and late in 
 });
 
 test('the flow headline counts projects that need a look instead of calling them on track', function () {
-    $soon = Project::factory()->status(ProjectStatus::Active)->create(['start_date' => '2025-01-01', 'end_date' => '2027-06-30']);
-    MonthlyReport::factory()->create(['project_id' => $soon->id, 'period' => '2026-08-01', 'status' => MonthlyReportStatus::Submitted]);
+    $soon = rowFor(Project::factory()->status(ProjectStatus::Active)->create(['start_date' => '2025-01-01', 'end_date' => '2027-06-30']));
+    reportAtRow($soon, ['period' => '2026-08-01', 'status' => MonthlyReportStatus::Submitted]);
 
     Livewire::actingAs(User::factory()->role('General Manager')->create())->test('desk.panels.flow', ['size' => 'XL'])
         ->assertSeeText(trans_choice('desk-cards.flow.watch', 1, ['count' => 1]))
@@ -81,11 +84,12 @@ test('the flow headline counts projects that need a look instead of calling them
 });
 
 test('an approved proposal is staged by how far its project got: acknowledgement, template, running, closing', function () {
-    $stageOf = function (ProjectStatus $status, ?string $endDate = null): Project {
+    $stageOf = function (ProjectStatus $status, ?string $endDate = null): ProposalLocation {
         $project = Project::factory()->status($status)->create(['start_date' => '2025-01-01', 'end_date' => $endDate]);
-        $project->proposals()->attach(Proposal::factory()->create(['status' => ProposalStatus::Approved]));
+        $proposal = Proposal::factory()->create(['status' => ProposalStatus::Approved]);
+        $project->proposals()->attach($proposal);
 
-        return $project;
+        return rowFor($project, $proposal);
     };
     $draft = $stageOf(ProjectStatus::Draft);
     $approved = $stageOf(ProjectStatus::Approved, '2027-06-30');
@@ -101,10 +105,14 @@ test('an approved proposal is staged by how far its project got: acknowledgement
 });
 
 test('a project the donor approved but with no dates says the dates are missing, not that it waits for a donor', function () {
-    $approved = Project::factory()->status(ProjectStatus::Active)->create(['name' => 'Undated Clinic']);
-    $approved->proposals()->attach(Proposal::factory()->create(['status' => ProposalStatus::Approved]));
-    $fundraising = Project::factory()->create(['name' => 'Early Clinic']);
-    $fundraising->proposals()->attach(Proposal::factory()->create(['status' => ProposalStatus::ProposalDraft]));
+    rowFor(
+        Project::factory()->status(ProjectStatus::Active)->create(['name' => 'Undated Clinic']),
+        Proposal::factory()->create(['status' => ProposalStatus::Approved]),
+    );
+    rowFor(
+        Project::factory()->create(['name' => 'Early Clinic']),
+        Proposal::factory()->create(['status' => ProposalStatus::ProposalDraft]),
+    );
 
     $html = Livewire::actingAs(User::factory()->role('General Manager')->create())->test('desk.panels.projects', ['size' => 'XL'])->call('setScope', 'all')->html();
 
@@ -116,10 +124,11 @@ test('a project takes its stage from its leading proposal', function () {
     $project = Project::factory()->create();
     $proposal = Proposal::factory()->create(['status' => ProposalStatus::ProposalReview]);
     $project->proposals()->attach($proposal);
+    $row = rowFor($project, $proposal);
 
     $lines = Livewire::actingAs(User::factory()->role('General Manager')->create())->test('desk.panels.projects', ['size' => 'XL'])->instance()->lines;
 
-    expect($lines[$project->id]['stage'])->toBe(2);
+    expect($lines[$row->id]['stage'])->toBe(2);
 });
 
 test('the stepper moves a task assigned to me up to under review, never to done', function () {
@@ -176,6 +185,7 @@ test('waiting on others lists my monthly reports at MEAL and my late tasks held 
     $me = userWithRole('Managers', insertHrEmployee());
     $colleague = insertHrEmployee(firstNameEn: 'Rana');
     $project = Project::factory()->create(['name' => 'Aleppo Wells', 'user_id' => $me->employee_id]);
+    $row = rowFor($project);
     MonthlyReport::factory()->submitted()->create(['project_id' => $project->id, 'period' => '2026-08-01', 'submitted_by' => $me->id]);
     Activity::withoutRecording(function () use ($me, $colleague): void {
         $task = Task::factory()->create(['title' => 'Book the venue', 'due_date' => '2026-09-01', 'created_by' => $me->id]);
@@ -216,8 +226,8 @@ test('department deliverables show the Media Team media work only and hide finan
 });
 
 test('the projects panel opens on the dates lens and keeps start and end under the name in every lens', function () {
-    Project::factory()->create(['name' => 'Aleppo Wells', 'start_date' => '2026-01-01', 'end_date' => '2026-12-31']);
-    Project::factory()->create(['name' => 'Undated Clinic', 'start_date' => null, 'end_date' => null]);
+    rowFor(Project::factory()->create(['name' => 'Aleppo Wells', 'start_date' => '2026-01-01', 'end_date' => '2026-12-31']));
+    rowFor(Project::factory()->create(['name' => 'Undated Clinic', 'start_date' => null, 'end_date' => null]));
 
     Livewire::actingAs(User::factory()->role('General Manager')->create())->test('desk.panels.projects', ['size' => 'XL'])
         ->assertSet('lens', 'dates')
@@ -243,8 +253,8 @@ test('a target behind links to its indicator and to its project', function () {
         ->assertSee('Aleppo Wells');
 });
 
-test('someone who owns no project sees every project without picking a scope', function () {
-    Project::factory()->create(['name' => 'Aleppo Wells']);
+test('someone who owns no place sees every place without picking a scope', function () {
+    rowFor(Project::factory()->create(['name' => 'Aleppo Wells']));
 
     Livewire::actingAs(userWithRole('General Manager', insertHrEmployee()))->test('desk.panels.projects', ['size' => 'XL'])
         ->assertSee('Aleppo Wells')
@@ -253,8 +263,8 @@ test('someone who owns no project sees every project without picking a scope', f
 
 test('an owner starts on every project and can narrow to their own', function () {
     $owner = userWithRole('Managers', insertHrEmployee());
-    Project::factory()->create(['name' => 'My Wells', 'user_id' => $owner->employee_id]);
-    Project::factory()->create(['name' => 'Their Clinic']);
+    rowFor(Project::factory()->create(['name' => 'My Wells', 'user_id' => $owner->employee_id]));
+    rowFor(Project::factory()->create(['name' => 'Their Clinic']));
 
     Livewire::actingAs($owner)->test('desk.panels.projects', ['size' => 'XL'])
         ->assertSee('My Wells')
@@ -359,14 +369,15 @@ test('each project lens shows its own line: money counts only its currency, resu
     $project = Project::factory()->create(['name' => 'Aleppo Wells', 'start_date' => '2026-01-01', 'end_date' => '2026-12-31']);
     $proposal = Proposal::factory()->create(['status' => ProposalStatus::Active]);
     $project->proposals()->attach($proposal);
+    $row = rowFor($project, $proposal);
     $agreement = DonorProposal::factory()->create(['proposal_id' => $proposal->id, 'budget' => 100000, 'currency' => 'EUR']);
     TransfersTracking::factory()->received()->create(['donor_proposal_id' => $agreement->id, 'payment_amount' => 40000, 'amount_received' => 40000, 'net_amount_received' => 40000, 'amount_transfered_currency' => 'EUR', 'amount_received_currency' => 'EUR', 'scheduled_date' => '2026-03-01']);
     TransfersTracking::factory()->received()->create(['donor_proposal_id' => $agreement->id, 'payment_amount' => 9000, 'amount_received' => 9000, 'net_amount_received' => 9000, 'amount_transfered_currency' => 'EUR', 'amount_received_currency' => 'USD', 'scheduled_date' => '2026-04-01']);
-    MonthlyReport::factory()->create(['project_id' => $project->id, 'period' => '2026-08-01', 'status' => MonthlyReportStatus::Validated]);
-    MonthlyReport::factory()->create(['project_id' => $project->id, 'period' => '2026-09-01']);
+    reportAtRow($row, ['period' => '2026-08-01', 'status' => MonthlyReportStatus::Validated]);
+    reportAtRow($row, ['period' => '2026-09-01']);
 
     $panel = Livewire::actingAs(User::factory()->role('Super Admin')->create())->test('desk.panels.projects', ['size' => 'S'])->call('setScope', 'all');
-    $line = $panel->instance()->lines[$project->id];
+    $line = $panel->instance()->lines[$row->id];
 
     expect($line['money'])->toMatchArray(['currency' => 'EUR', 'committed' => 100000.0, 'received' => 40000.0])
         ->and($line['results'])->toMatchArray(['validated' => 1, 'total' => 1]);

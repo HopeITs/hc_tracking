@@ -104,9 +104,10 @@ final class ProjectStage
     }
 
     /**
-     * What is late and what falls due soon. Reads the project's status and
-     * end_date, its loaded monthlyReports and, when
-     * loaded, proposals.donorProposals.transfers.
+     * What is late and what falls due soon. Reads the row's status and
+     * end_date, the monthly reports at its place (ProposalLocation::
+     * monthlyReports(), filled in one read for a list) and, when loaded, its
+     * proposal's donorProposals.transfers.
      *
      * @return array{late: int, soon: int}
      */
@@ -114,9 +115,10 @@ final class ProjectStage
     {
         $today = CarbonImmutable::today();
         $monthStart = $today->startOfMonth();
+        $reports = $row->monthlyReports();
 
-        $lateReports = $row->monthlyReports->filter(fn ($report): bool => $report->status === MonthlyReportStatus::Draft && $report->period->lt($monthStart))->count();
-        $waitingReports = $row->monthlyReports->where('status', MonthlyReportStatus::Submitted)->count();
+        $lateReports = $reports->filter(fn ($report): bool => $report->status === MonthlyReportStatus::Draft && $report->period->lt($monthStart))->count();
+        $waitingReports = $reports->where('status', MonthlyReportStatus::Submitted)->count();
         $lateTransfers = self::transfers($row)->filter(fn (TransfersTracking $transfer): bool => $transfer->state() === 'late')->count();
         $pastEnd = $row->status === ProjectStatus::Active && $row->end_date !== null && $row->end_date->lt($today) ? 1 : 0;
 

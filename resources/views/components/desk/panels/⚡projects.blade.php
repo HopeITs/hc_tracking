@@ -9,6 +9,7 @@ use App\Models\ProposalLocation;
 use App\Models\TransfersTracking;
 use App\Support\Desk\DeskWork;
 use App\Support\Desk\ProjectStage;
+use App\Support\Locations\MonthlyReportsAtRows;
 use Carbon\CarbonImmutable;
 use Illuminate\Support\Collection;
 use Livewire\Attributes\Computed;
@@ -79,7 +80,6 @@ new class extends Component
                 'proposal:id,name,status,donor_id',
                 'proposal.donor:id,name',
                 'proposal.donorNames',
-                'monthlyReports:id,project_id,period,status,returned_at',
                 'indicators' => fn ($query) => $query->select(['id', 'project_id', 'proposal_location_id', 'baseline', 'target'])->whereNotNull('target'),
                 'indicators.progress:id,indicator_id,date,value',
                 ...($money ? ['proposal.donorProposals:id,proposal_id,budget,currency', 'proposal.donorProposals.transfers'] : []),
@@ -99,8 +99,11 @@ new class extends Component
     {
         $lines = [];
         $thisMonth = CarbonImmutable::today()->startOfMonth();
+        // One read of the monthly reports at every row's place (Y-16).
+        $reports = app(MonthlyReportsAtRows::class)->reportsByRow($this->projects, ['id', 'project_id', 'report_template_id', 'period', 'status', 'returned_at']);
 
         foreach ($this->projects as $project) {
+            $project->setMonthlyReports($reports[$project->id] ?? new Collection);
             $lead = ProjectStage::leadOf($project);
             $stage = ProjectStage::stage($project, $lead);
             $signals = ProjectStage::signals($project);
@@ -129,8 +132,8 @@ new class extends Component
                 'centerInactive' => $project->hasInactiveCenter(),
                 'money' => $money,
                 'results' => [
-                    'validated' => $project->monthlyReports->where('status', MonthlyReportStatus::Validated)->count(),
-                    'total' => $project->monthlyReports->filter(fn ($report): bool => $report->period->lt($thisMonth))->count(),
+                    'validated' => $project->monthlyReports()->where('status', MonthlyReportStatus::Validated)->count(),
+                    'total' => $project->monthlyReports()->filter(fn ($report): bool => $report->period->lt($thisMonth))->count(),
                     ...$this->targetsOnPace($project),
                 ],
             ];

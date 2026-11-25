@@ -407,7 +407,7 @@ new #[Layout('layouts::desk'), Title('titles.project')] class extends Component 
         close="cancelArchive"
         tone="neutral"
         :title="__('projects.archive_this_project')"
-        :message="$this->archivingProject !== null ? __('projects.archiving_keeps_everything', ['name' => $this->archivingProject['project']->name]) : null"
+        :message="$this->archivingProject !== null ? __('projects.archiving_keeps_everything', ['name' => $this->archivingProject['project']->headline()]) : null"
         confirm="archiveProject"
         :confirm-label="__('projects.archive_project')"
         confirm-test="confirm-archive-project"

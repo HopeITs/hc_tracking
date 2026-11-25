@@ -13,7 +13,10 @@ beforeEach(function () {
 
     $this->project = Activity::withoutRecording(function (): Project {
         $project = Project::factory()->status(ProjectStatus::Active)->create();
-        $project->proposals()->attach(Proposal::factory()->create(['status' => ProposalStatus::Active, 'name' => 'Clean Water Phase One'])->id);
+        $proposal = Proposal::factory()->create(['status' => ProposalStatus::Active, 'name' => 'Clean Water Phase One']);
+        $project->proposals()->attach($proposal->id);
+        // Y-16 (D-93): the page reads the row, whose one proposal is this one.
+        rowFor($project, $proposal);
 
         return $project;
     });
@@ -36,10 +39,12 @@ test('a viewer without the permissions sees no edit or archive actions at all', 
         ->assertDontSeeHtml('wire:click="confirmArchive(');
 });
 
-test('archiving from the Story archives the project and offers Restore', function () {
+test('archiving from the Story archives the place and offers Restore', function () {
+    $row = rowFor($this->project);
+
     Livewire::actingAs(userWithRole('General Manager'))
-        ->test('pages::projects.show', ['project' => rowFor($this->project)->slug])
-        ->call('confirmArchive', $this->project->id)
+        ->test('pages::projects.show', ['project' => $row->slug])
+        ->call('confirmArchive', $row->id)
         ->assertSet('showArchiveModal', true)
         ->call('archiveProject')
         ->assertSet('showArchiveModal', false)
@@ -58,9 +63,11 @@ test('a viewer without the archive permission sees no Restore on an archived pro
 });
 
 test('archiving is refused for a viewer without the permission', function () {
+    $row = rowFor($this->project);
+
     Livewire::actingAs(userWithRole('Team Member'))
-        ->test('pages::projects.show', ['project' => rowFor($this->project)->slug])
-        ->call('confirmArchive', $this->project->id)
+        ->test('pages::projects.show', ['project' => $row->slug])
+        ->call('confirmArchive', $row->id)
         ->assertForbidden();
 
     expect($this->project->fresh()->status)->toBe(ProjectStatus::Active);

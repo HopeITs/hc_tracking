@@ -13,6 +13,7 @@ use App\Enums\ProposalStatus;
 use App\Notifications\TracksActivity;
 use App\Observers\MediaOwnerObserver;
 use App\Observers\ProposalLocationObserver;
+use App\Support\Locations\MonthlyReportsAtRows;
 use Carbon\CarbonImmutable;
 use Database\Factories\ProposalLocationFactory;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
@@ -27,6 +28,7 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Database\Eloquent\Relations\MorphMany;
 use Illuminate\Database\Eloquent\Relations\MorphOne;
+use Illuminate\Support\Collection;
 
 /**
  * One location row of a proposal (contracts.md §7, W-34a, D-62): a city, and
@@ -268,18 +270,40 @@ class ProposalLocation extends Model
     }
 
     /**
-     * The monthly reports of this row's place (Y-16).
+     * The monthly reports of this row's place, oldest first (Y-16).
      *
-     * Joined on the project both sides still carry, because a monthly report
-     * belongs to a **template** (Y-03) and a template reaches a row only by
-     * matching its place — which no foreign key expresses. Y-18 replaces this
-     * with the template path once `project_id` goes.
+     * Not a relation: a monthly report belongs to a **template**, and a
+     * template reaches a row only by matching its place, which no foreign key
+     * expresses (App\Support\Locations\MonthlyReportsAtRows). Joining on the
+     * project instead would hand the same report to every row of that project,
+     * and two proposals may share a place (D-77).
      *
-     * @return HasMany<MonthlyReport, $this>
+     * A list of rows should fill this in one read with setMonthlyReports();
+     * a single row may read it here.
+     *
+     * @return Collection<int, MonthlyReport>
      */
-    public function monthlyReports(): HasMany
+    /**
+     * The reports of this row's place once read; see monthlyReports().
+     *
+     * @var Collection<int, MonthlyReport>|null
+     */
+    protected ?Collection $monthlyReportsAtPlace = null;
+
+    public function monthlyReports(): Collection
     {
-        return $this->hasMany(MonthlyReport::class, 'project_id', 'project_id');
+        return $this->monthlyReportsAtPlace ??= app(MonthlyReportsAtRows::class)->forRow($this);
+    }
+
+    /**
+     * Hand the row the reports a list already read for it (one query for the
+     * page instead of two per row).
+     *
+     * @param  Collection<int, MonthlyReport>  $reports
+     */
+    public function setMonthlyReports(Collection $reports): void
+    {
+        $this->monthlyReportsAtPlace = $reports;
     }
 
     /**
