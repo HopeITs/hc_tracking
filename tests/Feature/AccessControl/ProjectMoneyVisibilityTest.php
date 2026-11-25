@@ -214,7 +214,7 @@ test('the project directory card counts funding paper only for viewers of fundin
         ->test('pages::projects.index')
         ->instance()
         ->projects
-        ->firstWhere('id', $project->id)
+        ->firstWhere('id', rowFor($project)->id)
         ->media_count;
 
     expect($fileCount('Managers'))->toBe(1)
@@ -287,7 +287,7 @@ test('the projects directory shows committed budgets in every view only to viewe
         ->assertDontSee('Committed funding');
 
     expect($managers->instance()->committedFunding)->toBe([])
-        ->and($managers->instance()->fundingByProject[$project->id])->toMatchArray([
+        ->and($managers->instance()->fundingByProject[rowFor($project)->id])->toMatchArray([
             'currencies' => [],
             'donors' => ['Aurora Foundation'],
             'proposals' => ['Harbour Clean Water'],

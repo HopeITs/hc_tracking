@@ -233,7 +233,7 @@
         $previewMeta = $previewFile === null ? null : collect([
             \Illuminate\Support\Str::upper($previewFile->type->value),
             $previewFile->collection->label(),
-            $previewFile->mediable_type === 'project' && $previewFile->mediable !== null ? $previewFile->mediable->name : null,
+            $previewFile->mediable_type === 'proposal_location' && $previewFile->mediable !== null ? $previewFile->mediable->headline() : null,
             $previewFile->size !== null ? \Illuminate\Support\Number::fileSize($previewFile->size, precision: 1) : null,
             $this->documents->count() > 1 ? __('reports.preview_position', [
                 'position' => $this->documents->search(fn ($candidate) => $candidate->id === $previewFile->id) + 1,

@@ -73,6 +73,8 @@ test('the project page hides other departments\' tasks', function () {
 
 test('a project owner sees every task in their own project', function () {
     $this->project->update(['user_id' => $this->mediaEmployee]);
+    // Y-16 (D-93): a place carries its own responsible; the mirror leaves it alone.
+    $this->row->update(['responsible_employee_id' => $this->mediaEmployee]);
 
     Livewire::actingAs($this->member->fresh())->test('pages::projects.show', ['project' => rowFor($this->project)->slug])
         ->set('tab', 'tasks')
@@ -104,6 +106,8 @@ test('proposal progress counts every task, including hidden ones', function () {
 test('a Media Team editor moves status on department tasks but cannot edit them, and only views owned-project tasks', function () {
     $editor = userWithRole('Media Team', $this->mediaEmployee);
     $this->project->update(['user_id' => $this->mediaEmployee]);
+    // Y-16 (D-93): a place carries its own responsible; the mirror leaves it alone.
+    $this->row->update(['responsible_employee_id' => $this->mediaEmployee]);
     $colleague = insertHrEmployee(firstNameEn: 'Media', lastNameEn: 'Colleague');
     insertHrContract($colleague, insertHrPosition($this->mediaDepartment));
     $departmentTask = Task::factory()->create(['title' => 'Media department task']);

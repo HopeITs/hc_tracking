@@ -61,7 +61,8 @@ test('the directory searches english and arabic names and clears the search', fu
 test('each city shows how many projects run in it', function () {
     $aleppo = insertHrCity('Aleppo');
     insertHrCity('Homs');
-    Project::factory(2)->create(['city_id' => $aleppo]);
+    // Y-16 (D-93): the city directory counts the places that run in a city.
+    Project::factory(2)->create(['city_id' => $aleppo])->each(fn ($project) => rowFor($project));
 
     Livewire::actingAs(User::factory()->role('General Manager')->create())
         ->test('pages::admin.cities')
@@ -90,8 +91,8 @@ test('the summary strip reports the portfolio footprint independent of the searc
     $aleppo = insertHrCity('Aleppo');
     insertHrCity('Homs');
     insertHrCity('Tartus', 'طرطوس', isActive: false);
-    Project::factory()->active()->create(['city_id' => $aleppo, 'target_beneficiaries' => 500]);
-    Project::factory()->closed()->create(['city_id' => $aleppo, 'target_beneficiaries' => 300]);
+    rowFor(Project::factory()->active()->create(['city_id' => $aleppo, 'target_beneficiaries' => 500]));
+    rowFor(Project::factory()->closed()->create(['city_id' => $aleppo, 'target_beneficiaries' => 300]));
 
     $component = Livewire::actingAs(User::factory()->role('General Manager')->create())
         ->test('pages::admin.cities')

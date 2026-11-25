@@ -11,6 +11,7 @@ use App\Enums\MediaCollection;
 use App\Models\Media;
 use App\Models\Project;
 use App\Models\Proposal;
+use App\Models\ProposalLocation;
 use App\Rules\SecureUpload;
 use Flux\Flux;
 use Illuminate\Database\Eloquent\Collection;
@@ -138,9 +139,10 @@ trait ManagesProposalFiles
     #[Computed]
     public function projectFiles(): Collection
     {
-        $projectIds = $this->projects->modelKeys();
+        // Y-16 (D-93): grant paper is filed on the place, not the project.
+        $locationIds = $this->projects->modelKeys();
 
-        if ($projectIds === []) {
+        if ($locationIds === []) {
             return new Collection;
         }
 
@@ -148,8 +150,8 @@ trait ManagesProposalFiles
 
         return Media::query()
             ->select(['id', 'mediable_type', 'mediable_id', 'collection', 'disk', 'path', 'original_name', 'type', 'size', 'uploaded_at', 'uploaded_by'])
-            ->where('mediable_type', 'project')
-            ->whereIn('mediable_id', $projectIds)
+            ->where('mediable_type', 'proposal_location')
+            ->whereIn('mediable_id', $locationIds)
             ->whereIn('collection', array_map(fn (MediaCollection $collection): string => $collection->value, $this->visibleGrantPaper()))
             ->with('uploader:id,hr_user_id,employee_id')
             ->orderByDesc('uploaded_at')
@@ -292,7 +294,7 @@ trait ManagesProposalFiles
     {
         return $media->mediable_type === 'proposal'
             ? route('proposals.files.download', [$this->proposal, $media])
-            : route('projects.files.download', [Project::query()->findOrFail($media->mediable_id), $media]);
+            : route('projects.files.download', [ProposalLocation::query()->findOrFail($media->mediable_id), $media]);
     }
 
     public function closeFileModal(): void

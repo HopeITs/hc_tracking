@@ -1,6 +1,6 @@
 {{--
     One document on the proposal page's documents tab, laid out like a report's supporting file.
-    $owner is the funded project a read-only file belongs to, or null for a file filed on the proposal itself.
+    $owner is the place (Y-16, D-93) a read-only file belongs to, or null for a file filed on the proposal itself.
 --}}
 @php
     $isStored = $media->isStored();
@@ -32,7 +32,7 @@
             <span class="font-semibold">{{ $media->collection->label() }}</span>
             @if ($owner !== null)
                 <span aria-hidden="true">·</span>
-                <a href="{{ route('projects.show', $owner) }}" wire:navigate class="underline-offset-4 hover:underline">{{ $owner->name }}</a>
+                <a href="{{ route('projects.show', $owner) }}" wire:navigate class="underline-offset-4 hover:underline">{{ $owner->headline() }}</a>
             @endif
             @if ($media->size !== null)
                 <span aria-hidden="true">·</span>

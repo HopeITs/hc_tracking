@@ -391,11 +391,9 @@ new #[Layout('layouts::desk'), Title('titles.report_templates')] class extends C
                 @endif
                 @php
                     $project = $row['project'];
-                    // Y-16 (D-93): Review opens the location row's template tab.
-                    // The row is resolved per queue row, which is short; the
-                    // link would still work through the legacy redirect, this
-                    // just saves the hop.
-                    $reviewRow = $project === null ? null : app(\App\Support\Locations\ProjectSuccessor::class)->rowFor($project->id);
+                    // Y-16 (D-93): Review opens the place's template tab. The
+                    // queue resolves every row's place in one query.
+                    $reviewRow = $row['reviewRow'];
                     $openProposal = $row['templateProposals'][0]['id'] ?? null;
                     $place = collect([$row['cityName'], $row['centerName']])->filter()->implode(' · ');
                 @endphp

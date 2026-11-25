@@ -86,7 +86,8 @@ test('a responsible MEAL officer sees only the pending templates of the projects
         ->assertSee('data-report-template-queue', false)
         ->assertSee('Aleppo Literacy')
         ->assertDontSee('Homs Nutrition')
-        ->assertSee(route('projects.show', [$covered->project, 'tab' => 'template']), false);
+        // Y-16 (D-93): the queue opens the place the template is for.
+        ->assertSee(route('projects.show', [rowFor($covered->project), 'tab' => 'template']), false);
 });
 
 test('the MEAL Manager slot holder sees every project', function () {
@@ -250,7 +251,7 @@ test('the status buttons, search and review links sit inside the component root'
         expect($xpath->query('//*[@*[name()="wire:id"]]//*[@data-test="'.$hook.'"]')->length)->toBeGreaterThan(0, $hook);
     }
 
-    expect($xpath->query('//*[@*[name()="wire:id"]]//a[@data-queue-open][contains(@href, "'.$template->project->slug.'")]')->length)->toBe(1);
+    expect($xpath->query('//*[@*[name()="wire:id"]]//a[@data-queue-open][contains(@href, "'.rowFor($template->project)->slug.'")]')->length)->toBe(1);
 });
 
 test('two templates at one place are listed with their own proposals at a fixed query count', function () {
