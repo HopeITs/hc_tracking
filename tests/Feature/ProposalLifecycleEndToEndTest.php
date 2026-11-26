@@ -3,27 +3,38 @@
 use App\Actions\FundingAgreements\SaveAgreementInstallments;
 use App\Actions\FundingAgreements\SaveFundingAgreement;
 use App\Actions\Locations\ActivateLocation;
+use App\Actions\Locations\CloseLocation;
 use App\Actions\Proposals\ApproveProposal;
 use App\Actions\Proposals\RecordFinalReportAcceptance;
 use App\Actions\Proposals\SaveProposal;
 use App\Actions\Proposals\TransitionProposal;
+use App\Actions\ReportTemplates\ConfirmReportTemplate;
 use App\Enums\AssignmentStatus;
 use App\Enums\Currency;
 use App\Enums\MediaCollection;
 use App\Enums\ProjectStatus;
 use App\Enums\ProposalKind;
 use App\Enums\ProposalStatus;
+use App\Models\Activity;
 use App\Models\Donor;
 use App\Models\DonorProposal;
+use App\Models\Indicator;
+use App\Models\LibraryIndicator;
 use App\Models\Media;
+use App\Models\MonthlyReport;
+use App\Models\PlanIndicator;
 use App\Models\Program;
 use App\Models\Project;
 use App\Models\Proposal;
 use App\Models\ProposalLocation;
+use App\Models\ReportTemplate;
+use App\Models\ReportTemplateLine;
 use App\Models\TransfersTracking;
 use App\Models\UserNotification;
+use App\Support\Reporting\ReportPlace;
 use Carbon\CarbonImmutable;
 use Database\Seeders\RolesAndPermissionsSeeder;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
 
 /*
@@ -155,8 +166,139 @@ test('a proposal goes from a draft place to an approved, active grant with an ag
         ->and(UserNotification::query()->forUser($generalManager)->count())->toBeGreaterThan(0);
 });
 
-test('template confirmation activates the project and generates its monthly report months')
-    ->skip('T33 (ConfirmReportTemplate) and T17A (monthly report generation) are not merged yet; step 4 above calls ActivateProject directly.');
+test('the whole walk, with no projects row at any point: concept note to approved, acknowledged, confirmed, active, reported, closed', function () {
+    // Y-17, Build order step 6. T33 (ConfirmReportTemplate) and T17A
+    // (monthly report generation) are merged, so this no longer skips: MEAL
+    // confirming the template is what activates the place, and the place is
+    // a location row of the proposal from the first step to the last.
+    $prManager = userWithRole('Public Relations Manager');
+    $meal = mealManager();
+    $today = '2026-10-14';
+
+    // 1. A concept note with one place. No project is created for it.
+    $cityId = insertHrCity('Aleppo', 'حلب');
+    $centerId = insertHrCenter($cityId, 'Hope Center Aleppo', 'مركز الأمل حلب');
+    $employeeId = insertHrEmployee($cityId);
+    $program = Program::factory()->create(['manager_id' => $employeeId]);
+
+    $this->actingAs($prManager);
+    $proposal = app(SaveProposal::class)->handle(null, [
+        'name' => 'Winter WASH Aleppo',
+        'internalProjectNumber' => 'HC-2026-980',
+        'donorId' => Donor::factory()->create()->id,
+        'plannedDateBegin' => '2026-11-01',
+        'plannedDateEnd' => '2027-10-31',
+        'requestedBudget' => '30000.00',
+        'requestedCurrency' => 'USD',
+        'locations' => [[
+            'city_id' => $cityId,
+            'program_id' => $program->id,
+            'responsible_employee_id' => $employeeId,
+            'center_ids' => [$centerId],
+        ]],
+    ], $prManager);
+
+    $row = $proposal->locations()->sole();
+
+    expect($proposal->status)->toBe(ProposalStatus::ConceptNote)
+        ->and($row->status)->toBe(ProjectStatus::Draft)
+        ->and(Project::query()->count())->toBe(0);
+
+    // 2. Through the stages to submitted. `proposal draft → proposal review`
+    // wants a beneficiary figure on every place, and a place takes it on the
+    // proposal form once its row exists (Y-17).
+    app(SaveProposal::class)->handle($proposal->fresh(), [
+        'name' => $proposal->name,
+        'internalProjectNumber' => $proposal->internal_project_number,
+        'donorId' => $proposal->donor_id,
+        'plannedDateBegin' => '2026-11-01',
+        'plannedDateEnd' => '2027-10-31',
+        'beneficiaries' => [$row->id => 1200],
+    ], $prManager);
+
+    expect($row->fresh()->target_beneficiaries)->toBe(1200);
+
+    foreach ([
+        [ProposalStatus::ConceptNoteReview, ProposalStatus::ConceptNote, []],
+        [ProposalStatus::ConceptNoteSubmitted, ProposalStatus::ConceptNoteReview, ['effective_date' => $today]],
+        [ProposalStatus::ProposalDraft, ProposalStatus::ConceptNoteSubmitted, ['effective_date' => $today]],
+        [ProposalStatus::ProposalReview, ProposalStatus::ProposalDraft, []],
+        [ProposalStatus::Submitted, ProposalStatus::ProposalReview, ['effective_date' => $today]],
+    ] as [$to, $from, $input]) {
+        app(TransitionProposal::class)->handle($proposal->fresh(), $to, $from, $input);
+    }
+
+    expect($proposal->fresh()->status)->toBe(ProposalStatus::Submitted);
+
+    // 3. The donor approves. The place is dated and waits for its responsible.
+    app(ApproveProposal::class)->handle($proposal->fresh(), ProposalStatus::Submitted, [
+        'actual_date_begin' => '2026-11-01',
+        'actual_date_end' => '2027-10-31',
+        'decision_date' => $today,
+        'approval_note' => 'The donor confirmed the grant by email on 13 October.',
+    ]);
+
+    expect($proposal->fresh()->status)->toBe(ProposalStatus::Approved)
+        ->and($row->fresh()->status)->toBe(ProjectStatus::Draft)
+        ->and($row->fresh()->start_date->toDateString())->toBe('2026-11-01')
+        ->and(Project::query()->count())->toBe(0);
+
+    // 4. The responsible acknowledges being in charge: the place is approved.
+    $assignment = $row->fresh()->currentAssignment('responsible_employee_id');
+    $this->actingAs(userWithRole('Managers', $employeeId));
+    $assignment->acknowledge(auth()->user());
+
+    expect($row->fresh()->status)->toBe(ProjectStatus::Approved)
+        ->and($proposal->fresh()->status)->toBe(ProposalStatus::Approved);
+
+    // 5. MEAL confirms the report template at the place: the place activates
+    // and takes the proposal with it, and the months are generated.
+    $template = Activity::withoutRecording(function () use ($proposal, $row, $centerId): ReportTemplate {
+        $template = ReportTemplate::factory()->forPlace(
+            new ReportPlace((int) $row->city_id, (int) $row->program_id, $centerId, false),
+            $proposal,
+        )->create();
+
+        $indicator = Indicator::factory()->create(['library_indicator_id' => LibraryIndicator::factory()->create()->id]);
+        $target = PlanIndicator::factory()->forProposal($proposal)->create([
+            'indicator_id' => $indicator->id,
+            'proposal_location_id' => $row->id,
+        ]);
+        ReportTemplateLine::factory()->create([
+            'report_template_id' => $template->id,
+            'plan_indicator_id' => $target->id,
+            'effective_from' => '2026-11-01',
+            'effective_to' => '2027-10-01',
+        ]);
+
+        return $template;
+    });
+
+    $this->actingAs($meal);
+    app(ConfirmReportTemplate::class)->handle($template, $template->lines()->pluck('id')->all());
+
+    expect($row->fresh()->status)->toBe(ProjectStatus::Active)
+        ->and($proposal->fresh()->status)->toBe(ProposalStatus::Active)
+        ->and(Project::query()->count())->toBe(0);
+
+    // 6. A monthly report exists for the template's own months.
+    $reports = MonthlyReport::query()->where('report_template_id', $template->id)->get();
+
+    expect($reports)->not->toBeEmpty()
+        ->and($reports->pluck('project_id')->filter()->all())->toBe([]);
+
+    // 7. The place is closed. It keeps its dates, and no project ever existed.
+    $this->actingAs(userWithRole('General Manager'));
+    app(CloseLocation::class)->handle($row->fresh());
+
+    expect($row->fresh())
+        ->status->toBe(ProjectStatus::Closed)
+        ->start_date->not->toBeNull()
+        ->end_date->not->toBeNull();
+
+    expect(Project::query()->count())->toBe(0)
+        ->and(DB::table('project_proposal')->count())->toBe(0);
+});
 
 test('a payroll proposal goes from draft to completed with the final report only (W-32)', function () {
     $finance = userWithRole('Financial');

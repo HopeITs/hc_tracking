@@ -759,7 +759,6 @@ function proposalPlaceRow(): array
         'city_wide' => true,
         'new_program_name_en' => '',
         'new_program_name_ar' => '',
-        'project' => null,
     ];
 }
 

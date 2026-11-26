@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace App\Actions\Proposals;
 
-use App\Actions\Locations\ApproveLocationFromProposal;
 use App\Enums\MediaCollection;
 use App\Enums\ProjectStatus;
 use App\Enums\ProposalStatus;
@@ -46,10 +45,7 @@ final class ApproveProposal
 
     public const OutcomeSkipped = 'skipped';
 
-    public function __construct(
-        private ApproveLocationFromProposal $approveLocation,
-        private MaterialiseProposalLocations $materialiseLocations,
-    ) {}
+    public function __construct(private MaterialiseProposalLocations $materialiseLocations) {}
 
     /**
      * @param  array{actual_date_begin: string, actual_date_end: string, decision_date: string, note?: ?string, approval_note?: ?string}  $input
@@ -80,14 +76,22 @@ final class ApproveProposal
             $validated = $this->validate($locked, $input);
             $hadAgreement = $locked->donorProposals()->exists();
 
+            // What each place is about to become, read before anything moves:
+            // once the rows are approved their own status no longer says
+            // whether this call funded them or extended them.
+            $moved = $this->outcomesOf($rows);
+
             // The grant's window has to be on the proposal before the rows
             // take their dates from it (ApproveLocationFromProposal).
             $this->recordApproval($locked, $expectedFrom, $validated);
 
             // T07: the proposal's reviewers are told about the approval here.
 
+            // MaterialiseProposalLocations is the one pass over the rows: it
+            // calls ApproveLocationFromProposal for each. Approving them a
+            // second time here would be idempotent but would make every
+            // place pay twice (quality-bar.md §2).
             $materialised = $this->materialiseLocations->handle($locked, (int) Auth::id());
-            $moved = $this->approveRows($rows);
 
             if (! $hadAgreement) {
                 $locked->recordActivity('proposal.approved_without_agreement');
@@ -249,29 +253,23 @@ final class ApproveProposal
     }
 
     /**
+     * Sort the proposal's places into what this approval does to each,
+     * reading their state **before** anything moves. It writes nothing:
+     * MaterialiseProposalLocations does the approving.
+     *
      * @param  list<ProposalLocation>  $rows
      * @return array{approved: list<int>, waiting: list<int>, skipped: list<int>}
      */
-    private function approveRows(array $rows): array
+    private function outcomesOf(array $rows): array
     {
         $result = ['approved' => [], 'waiting' => [], 'skipped' => []];
 
         foreach ($rows as $row) {
-            $outcome = $this->outcomeFor($row);
-
-            if ($outcome === self::OutcomeSkipped) {
-                $result['skipped'][] = $row->id;
-
-                continue;
-            }
-
-            $this->approveLocation->handle($row, 'proposal_approval');
-
-            if ($outcome === self::OutcomeWaiting) {
-                $result['waiting'][] = $row->id;
-            } else {
-                $result['approved'][] = $row->id;
-            }
+            match ($this->outcomeFor($row)) {
+                self::OutcomeSkipped => $result['skipped'][] = $row->id,
+                self::OutcomeWaiting => $result['waiting'][] = $row->id,
+                self::OutcomeFunded, self::OutcomeExtended => $result['approved'][] = $row->id,
+            };
         }
 
         return $result;

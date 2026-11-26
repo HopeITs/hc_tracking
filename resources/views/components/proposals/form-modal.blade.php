@@ -362,7 +362,8 @@
                     >
                         @foreach ($locations as $index => $location)
                             @php
-                                $isLinked = $location['project'] !== null;
+                                // Y-17: nothing links a project, so no row is locked by one.
+                                $isLinked = false;
                                 $cityCenters = $location['city_id'] === '' ? [] : ($centersByCity[(int) $location['city_id']] ?? []);
                                 $isNewProgram = $location['program_id'] === 'new';
                                 $isCityWide = $location['city_wide'];
@@ -371,9 +372,6 @@
                                 <div class="flex items-center justify-between gap-2 @2xl/modal:col-span-2">
                                     <p class="min-w-0 truncate text-sm font-semibold text-secondary-dark dark:text-ink">
                                         {{ __('proposals.location_row_title', ['number' => $index + 1]) }}
-                                        @if ($isLinked)
-                                            <span class="ms-1 text-xs font-normal {{ $mutedText }}" dir="auto" data-test="location-linked-project">{{ __('proposals.location_linked_project', ['name' => $location['project']]) }}</span>
-                                        @endif
                                     </p>
                                     @unless ($isLinked)
                                         <x-ui.button type="button" tone="ghost" size="sm" icon="x-mark" class="size-9! shrink-0" wire:click="removeLocationRow({{ $index }})" :aria-label="__('proposals.remove_location', ['number' => $index + 1])" data-test="remove-location" />

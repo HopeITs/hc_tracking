@@ -141,12 +141,18 @@ trait EditsProposalLocations
     }
 
     /**
-     * Remove a row. A row that stands for a linked project stays: only
-     * unlinking the project on the Projects tab removes it.
+     * Remove a row.
+     *
+     * Y-17: a row is no longer kept by the project it stood for — nothing
+     * links projects. What keeps a row is being delivered at: targets with
+     * reports, milestones, risks or a report template, which
+     * `ProposalLocationRows::refuseWhenRowInUse()` refuses on save with
+     * `proposals.location_in_use`. A place that has started belongs in the
+     * archive, not in the bin.
      */
     public function removeLocationRow(int $index): void
     {
-        if (! isset($this->locations[$index]) || $this->locations[$index]['project'] !== null) {
+        if (! isset($this->locations[$index])) {
             return;
         }
 
@@ -316,7 +322,6 @@ trait EditsProposalLocations
             'city_wide' => (bool) $row->city_wide,
             'new_program_name_en' => $row->programRequest->name_en ?? '',
             'new_program_name_ar' => $row->programRequest->name_ar ?? '',
-            'project' => $row->project?->name,
             'location_id' => $row->id,
         ])->all());
 
@@ -367,12 +372,11 @@ trait EditsProposalLocations
     }
 
     /**
-     * @param  array{city_id: string, program_id: string, responsible_employee_id: string, center_ids: list<string>, city_wide: bool, new_program_name_en: string, new_program_name_ar: string, project: string|null, location_id?: int|null}  $row
+     * @param  array{city_id: string, program_id: string, responsible_employee_id: string, center_ids: list<string>, city_wide: bool, new_program_name_en: string, new_program_name_ar: string, location_id?: int|null}  $row
      */
     private function isBlankLocationRow(array $row): bool
     {
-        return $row['project'] === null
-            && $row['city_id'] === ''
+        return $row['city_id'] === ''
             && $row['program_id'] === ''
             && $row['responsible_employee_id'] === ''
             && $row['center_ids'] === []
@@ -380,7 +384,7 @@ trait EditsProposalLocations
     }
 
     /**
-     * @return array{key: string, city_id: string, program_id: string, responsible_employee_id: string, center_ids: list<string>, city_wide: bool, new_program_name_en: string, new_program_name_ar: string, project: null, location_id: null}
+     * @return array{key: string, city_id: string, program_id: string, responsible_employee_id: string, center_ids: list<string>, city_wide: bool, new_program_name_en: string, new_program_name_ar: string, location_id: null}
      */
     private function blankLocationRow(): array
     {
@@ -393,7 +397,6 @@ trait EditsProposalLocations
             'city_wide' => false,
             'new_program_name_en' => '',
             'new_program_name_ar' => '',
-            'project' => null,
             'location_id' => null,
         ];
     }

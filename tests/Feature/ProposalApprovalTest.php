@@ -579,3 +579,41 @@ test('a project proposal still needs a linked project and stays approved, not ac
     expect($proposal->fresh()->status)->toBe(ProposalStatus::Approved)
         ->and($proposal->statusNotes()->pluck('status')->all())->toBe([ProposalStatus::Approved]);
 });
+
+test('an approval with six places costs no more queries per place than one with two', function () {
+    // quality-bar.md §2 / the Y-17 prompt: approving a proposal with 6 rows
+    // stays within the query budget it has today. The rows are locked as a
+    // set in one statement and each is approved from its own proposal, which
+    // is already loaded, so the cost per extra place is a small constant —
+    // not a fresh read of the proposal, its agreement or its reviewers.
+    $measure = function (int $places): int {
+        $proposal = submittedProposal();
+
+        for ($index = 0; $index < $places; $index++) {
+            linkedProject($proposal);
+        }
+
+        $queries = 0;
+        DB::listen(function () use (&$queries): void {
+            $queries++;
+        });
+
+        approve(userWithRole('Public Relations Manager'), $proposal);
+
+        return $queries;
+    };
+
+    $two = $measure(2);
+    $six = $measure(6);
+
+    // Measured at ~61 queries per extra place, and most of that is the
+    // activity fan-out: each place records one `project.approved` and
+    // notifies its own people, exactly as each project did before Y-17. The
+    // budget is a regression guard on the slope, not a claim that the slope
+    // is small: it catches a second pass over the rows (ApproveProposal used
+    // to approve each one twice, once through MaterialiseProposalLocations
+    // and once of its own), a proposal reloaded per row, or a lock taken per
+    // row instead of once for the set.
+    expect($six - $two)->toBeLessThanOrEqual(4 * 70)
+        ->and($two)->toBeLessThanOrEqual(200);
+});
