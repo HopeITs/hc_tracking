@@ -998,23 +998,6 @@ final class SaveProposal
         }
     }
 
-    /**
-     * The submitted beneficiaries as location row id => count (null when empty).
-     *
-     * @param  array<string, mixed>  $input
-     * @return array<int, int|null>
-     */
-    private function beneficiaries(array $input): array
-    {
-        $result = [];
-
-        foreach (is_array($input['beneficiaries']) ? $input['beneficiaries'] : [] as $projectId => $count) {
-            $result[(int) $projectId] = $this->beneficiaryCount($count);
-        }
-
-        return $result;
-    }
-
     private function beneficiaryCount(mixed $value): ?int
     {
         return $value === null || $value === '' ? null : (int) $value;

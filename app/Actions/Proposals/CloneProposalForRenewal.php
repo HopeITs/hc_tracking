@@ -227,13 +227,17 @@ final class CloneProposalForRenewal
 
     /**
      * The previous proposal's location rows for the renewal: city, program,
-     * responsible and centers, merged by SaveProposal onto the rows its
-     * linked projects bring. Only rows that still stand are copied: a row
-     * without a program (its request belongs to the old proposal) or in a
-     * city HR has closed is left out, and a responsible who has left is
-     * dropped, so the renewal is never refused for last year's place.
+     * responsible and centers, which SaveProposal creates as the renewal's
+     * own rows (Y-17: no project is looked up or linked). Only rows that
+     * still stand are copied: a row without a program (its request belongs
+     * to the old proposal) or in a city HR has closed is left out, and a
+     * responsible who has left is dropped, so the renewal is never refused
+     * for last year's place.
      *
-     * @return list<array{city_id: int, program_id: int, responsible_employee_id: int|null, center_ids: list<int>}>
+     * `beneficiaries` is keyed `city:program`, the pair a copied row is
+     * matched back by, and `skipped` names the places left out.
+     *
+     * @return array{rows: list<array{city_id: int, program_id: int, responsible_employee_id: int|null, center_ids: list<int>, city_wide: bool}>, beneficiaries: array<string, int|null>, skipped: list<string>}
      */
     private function locations(Proposal $previous): array
     {
