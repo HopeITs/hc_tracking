@@ -577,14 +577,28 @@ function mmEntry(MonthlyReport $report, Result $activity, ActivityStatus $status
 /**
  * @param  list<int>|null  $weeks
  */
-function mmSchedule(Result $activity, string $month, ?array $weeks = null, ?Project $project = null): ActivitySchedule
+function mmSchedule(Result $activity, string $month, ?array $weeks = null, ?ProposalLocation $row = null): ActivitySchedule
 {
     return Activity::withoutRecording(fn (): ActivitySchedule => ActivitySchedule::factory()->create([
         'result_id' => $activity->id,
-        'project_id' => $project?->id,
+        // Y-15, Y-16 (D-93): the override belongs to the location row;
+        // `project_id` is still written beside it until Y-18.
+        'proposal_location_id' => $row?->id,
+        'project_id' => $row?->project_id,
         'month' => $month,
         'weeks' => $weeks,
     ]));
+}
+
+/**
+ * The location row of the proposal carrying the project.
+ */
+function mmRow(Proposal $proposal, Project $project): ProposalLocation
+{
+    return ProposalLocation::query()
+        ->where('proposal_id', $proposal->id)
+        ->where('project_id', $project->id)
+        ->sole();
 }
 
 test('grouped mode sums counts across centers: target, cells and total', function () {
@@ -826,7 +840,7 @@ test('the Activities tab shows validated statuses, carries them forward and plan
     mmEntry(mmReport($project, '2026-04-01', MonthlyReportStatus::Submitted), $activity, ActivityStatus::Completed); // pending: ignored
     mmSchedule($activity, '2026-05-01', [1, 2]);
     mmSchedule($scheduled, '2026-06-01');
-    mmSchedule($scheduled, '2026-07-01', [4], $project); // the project's override replaces the proposal calendar
+    mmSchedule($scheduled, '2026-07-01', [4], mmRow($proposal, $project)); // the row's override replaces the proposal calendar
 
     $page = Livewire::actingAs(mmViewer())->withQueryParams(['tab' => 'activities'])->test('pages::reports.monthly-matrix');
     $board = $page->instance()->activityBoard;

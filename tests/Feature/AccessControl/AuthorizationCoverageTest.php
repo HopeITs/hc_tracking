@@ -52,6 +52,7 @@ function authorizationCoverageExemptions(): array
         'resources/views/components/desk/panels/⚡todo.blade.php:rename' => 'Saves only the signed-in user\'s own to-dos.',
         'app/Livewire/Concerns/AnnualPlans/EditsActivityPlan.php:saveMilestone' => 'ManagePlanMilestones::save() refuses anyone who may not manage the plan.',
         'app/Livewire/Concerns/AnnualPlans/EditsActivityPlan.php:deleteMilestone' => 'ManagePlanMilestones::delete() refuses anyone who may not manage the plan.',
+        'resources/views/components/proposals/⚡logframe.blade.php:deleteAssumption' => 'SaveAssumption::delete() authorizes results.update before it removes anything.',
     ];
 }
 

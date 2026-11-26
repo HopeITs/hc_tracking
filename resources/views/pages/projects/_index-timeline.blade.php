@@ -72,7 +72,7 @@
                                 <div class="grid gap-4 px-4 py-4 {{ $timelineColumns }} @4xl/directory:items-center @4xl/directory:gap-6">
                                     <div class="flex min-w-0 items-start justify-between gap-2">
                                         <div class="min-w-0">
-                                            <p class="line-clamp-2 text-sm font-semibold" title="{{ $project->name }}">{{ $project->name }}</p>
+                                            <p class="line-clamp-2 text-sm font-semibold" title="{{ $project->headline() }}">{{ $project->headline() }}</p>
                                             <p class="mt-0.5 truncate text-xs text-secondary-medium dark:text-ink-muted">{{ $project->city?->name ?? __('common.unknown_city') }} · {{ $project->program->name }}</p>
                                             <span class="dk-health {{ $healthClass }} mt-1.5">{{ $schedule['label'] }}</span>
                                         </div>

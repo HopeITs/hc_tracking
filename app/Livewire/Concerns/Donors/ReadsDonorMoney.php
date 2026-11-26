@@ -57,7 +57,10 @@ trait ReadsDonorMoney
             ->where('donor_id', $this->donorId)
             ->with([
                 'proposal:id,slug,name,internal_project_number,status',
-                'proposal.projects:id,name,status',
+                'proposal.locations:id,proposal_id,slug,status,city_id,city_wide,program_id',
+                'proposal.locations.city:id,name_en,name_ar',
+                'proposal.locations.program:id',
+                'proposal.locations.centers',
                 'transfers' => fn ($query) => $query
                     ->select(['id', 'donor_proposal_id', 'account_id', 'payment_amount', 'amount_transfered_currency', 'scheduled_date', 'transfer_date', 'fees', 'fees_currency', 'amount_received', 'exchange_rate', 'net_amount_received', 'amount_received_currency', 'receive_date', 'ar_status'])
                     ->when(! $canViewTransfers, fn ($query) => $query->whereRaw('1 = 0'))

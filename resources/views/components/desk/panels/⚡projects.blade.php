@@ -4,11 +4,12 @@ use App\Enums\MonthlyReportStatus;
 use App\Enums\RagStatus;
 use App\Livewire\Concerns\Desk\IsDeskPanel;
 use App\Models\Indicator;
-use App\Models\Project;
 use App\Models\Proposal;
+use App\Models\ProposalLocation;
 use App\Models\TransfersTracking;
 use App\Support\Desk\DeskWork;
 use App\Support\Desk\ProjectStage;
+use App\Support\Locations\MonthlyReportsAtRows;
 use Carbon\CarbonImmutable;
 use Illuminate\Support\Collection;
 use Livewire\Attributes\Computed;
@@ -23,6 +24,11 @@ use Livewire\Component;
  * validated of due monthly reports and targets on pace this year. Dates:
  * start → end with a today marker and days left. Stage and health come
  * from App\Support\Desk\ProjectStage.
+ *
+ * Y-16 (D-93): a line is a **location row**, named by its place and
+ * programme (label()) and owned by its responsible employee. A row is of
+ * exactly one proposal, so that proposal is its lead and that proposal's
+ * agreements are the row's money.
  */
 new class extends Component
 {
@@ -57,56 +63,61 @@ new class extends Component
     }
 
     /**
-     * @return Collection<int, Project>
+     * @return Collection<int, ProposalLocation>
      */
     #[Computed]
     public function projects(): Collection
     {
         $money = $this->canViewFundingPosition();
 
-        return DeskWork::projectsOnCard(auth()->user())
-            ->select(['id', 'slug', 'name', 'status', 'start_date', 'end_date', 'city_id', 'center_id', 'host_center_id', 'user_id'])
+        return DeskWork::locationsOnCard(auth()->user())
+            ->select(['id', 'proposal_id', 'slug', 'status', 'start_date', 'end_date', 'city_id', 'city_wide', 'program_id', 'project_id', 'responsible_employee_id'])
             ->with([
                 'city:id,name_en,name_ar',
-                'user:id,first_name_en,last_name_en,first_name_ar,last_name_ar',
-                'proposals:id,name,status,donor_id',
-                'proposals.donor:id,name',
-                'proposals.donorNames',
-                'monthlyReports:id,project_id,period,status,returned_at',
-                'indicators' => fn ($query) => $query->select(['id', 'project_id', 'baseline', 'target'])->whereNotNull('target'),
+                'program:id',
+                'centers',
+                'responsible',
+                'proposal:id,name,status,donor_id',
+                'proposal.donor:id,name',
+                'proposal.donorNames',
+                'indicators' => fn ($query) => $query->select(['id', 'project_id', 'proposal_location_id', 'baseline', 'target'])->whereNotNull('target'),
                 'indicators.progress:id,indicator_id,date,value',
-                ...($money ? ['proposals.donorProposals:id,proposal_id,budget,currency', 'proposals.donorProposals.transfers'] : []),
+                ...($money ? ['proposal.donorProposals:id,proposal_id,budget,currency', 'proposal.donorProposals.transfers'] : []),
             ])
-            ->orderBy('name')
-            ->get();
+            ->get()
+            ->sortBy(fn (ProposalLocation $row): string => $row->label())
+            ->values();
     }
 
     /**
-     * project id => derived line: stage 0–7, health, attention count and lens figures.
+     * row id => derived line: stage 0–7, health, attention count and lens figures.
      *
-     * @return array<int, array{stage: int, health: string, attention: int, lead: Proposal|null, donor: string, money: array{currency: string, committed: float, received: float, next: TransfersTracking|null}|null, results: array{validated: int, total: int, onPace: int, rated: int}}>
+     * @return array<int, array{stage: int, health: string, attention: int, lead: Proposal|null, donor: string, centerInactive: bool, money: array{currency: string, committed: float, received: float, next: TransfersTracking|null}|null, results: array{validated: int, total: int, onPace: int, rated: int}}>
      */
     #[Computed]
     public function lines(): array
     {
         $lines = [];
         $thisMonth = CarbonImmutable::today()->startOfMonth();
+        // One read of the monthly reports at every row's place (Y-16).
+        $reports = app(MonthlyReportsAtRows::class)->reportsByRow($this->projects, ['id', 'project_id', 'report_template_id', 'period', 'status', 'returned_at']);
 
         foreach ($this->projects as $project) {
-            $lead = ProjectStage::lead($project->proposals);
+            $project->setMonthlyReports($reports[$project->id] ?? new Collection);
+            $lead = ProjectStage::leadOf($project);
             $stage = ProjectStage::stage($project, $lead);
             $signals = ProjectStage::signals($project);
             $transfers = ProjectStage::transfers($project);
 
             $money = null;
-            $agreement = $lead?->relationLoaded('donorProposals') ? $project->proposals->flatMap->donorProposals->first() : null;
+            $agreement = $lead?->relationLoaded('donorProposals') ? $lead->donorProposals->first() : null;
 
             if ($agreement !== null) {
                 $currency = $agreement->currency->value;
                 $same = $transfers->filter(fn (TransfersTracking $transfer): bool => $transfer->amount_transfered_currency->value === $currency);
                 $money = [
                     'currency' => $currency,
-                    'committed' => (float) $project->proposals->flatMap->donorProposals->filter(fn ($link): bool => $link->currency->value === $currency)->sum('budget'),
+                    'committed' => (float) $lead->donorProposals->filter(fn ($link): bool => $link->currency->value === $currency)->sum('budget'),
                     'received' => (float) $transfers->filter(fn (TransfersTracking $transfer): bool => $transfer->state() === 'received' && $transfer->amount_received_currency?->value === $currency)->sum(fn (TransfersTracking $transfer): float => (float) ($transfer->net_amount_received ?? $transfer->amount_received ?? 0)),
                     'next' => $same->filter(fn (TransfersTracking $transfer): bool => in_array($transfer->state(), ['late', 'upcoming', 'transit'], true))->sortBy(fn (TransfersTracking $transfer): string => (string) $transfer->scheduled_date?->toDateString())->first(),
                 ];
@@ -118,10 +129,11 @@ new class extends Component
                 'attention' => $signals['late'] + $signals['soon'],
                 'lead' => $lead,
                 'donor' => $lead?->donor?->name ?? $lead?->donorNames->pluck('name')->implode(', ') ?? '',
+                'centerInactive' => $project->hasInactiveCenter(),
                 'money' => $money,
                 'results' => [
-                    'validated' => $project->monthlyReports->where('status', MonthlyReportStatus::Validated)->count(),
-                    'total' => $project->monthlyReports->filter(fn ($report): bool => $report->period->lt($thisMonth))->count(),
+                    'validated' => $project->monthlyReports()->where('status', MonthlyReportStatus::Validated)->count(),
+                    'total' => $project->monthlyReports()->filter(fn ($report): bool => $report->period->lt($thisMonth))->count(),
                     ...$this->targetsOnPace($project),
                 ],
             ];
@@ -131,12 +143,12 @@ new class extends Component
     }
 
     /**
-     * How many of the project's targets are on pace this year (green), of
+     * How many of the row's targets are on pace this year (green), of
      * those that can be rated.
      *
      * @return array{onPace: int, rated: int}
      */
-    private function targetsOnPace(Project $project): array
+    private function targetsOnPace(ProposalLocation $project): array
     {
         $today = CarbonImmutable::today();
         $rated = $project->indicators->map(fn (Indicator $indicator): ?RagStatus => $indicator->ragStatus($today->startOfYear(), $today->endOfYear()))->filter();
@@ -148,7 +160,7 @@ new class extends Component
 
 @php
     $lines = $this->lines;
-    ['hasOthers' => $hasOthers, 'shown' => $shownByDefault] = DeskWork::projectScopeOf($this->projects, auth()->user());
+    ['hasOthers' => $hasOthers, 'shown' => $shownByDefault] = DeskWork::locationScopeOf($this->projects, auth()->user());
     $base = $scope === 'mine' ? $shownByDefault : $this->projects;
     $filters = [
         'all' => fn ($project): bool => true,
@@ -206,11 +218,10 @@ new class extends Component
                 @endphp
                 <li wire:key="project-{{ $project->id }}">
                     <div class="dk-pj-n">
-                        <a href="{{ route('projects.show', $project) }}" wire:navigate title="{{ $project->name }}">@if ($line['attention'] > 0)<span class="dk-att" title="{{ trans_choice('desk.attention_items', $line['attention'], ['count' => $line['attention']]) }}">{{ $line['attention'] }}</span>@endif{{ $project->name }}</a>
+                        <a href="{{ route('projects.show', $project) }}" wire:navigate title="{{ $project->headline() }} · {{ $project->label() }}">@if ($line['attention'] > 0)<span class="dk-att" title="{{ trans_choice('desk.attention_items', $line['attention'], ['count' => $line['attention']]) }}">{{ $line['attention'] }}</span>@endif{{ $project->headline() }}</a>
                         <span class="dk-is dk-num" data-project-dates>{{ $project->start_date?->translatedFormat('M Y') ?? '—' }} → {{ $project->end_date?->translatedFormat('M Y') ?? '—' }}</span>
-                        <span class="dk-is" title="{{ $line['donor'] }}">{{ $line['donor'] !== '' ? $line['donor'] : __('desk.no_donor_yet') }} · {{ $project->user?->name ?? '—' }}</span>
-                        <x-projects.host-center-badge :project="$project" class="dk-is" />
-                        <x-projects.center-inactive-badge :project="$project" class="dk-is" />
+                        <span class="dk-is" title="{{ $line['donor'] }}">{{ $line['donor'] !== '' ? $line['donor'] : __('desk.no_donor_yet') }} · {{ $project->responsible?->name ?? '—' }}</span>
+                        <x-projects.center-inactive-badge :inactive="$line['centerInactive']" class="dk-is" />
                     </div>
                     <div class="dk-pj-l">
                         @switch($shownLens)

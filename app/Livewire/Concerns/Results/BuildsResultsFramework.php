@@ -58,9 +58,14 @@ trait BuildsResultsFramework
                 'proposal:id,name',
                 'contributesTo:id,statement',
                 'indicators' => fn ($query) => $query
-                    ->select(['id', 'name', 'result_id', 'project_id', 'measure', 'unit', 'baseline', 'target', 'frequency'])
+                    ->select(['id', 'name', 'result_id', 'project_id', 'proposal_location_id', 'measure', 'unit', 'baseline', 'target', 'frequency'])
                     ->with([
-                        'project:id,name',
+                        // Y-16 (D-93): a scoped instance names its place.
+                        'location:id,proposal_id,city_id,city_wide,program_id',
+                        'location.city:id,name_en,name_ar',
+                        'location.program:id',
+                        'location.centers',
+                        'location.proposal:id,name',
                         'progress:id,indicator_id,date,value',
                         'planIndicators' => fn ($query) => $query
                             ->select(['id', 'indicator_id', 'source_type', 'source_id', 'target', 'project_id', 'center_id', 'period'])

@@ -11,7 +11,7 @@ use App\Actions\Tasks\RescheduleTask;
 use App\Enums\TaskPriority;
 use App\Enums\TaskStatus;
 use App\Models\HrEmployee;
-use App\Models\Project;
+use App\Models\ProposalLocation;
 use App\Models\Task;
 use App\Notifications\UnreadSubjects;
 use Carbon\CarbonImmutable;
@@ -104,18 +104,18 @@ trait ManagesProgramTasks
 
     /**
      * Limit a task query to this program's tasks: raised against the program,
-     * or one of its projects.
+     * or one of its places (Y-16, D-93).
      *
      * @param  Builder<Task>  $query
      * @return Builder<Task>
      */
     protected function scopeToProgramTasks(Builder $query): Builder
     {
-        $projectIds = Project::query()->select('id')->where('program_id', $this->programId);
+        $locationIds = ProposalLocation::query()->select('id')->where('program_id', $this->programId);
 
         return $query->where(fn (Builder $query) => $query
             ->where(fn (Builder $query) => $query->where('source_type', 'program')->where('source_id', $this->programId))
-            ->orWhere(fn (Builder $query) => $query->where('source_type', 'project')->whereIn('source_id', $projectIds)));
+            ->orWhere(fn (Builder $query) => $query->where('source_type', 'proposal_location')->whereIn('source_id', $locationIds)));
     }
 
     /**
@@ -377,12 +377,14 @@ trait ManagesProgramTasks
         [$type, $id] = array_pad(explode(':', $target, 2), 2, '');
         $id = (int) $id;
 
+        // `location:ID` is the target form Y-12 established; the source it
+        // resolves to is the `proposal_location` morph key (Y-16, D-93).
         $belongs = match ($type) {
-            'project' => Project::query()->whereKey($id)->where('program_id', $this->programId)->exists(),
+            'location' => ProposalLocation::query()->whereKey($id)->where('program_id', $this->programId)->exists(),
             default => false,
         };
 
-        return $belongs ? ['type' => $type, 'id' => $id] : null;
+        return $belongs ? ['type' => 'proposal_location', 'id' => $id] : null;
     }
 
     /**

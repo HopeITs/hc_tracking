@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace App\Livewire\Concerns\Projects;
 
 use App\Enums\MediaCollection;
-use App\Models\Project;
+use App\Models\ProposalLocation;
 use Carbon\CarbonImmutable;
 use Illuminate\Pagination\LengthAwarePaginator;
 use Illuminate\Support\Facades\DB;
@@ -19,7 +19,7 @@ use Livewire\Attributes\Computed;
  * Used by projects/index only. It needs applyFilters() from
  * FiltersProjectDirectory, and the page's `projects()` list.
  *
- * @property-read LengthAwarePaginator<int, Project> $projects  #[Computed] projects() on the page
+ * @property-read LengthAwarePaginator<int, ProposalLocation> $projects  #[Computed] projects() on the page
  */
 trait SummarisesProjectFunding
 {
@@ -52,11 +52,11 @@ trait SummarisesProjectFunding
     }
 
     /**
-     * The project's delivery progress, or null when nothing measures it.
-     * Projects carry no progress measure since milestones were removed, so
-     * every project reads as unmeasured.
+     * The row's delivery progress, or null when nothing measures it.
+     * A place carries no progress measure since milestones were removed, so
+     * every row reads as unmeasured.
      */
-    protected function progressFor(Project $project): ?float
+    protected function progressFor(ProposalLocation $project): ?float
     {
         return null;
     }
@@ -64,9 +64,9 @@ trait SummarisesProjectFunding
     /**
      * Committed funding for the filtered portfolio, per currency.
      *
-     * Every proposal in this database is shared by two or three projects, so
-     * the total is taken over the DISTINCT proposals the filtered set reaches.
-     * Adding up a per-project figure instead overcounts by roughly 2.25x.
+     * A proposal covers several places (D-93), so the total is taken over the
+     * DISTINCT proposals the filtered rows reach. Adding up a per-row figure
+     * instead overcounts by roughly the number of places each proposal has.
      *
      * Currencies are never added together: USD, EUR and SYP have no conversion
      * anywhere in this system.
@@ -80,13 +80,13 @@ trait SummarisesProjectFunding
             return [];
         }
 
-        $projectIds = $this->applyFilters(Project::query())->toBase()->select('projects.id');
+        $rowIds = $this->applyFilters(ProposalLocation::query())->toBase()->select('proposal_locations.id');
 
         return DB::table('donor_proposal')
             ->whereIn('proposal_id', fn ($query) => $query
                 ->select('proposal_id')
-                ->from('project_proposal')
-                ->whereIn('project_id', $projectIds))
+                ->from('proposal_locations')
+                ->whereIn('id', $rowIds))
             ->groupBy('currency')
             ->selectRaw('currency, sum(budget) as total')
             ->pluck('total', 'currency')
@@ -100,15 +100,15 @@ trait SummarisesProjectFunding
     #[Computed]
     public function committedBeneficiaries(): int
     {
-        return (int) $this->applyFilters(Project::query())->sum('target_beneficiaries');
+        return (int) $this->applyFilters(ProposalLocation::query())->sum('proposal_locations.target_beneficiaries');
     }
 
     /**
-     * The funding envelope of every project on the visible page, in one read.
+     * The funding envelope of every row on the visible page, in one read.
      *
-     * A shared proposal's budget is not attributable to one project, so the
-     * card reports the envelope covering it and says how many other projects
-     * the same proposal covers.
+     * A proposal's budget is not attributable to one place, so the row
+     * reports the envelope covering it and says how many other places the
+     * same proposal covers (D-93).
      *
      * @return array<int, array{currencies: array<string, float>, donors: list<string>, proposals: list<string>, shared: int}>
      */
@@ -123,14 +123,14 @@ trait SummarisesProjectFunding
 
         $canViewMoney = $this->canViewMoney();
 
-        $rows = DB::table('project_proposal')
-            ->join('donor_proposal', 'donor_proposal.proposal_id', '=', 'project_proposal.proposal_id')
+        $rows = DB::table('proposal_locations')
+            ->join('donor_proposal', 'donor_proposal.proposal_id', '=', 'proposal_locations.proposal_id')
             ->join('donors', 'donors.id', '=', 'donor_proposal.donor_id')
-            ->join('proposals', 'proposals.id', '=', 'project_proposal.proposal_id')
-            ->whereIn('project_proposal.project_id', $visibleIds)
+            ->join('proposals', 'proposals.id', '=', 'proposal_locations.proposal_id')
+            ->whereIn('proposal_locations.id', $visibleIds)
             ->select([
-                'project_proposal.project_id',
-                'project_proposal.proposal_id',
+                'proposal_locations.id as project_id',
+                'proposal_locations.proposal_id',
                 'donors.name as donor_name',
                 'proposals.name as proposal_name',
             ])
@@ -139,9 +139,9 @@ trait SummarisesProjectFunding
                 'donor_proposal.budget',
             ]))
             ->selectSub(
-                DB::table('project_proposal as shares')
+                DB::table('proposal_locations as shares')
                     ->selectRaw('count(*)')
-                    ->whereColumn('shares.proposal_id', 'project_proposal.proposal_id'),
+                    ->whereColumn('shares.proposal_id', 'proposal_locations.proposal_id'),
                 'share_count',
             )
             ->get();
@@ -174,7 +174,7 @@ trait SummarisesProjectFunding
     /**
      * The date range the timeline plots every bar against.
      *
-     * It is read from the projects already on the page, so switching to the
+     * It is read from the rows already on the page, so switching to the
      * timeline costs no extra query.
      *
      * @return array{start: CarbonImmutable, end: CarbonImmutable}|null
@@ -184,7 +184,7 @@ trait SummarisesProjectFunding
     {
         $dates = $this->projects
             ->getCollection()
-            ->flatMap(fn (Project $project): array => [$project->start_date, $project->end_date])
+            ->flatMap(fn (ProposalLocation $project): array => [$project->start_date, $project->end_date])
             ->filter()
             ->values();
 

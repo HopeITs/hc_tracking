@@ -16,19 +16,17 @@ use Carbon\CarbonImmutable;
 final class ProposalFramework
 {
     /**
-     * The distinct programs of the proposal's linked projects, ascending.
+     * The distinct programs of the proposal's places, ascending (Y-16, D-93).
+     *
+     * The same answer `ActivityPlanScope::programIdsOf()` gives, which is the
+     * point: one proposal, one list of programs, read from the rows that are
+     * its places rather than from the projects they carry.
      *
      * @return list<int>
      */
     public static function programIds(Proposal $proposal): array
     {
-        return array_values($proposal->projects()
-            ->whereNotNull('projects.program_id')
-            ->distinct()
-            ->orderBy('projects.program_id')
-            ->pluck('projects.program_id')
-            ->map(fn (int|string $programId): int => (int) $programId)
-            ->all());
+        return ActivityPlanScope::programIdsOf($proposal);
     }
 
     /**

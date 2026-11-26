@@ -263,7 +263,10 @@ trait ReadsAgreementRegister
             ->with([
                 'donor:id,name',
                 'proposal:id,name,internal_project_number,status',
-                'proposal.projects' => fn ($query) => $query->select(['projects.id', 'projects.name'])->orderBy('projects.name'),
+                // Y-16 (D-93): the places the proposal pays for, named by it.
+                'proposal.locations' => fn ($query) => $query->select(['proposal_locations.id', 'proposal_locations.proposal_id', 'proposal_locations.slug', 'proposal_locations.city_id', 'proposal_locations.city_wide', 'proposal_locations.program_id'])->orderBy('proposal_locations.id'),
+                'proposal.locations.city:id,name_en,name_ar',
+                'proposal.locations.centers',
                 'transfers' => fn ($query) => $query
                     ->select(['id', 'donor_proposal_id', 'account_id', 'payment_amount', 'amount_transfered_currency', 'scheduled_date', 'transfer_date', 'fees', 'fees_currency', 'amount_received', 'net_amount_received', 'amount_received_currency', 'receive_date', 'ar_status'])
                     ->orderByRaw('scheduled_date is null, scheduled_date')

@@ -194,6 +194,8 @@ test('asked by me lists other people who still owe a review on the viewer\'s pro
     $project = Project::factory()->create(['user_id' => $ownerId, 'name' => 'Clean Water Homs']);
     $proposal = Proposal::factory()->create(['name' => 'Water Access', 'status' => ProposalStatus::ConceptNoteReview]);
     $proposal->projects()->attach($project->id);
+    // Y-16 (D-93): "asked by me" finds the viewer through the places they run.
+    proposalRowForProject($proposal, $project)->update(['responsible_employee_id' => $ownerId]);
     $late = insertHrEmployee(firstNameEn: 'Rana', lastNameEn: 'Late');
     $done = insertHrEmployee(firstNameEn: 'Sami', lastNameEn: 'Done');
     ProposalReviewer::factory()->create(['proposal_id' => $proposal->id, 'stage' => ReviewStage::ConceptNote, 'employee_id' => $late]);

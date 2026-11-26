@@ -68,7 +68,7 @@
                     >
                         <option value="program">{{ $places['program']['name'] }} · {{ __('tasks.move_program_itself') }}</option>
                         @foreach ($places['projects'] as $project)
-                            <option value="project:{{ $project['id'] }}">{{ $project['name'] }}</option>
+                            <option value="location:{{ $project['id'] }}">{{ $project['name'] }}</option>
                         @endforeach
                     </x-ui.form-select>
                 @elseif ($sourceLabel !== null)

@@ -17,7 +17,11 @@ function draftLinkedTo(ProposalStatus $status, bool $ownerAcknowledged = false):
         $project->currentAssignment('user_id')->forceFill(['status' => AssignmentStatus::Acknowledged])->save();
     }
 
-    Proposal::factory()->create(['status' => $status])->projects()->attach($project->id, ['target_beneficiaries' => 10]);
+    $proposal = Proposal::factory()->create(['status' => $status]);
+    $proposal->projects()->attach($project->id, ['target_beneficiaries' => 10]);
+    // Y-16 (D-93): the badge reads the place, and a place is of exactly one
+    // proposal — the one whose status this fixture is about.
+    rowFor($project, $proposal);
 
     return $project;
 }
@@ -43,12 +47,13 @@ test('the detail page and the directory show the funding badge in English and Ar
     $waiting = draftLinkedTo(ProposalStatus::Approved);
     $user = userWithRole('General Manager');
 
-    Livewire::actingAs($user)->test('pages::projects.show', ['project' => $waiting])
+    Livewire::actingAs($user)->test('pages::projects.show', ['project' => rowFor($waiting)->slug])
         ->assertSeeHtml('data-test="funding-badge-awaiting_owner"')
         ->assertSee(__('projects.awaiting_owner_acknowledgement'));
 
     $awaitingFunding = draftLinkedTo(ProposalStatus::Submitted);
     $funded = Project::factory()->approved()->create();
+    rowFor($funded);
 
     Livewire::actingAs($user)->test('pages::projects.index')
         ->assertSee(__('projects.awaiting_owner_acknowledgement'))

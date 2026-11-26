@@ -15,6 +15,7 @@ use App\Models\HrDepartment;
 use App\Models\MonthlyReport;
 use App\Models\Project;
 use App\Models\Proposal;
+use App\Models\ProposalLocation;
 use App\Models\Report;
 use App\Models\ReportTemplate;
 use App\Models\Task;
@@ -364,23 +365,27 @@ final class DeadlineCatalog
     }
 
     /**
+     * The end date of every open place (Y-16, D-93): the deadline is the
+     * row's, named after its proposal, and held by its responsible employee.
+     *
      * @return list<DeadlineItem>
      */
     private function projects(string $limit): array
     {
         $open = array_map(fn (ProjectStatus $status): string => $status->value, array_filter(ProjectStatus::cases(), fn (ProjectStatus $status): bool => $status->isOpen()));
 
-        $projects = Project::query()
+        $rows = ProposalLocation::query()
             ->notPaused()
-            ->whereIn('status', $open)
+            ->whereIn('proposal_locations.status', $open)
             ->whereNotNull('end_date')
             ->whereDate('end_date', '<=', $limit)
-            ->get(['id', 'name', 'end_date', 'user_id']);
+            ->with(['centers', 'city:id,name_en,name_ar', 'program:id', 'proposal:id,name'])
+            ->get(['id', 'proposal_id', 'project_id', 'city_id', 'city_wide', 'program_id', 'end_date', 'responsible_employee_id']);
 
-        $users = $this->employees->usersFor($projects->pluck('user_id')->map(fn ($id): int => (int) $id)->unique()->values()->all());
+        $users = $this->employees->usersFor($rows->pluck('responsible_employee_id')->filter()->map(fn ($id): int => (int) $id)->unique()->values()->all());
 
-        return array_values($projects->map(fn (Project $project): DeadlineItem => new DeadlineItem(
-            'project', $project->id, 'projects', $project->name, $project->end_date, $this->unique([$users[(int) $project->user_id] ?? null]),
+        return array_values($rows->map(fn (ProposalLocation $row): DeadlineItem => new DeadlineItem(
+            'proposal_location', $row->id, 'projects', $row->headline(), $row->end_date, $this->unique([$users[(int) $row->responsible_employee_id] ?? null]),
         ))->all());
     }
 

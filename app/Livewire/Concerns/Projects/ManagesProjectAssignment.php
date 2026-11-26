@@ -20,7 +20,7 @@ use Livewire\Attributes\On;
  * Used by projects/show only. The page provides projectId; mount() opens the
  * dialog when the page is reached with ?respond=reject.
  *
- * @property int $projectId
+ * @property int $locationId
  * @property-read Assignment|null $ownerAssignment  #[Computed] ownerAssignment()
  */
 trait ManagesProjectAssignment
@@ -38,7 +38,7 @@ trait ManagesProjectAssignment
     #[Computed]
     public function ownerAssignment(): ?Assignment
     {
-        return Project::query()->findOrFail($this->projectId)->currentAssignment('user_id')?->load('assigner');
+        return $this->writableProject()->currentAssignment('user_id')?->load('assigner');
     }
 
     public function openAssignmentModal(string $mode): void

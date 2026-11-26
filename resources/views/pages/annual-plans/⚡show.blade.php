@@ -31,6 +31,7 @@ new #[Layout('layouts::desk'), Title('titles.annual_plan')] class extends Compon
     public function mount(AnnualPlan $annualPlan): void
     {
         $this->annualPlanId = $annualPlan->id;
+        $this->adoptLegacyChainCenter();
     }
 
     #[Computed]

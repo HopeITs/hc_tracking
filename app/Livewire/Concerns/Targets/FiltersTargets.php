@@ -9,8 +9,8 @@ use App\Models\Donor;
 use App\Models\Indicator;
 use App\Models\PlanIndicator;
 use App\Models\Program;
-use App\Models\Project;
 use App\Models\Proposal;
+use App\Models\ProposalLocation;
 use App\Support\Like;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 use Illuminate\Database\Eloquent\Builder;
@@ -25,13 +25,17 @@ use Livewire\Attributes\Computed;
  *
  * Used by targets/index only. The page keeps the #[Url] filter properties.
  * updatedTargetSourceType() resets the form's source and calls
- * syncFormProject() from NarrowsTargetFormOptions; ReadsTargets loads the visible
- * targets through matchingTargets() and resultPage. The page provides
+ * syncFormLocation() from NarrowsTargetFormOptions; ReadsTargets loads the
+ * visible targets through matchingTargets() and resultPage. The page provides
  * resetPage() (WithPagination).
+ *
+ * Y-16 (D-93): the place filter is the location row. Its URL name is
+ * `location`; an old `?project=<id>` link is answered by the row that took
+ * that project over (ProjectSuccessor, D-94), translated once on mount.
  *
  * @property string $search
  * @property string $sourceType
- * @property string $project
+ * @property string $location
  * @property string $period
  * @property string $status
  * @property string $donor
@@ -41,7 +45,6 @@ use Livewire\Attributes\Computed;
  * @property string $result
  * @property string $targetSourceId
  * @property-read array<int, array{id: int, label: string}> $sourceOptions
- * @property-read Collection<int, Project> $formProjectOptions
  */
 trait FiltersTargets
 {
@@ -67,7 +70,7 @@ trait FiltersTargets
         $this->resetPage();
     }
 
-    public function updatedProject(): void
+    public function updatedLocation(): void
     {
         $this->resetPage();
     }
@@ -108,15 +111,15 @@ trait FiltersTargets
     public function updatedTargetSourceType(): void
     {
         $this->targetSourceId = '';
-        unset($this->sourceOptions, $this->formProjectOptions);
-        $this->syncFormProject();
+        unset($this->sourceOptions);
+        $this->syncFormLocation();
     }
 
     public function clearFilters(): void
     {
         $this->search = '';
         $this->sourceType = '';
-        $this->project = '';
+        $this->location = '';
         $this->period = '';
         $this->status = '';
         $this->donor = '';
@@ -163,19 +166,19 @@ trait FiltersTargets
             ->when($this->result !== '', fn ($query) => $query
                 ->whereIn('indicator_id', Indicator::query()->select('id')->where('result_id', (int) $this->result)))
             ->when($this->sourceType !== '', fn ($query) => $query->where('source_type', $this->sourceType))
-            ->when($this->project === 'none', fn ($query) => $query->whereNull('project_id'))
+            ->when($this->location === 'none', fn ($query) => $query->whereNull('proposal_location_id'))
             ->when(
-                $this->project !== '' && $this->project !== 'none',
-                fn ($query) => $query->where('project_id', (int) $this->project)
+                $this->location !== '' && $this->location !== 'none',
+                fn ($query) => $query->where('proposal_location_id', (int) $this->location)
             )
             ->when($this->period !== '', fn ($query) => $query->where('period', $this->period))
             // A donor funds proposals, so only proposal targets can carry one.
             ->when($this->donor !== '', fn ($query) => $query
                 ->where('source_type', 'proposal')
                 ->whereIn('source_id', DB::table('donor_proposal')->select('proposal_id')->where('donor_id', (int) $this->donor)))
-            // A program owns a target through its annual plan, the project delivering
-            // it, or the result it measures — so an organisation-wide proposal target
-            // still shows under the program whose logframe it serves.
+            // A program owns a target through its annual plan, the location row
+            // carrying it, or the result it measures — so an organisation-wide
+            // proposal target still shows under the program its logframe serves.
             ->when($this->program !== '', fn ($query) => $query->where(function ($query): void {
                 $programId = (int) $this->program;
 
@@ -183,7 +186,7 @@ trait FiltersTargets
                     ->where(fn ($query) => $query
                         ->where('source_type', 'annual_plan')
                         ->whereIn('source_id', AnnualPlan::query()->select('id')->where('program_id', $programId)))
-                    ->orWhereIn('project_id', Project::query()->select('id')->where('program_id', $programId))
+                    ->orWhereIn('proposal_location_id', ProposalLocation::query()->select('id')->where('program_id', $programId))
                     ->orWhereIn('indicator_id', Indicator::query()->select('indicators.id')
                         ->join('results', 'results.id', '=', 'indicators.result_id')
                         ->where('results.program_id', $programId));

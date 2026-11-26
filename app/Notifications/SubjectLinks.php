@@ -10,12 +10,13 @@ use App\Models\DonorProposal;
 use App\Models\DonorReport;
 use App\Models\MonthlyReport;
 use App\Models\Program;
-use App\Models\Project;
 use App\Models\Proposal;
+use App\Models\ProposalLocation;
 use App\Models\Report;
 use App\Models\Strategy;
 use App\Models\Task;
 use App\Models\UserNotification;
+use App\Support\Locations\ProjectSuccessor;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\Relation;
 
@@ -59,7 +60,12 @@ final class SubjectLinks
     {
         return match ($type) {
             'task' => $this->showRoute('tasks.show', Task::class, $id),
-            'project' => $this->showRoute('projects.show', Project::class, $id),
+            // Y-16 (D-93): the page is the row's. A notification stored before
+            // the backfill still names the project, which ProjectSuccessor
+            // answers with the row that took it over (D-94); Y-18 freezes
+            // those in `project_redirects`.
+            'proposal_location' => $this->showRoute('projects.show', ProposalLocation::class, $id),
+            'project' => $this->successorRoute($id),
             'program' => $this->showRoute('programs.show', Program::class, $id),
             'annual_plan' => $this->showRoute('annual-plans.show', AnnualPlan::class, $id),
             'strategy' => $this->showRoute('strategies.show', Strategy::class, $id),
@@ -128,5 +134,16 @@ final class SubjectLinks
         $record = $modelClass::query()->find($id);
 
         return $record === null ? null : route($routeName, $record);
+    }
+
+    /**
+     * The page of the row that took a project over (Y-16, D-94), for a
+     * notification or activity stored before the backfill re-pointed it.
+     */
+    private function successorRoute(int $projectId): ?string
+    {
+        $row = app(ProjectSuccessor::class)->rowFor($projectId);
+
+        return $row === null ? null : route('projects.show', $row);
     }
 }

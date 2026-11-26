@@ -9,13 +9,13 @@ use App\Models\Project;
 use Illuminate\Database\Eloquent\Relations\Relation;
 
 /**
- * Records hanging off a project (indicators, report templates): the project
- * owner is direct.
+ * Records hanging off a project (report templates): the project owner is
+ * direct.
  *
- * Risks left for LocationOwnedRecipients in Y-13. The subjects still here —
- * `plan_indicators` and `report_templates` — carry no `proposal_location_id`
- * until Y-16 moves them, so they keep reading the project; this class goes
- * with the `projects` table in Y-18.
+ * Risks left for LocationOwnedRecipients in Y-13 and targets in Y-16. A
+ * report template names a place, not a row (D-75), and keeps `project_id`
+ * until Y-18, so it still reads the project; this class goes with the
+ * `projects` table then.
  */
 abstract class ProjectOwnedRecipients extends ModuleRecipients
 {

@@ -9,7 +9,7 @@ use App\Enums\NotificationPriority;
 use App\Enums\ProjectStatus;
 use App\Models\Activity;
 use App\Models\Program;
-use App\Models\Project;
+use App\Models\ProposalLocation;
 use App\Notifications\EmployeeRecipients;
 use App\Notifications\EventCatalog;
 use App\Notifications\Recipients\OversightRecipients;
@@ -18,10 +18,16 @@ use Illuminate\Database\Eloquent\Collection;
 
 /**
  * `project.started` / `project.ended` (contracts.md §15.2): an active
- * project's start and end dates, counted in the project's own working week
- * (D-22). A date on a non-working day goes out the next working day; each run
- * catches up every date since the previous working day. The stage is the
- * date, so a moved date re-arms the notice.
+ * place's start and end dates, counted in its own working week (D-22). A date
+ * on a non-working day goes out the next working day; each run catches up
+ * every date since the previous working day. The stage is the date, so a
+ * moved date re-arms the notice.
+ *
+ * Y-16 (D-93): the subject is a **location row**, and the event keys keep
+ * their names. Two rows may stand at one place (D-77), where a project used
+ * to produce one notice: a place gets one notice per person and day, so the
+ * place and the date are the ledger's stage and the first row of the place
+ * is the subject.
  */
 final class ProjectDatesScanner implements Scanner
 {
@@ -55,41 +61,54 @@ final class ProjectDatesScanner implements Scanner
             return 0;
         }
 
-        $projects = $this->projectsDatedAround($today, $events);
-        $hits = $this->hits($projects, $today, $events);
+        $rows = $this->rowsDatedAround($today, $events);
+        $hits = $this->hits($rows, $today, $events);
 
         if ($hits === []) {
             return 0;
         }
 
-        $activatedOn = $this->activationDays(array_values(array_unique(array_column($hits, 'projectId'))));
-        $direct = $this->directUserIds($projects);
+        $activatedOn = $this->activationDays(array_values(array_unique(array_column($hits, 'locationId'))));
+        $direct = $this->directUserIds($rows);
+        $seen = [];
         $sent = 0;
 
         foreach ($hits as $hit) {
-            /** @var Project $project */
-            $project = $projects->find($hit['projectId']);
+            /** @var ProposalLocation $row */
+            $row = $rows->find($hit['locationId']);
             $date = $hit['date'];
 
-            if ($hit['key'] === 'project.started' && ($activatedOn[$project->id] ?? null)?->gt($date)) {
+            if ($hit['key'] === 'project.started' && ($activatedOn[$row->id] ?? null)?->gt($date)) {
                 continue;
             }
 
+            // One notice per place, key and day (D-77): the rows of one place
+            // are the same work to the people hearing about it.
+            $placeKey = $row->place()->key().'|'.$hit['key'].'|'.$date->toDateString();
+
+            if (isset($seen[$placeKey])) {
+                continue;
+            }
+
+            $seen[$placeKey] = true;
+
             [, $rule, $message] = self::Events[$hit['key']];
             $oversight = $events[$hit['key']] === EventImportance::Immediate
-                ? $this->oversight->userIdsFor($hit['key'], $project->id)
+                ? $this->oversight->userIdsFor($hit['key'], $row->id)
                 : [];
 
             $payload = $this->dispatcher->payload(
                 'projects',
                 NotificationPriority::Info,
                 $message,
-                ['subject' => $project->name, 'date' => ['date' => $date->toDateString()]],
-                'project',
-                $project->id,
+                ['subject' => $row->headline(), 'date' => ['date' => $date->toDateString()]],
+                'proposal_location',
+                $row->id,
             );
 
-            $sent += $this->dispatcher->send($rule, $date->toDateString(), $payload, $direct[$project->id] ?? [], $oversight);
+            // The stage carries the place, so the second row of a place finds
+            // the day already claimed even across runs.
+            $sent += $this->dispatcher->send($rule, $row->place()->key().':'.$date->toDateString(), $payload, $direct[$row->id] ?? [], $oversight);
         }
 
         return $sent;
@@ -115,38 +134,39 @@ final class ProjectDatesScanner implements Scanner
 
     /**
      * @param  array<string, EventImportance>  $events
-     * @return Collection<int, Project>
+     * @return Collection<int, ProposalLocation>
      */
-    private function projectsDatedAround(CarbonImmutable $today, array $events): Collection
+    private function rowsDatedAround(CarbonImmutable $today, array $events): Collection
     {
         $from = $today->subDays(self::LookbackDays)->toDateString();
         $to = $today->toDateString();
 
-        return Project::query()
+        return ProposalLocation::query()
             ->notPaused()
-            ->where('status', ProjectStatus::Active->value)
+            ->where('proposal_locations.status', ProjectStatus::Active->value)
             ->where(function ($query) use ($events, $from, $to): void {
                 foreach (array_keys($events) as $key) {
-                    $query->orWhereBetween(self::Events[$key][0], [$from, $to]);
+                    $query->orWhereBetween('proposal_locations.'.self::Events[$key][0], [$from, $to]);
                 }
             })
-            ->get(['id', 'name', 'user_id', 'program_id', 'start_date', 'end_date', 'working_days']);
+            ->with(['centers', 'city:id,name_en,name_ar', 'program:id', 'proposal:id,name'])
+            ->get(['id', 'proposal_id', 'project_id', 'city_id', 'city_wide', 'program_id', 'responsible_employee_id', 'start_date', 'end_date', 'working_days']);
     }
 
     /**
-     * The dates that fall in each project's window: after its previous
-     * working day, up to today, and only when today is one of its working days.
+     * The dates that fall in each row's window: after its previous working
+     * day, up to today, and only when today is one of its working days.
      *
-     * @param  Collection<int, Project>  $projects
+     * @param  Collection<int, ProposalLocation>  $rows
      * @param  array<string, EventImportance>  $events
-     * @return list<array{projectId: int, key: string, date: CarbonImmutable}>
+     * @return list<array{locationId: int, key: string, date: CarbonImmutable}>
      */
-    private function hits(Collection $projects, CarbonImmutable $today, array $events): array
+    private function hits(Collection $rows, CarbonImmutable $today, array $events): array
     {
         $hits = [];
 
-        foreach ($projects as $project) {
-            $calendar = $this->calendar->forProject($project);
+        foreach ($rows as $row) {
+            $calendar = $this->calendar->forDays($row->working_days);
 
             if (! $calendar->isWorkingDay($today)) {
                 continue;
@@ -155,11 +175,11 @@ final class ProjectDatesScanner implements Scanner
             $previous = $calendar->lastWorkingDayOnOrBefore($today->subDay());
 
             foreach (array_keys($events) as $key) {
-                $value = $project->{self::Events[$key][0]};
+                $value = $row->{self::Events[$key][0]};
                 $date = $value === null ? null : CarbonImmutable::parse($value)->startOfDay();
 
                 if ($date !== null && $date->gt($previous) && $date->lte($today)) {
-                    $hits[] = ['projectId' => $project->id, 'key' => $key, 'date' => $date];
+                    $hits[] = ['locationId' => $row->id, 'key' => $key, 'date' => $date];
                 }
             }
         }
@@ -168,17 +188,17 @@ final class ProjectDatesScanner implements Scanner
     }
 
     /**
-     * The day each project last became active: a `project.activated`
-     * activity (T08) or a status change to active.
+     * The day each place last became active: a `project.activated` activity
+     * (T08) or a status change to active, recorded against the row.
      *
-     * @param  list<int>  $projectIds
+     * @param  list<int>  $locationIds
      * @return array<int, CarbonImmutable>
      */
-    private function activationDays(array $projectIds): array
+    private function activationDays(array $locationIds): array
     {
         return Activity::query()
-            ->where('subject_type', 'project')
-            ->whereIn('subject_id', $projectIds)
+            ->where('subject_type', 'proposal_location')
+            ->whereIn('subject_id', $locationIds)
             ->where(fn ($query) => $query
                 ->where('event', 'project.activated')
                 ->orWhere(fn ($query) => $query->where('event', 'project.status_changed')->where('changes->status[1]', ProjectStatus::Active->value)))
@@ -186,29 +206,30 @@ final class ProjectDatesScanner implements Scanner
             ->selectRaw('subject_id, max(created_at) as activated_at')
             ->groupBy('subject_id')
             ->pluck('activated_at', 'subject_id')
-            ->mapWithKeys(fn (string $activatedAt, int|string $projectId): array => [(int) $projectId => CarbonImmutable::parse($activatedAt)->startOfDay()])
+            ->mapWithKeys(fn (string $activatedAt, int|string $locationId): array => [(int) $locationId => CarbonImmutable::parse($activatedAt)->startOfDay()])
             ->all();
     }
 
     /**
-     * Owner and program manager of each project, as users, in two queries.
+     * Responsible employee and program manager of each row, as users, in two
+     * queries.
      *
-     * @param  Collection<int, Project>  $projects
-     * @return array<int, list<int>> project id => user ids
+     * @param  Collection<int, ProposalLocation>  $rows
+     * @return array<int, list<int>> row id => user ids
      */
-    private function directUserIds(Collection $projects): array
+    private function directUserIds(Collection $rows): array
     {
         $managers = Program::query()
-            ->whereIn('id', $projects->pluck('program_id')->unique()->all())
+            ->whereIn('id', $rows->pluck('program_id')->filter()->unique()->all())
             ->pluck('manager_id', 'id')
             ->all();
 
         $employeeIds = [];
 
-        foreach ($projects as $project) {
-            $employeeIds[$project->id] = array_values(array_filter([
-                $project->user_id,
-                isset($managers[$project->program_id]) ? (int) $managers[$project->program_id] : null,
+        foreach ($rows as $row) {
+            $employeeIds[$row->id] = array_values(array_filter([
+                $row->responsible_employee_id,
+                isset($managers[$row->program_id]) ? (int) $managers[$row->program_id] : null,
             ]));
         }
 

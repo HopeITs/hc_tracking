@@ -9,9 +9,12 @@ use App\Concerns\HasSlug;
 use App\Concerns\RecordsParentActivity;
 use App\Enums\AssignmentStatus;
 use App\Enums\ProjectStatus;
+use App\Enums\ProposalStatus;
 use App\Notifications\TracksActivity;
 use App\Observers\MediaOwnerObserver;
 use App\Observers\ProposalLocationObserver;
+use App\Support\Locations\MonthlyReportsAtRows;
+use App\Support\Reporting\ReportPlace;
 use Carbon\CarbonImmutable;
 use Database\Factories\ProposalLocationFactory;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
@@ -26,6 +29,7 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Database\Eloquent\Relations\MorphMany;
 use Illuminate\Database\Eloquent\Relations\MorphOne;
+use Illuminate\Support\Collection;
 
 /**
  * One location row of a proposal (contracts.md §7, W-34a, D-62): a city, and
@@ -183,6 +187,20 @@ class ProposalLocation extends Model
      *
      * @return HasMany<ProposalLocationCenter, $this>
      */
+    /**
+     * The HR employee responsible for this row (Y-16): the twin of
+     * `Project::user()`, which the Projects screen read as its owner.
+     *
+     * A plain lookup against the read-only HR connection, like every other
+     * HR link: no join crosses the two databases.
+     *
+     * @return BelongsTo<HrEmployee, $this>
+     */
+    public function responsible(): BelongsTo
+    {
+        return $this->belongsTo(HrEmployee::class, 'responsible_employee_id');
+    }
+
     public function centers(): HasMany
     {
         return $this->hasMany(ProposalLocationCenter::class)->orderBy('center_id');
@@ -217,6 +235,89 @@ class ProposalLocation extends Model
      *
      * @return HasMany<PlanIndicator, $this>
      */
+    /**
+     * Whether this row's first centre is one HR has deactivated (D-66), the
+     * twin of `Project::hasInactiveCenter()`. Read from the in-memory HR
+     * lookup, so a page of rows costs no query per row. A city-wide row is
+     * field work (D-88) and has no centre to be inactive.
+     */
+    public function hasInactiveCenter(): bool
+    {
+        $centerId = $this->centerIds()[0] ?? null;
+
+        if ($centerId === null) {
+            return false;
+        }
+
+        try {
+            return HrCenter::remembered($centerId)?->is_active === false;
+        } catch (QueryException) {
+            return false;
+        }
+    }
+
+    /**
+     * The project indicator instances scoped to this row (Y-16, D-93).
+     *
+     * An instance with no row is shared by the proposal's rows; the project
+     * page adds those separately (ReadsProjectDelivery), so this relation is
+     * the row's own set.
+     *
+     * @return HasMany<Indicator, $this>
+     */
+    public function indicators(): HasMany
+    {
+        return $this->hasMany(Indicator::class, 'proposal_location_id');
+    }
+
+    /**
+     * The monthly reports of this row's place, oldest first (Y-16).
+     *
+     * Not a relation: a monthly report belongs to a **template**, and a
+     * template reaches a row only by matching its place, which no foreign key
+     * expresses (App\Support\Locations\MonthlyReportsAtRows). Joining on the
+     * project instead would hand the same report to every row of that project,
+     * and two proposals may share a place (D-77).
+     *
+     * A list of rows should fill this in one read with setMonthlyReports();
+     * a single row may read it here.
+     *
+     * @return Collection<int, MonthlyReport>
+     */
+    /**
+     * The reports of this row's place once read; see monthlyReports().
+     *
+     * @var Collection<int, MonthlyReport>|null
+     */
+    protected ?Collection $monthlyReportsAtPlace = null;
+
+    public function monthlyReports(): Collection
+    {
+        return $this->monthlyReportsAtPlace ??= app(MonthlyReportsAtRows::class)->forRow($this);
+    }
+
+    /**
+     * Hand the row the reports a list already read for it (one query for the
+     * page instead of two per row).
+     *
+     * @param  Collection<int, MonthlyReport>  $reports
+     */
+    public function setMonthlyReports(Collection $reports): void
+    {
+        $this->monthlyReportsAtPlace = $reports;
+    }
+
+    /**
+     * The register risks raised against this row (Y-13, D-93). Logframe risks
+     * belong to a proposal and are not here.
+     *
+     * @return HasMany<Risk, $this>
+     */
+    public function risks(): HasMany
+    {
+        return $this->hasMany(Risk::class, 'proposal_location_id');
+    }
+
     public function targets(): HasMany
     {
         return $this->hasMany(PlanIndicator::class, 'proposal_location_id');
@@ -291,6 +392,32 @@ class ProposalLocation extends Model
     }
 
     /**
+     * The owner assignment this place stands for, wherever it is filed.
+     *
+     * The place is what a person is put in charge of (Y-16, D-93), but the
+     * owner column still lives on the project until Y-18, and so does the
+     * assignment raised when it changes. A place that holds none of its own
+     * answers with the project's, so the banner, the bell and "mark as seen"
+     * all see the same pending request.
+     */
+    public function currentOwnerAssignment(): ?Assignment
+    {
+        $own = $this->currentAssignment('responsible_employee_id');
+
+        if ($own !== null || $this->project_id === null) {
+            return $own;
+        }
+
+        return Assignment::query()
+            ->current()
+            ->where('assignable_type', 'project')
+            ->where('assignable_id', $this->project_id)
+            ->where('field', 'user_id')
+            ->latest('id')
+            ->first();
+    }
+
+    /**
      * Where the row is, for every list and card: the program, the city and
      * the centers it runs from, or "Field work" for a city-wide row (D-88).
      * The twin of `Project::locationLabel()` and the project's name.
@@ -317,11 +444,120 @@ class ProposalLocation extends Model
     }
 
     /**
+     * The place this row delivers at (D-75): the city, the program and either
+     * field work (D-88), its centre (D-90) or "centre not set" (D-82).
+     *
+     * Two rows of two proposals may stand at one place (D-77), and a report
+     * template names a place, not a row. Load `centers`.
+     */
+    public function place(): ReportPlace
+    {
+        // The program is cast the way MealCoverage::responsibleForLocation()
+        // casts it, so one row never produces two different place keys.
+        return new ReportPlace($this->city_id, (int) $this->program_id, $this->centerIds()[0] ?? null, (bool) $this->city_wide);
+    }
+
+    /**
+     * What a list calls this row: its proposal's name, since a row is of
+     * exactly one proposal (D-93) and the register "names its proposal
+     * first" (Y-16). `label()` says where it is; the two read together as
+     * "<proposal> / <programme> · <city> · <centre>".
+     *
+     * Load `proposal`; a row whose proposal is gone falls back to its place.
+     */
+    public function headline(): string
+    {
+        return $this->proposal?->name ?? $this->label();
+    }
+
+    /**
      * Whether the row is still being delivered (ProjectStatus::isOpen()).
      */
     public function isOpen(): bool
     {
         return $this->status->isOpen();
+    }
+
+    /**
+     * How this row is named wherever a record is listed by name — the
+     * sidebar's recently used records, for one (Y-16).
+     *
+     * Its place, which is what the Projects screen calls it.
+     */
+    public function activityLabel(): string
+    {
+        $this->loadMissing(['city', 'program', 'centers']);
+
+        return $this->label();
+    }
+
+    /**
+     * The four demographic targets added up, or null when none is set
+     * (Y-16): the twin of `Project::targetDemographicTotal()`, on the columns
+     * Y-11 moved onto the row.
+     */
+    public function targetDemographicTotal(): ?int
+    {
+        $parts = [$this->target_men, $this->target_women, $this->target_boys, $this->target_girls];
+
+        if (array_filter($parts, fn (?int $part): bool => $part !== null) === []) {
+            return null;
+        }
+
+        return (int) array_sum($parts);
+    }
+
+    /**
+     * Where the row stands on its way to being funded, for the badge on the
+     * Projects screen; null when nothing is pending (Y-16).
+     *
+     * The twin of `Project::fundingState()`, and simpler for the same reason:
+     * a row is of exactly one proposal (D-93), so there is one status to read
+     * rather than a set to scan.
+     */
+    public function fundingState(): ?string
+    {
+        $this->loadMissing(['proposal:id,status', 'ownerAssignment']);
+
+        if ($this->status === ProjectStatus::Approved) {
+            return 'funded_awaiting_template';
+        }
+
+        if ($this->status !== ProjectStatus::Draft) {
+            return null;
+        }
+
+        $proposalStatus = $this->proposal?->status;
+
+        if ($proposalStatus?->isApprovedByDonor() === true) {
+            return $this->isOwnerRejected() || $this->ownerAssignment?->status === AssignmentStatus::Acknowledged ? null : 'awaiting_owner';
+        }
+
+        return $proposalStatus === ProposalStatus::Submitted ? 'awaiting_funding' : null;
+    }
+
+    /**
+     * Whether the proposal behind this row is still live (Y-16).
+     *
+     * The twin of `Project::hasActiveProposal()`, and simpler: a row is of
+     * exactly one proposal (D-93), so there is nothing to scan.
+     */
+    public function hasActiveProposal(): bool
+    {
+        $this->loadMissing('proposal:id,status');
+
+        return $this->proposal !== null && ! $this->proposal->status->isTerminal();
+    }
+
+    /**
+     * Whether the employee responsible for this row has rejected the
+     * appointment, which blocks every change to it (Y-16, D-93).
+     *
+     * The twin of `Project::isOwnerRejected()`, on the row's own assignment.
+     */
+    public function isOwnerRejected(): bool
+    {
+        return $this->ownerAssignment?->status === AssignmentStatus::Rejected;
     }
 
     /**
@@ -338,6 +574,29 @@ class ProposalLocation extends Model
         $inactive = HrCenter::inactiveIds();
 
         return array_intersect($this->centerIds(), $inactive) !== [];
+    }
+
+    /**
+     * The ids of every paused place: a row whose own centre HR has
+     * deactivated (D-66). Read once per render, the twin of
+     * `Project::pausedIds()`.
+     *
+     * @return list<int>
+     */
+    public static function pausedIds(): array
+    {
+        $inactive = HrCenter::inactiveIds();
+
+        if ($inactive === []) {
+            return [];
+        }
+
+        return array_values(static::query()
+            ->where('city_wide', false)
+            ->whereHas('centers', fn (Builder $center) => $center->whereIn('center_id', $inactive))
+            ->pluck('id')
+            ->map(fn (mixed $id): int => (int) $id)
+            ->all());
     }
 
     /**
@@ -375,6 +634,47 @@ class ProposalLocation extends Model
      *
      * @param  Builder<static>  $query
      */
+    /**
+     * Only the rows whose work is paused: one of their own centres HR has
+     * deactivated (D-66), the twin of `Project::paused()`. A city-wide row
+     * is field work (D-88) and is never paused by a centre.
+     *
+     * @param  Builder<static>  $query
+     */
+    #[Scope]
+    protected function paused(Builder $query): void
+    {
+        $inactive = HrCenter::inactiveIds();
+
+        if ($inactive === []) {
+            $query->whereRaw('1 = 0');
+
+            return;
+        }
+
+        $query->where('city_wide', false)
+            ->whereHas('centers', fn (Builder $center) => $center->whereIn('center_id', $inactive));
+    }
+
+    /**
+     * Leave out rows whose work is paused: a centre HR has deactivated
+     * (D-66), the twin of `Project::notPaused()`. A city-wide row is field
+     * work (D-88) and is never paused by a centre.
+     *
+     * @param  Builder<static>  $query
+     */
+    #[Scope]
+    protected function notPaused(Builder $query): void
+    {
+        $inactive = HrCenter::inactiveIds();
+
+        if ($inactive === []) {
+            return;
+        }
+
+        $query->whereDoesntHave('centers', fn (Builder $center) => $center->whereIn('center_id', $inactive));
+    }
+
     #[Scope]
     protected function open(Builder $query): void
     {

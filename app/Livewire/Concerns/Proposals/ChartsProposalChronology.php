@@ -121,7 +121,9 @@ trait ChartsProposalChronology
 
             $projects[] = [
                 'id' => $project->id,
-                'name' => $project->name,
+                'slug' => $project->slug,
+                // Y-16 (D-93): a bar is a place, named by where it is.
+                'name' => $project->label(),
                 'start' => $from,
                 'width' => max(2.0, $to - $from),
             ];

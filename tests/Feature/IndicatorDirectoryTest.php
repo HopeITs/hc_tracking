@@ -14,6 +14,7 @@ use App\Models\PlanIndicator;
 use App\Models\Program;
 use App\Models\Project;
 use App\Models\Proposal;
+use App\Models\ProposalLocation;
 use App\Models\Report;
 use App\Models\Result;
 use App\Models\User;
@@ -80,13 +81,13 @@ test('creating an indicator requires a name and a result', function () {
         ->assertHasErrors(['entryResultId']);
 });
 
-test('an indicator can be added with a unit and frequency then given logframe values', function () {
+test('an indicator can be added with a unit and frequency then given logframe values at a location row', function () {
     $user = User::factory()->role('General Manager')->create();
     $result = Result::factory()->create();
-    $project = Project::factory()->create();
+    $row = ProposalLocation::factory()->create(['program_id' => Program::factory()->create()->id]);
 
     Livewire::actingAs($user)
-        ->test('indicators.quick-form', ['initialResultId' => $result->id, 'initialProjectId' => $project->id, 'openOnLoad' => true])
+        ->test('indicators.quick-form', ['initialResultId' => $result->id, 'initialLocationId' => $row->id, 'openOnLoad' => true])
         ->set('entry.name_ar', 'Households with safe water access')
         ->set('entry.unit', 'households')
         ->set('entry.frequency', Period::Monthly->value)
@@ -109,7 +110,7 @@ test('an indicator can be added with a unit and frequency then given logframe va
         ->and((float) $indicator->baseline)->toBe(100.0)
         ->and((float) $indicator->target)->toBe(500.0)
         ->and($indicator->frequency)->toBe(Period::Monthly)
-        ->and($indicator->project_id)->toBe($project->id);
+        ->and($indicator->proposal_location_id)->toBe($row->id);
 });
 
 test('an indicator unit longer than the column can hold is rejected', function () {
@@ -472,49 +473,64 @@ test('the results framework can open the form already tied to a statement, or op
         ->assertSet('inspectingIndicatorId', $indicator->id);
 });
 
-test('the project page can open the form already scoped to a project', function () {
+test('the project page can open the form already scoped to a location row', function () {
+    $user = User::factory()->role('General Manager')->create();
+    $row = ProposalLocation::factory()->create(['program_id' => Program::factory()->create()->id]);
+
+    Livewire::actingAs($user)
+        ->withQueryParams(['create' => 1, 'location' => $row->id])
+        ->test('pages::indicators.index')
+        ->assertSet('openIndicatorEntryOnLoad', true)
+        ->assertSet('initialIndicatorLocationId', $row->id)
+        ->assertSet('initialIndicatorResultId', null);
+});
+
+test('an old project deep link opens the form on the row that took the project over', function () {
     $user = User::factory()->role('General Manager')->create();
     $project = Project::factory()->create();
+    $row = proposalRowForProject(Proposal::factory()->create(), $project);
 
     Livewire::actingAs($user)
         ->withQueryParams(['create' => 1, 'project' => $project->id])
         ->test('pages::indicators.index')
         ->assertSet('openIndicatorEntryOnLoad', true)
-        ->assertSet('initialIndicatorProjectId', $project->id)
+        ->assertSet('initialIndicatorLocationId', $row->id)
         ->assertSet('initialIndicatorResultId', null);
 });
 
-test('a project deep link to a project that does not exist opens nothing', function () {
+test('a deep link to a row that does not exist opens nothing', function () {
     $user = User::factory()->role('General Manager')->create();
 
     Livewire::actingAs($user)
-        ->withQueryParams(['create' => 1, 'project' => 999999])
+        ->withQueryParams(['create' => 1, 'location' => 999999])
         ->test('pages::indicators.index')
         ->assertSet('openIndicatorEntryOnLoad', false)
-        ->assertSet('initialIndicatorProjectId', null);
+        ->assertSet('initialIndicatorLocationId', null);
 });
 
-test('only projects delivering the result program are offered, and any other is refused', function () {
+test('only rows of the result program are offered, and any other is refused', function () {
     $user = User::factory()->role('General Manager')->create();
     $program = Program::factory()->create();
     $result = Result::factory()->for($program)->create();
-    $inside = Project::factory()->for($program)->create();
-    $outside = Project::factory()->create();
+    $inside = ProposalLocation::factory()->create(['program_id' => $program->id]);
+    $outside = ProposalLocation::factory()->create(['program_id' => Program::factory()->create()->id]);
+    ProposalLocation::factory()->create(['program_id' => null]);
     $indicator = Indicator::factory()->for($result)->create();
 
     $component = Livewire::actingAs($user)
         ->test('pages::indicators.index')
         ->call('openEditModal', $indicator->id);
 
-    expect($component->instance()->projectOptions()->modelKeys())->toBe([$inside->id]);
+    expect($component->instance()->locationOptions()->modelKeys())->toBe([$inside->id]);
 
     $component
-        ->set('name', 'Outside project indicator')
-        ->set('indicatorProjectId', (string) $outside->id)
+        ->set('name', 'Outside row indicator')
+        ->set('indicatorLocationId', (string) $outside->id)
         ->call('saveIndicator')
-        ->assertHasErrors(['indicatorProjectId']);
+        ->assertHasErrors(['indicatorLocationId']);
 
-    expect($indicator->fresh()->project_id)->not->toBe($outside->id);
+    expect(Indicator::query()->where('name', 'Outside row indicator')->exists())->toBeFalse()
+        ->and($indicator->fresh()->proposal_location_id)->not->toBe($outside->id);
 });
 
 test('a percentage indicator carries no unit and cannot target more than 100', function () {

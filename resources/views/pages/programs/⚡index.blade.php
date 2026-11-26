@@ -5,7 +5,6 @@ use App\Support\Like;
 use App\Models\HrEmployee;
 use App\Models\HrProgram;
 use App\Models\Program;
-use App\Models\Project;
 use App\Models\Strategy;
 use Flux\Flux;
 use Illuminate\Database\Eloquent\Builder;
@@ -93,9 +92,10 @@ new #[Layout('layouts::desk'), Title('titles.programs')] class extends Component
     #[Computed]
     public function programs(): Collection
     {
+        // Y-16 (D-93): a program's work is counted in places.
         $counts = [
-            'projects',
-            'projects as open_projects_count' => fn (Builder $query) => $query->whereIn('status', Project::openStatusValues()),
+            'locations as projects_count',
+            'locations as open_projects_count' => fn (Builder $query) => $query->whereIn('proposal_locations.status', ProjectStatus::openValues()),
         ];
 
         return $this->filteredProgramsQuery()
@@ -145,15 +145,17 @@ new #[Layout('layouts::desk'), Title('titles.programs')] class extends Component
             ->when($this->manager !== '' && $this->manager !== self::Unassigned, fn (Builder $query) => $query->where('manager_id', (int) $this->manager))
             ->when($this->gap === 'no_strategy', fn (Builder $query) => $query->whereNull('strategy_id'))
             ->when($this->gap === 'no_manager', fn (Builder $query) => $query->whereNull('manager_id'))
-            ->when($this->gap === 'overdue', fn (Builder $query) => $query->whereHas('projects', fn (Builder $projects) => $projects
-                ->where('status', ProjectStatus::Active->value)
+            ->when($this->gap === 'overdue', fn (Builder $query) => $query->whereHas('locations', fn (Builder $places) => $places
+                ->where('proposal_locations.status', ProjectStatus::Active->value)
                 ->whereDate('end_date', '<', today())))
-            ->when($this->gap === 'risk', fn (Builder $query) => $query->whereHas('projects', fn (Builder $projects) => $projects
-                ->whereIn('status', Project::openStatusValues())
+            ->when($this->gap === 'risk', fn (Builder $query) => $query->whereHas('locations', fn (Builder $places) => $places
+                ->whereIn('proposal_locations.status', ProjectStatus::openValues())
                 ->whereHas('risks', fn (Builder $risks) => $risks->where('happened', true))))
-            ->when($this->gap === 'no_proposal' && $this->canSeeFunding(), fn (Builder $query) => $query->whereHas('projects', fn (Builder $projects) => $projects
-                ->whereIn('status', Project::openStatusValues())
-                ->doesntHave('proposals')))
+            // Every place has a proposal (D-84, D-87), so "no proposal" is a
+            // place whose proposal carries no agreement yet.
+            ->when($this->gap === 'no_proposal' && $this->canSeeFunding(), fn (Builder $query) => $query->whereHas('locations', fn (Builder $places) => $places
+                ->whereIn('proposal_locations.status', ProjectStatus::openValues())
+                ->whereDoesntHave('proposal.donorProposals')))
             ->when($this->gap === 'no_plan', fn (Builder $query) => $query->whereDoesntHave(
                 'annualPlans',
                 fn (Builder $plans) => $plans->where('year', now()->year)->whereHas('planIndicators'),

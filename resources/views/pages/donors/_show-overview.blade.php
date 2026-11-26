@@ -233,11 +233,11 @@
 
                         <div class="min-w-0">
                             <h3 class="type-label {{ $mutedText }}">{{ __('donors.funds') }}</h3>
-                            @if ($agreement->proposal->projects->isEmpty())
+                            @if ($agreement->proposal->locations->isEmpty())
                                 <p class="mt-3 text-sm {{ $mutedText }}">{{ __('donors.no_projects_linked') }}</p>
                             @else
                                 <ol class="mt-3 flex flex-col">
-                                    @foreach ($agreement->proposal->projects as $project)
+                                    @foreach ($agreement->proposal->locations as $project)
                                         <li class="relative flex min-w-0 gap-3 pb-3 last:pb-0" wire:key="agreement-{{ $agreement->id }}-project-{{ $project->id }}" data-funded-project="{{ $project->id }}">
                                             <span class="relative flex w-3 shrink-0 justify-center" aria-hidden="true">
                                                 @unless ($loop->last)
@@ -250,7 +250,7 @@
                                                 ])></span>
                                             </span>
                                             <div class="flex min-w-0 flex-1 flex-wrap items-baseline justify-between gap-x-3 gap-y-1">
-                                                <a href="{{ route('projects.show', $project) }}" wire:navigate @class(['min-w-0 text-sm underline-offset-4 hover:underline', 'font-semibold '.$inkText => $project->status->isOpen(), $mutedText => ! $project->status->isOpen()])>{{ $project->name }}</a>
+                                                <a href="{{ route('projects.show', $project) }}" wire:navigate @class(['min-w-0 text-sm underline-offset-4 hover:underline', 'font-semibold '.$inkText => $project->status->isOpen(), $mutedText => ! $project->status->isOpen()])>{{ $project->headline() }}</a>
                                                 <x-ui.enum-badge :case="$project->status" />
                                             </div>
                                         </li>

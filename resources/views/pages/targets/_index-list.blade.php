@@ -30,7 +30,7 @@
                 </x-slot:action>
             </x-ui.empty-state>
         @else
-            <div class="flex flex-col gap-10 pt-6 transition-opacity duration-200" wire:loading.class="opacity-50" wire:target="search,sourceType,project,period,donor,program,year,filterStatus,clearFilters,gotoPage,nextPage,previousPage">
+            <div class="flex flex-col gap-10 pt-6 transition-opacity duration-200" wire:loading.class="opacity-50" wire:target="search,sourceType,location,period,donor,program,year,filterStatus,clearFilters,gotoPage,nextPage,previousPage">
                 @foreach ($groups as $resultId => $groupTargets)
                     @php
                         $groupResult = $groupTargets->first()->indicator->result;
@@ -115,7 +115,7 @@
                                                     <span class="font-medium text-secondary-dark dark:text-ink"><bdi>{{ $sourceLabel }}</bdi></span>
                                                 @endif
                                                 <flux:icon.arrow-long-right variant="micro" class="size-3.5 text-secondary-light rtl:-scale-x-100" aria-hidden="true" />
-                                                <span><bdi>{{ $target->project?->name ?? __('common.organisation_wide') }}</bdi></span>
+                                                <span><bdi>{{ $target->location?->label() ?? __('common.organisation_wide') }}</bdi></span>
                                             </p>
                                         </div>
 
@@ -218,13 +218,20 @@
                                                     @endif
                                                 @endif
                                                 <flux:icon.arrow-long-right variant="micro" class="size-3.5 text-secondary-light rtl:-scale-x-100" aria-hidden="true" />
-                                                @if ($target->project === null)
+                                                @if ($target->location === null)
                                                     <span>{{ __('common.organisation_wide') }}</span>
                                                 @else
-                                                    <a href="{{ route('projects.show', $target->project) }}" wire:navigate class="{{ $linkClass }}"><bdi>{{ $target->project->name }}</bdi></a>
+                                                    {{-- Y-16: the row names the place. The link still goes through the
+                                                         row's project while projects.show binds one; Y-16 slice 2 binds
+                                                         the row and this becomes route('projects.show', $target->location). --}}
+                                                    @if ($target->location->project === null)
+                                                        <span><bdi>{{ $target->location->label() }}</bdi></span>
+                                                    @else
+                                                        <a href="{{ route('projects.show', $target->location->project) }}" wire:navigate class="{{ $linkClass }}"><bdi>{{ $target->location->label() }}</bdi></a>
+                                                    @endif
                                                     <span class="inline-flex items-center gap-1">
                                                         <flux:icon.map-pin variant="micro" class="size-3.5 text-secondary-light" aria-hidden="true" />
-                                                        {{ $target->project->city?->name ?? __('common.unknown_city') }}
+                                                        {{ $target->location->city?->name ?? __('common.unknown_city') }}
                                                     </span>
                                                 @endif
                                             </p>

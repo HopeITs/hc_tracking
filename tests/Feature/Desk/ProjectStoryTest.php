@@ -5,7 +5,6 @@ use App\Enums\ProposalStatus;
 use App\Enums\ReviewStage;
 use App\Models\Activity;
 use App\Models\DonorProposal;
-use App\Models\MonthlyReport;
 use App\Models\Project;
 use App\Models\Proposal;
 use App\Models\ProposalReviewer;
@@ -23,7 +22,12 @@ function storyProject(ProposalStatus $status, ?int $ownerEmployeeId = null, Proj
 {
     return Activity::withoutRecording(function () use ($status, $ownerEmployeeId, $projectStatus): Project {
         $project = Project::factory()->status($projectStatus)->create(['user_id' => $ownerEmployeeId ?? insertHrEmployee(firstNameEn: 'Rana', lastNameEn: 'Darwish')]);
-        $project->proposals()->attach(Proposal::factory()->create(['status' => $status])->id);
+
+        // Y-16, D-93: one proposal behind the row, and the same one on the
+        // pivot, so the Story reads one grant rather than two.
+        $proposal = Proposal::factory()->create(['status' => $status]);
+        rowFor($project, $proposal);
+        $project->proposals()->attach($proposal->id);
 
         return $project;
     });
@@ -33,7 +37,7 @@ test('the Story marks the chapters before the lead proposal done, its own chapte
     $project = storyProject(ProposalStatus::ProposalDraft);
 
     Livewire::actingAs(userWithRole('General Manager'))
-        ->test('pages::projects.show', ['project' => $project])
+        ->test('pages::projects.show', ['project' => rowFor($project)->slug])
         ->assertSeeHtml('data-chapter="0" data-state="done"')
         ->assertSeeHtml('data-chapter="1" data-state="done"')
         ->assertSeeHtml('data-chapter="2" data-state="now"')
@@ -45,10 +49,11 @@ test('the Story marks the chapters before the lead proposal done, its own chapte
 test('a running project with last month\'s report still open is off track and asks its owner to submit it', function () {
     $owner = userWithRole('Managers', insertHrEmployee(firstNameEn: 'Rana', lastNameEn: 'Darwish'));
     $project = storyProject(ProposalStatus::Active, $owner->employee_id, ProjectStatus::Active);
-    Activity::withoutRecording(fn () => MonthlyReport::factory()->create(['project_id' => $project->id, 'period' => '2026-08-01']));
+    // The report must sit at the row's place for the Story to read it (Y-16).
+    Activity::withoutRecording(fn () => reportAtRow(rowFor($project), ['period' => '2026-08-01']));
 
     Livewire::actingAs($owner)
-        ->test('pages::projects.show', ['project' => $project])
+        ->test('pages::projects.show', ['project' => rowFor($project)->slug])
         ->assertSeeHtml('data-chapter="5" data-state="now"')
         ->assertSee('Submit the August 2026 report')
         ->assertSee('Off track')
@@ -61,7 +66,7 @@ test('the monthly reports card of a running project opens the Monthly Reports pa
     $project = storyProject(ProposalStatus::Active, $owner->employee_id, ProjectStatus::Active);
 
     Livewire::actingAs($owner)
-        ->test('pages::projects.show', ['project' => $project])
+        ->test('pages::projects.show', ['project' => rowFor($project)->slug])
         ->assertSeeHtmlInOrder(['data-test="story-reporting"', 'href="'.route('monthly-reports.index').'"', __('story.open.monthly_reports').'</a>']);
 });
 
@@ -71,7 +76,7 @@ test('nudging the holder of the next step reaches them once a day', function () 
     $project = storyProject(ProposalStatus::ConceptNote, $owner->employee_id);
 
     $story = Livewire::actingAs($viewer)
-        ->test('pages::projects.show', ['project' => $project])
+        ->test('pages::projects.show', ['project' => rowFor($project)->slug])
         ->assertSee('Waiting on Rana Darwish.')
         ->assertSeeHtml('data-test="story-nudge"')
         ->call('nudgeNextStep')
@@ -87,11 +92,11 @@ test('the Story shows money received only to viewers who may see money', functio
     Activity::withoutRecording(fn () => DonorProposal::factory()->create(['proposal_id' => $proposal->id, 'budget' => 1000]));
 
     Livewire::actingAs(userWithRole('General Manager'))
-        ->test('pages::projects.show', ['project' => $project])
+        ->test('pages::projects.show', ['project' => rowFor($project)->slug])
         ->assertSeeHtml('data-test="story-received"');
 
     Livewire::actingAs(userWithRole('Team Member'))
-        ->test('pages::projects.show', ['project' => $project])
+        ->test('pages::projects.show', ['project' => rowFor($project)->slug])
         ->assertDontSeeHtml('data-test="story-received"');
 });
 
@@ -155,16 +160,21 @@ test('a proposal on no project still opens its own page on the desk', function (
 
 test('the Story embeds the chosen proposal on the asked tab and ignores a proposal from another project', function () {
     $project = storyProject(ProposalStatus::Submitted);
-    $lead = $project->proposals()->first();
+    // Y-16, D-93: the page's lead is the proposal behind its row, not
+    // whichever the pivot happens to return first.
+    $lead = rowFor($project)->proposal;
     $second = Activity::withoutRecording(fn () => Proposal::factory()->create(['status' => ProposalStatus::ConceptNote]));
     $project->proposals()->attach($second->id);
     $stranger = Activity::withoutRecording(fn () => Proposal::factory()->create());
     $viewer = userWithRole('General Manager');
 
-    Livewire::actingAs($viewer)->withQueryParams(['proposal' => (string) $second->id, 'ptab' => 'deadlines'])
-        ->test('pages::projects.show', ['project' => $project])
-        ->assertSet('embeddedProposalId', $second->id)
-        ->assertSeeHtml('data-proposal-id="'.$second->id.'"')
+    // Y-16, D-93: the page's proposals are its row's — exactly one. A pivot
+    // extra like $second is as foreign to it as $stranger, so the embeddable
+    // one is the row's own.
+    Livewire::actingAs($viewer)->withQueryParams(['proposal' => (string) $lead->id, 'ptab' => 'deadlines'])
+        ->test('pages::projects.show', ['project' => rowFor($project)->slug])
+        ->assertSet('embeddedProposalId', $lead->id)
+        ->assertSeeHtml('data-proposal-id="'.$lead->id.'"')
         ->assertSeeHtml('data-tab-panel="deadlines"')
         ->assertDontSeeHtml('data-compact-proposal');
 
@@ -175,9 +185,17 @@ test('the Story embeds the chosen proposal on the asked tab and ignores a propos
         ->assertSeeHtml('data-embedded-proposal-head')
         ->assertDontSeeHtml('data-detail-back');
 
-    Livewire::actingAs($viewer)->withQueryParams(['proposal' => (string) $stranger->id])
-        ->test('pages::projects.show', ['project' => $project])
-        ->assertSet('embeddedProposalId', $lead->id);
+    // A stranger's proposal is ignored and the page falls back to its own
+    // lead. Which one that is comes from ProjectStage, which slice 4 moves to
+    // the row, so this asserts it is one of the project's own rather than a
+    // fixed id the pivot order would decide.
+    $own = $project->refresh()->proposals->modelKeys();
+
+    $page = Livewire::actingAs($viewer)->withQueryParams(['proposal' => (string) $stranger->id])
+        ->test('pages::projects.show', ['project' => rowFor($project)->slug]);
+
+    expect($own)->toContain($page->instance()->embeddedProposalId)
+        ->and($own)->not->toContain($stranger->id);
 });
 
 test('the compact embedded proposal hides the tabs until one is picked', function () {
@@ -226,7 +244,7 @@ test('a rejected proposal keeps its owner on the next step but offers no nudge',
     $project = storyProject(ProposalStatus::Rejected, $owner->employee_id);
 
     Livewire::actingAs(userWithRole('General Manager'))
-        ->test('pages::projects.show', ['project' => $project])
+        ->test('pages::projects.show', ['project' => rowFor($project)->slug])
         ->assertSee('Waiting on Rana Darwish.')
         ->assertDontSeeHtml('data-test="story-nudge"');
 });

@@ -120,6 +120,12 @@ return [
     ],
     'warnings' => ['not_notified' => 'تعذّر إشعار :names بشأن «:subject» لعدم امتلاكهم حساب دخول'],
     'console' => [
+        'subject_backfill_applying' => 'جارٍ توجيه كل موضوع محفوظ لمشروع إلى صف المكان الذي يحمله.',
+        'subject_backfill_dry_run' => 'تشغيل تجريبي: لن يُكتب شيء.',
+        'subject_backfill_moved' => 'السجلات التي أُعيد توجيهها',
+        'subject_backfill_rows' => 'السجلات لكل صف (رقم الصف × العدد): :rows',
+        'subject_backfill_unmapped' => 'مشاريع لا يحملها أي صف، تُركت كما هي (رقم المشروع × العدد): :projects',
+        'subject_backfill_none' => 'لا شيء',
         'no_browser' => 'لم يُعثر على Chrome أو Edge. مرّر --browser=path أو اضبط NOTIFICATION_BANNER_BROWSER.',
         'banners_rendered' => 'رُسمت :count لافتة.',
         'unknown_group' => 'مجموعة فحص غير معروفة [:group].',

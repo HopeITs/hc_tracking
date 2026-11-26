@@ -3,6 +3,7 @@
 use App\Enums\ProjectStatus;
 use App\Models\Activity;
 use App\Models\Project;
+use App\Models\ProposalLocation;
 use App\Models\User;
 use App\Models\UserNotification;
 use App\Notifications\Alerts\ResponsibleInactiveScanner;
@@ -28,15 +29,15 @@ beforeEach(function () {
 });
 
 /**
- * An open project owned by an employee who has left, or who has not.
+ * An open place whose responsible employee has left, or has not (Y-16, D-93).
  */
-function projectOwnedBy(int $employeeId, ProjectStatus $status = ProjectStatus::Active): Project
+function projectOwnedBy(int $employeeId, ProjectStatus $status = ProjectStatus::Active): ProposalLocation
 {
-    return Activity::withoutRecording(fn (): Project => Project::factory()->create([
+    return Activity::withoutRecording(fn (): ProposalLocation => rowFor(Project::factory()->create([
         'name' => 'Winter Shelter Aleppo',
         'status' => $status,
         'user_id' => $employeeId,
-    ]));
+    ])));
 }
 
 function scanResponsible(): int
@@ -47,12 +48,12 @@ function scanResponsible(): int
 /**
  * @return list<int>
  */
-function responsibleRecipients(Project $project): array
+function responsibleRecipients(ProposalLocation $row): array
 {
     $ids = UserNotification::query()
         ->where('data->key', RESPONSIBLE_INACTIVE_KEY)
-        ->where('subject_type', 'project')
-        ->where('subject_id', $project->id)
+        ->where('subject_type', 'proposal_location')
+        ->where('subject_id', $row->id)
         ->pluck('notifiable_id')
         ->map(fn (int|string $id): int => (int) $id)
         ->unique()
@@ -95,7 +96,7 @@ test('reassigning to another person who has also left asks again', function () {
     $project = projectOwnedBy(insertHrEmployee(isActive: false));
     scanResponsible();
 
-    Activity::withoutRecording(fn () => $project->forceFill(['user_id' => insertHrEmployee(isActive: false)])->save());
+    Activity::withoutRecording(fn () => $project->forceFill(['responsible_employee_id' => insertHrEmployee(isActive: false)])->save());
 
     expect(scanResponsible())->toBeGreaterThan(0);
 });
@@ -104,7 +105,7 @@ test('reassigning to someone who is here goes quiet', function () {
     $project = projectOwnedBy(insertHrEmployee(isActive: false));
     scanResponsible();
 
-    Activity::withoutRecording(fn () => $project->forceFill(['user_id' => insertHrEmployee()])->save());
+    Activity::withoutRecording(fn () => $project->forceFill(['responsible_employee_id' => insertHrEmployee()])->save());
 
     expect(scanResponsible())->toBe(0);
 });
@@ -144,7 +145,7 @@ test('HR is read once however many projects match', function () {
 test('the reassign action is offered to someone who may change the project', function () {
     $project = projectOwnedBy(insertHrEmployee(isActive: false));
 
-    $offered = fn (User $user): array => array_column(app(QuickActions::class)->forSubject('project', $project->id, $user), 'type');
+    $offered = fn (User $user): array => array_column(app(QuickActions::class)->forSubject('proposal_location', $project->id, $user), 'type');
 
     expect($offered($this->prManager))->toContain('project.reassign')
         ->and($offered($this->teamMember))->not->toContain('project.reassign');
@@ -153,7 +154,7 @@ test('the reassign action is offered to someone who may change the project', fun
 test('the reassign action is not offered when the owner is still here', function () {
     $project = projectOwnedBy(insertHrEmployee());
 
-    $offered = array_column(app(QuickActions::class)->forSubject('project', $project->id, $this->prManager), 'type');
+    $offered = array_column(app(QuickActions::class)->forSubject('proposal_location', $project->id, $this->prManager), 'type');
 
     expect($offered)->not->toContain('project.reassign');
 });

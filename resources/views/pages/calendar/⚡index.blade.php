@@ -9,7 +9,7 @@ use App\Livewire\Concerns\Calendar\ScopesCalendarPeople;
 use App\Livewire\Concerns\Calendar\ShowsCalendarDay;
 use App\Livewire\Concerns\ChecksFinanceVisibility;
 use App\Livewire\Concerns\NavigatesCalendarPeriods;
-use App\Models\Project;
+use App\Models\ProposalLocation;
 use Illuminate\Database\Eloquent\Collection;
 use Livewire\Attributes\Computed;
 use Livewire\Attributes\Layout;
@@ -48,7 +48,11 @@ new #[Layout('layouts::desk'), Title('titles.calendar')] class extends Component
     #[Computed]
     public function projectOptions(): Collection
     {
-        return Project::query()->select(['id', 'name'])->orderBy('name')->orderBy('id')->get();
+        // Y-16 (D-93): a task hangs off a place.
+        return ProposalLocation::query()
+            ->with(['city:id,name_en,name_ar', 'program:id', 'centers', 'proposal:id,name'])
+            ->orderBy('id')
+            ->get(['id', 'proposal_id', 'city_id', 'city_wide', 'program_id']);
     }
 };
 ?>

@@ -71,6 +71,17 @@ class Sector extends Model
     }
 
     /**
+     * The places that cover this sector (Y-16, D-93): the twin of
+     * `projects()`, which goes with the `projects` table in Y-18.
+     *
+     * @return BelongsToMany<ProposalLocation, $this>
+     */
+    public function locations(): BelongsToMany
+    {
+        return $this->belongsToMany(ProposalLocation::class, 'proposal_location_sector')->withTimestamps();
+    }
+
+    /**
      * Sectors still offered for new selection.
      *
      * @param  Builder<self>  $query

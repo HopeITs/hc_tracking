@@ -11,7 +11,7 @@ use App\Enums\TaskStatus;
 use App\Models\Donor;
 use App\Models\DonorReport;
 use App\Models\MonthlyReport;
-use App\Models\Project;
+use App\Models\ProposalLocation;
 use App\Models\Report;
 use App\Models\Task;
 use Carbon\CarbonImmutable;
@@ -43,7 +43,7 @@ trait PresentsCalendarItems
             $item instanceof Report => $item->isOverdue(),
             $item instanceof Donor => $item->isFollowUpOverdue(),
             $item instanceof DonorReport => ! $item->isSubmitted() && $item->isOverdue(),
-            $item instanceof Project => $item->end_date !== null
+            $item instanceof ProposalLocation => $item->end_date !== null
                 && $item->end_date->lt(CarbonImmutable::today())
                 && $item->status->isOpen(),
             default => false,
@@ -51,11 +51,11 @@ trait PresentsCalendarItems
     }
 
     /**
-     * The tone of a project's end chip: late once an open project has passed
-     * its end date, the neutral project tone otherwise. Start chips always
+     * The tone of a place's end chip: late once an open place has passed its
+     * end date, the neutral tone otherwise (Y-16, D-93). Start chips always
      * keep the neutral tone.
      */
-    protected function projectEndTone(Project $project): string
+    protected function projectEndTone(ProposalLocation $project): string
     {
         return $this->isLate($project)
             ? self::LATE_TONE

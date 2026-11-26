@@ -272,7 +272,42 @@ class PlanIndicator extends Model implements TracksActivity
     #[Scope]
     protected function forProjectInWindow(Builder $query, int $projectId, CarbonImmutable $from, CarbonImmutable $to): void
     {
-        $query->where('plan_indicators.project_id', $projectId)->where(function (Builder $sources) use ($from, $to): void {
+        $query->where('plan_indicators.project_id', $projectId);
+
+        self::whereSourceRunsInWindow($query, $from, $to);
+    }
+
+    /**
+     * The targets at a place in a period (Y-16, contracts.md §14): the
+     * place-keyed twin of forProjectInWindow().
+     *
+     * The window rule is the same one, shared rather than copied. The place
+     * rule is `atPlace` and nothing else (Y-08), so an unset place matches
+     * nothing (D-82) and a shared target is not found here (D-90): a caller
+     * that needs those asks `coversPlace()` per target.
+     *
+     * @param  Builder<self>  $query
+     */
+    #[Scope]
+    protected function forPlaceInWindow(Builder $query, ReportPlace $place, CarbonImmutable $from, CarbonImmutable $to): void
+    {
+        $query->atPlace($place);
+
+        self::whereSourceRunsInWindow($query, $from, $to);
+    }
+
+    /**
+     * Narrow to targets whose source runs inside the window: a proposal whose
+     * period overlaps it (actual dates once both are set, else planned), or an
+     * annual plan whose year falls in it.
+     *
+     * The one definition behind forProjectInWindow() and forPlaceInWindow().
+     *
+     * @param  Builder<self>  $query
+     */
+    private static function whereSourceRunsInWindow(Builder $query, CarbonImmutable $from, CarbonImmutable $to): void
+    {
+        $query->where(function (Builder $sources) use ($from, $to): void {
             $sources->where(function (Builder $proposalTargets) use ($from, $to): void {
                 $proposalTargets->where('plan_indicators.source_type', 'proposal')->whereExists(function (QueryBuilder $proposal) use ($from, $to): void {
                     $proposal->selectRaw('1')
@@ -331,9 +366,14 @@ class PlanIndicator extends Model implements TracksActivity
      * What the renewed proposal's matching target reached last year, shown
      * beside a target as a reference only (T10, D-11).
      *
-     * The match is the previous proposal's target on the same project whose
-     * indicator is linked to the same library entry. Returns null for a
-     * target that is not in a renewal, has no library link, or has no match.
+     * The match is the previous proposal's target **at the same place** whose
+     * indicator is linked to the same library entry (Y-16, D-30). The place
+     * and not the project: a renewal is a new proposal with new rows (D-93),
+     * so last year's target is reached through the place the two share, and a
+     * shared target (D-90) matches a shared target.
+     *
+     * Returns null for a target that is not in a renewal, has no library
+     * link, or has no place of its own to match on (D-82).
      *
      * @return array{value: ?float, percent: ?float}|null
      */
@@ -346,14 +386,18 @@ class PlanIndicator extends Model implements TracksActivity
         $libraryId = $target->indicator()->value('library_indicator_id');
         $previousId = Proposal::query()->whereKey($target->source_id)->value('previous_proposal_id');
 
-        if ($libraryId === null || $previousId === null || $target->project_id === null) {
+        if ($libraryId === null || $previousId === null || $target->city_id === null || $target->program_id === null) {
             return null;
         }
 
         $match = self::query()
             ->where('source_type', 'proposal')
             ->where('source_id', $previousId)
-            ->where('project_id', $target->project_id)
+            ->where('plan_indicators.city_id', $target->city_id)
+            ->where('plan_indicators.program_id', $target->program_id)
+            ->where('plan_indicators.center_id', $target->center_id)
+            ->where('plan_indicators.city_wide', $target->city_wide)
+            ->where('plan_indicators.all_centers', $target->all_centers)
             ->whereHas('indicator', fn (Builder $query) => $query->where('library_indicator_id', $libraryId))
             ->with(['reports', 'indicator'])
             ->orderBy('id')
@@ -606,14 +650,14 @@ class PlanIndicator extends Model implements TracksActivity
     /**
      * Where this target does not fit the chain it sits in, as translation keys.
      *
-     * Reads the loaded `source` (with a proposal's `projects`), `indicator`
-     * (with `result`) and `project`; see chainIssuesFor() for the rules.
+     * Reads the loaded `source`, `indicator` (with `result`) and `location`;
+     * see chainIssuesForRow() for the rules (Y-16, D-93).
      *
      * @return list<string>
      */
     public function chainIssues(): array
     {
-        return self::chainIssuesFor($this->source, $this->getRelation('indicator'), $this->project);
+        return self::chainIssuesForRow($this->source, $this->getRelation('indicator'), $this->getRelation('location'));
     }
 
     /**
@@ -662,6 +706,53 @@ class PlanIndicator extends Model implements TracksActivity
             if (! in_array($project->id, $fundedProjectIds, true)) {
                 $issues[] = 'targets.issue_project_not_on_proposal';
             }
+        }
+
+        return $issues;
+    }
+
+    /**
+     * Where a target committed in this source, for this indicator and
+     * location row, would not fit the chain (Y-16, D-93).
+     *
+     * The row-keyed twin of chainIssuesFor(), rule for rule and key for key,
+     * so the messages a user sees do not change:
+     * - an indicator scoped to one row can only be targeted for that row;
+     * - an annual plan commits targets on the program framework only (T12);
+     * - an annual plan can only commit targets on results of its program;
+     * - a row carrying an annual-plan target must sit in the plan's program;
+     * - a row carrying a proposal target must be a row **of that proposal**.
+     *
+     * The last rule needs no pivot: a row is of exactly one proposal (D-93),
+     * where a project could be funded by several.
+     *
+     * @return list<string>
+     */
+    public static function chainIssuesForRow(?Model $source, Indicator $indicator, ?ProposalLocation $row): array
+    {
+        $issues = [];
+        $resultProgramId = $indicator->relationLoaded('result') ? $indicator->result?->program_id : null;
+
+        if ($indicator->proposal_location_id !== null && $row?->id !== $indicator->proposal_location_id) {
+            $issues[] = 'targets.issue_project_differs_from_indicator';
+        }
+
+        if ($source instanceof AnnualPlan) {
+            if ($indicator->relationLoaded('result') && $indicator->result?->proposal_id !== null) {
+                $issues[] = 'targets.issue_plan_target_on_proposal_framework';
+            }
+
+            if ($resultProgramId !== null && $source->program_id !== $resultProgramId) {
+                $issues[] = 'targets.issue_plan_program_differs_from_result';
+            }
+
+            if ($row !== null && $row->program_id !== $source->program_id) {
+                $issues[] = 'targets.issue_project_outside_plan_program';
+            }
+        }
+
+        if ($source instanceof Proposal && $row !== null && $row->proposal_id !== $source->id) {
+            $issues[] = 'targets.issue_project_not_on_proposal';
         }
 
         return $issues;
@@ -756,7 +847,7 @@ class PlanIndicator extends Model implements TracksActivity
 
     public function activityProgramId(): ?int
     {
-        return static::programIdFor($this->getKey(), $this->activityAttribute('project_id'), $this->activityAttribute('source_type'), $this->activityAttribute('source_id'));
+        return static::programIdFor($this->getKey(), $this->activityAttribute('project_id'), $this->activityAttribute('source_type'), $this->activityAttribute('source_id'), $this->activityAttribute('proposal_location_id'));
     }
 
     /**
@@ -768,27 +859,34 @@ class PlanIndicator extends Model implements TracksActivity
     }
 
     /**
-     * The project owner, remembered for the deleted event.
+     * Whoever the target's place is on, remembered for the deleted event: the
+     * row's responsible employee (Y-16, D-93), or the project's owner for a
+     * target that still carries only a project.
      *
      * @return array<string, mixed>
      */
     protected function activityPropertiesBeforeDelete(): array
     {
-        return ['employee_ids' => array_filter([Project::ownerEmployeeIdFor($this->activityAttribute('project_id'))])];
+        $ownerId = ProposalLocation::ownerEmployeeIdFor($this->activityAttribute('proposal_location_id'))
+            ?? Project::ownerEmployeeIdFor($this->activityAttribute('project_id'));
+
+        return ['employee_ids' => array_filter([$ownerId])];
     }
 
     /**
-     * The program a target rolls up to: its project's, else its annual plan's.
-     * Pass the known columns to avoid a query; omit them to look the row up.
+     * The program a target rolls up to: its place's, else its annual plan's
+     * (Y-16, D-93). A target that still carries only a project falls back to
+     * that project's program. Pass the known columns to avoid a query; omit
+     * them to look the row up.
      */
-    public static function programIdFor(mixed $planIndicatorId, mixed $projectId = null, mixed $sourceType = null, mixed $sourceId = null): ?int
+    public static function programIdFor(mixed $planIndicatorId, mixed $projectId = null, mixed $sourceType = null, mixed $sourceId = null, mixed $locationId = null): ?int
     {
-        if ($projectId === null && $sourceType === null) {
-            $row = static::query()->select(['project_id', 'source_type', 'source_id'])->whereKey($planIndicatorId)->first();
-            [$projectId, $sourceType, $sourceId] = [$row?->project_id, $row?->source_type, $row?->source_id];
+        if ($projectId === null && $sourceType === null && $locationId === null) {
+            $row = static::query()->select(['project_id', 'proposal_location_id', 'source_type', 'source_id'])->whereKey($planIndicatorId)->first();
+            [$projectId, $locationId, $sourceType, $sourceId] = [$row?->project_id, $row?->proposal_location_id, $row?->source_type, $row?->source_id];
         }
 
-        $programId = Project::programIdFor($projectId);
+        $programId = ProposalLocation::programIdFor($locationId) ?? Project::programIdFor($projectId);
 
         if ($programId !== null || $sourceType !== 'annual_plan') {
             return $programId;

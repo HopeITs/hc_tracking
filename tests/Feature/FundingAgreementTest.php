@@ -464,6 +464,8 @@ test('agreement detail links the donor, proposal, the donor\'s other agreements 
     ]);
     $project = Project::factory()->create(['name' => 'Mobile Clinic Expansion']);
     $proposal->projects()->attach($project);
+    // Y-16 (D-93): the agreement links the places the proposal pays for.
+    $row = proposalRowForProject($proposal, $project);
 
     $this->actingAs($user)
         ->get(route('funding-agreements.show', $agreement))
@@ -471,9 +473,10 @@ test('agreement detail links the donor, proposal, the donor\'s other agreements 
         ->assertSee(route('donors.show', $donor), false)
         ->assertSee(route('proposals.show', $proposal), false)
         ->assertSee(route('funding-agreements.show', $sibling), false)
-        ->assertSee(route('projects.show', $project), false)
+        ->assertSee(route('projects.show', $row), false)
         ->assertSeeText('Winter Appeal')
-        ->assertSeeText('Mobile Clinic Expansion');
+        // The place is named by its proposal and where it is (Y-16).
+        ->assertSeeText($row->fresh()->load(['city', 'program', 'centers', 'proposal'])->headline());
 });
 
 test('a tranche saved from the agreement page is filed against that agreement even when the payload names another', function () {

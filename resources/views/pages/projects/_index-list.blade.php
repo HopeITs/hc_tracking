@@ -26,16 +26,13 @@
             <div class="dk-pjl-main" tabindex="0" aria-describedby="project-peek-{{ $project->id }}">
                 <p class="dk-pjl-name">
                     @if (in_array($project->id, $this->unreadIds, true))
-                        <span class="dk-pjl-dot" data-unread-dot="project-{{ $project->id }}" title="{{ __('notifications.has_unread') }}"><span class="sr-only">{{ __('notifications.has_unread') }}</span></span>
+                        <span class="dk-pjl-dot" data-unread-dot="proposal_location-{{ $project->id }}" title="{{ __('notifications.has_unread') }}"><span class="sr-only">{{ __('notifications.has_unread') }}</span></span>
                     @endif
-                    <span title="{{ $project->name }}">{{ $project->name }}</span>
+                    <span title="{{ $project->headline() }}">{{ $project->headline() }}</span>
                 </p>
                 <p class="dk-pjl-meta">
-                    <span>{{ $project->city?->name ?? __('common.unknown_city') }}</span>
-                    <x-projects.host-center-badge :project="$project" />
-                    <x-projects.center-inactive-badge :project="$project" />
-                    <span aria-hidden="true">·</span>
-                    <span class="truncate">{{ $project->program->name }}</span>
+                    <span title="{{ $project->label() }}">{{ $project->label() }}</span>
+                    <x-projects.center-inactive-badge :inactive="$project->hasInactiveCenter()" />
                     @if ($status === '')
                         <span aria-hidden="true">·</span>
                         <span>{{ $project->status->label() }}</span>
@@ -49,14 +46,14 @@
                     <dl>
                         <div>
                             <dt>{{ __('common.strategy') }}</dt>
-                            <dd>{{ $project->program->strategy?->name ?? __('common.strategy_not_assigned') }}</dd>
+                            <dd>{{ $project->program?->strategy?->name ?? __('common.strategy_not_assigned') }}</dd>
                         </div>
 
                         <div>
                             <dt>{{ __('projects.funding_envelope') }}</dt>
                             <dd>
                                 @if ($funding === null)
-                                    {{ $project->proposals_count === 0 ? __('projects.not_funded_yet') : '—' }}
+                                    {{ __('projects.not_funded_yet') }}
                                 @else
                                     @foreach ($funding['currencies'] as $peekCurrency => $peekTotal)
                                         <strong class="dk-num" wire:key="funding-{{ $project->id }}-{{ $peekCurrency }}"><x-ui.money :amount="$peekTotal" :currency="$peekCurrency" /></strong>
@@ -106,7 +103,7 @@
             <span class="dk-health {{ $healthClass }}" data-test="project-health" title="{{ $schedule['label'] }}">{{ $schedule['label'] }}</span>
 
             <div class="dk-pjl-prog">
-                <x-ui.progress-bar :value="$progress" :tone="$schedule['tone']" :label="__('projects.progress_for', ['name' => $project->name])" label-hidden />
+                <x-ui.progress-bar :value="$progress" :tone="$schedule['tone']" :label="__('projects.progress_for', ['name' => $project->headline()])" label-hidden />
                 <span class="dk-num" title="{{ __('projects.progress_not_measured') }}">{{ $progress === null ? '—' : round($progress).'%' }}</span>
             </div>
 
@@ -120,7 +117,7 @@
             </p>
 
             <div class="dk-pjl-owner">
-                <x-ui.employee-chip :employee="$project->user" compact />
+                <x-ui.employee-chip :employee="$project->responsible" compact />
             </div>
 
             @include('pages.projects._index-row-actions')

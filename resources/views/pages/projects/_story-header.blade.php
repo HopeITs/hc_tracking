@@ -9,7 +9,7 @@
     $next = $story['next'];
     $lead = $story['lead'];
     $health = $story['health'];
-    $project = $this->project;
+    $project = $this->location;
     $beneficiaries = $project->targetDemographicTotal() ?? $project->target_beneficiaries;
     $money = $this->canViewMoney() ? $this->fundingByCurrency->first() : null;
     $isArchived = $project->status === \App\Enums\ProjectStatus::Archived;
@@ -39,13 +39,17 @@
                 </span>
             @endif
             · {{ $project->city?->name ?? __('common.unknown_city') }}
-            <x-projects.host-center-badge :project="$project" class="ms-1.5 align-middle" />
+            {{-- Y-16: a row has no host centre. Its answer to "no centre here"
+                 is field work (D-88), which label() already says. --}}
+            @if ($project->city_wide)
+                <span class="type-meta" data-test="row-field-work">· {{ __('proposals.location_field_work') }}</span>
+            @endif
             <x-projects.sector-chips :sectors="$project->sectors" class="ms-1.5 inline-flex! align-middle" data-test="project-sectors" />
         </div>
 
         <h1 class="page-title">
-            {{ $project->name }}
-            @if (app(\App\Notifications\UnreadSubjects::class)->has(auth()->user(), 'project', $project->id))
+            {{ $project->label() }}
+            @if (app(\App\Notifications\UnreadSubjects::class)->has(auth()->user(), 'proposal_location', $project->id))
                 <span class="inline-block size-2.5 rounded-full bg-primary align-middle dark:bg-ink" data-unread-dot title="{{ __('notifications.has_unread') }}"><span class="sr-only">{{ __('notifications.has_unread') }}</span></span>
             @endif
         </h1>
@@ -53,7 +57,7 @@
         <p class="dk-pjh-meta">
             <x-ui.enum-badge :case="$project->status" />
             <x-ui.project-funding-badge :project="$project" />
-            <span><span class="dk-pjh-k">{{ __('story.facts.owner') }}</span> {{ $project->user?->name ?? '—' }}</span>
+            <span><span class="dk-pjh-k">{{ __('story.facts.owner') }}</span> {{ $project->responsible?->name ?? '—' }}</span>
             <span>
                 <span class="dk-pjh-k">{{ __('story.facts.dates') }}</span>
                 @if ($project->start_date !== null)
@@ -69,8 +73,8 @@
                 <span>
                     <span class="dk-pjh-k">{{ __('story.facts.proposal') }}</span>
                     <x-ui.enum-badge :case="$lead->status" />
-                    @if ($project->proposals_count > 1)
-                        <span class="dk-muted dk-small">+{{ $project->proposals_count - 1 }}</span>
+                    @if (1 > 1)
+                        <span class="dk-muted dk-small">+{{ 1 - 1 }}</span>
                     @endif
                 </span>
             @endif
@@ -82,8 +86,8 @@
             @if ($project->status === \App\Enums\ProjectStatus::Draft && ! $project->hasActiveProposal())
                 <span class="dk-pill dk-warn" data-test="no-active-proposal">{{ __('projects.no_active_proposal') }}</span>
             @endif
-            @if ($this->canStartConceptNote && $next['href'] !== route('proposals.index', ['for_project' => $project->id]))
-                <a class="dk-btn dk-sm" href="{{ route('proposals.index', ['for_project' => $project->id]) }}" wire:navigate data-test="new-concept-note"><x-desk.icon name="plus" />{{ $isClosed ? __('story.acts.new_proposal_reopens') : __('proposals.new_concept_note') }}</a>
+            @if ($this->canStartConceptNote && $next['href'] !== route('proposals.index', ['for_project' => $project->project_id]))
+                <a class="dk-btn dk-sm" href="{{ route('proposals.index', ['for_project' => $project->project_id]) }}" wire:navigate data-test="new-concept-note"><x-desk.icon name="plus" />{{ $isClosed ? __('story.acts.new_proposal_reopens') : __('proposals.new_concept_note') }}</a>
             @endif
             @if ($isArchived && $canArchiveProject)
                 <button type="button" class="dk-btn dk-primary dk-sm" wire:click="restoreProject({{ $project->id }})" data-test="restore-project"><x-desk.icon name="undo" />{{ __('story.acts.restore') }}</button>
@@ -95,7 +99,7 @@
             {{-- The rarer actions wait behind one button. --}}
             @if ($canCloseProject || ($canArchiveProject && ! $isArchived))
                 <span class="dk-pmenu" x-data="{ open: false }" x-on:click.outside="open = false" x-on:keydown.escape="open = false">
-                    <button type="button" class="dk-iconbtn dk-sm" x-on:click="open = ! open" x-bind:aria-expanded="open" aria-haspopup="menu" aria-label="{{ __('projects.more_actions_for', ['name' => $project->name]) }}"><x-desk.icon name="more" /></button>
+                    <button type="button" class="dk-iconbtn dk-sm" x-on:click="open = ! open" x-bind:aria-expanded="open" aria-haspopup="menu" aria-label="{{ __('projects.more_actions_for', ['name' => $project->label()]) }}"><x-desk.icon name="more" /></button>
                     <span class="dk-pop dk-pjl-menu" role="menu" x-show="open" x-cloak x-on:click="open = false">
                         @if ($canCloseProject)
                             <button type="button" role="menuitem" wire:click="confirmClose" data-test="close-project">

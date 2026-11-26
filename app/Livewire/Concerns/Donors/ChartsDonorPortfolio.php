@@ -227,7 +227,7 @@ trait ChartsDonorPortfolio
      */
     protected function donorMoney(Donor $donor): array
     {
-        $projects = $donor->donorProposals->flatMap(fn (DonorProposal $agreement) => $agreement->proposal?->projects->pluck('id') ?? [])->unique()->count();
+        $projects = $donor->donorProposals->flatMap(fn (DonorProposal $agreement) => $agreement->proposal?->locations->pluck('id') ?? [])->unique()->count();
 
         if (! $this->canViewAgreements()) {
             return ['lines' => [], 'next' => null, 'overdue' => 0, 'lastReceived' => null, 'projects' => $projects];

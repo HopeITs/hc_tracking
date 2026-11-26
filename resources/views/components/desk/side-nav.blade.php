@@ -33,9 +33,13 @@
             'kind' => __('navigation.kind_'.$entry['kind']),
         ])->values()->all();
 
-    /* Inside a project, the sidebar leads with that project's own sections. */
+    /* Inside a project, the sidebar leads with that row's own sections. Y-16
+       (D-93): projects.show carries a slug, not a bound model, because an old
+       project slug must redirect to its row (D-94) rather than 404. */
     $project = $routeName === 'projects.show' ? request()->route('project') : null;
-    $project = $project instanceof \App\Models\Project ? $project : null;
+    $project = is_string($project)
+        ? app(\App\Support\Locations\LocationFromSlug::class)->row($project)
+        : null;
     $sections = [];
 
     if ($project !== null) {
@@ -89,7 +93,8 @@
                     <flux:icon.arrow-left variant="micro" class="size-4 rtl:-scale-x-100" />
                     <span class="dk-side-l">{{ __('navigation.all_pages') }}</span>
                 </button>
-                <p class="dk-side-ctx-t" title="{{ $project->name }}">{{ $project->name }}</p>
+                {{-- The row names its place (Y-16). --}}
+                <p class="dk-side-ctx-t" dir="auto" title="{{ $project->label() }}">{{ $project->label() }}</p>
                 <ul>
                     @foreach ($sections as $section)
                         <li>

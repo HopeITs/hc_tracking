@@ -3,7 +3,6 @@
 use App\Enums\MediaCollection;
 use App\Enums\ProjectStatus;
 use App\Models\Program;
-use App\Models\Project;
 use App\Models\User;
 use Illuminate\Support\Facades\Storage;
 use Livewire\Livewire;
@@ -12,18 +11,20 @@ beforeEach(function () {
     Storage::fake('local');
     $this->ownerEmployee = insertHrEmployee();
     $this->owner = userWithRole('Team Member', $this->ownerEmployee);
-    $this->project = Project::factory()->create(['user_id' => $this->ownerEmployee]);
-    $this->show = fn (User $user) => Livewire::actingAs($user)->test('pages::projects.show', ['project' => $this->project]);
+    $this->project = projectWithRow(['user_id' => $this->ownerEmployee]);
+    $this->show = fn (User $user) => Livewire::actingAs($user)->test('pages::projects.show', ['project' => rowFor($this->project)->slug]);
     $this->index = fn (User $user) => Livewire::actingAs($user)->test('pages::projects.index');
+    // Y-16 (D-93): the directory's actions name the location row.
+    $this->rowId = rowFor($this->project)->id;
 });
 
 test('a Team Member cannot edit someone else\'s project or file on it', function () {
-    ($this->index)(userWithRole('Team Member'))->call('openEditModal', $this->project->id)->assertForbidden();
+    ($this->index)(userWithRole('Team Member'))->call('openEditModal', $this->rowId)->assertForbidden();
     ($this->show)(userWithRole('Team Member'))->call('openCreateFileModal')->assertForbidden();
 });
 
 test('the owner edits their project and uploads a file, but cannot archive it', function () {
-    ($this->index)($this->owner)->call('openEditModal', $this->project->id)->assertOk();
+    ($this->index)($this->owner)->call('openEditModal', $this->rowId)->assertOk();
 
     ($this->show)($this->owner)
         ->call('openCreateFileModal')
@@ -33,14 +34,14 @@ test('the owner edits their project and uploads a file, but cannot archive it', 
         ->call('saveFile')
         ->assertHasNoErrors();
 
-    ($this->index)($this->owner)->call('confirmArchive', $this->project->id)->assertForbidden();
+    ($this->index)($this->owner)->call('confirmArchive', $this->rowId)->assertForbidden();
 });
 
 test('an owner\'s edit keeps the project\'s program and owner', function () {
     $otherProgram = Program::factory()->create();
 
     ($this->index)($this->owner)
-        ->call('openEditModal', $this->project->id)
+        ->call('openEditModal', $this->rowId)
         ->set('name', 'Renamed by owner')
         ->set('programId', (string) $otherProgram->id)
         ->set('userId', (string) insertHrEmployee())
@@ -55,7 +56,7 @@ test('an owner\'s edit keeps the project\'s program and owner', function () {
 
 test('an owner cannot archive a project', function () {
     ($this->index)($this->owner)
-        ->call('confirmArchive', $this->project->id)
+        ->call('confirmArchive', $this->rowId)
         ->assertForbidden();
 
     expect($this->project->fresh()->status)->not->toBe(ProjectStatus::Archived);
@@ -66,15 +67,15 @@ test('a program manager edits any project in their program', function () {
     $programManager = userWithRole('Team Member', $managerEmployee);
     Program::query()->whereKey($this->project->program_id)->update(['manager_id' => $managerEmployee]);
 
-    ($this->index)($programManager)->call('openEditModal', $this->project->id)->assertOk();
+    ($this->index)($programManager)->call('openEditModal', $this->rowId)->assertOk();
 });
 
 test('managers archive and restore projects', function () {
     $manager = userWithRole('Managers');
 
-    ($this->index)($manager)->call('confirmArchive', $this->project->id)->call('archiveProject');
+    ($this->index)($manager)->call('confirmArchive', $this->rowId)->call('archiveProject');
     expect($this->project->fresh()->status)->toBe(ProjectStatus::Archived);
 
-    ($this->index)($manager)->call('restoreProject', $this->project->id);
+    ($this->index)($manager)->call('restoreProject', $this->rowId);
     expect($this->project->fresh()->status)->not->toBe(ProjectStatus::Archived);
 });

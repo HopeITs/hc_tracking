@@ -111,7 +111,7 @@ test('the project page links and unlinks a proposal through the same actions', f
     $other = Project::factory()->create();
     fileLink($this->proposal, $other);
 
-    Livewire::test('pages::projects.show', ['project' => $project])
+    Livewire::test('pages::projects.show', ['project' => rowFor($project)->slug])
         ->set('tab', 'proposals')
         ->assertSee('Winter Response')
         ->set('proposalToAttach', (string) $this->proposal->id)
@@ -121,7 +121,7 @@ test('the project page links and unlinks a proposal through the same actions', f
     expect(linkedIds($this->proposal))->toBe([min($project->id, $other->id), max($project->id, $other->id)])
         ->and(Activity::query()->where('event', 'proposal.project_linked')->count())->toBe(1);
 
-    Livewire::test('pages::projects.show', ['project' => $project])
+    Livewire::test('pages::projects.show', ['project' => rowFor($project)->slug])
         ->set('tab', 'proposals')
         ->call('detachProposal', $this->proposal->id)
         ->assertHasNoErrors();
@@ -135,7 +135,7 @@ test('the project page needs proposals.update, not projects.update, to link or u
     $project = Project::factory()->active()->create();
     fileLink($this->proposal, $project, Project::factory()->create());
     $unlinked = Proposal::factory()->create();
-    $fresh = fn () => Livewire::actingAs($manager)->test('pages::projects.show', ['project' => $project]);
+    $fresh = fn () => Livewire::actingAs($manager)->test('pages::projects.show', ['project' => rowFor($project)->slug]);
 
     expect($fresh()->instance()->attachableProposals)->toBeEmpty();
 
@@ -149,7 +149,7 @@ test('the project page needs proposals.update, not projects.update, to link or u
 test('the project page offers no proposal while the project itself cannot be linked', function () {
     $project = Project::factory()->status(ProjectStatus::Archived)->create();
 
-    expect(Livewire::test('pages::projects.show', ['project' => $project])->instance()->attachableProposals)->toBeEmpty();
+    expect(Livewire::test('pages::projects.show', ['project' => rowFor($project)->slug])->instance()->attachableProposals)->toBeEmpty();
 });
 
 test('the proposal page refuses linking and unlinking to a user without proposals.update', function () {

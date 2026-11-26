@@ -215,7 +215,7 @@ final class ReportTemplateReader
     {
         $targets = PlanIndicator::query()
             ->select(['plan_indicators.id', 'plan_indicators.source_type', 'plan_indicators.source_id', 'plan_indicators.project_id', 'plan_indicators.indicator_id', 'plan_indicators.target'])
-            ->with('indicator:id,name,code')
+            ->with('indicator:id,name,code,proposal_location_id')
             ->where('plan_indicators.source_type', 'proposal')
             ->whereNotNull('plan_indicators.project_id')
             ->when($template->project_id !== null, fn ($query) => $query->where('plan_indicators.project_id', $template->project_id))

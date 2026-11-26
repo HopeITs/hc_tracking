@@ -106,7 +106,7 @@
                     @forelse ($this->projects as $project)
                         <div class="mt-2.5 min-w-0" wire:key="project-{{ $project->id }}" data-project="{{ $project->id }}">
                             <div class="flex items-baseline justify-between gap-3">
-                                <a href="{{ route('projects.show', $project) }}" wire:navigate class="min-w-0 truncate text-sm font-semibold underline-offset-4 hover:underline {{ $inkText }}">{{ $project->name }}</a>
+                                <a href="{{ route('projects.show', $project) }}" wire:navigate class="min-w-0 truncate text-sm font-semibold underline-offset-4 hover:underline {{ $inkText }}">{{ $project->headline() }} <span class="type-meta">· {{ $project->label() }}</span></a>
                                 <span class="shrink-0 text-[11px] {{ $mutedText }}">{{ $project->status->label() }}</span>
                             </div>
                             <p class="truncate text-xs {{ $mutedText }}">{{ collect([$project->program?->name, $project->city?->name ?? __('common.unknown_city')])->filter()->implode(' · ') }}</p>

@@ -31,6 +31,9 @@ class ProposalFilePreviewController extends Controller
 
         $belongsHere = match ($media->mediable_type) {
             'proposal' => $media->mediable_id === $proposal->id,
+            // Y-16 (D-93): grant paper hangs off the place the proposal pays
+            // for; `project` stays for files filed before the rows existed.
+            'proposal_location' => $proposal->locations()->whereKey($media->mediable_id)->exists(),
             'project' => $proposal->projects()->whereKey($media->mediable_id)->exists(),
             default => false,
         };

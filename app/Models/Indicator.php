@@ -28,6 +28,7 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
  * @property int|null $copied_from_id
  * @property string|null $code
  * @property int|null $project_id
+ * @property int|null $proposal_location_id
  * @property IndicatorMeasure $measure
  * @property string|null $unit
  * @property string|null $baseline
@@ -37,7 +38,7 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
  * @property CarbonImmutable|null $created_at
  * @property CarbonImmutable|null $updated_at
  */
-#[Fillable(['name', 'result_id', 'library_indicator_id', 'copied_from_id', 'code', 'project_id', 'measure', 'unit', 'baseline', 'target', 'is_tracking_only', 'frequency'])]
+#[Fillable(['name', 'result_id', 'library_indicator_id', 'copied_from_id', 'code', 'project_id', 'proposal_location_id', 'measure', 'unit', 'baseline', 'target', 'is_tracking_only', 'frequency'])]
 class Indicator extends Model implements TracksActivity
 {
     /** @use HasFactory<IndicatorFactory> */
@@ -116,6 +117,20 @@ class Indicator extends Model implements TracksActivity
     public function project(): BelongsTo
     {
         return $this->belongsTo(Project::class);
+    }
+
+    /**
+     * The location row this instance belongs to, if any (Y-16, D-93).
+     *
+     * One place of one proposal: it replaces `project()` as the scope of an
+     * instance. Nullable for the same reason `project_id` is, and null as well
+     * for an instance the Y-16 backfill could not map (D-80).
+     *
+     * @return BelongsTo<ProposalLocation, $this>
+     */
+    public function location(): BelongsTo
+    {
+        return $this->belongsTo(ProposalLocation::class, 'proposal_location_id');
     }
 
     /**
@@ -255,13 +270,21 @@ class Indicator extends Model implements TracksActivity
     }
 
     /**
-     * The program of its result, else of its project.
+     * The program of its result, else of its location row (Y-16, D-93).
+     *
+     * The project answers only while a row has not taken over — an instance
+     * the Y-16 backfill could not map (D-80). Y-18 drops that fallback.
      */
     public function activityProgramId(): ?int
     {
         $programId = Result::query()->whereKey($this->activityAttribute('result_id'))->value('program_id');
 
-        return $programId !== null ? (int) $programId : Project::programIdFor($this->activityAttribute('project_id'));
+        if ($programId !== null) {
+            return (int) $programId;
+        }
+
+        return ProposalLocation::programIdFor($this->activityAttribute('proposal_location_id'))
+            ?? Project::programIdFor($this->activityAttribute('project_id'));
     }
 
     /**
@@ -280,12 +303,17 @@ class Indicator extends Model implements TracksActivity
     }
 
     /**
-     * The project owner, remembered for the deleted event.
+     * The responsible of its location row, remembered for the deleted event
+     * (Y-16, D-93). The project owner answers only while a row has not taken
+     * over (D-80); Y-18 drops that fallback.
      *
      * @return array<string, mixed>
      */
     protected function activityPropertiesBeforeDelete(): array
     {
-        return ['employee_ids' => array_filter([Project::ownerEmployeeIdFor($this->activityAttribute('project_id'))])];
+        $employeeId = ProposalLocation::ownerEmployeeIdFor($this->activityAttribute('proposal_location_id'))
+            ?? Project::ownerEmployeeIdFor($this->activityAttribute('project_id'));
+
+        return ['employee_ids' => array_filter([$employeeId])];
     }
 }

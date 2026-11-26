@@ -7,6 +7,7 @@ namespace App\Livewire\Concerns\Projects;
 use App\Actions\Projects\ArchiveProject;
 use App\Actions\Projects\RestoreProject;
 use App\Models\Project;
+use App\Models\ProposalLocation;
 use Flux\Flux;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Validation\ValidationException;
@@ -14,10 +15,15 @@ use Livewire\Attributes\Computed;
 use Livewire\Attributes\Locked;
 
 /**
- * Archiving and restoring projects from the directory: the confirmation
+ * Archiving and restoring places from the directory: the confirmation
  * dialog's state, the archive and restore actions.
  *
  * Used by projects/index and projects/show. The page provides WithPagination's resetPage().
+ *
+ * Y-16 (D-93): the dialog is opened on a **location row** and authorised on
+ * it. The two actions still write the project, which the mirror copies back
+ * to the row until Y-17 moves the writers; the row's project is reached
+ * through `project_id` (never the row's own id — they are different keys).
  */
 trait ArchivesProjects
 {
@@ -30,11 +36,11 @@ trait ArchivesProjects
      */
     public bool $showArchiveModal = false;
 
-    public function confirmArchive(int $projectId): void
+    public function confirmArchive(int $locationId): void
     {
-        Gate::authorize('delete', Project::query()->findOrFail($projectId));
+        Gate::authorize('delete', ProposalLocation::query()->findOrFail($locationId));
 
-        $this->archivingProjectId = $projectId;
+        $this->archivingProjectId = $locationId;
         $this->showArchiveModal = true;
     }
 
@@ -45,10 +51,10 @@ trait ArchivesProjects
     }
 
     /**
-     * The project under the archive confirmation, with the work it carries, so
+     * The row under the archive confirmation, with the work it carries, so
      * the dialog can say what leaves the active board. Nothing is destroyed.
      *
-     * @return array{project: Project, carries: array<string, int>}|null
+     * @return array{project: ProposalLocation, carries: array<string, int>}|null
      */
     #[Computed]
     public function archivingProject(): ?array
@@ -57,29 +63,31 @@ trait ArchivesProjects
             return null;
         }
 
-        $project = Project::query()
-            ->select(['id', 'name', 'status'])
-            ->withCount(['risks', 'proposals'])
+        $row = ProposalLocation::query()
+            ->select(['id', 'proposal_id', 'project_id', 'city_id', 'program_id', 'city_wide', 'status'])
+            ->with(['city:id,name_en,name_ar', 'program:id', 'centers', 'proposal:id,name'])
+            ->withCount(['risks'])
             ->find($this->archivingProjectId);
 
-        if ($project === null) {
+        if ($row === null) {
             return null;
         }
 
         return [
-            'project' => $project,
+            'project' => $row,
             'carries' => array_filter([
-                __('common.risks') => $project->risks_count,
-                __('common.proposals') => $project->proposals_count,
+                __('common.risks') => $row->risks_count,
+                // A row is of exactly one proposal (D-93).
+                __('common.proposals') => 1,
             ]),
         ];
     }
 
     /**
-     * Retire the project into the Archived lifecycle state.
+     * Retire the place into the Archived lifecycle state.
      *
      * Nothing in this application is soft-deleted, so archiving is how a
-     * project leaves the active portfolio without destroying its delivery
+     * place leaves the active portfolio without destroying its delivery
      * record. restoreProject() puts it back.
      */
     public function archiveProject(): void
@@ -88,7 +96,7 @@ trait ArchivesProjects
             return;
         }
 
-        $project = Project::query()->find($this->archivingProjectId);
+        $project = $this->projectOfRow($this->archivingProjectId);
 
         if ($project === null) {
             $this->cancelArchive();
@@ -110,9 +118,9 @@ trait ArchivesProjects
      * dates, else a draft, and only while no other open project holds its
      * center and program. RestoreProject enforces both.
      */
-    public function restoreProject(int $projectId): void
+    public function restoreProject(int $locationId): void
     {
-        $project = Project::query()->find($projectId);
+        $project = $this->projectOfRow($locationId);
 
         if ($project === null) {
             return;
@@ -129,5 +137,16 @@ trait ArchivesProjects
         $this->resetPage();
 
         Flux::toast(variant: 'success', text: __('projects.project_restored_as', ['status' => $status->label()]));
+    }
+
+    /**
+     * The project a row stands for, which the two actions still write
+     * (Y-17 moves them to the row).
+     */
+    private function projectOfRow(int $locationId): ?Project
+    {
+        $projectId = ProposalLocation::query()->whereKey($locationId)->value('project_id');
+
+        return $projectId === null ? null : Project::query()->find((int) $projectId);
     }
 }

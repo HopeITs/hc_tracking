@@ -168,12 +168,12 @@ test('a single alert names the program and opens its pre-filled create form', fu
 
 describe('the daily rule', function () {
     test('flags programs with open projects and no framework, once', function () {
-        Activity::withoutRecording(fn () => Project::factory()->status(ProjectStatus::Active)->create(['program_id' => $this->program->id]));
+        Activity::withoutRecording(fn () => rowFor(Project::factory()->status(ProjectStatus::Active)->create(['program_id' => $this->program->id])));
         $framed = Activity::withoutRecording(fn (): Program => Program::factory()->create());
         programFrameworkRoot($framed);
-        Activity::withoutRecording(fn () => Project::factory()->status(ProjectStatus::Draft)->create(['program_id' => $framed->id]));
+        Activity::withoutRecording(fn () => rowFor(Project::factory()->status(ProjectStatus::Draft)->create(['program_id' => $framed->id])));
         $closed = Activity::withoutRecording(fn (): Program => Program::factory()->create());
-        Activity::withoutRecording(fn () => Project::factory()->status(ProjectStatus::Closed)->create(['program_id' => $closed->id]));
+        Activity::withoutRecording(fn () => rowFor(Project::factory()->status(ProjectStatus::Closed)->create(['program_id' => $closed->id])));
         $monday = CarbonImmutable::parse('2026-09-21 06:00');
 
         app(DataGapScanner::class)->scan($monday);
@@ -183,7 +183,7 @@ describe('the daily rule', function () {
     });
 
     test('sends nothing on a non-working day', function () {
-        Activity::withoutRecording(fn () => Project::factory()->status(ProjectStatus::Active)->create(['program_id' => $this->program->id]));
+        Activity::withoutRecording(fn () => rowFor(Project::factory()->status(ProjectStatus::Active)->create(['program_id' => $this->program->id])));
 
         app(DataGapScanner::class)->scan(CarbonImmutable::parse('2026-09-20 06:00')); // Sunday
 

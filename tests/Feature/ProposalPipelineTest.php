@@ -303,13 +303,15 @@ test('the funding flow draws one graph per currency and lists unfunded proposals
     $unfunded = Proposal::factory()->create(['name' => 'Unfunded Proposal']);
     $project = Project::factory()->create(['name' => 'Water Network Expansion']);
     $funded->projects()->attach($project);
+    // Y-16 (D-93): the graph's third column is the places the proposal pays for.
+    $row = proposalRowForProject($funded, $project);
     Proposal::query()->whereKey($funded->id)->update(['donor_id' => $donor->id]);
     DonorProposal::factory()->create(['donor_id' => $donor->id, 'proposal_id' => $funded->id, 'budget' => 1250, 'currency' => 'USD']);
 
     $flow = Livewire::actingAs($user)
         ->test('pages::proposals.index')
         ->set('view', 'overview')
-        ->assertSee('Water Network Expansion')
+        ->assertSee($row->fresh()->load(['city', 'program', 'centers'])->label())
         ->instance()
         ->flow;
 
@@ -318,7 +320,7 @@ test('the funding flow draws one graph per currency and lists unfunded proposals
             ['from' => 'd'.$donor->id, 'to' => 'p'.$funded->id, 'amount' => 1250.0],
         ])
         ->and($flow['currencies'][0]['graph']['links'])->toBe([
-            ['from' => 'p'.$funded->id, 'to' => 'j'.$project->id],
+            ['from' => 'p'.$funded->id, 'to' => 'j'.$row->id],
         ])
         ->and($flow['unfunded'])->toBe([['id' => $unfunded->id, 'name' => 'Unfunded Proposal']]);
 });

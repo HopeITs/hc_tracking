@@ -20,7 +20,7 @@ beforeEach(function () {
     ]);
     auth()->logout();
 
-    $this->close = fn ($user) => Livewire::actingAs($user)->test('pages::projects.show', ['project' => $this->project]);
+    $this->close = fn ($user) => Livewire::actingAs($user)->test('pages::projects.show', ['project' => rowFor($this->project)->slug]);
 });
 
 test('a projects.update holder and the owner close an active project, keeping its dates', function (string $who) {

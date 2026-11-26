@@ -24,8 +24,9 @@ function glanceFor(User $user): array
 
 test('figures are computed with their trend: new running projects are good, more late tasks are bad', function () {
     Activity::withoutRecording(function (): void {
-        Project::factory()->create(['status' => ProjectStatus::Active, 'start_date' => '2026-09-02']);
-        Project::factory()->create(['status' => ProjectStatus::Active, 'start_date' => '2026-03-01']);
+        // Y-16 (D-93): At a glance counts running places.
+        rowFor(Project::factory()->create(['status' => ProjectStatus::Active, 'start_date' => '2026-09-02']));
+        rowFor(Project::factory()->create(['status' => ProjectStatus::Active, 'start_date' => '2026-03-01']));
         Task::factory()->create(['due_date' => '2026-09-10', 'status' => TaskStatus::Todo, 'created_at' => '2026-08-01']);
         Task::factory()->create(['due_date' => '2026-09-12', 'status' => TaskStatus::InProgress, 'created_at' => '2026-08-01']);
     });

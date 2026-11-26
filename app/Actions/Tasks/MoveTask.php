@@ -52,12 +52,16 @@ class MoveTask
             return null;
         }
 
-        $projects = Project::query()
-            ->select(['id', 'name'])
+        // Y-16 (D-93): the places of the program, named by their proposal and
+        // their place, in the `location:ID` form Y-12 established.
+        $projects = ProposalLocation::query()
+            ->select(['id', 'proposal_id', 'city_id', 'city_wide', 'program_id'])
             ->where('program_id', $program->id)
-            ->orderBy('name')
+            ->with(['city:id,name_en,name_ar', 'program:id', 'centers', 'proposal:id,name'])
             ->get()
-            ->map(fn (Project $project): array => ['id' => $project->id, 'name' => $project->name]);
+            ->map(fn (ProposalLocation $row): array => ['id' => $row->id, 'name' => $row->headline().' · '.$row->label()])
+            ->sortBy('name')
+            ->values();
 
         return [
             'program' => ['id' => $program->id, 'name' => $program->name],

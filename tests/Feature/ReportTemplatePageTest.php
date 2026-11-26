@@ -53,6 +53,9 @@ function rtpProject(ProjectStatus $status = ProjectStatus::Approved): array
 {
     $project = Project::factory()->approved()->create(['status' => $status, 'start_date' => '2026-11-01', 'end_date' => '2027-10-31']);
     $project->currentAssignment('user_id')?->forceFill(['status' => AssignmentStatus::Acknowledged])->save();
+    // Y-16 (D-93): the page is the place's, so it is made from the project
+    // before the template factory invents one of its own.
+    Activity::withoutRecording(fn () => rowFor($project));
 
     $template = Activity::withoutRecording(fn (): ReportTemplate => ReportTemplate::factory()->create(['project_id' => $project->id]));
 
@@ -110,7 +113,8 @@ function rtpResponsibleOfficer(Project $project): User
 
 function rtpPage(User $user, Project $project): Testable
 {
-    return Livewire::actingAs($user)->withQueryParams(['tab' => 'template'])->test('pages::projects.show', ['project' => $project]);
+    // Y-16: the page is the project's location row, named by its slug.
+    return Livewire::actingAs($user)->withQueryParams(['tab' => 'template'])->test('pages::projects.show', ['project' => rowFor($project)->slug]);
 }
 
 test('the responsible officer and the MEAL Manager see the lines grouped by proposal, with edit and confirm controls', function (string $who) {

@@ -8,6 +8,7 @@ use App\Enums\TaskStatus;
 use App\Models\DonorReport;
 use App\Models\Program;
 use App\Models\Project;
+use App\Models\ProposalLocation;
 use App\Models\Task;
 use App\Models\User;
 use App\Notifications\AppNotification;
@@ -18,13 +19,14 @@ use Livewire\Livewire;
  * A program with one project, and a manager who may do everything on its
  * tasks.
  *
- * @return array{program: Program, project: Project, manager: User, employeeId: int}
+ * @return array{program: Program, project: ProposalLocation, manager: User, employeeId: int}
  */
 function programTaskSetup(): array
 {
     $employeeId = insertHrEmployee();
     $program = Program::factory()->create();
-    $project = Project::factory()->create(['program_id' => $program->id, 'name' => 'Wells Project']);
+    // Y-16 (D-93): a task hangs off a place of the program.
+    $project = rowFor(Project::factory()->create(['program_id' => $program->id, 'name' => 'Wells Project']));
 
     return [
         'program' => $program,
@@ -34,9 +36,9 @@ function programTaskSetup(): array
     ];
 }
 
-function projectTask(Project $project, array $attributes = []): Task
+function projectTask(ProposalLocation $project, array $attributes = []): Task
 {
-    return Task::factory()->create(['source_type' => 'project', 'source_id' => $project->id, ...$attributes]);
+    return Task::factory()->create(['source_type' => 'proposal_location', 'source_id' => $project->id, ...$attributes]);
 }
 
 test('the stat cards count and filter the tasks, and search reaches every task', function () {
@@ -136,7 +138,7 @@ test('a group adds a task unassigned when its author has no HR employee', functi
 
     Livewire::actingAs($author)
         ->test('pages::programs.show', ['program' => $program])
-        ->call('addProgramTask', 'Find a volunteer', 'project:'.$project->id);
+        ->call('addProgramTask', 'Find a volunteer', 'location:'.$project->id);
 
     expect(Task::query()->where('title', 'Find a volunteer')->sole()->taskAssignees()->count())->toBe(0);
 });
@@ -162,13 +164,13 @@ test('a group adds a task assigned to its author and a row adds a subtask', func
 
     Livewire::actingAs($manager)
         ->test('pages::programs.show', ['program' => $program])
-        ->call('addProgramTask', 'Buy spare parts', 'project:'.$project->id)
+        ->call('addProgramTask', 'Buy spare parts', 'location:'.$project->id)
         ->call('addProgramSubtask', $parent->id, 'Call the supplier');
 
     $added = Task::query()->where('title', 'Buy spare parts')->firstOrFail();
     $subtask = Task::query()->where('title', 'Call the supplier')->firstOrFail();
 
-    expect($added->only(['source_type', 'source_id']))->toBe(['source_type' => 'project', 'source_id' => $project->id])
+    expect($added->only(['source_type', 'source_id']))->toBe(['source_type' => 'proposal_location', 'source_id' => $project->id])
         ->and($added->taskAssignees()->pluck('employee_id')->all())->toBe([$employeeId])
         ->and($subtask->parent_task_id)->toBe($parent->id)
         ->and($subtask->taskAssignees()->pluck('employee_id')->all())->toBe($parent->taskAssignees()->pluck('employee_id')->all());
@@ -176,7 +178,7 @@ test('a group adds a task assigned to its author and a row adds a subtask', func
 
 test('a task of another program is never touched from this page', function () {
     ['program' => $program, 'manager' => $manager] = programTaskSetup();
-    $elsewhere = projectTask(Project::factory()->create());
+    $elsewhere = projectTask(rowFor(Project::factory()->create()));
 
     Livewire::actingAs($manager)
         ->test('pages::programs.show', ['program' => $program])
@@ -239,7 +241,7 @@ test('the task list shows seven tasks a page', function () {
 
 test('each line of the side list shows one task count, flagged when some are past due', function () {
     ['program' => $program, 'project' => $project, 'manager' => $manager] = programTaskSetup();
-    $calm = Project::factory()->create(['program_id' => $program->id]);
+    $calm = rowFor(Project::factory()->create(['program_id' => $program->id]));
     projectTask($project, ['due_date' => now()->subDay()]);
     projectTask($project, ['due_date' => now()->addWeek()]);
     projectTask($calm, ['due_date' => now()->addWeek()]);
@@ -470,35 +472,35 @@ test('the Add task dialog shows where the task goes, starting on the project bei
         ->set('tab', 'tasks')
         ->call('pickTaskBucket', 'project-'.$project->id)
         ->call('openAddTaskModal')
-        ->assertSet('newTaskTarget', 'project:'.$project->id)
+        ->assertSet('newTaskTarget', 'location:'.$project->id)
         ->assertSeeHtml('data-test="new-program-task-goes-to"')
         ->set('newTaskTitle', 'Order spare pumps')
         ->call('addTask')
         ->assertHasNoErrors();
 
     expect(Task::query()->where('title', 'Order spare pumps')->sole()->only(['source_type', 'source_id']))
-        ->toBe(['source_type' => 'project', 'source_id' => $project->id]);
+        ->toBe(['source_type' => 'proposal_location', 'source_id' => $project->id]);
 });
 
 test('the Add task dialog sends the task to the picked project, and never outside the program', function () {
     ['program' => $program, 'project' => $project, 'manager' => $manager] = programTaskSetup();
-    $foreignProject = Project::factory()->create();
+    $foreignProject = rowFor(Project::factory()->create());
 
     $page = Livewire::actingAs($manager)
         ->test('pages::programs.show', ['program' => $program])
         ->call('openAddTaskModal')
         ->assertSet('newTaskTarget', 'program')
         ->set('newTaskTitle', 'Test the pumps')
-        ->set('newTaskTarget', 'project:'.$foreignProject->id)
+        ->set('newTaskTarget', 'location:'.$foreignProject->id)
         ->call('addTask')
         ->assertHasErrors(['newTaskTarget']);
 
     expect(Task::query()->where('title', 'Test the pumps')->exists())->toBeFalse();
 
-    $page->set('newTaskTarget', 'project:'.$project->id)
+    $page->set('newTaskTarget', 'location:'.$project->id)
         ->call('addTask')
         ->assertHasNoErrors();
 
     expect(Task::query()->where('title', 'Test the pumps')->sole()->only(['source_type', 'source_id']))
-        ->toBe(['source_type' => 'project', 'source_id' => $project->id]);
+        ->toBe(['source_type' => 'proposal_location', 'source_id' => $project->id]);
 });

@@ -22,6 +22,7 @@ use App\Models\EvidenceType;
 use App\Models\MonthlyReportAnswer;
 use App\Models\Project;
 use App\Models\Proposal;
+use App\Models\ProposalLocation;
 use App\Models\ReportTemplate;
 use App\Models\ReportTemplateQuestion;
 use App\Support\Reporting\PlaceBridge;
@@ -50,8 +51,8 @@ use Livewire\Attributes\Url;
  * Used by projects/show only. The page provides projectId and the #[Computed]
  * project().
  *
- * @property int $projectId
- * @property-read Project $project  #[Computed] project()
+ * @property int $locationId
+ * @property-read ProposalLocation $location  #[Computed] location()
  * @property-read ReportTemplate|null $reportTemplate  #[Computed] reportTemplate()
  * @property-read bool $canViewReportTemplate  #[Computed] canViewReportTemplate()
  * @property-read bool $canManageReportTemplate  #[Computed] canManageReportTemplate()
@@ -139,7 +140,7 @@ trait ManagesReportTemplate
     #[Computed]
     public function reportTemplateOptions(): Collection
     {
-        return ReportTemplate::query()->whereKey(app(PlaceBridge::class)->templateIdsOfProject($this->projectId))
+        return ReportTemplate::query()->whereKey(app(PlaceBridge::class)->templateIdsOfProject((int) $this->location->project_id))
             ->with('proposals:id,name')->orderBy('id')->get();
     }
 
@@ -153,7 +154,7 @@ trait ManagesReportTemplate
     public function reportTemplate(): ?ReportTemplate
     {
         return ReportTemplate::query()
-            ->whereKey(app(PlaceBridge::class)->templateIdsOfProject($this->projectId))
+            ->whereKey(app(PlaceBridge::class)->templateIdsOfProject((int) $this->location->project_id))
             ->withCount(['lines as pending_lines_count' => fn ($query) => $query->where('status', ReportTemplateLineStatus::Pending)])
             ->when($this->reportTemplateOptions->contains('id', (int) $this->selectedReportTemplate),
                 fn ($query) => $query->whereKey((int) $this->selectedReportTemplate))
@@ -274,7 +275,7 @@ trait ManagesReportTemplate
     public function confirmReportTemplate(): void
     {
         $template = $this->authorizeTemplate('manage');
-        $wasApproved = $this->project->status === ProjectStatus::Approved;
+        $wasApproved = $this->location->status === ProjectStatus::Approved;
 
         try {
             app(ConfirmReportTemplate::class)->handle($template, array_map(intval(...), $this->selectedTemplateLineIds));
@@ -294,7 +295,7 @@ trait ManagesReportTemplate
         $this->showTemplateConfirmModal = false;
         $this->selectedTemplateLineIds = [];
         $this->forgetReportTemplate();
-        unset($this->project);
+        unset($this->location);
 
         Flux::toast(variant: 'success', text: $wasApproved ? __('report_templates.tab.activated') : __('report_templates.tab.confirmed'));
     }
@@ -302,13 +303,15 @@ trait ManagesReportTemplate
     #[Computed]
     public function awaitingMonthlyReports(): bool
     {
-        $project = $this->project;
+        $row = $this->location;
 
-        return $project->status === ProjectStatus::Active
+        // Y-03: a monthly report belongs to a template, so "none generated
+        // yet" is asked of the row's own template (Y-16).
+        return $row->status === ProjectStatus::Active
             && $this->reportTemplate?->status === ReportTemplateStatus::Confirmed
-            && $project->start_date !== null
-            && $project->end_date !== null
-            && ! $project->monthlyReports()->exists();
+            && $row->start_date !== null
+            && $row->end_date !== null
+            && ! $this->reportTemplate->monthlyReports()->exists();
     }
 
     public function openTemplateLineModal(int $lineId): void
@@ -627,7 +630,7 @@ trait ManagesReportTemplate
      */
     public function templateConfirmMessage(): string
     {
-        return $this->project->status === ProjectStatus::Approved
+        return $this->location->status === ProjectStatus::Approved
             ? __('report_templates.tab.confirm_body_approved')
             : __('report_templates.tab.confirm_body_active');
     }
@@ -651,7 +654,7 @@ trait ManagesReportTemplate
 
     private function managedTemplate(): ReportTemplate
     {
-        $templateIds = app(PlaceBridge::class)->templateIdsOfProject($this->projectId);
+        $templateIds = app(PlaceBridge::class)->templateIdsOfProject((int) $this->location->project_id);
 
         return ReportTemplate::query()->whereKey($templateIds)
             ->when(in_array((int) $this->selectedReportTemplate, $templateIds, true),

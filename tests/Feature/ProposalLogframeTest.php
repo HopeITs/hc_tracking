@@ -31,8 +31,10 @@ function logframeProposal(Program ...$programs): Proposal
     $proposal = Proposal::factory()->create();
 
     foreach ($programs as $program) {
-        $projectId = Project::factory()->create(['program_id' => $program->id])->id;
-        DB::table('project_proposal')->insert(['project_id' => $projectId, 'proposal_id' => $proposal->id]);
+        $project = Project::factory()->create(['program_id' => $program->id]);
+        DB::table('project_proposal')->insert(['project_id' => $project->id, 'proposal_id' => $proposal->id]);
+        // Y-16 (D-93): the proposal's programs are read from its places.
+        proposalRowForProject($proposal, $project);
     }
 
     return $proposal;

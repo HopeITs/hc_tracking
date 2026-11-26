@@ -235,16 +235,18 @@ test('the work reading counts finished tasks and the plan tab lists the funded p
 
     $project = Project::factory()->create(['name' => 'Aleppo Water Response']);
     $proposal->projects()->attach($project);
+    // Y-16 (D-93): the plan tab reads the work of the proposal's places.
+    $row = proposalRowForProject($proposal, $project);
 
     Task::factory()->completed()->create([
-        'source_type' => 'project',
-        'source_id' => $project->id,
+        'source_type' => 'proposal_location',
+        'source_id' => $row->id,
         'title' => 'Verify beneficiary list',
         'due_date' => null,
     ]);
     Task::factory()->create([
-        'source_type' => 'project',
-        'source_id' => $project->id,
+        'source_type' => 'proposal_location',
+        'source_id' => $row->id,
         'title' => 'Procure water pumps',
         'due_date' => null,
         'progress_percentage' => 0,
@@ -271,10 +273,11 @@ test('a task sourced directly from the proposal is listed apart from funded-proj
 
     $funded = Project::factory()->create(['name' => 'Aleppo Water Response']);
     $proposal->projects()->attach($funded);
+    $row = proposalRowForProject($proposal, $funded);
 
     Task::factory()->create([
-        'source_type' => 'project',
-        'source_id' => $funded->id,
+        'source_type' => 'proposal_location',
+        'source_id' => $row->id,
         'title' => 'Funded project task',
     ]);
     Task::factory()->create([
@@ -297,9 +300,11 @@ test('the promises reading counts targets carrying a report and flags one commit
 
     $funded = Project::factory()->create();
     $proposal->projects()->attach($funded);
+    $row = proposalRowForProject($proposal, $funded);
 
     $reported = PlanIndicator::factory()->forProposal($proposal)->create([
         'project_id' => $funded->id,
+        'proposal_location_id' => $row->id,
         'target' => '100.00',
     ]);
     Report::factory()->approved()->create([
@@ -309,8 +314,10 @@ test('the promises reading counts targets carrying a report and flags one commit
 
     // Committed against a project this proposal does not fund: a real state the
     // page must name rather than quietly render as if it were sound.
+    $elsewhere = Project::factory()->create();
     PlanIndicator::factory()->forProposal($proposal)->create([
-        'project_id' => Project::factory()->create()->id,
+        'project_id' => $elsewhere->id,
+        'proposal_location_id' => proposalRowForProject(Proposal::factory()->create(), $elsewhere)->id,
         'target' => '50.00',
     ]);
 
@@ -522,6 +529,8 @@ test('the scrubber payload dates a project that began before the scale with a ne
         'end_date' => '2026-06-30',
     ]);
     $proposal->projects()->attach($project);
+    // Y-16 (D-93): the scale opens on the place's own term.
+    proposalRowForProject($proposal, $project)->update(['start_date' => '2025-10-01', 'end_date' => '2026-06-30']);
 
     $agreement = DonorProposal::factory()->create([
         'proposal_id' => $proposal->id,

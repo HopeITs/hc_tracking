@@ -3,6 +3,7 @@
 use App\Enums\IndicatorMeasure;
 use App\Models\AnnualPlan;
 use App\Models\Indicator;
+use App\Models\LibraryIndicator;
 use App\Models\PlanIndicator;
 use App\Models\Program;
 use App\Models\Project;
@@ -314,4 +315,171 @@ test('a shared target covers the centers of its row and no third center', functi
         ->and($target->coversPlace(new ReportPlace(7, $programId, 10, false)))->toBeTrue()
         ->and($target->coversPlace(new ReportPlace(7, $programId, 11, false)))->toBeFalse()
         ->and($target->coversPlace(new ReportPlace(7, $programId, null, true)))->toBeFalse();
+});
+
+/*
+ * Y-16 slice 1 (D-93): the row-keyed twins of the chain rules and the window
+ * scope. A row is of one proposal, so "funded by the proposal" becomes
+ * "belongs to the proposal" and needs no pivot.
+ */
+
+test('a target on the row its indicator is scoped to reports no issues', function () {
+    $program = Program::factory()->create();
+    $plan = AnnualPlan::factory()->for($program)->create();
+    $row = ProposalLocation::factory()->create(['program_id' => $program->id]);
+    $indicator = Indicator::factory()
+        ->for(Result::factory()->for($program))
+        ->create(['proposal_location_id' => $row->id]);
+
+    expect(PlanIndicator::chainIssuesForRow($plan, $indicator->load('result'), $row))->toBe([]);
+});
+
+test('a target on another row than its indicator names every broken rule', function () {
+    $plan = AnnualPlan::factory()->create();
+    $otherRow = ProposalLocation::factory()->create(['program_id' => Program::factory()->create()->id]);
+    $indicator = Indicator::factory()
+        ->for(Result::factory()->for(Program::factory()))
+        ->create(['proposal_location_id' => ProposalLocation::factory()->create()->id]);
+
+    expect(PlanIndicator::chainIssuesForRow($plan, $indicator->load('result'), $otherRow))->toBe([
+        'targets.issue_project_differs_from_indicator',
+        'targets.issue_plan_program_differs_from_result',
+        'targets.issue_project_outside_plan_program',
+    ]);
+});
+
+test('an annual plan cannot target an indicator of a proposal framework, by row', function () {
+    $program = Program::factory()->create();
+    $plan = AnnualPlan::factory()->for($program)->create();
+    $proposalResult = Result::factory()->for($program)->create(['proposal_id' => Proposal::factory()->create()->id]);
+    $indicator = Indicator::factory()->for($proposalResult)->create();
+
+    expect(PlanIndicator::chainIssuesForRow($plan, $indicator->load('result'), null))
+        ->toBe(['targets.issue_plan_target_on_proposal_framework']);
+});
+
+test('a proposal target may only be carried by a row of that proposal', function () {
+    $proposal = Proposal::factory()->create();
+    $own = ProposalLocation::factory()->create(['proposal_id' => $proposal->id]);
+    $foreign = ProposalLocation::factory()->create();
+    $indicator = Indicator::factory()->create();
+
+    expect(PlanIndicator::chainIssuesForRow($proposal, $indicator, $own))->toBe([])
+        ->and(PlanIndicator::chainIssuesForRow($proposal, $indicator, $foreign))
+        ->toBe(['targets.issue_project_not_on_proposal']);
+});
+
+test('forPlaceInWindow finds a proposal target at the place whose proposal runs inside the window', function () {
+    $proposal = Proposal::factory()->create([
+        'actual_date_begin' => '2026-01-01',
+        'actual_date_end' => '2026-12-31',
+    ]);
+    $program = Program::factory()->create();
+    $place = new ReportPlace(7, $program->id, 11, false);
+
+    $target = PlanIndicator::factory()->forProposal($proposal)->create([
+        'city_id' => 7,
+        'program_id' => $program->id,
+        'center_id' => 11,
+        'city_wide' => false,
+    ]);
+
+    $inside = PlanIndicator::query()
+        ->forPlaceInWindow($place, CarbonImmutable::parse('2026-06-01'), CarbonImmutable::parse('2026-06-30'))
+        ->pluck('plan_indicators.id')->all();
+
+    $outside = PlanIndicator::query()
+        ->forPlaceInWindow($place, CarbonImmutable::parse('2027-02-01'), CarbonImmutable::parse('2027-02-28'))
+        ->count();
+
+    expect($inside)->toBe([$target->id])->and($outside)->toBe(0);
+});
+
+test('forPlaceInWindow ignores a target of another place', function () {
+    $proposal = Proposal::factory()->create([
+        'actual_date_begin' => '2026-01-01',
+        'actual_date_end' => '2026-12-31',
+    ]);
+    $program = Program::factory()->create();
+
+    PlanIndicator::factory()->forProposal($proposal)->create([
+        'city_id' => 7,
+        'program_id' => $program->id,
+        'center_id' => 99,
+        'city_wide' => false,
+    ]);
+
+    expect(PlanIndicator::query()
+        ->forPlaceInWindow(new ReportPlace(7, $program->id, 11, false), CarbonImmutable::parse('2026-06-01'), CarbonImmutable::parse('2026-06-30'))
+        ->count())->toBe(0);
+});
+
+test('previousYearReference matches last year by place, so a new row at the same place still finds it', function () {
+    $program = Program::factory()->create();
+    $library = LibraryIndicator::factory()->create()->id;
+
+    $place = ['city_id' => 7, 'program_id' => $program->id, 'center_id' => 11, 'city_wide' => false];
+
+    $previous = Proposal::factory()->create();
+    $oldTarget = PlanIndicator::factory()->forProposal($previous)->create([
+        'indicator_id' => Indicator::factory()->create(['library_indicator_id' => $library])->id,
+        'target' => 100,
+        ...$place,
+    ]);
+
+    // The renewal is a different proposal with a different row (D-93), at the
+    // same place. The old project is nowhere in the match.
+    $renewal = Proposal::factory()->create(['previous_proposal_id' => $previous->id]);
+    $newTarget = PlanIndicator::factory()->forProposal($renewal)->create([
+        'indicator_id' => Indicator::factory()->create(['library_indicator_id' => $library])->id,
+        'proposal_location_id' => ProposalLocation::factory()->create(['proposal_id' => $renewal->id])->id,
+        'project_id' => null,
+        'target' => 200,
+        ...$place,
+    ]);
+
+    expect(PlanIndicator::previousYearReference($newTarget))
+        ->toBe(['value' => $oldTarget->achievedValue(), 'percent' => $oldTarget->percentAchieved()]);
+});
+
+test('previousYearReference ignores last year a target at another place', function () {
+    $program = Program::factory()->create();
+    $library = LibraryIndicator::factory()->create()->id;
+
+    $previous = Proposal::factory()->create();
+    PlanIndicator::factory()->forProposal($previous)->create([
+        'indicator_id' => Indicator::factory()->create(['library_indicator_id' => $library])->id,
+        'city_id' => 7, 'program_id' => $program->id, 'center_id' => 99, 'city_wide' => false,
+    ]);
+
+    $renewal = Proposal::factory()->create(['previous_proposal_id' => $previous->id]);
+    $newTarget = PlanIndicator::factory()->forProposal($renewal)->create([
+        'indicator_id' => Indicator::factory()->create(['library_indicator_id' => $library])->id,
+        'project_id' => null,
+        'city_id' => 7, 'program_id' => $program->id, 'center_id' => 11, 'city_wide' => false,
+    ]);
+
+    expect(PlanIndicator::previousYearReference($newTarget))->toBeNull();
+});
+
+test('previousYearReference matches a shared target with a shared target', function () {
+    $program = Program::factory()->create();
+    $library = LibraryIndicator::factory()->create()->id;
+
+    $shared = ['city_id' => 7, 'program_id' => $program->id, 'center_id' => null, 'city_wide' => false, 'all_centers' => true];
+
+    $previous = Proposal::factory()->create();
+    $oldTarget = PlanIndicator::factory()->forProposal($previous)->create([
+        'indicator_id' => Indicator::factory()->create(['library_indicator_id' => $library])->id,
+        ...$shared,
+    ]);
+
+    $renewal = Proposal::factory()->create(['previous_proposal_id' => $previous->id]);
+    $newTarget = PlanIndicator::factory()->forProposal($renewal)->create([
+        'indicator_id' => Indicator::factory()->create(['library_indicator_id' => $library])->id,
+        'project_id' => null,
+        ...$shared,
+    ]);
+
+    expect(PlanIndicator::previousYearReference($newTarget)['value'])->toBe($oldTarget->achievedValue());
 });

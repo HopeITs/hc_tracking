@@ -6,34 +6,31 @@ namespace App\Livewire\Concerns\Targets;
 
 use App\Models\AnnualPlan;
 use App\Models\Indicator;
-use App\Models\Project;
 use App\Models\Proposal;
 use App\Models\ProposalLocation;
 use Illuminate\Database\Eloquent\Collection;
-use Illuminate\Support\Facades\DB;
 use Livewire\Attributes\Computed;
 
 /**
  * The target form's options, narrowed by the results chain: the chosen
- * indicator, the sources and projects that fit it, and the hooks that drop a
- * choice that no longer fits; plus the project list the header filter reads.
+ * indicator, the sources and location rows that fit it, and the hooks that
+ * drop a choice that no longer fits; plus the row list the header filter reads.
  *
  * Used by targets/index only. Reads the form properties ManagesTargetForm
  * declares. ManagesTargetForm unsets these computed values;
- * FiltersTargets::updatedTargetSourceType() unsets sourceOptions and
- * formProjectOptions and calls syncFormProject().
+ * FiltersTargets::updatedTargetSourceType() unsets sourceOptions and calls
+ * syncFormLocation().
  *
  * @property string $targetSourceType
  * @property string $targetSourceId
  * @property string $targetIndicatorId
- * @property string $targetProjectId
  * @property string $targetLocationId
  * @property string $targetPeriod
  * @property ?int $editingTargetId
  * @property-read Indicator|null $formIndicator
  * @property-read array<int, array{id: int, label: string}> $sourceOptions
- * @property-read Collection<int, Project> $formProjectOptions
  * @property-read list<array{id: int, label: string}> $formLocationOptions
+ * @property-read list<array{id: int, label: string}> $locationOptions
  */
 trait NarrowsTargetFormOptions
 {
@@ -48,8 +45,8 @@ trait NarrowsTargetFormOptions
         }
 
         return Indicator::query()
-            ->select(['id', 'name', 'result_id', 'project_id', 'measure', 'unit', 'frequency'])
-            ->with(['result:id,statement,program_id', 'project:id,name'])
+            ->select(['id', 'name', 'result_id', 'project_id', 'proposal_location_id', 'measure', 'unit', 'frequency'])
+            ->with(['result:id,statement,program_id', 'location', 'location.city', 'location.program', 'location.centers'])
             ->find((int) $this->targetIndicatorId);
     }
 
@@ -101,40 +98,13 @@ trait NarrowsTargetFormOptions
     }
 
     /**
-     * Projects that may deliver the target being committed.
-     *
-     * An indicator scoped to one project allows only that project. Otherwise
-     * an annual-plan target is delivered inside the plan's program, and a
-     * proposal target by a project the proposal funds.
-     *
-     * @return Collection<int, Project>
-     */
-    #[Computed]
-    public function formProjectOptions(): Collection
-    {
-        $indicator = $this->formIndicator;
-        $sourceId = $this->targetSourceId === '' ? null : (int) $this->targetSourceId;
-
-        return Project::query()
-            ->select(['id', 'name', 'program_id'])
-            ->when($indicator?->project_id !== null, fn ($query) => $query->whereKey($indicator->project_id))
-            ->when($sourceId !== null && $this->targetSourceType === 'annual_plan', fn ($query) => $query
-                ->whereIn('program_id', AnnualPlan::query()->select('program_id')->whereKey($sourceId)))
-            ->when($sourceId !== null && $this->targetSourceType === 'proposal', fn ($query) => $query
-                ->whereIn('id', DB::table('project_proposal')->select('project_id')->where('proposal_id', $sourceId)))
-            ->orderBy('name')
-            ->orderBy('id')
-            ->get();
-    }
-
-    /**
-     * Choosing an indicator narrows the plans and projects that fit it: a
-     * project-scoped indicator fixes the project, and a source or project
-     * that no longer fits is dropped rather than carried to the save.
+     * Choosing an indicator narrows the plans and rows that fit it: a
+     * row-scoped indicator fixes the row, and a source or row that no longer
+     * fits is dropped rather than carried to the save.
      */
     public function updatedTargetIndicatorId(): void
     {
-        unset($this->formIndicator, $this->sourceOptions, $this->formProjectOptions);
+        unset($this->formIndicator, $this->sourceOptions);
 
         if ($this->targetSourceId !== '' && ! collect($this->sourceOptions)->contains('id', (int) $this->targetSourceId)) {
             $this->targetSourceId = '';
@@ -145,32 +115,43 @@ trait NarrowsTargetFormOptions
             $this->targetPeriod = $this->formIndicator->frequency->value;
         }
 
-        $this->syncFormProject();
+        $this->syncFormLocation();
     }
 
     public function updatedTargetSourceId(): void
     {
-        unset($this->formProjectOptions);
-
-        $this->syncFormProject();
+        $this->syncFormLocation();
     }
 
     /**
-     * The location rows (city · program) a proposal target may belong to: the
-     * rows of the chosen proposal (Y-10, D-91). Empty for an annual plan.
+     * The location rows (city · program) a target may be committed at
+     * (Y-10, D-91; Y-16, D-93).
+     *
+     * A proposal target: the rows of the chosen proposal. An annual-plan
+     * target: the rows of the plan's program, since a plan belongs to one
+     * program — the row-keyed twin of "a project delivering an annual-plan
+     * target must sit in the plan's program". An indicator scoped to one row
+     * allows only that row.
      *
      * @return list<array{id: int, label: string}>
      */
     #[Computed]
     public function formLocationOptions(): array
     {
-        if ($this->targetSourceType !== 'proposal' || $this->targetSourceId === '') {
+        if ($this->targetSourceId === '') {
             return [];
         }
 
+        $sourceId = (int) $this->targetSourceId;
+        $scopedTo = $this->formIndicator?->proposal_location_id;
+
         $rows = ProposalLocation::query()
             ->with('program')
-            ->where('proposal_id', (int) $this->targetSourceId)
+            ->when($this->targetSourceType === 'proposal', fn ($query) => $query->where('proposal_id', $sourceId))
+            ->when($this->targetSourceType === 'annual_plan', fn ($query) => $query
+                ->whereNotNull('program_id')
+                ->whereIn('program_id', AnnualPlan::query()->select('program_id')->whereKey($sourceId)))
+            ->when($scopedTo !== null, fn ($query) => $query->whereKey($scopedTo))
             ->orderBy('sort')
             ->orderBy('id')
             ->get();
@@ -180,32 +161,42 @@ trait NarrowsTargetFormOptions
     }
 
     /**
-     * Keep the chosen project and location inside the options that fit, and
-     * fill the project in when the indicator leaves exactly one.
+     * Keep the chosen row inside the options that fit, and fill it in when the
+     * indicator leaves exactly one.
      */
-    protected function syncFormProject(): void
+    protected function syncFormLocation(): void
     {
         unset($this->formLocationOptions);
 
-        if ($this->targetLocationId !== '' && ! collect($this->formLocationOptions)->contains('id', (int) $this->targetLocationId)) {
+        $options = $this->formLocationOptions;
+
+        if ($this->targetLocationId !== '' && ! collect($options)->contains('id', (int) $this->targetLocationId)) {
             $this->targetLocationId = '';
         }
 
-        $options = $this->formProjectOptions;
-
-        if ($this->targetProjectId !== '' && ! $options->contains('id', (int) $this->targetProjectId)) {
-            $this->targetProjectId = '';
-        }
-
-        if ($this->formIndicator?->project_id !== null && $options->count() === 1) {
-            $this->targetProjectId = (string) $options->first()->id;
+        if ($this->formIndicator?->proposal_location_id !== null && count($options) === 1) {
+            $this->targetLocationId = (string) $options[0]['id'];
         }
     }
 
-    /** @return Collection<int, Project> */
+    /**
+     * Every location row, for the directory's header filter (Y-16).
+     *
+     * @return list<array{id: int, label: string}>
+     */
     #[Computed]
-    public function projectOptions(): Collection
+    public function locationOptions(): array
     {
-        return Project::query()->select(['id', 'name'])->orderBy('name')->orderBy('id')->get();
+        $rows = ProposalLocation::query()->with(['proposal:id,name', 'program'])->get();
+        $labels = ProposalLocation::placeLabels($rows);
+
+        return $rows
+            ->sortBy(fn (ProposalLocation $row): string => ($row->proposal->name ?? '').' '.$labels[$row->id])
+            ->map(fn (ProposalLocation $row): array => [
+                'id' => $row->id,
+                'label' => ($row->proposal->name ?? '').' · '.$labels[$row->id],
+            ])
+            ->values()
+            ->all();
     }
 }

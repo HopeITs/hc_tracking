@@ -279,9 +279,10 @@
                                             data-test="edit-indicator-{{ $indicator->id }}"
                                         />@endcan
                                     @endif
-                                    @if ($indicator->project !== null)
+                                    {{-- Y-16 (D-93): a scoped instance names the place it was scoped to. --}}
+                                    @if ($indicator->location !== null)
                                         <span class="inline-flex shrink-0 items-center gap-1 type-meta text-secondary-medium dark:text-ink-muted">
-                                            <flux:icon.briefcase variant="micro" class="size-3.5" aria-hidden="true" />{{ $indicator->project->name }}
+                                            <flux:icon.briefcase variant="micro" class="size-3.5" aria-hidden="true" />{{ $indicator->location->headline() }}
                                         </span>
                                     @endif
                                 </p>

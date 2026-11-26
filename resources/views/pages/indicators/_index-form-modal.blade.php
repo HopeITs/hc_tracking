@@ -18,7 +18,7 @@
                 $formIsPercentage = $indicatorMeasure === IndicatorMeasure::Percentage->value;
             @endphp
 
-            <x-ui.form-section :title="__('common.section_details')" :fields="['name', 'indicatorResultId', 'indicatorProjectId']">
+            <x-ui.form-section :title="__('common.section_details')" :fields="['name', 'indicatorResultId', 'indicatorLocationId']">
                 <div class="grid gap-x-4 gap-y-3 @2xl/modal:grid-cols-2">
                     @if ($editingIndicatorLibraryId === null)
                         <x-ui.form-input wire:model="name" :label="__('common.indicator_name')" maxlength="255" required autofocus class="@2xl/modal:col-span-2" />
@@ -31,14 +31,14 @@
                     </x-ui.form-select>
 
                     <x-ui.form-select
-                        wire:model="indicatorProjectId"
+                        wire:model="indicatorLocationId"
                         :label="__('common.project')"
                         class="@2xl/modal:col-span-2"
                         :help="$indicatorResultId !== '' ? __('indicators.only_projects_delivering_the_result_program_are_offered') : null"
                     >
                         <option value="">{{ __('common.organisation_wide') }}</option>
-                        @foreach ($this->projectOptions as $projectOption)
-                            <option value="{{ $projectOption->id }}">{{ $projectOption->name }}</option>
+                        @foreach ($this->locationOptions as $locationOption)
+                            <option value="{{ $locationOption->id }}" dir="auto">{{ $locationOption->proposal?->name }} · {{ $locationOption->label() }}</option>
                         @endforeach
                     </x-ui.form-select>
                 </div>

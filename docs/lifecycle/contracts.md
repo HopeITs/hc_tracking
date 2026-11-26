@@ -206,6 +206,8 @@ SyncReportTask::handle(DonorReport $report): ?Task
 
 **Centers that already report.** A change that moves or removes a center (or turns a row city-wide or back) is refused (`proposals.location_center_reports`) when a report template of this proposal at that place has a monthly report that is `submitted` or `validated`; checked when the request is opened **and** when it is approved. Otherwise the place's template, its lines and its targets are **not** moved by the approval: the change is applied to the row and the affected templates are listed in the notification for MEAL to settle.
 
+**Pages (Y-16).** `projects.index` lists **location rows** of approved and later proposals; `projects.show` is `projects/{location:slug}`. The route names and the `projects.*` permission keys keep their names (they name a screen and an ability, not the table). An old project slug is answered by a redirect to its successor row (`ProjectSuccessor`, most recent proposal) until Y-18, which freezes those redirects in `project_redirects`.
+
 ## §7 Schema owned by Team A (frozen at CP1)
 **T03:**
 - `proposals`: `donor_id` (NOT NULL, FK `donors` restrictOnDelete), `requested_budget` decimal(14,2) null, `requested_currency` varchar(10) null (`Currency`), `status_remind_on` date null, `approval_note` text null (D-26), `final_report_accepted_on` date null, `final_report_accepted_by` FK `users` null nullOnDelete (D-02c), `previous_proposal_id` self FK null nullOnDelete, indexed (renewal chain, T10; cycle guard in T10). Unique `proposals(id, donor_id)`.
@@ -380,6 +382,7 @@ final class App\Support\SupervisionMap {
 - **Achievement:** `PlanIndicator::measuresLevel()` (renamed from `measuresPercentage()`) = percentage **or** average → latest approved value; counts sum. PHP and SQL forms change together.
 - API: `LibraryIndicator::active()` scope, `localizedName(): string`, `CollectionFrequency::period(): ?Period`, `App\Support\IndicatorCode::next(?int $programId, string $levelRef): array{code: string, serial: int}`.
 - Morph key `library_indicator`; events `library_indicator.created|updated|deactivated|reactivated`.
+- `indicators.proposal_location_id` FK `proposal_locations` null nullOnDelete, indexed (Y-16). It replaces `project_id` for an indicator instance that belongs to one place of a proposal; `project_id` is kept and still written until Y-18.
 
 ### §11.2 Logframe (T12)
 - `ResultType`: `impact`, `outcome`, `output`, **`activity`**, **`cross-cutting`**. Parent exactly one level up (activity → output → outcome → impact; impact has no parent; nothing under an activity). `cross-cutting` is a root only (no parent, no children). Several impact roots per program are allowed (tracks).
@@ -533,6 +536,7 @@ final class App\Support\SupervisionMap {
 - **Percentages:** only through `pooledRatioSql()`/`pooledRatio()` (§13); never an average of percentages.
 - No money in the matrix. Donor reports (T19) exclude internal (self-funding) donors.
 - **W-32 (D-55b) exclusions:** `DonorReportAggregator`, the matrix, targets, indicator coverage, `MealCoverage`, the Projects and Logframe tabs, location rows (W-34a) and stage templates (W-12, unless a template is marked `kind = payroll`: add `proposal_kind` to the template table with default `project`) all skip `kind = payroll`. *W-32 ruling (4 Nov):* W-12 and W-34a are not on `main` yet, so their exclusions land with those tasks.
+- **Centers in figures (Y-16).** Wherever a figure was grouped or filtered by project ("center view", donor report lines per center, program health per project), the key is the **place** (`city_id`, `program_id`, `center_id`, `city_wide`), read from the target (`plan_indicators`, Y-08) or the report's template (Y-02). No figure reads `projects`. Totals do not change on data where each project has one place.
 
 ### §14.1 Figures and views (T18, T19)
 - **Counts:** sum of validated values in the window. `is_cumulative`: the latest validated value in the window, never a sum.

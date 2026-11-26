@@ -66,11 +66,17 @@ function chainIndicator(Result $result, ?string $name = null): Indicator
 
 function chainTarget(Indicator $indicator, $source, ?Project $project, float $target): PlanIndicator
 {
+    // Y-16 (D-93): a proposal's target is committed at a place; an annual
+    // plan's carries none (D-44). Stated here rather than left to the
+    // factory, so every target of a run is shaped the same way.
+    $fromPlan = $source instanceof AnnualPlan;
+
     return PlanIndicator::factory()->create([
-        'source_type' => $source instanceof AnnualPlan ? 'annual_plan' : 'proposal',
+        'source_type' => $fromPlan ? 'annual_plan' : 'proposal',
         'source_id' => $source->id,
         'indicator_id' => $indicator->id,
         'project_id' => $project?->id,
+        'proposal_location_id' => $fromPlan || $project === null ? null : rowFor($project)->id,
         'target' => $target,
     ]);
 }

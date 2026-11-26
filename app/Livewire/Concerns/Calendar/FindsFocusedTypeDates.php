@@ -8,8 +8,8 @@ use App\Enums\ProposalStatus;
 use App\Models\Donor;
 use App\Models\DonorReport;
 use App\Models\MonthlyReport;
-use App\Models\Project;
 use App\Models\Proposal;
+use App\Models\ProposalLocation;
 use App\Models\Report;
 use App\Models\Task;
 use App\Models\TransfersTracking;
@@ -136,30 +136,30 @@ trait FindsFocusedTypeDates
                 ? $this->upcomingOrRecentRows(fn (bool $upcoming): \Illuminate\Support\Collection => $this->monthlyReportRows($employeeIds, $upcoming), 1)->first()['date'] ?? null
                 : null,
             'proposal' => ! $this->canViewProposals() ? null : $this->nearestOrLatestDate(
-                Proposal::query()->whereHas('projects', fn (Builder $query) => $query->whereIn('projects.user_id', $employeeIds))->whereNotIn('status', [ProposalStatus::Rejected, ProposalStatus::Completed]),
+                Proposal::query()->whereHas('locations', fn (Builder $query) => $query->whereIn('proposal_locations.responsible_employee_id', $employeeIds))->whereNotIn('status', [ProposalStatus::Rejected, ProposalStatus::Completed]),
                 'planned_date_end'
             ),
             'transfer' => ! $this->canViewTransfers() ? null : $this->nearestOrLatestDate(
-                TransfersTracking::query()->whereNotNull('scheduled_date')->whereHas('donorProposal.proposal.projects', fn (Builder $query) => $query->whereIn('projects.user_id', $employeeIds)),
+                TransfersTracking::query()->whereNotNull('scheduled_date')->whereHas('donorProposal.proposal.locations', fn (Builder $query) => $query->whereIn('proposal_locations.responsible_employee_id', $employeeIds)),
                 'scheduled_date'
             ),
             'donor' => $this->pickCloserDate(
                 ! $this->canViewDonors() ? null : $this->nearestOrLatestDate(
-                    Donor::query()->whereNotNull('next_step_due_on')->whereHas('proposals.projects', fn (Builder $query) => $query->whereIn('projects.user_id', $employeeIds)),
+                    Donor::query()->whereNotNull('next_step_due_on')->whereHas('proposals.locations', fn (Builder $query) => $query->whereIn('proposal_locations.responsible_employee_id', $employeeIds)),
                     'next_step_due_on'
                 ),
                 ! $this->canViewAgreements() ? null : $this->nearestOrLatestDate(
-                    DonorReport::query()->whereHas('donorProposal.proposal.projects', fn (Builder $query) => $query->whereIn('projects.user_id', $employeeIds)),
+                    DonorReport::query()->whereHas('donorProposal.proposal.locations', fn (Builder $query) => $query->whereIn('proposal_locations.responsible_employee_id', $employeeIds)),
                     'due_on'
                 ),
             ),
             'project' => $this->pickCloserDate(
                 $this->nearestOrLatestDate(
-                    Project::query()->whereIn('user_id', $employeeIds)->whereNotNull('start_date'),
+                    ProposalLocation::query()->whereIn('responsible_employee_id', $employeeIds)->whereNotNull('start_date'),
                     'start_date'
                 ),
                 $this->nearestOrLatestDate(
-                    Project::query()->whereIn('user_id', $employeeIds)->whereNotNull('end_date'),
+                    ProposalLocation::query()->whereIn('responsible_employee_id', $employeeIds)->whereNotNull('end_date'),
                     'end_date'
                 ),
             ),
@@ -372,7 +372,7 @@ trait FindsFocusedTypeDates
                 ? $this->upcomingOrRecentRows(fn (bool $upcoming): \Illuminate\Support\Collection => $this->monthlyReportRows($employeeIds, $upcoming))
                 : new \Illuminate\Support\Collection,
             'proposal' => ($this->canViewProposals() ? $this->upcomingOrRecent(
-                Proposal::query()->whereHas('projects', fn (Builder $query) => $query->whereIn('projects.user_id', $employeeIds))->whereNotIn('status', [ProposalStatus::Rejected, ProposalStatus::Completed]),
+                Proposal::query()->whereHas('locations', fn (Builder $query) => $query->whereIn('proposal_locations.responsible_employee_id', $employeeIds))->whereNotIn('status', [ProposalStatus::Rejected, ProposalStatus::Completed]),
                 'planned_date_end'
             ) : new Collection)->map(fn (Proposal $proposal): array => [
                 'kind' => 'link',
@@ -385,7 +385,7 @@ trait FindsFocusedTypeDates
             'transfer' => ($this->canViewTransfers() ? $this->upcomingOrRecent(
                 TransfersTracking::query()
                     ->whereNotNull('scheduled_date')
-                    ->whereHas('donorProposal.proposal.projects', fn (Builder $query) => $query->whereIn('projects.user_id', $employeeIds))
+                    ->whereHas('donorProposal.proposal.locations', fn (Builder $query) => $query->whereIn('proposal_locations.responsible_employee_id', $employeeIds))
                     ->with('donorProposal:id,slug,donor_id', 'donorProposal.donor:id,name'),
                 'scheduled_date'
             ) : new Collection)->map(fn (TransfersTracking $transfer): array => [
@@ -397,7 +397,7 @@ trait FindsFocusedTypeDates
                 'date' => $transfer->scheduled_date,
             ]),
             'donor' => $this->upcomingOrRecentRows(fn (bool $upcoming): \Illuminate\Support\Collection => ($this->canViewDonors() ? $this->datedRecords(
-                Donor::query()->whereNotNull('next_step_due_on')->whereHas('proposals.projects', fn (Builder $query) => $query->whereIn('projects.user_id', $employeeIds)),
+                Donor::query()->whereNotNull('next_step_due_on')->whereHas('proposals.locations', fn (Builder $query) => $query->whereIn('proposal_locations.responsible_employee_id', $employeeIds)),
                 'next_step_due_on',
                 $upcoming
             ) : new Collection)->map(fn (Donor $donor): array => [
@@ -410,7 +410,7 @@ trait FindsFocusedTypeDates
             ])->concat(
                 ($this->canViewAgreements() ? $this->datedRecords(
                     DonorReport::query()
-                        ->whereHas('donorProposal.proposal.projects', fn (Builder $query) => $query->whereIn('projects.user_id', $employeeIds))
+                        ->whereHas('donorProposal.proposal.locations', fn (Builder $query) => $query->whereIn('proposal_locations.responsible_employee_id', $employeeIds))
                         ->with('donorProposal:id,slug'),
                     'due_on',
                     $upcoming
@@ -424,28 +424,28 @@ trait FindsFocusedTypeDates
                 ])
             )),
             'project' => $this->upcomingOrRecentRows(fn (bool $upcoming): \Illuminate\Support\Collection => $this->datedRecords(
-                Project::query()->whereIn('user_id', $employeeIds)->whereNotNull('start_date'),
+                ProposalLocation::query()->with(['city:id,name_en,name_ar', 'program:id', 'centers', 'proposal:id,name'])->whereIn('responsible_employee_id', $employeeIds)->whereNotNull('start_date'),
                 'start_date',
                 $upcoming
-            )->map(fn (Project $project): array => [
+            )->map(fn (ProposalLocation $row): array => [
                 'kind' => 'link',
-                'id' => $project->id,
-                'url' => route('projects.show', $project),
-                'title' => $project->name,
+                'id' => $row->id,
+                'url' => route('projects.show', $row),
+                'title' => $row->headline(),
                 'subLabel' => __('calendar.project_starts'),
-                'date' => $project->start_date,
+                'date' => $row->start_date,
             ])->concat(
                 $this->datedRecords(
-                    Project::query()->whereIn('user_id', $employeeIds)->whereNotNull('end_date'),
+                    ProposalLocation::query()->with(['city:id,name_en,name_ar', 'program:id', 'centers', 'proposal:id,name'])->whereIn('responsible_employee_id', $employeeIds)->whereNotNull('end_date'),
                     'end_date',
                     $upcoming
-                )->map(fn (Project $project): array => [
+                )->map(fn (ProposalLocation $row): array => [
                     'kind' => 'link',
-                    'id' => $project->id,
-                    'url' => route('projects.show', $project),
-                    'title' => $project->name,
+                    'id' => $row->id,
+                    'url' => route('projects.show', $row),
+                    'title' => $row->headline(),
                     'subLabel' => __('calendar.project_ends'),
-                    'date' => $project->end_date,
+                    'date' => $row->end_date,
                 ])
             )),
             default => new \Illuminate\Support\Collection,

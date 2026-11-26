@@ -7,6 +7,7 @@ use App\Models\Program;
 use App\Models\Project;
 use App\Models\Sector;
 use App\Models\User;
+use App\Support\Locations\ProjectLocationMirror;
 use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
@@ -25,7 +26,7 @@ function projectSectorIds(int $projectId): array
 describe('SyncProjectSectors', function () {
     beforeEach(function () {
         $this->actingAs(userWithRole('General Manager'));
-        $this->project = Project::factory()->create();
+        $this->project = projectWithRow();
         [$this->health, $this->wash, $this->shelter] = [
             Sector::factory()->create(['name_ar' => 'الصحة', 'name_en' => 'Health']),
             Sector::factory()->create(['name_ar' => 'المياه', 'name_en' => 'WASH']),
@@ -194,14 +195,14 @@ describe('the project form', function () {
     });
 
     it('loads the linked sectors on edit and lets an older project without sectors be saved as it is', function () {
-        $legacy = Project::factory()->create(['center_id' => $this->centerId, 'city_id' => $this->cityId, 'program_id' => $this->program->id, 'user_id' => $this->owner]);
-        $withSector = Project::factory()->create(['program_id' => Program::factory()->create(['manager_id' => $this->owner])->id, 'user_id' => $this->owner]);
+        $legacy = projectWithRow(['center_id' => $this->centerId, 'city_id' => $this->cityId, 'program_id' => $this->program->id, 'user_id' => $this->owner]);
+        $withSector = projectWithRow(['program_id' => Program::factory()->create(['manager_id' => $this->owner])->id, 'user_id' => $this->owner]);
         $withSector->sectors()->attach($this->health->id);
 
         Livewire::actingAs($this->user)->test('pages::projects.index')
-            ->call('openEditModal', $withSector->id)
+            ->call('openEditModal', rowFor($withSector)->id)
             ->assertSet('sectorIds', [(string) $this->health->id])
-            ->call('openEditModal', $legacy->id)
+            ->call('openEditModal', rowFor($legacy)->id)
             ->assertSet('sectorIds', [])
             ->set('name', 'Renamed legacy')
             ->call('saveProject')
@@ -214,11 +215,11 @@ describe('the project form', function () {
     it('offers active sectors only, plus an inactive one the project already has, marked inactive', function () {
         $retired = Sector::factory()->inactive()->create(['name_en' => 'Retired sector']);
         $hidden = Sector::factory()->inactive()->create(['name_en' => 'Never offered']);
-        $project = Project::factory()->create(['center_id' => $this->centerId, 'city_id' => $this->cityId, 'program_id' => $this->program->id, 'user_id' => $this->owner]);
+        $project = projectWithRow(['center_id' => $this->centerId, 'city_id' => $this->cityId, 'program_id' => $this->program->id, 'user_id' => $this->owner]);
         $project->sectors()->attach($retired->id);
 
         Livewire::actingAs($this->user)->test('pages::projects.index')
-            ->call('openEditModal', $project->id)
+            ->call('openEditModal', rowFor($project)->id)
             ->assertSeeHtml('data-picker-sector="'.$this->health->id.'"')
             ->assertSeeHtml('data-picker-sector="'.$retired->id.'"')
             ->assertDontSeeHtml('data-picker-sector="'.$hidden->id.'"')
@@ -229,13 +230,17 @@ describe('the project form', function () {
 
 describe('display', function () {
     it('shows the sector chips on the project page, with the inactive badge', function () {
-        $project = Project::factory()->create();
-        $project->sectors()->attach([
+        // Y-11, Y-16: sectors live on the row (proposal_location_sector), and
+        // the page reads them there; the project keeps its own until Y-18.
+        $project = projectWithRow();
+        $sectorIds = [
             Sector::factory()->create(['name_en' => 'Protection', 'sort_order' => 1])->id,
             Sector::factory()->inactive()->create(['name_en' => 'Old sector', 'sort_order' => 2])->id,
-        ]);
+        ];
+        $project->sectors()->attach($sectorIds);
+        rowFor($project)->sectors()->attach($sectorIds);
 
-        $this->actingAs(userWithRole('Team Member'))->get(route('projects.show', $project))
+        $this->actingAs(userWithRole('Team Member'))->get(route('projects.show', rowFor($project)))
             ->assertOk()
             ->assertSeeInOrder(['data-test="project-sectors"', 'Protection', 'Old sector', __('sectors.inactive')], false);
     });
@@ -243,10 +248,14 @@ describe('display', function () {
     it('shows a sectors column on the list and narrows it by sector', function () {
         $health = Sector::factory()->create(['name_en' => 'Health']);
         $wash = Sector::factory()->create(['name_en' => 'WASH']);
-        $clinic = Project::factory()->create(['name' => 'Clinic project']);
-        $wells = Project::factory()->create(['name' => 'Wells project']);
+        $clinic = projectWithRow(['name' => 'Clinic project']);
+        $wells = projectWithRow(['name' => 'Wells project']);
         $clinic->sectors()->attach($health->id);
         $wells->sectors()->attach($wash->id);
+        // Y-16 (D-93): the register filters places, which carry their own
+        // sectors; SyncProjectSectors is what mirrors them in the application.
+        app(ProjectLocationMirror::class)->syncSectors($clinic);
+        app(ProjectLocationMirror::class)->syncSectors($wells);
 
         Livewire::actingAs(userWithRole('General Manager'))->test('pages::projects.index')
             ->set('view', 'list')

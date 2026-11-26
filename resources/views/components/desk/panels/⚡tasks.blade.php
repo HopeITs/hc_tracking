@@ -5,7 +5,7 @@ use App\Enums\TaskKind;
 use App\Enums\TaskStatus;
 use App\Livewire\Concerns\Dashboard\ReadsDashboardAttention;
 use App\Livewire\Concerns\Desk\IsDeskPanel;
-use App\Models\Project;
+use App\Models\ProposalLocation;
 use App\Models\Task;
 use App\Support\Desk\DeskWork;
 use App\Support\Desk\TeamScope;
@@ -159,7 +159,7 @@ new class extends Component {
     #[Computed]
     public function pausedProjectIds(): array
     {
-        return Project::pausedIds();
+        return ProposalLocation::pausedIds();
     }
 
     /**

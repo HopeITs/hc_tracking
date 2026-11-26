@@ -4,7 +4,8 @@ use App\Enums\ProjectStatus;
 use App\Enums\ReportTemplateStatus;
 use App\Livewire\Concerns\Desk\IsDeskPanel;
 use App\Models\HrEmployee;
-use App\Models\Project;
+use App\Models\ProposalLocation;
+use App\Support\Locations\MonthlyReportsAtRows;
 use App\Models\ReportTemplate;
 use App\Support\MealCoverage;
 use App\Support\Reporting\PlaceBridge;
@@ -41,12 +42,16 @@ new class extends Component {
             return new Collection;
         }
 
-        $projects = Project::query()
-            ->select(['id', 'slug', 'name', 'status', 'city_id', 'center_id', 'program_id', 'user_id'])
-            ->whereIn('status', [ProjectStatus::Active, ProjectStatus::Approved])
-            ->orderBy('name')
-            ->get();
-        $templateIds = app(PlaceBridge::class)->templateIdsOfProjects($projects->modelKeys());
+        // Y-16 (D-93): one line per **place** waiting for its report template,
+        // which is where a template's place points (D-75).
+        $projects = ProposalLocation::query()
+            ->select(['id', 'proposal_id', 'project_id', 'slug', 'status', 'city_id', 'city_wide', 'program_id', 'responsible_employee_id'])
+            ->whereIn('proposal_locations.status', [ProjectStatus::Active, ProjectStatus::Approved])
+            ->with(['city:id,name_en,name_ar', 'program:id', 'centers', 'proposal:id,name'])
+            ->get()
+            ->sortBy(fn (ProposalLocation $row): string => $row->headline())
+            ->values();
+        $templateIds = app(MonthlyReportsAtRows::class)->templateIdsByRow($projects);
         $templates = ReportTemplate::query()
             ->select(['id', 'status'])
             ->whereKey(array_merge(...array_values($templateIds)))
@@ -55,7 +60,7 @@ new class extends Component {
             ->keyBy('id');
 
         return $projects
-            ->map(function (Project $project) use ($templateIds, $templates): array {
+            ->map(function (ProposalLocation $project) use ($templateIds, $templates): array {
                 $template = $templates->get($templateIds[$project->id][0] ?? 0);
 
                 return [
@@ -73,7 +78,7 @@ new class extends Component {
     }
 
     /**
-     * project id => responsible MEAL officer's name.
+     * row id => responsible MEAL officer's name (Y-16, D-93).
      *
      * @return array<int, string>
      */
@@ -81,7 +86,7 @@ new class extends Component {
     public function officers(): array
     {
         $byProject = $this->rows->mapWithKeys(fn (array $row): array => [
-            $row['project']->id => MealCoverage::officersForLegacyProject($row['project']->id),
+            $row['project']->id => MealCoverage::responsibleForLocation($row['project']),
         ]);
         $names = HrEmployee::query()->whereKey($byProject->flatten()->unique()->values()->all())
             ->get(HrEmployee::NameColumns)->pluck('name', 'id');
@@ -90,27 +95,30 @@ new class extends Component {
     }
 
     /**
-     * "Create" on a project with no template: pre-fill it now from the
-     * project's donor-approved proposal targets and its HC.* annual-plan
+     * "Create" on a place with no template: pre-fill it now from the
+     * place's donor-approved proposal targets and its HC.* annual-plan
      * targets (ReportTemplatePrefiller, the same writer the donor approval
-     * runs), then open the project's Report template tab. A project with no
+     * runs), then open the place's Report template tab. A place with no
      * target to plan gets no template, and the toast says so.
+     *
+     * The pre-filler still writes against the project the place carries
+     * (Y-17 moves it), reached through `project_id`.
      */
-    public function createTemplate(int $projectId, ReportTemplatePrefiller $prefiller, PlaceBridge $places): void
+    public function createTemplate(int $locationId, ReportTemplatePrefiller $prefiller, PlaceBridge $places): void
     {
         Gate::authorize('report-templates.manage');
 
-        $row = $this->rows->first(fn (array $row): bool => $row['project']->id === $projectId);
+        $row = $this->rows->first(fn (array $row): bool => $row['project']->id === $locationId);
 
         if ($row === null) {
             return;
         }
 
         $project = $row['project'];
-        $prefiller->prefillProject($project->id);
+        $prefiller->prefillProject((int) $project->project_id);
 
-        if ($places->templateIdsOfProject($project->id) === []) {
-            Flux::toast(variant: 'warning', text: __('desk.template_nothing_to_plan', ['project' => $project->name]));
+        if ($places->templateIdsOfProject((int) $project->project_id) === []) {
+            Flux::toast(variant: 'warning', text: __('desk.template_nothing_to_plan', ['project' => $project->headline()]));
 
             return;
         }
@@ -146,7 +154,7 @@ new class extends Component {
                     $officer = $this->officers[$row['project']->id] ?? '';
                 @endphp
                 <li wire:key="tp-{{ $row['project']->id }}">
-                    <span class="dk-tp-n" title="{{ $row['project']->name }}">{{ $row['project']->name }}</span>
+                    <span class="dk-tp-n" title="{{ $row['project']->headline() }} · {{ $row['project']->label() }}">{{ $row['project']->headline() }}</span>
                     <span @class(['dk-pill dk-tp-s', 'dk-bad' => $row['state'] === 'missing', 'dk-warn' => $row['state'] === 'pending', 'dk-good' => $row['state'] === 'approved'])>{{ __('desk.template_state.'.$row['state']) }}</span>
                     <span class="dk-tp-m dk-is">@if ($row['state'] !== 'missing'){{ trans_choice('desk.lines_count', $row['lines'], ['count' => $row['lines']]) }} · @endif{{ $officer !== '' ? $officer : __('desk.no_meal_officer') }}</span>
                     @if ($row['state'] === 'missing')

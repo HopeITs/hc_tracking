@@ -186,11 +186,13 @@ test('the funding sources panel shows donor names to everyone but amounts only t
     $project = Project::factory()->create();
     $proposal = Proposal::factory()->create(['name' => 'Harbour Clean Water', 'donor_id' => Donor::factory()->create(['name' => 'Aurora Foundation'])]);
     $project->proposals()->attach($proposal);
+    // Y-16 (D-93): the page is the place's, and the place is of this proposal.
+    $row = proposalRowForProject($proposal, $project);
     DB::table('proposals')->where('id', $proposal->id)->update(['status' => ProposalStatus::Approved->value]);
     DonorProposal::factory()->create(['proposal_id' => $proposal->id, 'budget' => '731942.00']);
 
     $managers = Livewire::actingAs(userWithRole('Managers'))
-        ->test('pages::projects.show', ['project' => $project])
+        ->test('pages::projects.show', ['project' => $row->slug])
         ->assertSee('Funding sources')
         ->assertSee('Aurora Foundation')
         ->assertDontSee('731,942');
@@ -198,7 +200,7 @@ test('the funding sources panel shows donor names to everyone but amounts only t
     expect($managers->instance()->fundingSources->first()->relationLoaded('donorProposals'))->toBeFalse();
 
     Livewire::actingAs(userWithRole('Financial'))
-        ->test('pages::projects.show', ['project' => $project])
+        ->test('pages::projects.show', ['project' => $row->slug])
         ->assertSee('Aurora Foundation')
         ->assertSee('731,942');
 });

@@ -7,6 +7,7 @@ use App\Models\DonorProposal;
 use App\Models\Program;
 use App\Models\Project;
 use App\Models\Proposal;
+use App\Models\ProposalLocation;
 use App\Models\Risk;
 use App\Models\Strategy;
 use App\Models\User;
@@ -32,8 +33,8 @@ test('projects can be filtered by search city program owner and status', functio
     $water = Program::factory()->create(['name' => 'Water Security']);
     $shelter = Program::factory()->create(['name' => 'Safe Shelter']);
 
-    Project::factory()->active()->create(['name' => 'Aleppo Wells', 'city_id' => $aleppo, 'program_id' => $water->id, 'user_id' => $firstOwner]);
-    Project::factory()->closed()->create(['name' => 'Homs Shelter', 'city_id' => $homs, 'program_id' => $shelter->id, 'user_id' => $secondOwner]);
+    rowFor(Project::factory()->active()->create(['name' => 'Aleppo Wells', 'city_id' => $aleppo, 'program_id' => $water->id, 'user_id' => $firstOwner]));
+    rowFor(Project::factory()->closed()->create(['name' => 'Homs Shelter', 'city_id' => $homs, 'program_id' => $shelter->id, 'user_id' => $secondOwner]));
 
     Livewire::actingAs($user)
         ->test('pages::projects.index')
@@ -56,8 +57,8 @@ test('projects can be filtered by strategy across every one of its programs', fu
     $water = Program::factory()->create(['name' => 'Water Security', 'strategy_id' => $waterStrategy->id]);
     $shelter = Program::factory()->create(['name' => 'Safe Shelter', 'strategy_id' => $otherStrategy->id]);
 
-    Project::factory()->create(['name' => 'Aleppo Wells', 'program_id' => $water->id]);
-    Project::factory()->create(['name' => 'Homs Shelter', 'program_id' => $shelter->id]);
+    projectWithRow(['name' => 'Aleppo Wells', 'program_id' => $water->id]);
+    projectWithRow(['name' => 'Homs Shelter', 'program_id' => $shelter->id]);
 
     $this->actingAs($user)
         ->get(route('projects.index', ['strategy' => $waterStrategy->id]))
@@ -68,8 +69,8 @@ test('projects can be filtered by strategy across every one of its programs', fu
 
 test('the status URL filter selects projects by lifecycle state', function () {
     $user = User::factory()->role('General Manager')->create();
-    Project::factory()->active()->create(['name' => 'Active Water Network']);
-    Project::factory()->closed()->create(['name' => 'Closed Shelter Project']);
+    rowFor(Project::factory()->active()->create(['name' => 'Active Water Network']));
+    rowFor(Project::factory()->closed()->create(['name' => 'Closed Shelter Project']));
 
     $this->actingAs($user)
         ->get(route('projects.index', ['status' => ProjectStatus::Active->value]))
@@ -87,9 +88,9 @@ test('the stage URL filter selects the projects the Desk puts on that stage, and
     $this->travelTo('2026-11-06 09:00:00');
     $user = User::factory()->role('General Manager')->create();
     $running = Project::factory()->status(ProjectStatus::Active)->create(['name' => 'Running Water Network', 'end_date' => '2027-06-30']);
-    $running->proposals()->attach(Proposal::factory()->create(['status' => ProposalStatus::Approved]));
+    rowFor($running, Proposal::factory()->create(['name' => 'Running Water Network', 'status' => ProposalStatus::Approved]));
     $fundraising = Project::factory()->create(['name' => 'Draft Shelter Project']);
-    $fundraising->proposals()->attach(Proposal::factory()->create(['status' => ProposalStatus::ProposalDraft]));
+    rowFor($fundraising, Proposal::factory()->create(['name' => 'Draft Shelter Project', 'status' => ProposalStatus::ProposalDraft]));
 
     $this->actingAs($user)
         ->get(route('projects.index', ['stage' => 5]))
@@ -232,7 +233,7 @@ test('project lifecycle dates and targets reject invalid values', function () {
 
 test('a project can be renamed and moved to another center while keeping its status', function () {
     $user = User::factory()->role('General Manager')->create();
-    $project = Project::factory()->create([
+    $project = projectWithRow([
         'name' => 'Old Name',
         'description' => 'Original scope',
         'status' => ProjectStatus::Approved,
@@ -244,11 +245,12 @@ test('a project can be renamed and moved to another center while keeping its sta
         'target_boys' => 80,
         'target_girls' => 90,
     ]);
+    $row = rowFor($project);
     $newCity = insertHrCity('Hama');
 
     Livewire::actingAs($user)
         ->test('pages::projects.index')
-        ->call('openEditModal', $project->id)
+        ->call('openEditModal', $row->id)
         ->assertSet('name', 'Old Name')
         ->assertSet('description', 'Original scope')
         ->assertSet('startDate', '2026-01-01')
@@ -285,7 +287,7 @@ test('a project can be renamed and moved to another center while keeping its sta
 
 test('the project directory offers no delete action', function () {
     $user = User::factory()->role('General Manager')->create();
-    Project::factory()->create();
+    projectWithRow();
 
     Livewire::actingAs($user)
         ->test('pages::projects.index')
@@ -300,26 +302,26 @@ test('the project directory renders with no projects', function () {
 });
 
 /**
- * One project per triage lens, each tripping exactly one of them.
+ * One location row per triage lens, each tripping exactly one of them.
  *
- * @return array<string, Project>
+ * @return array<string, ProposalLocation>
  */
 function projectsForEachLens(): array
 {
-    $fund = function (Project $project): Project {
-        $proposal = Proposal::factory()->create();
-        DonorProposal::factory()->create(['proposal_id' => $proposal->id, 'budget' => '1000.00']);
-        $project->proposals()->attach($proposal);
+    // Y-16 (D-93): every row has a proposal, so "unfunded" is a row whose
+    // proposal carries no donor agreement.
+    $fund = function (ProposalLocation $row): ProposalLocation {
+        DonorProposal::factory()->create(['proposal_id' => $row->proposal_id, 'budget' => '1000.00']);
 
-        return $project;
+        return $row;
     };
 
-    $unfunded = Project::factory()->active()->create(['name' => 'Unfunded Wells', 'end_date' => today()->addYear()]);
+    $unfunded = rowFor(Project::factory()->active()->create(['name' => 'Unfunded Wells', 'end_date' => today()->addYear()]));
 
-    $overdue = $fund(Project::factory()->active()->create(['name' => 'Overdue Clinic', 'start_date' => today()->subYears(2), 'end_date' => today()->subDay()]));
+    $overdue = $fund(rowFor(Project::factory()->active()->create(['name' => 'Overdue Clinic', 'start_date' => today()->subYears(2), 'end_date' => today()->subDay()])));
 
-    $risky = $fund(Project::factory()->active()->create(['name' => 'Risky Bakery', 'end_date' => today()->addYear()]));
-    Risk::factory()->happened()->create(['project_id' => $risky->id]);
+    $risky = $fund(rowFor(Project::factory()->active()->create(['name' => 'Risky Bakery', 'end_date' => today()->addYear()])));
+    Risk::factory()->happened()->create(['project_id' => $risky->project_id, 'proposal_location_id' => $risky->id]);
 
     return ['unfunded' => $unfunded, 'overdue' => $overdue, 'risks' => $risky];
 }
@@ -330,7 +332,7 @@ test('each triage lens selects only the projects that trip it', function (string
 
     $component = Livewire::actingAs($user)->test('pages::projects.index')->set('lens', $lens);
 
-    expect($component->instance()->projects->getCollection()->pluck('name')->all())->toBe([$expected]);
+    expect($component->instance()->projects->getCollection()->map(fn (ProposalLocation $row): string => $row->headline())->all())->toBe([$expected]);
 })->with([
     ['unfunded', 'Unfunded Wells'],
     ['overdue', 'Overdue Clinic'],
@@ -384,9 +386,9 @@ test('lifecycle counts ignore the status filter but respect every other filter',
     $aleppo = insertHrCity('Aleppo');
     $homs = insertHrCity('Homs');
 
-    Project::factory()->active()->create(['city_id' => $aleppo]);
-    Project::factory()->closed()->create(['city_id' => $aleppo]);
-    Project::factory()->active()->create(['city_id' => $homs]);
+    rowFor(Project::factory()->active()->create(['city_id' => $aleppo]));
+    rowFor(Project::factory()->closed()->create(['city_id' => $aleppo]));
+    rowFor(Project::factory()->active()->create(['city_id' => $homs]));
 
     $component = Livewire::actingAs($user)->test('pages::projects.index');
 
@@ -401,13 +403,13 @@ test('lifecycle counts ignore the status filter but respect every other filter',
     expect($component->instance()->statusCounts)->toBe(['active' => 1, 'closed' => 1]);
 });
 
-test('committed funding counts a proposal shared by two projects once', function () {
+test('committed funding counts a proposal shared by two places once', function () {
     $user = User::factory()->role('General Manager')->create();
     $proposal = Proposal::factory()->create();
     DonorProposal::factory()->create(['proposal_id' => $proposal->id, 'budget' => '1000.00']);
 
     foreach (Project::factory()->count(2)->create() as $project) {
-        $project->proposals()->attach($proposal);
+        rowFor($project, $proposal);
     }
 
     $component = Livewire::actingAs($user)->test('pages::projects.index');
@@ -417,12 +419,11 @@ test('committed funding counts a proposal shared by two projects once', function
 
 test('committed funding reports one line per currency and never adds them together', function () {
     $user = User::factory()->role('General Manager')->create();
-    $project = Project::factory()->create();
-
+    // One agreement per proposal, and one proposal per row (D-93), so two
+    // currencies mean two places.
     foreach ([Currency::Usd, Currency::Eur] as $currency) {
-        $proposal = Proposal::factory()->create();
-        DonorProposal::factory()->create(['proposal_id' => $proposal->id, 'budget' => '2500.00', 'currency' => $currency]);
-        $project->proposals()->attach($proposal);
+        $row = rowFor(Project::factory()->create());
+        DonorProposal::factory()->create(['proposal_id' => $row->proposal_id, 'budget' => '2500.00', 'currency' => $currency]);
     }
 
     $funding = Livewire::actingAs($user)->test('pages::projects.index')->instance()->committedFunding;
@@ -434,8 +435,8 @@ test('committed funding reports one line per currency and never adds them togeth
 
 test('every view renders the same filtered project set and an unknown view falls back to the list', function () {
     $user = User::factory()->role('General Manager')->create();
-    Project::factory()->active()->create(['name' => 'Aleppo Wells']);
-    Project::factory()->closed()->create(['name' => 'Homs Shelter']);
+    rowFor(Project::factory()->active()->create(['name' => 'Aleppo Wells']));
+    rowFor(Project::factory()->closed()->create(['name' => 'Homs Shelter']));
 
     $component = Livewire::actingAs($user)->test('pages::projects.index');
 
@@ -452,13 +453,13 @@ test('every view renders the same filtered project set and an unknown view falls
 
 test('projects can be sorted by name dates and recency with undated projects last', function () {
     $user = User::factory()->role('General Manager')->create();
-    Project::factory()->create(['name' => 'Beta', 'start_date' => '2026-03-01', 'end_date' => '2026-12-31', 'updated_at' => '2026-01-01 00:00:00']);
-    Project::factory()->create(['name' => 'Alpha', 'start_date' => '2026-06-01', 'end_date' => '2026-07-31', 'updated_at' => '2026-02-01 00:00:00']);
-    Project::factory()->create(['name' => 'Gamma', 'start_date' => null, 'end_date' => null, 'updated_at' => '2026-03-01 00:00:00']);
+    projectWithRow(['name' => 'Beta', 'start_date' => '2026-03-01', 'end_date' => '2026-12-31', 'updated_at' => '2026-01-01 00:00:00']);
+    projectWithRow(['name' => 'Alpha', 'start_date' => '2026-06-01', 'end_date' => '2026-07-31', 'updated_at' => '2026-02-01 00:00:00']);
+    projectWithRow(['name' => 'Gamma', 'start_date' => null, 'end_date' => null, 'updated_at' => '2026-03-01 00:00:00']);
 
     $component = Livewire::actingAs($user)->test('pages::projects.index')->set('view', 'list');
 
-    $order = fn (): array => $component->instance()->projects->getCollection()->pluck('name')->all();
+    $order = fn (): array => $component->instance()->projects->getCollection()->map(fn (ProposalLocation $row): string => $row->headline())->all();
 
     $component->set('sort', 'name');
     expect($order())->toBe(['Alpha', 'Beta', 'Gamma']);
@@ -479,7 +480,7 @@ test('projects can be sorted by name dates and recency with undated projects las
 
 test('the list pages projects in twenties and the timeline in fifteens', function () {
     $user = User::factory()->role('General Manager')->create();
-    Project::factory()->count(25)->create();
+    Project::factory()->count(25)->create()->each(fn (Project $project) => rowFor($project));
 
     $component = Livewire::actingAs($user)->test('pages::projects.index');
 
@@ -502,7 +503,7 @@ test('an old board or table link opens the list', function (string $oldView) {
 
 test('the project directory renders within its query budget', function () {
     $user = User::factory()->role('General Manager')->create();
-    Project::factory()->count(5)->create();
+    Project::factory()->count(5)->create()->each(fn (Project $project) => rowFor($project));
 
     $queries = 0;
     DB::listen(function () use (&$queries): void {
@@ -512,52 +513,57 @@ test('the project directory renders within its query budget', function () {
     Livewire::actingAs($user)->test('pages::projects.index');
 
     // 17 + one query that loads every owner assignment for the Rejected badge
+    // + one load of the rows' centers, which label() names (Y-16: the project
+    //   carried a single center_id column and needed no join)
     // + one count of the projects without a center (shown to managers)
     // + the two HR queries of EmployeeProfile behind the owner chips' positions
     // + the sector filter's options and the list preview's sector eager load (T34).
     // + one read of the HR centers lookup for the «Center inactive» badge (W-02), flat however many rows.
     // + one load of the linked proposals' statuses for the funding badge (T08).
-    expect($queries)->toBeLessThanOrEqual(25);
+    expect($queries)->toBeLessThanOrEqual(26);
 });
 
 test('a list preview names only the relations a project has and flags a materialised risk', function () {
     $user = User::factory()->role('General Manager')->create();
-    $project = Project::factory()->active()->create(['name' => 'Wells Of Hope']);
-    Risk::factory()->count(2)->create(['project_id' => $project->id, 'happened' => false]);
+    $row = rowFor(Project::factory()->active()->create(['name' => 'Wells Of Hope']));
+    Risk::factory()->count(2)->create(['project_id' => $row->project_id, 'proposal_location_id' => $row->id, 'happened' => false]);
 
     Livewire::actingAs($user)->test('pages::projects.index')
         ->assertSeeText(trans_choice('programs.timeline_open_risks', 2, ['count' => 2]))
         ->assertDontSeeHtml('dk-pjl-link dk-bad');
 
-    Risk::factory()->create(['project_id' => $project->id, 'happened' => true]);
+    Risk::factory()->create(['project_id' => $row->project_id, 'proposal_location_id' => $row->id, 'happened' => true]);
 
     Livewire::actingAs($user)->test('pages::projects.index')
         ->assertSeeHtml('dk-pjl-link dk-bad');
 });
 
-test('a list preview with no relations at all says so instead of rendering empty chips', function () {
+test('a list preview names the one proposal a bare row carries and no empty chips', function () {
     $user = User::factory()->role('General Manager')->create();
-    Project::factory()->active()->create(['name' => 'Bare Project']);
+    rowFor(Project::factory()->active()->create(['name' => 'Bare Project']));
 
+    // Y-16 (D-84, D-87): a row exists only under a proposal, so the preview
+    // always has that one relation to name and never reads as "nothing".
     Livewire::actingAs($user)->test('pages::projects.index')
-        ->assertSeeText('Nothing linked yet')
+        ->assertSeeText(trans_choice('projects.count_proposal', 1, ['count' => 1]))
+        ->assertDontSeeText('Nothing linked yet')
         ->assertDontSeeHtml('aria-hidden="true">0</span>');
 });
 
 test('a list row opens the project through an eye action, not a clickable name', function () {
     $user = User::factory()->role('General Manager')->create();
-    $project = Project::factory()->active()->create(['name' => 'Wells Of Hope']);
+    $row = rowFor(Project::factory()->active()->create(['name' => 'Wells Of Hope']));
 
     Livewire::actingAs($user)->test('pages::projects.index')
         ->assertSeeHtml('aria-label="Open Wells Of Hope"')
-        ->assertSeeHtml('href="'.route('projects.show', $project).'"')
+        ->assertSeeHtml('href="'.route('projects.show', $row).'"')
         // The name is plain text; nothing stretches a link across the card.
         ->assertDontSeeHtml('after:absolute after:inset-0');
 });
 
 test('a list row never prints the progress bar accessibility label as visible copy', function () {
     $user = User::factory()->role('General Manager')->create();
-    $project = Project::factory()->active()->create(['name' => 'Wells Of Hope']);
+    rowFor(Project::factory()->active()->create(['name' => 'Wells Of Hope']));
     $rendered = Livewire::actingAs($user)->test('pages::projects.index');
 
     // The name still reaches assistive tech through aria-label, but is not drawn.
@@ -567,11 +573,11 @@ test('a list row never prints the progress bar accessibility label as visible co
 
 test('a list row rates an overdue project critical', function () {
     $user = User::factory()->role('General Manager')->create();
-    $overdue = Project::factory()->active()->create([
+    rowFor(Project::factory()->active()->create([
         'name' => 'Overdue Project',
         'start_date' => now()->subYear(),
         'end_date' => now()->subMonth(),
-    ]);
+    ]));
 
     Livewire::actingAs($user)->test('pages::projects.index')
         ->assertSeeHtml('dk-pjl-row dk-pjl-alert')
@@ -581,8 +587,8 @@ test('a list row rates an overdue project critical', function () {
 
 test('every view opens a project through the same eye action instead of a clickable name', function () {
     $user = User::factory()->role('General Manager')->create();
-    $project = Project::factory()->active()->create(['name' => 'Wells Of Hope']);
-    $showUrl = route('projects.show', $project);
+    $row = rowFor(Project::factory()->active()->create(['name' => 'Wells Of Hope']));
+    $showUrl = route('projects.show', $row);
 
     foreach (['list', 'timeline'] as $view) {
         Livewire::actingAs($user)->test('pages::projects.index')
@@ -596,13 +602,14 @@ test('every view opens a project through the same eye action instead of a clicka
 
 test('a project is archived rather than deleted, keeping every record it carries', function () {
     $user = User::factory()->role('General Manager')->create();
-    $project = Project::factory()->active()->create(['name' => 'Wells Of Hope']);
-    Risk::factory()->create(['project_id' => $project->id]);
+    $row = rowFor(Project::factory()->active()->create(['name' => 'Wells Of Hope']));
+    $project = $row->project;
+    Risk::factory()->create(['project_id' => $project->id, 'proposal_location_id' => $row->id]);
 
     Livewire::actingAs($user)->test('pages::projects.index')
-        ->call('confirmArchive', $project->id)
+        ->call('confirmArchive', $row->id)
         // The dialog only opens from the boolean, so both must be set.
-        ->assertSet('archivingProjectId', $project->id)
+        ->assertSet('archivingProjectId', $row->id)
         ->assertSet('showArchiveModal', true)
         ->call('archiveProject')
         ->assertSet('archivingProjectId', null)
@@ -616,8 +623,9 @@ test('a project is archived rather than deleted, keeping every record it carries
 test('an archived project can be restored back into the portfolio as a draft', function () {
     $user = User::factory()->role('General Manager')->create();
     $project = Project::factory()->create(['name' => 'Wells Of Hope', 'status' => ProjectStatus::Archived]);
+    $row = rowFor($project);
 
-    Livewire::actingAs($user)->test('pages::projects.index')->call('restoreProject', $project->id);
+    Livewire::actingAs($user)->test('pages::projects.index')->call('restoreProject', $row->id);
 
     expect($project->fresh()->status)->toBe(ProjectStatus::Draft);
 });
@@ -625,8 +633,9 @@ test('an archived project can be restored back into the portfolio as a draft', f
 test('restoring only applies to archived projects', function () {
     $user = User::factory()->role('General Manager')->create();
     $project = Project::factory()->active()->create(['name' => 'Wells Of Hope']);
+    $row = rowFor($project);
 
-    Livewire::actingAs($user)->test('pages::projects.index')->call('restoreProject', $project->id);
+    Livewire::actingAs($user)->test('pages::projects.index')->call('restoreProject', $row->id);
 
     expect($project->fresh()->status)->toBe(ProjectStatus::Active);
 });
@@ -634,9 +643,10 @@ test('restoring only applies to archived projects', function () {
 test('cancelling the archive confirmation leaves the project where it was', function () {
     $user = User::factory()->role('General Manager')->create();
     $project = Project::factory()->active()->create(['name' => 'Wells Of Hope']);
+    $row = rowFor($project);
 
     Livewire::actingAs($user)->test('pages::projects.index')
-        ->call('confirmArchive', $project->id)
+        ->call('confirmArchive', $row->id)
         ->call('cancelArchive')
         ->assertSet('archivingProjectId', null)
         ->assertSet('showArchiveModal', false);
@@ -646,14 +656,14 @@ test('cancelling the archive confirmation leaves the project where it was', func
 
 test('the archive confirmation names the work the project keeps', function () {
     $user = User::factory()->role('General Manager')->create();
-    $project = Project::factory()->active()->create(['name' => 'Wells Of Hope']);
-    Risk::factory()->count(3)->create(['project_id' => $project->id]);
+    $row = rowFor(Project::factory()->active()->create(['name' => 'Wells Of Hope']));
+    Risk::factory()->count(3)->create(['project_id' => $row->project_id, 'proposal_location_id' => $row->id]);
 
-    $component = Livewire::actingAs($user)->test('pages::projects.index')->call('confirmArchive', $project->id);
+    $component = Livewire::actingAs($user)->test('pages::projects.index')->call('confirmArchive', $row->id);
     $pending = $component->instance()->archivingProject;
 
-    // Nothing with a zero count is listed.
-    expect($pending['carries'])->toBe(['Risks' => 3]);
+    // A row is of exactly one proposal (D-93), so it always carries that one.
+    expect($pending['carries'])->toBe(['Risks' => 3, 'Proposals' => 1]);
 
     $component->assertSeeText('Archive this project?')
         ->assertSeeText('3 Risks');
@@ -661,11 +671,11 @@ test('the archive confirmation names the work the project keeps', function () {
 
 test('archiving a project that vanished mid-confirmation closes cleanly instead of erroring', function () {
     $user = User::factory()->role('General Manager')->create();
-    $project = Project::factory()->active()->create(['name' => 'Wells Of Hope']);
+    $row = rowFor(Project::factory()->active()->create(['name' => 'Wells Of Hope']));
 
-    $component = Livewire::actingAs($user)->test('pages::projects.index')->call('confirmArchive', $project->id);
+    $component = Livewire::actingAs($user)->test('pages::projects.index')->call('confirmArchive', $row->id);
 
-    Project::query()->whereKey($project->id)->delete();
+    ProposalLocation::query()->whereKey($row->id)->update(['project_id' => null]);
 
     $component->call('archiveProject')
         ->assertSet('archivingProjectId', null)
@@ -675,8 +685,8 @@ test('archiving a project that vanished mid-confirmation closes cleanly instead 
 
 test('every view offers archive for a live project and restore for an archived one', function () {
     $user = User::factory()->role('General Manager')->create();
-    $live = Project::factory()->active()->create(['name' => 'Wells Of Hope']);
-    $archived = Project::factory()->create(['name' => 'Retired Project', 'status' => ProjectStatus::Archived]);
+    $live = rowFor(Project::factory()->active()->create(['name' => 'Wells Of Hope']));
+    $archived = rowFor(Project::factory()->create(['name' => 'Retired Project', 'status' => ProjectStatus::Archived]));
 
     foreach (['list', 'timeline'] as $view) {
         Livewire::actingAs($user)->test('pages::projects.index')
@@ -738,8 +748,9 @@ test('editing a project shows its saved choices in the form pickers', function (
         'program_id' => $program->id,
         'user_id' => $owner,
     ]);
+    $row = rowFor($project);
 
-    $html = Livewire::actingAs($user)->test('pages::projects.index')->call('openEditModal', $project->id)->html();
+    $html = Livewire::actingAs($user)->test('pages::projects.index')->call('openEditModal', $row->id)->html();
 
     $document = new DOMDocument;
     @$document->loadHTML('<?xml encoding="utf-8" ?>'.$html);
@@ -762,26 +773,31 @@ test('the project form is rendered only while its modal is open', function () {
         ->assertSeeHtml('wire:model="targetBeneficiaries"');
 });
 
-test('a hosted project says which center hosts it and a centered one does not', function () {
+/*
+| Y-16 (D-88): a row has no host center. A place with no center of its own is
+| field work across the city, which the row says itself, so the directory
+| names the place and never "hosted by".
+*/
+
+test('a city-wide row reads as field work and is not counted as unplaced', function () {
     $user = User::factory()->role('General Manager')->create();
     $idleb = insertHrCity('Idleb', 'إدلب');
     $aleppo = insertHrCity('Aleppo', 'حلب');
-    $host = insertHrCenter($aleppo, 'Head Office Aleppo', 'المكتب الرئيسي حلب');
-    Project::factory()->hostedBy($host)->create(['name' => 'Wells Idleb', 'city_id' => $idleb]);
-    Project::factory()->create(['name' => 'Aleppo Clinics', 'city_id' => $aleppo, 'center_id' => $host]);
+    $center = insertHrCenter($aleppo, 'Head Office Aleppo', 'المكتب الرئيسي حلب');
+    $field = rowFor(Project::factory()->create(['name' => 'Wells Idleb', 'city_id' => $idleb]));
+    $field->update(['city_wide' => true]);
+    rowFor(Project::factory()->create(['name' => 'Aleppo Clinics', 'city_id' => $aleppo, 'center_id' => $center]));
 
-    $page = Livewire::actingAs($user)->test('pages::projects.index')
-        ->assertSeeText('Hosted by Head Office Aleppo')
-        ->assertSeeHtml('data-test="hosted-by-badge"')
+    Livewire::actingAs($user)->test('pages::projects.index')
+        ->assertSeeText('Field work')
+        ->assertSeeText('Head Office Aleppo')
         ->assertDontSeeText('Projects without a center');
-
-    expect(substr_count($page->html(), 'data-test="hosted-by-badge"'))->toBe(1);
 });
 
-test('hosted projects add no query per row to the directory', function () {
+test('places add no query per row to the directory', function () {
     $user = User::factory()->role('General Manager')->create();
-    $host = insertHrCenter(insertHrCity('Aleppo', 'حلب'), 'Head Office Aleppo');
-    Project::factory()->hostedBy($host)->create();
+    $center = insertHrCenter(insertHrCity('Aleppo', 'حلب'), 'Head Office Aleppo');
+    rowFor(Project::factory()->create(['center_id' => $center]));
 
     $countQueries = function () use ($user): int {
         $queries = 0;
@@ -794,7 +810,7 @@ test('hosted projects add no query per row to the directory', function () {
     };
 
     $withOne = $countQueries();
-    Project::factory()->count(4)->hostedBy($host)->create();
+    Project::factory()->count(4)->create(['center_id' => $center])->each(fn (Project $project) => rowFor($project));
 
     expect($countQueries())->toBeLessThanOrEqual($withOne);
 });
