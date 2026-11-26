@@ -68,13 +68,13 @@ test('an indicator added on the framework is tied to its statement and lands in 
     Livewire::actingAs($user)
         ->test('indicators.quick-form')
         ->dispatch('add-indicator', resultId: $output->id)
-        ->assertSet('showIndicatorModal', true)
-        ->assertSet('indicatorResultId', (string) $output->id)
-        ->set('name', 'Wells drilled')
-        ->set('unit', 'wells')
-        ->call('saveIndicator')
+        ->assertSet('showEntryModal', true)
+        ->assertSet('entryResultId', (string) $output->id)
+        ->set('entry.name_ar', 'Wells drilled')
+        ->set('entry.unit', 'wells')
+        ->call('saveEntry')
         ->assertHasNoErrors()
-        ->assertSet('showIndicatorModal', false)
+        ->assertSet('showEntryModal', false)
         ->assertDispatched('indicator-saved');
 
     $indicator = Indicator::query()->where('name', 'Wells drilled')->sole();
@@ -91,7 +91,7 @@ test('an indicator added on the framework is tied to its statement and lands in 
         ->and($entry->unit)->toBe('wells');
 });
 
-test('a new indicator reuses the library entry that already carries its name', function () {
+test('typing a duplicate name offers the matching entry and picking it attaches it', function () {
     $user = mealManager();
     $program = Program::factory()->create();
     $outcome = Result::factory()->type(ResultType::Outcome)->create(['program_id' => $program->id]);
@@ -101,15 +101,18 @@ test('a new indicator reuses the library entry that already carries its name', f
     Livewire::actingAs($user)
         ->test('indicators.quick-form')
         ->dispatch('add-indicator', resultId: $outcome->id)
-        ->set('name', 'People reached')
-        ->call('saveIndicator')
+        ->set('entry.name_ar', 'PEOPLE   reached')
+        ->assertSee('People reached')
+        ->call('saveEntry')
+        ->assertHasErrors('entry.name_ar')
+        ->call('pickExistingEntry', $entry->id)
         ->assertHasNoErrors();
 
     expect(LibraryIndicator::query()->count())->toBe(2)
         ->and(Indicator::query()->where('name', 'People reached')->sole()->library_indicator_id)->toBe($entry->id);
 });
 
-test('an indicator is kept when its program has no HR code for a library entry', function () {
+test('a missing program code leaves the logframe and library unchanged', function () {
     $user = mealManager();
     $program = Program::factory()->create();
     DB::connection('hr')->table('programs')->where('id', $program->id)->update(['code' => '']);
@@ -118,12 +121,31 @@ test('an indicator is kept when its program has no HR code for a library entry',
     Livewire::actingAs($user)
         ->test('indicators.quick-form')
         ->dispatch('add-indicator', resultId: $outcome->id)
-        ->set('name', 'People reached')
-        ->call('saveIndicator')
+        ->set('entry.name_ar', 'People reached')
+        ->call('saveEntry')
+        ->assertHasErrors(['entry.program_id']);
+
+    expect(Indicator::query()->where('name', 'People reached')->exists())->toBeFalse()
+        ->and(LibraryIndicator::query()->count())->toBe(0);
+});
+
+test('an independent indicator create grant permits contextual creation only', function () {
+    $user = User::factory()->create(['employee_id' => holdMealManagerSlot()]);
+    $user->givePermissionTo('indicators.create');
+    $result = Result::factory()->type(ResultType::Impact)->create();
+
+    Livewire::actingAs($user)->test('indicators.quick-form')
+        ->call('addForResult', $result->id)
+        ->assertSeeHtml('data-test="save-library-entry"')
+        ->call('saveEntry')
+        ->assertHasErrors(['entry.name_ar'])
+        ->set('entry.name_ar', 'عدد الأسر')
+        ->call('saveEntry')
         ->assertHasNoErrors();
 
-    expect(Indicator::query()->where('name', 'People reached')->sole()->library_indicator_id)->toBeNull()
-        ->and(LibraryIndicator::query()->count())->toBe(0);
+    expect($result->indicators()->sole()->libraryIndicator->name_en)->toBeNull();
+
+    Livewire::actingAs($user)->test('indicators.quick-form')->call('openCreateModal')->assertForbidden();
 });
 
 test('editing an indicator from the framework changes it without a second library entry', function () {

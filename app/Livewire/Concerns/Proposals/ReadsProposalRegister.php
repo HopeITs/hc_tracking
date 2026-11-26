@@ -120,6 +120,8 @@ trait ReadsProposalRegister
             ->when($this->flag === 'on_hold', fn (Builder $query) => $query->whereNotNull('proposals.on_hold_since'))
             // Missing a center (Y-01 slice 3): a live project proposal with a row that has no center and is not field work. Not money: no permission gate.
             ->when($this->flag === 'no_center', fn (Builder $query) => $query->withoutCenter())
+            // Funded through a Main Partner (PR's list): the donor stays the back donor, so this narrows nothing else.
+            ->when($this->flag === 'via_partner', fn (Builder $query) => $query->whereNotNull('proposals.main_partner_id'))
             ->when($this->flag === 'no_agreement' && $canAgreements, fn (Builder $query) => $query->doesntHave('donorProposals'))
             ->when($this->flag === 'report_overdue' && $canAgreements, fn (Builder $query) => $query->whereHas('donorProposals.reports', fn (Builder $query) => $query->whereNull('submitted_on')->whereDate('due_on', '<', $today)))
             ->when($this->flag === 'overdue' && $canTransfers, fn (Builder $query) => $query->whereHas('donorProposals.transfers', fn (Builder $query) => $query->inState('late')))
@@ -306,8 +308,13 @@ trait ReadsProposalRegister
     protected function selectLine(Builder $query): Builder
     {
         $query
-            ->select(['proposals.id', 'proposals.slug', 'proposals.name', 'proposals.internal_project_number', 'proposals.donor_id', 'proposals.planned_date_begin', 'proposals.planned_date_end', 'proposals.status', 'proposals.kind', 'proposals.on_hold_since'])
+            ->select(['proposals.id', 'proposals.slug', 'proposals.name', 'proposals.internal_project_number', 'proposals.donor_id', 'proposals.main_partner_id', 'proposals.planned_date_begin', 'proposals.planned_date_end', 'proposals.status', 'proposals.kind', 'proposals.on_hold_since'])
             ->withCount(['projects', 'donorProposals']);
+
+        // The Main Partner is a donor-library name, not money: anyone who may view donors sees it.
+        if (auth()->user()?->can('donors.view')) {
+            $query->with(['mainPartner' => fn ($query) => $query->select(['id', 'slug', 'name'])]);
+        }
 
         // Donors stay hidden from someone who may not see agreements (FundraisingPagesMoneyTest).
         if ($this->canViewAgreements()) {
@@ -355,6 +362,27 @@ trait ReadsProposalRegister
     public function missingCenterCount(): int
     {
         return Proposal::query()->withoutCenter()->count();
+    }
+
+    /**
+     * How many proposals the "Via a Main Partner" flag lists, and so how many
+     * Main Partners-routed projects management is tracking. Like the other flag
+     * counts it ignores the other filters.
+     */
+    #[Computed]
+    public function viaPartnerCount(): int
+    {
+        return Proposal::query()->whereNotNull('main_partner_id')->count();
+    }
+
+    /**
+     * How many different organisations act as Main Partner across all
+     * proposals: the number management asked to see beside the routed projects.
+     */
+    #[Computed]
+    public function mainPartnerCount(): int
+    {
+        return Proposal::query()->whereNotNull('main_partner_id')->distinct()->count('main_partner_id');
     }
 
     /**

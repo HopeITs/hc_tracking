@@ -8,6 +8,17 @@
     .mrp-card { padding: 18px 20px; border: 1px solid var(--line); border-radius: 18px; background: var(--paper); }
     .mrp-note { display: flex; gap: 12px; }
 
+    /* Header facts: City | Program | Center | Proposal, each a small label over its value, split by hairlines. */
+    .mrp-head-facts { display: flex; flex-wrap: wrap; gap: 12px 0; margin-top: 10px; }
+    .mrp-head-facts > div { display: flex; min-width: 0; flex-direction: column; gap: 2px; padding-inline: 20px; border-inline-start: 1px solid var(--line-2); }
+    .mrp-head-facts > div:first-child { padding-inline-start: 0; border-inline-start: 0; }
+    .mrp-head-facts dt { font-size: 11.5px; font-weight: 700; letter-spacing: .05em; text-transform: uppercase; color: var(--ink-3); }
+    .mrp-head-facts dt:lang(ar) { letter-spacing: 0; }
+    .mrp-head-facts dd { font-size: 14.5px; font-weight: 600; color: var(--ink); }
+    .mrp-head-facts a { color: inherit; text-decoration: underline; text-decoration-color: var(--line-2); text-underline-offset: 3px; }
+    .mrp-head-facts a:hover { text-decoration-color: var(--ink); }
+    .mrp-head-unset { font-weight: 500 !important; color: var(--ink-3) !important; }
+
     /* Journey */
     .mrp-journey { display: grid; grid-template-columns: repeat(auto-fit, minmax(13rem, 1fr)); gap: 10px; }
     .mrp-step { display: flex; align-items: center; gap: 12px; padding: 12px 14px; list-style: none; border: 1px solid var(--line); border-radius: 14px; background: var(--sunk); }
@@ -21,16 +32,26 @@
     .mrp-actions { padding: 12px 16px; border: 1px solid var(--line); border-radius: 14px; background: var(--paper); }
 
     /* Columns */
-    .mrp-cols { display: flex; flex-wrap: wrap; align-items: flex-start; gap: 20px; }
-    .mrp-main { display: flex; flex: 999 1 38rem; min-width: 0; flex-direction: column; gap: 20px; }
-    .mrp-aside { display: flex; flex: 1 1 18rem; min-width: 0; flex-direction: column; gap: 16px; }
-    .mrp-section-head h2 { font-size: 19px; font-weight: 800; color: var(--ink); }
+    /* One grid for the page: main column + a fixed 20rem side column, so the
+     * journey, the indicator cards and the side cards share the same edges. */
+    .mrp-cols { display: grid; grid-template-columns: minmax(0, 1fr); align-items: start; gap: 24px; }
+    @container detail (min-width: 62rem) {
+        .mrp-cols { grid-template-columns: minmax(0, 1fr) 20rem; }
+        .mrp-aside { position: sticky; top: 16px; }
+    }
+    .mrp-main { display: flex; min-width: 0; flex-direction: column; gap: 28px; }
+    .mrp-aside { display: flex; min-width: 0; flex-direction: column; gap: 16px; }
+    .mrp-section-head { display: flex; flex-direction: column; gap: 2px; }
+    .mrp-section-head h2, .mrp-h2 { font-size: 17px; font-weight: 800; line-height: 1.3; color: var(--ink); }
     .mrp-section-head p { font-size: 13.5px; color: var(--ink-3); }
-    .mrp-side-card { display: flex; flex-direction: column; gap: 12px; }
+    .mrp-side-card { display: flex; flex-direction: column; gap: 14px; }
     .mrp-side-card h2 { font-size: 15.5px; font-weight: 800; color: var(--ink); }
-    .mrp-facts { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 10px 14px; font-size: 14px; }
-    .mrp-facts dt { color: var(--ink-3); }
-    .mrp-facts dd { min-width: 0; color: var(--ink); }
+    /* Label above value, one hairline between facts: no ragged two-column wrap in a narrow card. */
+    .mrp-facts { display: flex; flex-direction: column; font-size: 14px; }
+    .mrp-facts dt { padding-top: 10px; border-top: 1px solid var(--line); font-size: 12px; font-weight: 600; color: var(--ink-3); }
+    .mrp-facts dt:first-child { padding-top: 0; border-top: 0; }
+    .mrp-facts dd { min-width: 0; padding: 2px 0 10px; line-height: 1.4; color: var(--ink); }
+    .mrp-facts dd:last-child { padding-bottom: 0; }
     .mrp-months { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 6px; }
     .mrp-months li { list-style: none; }
     .mrp-month { display: grid; place-items: center; height: 38px; box-sizing: border-box; border-radius: 9px; font-size: 13px; font-weight: 700; text-decoration: none; color: var(--ink-3); border: 1px solid var(--line); }
@@ -46,18 +67,30 @@
     /* Indicator cards */
     .mrp-lines { display: flex; flex-direction: column; gap: 12px; }
     .mrp-line { overflow: hidden; border: 1px solid var(--line); border-radius: 18px; background: var(--paper); }
-    .mrp-line-main { display: flex; flex-wrap: wrap; align-items: center; gap: 16px 28px; padding: 20px; }
-    .mrp-line-ind { display: flex; flex: 1 1 16rem; min-width: 0; flex-direction: column; gap: 4px; }
+    /* Fixed tracks so the month figure, the year bar and Details line up from card to card. */
+    .mrp-line-main {
+        display: grid; align-items: center; gap: 16px 24px; padding: 20px 22px;
+        grid-template-columns: minmax(0, 1fr) auto;
+        grid-template-areas: "ind tools" "value value" "year year";
+    }
+    @container detail (min-width: 48rem) {
+        .mrp-line-main { grid-template-columns: minmax(0, 1fr) 11rem; grid-template-areas: "ind value" "year year" ". tools"; }
+        .mrp-line-value { padding-inline-start: 24px; border-inline-start: 1px solid var(--line); }
+    }
+    @container detail (min-width: 78rem) {
+        .mrp-line-main { grid-template-columns: minmax(0, 1fr) 11rem minmax(14rem, 1.1fr) 6.5rem; grid-template-areas: "ind value year tools"; }
+    }
+    .mrp-line-ind { display: flex; grid-area: ind; min-width: 0; flex-direction: column; gap: 6px; }
     .mrp-line-name { font-size: 16.5px; font-weight: 700; line-height: 1.35; color: var(--ink); }
     .mrp-code { padding: 1px 7px; border-radius: 6px; background: var(--sunk); color: var(--ink); font-size: 11.5px; font-weight: 800; }
-    .mrp-line-value { display: flex; flex: 0 0 12rem; flex-direction: column; gap: 4px; }
+    .mrp-line-value { display: flex; grid-area: value; min-width: 0; flex-direction: column; gap: 4px; }
     .mrp-line-label { font-size: 12px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; color: var(--ink-3); }
     .mrp-line-label:lang(ar) { letter-spacing: 0; }
     .mrp-line-figure { font-size: 30px; line-height: 1.1; font-weight: 800; font-variant-numeric: tabular-nums; color: var(--ink); }
     .mrp-line-empty { font-size: 18px; color: var(--faint); }
     .mrp-line-compare { font-size: 13px; font-weight: 700; color: var(--ink-2); }
     .mrp-line-low { color: var(--color-status-critical-text); }
-    .mrp-line-year { display: flex; flex: 1 1 15rem; min-width: 0; flex-direction: column; gap: 8px; }
+    .mrp-line-year { display: flex; grid-area: year; min-width: 0; flex-direction: column; gap: 8px; }
     .mrp-line-year-head { display: flex; justify-content: space-between; gap: 8px; font-size: 13px; color: var(--ink-3); }
     .mrp-line-year-head b { color: var(--ink); font-variant-numeric: tabular-nums; }
     .mrp-line-year-foot { font-size: 12px; color: var(--ink-3); }
@@ -69,6 +102,50 @@
     .mrp-spark-bar { display: block; border-radius: 3px; background: var(--line-2); }
     .mrp-spark-now { background: var(--ink); }
     .mrp-spark-low { background: var(--brand); }
-    .mrp-line-tools { display: flex; flex: none; align-items: center; }
+    .mrp-line-tools { display: flex; grid-area: tools; align-items: center; justify-content: flex-end; }
     .mrp-line-details { margin: 0 20px 20px; padding: 16px; border-radius: 14px; background: var(--sunk); }
+
+    /* Activities and questions, built to stay short: activities are rows in one card, questions a
+     * two-column grid; long reasons, notes and answers are clamped and open on click. Status in ink
+     * (done), outline (going) or red (stopped). */
+    .mrp-count { display: inline-grid; min-width: 22px; height: 22px; margin-inline-start: 8px; padding-inline: 6px; place-items: center; border-radius: 999px; background: var(--sunk); font-size: 12px; font-weight: 700; vertical-align: 2px; color: var(--ink-2); }
+    .mrp-clamp { display: -webkit-box; overflow: hidden; -webkit-box-orient: vertical; -webkit-line-clamp: 1; }
+    .mrp-clamp-3 { display: -webkit-box; overflow: hidden; -webkit-box-orient: vertical; -webkit-line-clamp: 3; cursor: pointer; }
+
+    .mrp-stack { display: flex; flex-direction: column; overflow: hidden; border: 1px solid var(--line); border-radius: 16px; background: var(--paper); }
+    .mrp-act { display: flex; align-items: flex-start; gap: 12px; padding: 12px 18px; list-style: none; }
+    .mrp-act + .mrp-act { border-top: 1px solid var(--line); }
+    .mrp-act-body { display: flex; min-width: 0; flex: 1; flex-direction: column; gap: 3px; }
+    .mrp-act:has(input, textarea) .mrp-act-body { gap: 12px; }
+    /* Read-only grid: each activity is its own short card, two to a row on wide screens. */
+    .mrp-act-grid { display: grid; grid-template-columns: minmax(0, 1fr); gap: 10px; }
+    @container detail (min-width: 62rem) { .mrp-act-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+    .mrp-act-grid > .mrp-act { border: 1px solid var(--line); border-radius: 14px; background: var(--paper); padding: 12px 14px; }
+    .mrp-act-grid > .mrp-act + .mrp-act { border-top: 1px solid var(--line); }
+    .mrp-act-grid .mrp-act-body { gap: 6px; }
+    .mrp-act-grid .mrp-act-body > div:first-child { flex-wrap: nowrap; gap: 10px; }
+    .mrp-act-grid .mrp-act-body > div:first-child > div { flex-basis: 0; }
+    .mrp-act-title { font-size: 14.5px; font-weight: 700; line-height: 1.35; color: var(--ink); }
+    .mrp-act-mark { display: grid; flex: none; width: 24px; height: 24px; margin-top: 1px; place-items: center; border-radius: 999px; border: 1.5px solid var(--line-2); color: var(--ink-3); }
+    .mrp-act-mark svg { width: 13px; height: 13px; }
+    .mrp-act-done .mrp-act-mark { border-color: var(--ink); background: var(--ink); color: var(--paper); }
+    .mrp-act-going .mrp-act-mark { border-color: var(--ink); color: var(--ink); }
+    .mrp-act-stopped .mrp-act-mark { border-color: var(--brand); color: var(--brand); }
+    .mrp-act-meta { font-size: 12.5px; color: var(--ink-3); }
+    .mrp-act-text { display: flex; min-width: 0; gap: 6px; padding: 0; border: 0; font-size: 13px; line-height: 1.45; color: var(--ink-2); }
+    .mrp-act-text b { flex: none; font-weight: 700; color: var(--ink-3); }
+    .mrp-act-text-reason b { color: var(--color-status-critical-text); }
+
+    .mrp-pill { display: inline-flex; flex: none; align-items: center; gap: 4px; padding: 2px 9px; border-radius: 999px; border: 1px solid var(--line-2); font-size: 11.5px; font-weight: 700; white-space: nowrap; color: var(--ink-2); }
+    .mrp-pill-done { border-color: var(--ink); background: var(--ink); color: var(--paper); }
+    .mrp-pill-going { border-color: var(--ink); color: var(--ink); }
+    .mrp-pill-stopped { border-color: var(--brand); color: var(--color-status-critical-text); }
+
+    .mrp-qa-list { display: grid; grid-template-columns: minmax(0, 1fr); gap: 10px; counter-reset: mrp-qa; }
+    @container detail (min-width: 62rem) { .mrp-qa-list { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+    .mrp-qa { display: flex; flex-direction: column; gap: 6px; padding: 14px 18px; list-style: none; border: 1px solid var(--line); border-radius: 16px; background: var(--paper); counter-increment: mrp-qa; }
+    .mrp-qa-head { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 8px; }
+    .mrp-qa-head::before { content: counter(mrp-qa); display: grid; flex: none; width: 22px; height: 22px; place-items: center; border-radius: 6px; background: var(--sunk); font-size: 12px; font-weight: 800; color: var(--ink-2); }
+    .mrp-qa-question { min-width: 0; flex: 1; font-size: 14px; font-weight: 700; line-height: 1.35; color: var(--ink); }
+    .mrp-qa-answer { font-size: 13.5px; line-height: 1.55; white-space: pre-line; color: var(--ink-2); }
 }

@@ -15,6 +15,7 @@ test('the MEAL manager adds an activity linked to no statement on the results fr
     Livewire::actingAs(mealManager())
         ->test('pages::results.index')
         ->assertSeeHtml('data-test="add-free-activity-'.$program->id.'"')
+        ->assertDontSee('Write activities here that are not linked to any outcome or output.')
         ->call('openCreateActivity', $program->id)
         ->assertSet('showResultModal', true)
         ->assertSet('resultType', ResultType::Activity->value)

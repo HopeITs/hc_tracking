@@ -56,6 +56,18 @@ describe('authorization', function () {
 describe('saving', function () {
     beforeEach(fn () => $this->actingAs(mealManager()));
 
+    it('refuses an existing name even when case or whitespace differs', function (string $field, string $existing, string $entered) {
+        LibraryIndicator::factory()->create([$field => $existing]);
+
+        expect(fn () => app(SaveLibraryIndicator::class)->handle(null, libraryIndicatorInput([$field => $entered])))
+            ->toThrow(ValidationException::class, __('indicator_library.name_already_exists'));
+
+        expect(LibraryIndicator::query()->count())->toBe(1);
+    })->with([
+        'Arabic' => ['name_ar', 'عدد الأسر', '  عدد   الأسر  '],
+        'English' => ['name_en', 'Households reached', "HOUSEHOLDS\tREACHED"],
+    ]);
+
     it('rejects an entry that breaks a form rule with its message', function (array $overrides, string $message) {
         expect(fn () => app(SaveLibraryIndicator::class)->handle(null, libraryIndicatorInput($overrides)))
             ->toThrow(ValidationException::class, $message);

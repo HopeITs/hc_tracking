@@ -28,10 +28,44 @@
             $yesNo = [['value' => '1', 'label' => __('indicator_library.yes')], ['value' => '0', 'label' => __('indicator_library.no')]];
         @endphp
 
+        @if ($attachingEntry && $fixedEntryResultId === null)
+            <x-ui.form-select wire:model.live="entryResultId" :label="__('proposals.framework.choose_result')" required>
+                <option value="">{{ __('proposals.framework.choose_result') }}</option>
+                @foreach ($this->entryResultOptions as $resultOption)
+                    <option value="{{ $resultOption->id }}">{{ $resultOption->program?->name ?? __('common.unassigned') }} — {{ $resultOption->type->label() }} — {{ $resultOption->statement }}</option>
+                @endforeach
+            </x-ui.form-select>
+        @endif
+        @if ($editingEntryId === null)
+            <x-ui.form-input type="search" wire:model.live.debounce.250ms="entrySearch" :label="__('indicator_library.existing_indicators')" />
+            <ul class="max-h-40 overflow-y-auto">
+                @foreach ($this->existingEntries as $existing)
+                    <li wire:key="existing-indicator-{{ $existing->id }}">
+                        @if ($this->canWriteEntry())
+                            <x-ui.button type="button" tone="ghost" wire:click="pickExistingEntry({{ $existing->id }})">
+                                <bdi>{{ $existing->name_ar }}</bdi>
+                                @if (filled($existing->name_en))
+                                    <bdi>{{ $existing->name_en }}</bdi>
+                                @endif
+                                <bdi>{{ $existing->code }}</bdi>
+                            </x-ui.button>
+                        @else
+                            <span>{{ $existing->localizedName() }} <bdi>{{ $existing->code }}</bdi></span>
+                        @endif
+                    </li>
+                @endforeach
+            </ul>
+            @foreach (['entry.library_indicator', 'entry.result', 'entry.proposal'] as $field)
+                @error($field)
+                    <p role="alert" class="text-status-critical">{{ $message }}</p>
+                @enderror
+            @endforeach
+        @endif
+        @if ($this->canWriteEntry())
         <x-ui.form-section :title="__('indicator_library.section_name')" :fields="['entry.name_ar', 'entry.name_en']">
             <div class="grid gap-x-4 gap-y-3 @2xl/modal:grid-cols-2">
-                <x-ui.form-input wire:model="entry.name_ar" :label="__('indicator_library.fields.name_ar')" maxlength="255" dir="rtl" lang="ar" required autofocus />
-                <x-ui.form-input wire:model="entry.name_en" :label="__('indicator_library.fields.name_en')" :help="__('indicator_library.name_en_help')" maxlength="255" dir="ltr" lang="en" />
+                <x-ui.form-input wire:model.live.debounce.300ms="entry.name_ar" :label="__('indicator_library.fields.name_ar')" maxlength="255" dir="rtl" lang="ar" required autofocus />
+                <x-ui.form-input wire:model.live.debounce.300ms="entry.name_en" :label="__('indicator_library.fields.name_en')" :help="__('indicator_library.name_en_help')" maxlength="255" dir="ltr" lang="en" />
             </div>
         </x-ui.form-section>
 
@@ -93,21 +127,10 @@
                     :options="collect(IndicatorMeasure::cases())->map(fn (IndicatorMeasure $measureCase): array => ['value' => $measureCase->value, 'label' => $measureCase->label()])->all()"
                 />
 
-                @if ($isPercentage)
-                    <x-ui.form-select wire:model="entry.denominator_basis" :label="__('indicator_library.fields.denominator_basis')" :help="__('indicator_library.denominator_basis_help')">
-                        <option value="">{{ __('indicator_library.basis_default', ['basis' => $this->defaultBasisLabel()]) }}</option>
-                        @foreach (DenominatorBasis::cases() as $basisCase)
-                            <option value="{{ $basisCase->value }}">{{ $basisCase->label() }}</option>
-                        @endforeach
-                    </x-ui.form-select>
-
-                    <x-ui.form-input wire:model="entry.numerator_label" :label="__('indicator_library.fields.numerator_label')" maxlength="255" />
-                    <x-ui.form-input wire:model="entry.denominator_label" :label="__('indicator_library.fields.denominator_label')" maxlength="255" />
-                @else
+                @unless ($isPercentage)
                     <x-ui.form-input wire:model="entry.unit" :label="__('indicator_library.fields.unit')" :placeholder="__('indicators.unit_placeholder')" maxlength="50" />
-                @endif
+                @endunless
 
-                <x-ui.form-textarea wire:model="entry.calculation_method" :label="__('indicator_library.fields.calculation_method')" rows="2" maxlength="5000" class="@2xl/modal:col-span-2" />
             </div>
         </x-ui.form-section>
 
@@ -130,10 +153,27 @@
                     <x-ui.form-input wire:model="entry.follow_up_months" :label="__('indicator_library.fields.follow_up_months')" type="number" min="1" max="120" step="1" required />
                 @endif
 
+                <x-ui.form-segmented wire:model="entry.is_cumulative" :label="__('indicator_library.fields.is_cumulative')" :help="__('indicator_library.cumulative_help')" :options="$yesNo" />
+            </div>
+        </x-ui.form-section>
+
+        <x-ui.form-section :title="__('indicator_library.more_options')" :optional="true" :fields="['entry.denominator_basis', 'entry.numerator_label', 'entry.denominator_label', 'entry.calculation_method', 'entry.frequency_note', 'entry.is_disaggregated']">
+            <div class="grid gap-x-4 gap-y-3 @2xl/modal:grid-cols-2">
+                @if ($isPercentage)
+                    <x-ui.form-select wire:model="entry.denominator_basis" :label="__('indicator_library.fields.denominator_basis')" :help="__('indicator_library.denominator_basis_help')">
+                        <option value="">{{ __('indicator_library.basis_default', ['basis' => $this->defaultBasisLabel()]) }}</option>
+                        @foreach (DenominatorBasis::cases() as $basisCase)
+                            <option value="{{ $basisCase->value }}">{{ $basisCase->label() }}</option>
+                        @endforeach
+                    </x-ui.form-select>
+
+                    <x-ui.form-input wire:model="entry.numerator_label" :label="__('indicator_library.fields.numerator_label')" maxlength="255" />
+                    <x-ui.form-input wire:model="entry.denominator_label" :label="__('indicator_library.fields.denominator_label')" maxlength="255" />
+                @endif
+                <x-ui.form-textarea wire:model="entry.calculation_method" :label="__('indicator_library.fields.calculation_method')" rows="2" maxlength="5000" class="@2xl/modal:col-span-2" />
                 <x-ui.form-textarea wire:model="entry.frequency_note" :label="__('indicator_library.fields.frequency_note')" :help="__('indicator_library.frequency_note_help')" rows="2" maxlength="5000" class="@2xl/modal:col-span-2" />
 
                 <x-ui.form-segmented wire:model="entry.is_disaggregated" :label="__('indicator_library.fields.is_disaggregated')" :help="__('indicator_library.disaggregated_help')" :options="$yesNo" />
-                <x-ui.form-segmented wire:model="entry.is_cumulative" :label="__('indicator_library.fields.is_cumulative')" :help="__('indicator_library.cumulative_help')" :options="$yesNo" />
             </div>
         </x-ui.form-section>
 
@@ -152,11 +192,14 @@
                 <x-ui.form-textarea wire:model="entry.means_of_verification" :label="__('indicator_library.fields.means_of_verification')" rows="2" maxlength="5000" class="@2xl/modal:col-span-2" />
             </div>
         </x-ui.form-section>
+        @endif
     @endif
 
     <x-slot:actions>
+        @if ($this->canWriteEntry())
         <x-ui.button type="submit" tone="primary" data-test="save-library-entry">
             {{ $editingEntryId === null ? __('indicator_library.add_entry') : __('common.save_changes') }}
         </x-ui.button>
+        @endif
     </x-slot:actions>
 </x-ui.modal>

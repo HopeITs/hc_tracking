@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace App\Livewire\Concerns\Indicators;
 
-use App\Actions\Indicators\AddIndicatorToLibrary;
 use App\Enums\IndicatorMeasure;
 use App\Enums\Period;
 use App\Models\Indicator;
@@ -19,7 +18,6 @@ use Illuminate\Database\Eloquent\Relations\MorphTo;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\Rules\Enum;
-use Illuminate\Validation\ValidationException;
 use Livewire\Attributes\Computed;
 use Livewire\Attributes\Locked;
 
@@ -46,6 +44,9 @@ trait ManagesIndicatorForm
     #[Locked]
     public ?int $editingIndicatorId = null;
 
+    #[Locked]
+    public ?int $editingIndicatorLibraryId = null;
+
     public string $name = '';
 
     public string $indicatorResultId = '';
@@ -71,7 +72,9 @@ trait ManagesIndicatorForm
     #[Computed]
     public function resultOptions(): Collection
     {
-        return Result::query()->select(['id', 'statement', 'type', 'program_id'])->with('program:id')->orderBy('id')->get();
+        return Result::query()
+            ->when($this->indicatorFormProposalId() !== null, fn ($query) => $query->proposalFramework($this->indicatorFormProposalId()))
+            ->select(['id', 'statement', 'type', 'program_id'])->with('program:id')->orderBy('id')->get();
     }
 
     /** @return Collection<int, Program> */
@@ -155,24 +158,18 @@ trait ManagesIndicatorForm
         return $indicator !== null && $indicator->plan_indicators_count === 0;
     }
 
-    public function openCreateModal(): void
-    {
-        Gate::authorize('indicators.create');
-
-        $this->resetIndicatorForm();
-        $this->showIndicatorModal = true;
-    }
-
     public function openEditModal(int $indicatorId): void
     {
         Gate::authorize('indicators.update');
 
         $indicator = Indicator::query()
-            ->select(['id', 'name', 'result_id', 'project_id', 'measure', 'unit', 'baseline', 'target', 'frequency'])
+            ->when($this->indicatorFormProposalId() !== null, fn ($query) => $query->whereHas('result', fn ($result) => $result->proposalFramework($this->indicatorFormProposalId())))
+            ->select(['id', 'name', 'result_id', 'project_id', 'proposal_location_id', 'measure', 'unit', 'baseline', 'target', 'frequency', 'library_indicator_id'])
             ->findOrFail($indicatorId);
 
         $this->resetValidation();
         $this->editingIndicatorId = $indicator->id;
+        $this->editingIndicatorLibraryId = $indicator->library_indicator_id;
         $this->name = $indicator->name;
         $this->indicatorResultId = (string) $indicator->result_id;
         $this->indicatorMeasure = $indicator->measure->value;
@@ -186,7 +183,21 @@ trait ManagesIndicatorForm
 
     public function saveIndicator(): void
     {
-        Gate::authorize($this->editingIndicatorId === null ? 'indicators.create' : 'indicators.update');
+        Gate::authorize('indicators.update');
+        abort_if($this->editingIndicatorId === null, 403);
+
+        $indicator = Indicator::query()->with('result.proposal')->findOrFail($this->editingIndicatorId);
+        if ($indicator->result->proposal !== null) {
+            Gate::authorize('view', $indicator->result->proposal);
+            abort_if($indicator->result->proposal->status->isTerminal(), 403);
+        }
+
+        if ($indicator->library_indicator_id !== null) {
+            $this->name = $indicator->name;
+            $this->indicatorMeasure = $indicator->measure->value;
+            $this->unit = (string) $indicator->unit;
+            $this->frequency = $indicator->frequency->value;
+        }
 
         $this->name = trim($this->name);
         $this->unit = trim($this->unit);
@@ -216,7 +227,9 @@ trait ManagesIndicatorForm
             ? new Indicator
             : Indicator::query()->findOrFail($this->editingIndicatorId);
 
-        $result = Result::query()->select(['id', 'program_id', 'proposal_id'])->findOrFail((int) $validated['indicatorResultId']);
+        $result = Result::query()
+            ->when($this->indicatorFormProposalId() !== null, fn ($query) => $query->proposalFramework($this->indicatorFormProposalId()))
+            ->select(['id', 'program_id', 'proposal_id'])->findOrFail((int) $validated['indicatorResultId']);
         $locationId = $validated['indicatorLocationId'] === '' || $validated['indicatorLocationId'] === null
             ? null
             : (int) $validated['indicatorLocationId'];
@@ -245,41 +258,12 @@ trait ManagesIndicatorForm
 
         $indicator->save();
 
-        $wasRecentlyCreated = $indicator->wasRecentlyCreated;
-        $libraryRefusal = $wasRecentlyCreated ? $this->addToLibrary($indicator) : null;
-
         $this->showIndicatorModal = false;
         $this->resetIndicatorForm();
         $this->forgetIndicators();
         $this->resetPage();
 
-        if ($libraryRefusal !== null) {
-            Flux::toast(variant: 'warning', text: __('indicators.indicator_created_library_skipped', ['reason' => $libraryRefusal]));
-
-            return;
-        }
-
-        Flux::toast(
-            variant: 'success',
-            text: $wasRecentlyCreated ? __('indicators.indicator_created_in_library') : __('indicators.indicator_updated'),
-        );
-    }
-
-    /**
-     * Every indicator written here also becomes an Indicator Library entry
-     * (AddIndicatorToLibrary). The indicator is kept even when the library
-     * refuses the entry (its program has no usable HR code); the reason is
-     * returned so the user is told.
-     */
-    protected function addToLibrary(Indicator $indicator): ?string
-    {
-        try {
-            app(AddIndicatorToLibrary::class)->handle($indicator);
-        } catch (ValidationException $exception) {
-            return (string) collect($exception->errors())->flatten()->first();
-        }
-
-        return null;
+        Flux::toast(variant: 'success', text: __('indicators.indicator_updated'));
     }
 
     /**
@@ -399,6 +383,7 @@ trait ManagesIndicatorForm
 
     protected function resetIndicatorForm(): void
     {
+        $this->editingIndicatorLibraryId = null;
         $this->resetValidation();
         $this->editingIndicatorId = null;
         $this->name = '';
@@ -409,6 +394,11 @@ trait ManagesIndicatorForm
         $this->target = '';
         $this->frequency = 'quarterly';
         $this->indicatorLocationId = '';
+    }
+
+    protected function indicatorFormProposalId(): ?int
+    {
+        return null;
     }
 
     /**

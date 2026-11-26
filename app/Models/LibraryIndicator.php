@@ -113,7 +113,7 @@ class LibraryIndicator extends Model implements TracksActivity
      */
     public function localizedName(): string
     {
-        if (app()->getLocale() === 'ar' || blank($this->name_en)) {
+        if ((app()->getLocale() === 'ar' && filled($this->name_ar)) || blank($this->name_en)) {
             return $this->name_ar;
         }
 

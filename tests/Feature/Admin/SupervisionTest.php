@@ -217,7 +217,7 @@ test('every Supervision tab method is refused without supervisions.manage', func
     $this->actingAs(userDirectoryOnlyAdmin());
 
     $component->set('supervisorEmployeeId', (string) insertHrEmployee())
-        ->set('superviseeEmployeeId', (string) insertHrEmployee())
+        ->set('superviseeEmployeeIds', [(string) insertHrEmployee()])
         ->call($method, ...($arguments === [] ? [] : [$supervision->id]))
         ->assertForbidden();
 
@@ -249,7 +249,7 @@ test('General Manager adds and removes a supervision from the tab', function () 
     $component = Livewire::actingAs(userWithRole('General Manager'))->test('admin.supervisions')
         ->call('openAddModal')
         ->set('supervisorEmployeeId', (string) $supervisor)
-        ->set('superviseeEmployeeId', (string) $supervisee)
+        ->set('superviseeEmployeeIds', [(string) $supervisee])
         ->call('addSupervision')
         ->assertHasNoErrors()
         ->assertSet('showAddModal', false)
@@ -262,7 +262,7 @@ test('General Manager adds and removes a supervision from the tab', function () 
         ->assertSet('showRemoveModal', true)
         ->call('removeSupervision')
         ->assertSet('showRemoveModal', false)
-        ->assertDontSee('Rami Saleh');
+        ->assertDontSeeHtml('wire:click="confirmRemove(');
 
     expect(DB::table('supervisions')->count())->toBe(0);
 });
@@ -273,9 +273,9 @@ test('a refused add from the tab shows the message on the field', function () {
     Livewire::actingAs(userWithRole('General Manager'))->test('admin.supervisions')
         ->call('openAddModal')
         ->set('supervisorEmployeeId', (string) $person)
-        ->set('superviseeEmployeeId', (string) $person)
+        ->set('superviseeEmployeeIds', [(string) $person])
         ->call('addSupervision')
-        ->assertHasErrors(['superviseeEmployeeId'])
+        ->assertHasErrors(['superviseeEmployeeIds'])
         ->assertSee('A person cannot supervise themselves');
 
     expect(DB::table('supervisions')->count())->toBe(0);
@@ -326,4 +326,60 @@ test('the added and removed activities read with both names in the reader\'s lan
         ->and($presenter->sentence($removed, 'en'))->toBe($admin->name.' removed Nour Ali as a supervisor of Rami Saleh')
         ->and($presenter->sentence($added, 'ar'))->toContain('نور علي')->toContain('رامي صالح')
         ->and($presenter->sentence($removed, 'ar'))->toContain('نور علي')->toContain('رامي صالح');
+});
+
+test('several supervisees are added at once, and one refusal names the person and adds none', function () {
+    $supervisor = insertHrEmployee(firstNameEn: 'Nour', lastNameEn: 'Ali');
+    [$first, $second] = [insertHrEmployee(), insertHrEmployee()];
+    $blocked = insertHrEmployee(firstNameEn: 'Rami', lastNameEn: 'Saleh');
+    storedSupervision($supervisor, $blocked);
+
+    $component = Livewire::actingAs(userWithRole('General Manager'))->test('admin.supervisions')
+        ->call('openAddModal', $supervisor)
+        ->assertSet('supervisorEmployeeId', (string) $supervisor)
+        ->set('superviseeEmployeeIds', [(string) $first, (string) $blocked])
+        ->call('addSupervision')
+        ->assertHasErrors(['superviseeEmployeeIds'])
+        ->assertSee('Rami Saleh: This supervision already exists');
+
+    expect(DB::table('supervisions')->count())->toBe(1);
+
+    $component->set('superviseeEmployeeIds', [(string) $first, (string) $second])
+        ->call('addSupervision')
+        ->assertHasNoErrors();
+
+    expect(DB::table('supervisions')->where('supervisor_employee_id', $supervisor)->pluck('supervisee_employee_id')->sort()->values()->all())
+        ->toBe(collect([$first, $second, $blocked])->sort()->values()->all());
+});
+
+test('the tree nests teams, filters by source and lists active staff with no supervisor', function () {
+    [$director, $manager, $officer] = [insertHrEmployee(firstNameEn: 'Dana', lastNameEn: 'Director'), insertHrEmployee(firstNameEn: 'Hala', lastNameEn: 'Manager'), insertHrEmployee(firstNameEn: 'Omar', lastNameEn: 'Officer')];
+    hrReportsTo($manager, $director);
+    $local = storedSupervision($manager, $officer);
+    $loner = insertHrEmployee(firstNameEn: 'Lone', lastNameEn: 'Ranger');
+    insertHrContract($loner, insertHrPosition(insertHrDepartment(), 'Driver'));
+    insertHrEmployee(firstNameEn: 'Nocon', lastNameEn: 'Tract');
+
+    Livewire::actingAs(userWithRole('General Manager'))->test('admin.supervisions')
+        ->assertSeeInOrder(['Dana Director', 'Hala Manager', 'Omar Officer', __('users.supervision_unassigned_title'), 'Lone Ranger'])
+        ->assertSeeHtml('data-test="supervision-unassigned-alert"')
+        ->assertSeeHtml('data-test="assign-supervisor-'.$loner.'"')
+        ->assertSeeHtml('data-test="supervision-panel-'.$director.'"')
+        ->assertDontSeeHtml('data-test="assign-supervisor-'.$director.'"')
+        ->assertSeeHtml('data-hr-problem="noContract"')
+        ->assertSeeInOrder([__('users.supervision_issue_no_contract'), 'Nocon Tract'])
+        ->call('openAddModal', null, $loner)
+        ->assertSet('superviseeEmployeeIds', [(string) $loner])
+        ->call('closeAddModal')
+        ->set('source', 'added')
+        ->assertSeeHtml('wire:click="confirmRemove('.$local->id.')"')
+        ->assertDontSee('Dana Director')
+        ->assertDontSee('Lone Ranger')
+        ->set('source', 'hr')
+        ->assertSee('Dana Director')
+        ->assertDontSee('Omar Officer')
+        ->set('source', 'all')
+        ->set('search', 'Omar')
+        ->assertSee('Dana Director › Hala Manager › Omar Officer')
+        ->assertDontSee('Lone Ranger');
 });

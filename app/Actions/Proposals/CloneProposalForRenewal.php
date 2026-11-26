@@ -6,6 +6,7 @@ namespace App\Actions\Proposals;
 
 use App\Enums\ProposalKind;
 use App\Enums\ProposalStatus;
+use App\Models\Donor;
 use App\Models\HrCenter;
 use App\Models\HrCity;
 use App\Models\HrEmployee;
@@ -145,6 +146,7 @@ final class CloneProposalForRenewal
         $renewal = app(SaveProposal::class)->handle(null, [
             'name' => isset($data['name']) && $data['name'] !== '' ? (string) $data['name'] : $previous->name,
             'donorId' => $previous->donor_id,
+            ...$this->partnerPayload($previous),
             'projectIds' => $projects['ids'],
             ...($locations === [] ? [] : ['locations' => $locations]),
             'beneficiaries' => $projects['beneficiaries'],
@@ -178,6 +180,26 @@ final class CloneProposalForRenewal
     }
 
     /**
+     * The renewal funds through the same route as the proposal it renews: its
+     * Main Partner and Partners. SaveProposal writes them only for a manager of
+     * partners, and a donor request still waiting for approval is left out so
+     * the renewal is never refused for it.
+     *
+     * @return array{mainPartnerId: int|null, partnerIds: list<int>}
+     */
+    private function partnerPayload(Proposal $previous): array
+    {
+        $ids = array_values(array_filter([$previous->main_partner_id, ...$previous->partners()->pluck('donors.id')->all()]));
+        $pending = $ids === [] ? [] : Donor::query()->pending()->whereKey($ids)->pluck('id')->all();
+        $mainId = $previous->main_partner_id !== null && ! in_array($previous->main_partner_id, $pending, true) ? $previous->main_partner_id : null;
+
+        return [
+            'mainPartnerId' => $mainId,
+            'partnerIds' => $mainId === null ? [] : array_values(array_diff($previous->partners()->pluck('donors.id')->map(fn (mixed $id): int => (int) $id)->all(), $pending)),
+        ];
+    }
+
+    /**
      * A payroll renewal (W-32) stays payroll: it carries the narrative, the
      * donor, the notes and the planned duration, and never a project, a
      * framework or a plan. SaveProposal starts it in `proposal draft`.
@@ -192,6 +214,7 @@ final class CloneProposalForRenewal
             'kind' => ProposalKind::Payroll->value,
             'name' => isset($data['name']) && $data['name'] !== '' ? (string) $data['name'] : $previous->name,
             'donorId' => $previous->donor_id,
+            ...$this->partnerPayload($previous),
             'narrative' => $previous->narrative,
             'plannedDateBegin' => $begin->toDateString(),
             'plannedDateEnd' => $end->toDateString(),

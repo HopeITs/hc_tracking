@@ -28,7 +28,7 @@ use Illuminate\Database\Eloquent\Relations\Relation;
 use Illuminate\Support\Collection;
 
 /**
- * Every report still open that the viewer may open, from the three sources,
+ * Every report still open (or, on request, finished) that the viewer may open, from the three sources,
  * in one common row shape (M-02).
  *
  * Open means: a monthly report that is a draft (once its month has started)
@@ -52,13 +52,24 @@ final class ActiveReports
     ) {}
 
     /**
-     * Overdue first, then soonest due, then by name.
+     * Open reports: overdue first, then soonest due, then by name. With
+     * `$closed` the finished ones instead (monthly validated, donor submitted,
+     * report approved), the most recent first; none of them needs anyone.
      *
      * @return Collection<int, ActiveReportRow>
      */
-    public function for(User $user): Collection
+    public function for(User $user, bool $closed = false): Collection
     {
-        return collect([...$this->monthly($user), ...$this->donor($user), ...$this->narrative($user)])
+        $rows = collect([...$this->monthly($user, $closed), ...$this->donor($user, $closed), ...$this->narrative($user, $closed)]);
+
+        if ($closed) {
+            return $rows
+                ->sort(fn (ActiveReportRow $a, ActiveReportRow $b): int => [$b->due?->getTimestamp() ?? 0, mb_strtolower($a->name), $a->key()]
+                    <=> [$a->due?->getTimestamp() ?? 0, mb_strtolower($b->name), $b->key()])
+                ->values();
+        }
+
+        return $rows
             ->sort(fn (ActiveReportRow $a, ActiveReportRow $b): int => [! $a->overdue, $a->due === null, $a->due?->getTimestamp() ?? 0, mb_strtolower($a->name), $a->key()]
                 <=> [! $b->overdue, $b->due === null, $b->due?->getTimestamp() ?? 0, mb_strtolower($b->name), $b->key()])
             ->values();
@@ -67,22 +78,22 @@ final class ActiveReports
     /**
      * @return list<ActiveReportRow>
      */
-    private function monthly(User $user): array
+    private function monthly(User $user, bool $closed): array
     {
         $columns = ['id', 'slug', 'report_template_id', 'period', 'status', 'returned_at', 'revised_due_on'];
         $prepared = $this->preparers->templateIdsFor($user);
 
         $mine = MonthlyReport::query()
             ->whereIn('report_template_id', $prepared)
-            ->whereIn('status', [MonthlyReportStatus::Draft, MonthlyReportStatus::Submitted])
+            ->whereIn('status', $closed ? [MonthlyReportStatus::Validated] : [MonthlyReportStatus::Draft, MonthlyReportStatus::Submitted])
             ->get($columns);
 
         $toValidate = MonthlyReport::query()
             ->validatableBy($user)
-            ->where('status', MonthlyReportStatus::Submitted)
+            ->where('status', $closed ? MonthlyReportStatus::Validated : MonthlyReportStatus::Submitted)
             ->get($columns);
 
-        $validatable = array_flip($toValidate->pluck('id')->all());
+        $validatable = $closed ? [] : array_flip($toValidate->pluck('id')->all());
         $preparedSet = array_flip($prepared);
         $reports = $mine->concat($toValidate)->unique('id')->values();
 
@@ -152,10 +163,10 @@ final class ActiveReports
      *
      * @return list<ActiveReportRow>
      */
-    private function donor(User $user): array
+    private function donor(User $user, bool $closed): array
     {
         $reports = DonorReport::query()
-            ->whereNull('submitted_on')
+            ->when($closed, fn (Builder $query) => $query->whereNotNull('submitted_on'), fn (Builder $query) => $query->whereNull('submitted_on'))
             ->unless(
                 $user->can('funding-agreements.view') || $user->can('reports.aggregate'),
                 fn (Builder $query) => $query->where('responsible_employee_id', $user->employee_id ?? 0),
@@ -169,7 +180,7 @@ final class ActiveReports
 
         $people = DonorReportResponsibles::resolve(array_values($reports->pluck('responsible_employee_id')->filter()->map(fn (mixed $id): int => (int) $id)->all()));
 
-        return array_values($reports->map(function (DonorReport $report) use ($people, $user): ActiveReportRow {
+        return array_values($reports->map(function (DonorReport $report) use ($people, $user, $closed): ActiveReportRow {
             $agreement = $report->donorProposal;
             $proposalName = (string) $agreement?->proposal?->name;
             $donorName = (string) $agreement?->donor?->name;
@@ -186,7 +197,7 @@ final class ActiveReports
                 overdue: $state === DonorReportState::Overdue,
                 owner: $report->responsible_employee_id === null ? null : $people[$report->responsible_employee_id]['employee']?->name,
                 url: route('donor-reports.show', $report),
-                needsMe: $user->employee_id !== null && $report->responsible_employee_id === $user->employee_id,
+                needsMe: ! $closed && $user->employee_id !== null && $report->responsible_employee_id === $user->employee_id,
                 programId: null,
                 donorId: $agreement?->donor_id,
                 search: mb_strtolower($report->title.' '.$proposalName.' '.$donorName),
@@ -199,7 +210,7 @@ final class ActiveReports
      *
      * @return list<ActiveReportRow>
      */
-    private function narrative(User $user): array
+    private function narrative(User $user, bool $closed): array
     {
         if ($user->cannot('viewAny', Report::class)) {
             return [];
@@ -210,7 +221,7 @@ final class ActiveReports
 
         $rows = Report::query()
             ->whereNull('monthly_report_id')
-            ->whereIn('status', [ReportStatus::Draft, ReportStatus::Reviewed])
+            ->whereIn('status', $closed ? [ReportStatus::Approved] : [ReportStatus::Draft, ReportStatus::Reviewed])
             ->with([
                 'planIndicator:id,indicator_id,source_type,source_id',
                 'planIndicator.indicator:id,name',
@@ -222,7 +233,7 @@ final class ActiveReports
                 'user:id,hr_user_id,employee_id',
             ])
             ->get(['id', 'slug', 'plan_indicator_id', 'user_id', 'status', 'planned_date'])
-            ->map(function (Report $report) use ($user, $today, $canApprove): ActiveReportRow {
+            ->map(function (Report $report) use ($user, $today, $canApprove, $closed): ActiveReportRow {
                 $source = $report->planIndicator?->source;
                 $context = match (true) {
                     $source instanceof AnnualPlan => __('common.fy_year', ['year' => $source->year]),
@@ -244,7 +255,7 @@ final class ActiveReports
                     overdue: $isDraft && $report->planned_date->lt($today),
                     owner: $report->user?->name,
                     url: route('reports.show', $report),
-                    needsMe: $isDraft ? $isAuthor : ($canApprove && ! $isAuthor),
+                    needsMe: ! $closed && ($isDraft ? $isAuthor : ($canApprove && ! $isAuthor)),
                     programId: null,
                     donorId: $source instanceof Proposal ? $source->donor_id : null,
                     search: mb_strtolower($name.' '.$context),

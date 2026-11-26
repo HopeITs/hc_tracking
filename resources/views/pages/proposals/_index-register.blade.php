@@ -52,6 +52,9 @@
                                 @endif
                             </span>
                         @endunless
+                        @if (! $isRepeat && $proposal->relationLoaded('mainPartner') && $proposal->mainPartner !== null)
+                            <span class="block text-xs {{ $mutedText }}" dir="auto" data-main-partner-line="{{ $proposal->id }}">{{ __('proposals.via_main_partner', ['name' => $proposal->mainPartner->name]) }}</span>
+                        @endif
                         @if (! $isRepeat && $this->flag === 'no_center')
                             {{-- The rows still without a center, and where to give them one: the editor opens for an approved proposal only. --}}
                             <div class="mt-1.5 space-y-1 text-xs {{ $mutedText }}" data-test="missing-center-rows-{{ $proposal->id }}">

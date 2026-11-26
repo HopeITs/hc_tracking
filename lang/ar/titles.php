@@ -26,7 +26,7 @@ return [
     'report' => 'التقرير',
     'reports' => 'التقارير',
     'monthly_report' => 'التقرير الشهري',
-    'active_reports' => 'التقارير المفتوحة',
+    'active_reports' => 'متابعة التقارير',
     'monthly_reports' => 'التقارير الشهرية',
     'report_templates' => 'قوالب بانتظار التأكيد',
     'results_framework' => 'إطار النتائج',

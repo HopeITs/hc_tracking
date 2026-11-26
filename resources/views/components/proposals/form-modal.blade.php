@@ -32,6 +32,11 @@
     'editing' => false,
     'donors' => [],
     'donorPending' => false,
+    /* PR only: the "Through a Main Partner?" checkbox and its two pickers. */
+    'canManagePartners' => false,
+    'hasMainPartner' => false,
+    'donorId' => '',
+    'mainPartnerId' => '',
     'canAddDonor' => false,
     'locations' => [],
     'cities' => [],
@@ -68,7 +73,7 @@
     $sectionFields = [
         ...($changeRequest ? [__('proposals.change.reason_section') => ['changeReason']] : []),
         __('proposals.section_identity') => ['kind', 'previousProposalId', 'name', 'internalProjectNumber'],
-        __('proposals.section_donor') => ['donorId'],
+        __('proposals.section_donor') => ['donorId', 'mainPartnerId', 'partnerIds', 'partnerIds.*'],
         ...($isPayroll
             ? [__('proposals.section_narrative') => ['narrative']]
             : [
@@ -267,6 +272,44 @@
                             <span>{{ __('proposals.donor_request_pending_banner') }}</span>
                         </div>
                     @endif
+                @endif
+
+                @if ($canManagePartners)
+                    <div class="grid gap-x-4 gap-y-3 @2xl/modal:col-span-2" data-main-partner-block>
+                        <label class="flex items-center gap-2 text-sm font-medium text-secondary-dark dark:text-ink">
+                            <input type="checkbox" wire:model.live="hasMainPartner" class="size-4 shrink-0 accent-primary" data-test="has-main-partner" />
+                            <span>{{ __('proposals.through_a_main_partner') }}</span>
+                        </label>
+
+                        @if ($hasMainPartner)
+                            <div class="flex flex-wrap items-end gap-2">
+                                <x-ui.form-select wire:model.live="mainPartnerId" id="proposal-main-partner" :label="__('proposals.main_partner')" :help="__('proposals.main_partner_help')" :placeholder="__('proposals.choose_the_main_partner')" :error="$errors->first('mainPartnerId')" required class="min-w-0 flex-1">
+                                    @foreach ($donors as $partner)
+                                        @continue ((string) $partner->id === (string) $donorId)
+                                        <option value="{{ $partner->id }}">{{ $partner->name }}@if ($partner->isPending()) — {{ __('donors.pending_badge') }}@endif</option>
+                                    @endforeach
+                                </x-ui.form-select>
+
+                                @if ($canAddDonor)
+                                    <x-ui.button type="button" tone="secondary" icon="plus" wire:click="$dispatch('open-donor-request', { target: 'main' })" data-test="add-main-partner-button">
+                                        {{ __('donors.add_donor') }}
+                                    </x-ui.button>
+                                @endif
+                            </div>
+
+                            <div class="flex flex-wrap items-start gap-2">
+                                <div class="min-w-0 flex-1">
+                                    <x-proposals.partner-picker wire:model.live="partnerIds" :donors="$donors" :exclude="[$donorId, $mainPartnerId]" />
+                                </div>
+
+                                @if ($canAddDonor)
+                                    <x-ui.button type="button" tone="secondary" icon="plus" class="mt-6" wire:click="$dispatch('open-donor-request', { target: 'partner' })" data-test="add-partner-button">
+                                        {{ __('donors.add_donor') }}
+                                    </x-ui.button>
+                                @endif
+                            </div>
+                        @endif
+                    </div>
                 @endif
             </div>
         </x-ui.form-section>

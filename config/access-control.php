@@ -23,7 +23,7 @@ $groups = [
     'risks' => ['view', 'create', 'update', 'delete'],
     'targets' => ['view', 'create', 'update', 'delete'],
     'donors' => ['view', 'create', 'update', 'delete', 'approve'],
-    'proposals' => ['view', 'create', 'update', 'delete', 'manage-reviewers', 'correct-status', 'approve'],
+    'proposals' => ['view', 'create', 'update', 'delete', 'manage-reviewers', 'correct-status', 'approve', 'manage-partners', 'edit-details'],
     'funding-agreements' => ['view', 'create', 'update', 'delete'],
     'transfers' => ['view', 'create', 'update', 'delete'],
     'strategies' => ['view', 'create', 'update', 'delete'],
@@ -236,19 +236,19 @@ return [
     */
     'role_baselines' => [
         'Team Member' => $viewEverything,
-        'Media Team' => [...$viewEverything, ...$taskWriter, ...$reportWriter],
+        'Media Team' => [...$viewEverything, ...$taskWriter, ...$reportWriter, 'proposals.edit-details'],
         // The fundraising officer works the proposals (user story §1). The donor list
         // is read-only for them: only the PR Manager records a donor, and the
         // General Manager approves it.
         'Public Relations' => [
             ...$viewEverything, ...$fundraisingViews, ...$taskWriter, ...$reportWriter,
-            'proposals.create', 'proposals.update',
+            'proposals.create', 'proposals.update', 'proposals.manage-partners',
             ...$aiDrafter,
         ],
         'Public Relations Manager' => [
             ...$viewEverything, ...$fundraisingViews, ...$taskWriter, ...$reportWriter,
             'donors.create', 'donors.update',
-            'proposals.create', 'proposals.update', 'proposals.manage-reviewers', 'proposals.correct-status',
+            'proposals.create', 'proposals.update', 'proposals.manage-reviewers', 'proposals.correct-status', 'proposals.manage-partners',
             // D-70: recording the donor's approval belongs to this role only.
             'proposals.approve',
             'projects.create',
@@ -258,6 +258,7 @@ return [
         ],
         'MEAL' => [
             ...$viewEverything, ...$taskWriter, ...$reportWriter, 'reports.approve', 'reports.mark-seen',
+            'proposals.edit-details',
             'indicators.create', 'indicators.update', 'indicators.delete', 'indicators.record',
             'results.create', 'results.update', 'results.delete',
             'targets.create', 'targets.update', 'targets.delete',
@@ -276,6 +277,7 @@ return [
         ],
         'Managers' => [
             ...$viewEverything, ...$taskWriter, 'tasks.delete', ...$reportWriter,
+            'proposals.edit-details',
             'strategies.create', 'strategies.update', 'strategies.delete',
             'programs.update',
             'annual-plans.create', 'annual-plans.update', 'annual-plans.delete',
@@ -294,6 +296,8 @@ return [
             'notification-settings.manage',
             'reports.reopen',
             'proposals.approve',
+            // PR alone sets and manages Main Partners and Partners (2026-11-24).
+            'proposals.manage-partners',
             ...$mealOnly,
             ...$targetWriter,
             ...$aiDrafter,

@@ -70,6 +70,27 @@ final class MonthlyReportNames
     }
 
     /**
+     * The place of one template split into its city, program and center, for
+     * a header that labels each part instead of joining them with dots.
+     *
+     * @return array{city: string|null, program: string|null, center: string|null}
+     */
+    public function placeParts(ReportTemplate $template): array
+    {
+        $center = match (true) {
+            $template->city_wide => (string) __('monthly_reports.place_field_work'),
+            $template->center_id !== null => HrCenter::remembered($template->center_id)->name,
+            default => null,
+        };
+
+        return [
+            'city' => $this->cityNames(new Collection([$template]))[$template->city_id] ?? null,
+            'program' => HrProgram::nameOf($template->program_id) ?: null,
+            'center' => filled($center) ? $center : null,
+        ];
+    }
+
+    /**
      * The place of one template in the interface language.
      */
     public function place(ReportTemplate $template): string

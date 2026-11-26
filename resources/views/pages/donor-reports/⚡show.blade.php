@@ -53,7 +53,7 @@ new #[Layout('layouts::desk'), Title('titles.donor_report')] class extends Compo
     #[Computed]
     public function report(): DonorReport
     {
-        return DonorReport::query()->with('donorProposal:id,slug,proposal_id,donor_id')->findOrFail($this->reportId);
+        return DonorReport::query()->with(['donorProposal:id,slug,proposal_id,donor_id', 'donorProposal.proposal', 'donorProposal.proposal.mainPartner:id,slug,name'])->findOrFail($this->reportId);
     }
 
     /**
@@ -228,6 +228,9 @@ new #[Layout('layouts::desk'), Title('titles.donor_report')] class extends Compo
             <span>{{ __('donor_reports.due_on_date', ['date' => $report->due_on->translatedFormat(__('formats.date'))]) }}</span>
             @if (filled($header['donor_name'] ?? null))
                 <span dir="auto">{{ $header['donor_name'] }}</span>
+            @endif
+            @if ($report->donorProposal?->proposal?->mainPartner !== null)
+                <x-proposals.partner-note :partner="$report->donorProposal->proposal->mainPartner" for="reports" class="font-semibold" />
             @endif
             @if ($canSeeAgreement && $report->donorProposal !== null)
                 <a href="{{ route('funding-agreements.show', $report->donorProposal) }}" wire:navigate class="hover:underline" data-agreement-link>{{ __('donor_reports.open_agreement') }}</a>

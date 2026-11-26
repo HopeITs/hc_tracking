@@ -143,4 +143,6 @@ return [
     'decline_request' => 'رفض الطلب',
     'reason_for_declining' => 'سبب الرفض',
     'donor_request_declined' => 'تم رفض طلب المانح.',
+    'partner_roles_heading' => 'المشاريع كشريك رئيسي أو شريك',
+    'partner_badge' => 'شريك',
 ];

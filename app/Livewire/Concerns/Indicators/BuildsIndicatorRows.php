@@ -74,8 +74,9 @@ trait BuildsIndicatorRows
     public function allIndicators(): Collection
     {
         return Indicator::query()
-            ->select(['id', 'name', 'result_id', 'project_id', 'proposal_location_id', 'measure', 'unit', 'baseline', 'target', 'frequency', 'updated_at'])
+            ->select(['id', 'name', 'result_id', 'project_id', 'proposal_location_id', 'measure', 'unit', 'baseline', 'target', 'frequency', 'updated_at', 'library_indicator_id'])
             ->with([
+                'libraryIndicator:id,name_ar,name_en',
                 // parent_id is selected so the statement's lineage can be walked.
                 'result:id,statement,type,program_id,proposal_id,parent_id',
                 // program_id is nullable on results, so a result can outlive its program.

@@ -57,6 +57,13 @@ trait ManagesProposalStatus
 
     public bool $statusStale = false;
 
+    /**
+     * Beneficiary counts typed in the modal, by linked project id.
+     *
+     * @var array<int|string, string>
+     */
+    public array $statusBeneficiaries = [];
+
     public bool $showCorrectModal = false;
 
     public string $correctTarget = '';
@@ -148,6 +155,62 @@ trait ManagesProposalStatus
     }
 
     /**
+     * The linked projects still missing a beneficiary count, when the chosen
+     * target needs one. The modal asks for them in place so the move is never
+     * a dead end.
+     *
+     * @return list<array{id: int, name: string}>
+     */
+    #[Computed]
+    public function statusMissingBeneficiaries(): array
+    {
+        $to = ProposalStatus::tryFrom($this->newStatus);
+        $subject = $this->statusSubject;
+
+        if ($to === null || $subject === null || ! in_array($to, $this->statusTargets, true)) {
+            return [];
+        }
+
+        if (! in_array('target_beneficiaries', ProposalTransitions::requirements($subject->status, $to, $subject->kind) ?? [], true)) {
+            return [];
+        }
+
+        return $subject->projects()
+            ->select(['projects.id', 'projects.name'])
+            ->where(fn ($query) => $query->whereNull('project_proposal.target_beneficiaries')->orWhere('project_proposal.target_beneficiaries', '<', 1))
+            ->orderBy('projects.id')
+            ->get()
+            ->map(fn ($project): array => ['id' => (int) $project->id, 'name' => (string) $project->name])
+            ->all();
+    }
+
+    /**
+     * Validate and save the counts typed for the missing projects. An empty
+     * count, or one that is not a whole number of at least 1, stops the move
+     * with a field error.
+     */
+    private function saveMissingBeneficiaries(Proposal $proposal): void
+    {
+        $missing = $this->statusMissingBeneficiaries;
+
+        if ($missing === []) {
+            return;
+        }
+
+        $rules = [];
+
+        foreach ($missing as $row) {
+            $rules['statusBeneficiaries.'.$row['id']] = ['required', 'integer', 'min:1', 'max:100000000'];
+        }
+
+        $this->validate($rules, [], collect($missing)->mapWithKeys(fn (array $row): array => ['statusBeneficiaries.'.$row['id'] => $row['name']])->all());
+
+        foreach ($missing as $row) {
+            $proposal->projects()->updateExistingPivot($row['id'], ['target_beneficiaries' => (int) $this->statusBeneficiaries[$row['id']]]);
+        }
+    }
+
+    /**
      * D-15: when the chosen target sends the proposal to the donor, the
      * reviewers of that stage who have not seen it yet, by name. A warning
      * only; the move is never blocked.
@@ -202,6 +265,9 @@ trait ManagesProposalStatus
             'effective_date' => in_array('effective_date', $fields, true) ? $this->statusDate : null,
             'meeting_at' => in_array('meeting_at', $fields, true) && trim($this->statusMeetingAt) !== '' ? $this->statusMeetingAt : null,
         ], fn (?string $value): bool => $value !== null);
+
+        $this->saveMissingBeneficiaries($proposal);
+        unset($this->statusMissingBeneficiaries);
 
         try {
             $result = app(TransitionProposal::class)->handle($proposal, $to, ProposalStatus::from($this->statusExpectedFrom), $input);
@@ -340,8 +406,9 @@ trait ManagesProposalStatus
         $this->statusDate = '';
         $this->statusMeetingAt = '';
         $this->statusStale = false;
+        $this->statusBeneficiaries = [];
         $this->correctTarget = '';
         $this->correctReason = '';
-        unset($this->statusSubject, $this->statusTargets, $this->statusFields, $this->unseenReviewerNames, $this->correctionTargets);
+        unset($this->statusMissingBeneficiaries, $this->statusSubject, $this->statusTargets, $this->statusFields, $this->unseenReviewerNames, $this->correctionTargets);
     }
 }

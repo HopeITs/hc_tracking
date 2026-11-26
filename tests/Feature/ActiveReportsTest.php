@@ -136,6 +136,47 @@ test('open reports of all three types are listed and closed ones are not', funct
         ->assertSeeText(['Education for All', 'Safe Schools', 'Q4 narrative']);
 });
 
+test('the Done tab lists the finished reports of all three types and never the open ones', function () {
+    $seed = arpSeedAllTypes();
+
+    Livewire::actingAs($this->meal)->test('pages::active-reports.index')
+        ->set('tab', 'done')
+        ->assertSeeHtml('data-active-report="monthly-'.$seed['monthlyClosed']->id.'"')
+        ->assertSeeHtml('data-active-report="donor-'.$seed['donorClosed']->id.'"')
+        ->assertSeeHtml('data-active-report="report-'.$seed['reportClosed']->id.'"')
+        ->assertDontSeeHtml('data-active-report="monthly-'.$seed['monthlyOpen']->id.'"')
+        ->assertDontSeeHtml('data-active-report="donor-'.$seed['donorOpen']->id.'"')
+        ->assertDontSeeHtml('data-active-report="report-'.$seed['reportOpen']->id.'"')
+        ->assertDontSeeHtml('data-active-report="report-'.$seed['reportMirror']->id.'"');
+});
+
+test('a finished report is hidden from anyone who may not open it', function () {
+    $seed = arpSeedAllTypes();
+    $viewer = User::factory()->role('Team Member')->create();
+
+    Livewire::actingAs($viewer)->test('pages::active-reports.index')
+        ->set('tab', 'done')
+        ->assertDontSeeHtml('data-active-report="monthly-'.$seed['monthlyClosed']->id.'"')
+        ->assertDontSeeHtml('data-active-report="donor-'.$seed['donorClosed']->id.'"')
+        ->assertSeeHtml('data-active-report="report-'.$seed['reportClosed']->id.'"');
+});
+
+test('the Type filter lists the kinds of report the viewer may have, even when none is open today', function () {
+    $viewer = User::factory()->role('Team Member')->create();
+
+    // No donor reports for a role without them, but monthly and existing reports are offered.
+    Livewire::actingAs($viewer)->test('pages::active-reports.index')
+        ->assertDontSeeHtml("'type', 'donor')")
+        ->assertSeeHtml("'type', 'monthly')")
+        ->assertSeeHtml("'type', 'report')");
+
+    // MEAL has nothing open at all and still sees every type.
+    Livewire::actingAs($this->meal)->test('pages::active-reports.index')
+        ->assertSeeHtml("'type', 'monthly')")
+        ->assertSeeHtml("'type', 'donor')")
+        ->assertSeeHtml("'type', 'report')");
+});
+
 test('a preparer sees their started drafts and submitted months, not months still to come', function () {
     $mine = arpTemplate($this->aleppo, 'Child Protection', [
         '2026-10-01' => MonthlyReportStatus::Draft,

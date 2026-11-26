@@ -10,7 +10,7 @@
 
 <section aria-labelledby="monthly-report-answers-heading" class="flex flex-col gap-3" data-monthly-report-answers>
     <div>
-        <h2 id="monthly-report-answers-heading" class="text-base font-bold">{{ __('monthly_reports.questions_this_month') }} <span class="text-xs font-normal {{ $mutedText }}">{{ __('monthly_reports.optional') }}</span></h2>
+        <h2 id="monthly-report-answers-heading" class="mrp-h2">{{ __('monthly_reports.questions_this_month') }}@if (! $isDraft && $answeredQuestions->isNotEmpty()) <span class="mrp-count">{{ $answeredQuestions->count() }}</span>@endif <span class="text-xs font-normal {{ $mutedText }}">{{ __('monthly_reports.optional') }}</span></h2>
         @if ($fillsNarrative && $questions->isNotEmpty())
             <p class="type-meta {{ $mutedText }}">{{ __('monthly_reports.answers_help') }}</p>
         @endif
@@ -19,18 +19,18 @@
     @if (! $isDraft && $answeredQuestions->isEmpty())
         @include('pages.monthly-reports._show-empty-line', ['key' => 'answers', 'icon' => 'chat-bubble-left-right', 'heading' => __('monthly_reports.no_stored_answers'), 'body' => null])
     @elseif (! $isDraft)
-        <ol class="flex flex-col border-t border-secondary-soft dark:border-line" role="list">
+        <ol class="mrp-qa-list" role="list">
             @foreach ($answeredQuestions as $storedAnswer)
-                <li class="flex flex-col gap-2 border-b border-secondary-soft py-4 dark:border-line" wire:key="stored-answer-{{ $storedAnswer->id }}">
-                    <div class="flex flex-wrap items-center gap-2">
-                        <p class="font-semibold" dir="auto">{{ $storedAnswer->question_text }}</p>
+                <li class="mrp-qa" wire:key="stored-answer-{{ $storedAnswer->id }}">
+                    <div class="mrp-qa-head">
+                        <p class="mrp-qa-question" dir="auto">{{ $storedAnswer->question_text }}</p>
                         @if ($storedAnswer->question?->frequency === \App\Enums\NarrativeQuestionFrequency::QuarterEnd)
-                            <span class="rounded-md border border-secondary-light px-1.5 py-0.5 text-[11px] font-semibold dark:border-line-strong">{{ __('monthly_reports.quarter_end_question') }}</span>
+                            <span class="mrp-pill mrp-pill-none">{{ __('monthly_reports.quarter_end_question') }}</span>
                         @endif
                     </div>
 
                     @if (filled($storedAnswer->answer))
-                        <p class="text-sm whitespace-pre-line" dir="auto">{{ $storedAnswer->answer }}</p>
+                        <p class="mrp-qa-answer" dir="auto" x-data="{ full: false }" x-on:click="full = ! full" x-bind:class="{ 'mrp-clamp-3': ! full }">{{ $storedAnswer->answer }}</p>
                     @else
                         <p class="text-sm {{ $mutedText }}">{{ __('monthly_reports.no_answer') }}</p>
                     @endif
@@ -40,13 +40,13 @@
     @elseif ($questions->isEmpty())
         @include('pages.monthly-reports._show-empty-line', ['key' => 'answers', 'icon' => 'chat-bubble-left-right', 'heading' => __('monthly_reports.no_questions'), 'body' => __('monthly_reports.no_questions_body')])
     @else
-        <ol class="flex flex-col border-t border-secondary-soft dark:border-line" role="list">
+        <ol class="mrp-qa-list" role="list">
             @foreach ($questions as $question)
-                <li class="flex flex-col gap-2 border-b border-secondary-soft py-4 dark:border-line" wire:key="question-{{ $question->id }}">
-                    <div class="flex flex-wrap items-center gap-2">
-                        <label for="answer-{{ $question->id }}" class="font-semibold" dir="auto">{{ $question->localizedText() }}</label>
+                <li class="mrp-qa" wire:key="question-{{ $question->id }}">
+                    <div class="mrp-qa-head">
+                        <label for="answer-{{ $question->id }}" class="mrp-qa-question" dir="auto">{{ $question->localizedText() }}</label>
                         @if ($question->frequency === \App\Enums\NarrativeQuestionFrequency::QuarterEnd)
-                            <span class="rounded-md border border-secondary-light px-1.5 py-0.5 text-[11px] font-semibold dark:border-line-strong">{{ __('monthly_reports.quarter_end_question') }}</span>
+                            <span class="mrp-pill mrp-pill-none">{{ __('monthly_reports.quarter_end_question') }}</span>
                         @endif
                     </div>
 
@@ -62,7 +62,7 @@
                             <p class="text-xs text-status-critical">{{ $message }}</p>
                         @enderror
                     @elseif (filled($storedAnswers->get($question->id)?->answer))
-                        <p class="text-sm whitespace-pre-line" dir="auto">{{ $storedAnswers->get($question->id)->answer }}</p>
+                        <p class="mrp-qa-answer" dir="auto" x-data="{ full: false }" x-on:click="full = ! full" x-bind:class="{ 'mrp-clamp-3': ! full }">{{ $storedAnswers->get($question->id)->answer }}</p>
                     @else
                         <p class="text-sm {{ $mutedText }}">{{ __('monthly_reports.no_answer') }}</p>
                     @endif

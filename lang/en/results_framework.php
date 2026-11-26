@@ -77,7 +77,6 @@ return [
     'tree_indicators' => '{0} No indicators|{1} 1 indicator|[2,*] :count indicators',
     'tree_show_children' => '{1} Show 1 below|[2,*] Show :count below',
     'tree_hide_children' => 'Hide',
-    'free_activities_empty' => 'Write activities here that are not linked to any outcome or output.',
     'add_free_activity' => 'Add activity',
     'free_activity_help' => 'Choose an output, or leave it empty to keep the activity on its own.',
     'no_statement_free_activity' => 'Not linked to a statement',

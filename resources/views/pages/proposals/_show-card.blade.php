@@ -44,11 +44,11 @@
             <div class="pp-kv"><div class="pp-k">{{ __('proposals.page.kv_extended_to') }}</div><div class="pp-v">{{ $dateText($extendedTo) ?? '—' }}</div></div>
             <div class="pp-kv"><div class="pp-k">{{ __('proposals.page.kv_locations') }}</div><div class="pp-v">{{ $places ?: '—' }}</div></div>
             <div class="pp-kv pp-kv-wide"><div class="pp-k">{{ __('proposals.page.kv_summary') }}</div><div class="pp-v" dir="auto">{{ $cardProposal->notes ?: __('proposals.page.no_summary') }}</div></div>
-            @if ($this->canEditCardField('title'))
+            @can('editDetails', $cardProposal)
                 <div class="pp-fold-acts">
                     <button type="button" class="pp-btn pp-btn-sm" wire:click="openEditModal({{ $cardProposal->id }})">{{ __('proposals.edit_details') }}</button>
                 </div>
-            @endif
+            @endcan
         </div>
     @endif
 
@@ -64,6 +64,17 @@
         <div>
             @include('pages.proposals._show-card-field', ['field' => 'donor', 'display' => $cardProposal->donor?->name])
         </div>
+        @if ($cardProposal->mainPartner !== null)
+            <div class="pp-field-wrap" data-main-partner-card>
+                <div class="pp-field pp-locked">
+                    <span class="pp-flabel">{{ __('proposals.main_partner') }}</span>
+                    <span class="pp-val" dir="auto">{{ $cardProposal->mainPartner->name }}</span>
+                    @if ($cardProposal->partners->isNotEmpty())
+                        <span class="pp-ext-note" dir="auto" data-partners-line>{{ __('proposals.partners_label') }}: {{ $cardProposal->partners->pluck('name')->implode(', ') }}</span>
+                    @endif
+                </div>
+            </div>
+        @endif
     </div>
 
     @if ($cardProposal->isPayroll())

@@ -6,6 +6,7 @@ use App\Enums\ProposalStatus;
 use App\Enums\ResultType;
 use App\Exceptions\InvalidParentException;
 use App\Models\Activity;
+use App\Models\Donor;
 use App\Models\DonorProposal;
 use App\Models\Indicator;
 use App\Models\LibraryIndicator;
@@ -385,4 +386,17 @@ test('a renewal copies the location rows that still stand, with their centers', 
         ->and($rows[1]->program_id)->toBe($homsProgram->id)
         ->and($rows[1]->responsible_employee_id)->toBeNull()
         ->and($rows[1]->centerIds())->toBe([$homsCenter]);
+});
+
+test('a renewal keeps the Main Partner and the Partners of the proposal it renews', function () {
+    ['previous' => $previous] = renewalSource();
+    $mainPartner = Donor::factory()->create();
+    $partner = Donor::factory()->create();
+    $previous->update(['main_partner_id' => $mainPartner->id]);
+    $previous->partners()->attach($partner->id);
+
+    $renewal = app(CloneProposalForRenewal::class)->handle($previous, renewalData(), renewalActor('Public Relations Manager'))['proposal'];
+
+    expect($renewal->main_partner_id)->toBe($mainPartner->id)
+        ->and($renewal->partners()->pluck('donors.id')->all())->toBe([$partner->id]);
 });

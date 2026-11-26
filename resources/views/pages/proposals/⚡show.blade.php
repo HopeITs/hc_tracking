@@ -269,9 +269,13 @@ new #[Layout('layouts::desk'), Title('titles.proposal')] class extends Component
     public function proposal(): Proposal
     {
         return Proposal::query()
-            ->select(['id', 'name', 'internal_project_number', 'planned_date_begin', 'planned_date_end', 'actual_date_begin', 'actual_date_end', 'extended_date_end', 'extension_reason', 'status', 'kind', 'on_hold_since', 'status_remind_on', 'notes', 'concept_note', 'updated_at', 'created_at', 'donor_id', 'final_report_accepted_on', 'final_report_accepted_by', 'requested_budget', 'requested_currency'])
+            ->select(['id', 'name', 'internal_project_number', 'planned_date_begin', 'planned_date_end', 'actual_date_begin', 'actual_date_end', 'extended_date_end', 'extension_reason', 'status', 'kind', 'on_hold_since', 'status_remind_on', 'notes', 'concept_note', 'updated_at', 'created_at', 'donor_id', 'main_partner_id', 'final_report_accepted_on', 'final_report_accepted_by', 'requested_budget', 'requested_currency'])
             // The donor's name heads the concept-note card (W-24); a name is not money.
-            ->with('donor:id,name')
+            ->with([
+                'donor:id,name',
+                'mainPartner:id,slug,name',
+                'partners' => fn ($query) => $query->select(['donors.id', 'donors.slug', 'donors.name'])->orderBy('donors.name'),
+            ])
             ->findOrFail($this->proposalId);
     }
 

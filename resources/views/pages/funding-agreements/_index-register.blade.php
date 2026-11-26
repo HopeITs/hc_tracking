@@ -56,6 +56,9 @@
                             @else
                                 <span class="font-semibold">{{ $agreement->donor->name }}</span>
                             @endcan
+                            @if ($agreement->proposal->mainPartner !== null)
+                                <span class="block text-xs text-secondary-medium dark:text-ink-muted" dir="auto" data-main-partner-line>{{ __('proposals.via_main_partner', ['name' => $agreement->proposal->mainPartner->name]) }}</span>
+                            @endif
                             <span class="sub">
                                 @can('proposals.view')
                                     <a href="{{ route('proposals.show', $agreement->proposal) }}" wire:navigate class="underline-offset-2 hover:underline">{{ $agreement->proposal->name }}</a>
