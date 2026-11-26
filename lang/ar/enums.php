@@ -15,11 +15,6 @@ return [
         'pending' => 'قيد الموافقة',
         'approved' => 'تمت الموافقة',
     ],
-    'program_request_status' => [
-        'pending' => 'معلّق',
-        'created' => 'أُنشئ',
-        'declined' => 'مرفوض',
-    ],
     'proposal_change_request_status' => [
         'pending' => 'بانتظار القرار',
         'approved' => 'مُعتمد',
@@ -109,7 +104,6 @@ return [
     'active_report_type' => [
         'monthly' => 'تقرير شهري',
         'donor' => 'تقرير مانح',
-        'report' => 'تقرير',
     ],
     'donor_report_state' => [
         'due' => 'بانتظار التسليم',
@@ -154,6 +148,9 @@ return [
         'acknowledged' => 'تم التأكيد',
         'rejected' => 'مرفوض',
         'superseded' => 'مستبدل',
+    ],
+    'stage_template_creates' => [
+        'task' => 'مهمة قسم',
     ],
     'status_note_kind' => [
         'transition' => 'تغيير حالة',

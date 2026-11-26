@@ -34,7 +34,7 @@ beforeEach(function () {
     Activity::withoutRecording(function (): void {
         $aleppo = insertHrCity('Aleppo', 'حلب');
         $homs = insertHrCity('Homs', 'حمص');
-        $program = Program::factory()->create(['name' => 'Education']);
+        $program = Program::factory()->create(['name_en' => 'Education']);
         $centerOne = insertHrCenter($aleppo, 'Center One', 'المركز الأول');
         $centerThree = insertHrCenter($homs, 'Center Three', 'المركز الثالث');
         $donor = Donor::factory()->create();

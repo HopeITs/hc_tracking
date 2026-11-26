@@ -3,6 +3,8 @@
     $openChecks = \App\Support\FrameworkChecks::open($checks);
 @endphp
 
+@include('pages.indicators._index-reading-modal')
+
 <x-ui.modal wire:model="showDoneModal" size="sm" submit="markDone" :title="$openChecks === [] ? __('proposals.framework.done_title_ready') : trans_choice('proposals.framework.done_title_left', count($openChecks), ['count' => count($openChecks)])">
     @if ($showDoneModal)
         <div class="flex flex-col gap-4" data-test="framework-done-form">
@@ -64,6 +66,7 @@
 @include('pages.results._index-result-modal')
 
 <livewire:indicators.quick-form :key="'logframe-indicator-form-'.$proposalId" />
+<livewire:targets.framework-form :proposal-id="$proposalId" :open-on-load="request()->boolean('newTarget')" :initial-indicator-id="request()->integer('targetIndicator') ?: null" :key="'logframe-target-form-'.$proposalId" />
 
 @if ($canCreate)
     @include('components.proposals._logframe-copy-modal')

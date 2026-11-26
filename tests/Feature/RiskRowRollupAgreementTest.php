@@ -84,7 +84,7 @@ beforeEach(function () {
         $this->program = Program::factory()->create([
             'manager_id' => $this->managerEmployee,
             'strategy_id' => $this->strategy->id,
-            'name' => 'WASH',
+            'name_en' => 'WASH',
         ]);
         $this->project = Project::factory()->create(['program_id' => $this->program->id, 'end_date' => '2027-12-31']);
         $this->row = ProposalLocation::factory()->forProject($this->project)->create();

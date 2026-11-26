@@ -71,8 +71,8 @@ final class AskEngine
         'transfers' => ['route' => 'transfers.index', 'create' => 'transfers.create', 'label' => 'desk.ask_new.transfer'],
         'funding-agreements' => ['route' => 'funding-agreements.index', 'create' => 'funding-agreements.create', 'label' => 'desk.ask_new.agreement'],
         'risks' => ['route' => 'risks.index', 'create' => 'risks.create', 'label' => 'desk.ask_new.risk'],
-        'indicators' => ['route' => 'indicators.index', 'create' => 'indicators.create', 'label' => 'desk.ask_new.indicator'],
-        'targets' => ['route' => 'targets.index', 'create' => 'targets.create', 'label' => 'desk.ask_new.target'],
+        'indicators' => ['route' => 'results.index', 'create' => 'indicators.create', 'label' => 'desk.ask_new.indicator'],
+        'targets' => ['route' => 'results.index', 'create' => 'targets.create', 'label' => 'desk.ask_new.target'],
         'reports' => ['route' => 'reports.index', 'create' => 'reports.create', 'label' => 'desk.ask_new.report'],
         'results' => ['route' => 'results.index', 'create' => 'results.create', 'label' => 'desk.ask_new.result'],
         'annual-plans' => ['route' => 'annual-plans.index', 'create' => 'annual-plans.create', 'label' => 'desk.ask_new.annual_plan'],
@@ -267,7 +267,9 @@ final class AskEngine
             $actions[] = [
                 'module' => $module,
                 'label' => __($action['label']),
-                'href' => route($action['route'], ['quick' => 'create']),
+                'href' => route($action['route'], match ($action['create']) {
+                    'indicators.create' => ['newIndicator' => 1], 'targets.create' => ['newTarget' => 1], default => ['quick' => 'create']
+                }),
             ];
         }
 

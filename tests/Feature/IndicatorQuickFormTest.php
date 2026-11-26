@@ -7,7 +7,6 @@ use App\Models\LibraryIndicator;
 use App\Models\Program;
 use App\Models\Result;
 use App\Models\User;
-use Illuminate\Support\Facades\DB;
 use Livewire\Livewire;
 
 test('the indicator directory can be narrowed to the level of the result measured', function () {
@@ -114,8 +113,7 @@ test('typing a duplicate name offers the matching entry and picking it attaches 
 
 test('a missing program code leaves the logframe and library unchanged', function () {
     $user = mealManager();
-    $program = Program::factory()->create();
-    DB::connection('hr')->table('programs')->where('id', $program->id)->update(['code' => '']);
+    $program = Program::factory()->create(['code' => '']);
     $outcome = Result::factory()->type(ResultType::Outcome)->create(['program_id' => $program->id]);
 
     Livewire::actingAs($user)

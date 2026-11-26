@@ -437,6 +437,12 @@ return [
             'description' => 'Which project has not submitted or not had validated which month. Click a legend state to see only it.',
             'locked' => 'Your role does not open monthly reports.',
         ],
+        'tracker' => [
+            'title' => 'Report Tracker',
+            'description' => 'Monthly reports, your reporting duties and donor reports: what waits on you and what is late. Click a door to open it.',
+            'empty' => 'No reports are open.',
+            'locked' => 'Your role does not open reports.',
+        ],
         'validate' => [
             'title' => 'To validate',
             'description' => 'Monthly reports waiting for MEAL, oldest first.',

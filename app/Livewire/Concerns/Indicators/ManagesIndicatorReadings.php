@@ -7,7 +7,9 @@ namespace App\Livewire\Concerns\Indicators;
 use App\Enums\IndicatorMeasure;
 use App\Models\Indicator;
 use App\Models\IndicatorProgress;
+use Carbon\CarbonImmutable;
 use Flux\Flux;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Facades\Gate;
 use Livewire\Attributes\Computed;
 use Livewire\Attributes\Locked;
@@ -16,8 +18,7 @@ use Livewire\Attributes\Locked;
  * The reading dialog on indicators/index: log a reading, correct one, and
  * delete one inline from the chain inspector's history.
  *
- * Used by indicators/index only. The page provides forgetIndicators();
- * the inspected indicator's id comes from InspectsIndicatorChain.
+ * The host provides its indicator scope and cache invalidation.
  *
  * @property ?int $inspectingIndicatorId InspectsIndicatorChain
  */
@@ -46,6 +47,8 @@ trait ManagesIndicatorReadings
     {
         Gate::authorize('indicators.record');
 
+        $this->readingIndicators()->findOrFail($indicatorId);
+
         $this->resetValidation();
         $this->progressIndicatorId = $indicatorId;
         $this->editingReadingId = null;
@@ -65,6 +68,7 @@ trait ManagesIndicatorReadings
         Gate::authorize('indicators.record');
 
         $reading = IndicatorProgress::query()->findOrFail($readingId);
+        $this->readingIndicators()->findOrFail($reading->indicator_id);
 
         $this->resetValidation();
         $this->progressIndicatorId = $reading->indicator_id;
@@ -107,7 +111,8 @@ trait ManagesIndicatorReadings
             return;
         }
 
-        $isPercentage = Indicator::query()->whereKey($this->progressIndicatorId)->value('measure') === IndicatorMeasure::Percentage->value;
+        $indicator = $this->readingIndicators()->findOrFail($this->progressIndicatorId);
+        $isPercentage = $indicator->measure === IndicatorMeasure::Percentage;
 
         $validated = $this->validate([
             // A reading records something that has happened, never a forecast.
@@ -120,6 +125,8 @@ trait ManagesIndicatorReadings
             'progressDate.before_or_equal' => __('indicators.a_reading_cannot_be_dated_in_the_future'),
             'progressValue.required' => __('indicators.enter_the_value_recorded'),
         ] + ($isPercentage ? ['progressValue.max' => __('indicators.a_percentage_cannot_exceed_100')] : []));
+
+        $this->authorizeReadingPeriod($indicator, CarbonImmutable::parse($validated['progressDate']));
 
         $attributes = [
             'date' => $validated['progressDate'],
@@ -176,12 +183,16 @@ trait ManagesIndicatorReadings
     {
         Gate::authorize('indicators.record');
 
-        if ($this->deletingReadingId === null || $this->inspectingIndicatorId === null) {
+        $indicatorId = $this->inspectingIndicatorId ?? null;
+
+        if ($this->deletingReadingId === null || $indicatorId === null) {
             return;
         }
 
+        $this->readingIndicators()->findOrFail($indicatorId);
+
         IndicatorProgress::query()
-            ->where('indicator_id', $this->inspectingIndicatorId)
+            ->where('indicator_id', $indicatorId)
             ->findOrFail($this->deletingReadingId)
             ->delete();
 
@@ -190,6 +201,14 @@ trait ManagesIndicatorReadings
 
         Flux::toast(variant: 'success', text: __('indicators.reading_deleted'));
     }
+
+    /** @return Builder<Indicator> */
+    protected function readingIndicators(): Builder
+    {
+        return Indicator::query();
+    }
+
+    protected function authorizeReadingPeriod(Indicator $indicator, CarbonImmutable $date): void {}
 
     /**
      * Drop every cached read after a write; the page's own method.

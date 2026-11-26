@@ -6,7 +6,6 @@ namespace App\Support;
 
 use App\Enums\NotificationKind;
 use App\Enums\NotificationPriority;
-use App\Models\HrProgram;
 use App\Models\Program;
 use App\Models\StrategicPlan;
 use App\Models\Strategy;
@@ -51,7 +50,7 @@ final class StrategicPlanNotifier
                 subjectType: null,
                 subjectId: null,
                 actorId: $actor?->id,
-                link: ['route' => 'strategic-plans.show', 'parameters' => ['strategy' => $strategy->slug, 'program' => HrProgram::slugOf($plan->program_id)]],
+                link: ['route' => 'strategic-plans.show', 'parameters' => ['strategy' => $strategy->slug, 'program' => Program::slugOf($plan->program_id)]],
             ))), report: false);
         }
     }

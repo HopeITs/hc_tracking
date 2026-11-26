@@ -7,7 +7,7 @@ use App\Enums\ProjectStatus;
 use App\Enums\ProposalStatus;
 use App\Events\ProposalStatusChanged;
 use App\Models\Program;
-use App\Models\ProgramRequest;
+use App\Models\Project;
 use App\Models\Proposal;
 use App\Models\ProposalLocation;
 use App\Models\User;
@@ -183,10 +183,8 @@ test('a row already approved is skipped, so a second run writes nothing', functi
 
 // ── Completeness ────────────────────────────────────────────────────────
 
-test('a row whose program request is still pending blocks the approval and writes nothing', function () {
+test('a row with no program blocks the approval and writes nothing', function () {
     $proposal = proposalWithRows([newRow(['program_id' => null])]);
-    $rowId = (int) rowsOf($proposal)[0]->id;
-    ProgramRequest::factory()->create(['proposal_location_id' => $rowId]);
     Event::fake([ProposalStatusChanged::class]);
 
     $errors = refusedRowsApproval(fn () => approveWithRows($this->approver, $proposal));

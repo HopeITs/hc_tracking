@@ -18,12 +18,12 @@ function contractEventKeys(): array
         'project.period_changed', 'project.started', 'project.ended', 'project.closed', 'project.archived', 'project.sectors_changed',
         'proposal.created', 'proposal.status_changed', 'proposal.review_requested', 'proposal.reviewer_added', 'proposal.reviewer_removed',
         'proposal.reviewer_seen', 'proposal.need_assessment_added', 'proposal.approved', 'proposal.approved_without_agreement',
-        'proposal.on_hold_reminder', 'proposal.responsible_inactive', 'proposal.final_report_accepted', 'proposal.beneficiaries_changed', 'proposal.change_requested', 'proposal.change_reviewed', 'proposal.change_approved', 'proposal.change_rejected', 'proposal.concept_note_updated', 'proposal.targets_saved',
-        'proposal.project_linked', 'proposal.project_unlinked', 'proposal.deleted', 'proposal.risk_attached', 'proposal.risk_detached',
+        'proposal.on_hold_reminder', 'proposal.ending_with_funds.due', 'proposal.responsible_inactive', 'proposal.final_report_accepted', 'proposal.beneficiaries_changed', 'proposal.change_requested', 'proposal.change_reviewed', 'proposal.change_approved', 'proposal.change_rejected', 'proposal.concept_note_updated', 'proposal.targets_saved',
+        'proposal.project_linked', 'proposal.project_unlinked', 'proposal.deleted', 'proposal.risk_attached', 'proposal.risk_detached', 'proposal.stage_tasks_created',
         'agreement.recorded', 'transfer.generated', 'transfer.received', 'transfer.late',
         'monthly_reports.generated', 'monthly_report.due', 'monthly_report.overdue', 'monthly_report.submitted', 'monthly_report.validated',
         'monthly_report.returned', 'monthly_report.reopen_requested', 'monthly_report.reopen_decided', 'monthly_report.reopen_escalated',
-        'report_template.pending', 'report_template.confirmed', 'report_template.lines_added',
+        'report_template.placement_pending', 'report_template.pending', 'report_template.confirmed', 'report_template.lines_added',
         'donor_report.saved', 'donor_report.submitted', 'donor_report.due', 'donor_report.overdue',
         // W-04 (D-57): a donor requested from the proposal form, and the General Manager's decision.
         'donor.requested', 'donor.approved', 'donor.declined',
@@ -33,7 +33,7 @@ function contractEventKeys(): array
         'proposal.extended',
         'department_task.created', 'department_task.due', 'department_task.overdue', 'department_task.delivered', 'department_task.returned',
         'library_indicator.created', 'library_indicator.updated', 'library_indicator.deactivated', 'library_indicator.reactivated',
-        'meal_coverage.assigned', 'meal_coverage.responsible_changed', 'meal_coverage.project_assigned',
+        'meal_coverage.assigned', 'meal_coverage.responsible_changed', 'meal_coverage.place_assigned', 'meal_coverage.project_assigned',
         'program.logframe_missing', 'annual_plan.missing', 'supervision.added', 'supervision.removed',
         // T07: a moved MEAL Manager slot tells both holders; registered by the owning task, not yet in §15.2 (Dev 3).
         'notification_settings.meal_manager_changed',
@@ -44,8 +44,10 @@ function contractEventKeys(): array
         'nudge.sent',
         // Task workflow: submitted for review / sent back with a note; user-approved 2026-10-27, not yet in §15.2.
         'task_review.submitted', 'task_review.sent_back',
-        // W-34a (D-62): proposal location rows (counts only) and the program requests they open.
-        'proposal.locations_changed', 'program_request.opened', 'program_request.linked',
+        // W-34a (D-62): proposal location rows (counts only).
+        'proposal.locations_changed',
+        // Page review follow-up (6 Nov 2026): missing actual grant dates filled in after approval.
+        'proposal.grant_dates_set',
     ];
 }
 
@@ -95,11 +97,11 @@ test('importance, oversight and critical follow the contract', function () {
     expect($digest)->toBe([
         'donor_report.saved', 'donor_report.submitted',
         'library_indicator.created', 'library_indicator.deactivated', 'library_indicator.reactivated', 'library_indicator.updated',
-        'meal_coverage.assigned', 'meal_coverage.project_assigned', 'meal_coverage.responsible_changed',
+        'meal_coverage.assigned', 'meal_coverage.place_assigned', 'meal_coverage.project_assigned', 'meal_coverage.responsible_changed',
         'program.logframe_missing',
         'project.archived', 'project.created', 'project.sectors_changed',
-        'proposal.concept_note_updated', 'proposal.created', 'proposal.deleted', 'proposal.locations_changed', 'proposal.need_assessment_added', 'proposal.negotiation_noted', 'proposal.project_linked', 'proposal.project_unlinked',
-        'proposal.reviewer_removed', 'proposal.reviewer_seen', 'proposal.risk_attached', 'proposal.risk_detached', 'proposal.targets_saved',
+        'proposal.concept_note_updated', 'proposal.created', 'proposal.deleted', 'proposal.grant_dates_set', 'proposal.locations_changed', 'proposal.need_assessment_added', 'proposal.negotiation_noted', 'proposal.project_linked', 'proposal.project_unlinked',
+        'proposal.reviewer_removed', 'proposal.reviewer_seen', 'proposal.risk_attached', 'proposal.risk_detached', 'proposal.stage_tasks_created', 'proposal.targets_saved',
         'result.created', 'result.deleted', 'result.updated',
         'supervision.added', 'supervision.removed',
     ])

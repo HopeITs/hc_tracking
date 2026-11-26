@@ -54,7 +54,7 @@ function scopeIndicator(Project $project, Indicator $indicator): Indicator
 test('the targets tab lists the indicators of its proposals and of its program framework', function () {
     $otherProgramIndicator = Indicator::factory()->create([
         'result_id' => Result::factory()->create(['type' => ResultType::Output, 'program_id' => Program::factory()->create()->id])->id,
-        'name' => 'Seeds distributed',
+        'name_en' => 'Seeds distributed',
     ]);
     $elsewhere = Indicator::factory()->create([
         'result_id' => $this->programNode->id,
@@ -126,7 +126,7 @@ test('users without indicator rights see no scope button and are refused', funct
 test('the targets tab offers a New indicator link to the indicator directory scoped to this project', function () {
     projectTargetsTab($this->meal, $this->project)
         ->assertSeeHtml('data-new-indicator')
-        ->assertSeeHtml('href="'.e(route('indicators.index', ['create' => 1, 'location' => $this->row->id])).'"')
+        ->assertSeeHtml('href="'.e(route('results.index', ['newIndicator' => 1, 'location' => $this->row->id])).'"')
         ->assertSee(__('projects.new_indicator'));
 });
 

@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace App\Livewire\Concerns\Proposals;
 
-use App\Enums\Locale;
 use App\Enums\ReportStatus;
 use App\Models\DonorProposal;
 use App\Models\DonorReport;
@@ -46,13 +45,13 @@ trait ReadsProposalDelivery
      * `missing_center`. City, center, employee and program names are read from
      * HR, never copied; the rows load their relations once.
      *
-     * @return list<array{id: int, city: string, program: string|null, programRequestName: string|null, responsible: string|null, centers: list<string>, fieldWork: bool, status: string, project: string|null}>
+     * @return list<array{id: int, city: string, program: string|null, responsible: string|null, centers: list<string>, fieldWork: bool, status: string, project: string|null}>
      */
     #[Computed]
     public function locationRows(): array
     {
         $rows = $this->proposal->locations()
-            ->with(['centers', 'programRequest', 'program:id', 'project:id,slug,name,status'])
+            ->with(['centers', 'program:id', 'project:id,slug,name,status'])
             ->orderBy('sort')
             ->orderBy('id')
             ->get();
@@ -70,7 +69,7 @@ trait ReadsProposalDelivery
         return $rows->map(function (ProposalLocation $row) use ($incomplete, $cities, $employees): array {
             $status = match (true) {
                 ! isset($incomplete[$row->id]) => 'complete',
-                $row->program_id === null || ($row->programRequest?->isPending() ?? false) => 'waiting_program',
+                $row->program_id === null => 'waiting_program',
                 $row->responsible_employee_id === null => 'missing_responsible',
                 default => 'missing_center',
             };
@@ -79,9 +78,6 @@ trait ReadsProposalDelivery
                 'id' => $row->id,
                 'city' => $cities->get($row->city_id)?->name ?? __('common.unknown_city'),
                 'program' => $row->program?->name,
-                'programRequestName' => $row->program_id === null && $row->programRequest !== null
-                    ? (Locale::current() === Locale::Arabic && trim($row->programRequest->name_ar) !== '' ? trim($row->programRequest->name_ar) : trim($row->programRequest->name_en))
-                    : null,
                 'responsible' => $row->responsible_employee_id === null ? null : ($employees->get($row->responsible_employee_id)?->name ?? '#'.$row->responsible_employee_id),
                 'centers' => $row->city_wide ? [] : array_map(fn (int $centerId): string => HrCenter::remembered($centerId)?->name ?? '#'.$centerId, $row->centerIds()),
                 'fieldWork' => $row->city_wide,

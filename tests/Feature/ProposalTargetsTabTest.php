@@ -8,7 +8,6 @@ use App\Models\Indicator;
 use App\Models\LibraryIndicator;
 use App\Models\PlanIndicator;
 use App\Models\Program;
-use App\Models\ProgramRequest;
 use App\Models\Project;
 use App\Models\Proposal;
 use App\Models\ProposalLocation;
@@ -362,13 +361,12 @@ test('a row with several centers says once that its centers reach one target tog
 
 test('a row waiting for its program shows its column disabled with the reason and sends nothing', function () {
     $waiting = ProposalLocation::factory()->isNew()->create(['proposal_id' => $this->proposal->id, 'program_id' => null]);
-    ProgramRequest::factory()->create(['proposal_location_id' => $waiting->id, 'name_en' => 'Mobile clinics', 'name_ar' => 'عيادات متنقلة']);
     $key = cellKey($this->indicator, $waiting);
 
     $tab = targetsTab($this->meal, $this->proposal);
     $html = $tab->html();
 
-    expect(columnHeader($html, $waiting))->toContain('data-waiting')->toContain(__('targets.column_waiting_program'))->toContain('Mobile clinics')
+    expect(columnHeader($html, $waiting))->toContain('data-waiting')->toContain(__('targets.column_waiting_program'))
         ->and($html)->not->toContain('name="grid['.$key.'][value]"')
         ->and($html)->toContain('name="grid['.cellKey($this->indicator, $this->rowA).'][value]"');
 

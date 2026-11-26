@@ -303,17 +303,6 @@ parameters:
         # The targets/index traits below hold code moved unchanged from the page,
         # which PHPStan could not read before. Same rule as above.
         -
-            # portfolio() groups Reports with groupBy() and maps each group in a
-            # closure typed with the bare Eloquent Collection (element type
-            # Model), so the returned shape degrades: project is mixed, reports
-            # is Collection<int, Model> and latest is Model|null (first() is
-            # nullable, though a group is never empty). The docblock states the
-            # real shape the partial relies on, so it stays.
-            message: '#portfolio\(\) should return#'
-            identifier: return.type
-            path: app/Livewire/Concerns/Reports/ReadsReportPortfolio.php
-            count: 1
-        -
             # targets() eager-loads `source` with a callback typed for the MorphTo
             # it receives (it calls morphWith()); Larastan types every with()
             # callback as taking any Relation.

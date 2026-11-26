@@ -46,8 +46,8 @@ final class Shortcuts
         'agreement' => ['route' => 'funding-agreements.index', 'ability' => 'funding-agreements.create', 'icon' => 'document-currency-dollar', 'label' => 'desk.ask_new.agreement'],
         'transfer' => ['route' => 'transfers.index', 'ability' => 'transfers.create', 'icon' => 'banknotes', 'label' => 'desk.ask_new.transfer'],
         'risk' => ['route' => 'risks.index', 'ability' => 'risks.create', 'view' => 'risks.view', 'icon' => 'exclamation-triangle', 'label' => 'desk.ask_new.risk'],
-        'indicator' => ['route' => 'indicators.index', 'ability' => 'indicators.create', 'icon' => 'chart-bar', 'label' => 'desk.ask_new.indicator'],
-        'target' => ['route' => 'targets.index', 'ability' => 'targets.create', 'icon' => 'viewfinder-circle', 'label' => 'desk.ask_new.target'],
+        'indicator' => ['route' => 'results.index', 'ability' => 'indicators.create', 'icon' => 'chart-bar', 'label' => 'desk.ask_new.indicator'],
+        'target' => ['route' => 'results.index', 'ability' => 'targets.create', 'icon' => 'viewfinder-circle', 'label' => 'desk.ask_new.target'],
         'result' => ['route' => 'results.index', 'ability' => 'results.create', 'icon' => 'trophy', 'label' => 'desk.ask_new.result'],
         'annual-plan' => ['route' => 'annual-plans.index', 'ability' => 'annual-plans.create', 'icon' => 'calendar-date-range', 'label' => 'desk.ask_new.annual_plan'],
         'strategy' => ['route' => 'strategies.index', 'ability' => 'strategies.create', 'icon' => 'light-bulb', 'label' => 'desk.ask_new.strategy'],
@@ -83,7 +83,9 @@ final class Shortcuts
                 'label' => (string) __($action['label']),
                 'icon' => $action['icon'],
                 'route' => $action['route'],
-                'href' => route($action['route'], ['quick' => 'create']),
+                'href' => route($action['route'], match ($key) {
+                    'indicator' => ['newIndicator' => 1], 'target' => ['newTarget' => 1], default => ['quick' => 'create']
+                }),
             ];
         }
 

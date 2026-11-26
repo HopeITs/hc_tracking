@@ -71,7 +71,6 @@ test('the fundraiser saves a city-only row, and a new row with no program or cit
     };
 
     expect($refuse(['city_id' => null]))->toHaveKey('locations.0.city_id')
-        ->and($refuse(['city_id' => $city, 'is_new' => true]))->toHaveKey('locations.0.new_program_name_en')
         ->and(Proposal::query()->count())->toBe(1);
 });
 

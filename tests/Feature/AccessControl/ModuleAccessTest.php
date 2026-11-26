@@ -23,8 +23,6 @@ dataset('module pages', [
     'project' => [fn (): string => route('projects.show', rowFor(Project::factory()->create()))],
     'risks' => [fn (): string => route('risks.index')],
     'results' => [fn (): string => route('results.index')],
-    'indicators' => [fn (): string => route('indicators.index')],
-    'targets' => [fn (): string => route('targets.index')],
     'tasks' => [fn (): string => route('tasks.index')],
     'reports' => [fn (): string => route('reports.index')],
     'report' => [fn (): string => route('reports.show', Report::factory()->create())],

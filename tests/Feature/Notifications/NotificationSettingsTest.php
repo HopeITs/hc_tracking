@@ -24,3 +24,20 @@ test('a saved value wins over the default and survives a fresh instance', functi
         ->and($fresh->get('stalled_proposal_days'))->toBe(30)
         ->and($fresh->all()['overdue_repeat_days'])->toBe(2);
 });
+
+test('settings are read once per request and a save is seen at once', function () {
+    $settings = app(NotificationSettings::class);
+    $settings->get('working_days');
+
+    DB::flushQueryLog();
+    DB::enableQueryLog();
+    foreach (range(1, 50) as $ignored) {
+        $settings->get('working_days');
+    }
+    expect(DB::getQueryLog())->toBe([]);
+    DB::disableQueryLog();
+
+    $settings->save(['monthly_report_due_working_days' => 9]);
+
+    expect($settings->get('monthly_report_due_working_days'))->toBe(9);
+});

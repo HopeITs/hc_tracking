@@ -80,8 +80,9 @@ new class extends Component
                 'proposal:id,name,status,donor_id',
                 'proposal.donor:id,name',
                 'proposal.donorNames',
-                'indicators' => fn ($query) => $query->select(['id', 'project_id', 'proposal_location_id', 'baseline', 'target'])->whereNotNull('target'),
+                'indicators' => fn ($query) => $query->select(['id', 'project_id', 'proposal_location_id', 'baseline', 'target', 'measure'])->whereNotNull('target'),
                 'indicators.progress:id,indicator_id,date,value',
+                'indicators.approvedMonthlyMeasurements',
                 ...($money ? ['proposal.donorProposals:id,proposal_id,budget,currency', 'proposal.donorProposals.transfers'] : []),
             ])
             ->get()

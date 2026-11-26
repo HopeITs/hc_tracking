@@ -187,8 +187,8 @@ final class StrategyRollup
             ->join('programs', 'programs.id', '=', 'results.program_id')
             ->whereIn('programs.strategy_id', $strategyIds)
             ->whereNotNull('indicators.target')
-            ->with('progress:id,indicator_id,date,value')
-            ->get(['indicators.id', 'indicators.baseline', 'indicators.target', 'programs.strategy_id', 'programs.id as program_id'])
+            ->with(['progress:id,indicator_id,date,value', 'approvedMonthlyMeasurements'])
+            ->get(['indicators.id', 'indicators.baseline', 'indicators.target', 'indicators.measure', 'programs.strategy_id', 'programs.id as program_id'])
             ->map(fn (Indicator $indicator): array => [
                 'strategy' => (int) $indicator->getAttribute('strategy_id'),
                 'program' => (int) $indicator->getAttribute('program_id'),

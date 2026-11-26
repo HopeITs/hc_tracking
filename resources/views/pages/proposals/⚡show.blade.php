@@ -12,6 +12,7 @@ use App\Livewire\Concerns\Proposals\EditsProposalCard;
 use App\Livewire\Concerns\Proposals\FillsProposalCenters;
 use App\Livewire\Concerns\Proposals\FoldsProposalSections;
 use App\Livewire\Concerns\Proposals\ManagesFinalReportAcceptance;
+use App\Livewire\Concerns\Proposals\ManagesGrantDates;
 use App\Livewire\Concerns\Proposals\ManagesNegotiationNotes;
 use App\Livewire\Concerns\Proposals\ManagesProposalApproval;
 use App\Livewire\Concerns\Proposals\ManagesProposalFiles;
@@ -57,6 +58,7 @@ new #[Layout('layouts::desk'), Title('titles.proposal')] class extends Component
     use ManagesFinalReportAcceptance;
     use ManagesNegotiationNotes;
     use ManagesProposalApproval;
+    use ManagesGrantDates;
     use ManagesProposalExtension;
     use ManagesProposalFiles;
     use ManagesProposalForm;
@@ -165,6 +167,7 @@ new #[Layout('layouts::desk'), Title('titles.proposal')] class extends Component
         $this->openExtensionFromLink();
 
         $this->openChangeRequestFromLink();
+        $this->openGrantDatesFromLink();
     }
 
     /**

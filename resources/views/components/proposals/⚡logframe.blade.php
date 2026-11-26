@@ -5,6 +5,7 @@ use App\Actions\Results\SaveAssumption;
 use App\Enums\AssumptionStatus;
 use App\Enums\ResultType;
 use App\Enums\TaskStatus;
+use App\Livewire\Concerns\Indicators\ManagesIndicatorReadings;
 use App\Livewire\Concerns\Proposals\CopiesProgramFramework;
 use App\Livewire\Concerns\Proposals\EditsCentreTargets;
 use App\Livewire\Concerns\Proposals\ManagesFrameworkBoard;
@@ -15,13 +16,17 @@ use App\Livewire\Concerns\Results\BuildsResultsTree;
 use App\Livewire\Concerns\Results\ManagesResultForm;
 use App\Models\Assumption;
 use App\Models\HrEmployee;
+use App\Models\Indicator;
 use App\Models\Proposal;
 use App\Models\Result;
 use App\Models\Task;
 use App\Support\FrameworkChecks;
+use App\Support\MonthlyReportLineBuilder;
 use App\Support\ProposalFramework;
+use Carbon\CarbonImmutable;
 use Flux\Flux;
 use Illuminate\Auth\Access\AuthorizationException;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Validation\ValidationException;
 use Livewire\Attributes\Computed;
@@ -48,6 +53,7 @@ new class extends Component {
     use CopiesProgramFramework;
     use EditsCentreTargets;
     use ManagesFrameworkBoard;
+    use ManagesIndicatorReadings;
     use ManagesProposalRisks;
     use ManagesResultForm;
     use ReadsProposalFramework;
@@ -108,6 +114,7 @@ new class extends Component {
     public function mount(int $proposalId): void
     {
         $this->proposalId = $proposalId;
+        abort_if($this->proposal->isPayroll(), 404);
         $this->formProposalId = $proposalId;
         $this->applyPrefs();
     }
@@ -593,6 +600,30 @@ new class extends Component {
     private function forgetBox(): void
     {
         unset($this->allResults, $this->framework, $this->visibleIds, $this->rail, $this->subtreeTotals, $this->focusedId, $this->checks, $this->logframeTask, $this->taskPeople, $this->proposalRisks);
+    }
+
+    /** @return Builder<Indicator> */
+    protected function readingIndicators(): Builder
+    {
+        return Indicator::query()->whereIn('result_id', $this->frameworkResults()->select('id'));
+    }
+
+    protected function authorizeReadingPeriod(Indicator $indicator, CarbonImmutable $date): void
+    {
+        if (app(MonthlyReportLineBuilder::class)->canCarryMeasurement($indicator, $date)) {
+            throw ValidationException::withMessages(['progressDate' => __('indicators.measurement_belongs_in_monthly_report')]);
+        }
+    }
+
+    protected function forgetIndicators(): void
+    {
+        $this->forgetFramework();
+    }
+
+    #[On('framework-target-saved')]
+    public function refreshFrameworkTargets(): void
+    {
+        $this->forgetFramework();
     }
 
     protected function forgetFramework(): void

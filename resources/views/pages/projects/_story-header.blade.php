@@ -48,7 +48,7 @@
         </div>
 
         <h1 class="page-title">
-            {{ $project->label() }}
+            {{ $project->headline() }}
             @if (app(\App\Notifications\UnreadSubjects::class)->has(auth()->user(), 'proposal_location', $project->id))
                 <span class="inline-block size-2.5 rounded-full bg-primary align-middle dark:bg-ink" data-unread-dot title="{{ __('notifications.has_unread') }}"><span class="sr-only">{{ __('notifications.has_unread') }}</span></span>
             @endif
@@ -99,7 +99,7 @@
             {{-- The rarer actions wait behind one button. --}}
             @if ($canCloseProject || ($canArchiveProject && ! $isArchived))
                 <span class="dk-pmenu" x-data="{ open: false }" x-on:click.outside="open = false" x-on:keydown.escape="open = false">
-                    <button type="button" class="dk-iconbtn dk-sm" x-on:click="open = ! open" x-bind:aria-expanded="open" aria-haspopup="menu" aria-label="{{ __('projects.more_actions_for', ['name' => $project->label()]) }}"><x-desk.icon name="more" /></button>
+                    <button type="button" class="dk-iconbtn dk-sm" x-on:click="open = ! open" x-bind:aria-expanded="open" aria-haspopup="menu" aria-label="{{ __('projects.more_actions_for', ['name' => $project->headline()]) }}"><x-desk.icon name="more" /></button>
                     <span class="dk-pop dk-pjl-menu" role="menu" x-show="open" x-cloak x-on:click="open = false">
                         @if ($canCloseProject)
                             <button type="button" role="menuitem" wire:click="confirmClose" data-test="close-project">

@@ -13,7 +13,7 @@ use App\Enums\ProposalKind;
 use App\Enums\ProposalStatus;
 use App\Models\Donor;
 use App\Models\HrCenter;
-use App\Models\HrProgram;
+use App\Models\Program;
 use App\Models\Project;
 use App\Models\Proposal;
 use App\Models\ProposalLocation;
@@ -655,7 +655,7 @@ trait ManagesProposalForm
      * A payroll proposal (W-32) sends its narrative and, on create, its kind;
      * it never sends places, beneficiaries or a starting stage.
      *
-     * @return array{name: string, internalProjectNumber: string, donorId: string|null, mainPartnerId?: string|null, partnerIds?: list<int|string>, beneficiaries: array<int|string, int|string|null>, beneficiariesReason: string|null, plannedDateBegin: string|null, plannedDateEnd: string|null, notes: string, conceptNote: string|null, narrative?: string|null, kind?: string, locations?: list<array{city_id: string, program_id: string|null, responsible_employee_id: string|null, center_ids: list<string>, city_wide: bool, is_new: bool, new_program_name_en: string, new_program_name_ar: string}>, startingStage?: string, skipReason?: string|null, requestedBudget?: string|null, requestedCurrency?: string|null}
+     * @return array{name: string, internalProjectNumber: string, donorId: string|null, mainPartnerId?: string|null, partnerIds?: list<int|string>, beneficiaries: array<int|string, int|string|null>, beneficiariesReason: string|null, plannedDateBegin: string|null, plannedDateEnd: string|null, notes: string, conceptNote: string|null, narrative?: string|null, kind?: string, locations?: list<array{city_id: string, program_id: string|null, responsible_employee_id: string|null, center_ids: list<string>, city_wide: bool, is_new: bool}>, startingStage?: string, skipReason?: string|null, requestedBudget?: string|null, requestedCurrency?: string|null}
      */
     private function proposalFormData(bool $isCreate): array
     {
@@ -767,7 +767,7 @@ trait ManagesProposalForm
         }
 
         try {
-            $name = HrProgram::nameOf($programId);
+            $name = Program::nameOf($programId);
         } catch (QueryException) {
             $name = '';
         }

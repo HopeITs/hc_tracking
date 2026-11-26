@@ -168,7 +168,7 @@
                                     @endforeach
                                 </ul>
                                 @if ($canOpenTargets)
-                                    <a href="{{ route('targets.index', ['indicator' => $row['indicator']->id]) }}" wire:navigate class="dk-prs-open">{{ __('programs.results_open_targets') }}<x-desk.icon name="arrow" class="dk-flip" /></a>
+                                    <a href="{{ app(\App\Notifications\SubjectLinks::class)->frameworkRoute($row['indicator']) ?? route('results.index') }}" wire:navigate class="dk-prs-open">{{ __('programs.results_open_targets') }}<x-desk.icon name="arrow" class="dk-flip" /></a>
                                 @endif
                             </div>
                         @endif

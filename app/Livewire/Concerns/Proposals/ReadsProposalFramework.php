@@ -111,9 +111,14 @@ trait ReadsProposalFramework
             'name' => $indicator->name,
             'unit' => $indicator->unit,
             'target' => $indicator->target === null ? null : (float) $indicator->target,
-            'actual' => $indicator->progress->last()?->value === null ? null : (float) $indicator->progress->last()->value,
+            'actual' => $indicator->latestValue(),
             'percent' => $indicator->percentAchieved(),
             'frequency' => $indicator->frequency->label(),
+            'committedTargets' => $proposalTargets->map(fn (PlanIndicator $target): array => [
+                'id' => $target->id,
+                'value' => (float) $target->target,
+                'deletable' => $target->reports->isEmpty(),
+            ])->values()->all(),
             'centres' => $proposalTargets
                 ->filter(fn (PlanIndicator $target): bool => $target->center_id !== null)
                 ->map(fn (PlanIndicator $target): array => ['name' => HrCenter::remembered($target->center_id)?->name ?? '#'.$target->center_id, 'target' => (float) $target->target])

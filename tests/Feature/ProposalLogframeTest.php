@@ -5,6 +5,11 @@ use App\Enums\ProposalStatus;
 use App\Enums\ResultType;
 use App\Enums\TaskKind;
 use App\Enums\TaskStatus;
+use App\Models\Indicator;
+use App\Models\MonthlyReport;
+use App\Models\MonthlyReportLine;
+use App\Models\MonthlyReportLineShare;
+use App\Models\PlanIndicator;
 use App\Models\Program;
 use App\Models\Project;
 use App\Models\Proposal;
@@ -59,6 +64,58 @@ function logframeNode(Proposal $proposal, ResultType $type, ?Result $parent = nu
         'program_id' => $parent?->program_id ?? $programId,
     ]);
 }
+
+test('MEAL can record a measurement in the proposal logframe when there is no report line', function () {
+    $result = logframeNode($this->proposal, ResultType::Output);
+    $indicator = Indicator::factory()->for($result)->create();
+    $meal = mealManager();
+
+    logframeTab($meal, $this->proposal)
+        ->call('openProgressModal', $indicator->id)
+        ->set('progressValue', '12')
+        ->call('saveProgress')
+        ->assertHasNoErrors();
+
+    expect($indicator->progress()->sole()->recorded_by)->toBe($meal->id)
+        ->and($indicator->fresh()->latestValue())->toBe(12.0);
+});
+
+test('the logframe measurement action enforces permission and proposal scope', function () {
+    $local = Indicator::factory()->for(logframeNode($this->proposal, ResultType::Output))->create();
+    $foreign = Indicator::factory()->for(logframeNode(logframeProposal($this->program), ResultType::Output))->create();
+
+    logframeTab(User::factory()->role('Financial')->create(), $this->proposal)
+        ->call('openProgressModal', $local->id)
+        ->assertForbidden();
+
+    logframeTab(mealManager(), $this->proposal)
+        ->call('openProgressModal', $foreign->id)
+        ->assertNotFound();
+});
+
+test('a report share blocks manual measurement only in its own month', function () {
+    $this->travelTo('2026-11-26');
+    $indicator = Indicator::factory()->for(logframeNode($this->proposal, ResultType::Output))->create();
+    $target = PlanIndicator::factory()->forProposal()->for($indicator)->create();
+    $report = MonthlyReport::factory()->create(['period' => '2026-11-01']);
+    $line = MonthlyReportLine::factory()->for($report)->create();
+    MonthlyReportLineShare::factory()->for($line, 'line')->for($target)->create();
+
+    logframeTab(mealManager(), $this->proposal)
+        ->call('openProgressModal', $indicator->id)
+        ->set('progressValue', '12')
+        ->call('saveProgress')
+        ->assertHasErrors(['progressDate']);
+
+    expect($indicator->progress()->exists())->toBeFalse();
+
+    logframeTab(mealManager(), $this->proposal)
+        ->call('openProgressModal', $indicator->id)
+        ->set('progressDate', '2026-10-31')
+        ->set('progressValue', '10')
+        ->call('saveProgress')
+        ->assertHasNoErrors();
+});
 
 test('the proposal page shows the logical framework inside the proposal card', function () {
     $user = User::factory()->role('Financial')->create();

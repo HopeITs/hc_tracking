@@ -15,11 +15,6 @@ return [
         'pending' => 'Pending',
         'approved' => 'Approved',
     ],
-    'program_request_status' => [
-        'pending' => 'Pending',
-        'created' => 'Created',
-        'declined' => 'Declined',
-    ],
     'proposal_change_request_status' => [
         'pending' => 'Waiting',
         'approved' => 'Approved',
@@ -109,7 +104,6 @@ return [
     'active_report_type' => [
         'monthly' => 'Monthly report',
         'donor' => 'Donor report',
-        'report' => 'Report',
     ],
     'donor_report_state' => [
         'due' => 'To submit',
@@ -154,6 +148,9 @@ return [
         'acknowledged' => 'Acknowledged',
         'rejected' => 'Rejected',
         'superseded' => 'Superseded',
+    ],
+    'stage_template_creates' => [
+        'task' => 'Department task',
     ],
     'status_note_kind' => [
         'transition' => 'Status change',

@@ -40,6 +40,30 @@ test('project detail shows the project its city program and owner', function () 
         ->assertSeeText('Rana Darwish');
 });
 
+test('project detail is titled with the proposal name the list showed, and keeps the place in the path', function () {
+    $user = User::factory()->role('General Manager')->create();
+    $project = projectWithRow(['name' => 'Al-Wadi Training Center - GIZ']);
+    $row = rowFor($project);
+
+    expect($row->headline())->toBe('Al-Wadi Training Center - GIZ')
+        ->and($row->label())->not->toBe($row->headline());
+
+    $this->actingAs($user)
+        ->get(route('projects.index'))
+        ->assertSeeText($row->headline());
+
+    $this->actingAs($user)
+        ->get(route('projects.show', $row))
+        ->assertOk()
+        ->assertSeeHtml('<h1 class="page-title">')
+        ->assertSeeTextInOrder([$project->city->name_en, 'Al-Wadi Training Center - GIZ'])
+        ->assertSeeHtml('data-test="project-crumb"')
+        ->assertSeeHtml('aria-label="'.e(__('projects.more_actions_for', ['name' => $row->headline()])).'"')
+        ->assertSeeHtml('<p class="dk-side-ctx-t" dir="auto" title="Al-Wadi Training Center - GIZ">');
+
+    expect($row->activityLabel())->toBe('Al-Wadi Training Center - GIZ');
+});
+
 test('project detail preserves lifecycle and disagreement between headline and demographic targets', function () {
     $user = User::factory()->role('General Manager')->create();
     $project = projectWithRow([

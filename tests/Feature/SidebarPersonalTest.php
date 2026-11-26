@@ -50,7 +50,7 @@ test('opening a project counts as a use of it, kept once however often it is ope
     $this->actingAs($user)->get(route('projects.show', rowFor($first)))->assertOk();
 
     expect(collect(RemembersRecentRecord::mostUsed($user->fresh()->nav_recent))->map(fn (array $entry): array => [$entry['label'], $entry['n']])->all())
-        ->toBe([[rowFor($first)->label(), 2], [rowFor($second)->label(), 1]]);
+        ->toBe([[rowFor($first)->headline(), 2], [rowFor($second)->headline(), 1]]);
 
     $this->actingAs($user)->get(route('dashboard'))
         ->assertSee('data-side-recent', false)

@@ -1,7 +1,7 @@
     {{-- The logframe connection: every result this plan measures, and the targets committed under it, one aligned row per target. --}}
     <x-ui.panel :title="__('annual_plans.results_and_targets')" :count="$summary['targets']" :subtitle="__('annual_plans.how_this_plans_targets_connect_to_the_logframe')">
         <x-slot:toolbar>
-            <a href="{{ route('targets.index', ['sourceType' => 'annual_plan']) }}" wire:navigate class="text-xs font-semibold text-secondary-medium hover:underline dark:text-ink-muted">
+            <a href="{{ route('results.index') }}" wire:navigate class="text-xs font-semibold text-secondary-medium hover:underline dark:text-ink-muted">
                 {{ __('annual_plans.all_annual_plan_targets') }}
             </a>
         </x-slot:toolbar>
@@ -34,7 +34,7 @@
                         <div class="divide-y divide-board-line">
                             @foreach ($group['targets'] as $target)
                                 @php
-                                    $targetHref = $target->project !== null ? route('projects.show', ['project' => $target->project, 'tab' => 'targets']) : route('indicators.index', ['result' => $result->id]);
+                                    $targetHref = $target->project !== null ? route('projects.show', ['project' => $target->project, 'tab' => 'targets']) : route('results.index', ['program' => $result->program_id ?? 'none']).'#framework-result-'.$result->id;
                                 @endphp
                                 <a
                                     href="{{ $targetHref }}" wire:navigate

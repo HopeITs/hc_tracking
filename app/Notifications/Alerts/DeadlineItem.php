@@ -20,6 +20,7 @@ final readonly class DeadlineItem
      * @param  list<int>  $unassignedUserIds  set when nobody carries the item yet: who must name a person (D-33)
      * @param  list<int>  $exemptUserIds  direct people who hear without the module's view permission (a donor report's responsible person)
      * @param  array{route?: string, parameters?: array<string, mixed>}  $link  where the alert leads instead of the subject's page
+     * @param  string|null  $messageKey  the sentence to use instead of the generic `due_soon.*` one, for an item whose point is not that it is due (W-33's "its agreement still has funds"); it is given the same `:subject` and `:date`
      */
     public function __construct(
         public string $subjectType,
@@ -36,5 +37,6 @@ final readonly class DeadlineItem
         public array $unassignedUserIds = [],
         public array $exemptUserIds = [],
         public array $link = [],
+        public ?string $messageKey = null,
     ) {}
 }

@@ -93,8 +93,8 @@
                     <flux:icon.arrow-left variant="micro" class="size-4 rtl:-scale-x-100" />
                     <span class="dk-side-l">{{ __('navigation.all_pages') }}</span>
                 </button>
-                {{-- The row names its place (Y-16). --}}
-                <p class="dk-side-ctx-t" dir="auto" title="{{ $project->label() }}">{{ $project->label() }}</p>
+                {{-- The row is named by its proposal, like its page title (Y-16). --}}
+                <p class="dk-side-ctx-t" dir="auto" title="{{ $project->headline() }}">{{ $project->headline() }}</p>
                 <ul>
                     @foreach ($sections as $section)
                         <li>

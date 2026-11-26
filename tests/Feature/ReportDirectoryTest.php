@@ -384,11 +384,10 @@ test('a row shows its target achievement from approved reports only', function (
     Report::factory()->approved()->for($target)->create(['value' => 100]);
     Report::factory()->for($target)->create(['value' => 300]);
 
-    $component = Livewire::actingAs($user)->test('pages::reports.index');
-
-    $component->assertSee('target 25% achieved')->assertDontSee('target 75% achieved');
-
-    expect($component->instance()->insights()['avgAchievement'])->toBe(25);
+    Livewire::actingAs($user)
+        ->test('pages::reports.index')
+        ->assertSee('target 25% achieved')
+        ->assertDontSee('target 75% achieved');
 });
 
 test('reports can be narrowed to overdue drafts, a location row and a single target', function () {
@@ -411,6 +410,21 @@ test('reports can be narrowed to overdue drafts, a location row and a single tar
         ->set('target', (string) $onTime->plan_indicator_id)
         ->assertSee(route('reports.show', $onTime))
         ->assertDontSee(route('reports.show', $late));
+});
+
+test('the search finds a report by the program or proposal of its place', function () {
+    $user = User::factory()->role('Media Team')->create();
+    $row = ProposalLocation::factory()->create(['program_id' => Program::factory()->create(['name' => 'Lighthouse Programme'])->id]);
+    $inRow = Report::factory()->for(PlanIndicator::factory()->create(['proposal_location_id' => $row->id]))->create();
+    $elsewhere = Report::factory()->create();
+
+    Livewire::actingAs($user)
+        ->test('pages::reports.index')
+        ->set('search', 'Lighthouse')
+        ->assertSee(route('reports.show', $inRow))
+        ->assertDontSee(route('reports.show', $elsewhere))
+        ->set('search', $row->proposal->name)
+        ->assertSee(route('reports.show', $inRow));
 });
 
 test('the report form is rendered only while its modal is open', function () {

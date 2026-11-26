@@ -16,10 +16,10 @@ use App\Notifications\QuickActions;
 use Carbon\CarbonImmutable;
 use Livewire\Livewire;
 
-function taskNotificationFor(User $assignee, TaskStatus $status = TaskStatus::Todo): array
+function taskNotificationFor(User $assignee, TaskStatus $status = TaskStatus::Todo, ?User $creator = null): array
 {
-    $task = Activity::withoutRecording(function () use ($assignee, $status) {
-        $task = Task::factory()->create(['status' => $status, 'title' => 'Plan']);
+    $task = Activity::withoutRecording(function () use ($assignee, $status, $creator) {
+        $task = Task::factory()->create(['status' => $status, 'title' => 'Plan', ...($creator === null ? [] : ['created_by' => $creator->id])]);
         $task->taskAssignees()->delete();
         $task->taskAssignees()->create(['employee_id' => $assignee->employee_id]);
 
@@ -31,16 +31,36 @@ function taskNotificationFor(User $assignee, TaskStatus $status = TaskStatus::To
     return [$task, UserNotification::query()->forUser($assignee)->sole()];
 }
 
-test('a task notification offers start and mark done to someone who may update tasks', function () {
+test('a task notification offers start and mark done to the person who approves the task', function () {
     $assignee = userWithRole('Managers', insertHrEmployee());
-    [, $notification] = taskNotificationFor($assignee);
+    [, $notification] = taskNotificationFor($assignee, creator: $assignee);
 
     expect(array_column($notification->data['actions'], 'type'))->toBe(['task.start', 'task.mark_done']);
 });
 
+test('a task notification offers only start to an assignee who did not create the task', function () {
+    $assignee = userWithRole('Team Member', insertHrEmployee());
+    [, $notification] = taskNotificationFor($assignee);
+
+    expect(array_column($notification->data['actions'], 'type'))->toBe(['task.start']);
+});
+
+test('an assignee cannot mark a task done from the bell: it waits for review', function () {
+    $assignee = userWithRole('Team Member', insertHrEmployee());
+    [$task, $notification] = taskNotificationFor($assignee, TaskStatus::InProgress);
+    // Offered before this rule existed: the run itself must still refuse it.
+    $notification->forceFill(['data' => [...$notification->data, 'actions' => [['type' => 'task.mark_done']]]])->save();
+
+    $result = app(QuickActions::class)->run($assignee, $notification, 'task.mark_done');
+
+    expect($result['ok'])->toBeFalse()
+        ->and($result['message'])->toBe(__('tasks.workflow.only_approver_done'))
+        ->and($task->fresh()->status)->toBe(TaskStatus::InProgress);
+});
+
 test('marking a task done from the bell records the actor and reads the notification', function () {
     $assignee = userWithRole('Managers', insertHrEmployee());
-    [$task, $notification] = taskNotificationFor($assignee);
+    [$task, $notification] = taskNotificationFor($assignee, creator: $assignee);
 
     Livewire::actingAs($assignee)->test('notifications.bell')->call('runQuickAction', $notification->id, 'task.mark_done');
 
@@ -52,7 +72,7 @@ test('marking a task done from the bell records the actor and reads the notifica
 
 test('a quick action on work already done changes nothing and says so', function () {
     $assignee = userWithRole('Managers', insertHrEmployee());
-    [$task, $notification] = taskNotificationFor($assignee);
+    [$task, $notification] = taskNotificationFor($assignee, creator: $assignee);
     Activity::withoutRecording(fn () => $task->update(['status' => TaskStatus::Done]));
 
     $result = app(QuickActions::class)->run($assignee, $notification, 'task.mark_done');
@@ -67,7 +87,7 @@ test('a quick action is re-authorised on the server', function () {
     $assignee->syncRoles([]);
     Activity::withoutRecording(fn () => $task->taskAssignees()->delete());
 
-    $result = app(QuickActions::class)->run($assignee->fresh(), $notification, 'task.mark_done');
+    $result = app(QuickActions::class)->run($assignee->fresh(), $notification, 'task.start');
 
     expect($result['ok'])->toBeFalse()->and($result['message'])->toBe('notifications.quick.forbidden');
 });

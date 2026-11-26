@@ -9,7 +9,6 @@ use App\Models\Project;
 use App\Models\Proposal;
 use App\Models\ProposalLocation;
 use App\Models\ReportTemplate;
-use App\Models\User;
 use App\Support\ProposalLocationRows;
 use App\Support\Reporting\PlaceBridge;
 use App\Support\Reporting\ReportPlace;
@@ -204,9 +203,7 @@ it('turns a row target shared in the same save when a second center is added (Y-
         'responsible_employee_id' => null,
         'center_ids' => [$this->centerA, $this->centerB],
         'is_new' => false,
-        'new_program_name_en' => '',
-        'new_program_name_ar' => '',
-    ]], User::factory()->create()));
+    ]]));
 
     expect($target->refresh()->only(['proposal_location_id', 'center_id', 'all_centers']))->toBe([
         'proposal_location_id' => $row->id,
@@ -225,7 +222,7 @@ it('refuses to remove a row that still has targets (Y-10)', function (): void {
         ...PlanIndicator::placeColumnsForRow($row),
     ]);
 
-    expect(fn () => DB::transaction(fn () => app(ProposalLocationRows::class)->replace($this->proposal, [], User::factory()->create())))
+    expect(fn () => DB::transaction(fn () => app(ProposalLocationRows::class)->replace($this->proposal, [])))
         ->toThrow(ValidationException::class, __('proposals.location_has_targets'));
     expect(ProposalLocation::query()->whereKey($row->id)->exists())->toBeTrue();
 });

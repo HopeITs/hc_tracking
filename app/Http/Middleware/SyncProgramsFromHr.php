@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace App\Http\Middleware;
 
-use App\Jobs\CheckProgramLogframe;
 use App\Models\Program;
 use Closure;
 use Illuminate\Http\Request;
@@ -13,10 +12,14 @@ use Symfony\Component\HttpFoundation\Response;
 use Throwable;
 
 /**
- * Keeps the local program mirror in step with the HR database.
+ * Keeps every program's manager in step with HR's Program Manager position.
  *
  * Runs at most once a minute across all requests. An unreachable HR database
  * is reported rather than raised, so tracking still loads with the last copy.
+ *
+ * Since W-34b (D-68) this no longer creates programs — tracking owns them —
+ * so the logframe-gap job it used to dispatch for new rows now hangs off
+ * ProgramObserver::created instead.
  */
 class SyncProgramsFromHr
 {
@@ -31,11 +34,7 @@ class SyncProgramsFromHr
     {
         if (Cache::add(self::CacheKey, true, 60)) {
             try {
-                $newProgramIds = Program::syncFromHr();
-
-                if ($newProgramIds !== []) {
-                    CheckProgramLogframe::dispatch($newProgramIds);
-                }
+                Program::syncFromHr();
             } catch (Throwable $exception) {
                 Cache::forget(self::CacheKey);
                 report($exception);

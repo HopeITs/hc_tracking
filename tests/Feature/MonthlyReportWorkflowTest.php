@@ -355,6 +355,75 @@ test('validation approves the mirrors, so achievement changes', function () {
         ->and($achieved())->toBe(12.0);
 });
 
+test('validated monthly report shares feed indicator progress without overwriting manual history', function (DonorAttribution $attribution) {
+    $report = mrwReport(mrwProject($attribution));
+    $line = mrwLine($report, shareDenominators: [null, null]);
+    [$first, $second] = $line->load('shares.planIndicator.indicator')->shares->all();
+    $indicator = $first->planIndicator->indicator;
+    $indicator->update(['baseline' => 10, 'target' => 50]);
+    $indicator->progress()->create(['value' => 30, 'date' => '2026-10-10', 'recorded_by' => $this->officer->id]);
+    $start = CarbonImmutable::parse('2026-01-01');
+    $end = CarbonImmutable::parse('2026-12-31');
+
+    $input = $attribution === DonorAttribution::Split
+        ? ['shares' => [['id' => $first->id, 'value' => 30], ['id' => $second->id, 'value' => 5]]]
+        : ['value' => 30];
+
+    mrwSave($report, [['id' => $line->id, ...$input]]);
+    mrwSubmit($report);
+
+    $manual = $indicator->fresh();
+    $achievement = $manual->percentAchieved();
+    $rag = $manual->ragStatus($start, $end);
+
+    expect($achievement)->toBe(50.0)
+        ->and($manual->latestMeasurementDate()?->toDateString())->toBe('2026-10-10');
+
+    mrwValidate($report);
+
+    $measured = $indicator->fresh();
+
+    expect($measured->latestValue())->toBe(30.0)
+        ->and($measured->latestMeasurementDate()?->toDateString())->toBe('2026-10-31')
+        ->and($measured->percentAchieved())->toBe($achievement)
+        ->and($measured->ragStatus($start, $end))->toBe($rag)
+        ->and($second->planIndicator->indicator->fresh()->latestValue())->toBe($attribution === DonorAttribution::Split ? 5.0 : 30.0)
+        ->and($measured->progress()->sole()->date->toDateString())->toBe('2026-10-10');
+})->with([DonorAttribution::Shared, DonorAttribution::Split]);
+
+test('approved shares for one indicator combine into one monthly measurement', function (DonorAttribution $attribution, IndicatorMeasure $measure, float $expected) {
+    $report = mrwReport(mrwProject($attribution));
+    $line = mrwLine($report, ['measure' => $measure, 'denominator_basis' => DenominatorBasis::Entered], [null, null]);
+    [$first, $second] = $line->load('shares.planIndicator.indicator')->shares->all();
+    $indicator = $first->planIndicator->indicator;
+    $second->planIndicator->update(['indicator_id' => $indicator->id]);
+
+    $input = match (true) {
+        $attribution === DonorAttribution::Shared => ['value' => 30],
+        $measure === IndicatorMeasure::Percentage => ['shares' => [
+            ['id' => $first->id, 'numerator' => 3, 'denominator' => 10],
+            ['id' => $second->id, 'numerator' => 8, 'denominator' => 20],
+        ]],
+        default => ['shares' => [
+            ['id' => $first->id, 'value' => 30],
+            ['id' => $second->id, 'value' => 5],
+        ]],
+    };
+
+    mrwSave($report, [['id' => $line->id, ...$input]]);
+    mrwSubmit($report);
+    expect($indicator->fresh()->latestValue())->toBeNull();
+
+    mrwValidate($report);
+
+    expect($indicator->fresh()->latestValue())->toBe($expected)
+        ->and($indicator->fresh()->load('approvedMonthlyMeasurements')->latestValue())->toBe($expected);
+})->with([
+    [DonorAttribution::Split, IndicatorMeasure::Numeric, 35.0],
+    [DonorAttribution::Split, IndicatorMeasure::Percentage, 36.67],
+    [DonorAttribution::Shared, IndicatorMeasure::Numeric, 30.0],
+]);
+
 test('an unfilled MEAL line blocks validation, not submission; the validator fills it, the manager cannot', function () {
     $report = mrwReport(mrwProject());
     $meal = mrwLine($report, enteredBy: IndicatorCollector::Meal);

@@ -8,7 +8,9 @@ use App\Models\AnnualPlan;
 use App\Models\Donor;
 use App\Models\DonorProposal;
 use App\Models\DonorReport;
+use App\Models\Indicator;
 use App\Models\MonthlyReport;
+use App\Models\PlanIndicator;
 use App\Models\Program;
 use App\Models\Proposal;
 use App\Models\ProposalLocation;
@@ -76,9 +78,9 @@ final class SubjectLinks
             'donor_proposal' => $this->showRoute('funding-agreements.show', DonorProposal::class, $id),
             'donor_report' => $this->donorReportRoute($id),
             'risk' => route('risks.index'),
-            'indicator' => route('indicators.index', ['inspect' => $id]),
+            'indicator' => $this->frameworkRoute(Indicator::query()->with('result.proposal')->find($id)),
             'library_indicator' => route('indicator-library.index', ['entry' => $id]),
-            'plan_indicator' => route('targets.index'),
+            'plan_indicator' => $this->frameworkRoute(PlanIndicator::query()->with('indicator.result.proposal')->find($id)?->indicator),
             'result' => route('results.index'),
             'transfer' => route('transfers.index'),
             'account' => route('admin.accounts.index'),
@@ -88,6 +90,21 @@ final class SubjectLinks
             'supervision' => route('admin.users.index', ['tab' => 'supervision']),
             default => null,
         };
+    }
+
+    public function frameworkRoute(?Indicator $indicator): ?string
+    {
+        $result = $indicator?->result;
+
+        if ($result === null) {
+            return null;
+        }
+
+        if ($result->proposal !== null) {
+            return route('proposals.show', ['proposal' => $result->proposal, 'ptab' => 'logframe']);
+        }
+
+        return route('results.index', ['program' => $result->program_id ?? 'none']).'#framework-result-'.$result->id;
     }
 
     /**

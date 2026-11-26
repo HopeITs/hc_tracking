@@ -15,7 +15,7 @@ test('every register opens in the desk frame with a way back to the desk', funct
     'tasks.index', 'projects.index', 'proposals.index', 'transfers.index', 'donors.index',
     'funding-agreements.index', 'annual-plans.index', 'risks.index',
     'reports.index', 'monthly-reports.index', 'reviews.index',
-    'activity.index', 'calendar.index', 'department-tasks.index', 'targets.index', 'notifications.index',
+    'activity.index', 'calendar.index', 'department-tasks.index', 'notifications.index',
     'results.index', 'reports.monthly-matrix', 'indicator-library.index',
 ]);
 

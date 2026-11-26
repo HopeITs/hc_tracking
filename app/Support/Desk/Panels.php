@@ -69,8 +69,9 @@ final class Panels
     private const array RoutePanels = [
         'reviews.index' => 'reviews',
         'projects.index' => 'projects',
-        'targets.index' => 'targets',
+        'results.index' => 'targets',
         'reports.monthly-matrix' => 'matrix',
+        'active-reports.index' => 'tracker',
         'monthly-reports.index' => 'validate',
         'report-templates.index' => 'templates',
         'donor-reports.index' => 'duties',
@@ -229,7 +230,7 @@ final class Panels
         'money' => 'money', 'transfers' => 'money', 'pipeline' => 'money', 'donors' => 'money',
         'myteam' => 'people', 'waiting' => 'people', 'reviews' => 'people',
         'needs' => 'work', 'coming' => 'work', 'overdue' => 'work', 'tasks' => 'work', 'deliverables' => 'work', 'projects' => 'work', 'flow' => 'work', 'todo' => 'work', 'plan-milestones' => 'work',
-        'targets' => 'results', 'validate' => 'results', 'matrix' => 'results', 'templates' => 'results', 'duties' => 'results', 'glance' => 'results',
+        'targets' => 'results', 'validate' => 'results', 'matrix' => 'results', 'templates' => 'results', 'duties' => 'results', 'tracker' => 'results', 'glance' => 'results',
     ];
 
     /**
@@ -960,6 +961,8 @@ final class Panels
             'money' => ['icon' => 'coins', 'size' => 'L', 'register' => 'funding-agreements.index', 'allows' => fn (User $user): bool => $user->can('funding-agreements.view') && $user->can('transfers.view')],
             'transfers' => ['icon' => 'coins', 'size' => 'M', 'register' => 'transfers.index', 'allows' => $can('transfers.view')],
             'matrix' => ['icon' => 'table', 'size' => 'XL', 'register' => 'reports.monthly-matrix', 'allows' => $can('reports.view')],
+            /* Report Tracker in panel form: its doors, counted as the page counts them. */
+            'tracker' => ['icon' => 'file', 'size' => 'L', 'rows' => 3, 'register' => 'active-reports.index', 'allows' => $can('reports.view')],
             'validate' => ['icon' => 'check', 'size' => 'M', 'register' => 'monthly-reports.index', 'allows' => fn (User $user): bool => $user->hasRole('MEAL')],
             'templates' => ['icon' => 'file', 'size' => 'M', 'register' => null, 'allows' => $can('report-templates.manage')],
             'reviews' => ['icon' => 'search', 'size' => 'M', 'register' => 'reviews.index', 'allows' => $this->hasReviews(...)],
@@ -968,7 +971,7 @@ final class Panels
             /* The Department Tasks surface in panel form, so it follows the page's rule (W-14, D-65). */
             'deliverables' => ['icon' => 'board', 'size' => 'M', 'register' => 'department-tasks.index', 'allows' => fn (User $user): bool => $user->can('viewDepartmentQueue', Task::class)],
             'myteam' => ['icon' => 'users', 'size' => 'M', 'register' => null, 'allows' => fn (User $user): bool => $user->employee_id !== null || $user->isAdministrator()],
-            'targets' => ['icon' => 'chart', 'size' => 'L', 'register' => 'targets.index', 'allows' => $can('targets.view')],
+            'targets' => ['icon' => 'chart', 'size' => 'L', 'register' => 'results.index', 'allows' => $can('targets.view')],
             'duties' => ['icon' => 'file', 'size' => 'M', 'register' => 'donor-reports.index', 'allows' => fn (User $user): bool => $user->can('reports.aggregate') || $user->can('funding-agreements.update') || $user->hasReportingDuties()],
             'donors' => ['icon' => 'users', 'size' => 'L', 'register' => 'donors.index', 'allows' => $can('donors.view')],
         ];

@@ -66,7 +66,7 @@ final class SaveProposal
      * are ignored entirely for a user who may not see money. `locations`, when
      * sent, replaces the rows (a fill only once approved); an edit that omits it leaves them alone.
      *
-     * @param  array{kind?: ?string, name: string, donorId: int|string|null, mainPartnerId?: int|string|null, partnerIds?: list<int|string>, narrative?: ?string, locations?: list<array{city_id: int|string|null, program_id?: int|string|null, responsible_employee_id?: int|string|null, center_ids?: list<int|string>, is_new?: bool|int|string|null, city_wide?: bool|int|string|null, new_program_name_en?: ?string, new_program_name_ar?: ?string}>, beneficiaries?: array<int|string, int|string|null>, beneficiariesReason?: ?string, requestedBudget?: string|int|float|null, requestedCurrency?: ?string, plannedDateBegin: ?string, plannedDateEnd: ?string, notes?: ?string, conceptNote?: ?string, startingStage?: string, skipReason?: ?string, previousProposalId?: int|null}  $data
+     * @param  array{kind?: ?string, name: string, donorId: int|string|null, mainPartnerId?: int|string|null, partnerIds?: list<int|string>, narrative?: ?string, locations?: list<array{city_id: int|string|null, program_id?: int|string|null, responsible_employee_id?: int|string|null, center_ids?: list<int|string>, is_new?: bool|int|string|null, city_wide?: bool|int|string|null}>, beneficiaries?: array<int|string, int|string|null>, beneficiariesReason?: ?string, requestedBudget?: string|int|float|null, requestedCurrency?: ?string, plannedDateBegin: ?string, plannedDateEnd: ?string, notes?: ?string, conceptNote?: ?string, startingStage?: string, skipReason?: ?string, previousProposalId?: int|null}  $data
      */
     public function handle(?Proposal $existing, array $data, User $actor): Proposal
     {
@@ -108,7 +108,7 @@ final class SaveProposal
             ]);
 
             if ($rows !== null) {
-                $this->announceLocations($proposal, app(ProposalLocationRows::class)->replace($proposal, $rows, $actor), $actor);
+                $this->announceLocations($proposal, app(ProposalLocationRows::class)->replace($proposal, $rows), $actor);
             }
 
             if ($kind === ProposalKind::Payroll || $input['startingStage'] === ProposalStatus::ProposalDraft->value) {
@@ -166,7 +166,7 @@ final class SaveProposal
             if ($rows !== null) {
                 $counts = $isApproved
                     ? app(ProposalLocationRows::class)->fillEmpty($locked, $rows)
-                    : app(ProposalLocationRows::class)->replace($locked, $rows, $actor);
+                    : app(ProposalLocationRows::class)->replace($locked, $rows);
 
                 $this->announceLocations($locked, $counts, $actor);
             }
@@ -240,7 +240,7 @@ final class SaveProposal
         }
 
         if ($rows !== null) {
-            $this->announceLocations($locked, app(ProposalLocationRows::class)->replace($locked, $rows, $actor), $actor);
+            $this->announceLocations($locked, app(ProposalLocationRows::class)->replace($locked, $rows), $actor);
         }
     }
 
@@ -326,7 +326,7 @@ final class SaveProposal
      * program: `from` and `to` are the row's centers, field-work flag and
      * responsible (null for an added or a dropped row). Ids only.
      *
-     * @param  list<array{city_id: int|null, program_id: int|null, responsible_employee_id: int|null, center_ids: list<int>, is_new: bool, city_wide: bool, new_program_name_en: string, new_program_name_ar: string}>  $rows
+     * @param  list<array{city_id: int|null, program_id: int|null, responsible_employee_id: int|null, center_ids: list<int>, is_new: bool, city_wide: bool}>  $rows
      * @return list<array{field: string, row: array{city_id: int, program_id: int|null}, from: array{responsible_employee_id: int|null, center_ids: list<int>, city_wide: bool, is_new: bool}|null, to: array{responsible_employee_id: int|null, center_ids: list<int>, city_wide: bool, is_new: bool}|null}>
      *
      * @throws ValidationException a dropped row that still carries a project
@@ -594,14 +594,6 @@ final class SaveProposal
             if ($row['responsible_employee_id'] !== null && ! in_array($row['responsible_employee_id'], $activeEmployees, true)) {
                 $validator->errors()->add("locations.{$index}.responsible_employee_id", __('proposals.location_responsible_inactive'));
             }
-
-            if ($row['is_new'] && $row['program_id'] === null) {
-                foreach (['new_program_name_en', 'new_program_name_ar'] as $field) {
-                    if ($row[$field] === '') {
-                        $validator->errors()->add("locations.{$index}.{$field}", __('proposals.location_program_name_required'));
-                    }
-                }
-            }
         }
     }
 
@@ -671,7 +663,7 @@ final class SaveProposal
      * form sent no `locations` key at all.
      *
      * @param  array<string, mixed>  $input
-     * @return list<array{city_id: int|null, program_id: int|null, responsible_employee_id: int|null, center_ids: list<int>, is_new: bool, city_wide: bool, new_program_name_en: string, new_program_name_ar: string}>|null
+     * @return list<array{city_id: int|null, program_id: int|null, responsible_employee_id: int|null, center_ids: list<int>, is_new: bool, city_wide: bool}>|null
      */
     private function locationRows(array $input): ?array
     {
@@ -694,8 +686,6 @@ final class SaveProposal
                 'center_ids' => $centerIds,
                 'is_new' => filter_var($row['is_new'] ?? false, FILTER_VALIDATE_BOOLEAN),
                 'city_wide' => filter_var($row['city_wide'] ?? false, FILTER_VALIDATE_BOOLEAN),
-                'new_program_name_en' => is_string($row['new_program_name_en'] ?? null) ? trim($row['new_program_name_en']) : '',
-                'new_program_name_ar' => is_string($row['new_program_name_ar'] ?? null) ? trim($row['new_program_name_ar']) : '',
             ];
         }
 

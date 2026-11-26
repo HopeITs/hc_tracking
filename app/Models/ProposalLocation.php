@@ -28,7 +28,6 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
-use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Database\Eloquent\Relations\MorphMany;
 use Illuminate\Database\Eloquent\Relations\MorphOne;
 use Illuminate\Support\Collection;
@@ -326,16 +325,6 @@ class ProposalLocation extends Model implements TracksActivity
     }
 
     /**
-     * The request opened when this row names a program HR does not have.
-     *
-     * @return HasOne<ProgramRequest, $this>
-     */
-    public function programRequest(): HasOne
-    {
-        return $this->hasOne(ProgramRequest::class);
-    }
-
-    /**
      * The HR city of the row, from the HR connection.
      *
      * @return BelongsTo<HrCity, $this>
@@ -483,13 +472,14 @@ class ProposalLocation extends Model implements TracksActivity
      * How this row is named wherever a record is listed by name — the
      * sidebar's recently used records, for one (Y-16).
      *
-     * Its place, which is what the Projects screen calls it.
+     * Its proposal's name, which is what the Projects screen and the row's
+     * own page call it (`headline()`).
      */
     public function activityLabel(): string
     {
-        $this->loadMissing(['city', 'program', 'centers']);
+        $this->loadMissing(['proposal', 'city', 'program', 'centers']);
 
-        return $this->label();
+        return $this->headline();
     }
 
     /**

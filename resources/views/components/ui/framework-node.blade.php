@@ -1,4 +1,4 @@
-@props(['node', 'depth' => 0, 'order' => 0, 'editable' => true, 'collapsed' => false])
+@props(['node', 'depth' => 0, 'order' => 0, 'editable' => true, 'collapsed' => false, 'recordReadings' => false])
 
 @php
     use App\Enums\RagStatus;
@@ -266,8 +266,16 @@
                           <div class="flex flex-col gap-2.5 @2xl/directory:flex-row @2xl/directory:items-center @2xl/directory:gap-4">
                             <div class="min-w-0 @2xl/directory:flex-1">
                                 <p class="flex flex-wrap items-center gap-2">
-                                    <a href="{{ route('indicators.index', ['inspect' => $indicator->id]) }}" wire:navigate class="truncate text-sm font-semibold text-secondary-dark hover:text-primary dark:hover:text-brand-text hover:underline dark:text-ink">{{ $indicator->name }}</a>
+                                    <a href="{{ route('results.index', ['program' => $result->program_id ?? 'none']).'#framework-result-'.$result->id }}" wire:navigate class="truncate text-sm font-semibold text-secondary-dark hover:text-primary dark:hover:text-brand-text hover:underline dark:text-ink">{{ $indicator->name }}</a>
                                     <x-ui.enum-badge :case="$indicator->measure" class="shrink-0" />
+                                    @if ($recordReadings)
+                                        @can('targets.create')
+                                            <button type="button" class="type-meta font-semibold hover:underline" wire:click="$dispatch('commit-framework-target', { indicatorId: {{ $indicator->id }} })">{{ __('targets.commit_target') }}</button>
+                                        @endcan
+                                        @can('indicators.record')
+                                            <button type="button" class="type-meta font-semibold hover:underline" wire:click="openProgressModal({{ $indicator->id }})" data-test="record-indicator-{{ $indicator->id }}">{{ __('indicators.log_reading') }}</button>
+                                        @endcan
+                                    @endif
                                     @if ($editable)
                                         @can('indicators.update')<x-ui.button
                                             tone="ghost"
@@ -340,6 +348,18 @@
                                     {{-- Two rows inside the card: where it was committed, then what was committed. Keeps the
                                          source name readable at 375px instead of truncating it to a single letter. --}}
                                     <li class="flex flex-1 flex-col gap-1.5 rounded-lg border border-secondary-soft px-2.5 py-2 @xl/directory:min-w-72 dark:border-line" wire:key="framework-target-{{ $targetRow['target']->id }}">
+                                        @if ($recordReadings)
+                                            <div class="flex gap-2">
+                                                @can('targets.update')
+                                                    <button type="button" class="type-meta font-semibold hover:underline" wire:click="$dispatch('edit-framework-target', { targetId: {{ $targetRow['target']->id }} })">{{ __('targets.edit_target') }}</button>
+                                                @endcan
+                                                @can('targets.delete')
+                                                    @if ($targetRow['reports'] === 0)
+                                                        <button type="button" class="type-meta font-semibold hover:underline" wire:click="$dispatch('delete-framework-target', { targetId: {{ $targetRow['target']->id }} })">{{ __('targets.delete_target') }}</button>
+                                                    @endif
+                                                @endcan
+                                            </div>
+                                        @endif
                                         <div class="flex min-w-0 items-center gap-2">
                                             <span @class([
                                                 'inline-flex shrink-0 items-center gap-1 rounded-md border px-1.5 py-0.5 text-[11px] font-semibold',
@@ -402,7 +422,7 @@
                 </ul>
 
                 <div class="flex flex-wrap items-center gap-x-4 gap-y-1 border-t border-secondary-soft px-4 py-2 dark:border-line">
-                    <a href="{{ route('indicators.index', ['result' => $result->id]) }}" wire:navigate class="type-meta font-semibold text-secondary-medium hover:text-primary dark:hover:text-brand-text hover:underline dark:text-ink-muted">
+                    <a href="{{ route('results.index', ['program' => $result->program_id ?? 'none']).'#framework-result-'.$result->id }}" wire:navigate class="type-meta font-semibold text-secondary-medium hover:text-primary dark:hover:text-brand-text hover:underline dark:text-ink-muted">
                         {{ __('results_framework.manage_indicators') }}
                     </a>
                     @if ($editable)
@@ -412,7 +432,7 @@
                         </button>@endcan
                     @endif
                     @if ($measurement['targets'] > 0)
-                        <a href="{{ route('targets.index', ['result' => $result->id]) }}" wire:navigate class="type-meta font-semibold text-secondary-medium hover:text-primary dark:hover:text-brand-text hover:underline dark:text-ink-muted">
+                        <a href="{{ route('results.index', ['program' => $result->program_id ?? 'none']).'#framework-result-'.$result->id }}" wire:navigate class="type-meta font-semibold text-secondary-medium hover:text-primary dark:hover:text-brand-text hover:underline dark:text-ink-muted">
                             {{ __('results_framework.view_targets') }}
                         </a>
                     @endif
@@ -444,7 +464,7 @@
                         ])></span>
                         <span aria-hidden="true" class="absolute start-0 top-7 h-px w-6 bg-secondary-soft dark:bg-line-strong"></span>
 
-                        <x-ui.framework-node :node="$child" :depth="$depth + 1" :order="$loop->index" :editable="$editable" :collapsed="$collapsed" />
+                        <x-ui.framework-node :node="$child" :depth="$depth + 1" :order="$loop->index" :editable="$editable" :collapsed="$collapsed" :record-readings="$recordReadings" />
                     </li>
                 @endforeach
             </ol>

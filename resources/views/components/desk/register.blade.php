@@ -13,11 +13,17 @@
     actions, then the search-and-filter bar and the list itself. The page keeps
     its own Livewire logic; this is only the frame (desk.js renderRegister).
 
+    $back (slot): replaces the "Your desk" link, e.g. a page's own step back.
+
     $views: ['list' => ['icon' => 'table', 'label' => '…'], …] keyed by the
     value written to the page's $viewModel property.
 --}}
 <section {{ $attributes->class('dk-register') }} @if ($headingId) aria-labelledby="{{ $headingId }}" @endif data-desk-register>
-    <a class="dk-back" href="{{ route('dashboard') }}" wire:navigate data-desk-register-back><x-desk.icon name="back" class="dk-flip" />{{ __('desk.your_desk') }}</a>
+    @isset($back)
+        {{ $back }}
+    @else
+        <a class="dk-back" href="{{ route('dashboard') }}" wire:navigate data-desk-register-back><x-desk.icon name="back" class="dk-flip" />{{ __('desk.your_desk') }}</a>
+    @endisset
 
     <div class="dk-reg-h">
         <div>
