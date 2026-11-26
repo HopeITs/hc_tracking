@@ -5,6 +5,8 @@ use App\Models\Activity;
 use App\Models\AnnualPlan;
 use App\Models\MonthlyReport;
 use App\Models\PlanIndicator;
+use App\Models\Program;
+use App\Models\ProposalLocation;
 use App\Models\Report;
 use App\Models\ReportFile;
 use App\Models\User;
@@ -260,7 +262,7 @@ test('the detail page links back along the chain to the indicator and its target
 });
 
 /**
- * A mirror row of a monthly report (contracts §13 "Mirrors in reports").
+ * A mirror row of a monthly report (contracts Â§13 "Mirrors in reports").
  */
 function monthlyMirror(ReportStatus $status, User $author): Report
 {
@@ -305,4 +307,16 @@ test('the report form refuses to open, save or delete a monthly report mirror', 
         ->assertSet('showDeleteReportModal', false);
 
     expect(DB::table('reports')->find($mirror->id))->not->toBeNull();
+});
+
+test('report detail names the place its target is committed at and links to it', function () {
+    $user = User::factory()->role('General Manager')->create();
+    $row = ProposalLocation::factory()->create(['program_id' => Program::factory()->create(['name_en' => 'Harbour Programme'])->id]);
+    $report = Report::factory()->for(PlanIndicator::factory()->create(['proposal_location_id' => $row->id]))->create();
+
+    $this->actingAs($user)
+        ->get(route('reports.show', $report))
+        ->assertOk()
+        ->assertSeeText('Harbour Programme')
+        ->assertSee(route('projects.show', $row));
 });

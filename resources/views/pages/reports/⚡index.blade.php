@@ -4,7 +4,6 @@ use App\Support\Like;
 use App\Enums\ReportStatus;
 use App\Livewire\Concerns\FiltersByStrategy;
 use App\Livewire\Concerns\ManagesReportForm;
-use App\Livewire\Concerns\Reports\ReadsReportPortfolio;
 use App\Models\AnnualPlan;
 use App\Models\PlanIndicator;
 use App\Models\ProposalLocation;
@@ -27,7 +26,6 @@ use Livewire\WithPagination;
 new #[Layout('layouts::desk'), Title('titles.reports')] class extends Component {
     use FiltersByStrategy;
     use ManagesReportForm;
-    use ReadsReportPortfolio;
     use WithPagination;
 
     #[Url(except: '')]
@@ -64,13 +62,6 @@ new #[Layout('layouts::desk'), Title('titles.reports')] class extends Component 
     /** attention | progress | approved: the three plain answers at the top of the page. */
     #[Url(except: '')]
     public string $focus = '';
-
-    /**
-     * Read only by ReadsReportPortfolio, which still answers `insights()`.
-     * The register has one shape now: its Board, Calendar and Portfolio views
-     * moved to Active Reports (M-02) and their URLs redirect there.
-     */
-    public string $view = 'list';
 
     /**
      * `?create=1` (with `?target=`) opens the form already tied to a target —
@@ -178,7 +169,8 @@ new #[Layout('layouts::desk'), Title('titles.reports')] class extends Component 
                 $query->where(Like::everyWord($search, fn ($query, string $word) => $query
                     ->where(Like::word('narrative_report_notes', $word))
                     ->orWhereHas('planIndicator.indicator', Like::word('name', $word))
-                    ->orWhereHas('planIndicator.project', Like::word('name', $word))));
+                    ->orWhereHas('planIndicator.location.proposal', Like::word('name', $word))
+                    ->orWhereHas('planIndicator.location', fn ($places) => $places->whereIn('program_id', \App\Models\HrProgram::idsMatchingName($word)))));
             })
             ->when($this->author !== '', fn ($query) => $query->where('user_id', (int) $this->author))
             ->when($this->location === 'none', fn ($query) => $query->whereHas('planIndicator', fn ($query) => $query->whereNull('proposal_location_id')))
@@ -186,7 +178,7 @@ new #[Layout('layouts::desk'), Title('titles.reports')] class extends Component 
                 ->whereHas('planIndicator', fn ($query) => $query->where('proposal_location_id', (int) $this->location)))
             ->when($this->target !== '', fn ($query) => $query->where('plan_indicator_id', (int) $this->target))
             ->when($this->strategyFilter !== null, fn ($query) => $query
-                ->whereHas('planIndicator', fn ($query) => $this->whereInStrategy($query, 'plan_indicators.project_id')));
+                ->whereHas('planIndicator', fn ($query) => $this->whereLocationInStrategy($query, 'plan_indicators.proposal_location_id')));
     }
 
     /**
@@ -266,6 +258,23 @@ new #[Layout('layouts::desk'), Title('titles.reports')] class extends Component 
     public function unreadIds(): array
     {
         return app(UnreadSubjects::class)->ids(auth()->user(), 'report');
+    }
+
+    /**
+     * The target the feed is narrowed to, labelled as the form labels it.
+     */
+    #[Computed]
+    public function scopedTargetLabel(): ?string
+    {
+        if ($this->target === '') {
+            return null;
+        }
+
+        $target = PlanIndicator::query()
+            ->with(['indicator:id,name,measure', 'location', 'location.city', 'location.program', 'location.centers', 'source'])
+            ->find((int) $this->target);
+
+        return $target === null ? null : $this->targetLabel($target);
     }
 
     /** @return LengthAwarePaginator<int, Report> */

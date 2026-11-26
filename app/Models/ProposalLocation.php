@@ -471,13 +471,14 @@ class ProposalLocation extends Model
      * How this row is named wherever a record is listed by name — the
      * sidebar's recently used records, for one (Y-16).
      *
-     * Its place, which is what the Projects screen calls it.
+     * Its proposal's name, which is what the Projects screen and the row's
+     * own page call it (`headline()`).
      */
     public function activityLabel(): string
     {
-        $this->loadMissing(['city', 'program', 'centers']);
+        $this->loadMissing(['proposal', 'city', 'program', 'centers']);
 
-        return $this->label();
+        return $this->headline();
     }
 
     /**

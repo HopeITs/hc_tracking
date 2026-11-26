@@ -82,10 +82,10 @@ test('the donor report builder goes only to reports.aggregate holders, donor rep
         ->and(deskPageRoutes(User::factory()->role('Financial')->create()))->not->toContain('reporting-duties.index');
 });
 
-test('the old My Reporting Duties address leads to Donor Reports', function () {
+test('the old My Reporting Duties address leads to My reporting duties in the Report Tracker', function () {
     $this->actingAs(User::factory()->role('Team Member')->create())
         ->get('/reporting-duties')
-        ->assertRedirect(route('donor-reports.index'));
+        ->assertRedirect(route('active-reports.index', ['kind' => 'duties']));
 });
 
 test('the retired indicator and target addresses permanently redirect to the framework', function (string $routeName) {

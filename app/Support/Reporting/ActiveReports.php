@@ -7,12 +7,8 @@ namespace App\Support\Reporting;
 use App\Enums\ActiveReportType;
 use App\Enums\DonorReportState;
 use App\Enums\MonthlyReportStatus;
-use App\Enums\ReportStatus;
-use App\Models\AnnualPlan;
 use App\Models\DonorReport;
 use App\Models\MonthlyReport;
-use App\Models\Proposal;
-use App\Models\Report;
 use App\Models\ReportTemplate;
 use App\Models\User;
 use App\Support\DonorReportResponsibles;
@@ -23,29 +19,35 @@ use App\Support\MonthlyReportPreparers;
 use Carbon\CarbonImmutable;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Collection as EloquentCollection;
-use Illuminate\Database\Eloquent\Relations\MorphTo;
-use Illuminate\Database\Eloquent\Relations\Relation;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\Cache;
 
 /**
- * Every report still open (or, on request, finished) that the viewer may open, from the three sources,
+ * Every report still open (or, on request, finished) that the viewer may open, from the two sources,
  * in one common row shape (M-02).
  *
  * Open means: a monthly report that is a draft (once its month has started)
- * or submitted; a donor report not yet submitted; an existing report that is
- * a draft or reviewed. A report mirror of a monthly report is that monthly
- * report, listed once as such.
+ * or submitted; a donor report not yet submitted. Hand-recorded reports are
+ * not tracked here (2026-11-26): every target is reported through monthly
+ * reports, so they stay on the Reports page only.
  *
  * Who sees what is each source's own rule, never a new one: the monthly
  * reports of the templates the viewer prepares plus the ones they validate
  * (MonthlyReportPreparers, MonthlyReport::validatableBy), donor reports as
- * DonorReportPolicy::view decides, existing reports for reports.view. No
+ * DonorReportPolicy::view decides. No
  * amount is read: money stays on the funding pages.
  *
- * A fixed number of queries whatever the number of reports.
+ * A fixed number of queries whatever the number of reports. The rows are
+ * kept in the cache per viewer, day and locale for a few minutes, so every
+ * click on the Report Tracker answers from memory; saving or deleting any
+ * record the rows are read from forgets them all at once (forget()).
  */
 final class ActiveReports
 {
+    private const VersionKey = 'active-reports.version';
+
+    private const KeepSeconds = 300;
+
     public function __construct(
         private readonly MonthlyReportPreparers $preparers,
         private readonly MonthlyReportNames $names,
@@ -53,14 +55,39 @@ final class ActiveReports
 
     /**
      * Open reports: overdue first, then soonest due, then by name. With
-     * `$closed` the finished ones instead (monthly validated, donor submitted,
-     * report approved), the most recent first; none of them needs anyone.
+     * `$closed` the finished ones instead (monthly validated, donor submitted), the most recent first; none of them needs anyone.
      *
      * @return Collection<int, ActiveReportRow>
      */
     public function for(User $user, bool $closed = false): Collection
     {
-        $rows = collect([...$this->monthly($user, $closed), ...$this->donor($user, $closed), ...$this->narrative($user, $closed)]);
+        $key = sprintf('active-reports-rows:%s:%d:%s:%s:%s', Cache::get(self::VersionKey, '0'), $user->id, $closed ? 'closed' : 'open', CarbonImmutable::today()->format('Y-m-d'), app()->getLocale());
+
+        $cached = Cache::remember($key, self::KeepSeconds, fn (): array => $this->build($user, $closed)->map(fn (ActiveReportRow $row): array => $row->toCache())->all());
+
+        if (! is_array($cached) || ($cached !== [] && ! is_array(reset($cached)))) {
+            Cache::forget($key);
+
+            return $this->build($user, $closed);
+        }
+
+        return collect($cached)->map(fn (array $row): ActiveReportRow => ActiveReportRow::fromCache($row))->values();
+    }
+
+    /**
+     * Forget every viewer's cached rows: a report, template, place or agreement changed.
+     */
+    public static function forget(): void
+    {
+        Cache::forever(self::VersionKey, (string) hrtime(true));
+    }
+
+    /**
+     * @return Collection<int, ActiveReportRow>
+     */
+    private function build(User $user, bool $closed): Collection
+    {
+        $rows = collect([...$this->monthly($user, $closed), ...$this->donor($user, $closed)]);
 
         if ($closed) {
             return $rows
@@ -152,6 +179,9 @@ final class ActiveReports
                 programId: $template->program_id,
                 donorId: $template->proposals->first()?->donor_id,
                 search: mb_strtolower($name['place'].' '.$proposalNames),
+                templateId: $template->id,
+                returned: $isDraft && $report->returned_at !== null,
+                needsCheck: isset($validatable[$report->id]),
             );
         }
 
@@ -201,67 +231,8 @@ final class ActiveReports
                 programId: null,
                 donorId: $agreement?->donor_id,
                 search: mb_strtolower($report->title.' '.$proposalName.' '.$donorName),
+                donorName: $donorName === '' ? null : $donorName,
             );
         })->all());
-    }
-
-    /**
-     * Existing (narrative) reports, never the mirrors of monthly reports.
-     *
-     * @return list<ActiveReportRow>
-     */
-    private function narrative(User $user, bool $closed): array
-    {
-        if ($user->cannot('viewAny', Report::class)) {
-            return [];
-        }
-
-        $today = CarbonImmutable::today();
-        $canApprove = $user->can('reports.approve');
-
-        $rows = Report::query()
-            ->whereNull('monthly_report_id')
-            ->whereIn('status', $closed ? [ReportStatus::Approved] : [ReportStatus::Draft, ReportStatus::Reviewed])
-            ->with([
-                'planIndicator:id,indicator_id,source_type,source_id',
-                'planIndicator.indicator:id,name',
-                'planIndicator.source' => function (Relation $relation): void {
-                    if ($relation instanceof MorphTo) {
-                        $relation->morphWith([AnnualPlan::class => [], Proposal::class => []]);
-                    }
-                },
-                'user:id,hr_user_id,employee_id',
-            ])
-            ->get(['id', 'slug', 'plan_indicator_id', 'user_id', 'status', 'planned_date'])
-            ->map(function (Report $report) use ($user, $today, $canApprove, $closed): ActiveReportRow {
-                $source = $report->planIndicator?->source;
-                $context = match (true) {
-                    $source instanceof AnnualPlan => __('common.fy_year', ['year' => $source->year]),
-                    $source instanceof Proposal => $source->name,
-                    default => __('targets.source_no_longer_available'),
-                };
-                $name = (string) $report->planIndicator?->indicator?->name;
-                $isDraft = $report->status === ReportStatus::Draft;
-                $isAuthor = $report->user_id === $user->id;
-
-                return new ActiveReportRow(
-                    type: ActiveReportType::Report,
-                    id: $report->id,
-                    name: $name,
-                    context: $context,
-                    periodKey: $report->planned_date->format('Y-m'),
-                    status: $report->status,
-                    due: CarbonImmutable::instance($report->planned_date),
-                    overdue: $isDraft && $report->planned_date->lt($today),
-                    owner: $report->user?->name,
-                    url: route('reports.show', $report),
-                    needsMe: ! $closed && ($isDraft ? $isAuthor : ($canApprove && ! $isAuthor)),
-                    programId: null,
-                    donorId: $source instanceof Proposal ? $source->donor_id : null,
-                    search: mb_strtolower($name.' '.$context),
-                );
-            });
-
-        return array_values($rows->all());
     }
 }

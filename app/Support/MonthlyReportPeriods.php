@@ -30,6 +30,13 @@ use Illuminate\Database\Eloquent\Collection;
 final class MonthlyReportPeriods
 {
     /**
+     * Each month's due date once counted, by 'Y-m': counting walks the calendar day by day.
+     *
+     * @var array<string, CarbonImmutable>
+     */
+    private array $dueDates = [];
+
+    /**
      * @param  Collection<int, MonthlyReport>  $reports  the template's reports, oldest first, with `lines_count`
      */
     private function __construct(
@@ -144,7 +151,7 @@ final class MonthlyReportPeriods
      */
     public function dueDate(CarbonImmutable $month): CarbonImmutable
     {
-        return $this->calendar->addWorkingDays($month->endOfMonth(), (int) $this->settings->get('monthly_report_due_working_days'));
+        return $this->dueDates[$month->format('Y-m')] ??= $this->calendar->addWorkingDays($month->endOfMonth(), (int) $this->settings->get('monthly_report_due_working_days'));
     }
 
     /**

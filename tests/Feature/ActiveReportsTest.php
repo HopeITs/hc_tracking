@@ -1,5 +1,6 @@
 <?php
 
+use App\Enums\ActiveReportType;
 use App\Enums\MonthlyReportStatus;
 use App\Models\Activity;
 use App\Models\Donor;
@@ -13,6 +14,8 @@ use App\Models\ProposalLocation;
 use App\Models\Report;
 use App\Models\ReportTemplate;
 use App\Models\User;
+use App\Support\Desk\Panels;
+use App\Support\Reporting\ActiveReports;
 use App\Support\Reporting\ReportPlace;
 use Illuminate\Support\Facades\DB;
 use Livewire\Livewire;
@@ -117,64 +120,219 @@ test('guests are sent to sign in and a user without reports.view is refused', fu
     $this->actingAs($this->meal)->get(route('active-reports.index'))->assertOk();
 });
 
-test('open reports of all three types are listed and closed ones are not', function () {
+test('the door screen offers only the kinds the viewer can open', function () {
+    Livewire::actingAs($this->meal)->test('pages::active-reports.index')
+        ->assertSet('kind', '')
+        ->assertSeeHtml('data-tracker-door="monthly"')
+        ->assertSeeHtml('data-tracker-door="duties"')
+        ->assertSeeHtml('data-tracker-door="donor"');
+
+    // Only monthly reports: no doors, the monthly view opens with a note saying why.
+    Livewire::actingAs(User::factory()->role('Team Member')->create())->test('pages::active-reports.index')
+        ->assertSet('kind', 'monthly')
+        ->assertDontSeeHtml('data-tracker-door=')
+        ->assertDontSeeHtml('data-tracker-switch=')
+        ->assertSeeHtml('data-tracker-single');
+});
+
+test('choosing a kind is remembered until logout and going back to the doors forgets it', function () {
+    Livewire::actingAs($this->meal)->test('pages::active-reports.index')
+        ->call('chooseKind', 'donor')
+        ->assertSet('kind', 'donor');
+
+    expect(session('active_reports.kind'))->toBe('donor');
+
+    Livewire::actingAs($this->meal)->test('pages::active-reports.index')
+        ->assertSet('kind', 'donor')
+        ->call('backToDoors')
+        ->assertSet('kind', '');
+
+    expect(session()->has('active_reports.kind'))->toBeFalse();
+
+    Livewire::actingAs($this->meal)->test('pages::active-reports.index')->assertSet('kind', '');
+});
+
+test('door numbers equal the switcher numbers and ignore the search', function () {
+    arpSeedAllTypes();
+    arpTemplate($this->aleppo, 'Late Place', ['2026-09-01' => MonthlyReportStatus::Draft, '2026-10-01' => MonthlyReportStatus::Draft], $this->mealEmployee);
+
+    $doors = Livewire::actingAs($this->meal)->test('pages::active-reports.index');
+    $counts = $doors->instance()->doorCounts;
+
+    expect($counts['duties']['total'])->toBeGreaterThan(0)
+        ->and($counts['monthly']['needs'])->toBeGreaterThan(0)
+        ->and($counts['donor']['needs'])->toBe(1);
+
+    $doors->assertSeeHtml('data-door-count="'.$counts['monthly']['needs'].'"')
+        ->assertSeeHtml('data-door-count="'.$counts['duties']['total'].'"')
+        ->call('chooseKind', 'monthly')
+        ->set('search', 'nothing matches this')
+        ->assertSeeHtml('data-tracker-badge="monthly">'.$counts['monthly']['needs'].'</span>')
+        ->assertSeeHtml('data-tracker-badge="duties">'.$counts['duties']['total'].'</span>')
+        ->assertSeeHtml('data-tracker-badge="donor">'.$counts['donor']['needs'].'</span>');
+});
+
+test('old tab and type links land on the matching kind', function (array $query, string $kind) {
+    Livewire::withQueryParams($query)->actingAs($this->meal)->test('pages::active-reports.index')->assertSet('kind', $kind);
+})->with([
+    'needs me' => [['tab' => 'needs'], 'duties'],
+    'all' => [['tab' => 'all'], ''],
+    'done' => [['tab' => 'done'], ''],
+    'donor type' => [['type' => 'donor'], 'donor'],
+    'monthly type' => [['type' => 'monthly'], 'monthly'],
+    'unknown kind' => [['kind' => 'bogus'], ''],
+]);
+
+test('a kind the viewer cannot open is never shown', function () {
+    Livewire::withQueryParams(['kind' => 'donor'])->actingAs(User::factory()->role('Team Member')->create())
+        ->test('pages::active-reports.index')
+        ->assertSet('kind', 'monthly')
+        ->call('chooseKind', 'donor')
+        ->assertSet('kind', 'monthly');
+});
+
+test('the monthly grid shows each place by month with its state', function () {
     $seed = arpSeedAllTypes();
+    $newPlace = arpTemplate($this->aleppo, 'New Place', ['2026-11-01' => MonthlyReportStatus::Draft], $this->mealEmployee);
 
-    $page = Livewire::actingAs($this->meal)->test('pages::active-reports.index')->set('tab', 'all');
-
-    $page->assertSeeHtml('data-active-report="monthly-'.$seed['monthlyOpen']->id.'"')
-        ->assertSeeHtml('data-active-report="donor-'.$seed['donorOpen']->id.'"')
-        ->assertSeeHtml('data-active-report="report-'.$seed['reportOpen']->id.'"')
-        ->assertSeeHtml('data-active-report="report-'.$seed['reportReviewed']->id.'"')
-        ->assertDontSeeHtml('data-active-report="monthly-'.$seed['monthlyClosed']->id.'"')
-        ->assertDontSeeHtml('data-active-report="donor-'.$seed['donorClosed']->id.'"')
-        ->assertDontSeeHtml('data-active-report="report-'.$seed['reportClosed']->id.'"')
+    Livewire::actingAs($this->meal)->test('pages::active-reports.index')
+        ->call('chooseKind', 'monthly')
+        ->assertSeeHtml('data-state="done" data-tracker-cell="monthly-'.$seed['monthlyClosed']->id.'"')
+        ->assertSeeHtml('data-state="wait" data-tracker-cell="monthly-'.$seed['monthlyOpen']->id.'"')
+        ->assertSeeHtml('data-tracker-place="'.$newPlace['template']->id.'"')
+        ->assertSeeHtml('data-state="draft" data-tracker-cell="monthly-'.$newPlace['reports']['2026-11-01']->id.'"')
+        ->assertSeeHtml('data-state="none"')
+        ->assertSee(route('monthly-reports.show', $seed['monthlyOpen']), false)
         // A draft of somebody else's template is not the validator's to see.
-        ->assertDontSeeHtml('data-active-report="monthly-'.$seed['monthlyDraftElsewhere']->id.'"')
-        // A mirror is its monthly report, listed once as that.
-        ->assertDontSeeHtml('data-active-report="report-'.$seed['reportMirror']->id.'"')
-        ->assertSeeText(['Education for All', 'Safe Schools', 'Q4 narrative']);
+        ->assertDontSeeHtml('data-tracker-cell="monthly-'.$seed['monthlyDraftElsewhere']->id.'"');
 });
 
-test('the Done tab lists the finished reports of all three types and never the open ones', function () {
+test('a late month says how late it is and a place two months behind says so', function () {
+    $place = arpTemplate($this->aleppo, 'Behind Place', ['2026-08-01' => MonthlyReportStatus::Draft, '2026-09-01' => MonthlyReportStatus::Draft], $this->mealEmployee);
+
+    Livewire::actingAs($this->meal)->test('pages::active-reports.index')
+        ->call('chooseKind', 'monthly')
+        ->assertSeeHtml('data-state="late" data-tracker-cell="monthly-'.$place['reports']['2026-08-01']->id.'"')
+        ->assertSeeText('2 months behind');
+});
+
+test('a chip dims the cells it does not keep and keeps every row', function () {
     $seed = arpSeedAllTypes();
 
     Livewire::actingAs($this->meal)->test('pages::active-reports.index')
-        ->set('tab', 'done')
-        ->assertSeeHtml('data-active-report="monthly-'.$seed['monthlyClosed']->id.'"')
-        ->assertSeeHtml('data-active-report="donor-'.$seed['donorClosed']->id.'"')
-        ->assertSeeHtml('data-active-report="report-'.$seed['reportClosed']->id.'"')
-        ->assertDontSeeHtml('data-active-report="monthly-'.$seed['monthlyOpen']->id.'"')
-        ->assertDontSeeHtml('data-active-report="donor-'.$seed['donorOpen']->id.'"')
-        ->assertDontSeeHtml('data-active-report="report-'.$seed['reportOpen']->id.'"')
-        ->assertDontSeeHtml('data-active-report="report-'.$seed['reportMirror']->id.'"');
+        ->call('chooseKind', 'monthly')
+        ->call('setChip', 'wait')
+        ->assertSet('show', 'wait')
+        ->assertSeeHtml('class="rt-cell" data-state="wait" data-tracker-cell="monthly-'.$seed['monthlyOpen']->id.'"')
+        ->assertSeeHtml('class="rt-cell is-dim" data-state="done" data-tracker-cell="monthly-'.$seed['monthlyClosed']->id.'"')
+        ->call('setChip', 'wait')
+        ->assertSet('show', '');
 });
 
-test('a finished report is hidden from anyone who may not open it', function () {
-    $seed = arpSeedAllTypes();
-    $viewer = User::factory()->role('Team Member')->create();
+test('the program filter and the search narrow the places', function () {
+    $first = arpTemplate($this->aleppo, 'Water Wells', ['2026-10-01' => MonthlyReportStatus::Submitted]);
+    $second = arpTemplate($this->aleppo, 'School Meals', ['2026-10-01' => MonthlyReportStatus::Submitted]);
 
-    Livewire::actingAs($viewer)->test('pages::active-reports.index')
-        ->set('tab', 'done')
-        ->assertDontSeeHtml('data-active-report="monthly-'.$seed['monthlyClosed']->id.'"')
-        ->assertDontSeeHtml('data-active-report="donor-'.$seed['donorClosed']->id.'"')
-        ->assertSeeHtml('data-active-report="report-'.$seed['reportClosed']->id.'"');
+    $page = Livewire::actingAs($this->meal)->test('pages::active-reports.index')->call('chooseKind', 'monthly');
+
+    $page->set('search', 'water')
+        ->assertSeeHtml('data-tracker-place="'.$first['template']->id.'"')
+        ->assertDontSeeHtml('data-tracker-place="'.$second['template']->id.'"')
+        ->set('search', '')
+        ->set('program', (string) $second['template']->program_id)
+        ->assertSeeHtml('data-tracker-place="'.$second['template']->id.'"')
+        ->assertDontSeeHtml('data-tracker-place="'.$first['template']->id.'"');
 });
 
-test('the Type filter lists the kinds of report the viewer may have, even when none is open today', function () {
-    $viewer = User::factory()->role('Team Member')->create();
-
-    // No donor reports for a role without them, but monthly and existing reports are offered.
-    Livewire::actingAs($viewer)->test('pages::active-reports.index')
-        ->assertDontSeeHtml("'type', 'donor')")
-        ->assertSeeHtml("'type', 'monthly')")
-        ->assertSeeHtml("'type', 'report')");
-
-    // MEAL has nothing open at all and still sees every type.
+test('a month range with From after To or longer than twelve months is refused', function () {
     Livewire::actingAs($this->meal)->test('pages::active-reports.index')
-        ->assertSeeHtml("'type', 'monthly')")
-        ->assertSeeHtml("'type', 'donor')")
-        ->assertSeeHtml("'type', 'report')");
+        ->call('chooseKind', 'monthly')
+        ->call('setRange', '2026-10', '2026-08')
+        ->assertHasErrors('from')
+        ->assertSet('from', '')
+        ->call('setRange', '2025-10', '2026-11')
+        ->assertHasErrors('from')
+        ->assertSet('from', '')
+        ->call('setRange', '2026-08', '2026-10')
+        ->assertHasNoErrors()
+        ->assertSet('from', '2026-08')
+        ->assertSet('to', '2026-10');
+
+    Livewire::withQueryParams(['kind' => 'monthly', 'from' => '2026-10', 'to' => '2026-01'])->actingAs($this->meal)
+        ->test('pages::active-reports.index')
+        ->assertSet('from', '');
+});
+
+test('donor reports sit in lanes by due date', function () {
+    $overdue = arpDonorReport('Lane A', ['due_on' => '2026-11-10']);
+    $soon = arpDonorReport('Lane B', ['due_on' => '2026-11-30']);
+    $later = arpDonorReport('Lane C', ['due_on' => '2027-01-30']);
+    $sent = arpDonorReport('Lane D', ['due_on' => '2026-09-20'], submitted: true);
+    $old = arpDonorReport('Lane E', ['due_on' => '2025-09-01'], submitted: true);
+
+    $page = Livewire::actingAs($this->meal)->test('pages::active-reports.index')->call('chooseKind', 'donor');
+    $ids = fn (string $lane): array => array_map(fn ($row) => $row->id, $page->instance()->donorLanes[$lane]);
+
+    expect($ids('overdue'))->toBe([$overdue->id])
+        ->and($ids('soon'))->toBe([$soon->id])
+        ->and($ids('later'))->toBe([$later->id])
+        ->and($ids('submitted'))->toBe([$sent->id]);
+
+    $page->assertSeeHtml('data-tracker-card="donor-'.$overdue->id.'"')
+        ->assertSee(route('donor-reports.show', $overdue), false)
+        ->assertDontSeeHtml('data-tracker-card="donor-'.$old->id.'"');
+});
+
+test('Mine to send keeps only the donor reports the viewer is responsible for', function () {
+    $mine = arpDonorReport('Mine', ['due_on' => '2026-12-01', 'responsible_employee_id' => $this->mealEmployee]);
+    $theirs = arpDonorReport('Theirs', ['due_on' => '2026-12-02', 'responsible_employee_id' => insertHrEmployee(firstNameEn: 'Other', lastNameEn: 'Person')]);
+
+    Livewire::actingAs($this->meal)->test('pages::active-reports.index')
+        ->call('chooseKind', 'donor')
+        ->assertSeeHtml('data-tracker-card="donor-'.$theirs->id.'"')
+        ->call('setChip', 'mine')
+        ->assertSeeHtml('data-tracker-card="donor-'.$mine->id.'"')
+        ->assertDontSeeHtml('data-tracker-card="donor-'.$theirs->id.'"');
+});
+
+test('the donor filter narrows the lanes', function () {
+    $first = arpDonorReport('First', ['due_on' => '2026-12-01']);
+    $second = arpDonorReport('Second', ['due_on' => '2026-12-02']);
+
+    Livewire::actingAs($this->meal)->test('pages::active-reports.index')
+        ->call('chooseKind', 'donor')
+        ->set('donor', (string) $first->donorProposal->donor_id)
+        ->assertSeeHtml('data-tracker-card="donor-'.$first->id.'"')
+        ->assertDontSeeHtml('data-tracker-card="donor-'.$second->id.'"');
+});
+
+test('my reporting duties group what to fill in, check and send', function () {
+    $seed = arpSeedAllTypes();
+    $mine = arpTemplate($this->aleppo, 'My Place', ['2026-10-01' => MonthlyReportStatus::Draft], $this->mealEmployee);
+
+    Livewire::actingAs($this->meal)->test('pages::active-reports.index')
+        ->call('chooseKind', 'duties')
+        ->assertSeeHtml('data-tracker-group="fill"')
+        ->assertSeeHtml('data-tracker-group="check"')
+        ->assertSeeHtml('data-tracker-group="send"')
+        ->assertSeeHtml('data-tracker-duty="monthly-'.$mine['reports']['2026-10-01']->id.'"')
+        ->assertSeeHtml('data-tracker-duty="monthly-'.$seed['monthlyOpen']->id.'"')
+        ->assertSeeHtml('data-tracker-duty="donor-'.$seed['donorOpen']->id.'"');
+});
+
+test('open months of one place show as one line that opens the oldest', function () {
+    $mine = arpTemplate($this->aleppo, 'Backlog Place', [
+        '2026-08-01' => MonthlyReportStatus::Draft,
+        '2026-09-01' => MonthlyReportStatus::Draft,
+        '2026-10-01' => MonthlyReportStatus::Draft,
+    ], $this->mealEmployee);
+
+    Livewire::actingAs($this->meal)->test('pages::active-reports.index')
+        ->call('chooseKind', 'duties')
+        ->assertSeeHtml('data-tracker-duty="monthly-'.$mine['reports']['2026-08-01']->id.'"')
+        ->assertDontSeeHtml('data-tracker-duty="monthly-'.$mine['reports']['2026-09-01']->id.'"')
+        ->assertSee(route('monthly-reports.show', $mine['reports']['2026-08-01']), false)
+        ->assertSeeText('3 months open');
 });
 
 test('a preparer sees their started drafts and submitted months, not months still to come', function () {
@@ -186,73 +344,46 @@ test('a preparer sees their started drafts and submitted months, not months stil
     $notMine = arpTemplate($this->aleppo, 'Hidden Elsewhere', ['2026-10-01' => MonthlyReportStatus::Draft], insertHrEmployee(firstNameEn: 'Other', lastNameEn: 'Person'));
 
     Livewire::actingAs($this->preparer)->test('pages::active-reports.index')
-        ->set('tab', 'all')
-        ->assertSeeHtml('data-active-report="monthly-'.$mine['reports']['2026-10-01']->id.'"')
-        ->assertSeeHtml('data-active-report="monthly-'.$mine['reports']['2026-11-01']->id.'"')
-        ->assertDontSeeHtml('data-active-report="monthly-'.$mine['reports']['2026-12-01']->id.'"')
-        ->assertDontSeeHtml('data-active-report="monthly-'.$notMine['reports']['2026-10-01']->id.'"')
-        ->set('tab', 'needs')
-        ->assertSeeHtml('data-active-report="monthly-'.$mine['reports']['2026-10-01']->id.'"')
-        // Submitted: it waits on MEAL, not on the preparer.
-        ->assertDontSeeHtml('data-active-report="monthly-'.$mine['reports']['2026-11-01']->id.'"');
+        ->call('chooseKind', 'monthly')
+        ->assertSeeHtml('data-tracker-cell="monthly-'.$mine['reports']['2026-10-01']->id.'"')
+        ->assertSeeHtml('data-tracker-cell="monthly-'.$mine['reports']['2026-11-01']->id.'"')
+        ->assertDontSeeHtml('data-tracker-cell="monthly-'.$mine['reports']['2026-12-01']->id.'"')
+        ->assertDontSeeHtml('data-tracker-place="'.$notMine['template']->id.'"')
+        // Only monthly reports: "Needs me" keeps the preparer's late draft, not the month waiting on MEAL.
+        ->call('setChip', 'needs')
+        ->assertSeeHtml('class="rt-cell" data-state="late" data-tracker-cell="monthly-'.$mine['reports']['2026-10-01']->id.'"')
+        ->assertSeeHtml('class="rt-cell is-dim" data-state="wait" data-tracker-cell="monthly-'.$mine['reports']['2026-11-01']->id.'"');
 });
 
-test('"Needs me" lists only what waits on the viewer', function () {
+test('a finished report is hidden from anyone who may not open it', function () {
     $seed = arpSeedAllTypes();
-    $otherDonor = arpDonorReport('Elsewhere Proposal', ['title' => 'Not mine', 'due_on' => '2026-11-30', 'responsible_employee_id' => insertHrEmployee(firstNameEn: 'Other', lastNameEn: 'Person')]);
 
-    Livewire::actingAs($this->meal)->test('pages::active-reports.index')
-        ->set('tab', 'needs')
-        // Submitted monthly report to validate, own donor report, own draft report, someone's report to approve.
-        ->assertSeeHtml('data-active-report="monthly-'.$seed['monthlyOpen']->id.'"')
-        ->assertSeeHtml('data-active-report="donor-'.$seed['donorOpen']->id.'"')
-        ->assertSeeHtml('data-active-report="report-'.$seed['reportOpen']->id.'"')
-        ->assertSeeHtml('data-active-report="report-'.$seed['reportReviewed']->id.'"')
-        ->assertDontSeeHtml('data-active-report="donor-'.$otherDonor->id.'"')
-        ->set('tab', 'all')
-        ->assertSeeHtml('data-active-report="donor-'.$otherDonor->id.'"');
+    Livewire::actingAs(User::factory()->role('Team Member')->create())->test('pages::active-reports.index')
+        ->assertDontSeeHtml('data-tracker-cell="monthly-'.$seed['monthlyClosed']->id.'"')
+        ->assertDontSeeHtml('donor-'.$seed['donorClosed']->id);
 });
 
-test('the type filter, the status filter and the search narrow the table', function () {
-    $seed = arpSeedAllTypes();
-
-    $page = Livewire::actingAs($this->meal)->test('pages::active-reports.index')->set('tab', 'all');
-
-    $page->set('type', 'donor')
-        ->assertSeeHtml('data-active-report="donor-'.$seed['donorOpen']->id.'"')
-        ->assertDontSeeHtml('data-active-report="monthly-'.$seed['monthlyOpen']->id.'"')
-        ->assertDontSeeHtml('data-active-report="report-'.$seed['reportOpen']->id.'"')
-        ->set('type', 'bogus')->assertSet('type', '')
-        ->set('status', 'reviewed')
-        ->assertSeeHtml('data-active-report="report-'.$seed['reportReviewed']->id.'"')
-        ->assertDontSeeHtml('data-active-report="report-'.$seed['reportOpen']->id.'"')
-        ->set('status', '')
-        ->set('search', 'Safe Schools')
-        ->assertSeeHtml('data-active-report="donor-'.$seed['donorOpen']->id.'"')
-        ->assertDontSeeHtml('data-active-report="monthly-'.$seed['monthlyOpen']->id.'"');
-});
-
-test('a row opens its own record page and no money is read', function () {
-    $seed = arpSeedAllTypes();
+test('no money is read', function () {
+    arpSeedAllTypes();
     DB::flushQueryLog();
     DB::enableQueryLog();
 
-    $page = Livewire::actingAs($this->meal)->test('pages::active-reports.index')->set('tab', 'all');
-    $sql = collect(DB::getQueryLog())->pluck('query')->implode("\n");
+    foreach (['monthly', 'duties', 'donor'] as $kind) {
+        Livewire::actingAs($this->meal)->test('pages::active-reports.index')->call('chooseKind', $kind);
+    }
 
-    $page->assertSee(route('monthly-reports.show', $seed['monthlyOpen']), false)
-        ->assertSee(route('donor-reports.show', $seed['donorOpen']), false)
-        ->assertSee(route('reports.show', $seed['reportOpen']), false);
+    $sql = collect(DB::getQueryLog())->pluck('query')->implode("\n");
 
     expect($sql)->not->toContain('transfers')->not->toContain('accounts')->not->toContain('`amount')->not->toContain('salary');
 });
 
-test('the query count does not grow with the number of reports', function () {
+test('the query count does not grow with the number of reports', function (string $kind) {
     arpSeedAllTypes();
-    $count = function (): int {
+    $count = function () use ($kind): int {
+        ActiveReports::forget(); // Measure a cold build, not the cached rows.
         DB::flushQueryLog();
         DB::enableQueryLog();
-        Livewire::actingAs($this->meal)->test('pages::active-reports.index')->set('tab', 'all');
+        Livewire::withQueryParams(['kind' => $kind])->actingAs($this->meal)->test('pages::active-reports.index');
         $queries = count(DB::getQueryLog());
         DB::disableQueryLog();
 
@@ -265,11 +396,10 @@ test('the query count does not grow with the number of reports', function () {
     foreach (['One', 'Two', 'Three'] as $name) {
         arpTemplate($this->aleppo, 'Extra '.$name, ['2026-10-01' => MonthlyReportStatus::Submitted, '2026-11-01' => MonthlyReportStatus::Submitted]);
         arpDonorReport('Extra donor '.$name, ['due_on' => '2026-12-01']);
-        Activity::withoutRecording(fn () => Report::factory()->count(2)->create(['planned_date' => '2026-11-02']));
     }
 
     expect($count())->toBe($few);
-});
+})->with(['doors' => [''], 'monthly' => ['monthly'], 'duties' => ['duties'], 'donor' => ['donor']]);
 
 test('the Board and Portfolio views of the reports register land on Active Reports, keeping the search', function () {
     $this->actingAs($this->meal);
@@ -285,4 +415,143 @@ test('the Board and Portfolio views of the reports register land on Active Repor
 test('the reports register has no view switch any more', function () {
     Livewire::actingAs($this->meal)->test('pages::reports.index')
         ->assertDontSeeHtml('data-desk-register-views');
+});
+
+test('a monthly row knows its template, whether it was returned and its tracker state', function () {
+    $place = arpTemplate($this->aleppo, 'State Check', [
+        '2026-07-01' => MonthlyReportStatus::Validated,
+        '2026-08-01' => MonthlyReportStatus::Submitted,
+        '2026-09-01' => MonthlyReportStatus::Draft,
+        '2026-10-01' => MonthlyReportStatus::Draft,
+        '2026-11-01' => MonthlyReportStatus::Draft,
+    ], $this->mealEmployee);
+    $place['reports']['2026-09-01']->forceFill(['returned_at' => '2026-10-20 09:00:00'])->save();
+
+    $reports = app(ActiveReports::class);
+    $rows = $reports->for($this->meal)->concat($reports->for($this->meal, closed: true))
+        ->where('type', ActiveReportType::Monthly)
+        ->keyBy('periodKey');
+
+    expect($rows['2026-07']->state())->toBe('done')
+        ->and($rows['2026-08']->state())->toBe('wait')
+        ->and($rows['2026-08']->needsCheck)->toBeTrue()
+        ->and($rows['2026-09']->returned)->toBeTrue()
+        ->and($rows['2026-09']->state())->toBe('returned')
+        ->and($rows['2026-10']->state())->toBe('late')
+        ->and($rows['2026-11']->state())->toBe('draft')
+        ->and($rows['2026-11']->needsCheck)->toBeFalse()
+        ->and($rows->pluck('templateId')->unique()->all())->toBe([$place['template']->id]);
+});
+
+test('hand-recorded reports are not part of the tracker', function () {
+    $seed = arpSeedAllTypes();
+    $reports = app(ActiveReports::class);
+
+    expect(ActiveReportType::values())->toBe(['monthly', 'donor'])
+        ->and($reports->for($this->meal)->concat($reports->for($this->meal, closed: true))->map->key()->filter(fn (string $key): bool => str_starts_with($key, 'report-'))->all())->toBe([]);
+});
+
+test('the monthly grid shows at most six months and steps back through the window', function () {
+    $place = arpTemplate($this->aleppo, 'Long Place', ['2026-01-01' => MonthlyReportStatus::Submitted, '2026-11-01' => MonthlyReportStatus::Submitted]);
+
+    $page = Livewire::actingAs($this->meal)->test('pages::active-reports.index')
+        ->call('chooseKind', 'monthly')
+        ->call('setRange', '2026-01', '2026-11');
+
+    expect($page->instance()->visibleMonths)->toBe(['2026-06', '2026-07', '2026-08', '2026-09', '2026-10', '2026-11']);
+    $page->assertSeeHtml('data-tracker-cell="monthly-'.$place['reports']['2026-11-01']->id.'"')
+        ->assertDontSeeHtml('data-tracker-cell="monthly-'.$place['reports']['2026-01-01']->id.'"')
+        ->call('shiftMonths', 99)
+        ->assertSet('monthShift', 5)
+        ->assertSeeHtml('data-tracker-cell="monthly-'.$place['reports']['2026-01-01']->id.'"');
+});
+
+test('places are paged and a chip drops the places it keeps nothing of', function () {
+    foreach (range(1, 16) as $n) {
+        arpTemplate($this->aleppo, sprintf('Paged %02d', $n), ['2026-10-01' => MonthlyReportStatus::Submitted]);
+    }
+    $validated = arpTemplate($this->aleppo, 'Only Validated', ['2026-10-01' => MonthlyReportStatus::Validated]);
+
+    $page = Livewire::actingAs($this->meal)->test('pages::active-reports.index')->call('chooseKind', 'monthly');
+
+    expect($page->instance()->placePage)->toMatchArray(['total' => 17, 'pages' => 2, 'first' => 1, 'last' => 15]);
+    $page->call('goToPage', 2)->assertSet('page', 2)
+        ->call('setChip', 'wait')
+        ->assertSet('page', 1)
+        ->assertDontSeeHtml('data-tracker-place="'.$validated['template']->id.'"');
+    expect($page->instance()->placePage['total'])->toBe(16);
+});
+
+test('donor reports are grouped by donor with the overdue donor first', function () {
+    $calm = arpDonorReport('Calm', ['due_on' => '2027-01-30']);
+    $late = arpDonorReport('Late', ['due_on' => '2026-11-10']);
+
+    $groups = Livewire::actingAs($this->meal)->test('pages::active-reports.index')
+        ->call('chooseKind', 'donor')
+        ->assertSeeHtml('data-tracker-donor="'.$late->donorProposal->donor_id.'"')
+        ->instance()->donorGroups;
+
+    expect($groups[0]['key'])->toBe((string) $late->donorProposal->donor_id)
+        ->and($groups[0]['overdue'])->toBe(1)
+        ->and(collect($groups)->pluck('key'))->toContain((string) $calm->donorProposal->donor_id);
+});
+
+test('inside a kind the back link returns to the report kinds instead of the desk', function () {
+    Livewire::actingAs($this->meal)->test('pages::active-reports.index')
+        ->assertSeeHtml('data-desk-register-back')
+        ->call('chooseKind', 'donor')
+        ->assertSeeHtml('data-tracker-back')
+        ->assertDontSeeHtml('data-desk-register-back')
+        ->call('backToDoors')
+        ->assertSet('kind', '')
+        ->assertSeeHtml('data-desk-register-back');
+});
+
+test('the rows are kept between clicks and forgotten when a report changes', function () {
+    $place = arpTemplate($this->aleppo, 'Cached Place', ['2026-10-01' => MonthlyReportStatus::Submitted]);
+    $report = $place['reports']['2026-10-01'];
+    $reads = function (): int {
+        DB::flushQueryLog();
+        DB::enableQueryLog();
+        Livewire::actingAs($this->meal)->test('pages::active-reports.index')->call('chooseKind', 'monthly');
+        $reads = collect(DB::getQueryLog())->filter(fn (array $query): bool => str_contains($query['query'], 'from `monthly_reports`'))->count();
+        DB::disableQueryLog();
+
+        return $reads;
+    };
+
+    $reads();
+    expect($reads())->toBe(0);
+
+    $report->update(['status' => MonthlyReportStatus::Validated]);
+
+    expect($reads())->toBeGreaterThan(0);
+    Livewire::actingAs($this->meal)->test('pages::active-reports.index')
+        ->call('chooseKind', 'monthly')
+        ->assertSeeHtml('data-state="done" data-tracker-cell="monthly-'.$report->id.'"');
+});
+
+test('the Desk panel shows the same door numbers as the page and links each door', function () {
+    arpSeedAllTypes();
+    arpTemplate($this->aleppo, 'Late Place', ['2026-09-01' => MonthlyReportStatus::Draft, '2026-10-01' => MonthlyReportStatus::Draft], $this->mealEmployee);
+
+    $counts = Livewire::actingAs($this->meal)->test('pages::active-reports.index')->instance()->doorCounts;
+
+    Livewire::actingAs($this->meal)->test('desk.panels.tracker', ['size' => 'L'])
+        ->assertSeeHtml('data-tracker-panel-door="monthly" data-door-count="'.$counts['monthly']['needs'].'"')
+        ->assertSeeHtml('data-tracker-panel-door="duties" data-door-count="'.$counts['duties']['total'].'"')
+        ->assertSeeHtml('data-tracker-panel-door="donor" data-door-count="'.$counts['donor']['needs'].'"')
+        ->assertSeeHtml(e(route('active-reports.index', ['kind' => 'duties'])));
+});
+
+test('the Desk panel offers only the monthly door to a viewer without donor reports', function () {
+    Livewire::actingAs(User::factory()->role('Team Member')->create())->test('desk.panels.tracker', ['size' => 'L'])
+        ->assertSeeHtml('data-tracker-panel-door="monthly"')
+        ->assertDontSeeHtml('data-tracker-panel-door="donor"')
+        ->assertDontSeeHtml('data-tracker-panel-door="duties"');
+});
+
+test('Report Tracker goes on the Desk as its own panel, not a quick access button', function () {
+    expect(app(Panels::class)->itemForRoute($this->meal, 'active-reports.index'))->toBe('tracker')
+        ->and(app(Panels::class)->itemForRoute(User::factory()->create(), 'active-reports.index'))->toBeNull();
 });
