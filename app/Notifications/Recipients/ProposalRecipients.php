@@ -6,8 +6,8 @@ namespace App\Notifications\Recipients;
 
 use App\Enums\NotificationPriority;
 use App\Models\Activity;
-use App\Models\Project;
 use App\Models\ProposalChangeRequest;
+use App\Models\ProposalLocation;
 use App\Models\ProposalReviewer;
 use App\Models\Role;
 use App\Models\User;
@@ -36,8 +36,9 @@ use App\Support\Slots;
  * proposal's reviewers and the CEO slot holder, besides the usual watchers;
  * the reviewers and the CEO skip the permission check for it.
  *
- * An extension (proposal.extended, W-08, D-60) tells the owners of the linked
- * projects, besides the usual watchers; the owners skip the permission check.
+ * An extension (proposal.extended, W-08, D-60) tells the responsibles of the
+ * proposal's places (Y-17), besides the usual watchers; they skip the
+ * permission check.
  * The activity carries names and dates only.
  *
  * The approval rebase (proposal.plan_rebased, T31) is the system's: it tells
@@ -341,9 +342,11 @@ final class ProposalRecipients extends WatcherRecipients
      */
     private function projectOwnerIds(Activity $activity): array
     {
-        return $this->uniqueIds(Project::query()
-            ->whereHas('proposals', fn ($query) => $query->whereKey($activity->subject_id))
-            ->pluck('user_id')
+        // Y-17: the proposal's places are its own location rows (D-93), and
+        // the person answering for a place is the row's responsible.
+        return $this->uniqueIds(ProposalLocation::query()
+            ->where('proposal_id', $activity->subject_id)
+            ->pluck('responsible_employee_id')
             ->all());
     }
 }

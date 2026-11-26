@@ -10,8 +10,8 @@ use App\Models\HrCenter;
 use App\Models\HrCity;
 use App\Models\HrEmployee;
 use App\Models\HrProgram;
+use App\Models\ProposalLocation;
 use App\Models\User;
-use App\Support\Reporting\PlaceBridge;
 use Carbon\CarbonImmutable;
 use Illuminate\Database\QueryException;
 use Illuminate\Support\Str;
@@ -100,12 +100,13 @@ final class ProposalChangeLines
         }
 
         if ($field === 'beneficiaries') {
-            $projectId = (int) ($change['project_id'] ?? 0);
+            // Y-17: the figure belongs to a location row, named by its place.
+            $locationId = (int) ($change['location_id'] ?? 0);
 
             return [
                 'field' => $field,
                 'label' => __('proposals.change.fields.beneficiaries'),
-                'place' => $names['projects'][$projectId] ?? '#'.$projectId,
+                'place' => $names['projects'][$locationId] ?? '#'.$locationId,
                 'from' => self::plain($from),
                 'to' => self::plain($to),
             ];
@@ -171,7 +172,7 @@ final class ProposalChangeLines
         foreach ($changes as $change) {
             match ($change['field'] ?? null) {
                 'donorId' => array_push($ids['donors'], ...array_filter([$change['from'] ?? null, $change['to'] ?? null], 'is_numeric')),
-                'beneficiaries' => array_push($ids['projects'], (int) ($change['project_id'] ?? 0)),
+                'beneficiaries' => array_push($ids['projects'], (int) ($change['location_id'] ?? 0)),
                 'locations' => self::collectRowIds($change, $ids),
                 default => null,
             };
@@ -183,7 +184,10 @@ final class ProposalChangeLines
             'donors' => $ids['donors'] === [] ? [] : Donor::query()->whereKey($ids['donors'])->pluck('name', 'id')->all(),
             'cities' => $ids['cities'] === [] ? [] : HrCity::query()->whereKey($ids['cities'])->get(['id', 'name_en', 'name_ar'])->mapWithKeys(fn (HrCity $city): array => [$city->id => (string) $city->name])->all(),
             'employees' => $ids['employees'] === [] ? [] : HrEmployee::query()->whereKey($ids['employees'])->get(HrEmployee::NameColumns)->mapWithKeys(fn (HrEmployee $employee): array => [$employee->id => (string) $employee->name])->all(),
-            'projects' => $ids['projects'] === [] ? [] : app(PlaceBridge::class)->projectsByIds($ids['projects'])->map(fn (mixed $project): string => (string) $project->name)->all(),
+            // Y-17: the ids are location rows, and a row is named by its place.
+            'projects' => $ids['projects'] === [] ? [] : ProposalLocation::query()->whereKey($ids['projects'])
+                ->with(['city', 'program', 'centers'])->get()
+                ->mapWithKeys(fn (ProposalLocation $row): array => [$row->id => $row->label()])->all(),
         ];
     }
 

@@ -187,7 +187,7 @@ final class SaveProposal
      * caller holds the proposal's lock and has authorized the request.
      *
      * @param  array<string, mixed>  $data
-     * @return list<array{field: string, from: mixed, to: mixed, row?: array{city_id: int, program_id: int|null}, project_id?: int}>
+     * @return list<array{field: string, from: mixed, to: mixed, row?: array{city_id: int, program_id: int|null}, location_id?: int}>
      *
      * @throws ValidationException
      */
@@ -273,7 +273,7 @@ final class SaveProposal
      *
      * @param  array<string, mixed>  $input
      * @param  Collection<int, ProposalLocation>  $linked
-     * @return list<array{field: string, from: mixed, to: mixed, project_id?: int}>
+     * @return list<array{field: string, from: mixed, to: mixed, location_id?: int}>
      */
     private function detailDifferences(Proposal $proposal, array $input, User $actor, Collection $linked): array
     {
@@ -315,7 +315,7 @@ final class SaveProposal
         }
 
         foreach ($this->beneficiaryChanges($linked, $input) as $change) {
-            $differences[] = ['field' => 'beneficiaries', 'project_id' => $change['project_id'], 'from' => $change['from'], 'to' => $change['to']];
+            $differences[] = ['field' => 'beneficiaries', 'location_id' => $change['location_id'], 'from' => $change['from'], 'to' => $change['to']];
         }
 
         return $differences;

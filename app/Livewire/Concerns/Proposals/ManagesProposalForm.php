@@ -231,7 +231,7 @@ trait ManagesProposalForm
 
         $rows = ProposalLocation::query()
             ->where('proposal_id', $this->editingProposalId)
-            ->with(['city:id,name_en,name_ar', 'program:id,name', 'centers'])
+            ->with(['city:id,name_en,name_ar', 'program', 'centers'])
             ->orderBy('sort')
             ->orderBy('id')
             ->get();
@@ -302,7 +302,7 @@ trait ManagesProposalForm
         }
 
         $rows = $previous->locations()
-            ->with(['city:id,name_en,name_ar', 'program:id,name', 'centers'])
+            ->with(['city:id,name_en,name_ar', 'program', 'centers'])
             ->orderBy('sort')
             ->orderBy('id')
             ->get();

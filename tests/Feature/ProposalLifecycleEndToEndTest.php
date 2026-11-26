@@ -2,7 +2,7 @@
 
 use App\Actions\FundingAgreements\SaveAgreementInstallments;
 use App\Actions\FundingAgreements\SaveFundingAgreement;
-use App\Actions\Projects\ActivateProject;
+use App\Actions\Locations\ActivateLocation;
 use App\Actions\Proposals\ApproveProposal;
 use App\Actions\Proposals\RecordFinalReportAcceptance;
 use App\Actions\Proposals\SaveProposal;
@@ -16,6 +16,7 @@ use App\Enums\ProposalStatus;
 use App\Models\Donor;
 use App\Models\DonorProposal;
 use App\Models\Media;
+use App\Models\Program;
 use App\Models\Project;
 use App\Models\Proposal;
 use App\Models\ProposalLocation;
@@ -36,15 +37,15 @@ beforeEach(function () {
     $this->seed(RolesAndPermissionsSeeder::class);
 });
 
-test('a proposal goes from a draft project to an approved, active grant with an agreement and expected transfers', function () {
+test('a proposal goes from a draft place to an approved, active grant with an agreement and expected transfers', function () {
     $prManager = userWithRole('Public Relations Manager');
     $meal = userWithRole('MEAL');
     $generalManager = userWithRole('General Manager');
     $finance = userWithRole('Financial');
 
-    // 1. A draft project (no dates) and a concept note that funds it.
-    $project = Project::factory()->create();
-    $project->currentAssignment('user_id')?->forceFill(['status' => AssignmentStatus::Acknowledged])->save();
+    // 1. A draft place (no dates) and a concept note that funds it. Y-17:
+    // the place IS a location row of that proposal (D-93); no project exists
+    // at any point of this run.
     $proposal = Proposal::factory()->create([
         'status' => ProposalStatus::ConceptNote,
         'requested_budget' => '30000.00',
@@ -52,12 +53,23 @@ test('a proposal goes from a draft project to an approved, active grant with an 
         'planned_date_begin' => '2026-11-01',
         'planned_date_end' => '2027-10-31',
     ]);
-    $proposal->projects()->attach($project->id, ['target_beneficiaries' => 120]);
-    ProposalLocation::factory()->for($proposal)->forProject($project)->create();
+    $cityId = insertHrCity('Aleppo', 'حلب');
+    $employeeId = insertHrEmployee($cityId);
+    $project = ProposalLocation::factory()->create([
+        'proposal_id' => $proposal->id,
+        'city_id' => $cityId,
+        'program_id' => Program::factory()->create(['manager_id' => $employeeId])->id,
+        'responsible_employee_id' => $employeeId,
+        'target_beneficiaries' => 120,
+    ]);
+    $project->centers()->create(['center_id' => insertHrCenter($cityId, 'Hope Center Aleppo', 'مركز الأمل حلب')]);
+    $project->currentAssignment('responsible_employee_id')?->forceFill(['status' => AssignmentStatus::Acknowledged])->save();
+    $project = $project->fresh();
 
     expect($project->status)->toBe(ProjectStatus::Draft)
         ->and($project->start_date)->toBeNull()
-        ->and($project->end_date)->toBeNull();
+        ->and($project->end_date)->toBeNull()
+        ->and(Project::query()->count())->toBe(0);
 
     // 2. Concept note → review → submitted to the donor → proposal draft → review → submitted.
     $this->actingAs($prManager);
@@ -77,7 +89,7 @@ test('a proposal goes from a draft project to an approved, active grant with an 
     expect($proposal->fresh()->status)->toBe(ProposalStatus::Submitted)
         ->and($proposal->statusNotes()->count())->toBe(5);
 
-    // 3. Approval: the project is approved and takes the grant dates.
+    // 3. Approval: the place is approved and takes the grant dates.
     $result = app(ApproveProposal::class)->handle($proposal->fresh(), ProposalStatus::Submitted, [
         'actual_date_begin' => '2026-11-01',
         'actual_date_end' => '2027-10-31',
@@ -85,16 +97,16 @@ test('a proposal goes from a draft project to an approved, active grant with an 
         'approval_note' => 'The donor confirmed the grant by email on 13 October.',
     ]);
 
-    expect($result->approvedProjectIds)->toBe([$project->id])
+    expect($result->approvedLocationIds)->toBe([$project->id])
         ->and($result->warnings)->toBe(['no_agreement'])
         ->and($proposal->fresh()->status)->toBe(ProposalStatus::Approved)
         ->and($project->fresh()->status)->toBe(ProjectStatus::Approved)
         ->and($project->fresh()->start_date->toDateString())->toBe('2026-11-01')
         ->and($project->fresh()->end_date->toDateString())->toBe('2027-10-31');
 
-    // 4. MEAL confirms the report template: until T33 merges, activation is called directly.
+    // 4. MEAL confirms the report template: activation is called directly here.
     $this->actingAs($meal);
-    app(ActivateProject::class)->handle($project->fresh(), 'template_confirmation');
+    app(ActivateLocation::class)->handle($project->fresh(), 'template_confirmation');
 
     expect($project->fresh()->status)->toBe(ProjectStatus::Active)
         ->and($proposal->fresh()->status)->toBe(ProposalStatus::Active);
@@ -176,7 +188,7 @@ test('a payroll proposal goes from draft to completed with the final report only
     ]);
     $this->actingAs($finance);
 
-    expect($result->approvedProjectIds)->toBe([])
+    expect($result->approvedLocationIds)->toBe([])
         ->and($proposal->fresh()->status)->toBe(ProposalStatus::Active)
         ->and(Project::query()->count())->toBe(0);
 
