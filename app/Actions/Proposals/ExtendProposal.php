@@ -10,12 +10,12 @@ use App\Enums\ReportTemplateLineStatus;
 use App\Enums\StatusNoteKind;
 use App\Models\Media;
 use App\Models\PlanIndicator;
-use App\Models\Project;
 use App\Models\Proposal;
+use App\Models\ProposalLocation;
 use App\Models\ProposalStatusNote;
 use App\Models\ReportTemplateLine;
 use App\Support\DonorReportFiles;
-use App\Support\ProjectPeriods;
+use App\Support\Locations\LocationPeriods;
 use App\Support\StoredFiles;
 use Carbon\CarbonImmutable;
 use Illuminate\Http\UploadedFile;
@@ -31,7 +31,7 @@ use Throwable;
  * The original `actual_date_end` stays; `extended_date_end`, the reason and an
  * optional amendment file are recorded beside it with one `extension` status
  * note. Every linked approved or active project that ends earlier widens
- * through ProjectPeriods (an active one raises ProjectPeriodChanged, so the
+ * through LocationPeriods (an active one raises LocationPeriodChanged, so the
  * new monthly reports are generated after commit). The proposal's template
  * lines that ran to the old last month run to the new one. Not a status
  * writer: the status stays `active`.
@@ -109,7 +109,7 @@ final class ExtendProposal
                     );
                 }
 
-                $this->widenProjects($locked, $newEnd);
+                $this->widenLocations($locked, $newEnd);
                 $this->extendTemplateLines($locked, $currentEnd, $newEnd);
 
                 $locked->recordActivity('proposal.extended', properties: [
@@ -149,22 +149,23 @@ final class ExtendProposal
     }
 
     /**
-     * Widen every linked approved or active project, locked in ascending id
-     * order, loaded through the proposal. Dates are never shortened.
+     * Widen every approved or active row of the proposal, locked in
+     * ascending id order. Dates are never shortened, and a row with no
+     * start date has no window to widen (Y-17).
      */
-    private function widenProjects(Proposal $proposal, CarbonImmutable $newEnd): void
+    private function widenLocations(Proposal $proposal, CarbonImmutable $newEnd): void
     {
-        $ids = $proposal->projects()->orderBy('projects.id')->pluck('projects.id')->all();
+        $ids = $proposal->locations()->orderBy('proposal_locations.id')->pluck('proposal_locations.id')->all();
 
         if ($ids === []) {
             return;
         }
 
-        $projects = Project::query()->whereKey($ids)->orderBy('id')->lockForUpdate()->get();
+        $rows = ProposalLocation::query()->whereKey($ids)->orderBy('id')->lockForUpdate()->get();
 
-        foreach ($projects as $project) {
-            if ($project->start_date !== null) {
-                ProjectPeriods::widen($project, $project->start_date, $newEnd);
+        foreach ($rows as $row) {
+            if ($row->start_date !== null) {
+                LocationPeriods::widen($row, $row->start_date, $newEnd);
             }
         }
     }

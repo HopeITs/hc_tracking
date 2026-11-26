@@ -751,7 +751,8 @@ class ProposalLocation extends Model implements TracksActivity
     }
 
     /**
-     * Row-level hooks record nothing: SaveProposal records the set's change.
+     * Row-level hooks record nothing on the proposal: SaveProposal records
+     * the set's change once, with counts.
      */
     protected function parentActivityEvent(string $hook): ?string
     {

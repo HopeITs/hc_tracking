@@ -4,13 +4,13 @@ declare(strict_types=1);
 
 namespace App\Actions\Proposals;
 
-use App\Actions\Projects\ApproveProjectFromProposal;
+use App\Actions\Locations\ApproveLocationFromProposal;
 use App\Enums\MediaCollection;
 use App\Enums\ProjectStatus;
 use App\Enums\ProposalStatus;
 use App\Events\ProposalStatusChanged;
-use App\Models\Project;
 use App\Models\Proposal;
+use App\Models\ProposalLocation;
 use App\Models\ProposalStatusNote;
 use App\Support\ApprovalResult;
 use App\Support\ProposalLocationRows;
@@ -27,13 +27,14 @@ use Illuminate\Validation\Validator as ValidatorInstance;
  *
  * One transaction: the proposal row is locked and compared with the status the
  * caller saw, its location rows must be complete (`locations_complete`,
- * W-34a), the projects those rows still lack are materialised
- * (MaterialiseProposalLocations: drafts created and linked, open projects
- * reused), then the proposal, its one audit note and every linked project
- * (locked in ascending id) are written together. Approval is not activation:
- * a project becomes `active` only when MEAL confirms its report template.
+ * W-34a), then the proposal, its one audit note and every row of it (locked
+ * in ascending id) are written together. Y-17: no project is created,
+ * linked or touched - a place IS a row (D-93), and
+ * MaterialiseProposalLocations completes the rows. Approval is not
+ * activation: a row becomes `active` only when MEAL confirms the report
+ * template at its place.
  * ProposalStatusChanged fires after the commit. A payroll proposal (W-32)
- * is the exception: it has no project, so it goes on to `active` at once.
+ * is the exception: it has no place, so it goes on to `active` at once.
  */
 final class ApproveProposal
 {
@@ -46,7 +47,7 @@ final class ApproveProposal
     public const OutcomeSkipped = 'skipped';
 
     public function __construct(
-        private ApproveProjectFromProposal $approveProject,
+        private ApproveLocationFromProposal $approveLocation,
         private MaterialiseProposalLocations $materialiseLocations,
     ) {}
 
@@ -70,22 +71,23 @@ final class ApproveProposal
                 throw ValidationException::withMessages(['locations_complete' => __('proposals.locations_incomplete')]);
             }
 
-            $materialised = $this->materialiseLocations->handle($locked, (int) Auth::id());
+            $rows = $this->lockRows($locked);
 
-            $projects = $this->lockLinkedProjects($locked);
-
-            if ($projects === []) {
-                throw ValidationException::withMessages(['linked_project' => __('proposals.link_project_first')]);
+            if ($rows === []) {
+                throw ValidationException::withMessages(['locations' => __('proposals.locations_required')]);
             }
 
             $validated = $this->validate($locked, $input);
             $hadAgreement = $locked->donorProposals()->exists();
 
+            // The grant's window has to be on the proposal before the rows
+            // take their dates from it (ApproveLocationFromProposal).
             $this->recordApproval($locked, $expectedFrom, $validated);
 
             // T07: the proposal's reviewers are told about the approval here.
 
-            $moved = $this->approveProjects($projects);
+            $materialised = $this->materialiseLocations->handle($locked, (int) Auth::id());
+            $moved = $this->approveRows($rows);
 
             if (! $hadAgreement) {
                 $locked->recordActivity('proposal.approved_without_agreement');
@@ -177,8 +179,8 @@ final class ApproveProposal
     }
 
     /**
-     * What approving would do to each linked project, for the modal and the
-     * result message: project id => funded | waiting | extended | skipped.
+     * What approving would do to each location row, for the modal and the
+     * result message: row id => funded | waiting | extended | skipped.
      *
      * @return array<int, string>
      */
@@ -186,21 +188,21 @@ final class ApproveProposal
     {
         $outcomes = [];
 
-        foreach ($proposal->projects()->with('ownerAssignment')->orderBy('projects.id')->get() as $project) {
-            $outcomes[$project->id] = $this->outcomeFor($project);
+        foreach ($proposal->locations()->with('ownerAssignment')->orderBy('proposal_locations.id')->get() as $row) {
+            $outcomes[$row->id] = $this->outcomeFor($row);
         }
 
         return $outcomes;
     }
 
-    private function outcomeFor(Project $project): string
+    private function outcomeFor(ProposalLocation $row): string
     {
-        if ($project->isOwnerRejected()) {
+        if ($row->isOwnerRejected()) {
             return self::OutcomeSkipped;
         }
 
-        return match ($project->status) {
-            ProjectStatus::Draft => $project->isAssignmentAcknowledged('user_id')
+        return match ($row->status) {
+            ProjectStatus::Draft => $row->isAssignmentAcknowledged('responsible_employee_id')
                 ? self::OutcomeFunded
                 : self::OutcomeWaiting,
             ProjectStatus::Approved, ProjectStatus::Active => self::OutcomeExtended,
@@ -233,42 +235,42 @@ final class ApproveProposal
     }
 
     /**
-     * @return list<Project>
+     * @return list<ProposalLocation>
      */
-    private function lockLinkedProjects(Proposal $proposal): array
+    private function lockRows(Proposal $proposal): array
     {
-        $ids = $proposal->projects()->orderBy('projects.id')->pluck('projects.id')->all();
+        $ids = $proposal->locations()->orderBy('proposal_locations.id')->pluck('proposal_locations.id')->all();
 
         if ($ids === []) {
             return [];
         }
 
-        return array_values(Project::query()->whereIn('id', $ids)->orderBy('id')->lockForUpdate()->get()->load('ownerAssignment')->all());
+        return array_values(ProposalLocation::query()->whereIn('id', $ids)->orderBy('id')->lockForUpdate()->get()->load('ownerAssignment')->all());
     }
 
     /**
-     * @param  list<Project>  $projects
+     * @param  list<ProposalLocation>  $rows
      * @return array{approved: list<int>, waiting: list<int>, skipped: list<int>}
      */
-    private function approveProjects(array $projects): array
+    private function approveRows(array $rows): array
     {
         $result = ['approved' => [], 'waiting' => [], 'skipped' => []];
 
-        foreach ($projects as $project) {
-            $outcome = $this->outcomeFor($project);
+        foreach ($rows as $row) {
+            $outcome = $this->outcomeFor($row);
 
             if ($outcome === self::OutcomeSkipped) {
-                $result['skipped'][] = $project->id;
+                $result['skipped'][] = $row->id;
 
                 continue;
             }
 
-            $this->approveProject->handle($project, 'proposal_approval');
+            $this->approveLocation->handle($row, 'proposal_approval');
 
             if ($outcome === self::OutcomeWaiting) {
-                $result['waiting'][] = $project->id;
+                $result['waiting'][] = $row->id;
             } else {
-                $result['approved'][] = $project->id;
+                $result['approved'][] = $row->id;
             }
         }
 

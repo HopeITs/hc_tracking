@@ -664,10 +664,10 @@ return [
     'location_status_missing_responsible' => 'ينقصه مسؤول',
     'location_status_waiting_program' => 'بانتظار البرنامج',
     'location_program_pending' => 'برنامج جديد: :name',
-    'approval_locations_title' => 'ما سيحدث لصفوف المواقع',
-    'approval_locations_create' => '{0} لا مشروع جديد|{1} سيُنشأ مشروع واحد|{2} سيُنشأ مشروعان|[3,10] سيُنشأ :count مشاريع|[11,*] سيُنشأ :count مشروعًا',
-    'approval_locations_link' => '{0} لا مشروع مفتوح يُربط|{1} يُربط مشروع مفتوح واحد|{2} يُربط مشروعان مفتوحان|[3,10] تُربط :count مشاريع مفتوحة|[11,*] يُربط :count مشروعًا مفتوحًا',
-    'approval_locations_wait' => '{0} لا صفّ ينتظر برنامجًا|{1} صفّ واحد ينتظر برنامجه|{2} صفّان ينتظران برنامجيهما|[3,10] :count صفوف تنتظر برامجها|[11,*] :count صفًّا ينتظر برامجه',
+    'approval_locations_title' => 'ما سيحدث للأماكن',
+    'approval_locations_approved' => '{0} لا مكان معتمد بعد|{1} مكان واحد معتمد|{2} مكانان معتمدان|[3,10] :count أماكن معتمدة|[11,*] :count مكانًا معتمدًا',
+    'approval_locations_waiting' => '{0} لا مكان ينتظر مسؤوله|{1} مكان واحد ينتظر مسؤوله|{2} مكانان ينتظران مسؤوليهما|[3,10] :count أماكن تنتظر مسؤوليها|[11,*] :count مكانًا ينتظر مسؤوله',
+    'approval_locations_wait' => '{0} لا مكان ينتظر برنامجًا|{1} مكان واحد ينتظر برنامجه|{2} مكانان ينتظران برنامجيهما|[3,10] :count أماكن تنتظر برامجها|[11,*] :count مكانًا ينتظر برامجه',
 
     /* Y-09 slice 2: change requests on an approved proposal (D-89, D-89a). */
     'change' => [

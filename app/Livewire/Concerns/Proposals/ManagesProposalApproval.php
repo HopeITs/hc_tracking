@@ -137,9 +137,9 @@ trait ManagesProposalApproval
      * approval runs (MaterialiseProposalLocations::preview): projects it will
      * create, open projects it will link instead (with the
      * `location_linked_existing` warning key), rows left waiting for a
-     * program. Nothing is written.
+     * program (Y-17: it creates nothing). Nothing is written.
      *
-     * @return array{create: int, link: int, wait: int, warnings: list<string>}
+     * @return array{approved: int, waiting: int, wait: int, warnings: list<string>}
      */
     #[Computed]
     public function approvalLocations(): array
@@ -147,15 +147,15 @@ trait ManagesProposalApproval
         $subject = $this->approveProposalId === null ? null : Proposal::query()->find($this->approveProposalId);
 
         if ($subject === null || $subject->isPayroll()) {
-            return ['create' => 0, 'link' => 0, 'wait' => 0, 'warnings' => []];
+            return ['approved' => 0, 'waiting' => 0, 'wait' => 0, 'warnings' => []];
         }
 
         $result = app(MaterialiseProposalLocations::class)->preview($subject);
 
         return [
-            'create' => count($result->createdProjectIds),
-            'link' => count($result->linkedProjectIds),
-            'wait' => count($result->waitingLocationIds),
+            'approved' => count($result->approvedLocationIds),
+            'waiting' => count($result->waitingForOwnerLocationIds),
+            'wait' => count($result->waitingForProgramLocationIds),
             'warnings' => $result->warnings,
         ];
     }

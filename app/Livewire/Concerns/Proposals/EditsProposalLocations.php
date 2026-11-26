@@ -403,13 +403,14 @@ trait EditsProposalLocations
      * the project page): its city, program, responsible and center. The
      * project is not linked; the row is a place like any other.
      */
-    protected function seedLocationRowFromProject(Project $project): void
+    protected function seedLocationRowFromPlace(ProposalLocation $place): void
     {
         $row = $this->blankLocationRow();
-        $row['city_id'] = (string) $project->city_id;
-        $row['program_id'] = (string) $project->program_id;
-        $row['responsible_employee_id'] = $project->user_id !== null ? (string) $project->user_id : '';
-        $row['center_ids'] = $project->center_id !== null ? [(string) $project->center_id] : [];
+        $row['city_id'] = (string) $place->city_id;
+        $row['program_id'] = $place->program_id !== null ? (string) $place->program_id : '';
+        $row['responsible_employee_id'] = $place->responsible_employee_id !== null ? (string) $place->responsible_employee_id : '';
+        $row['center_ids'] = array_map(strval(...), $place->centerIds());
+        $row['city_wide'] = $place->city_wide;
 
         $this->locations = [$row];
     }

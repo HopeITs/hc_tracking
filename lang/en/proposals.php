@@ -664,10 +664,10 @@ return [
     'location_status_missing_responsible' => 'Missing responsible',
     'location_status_waiting_program' => 'Waiting for program',
     'location_program_pending' => 'New program: :name',
-    'approval_locations_title' => 'What happens to the location rows',
-    'approval_locations_create' => '{0} No new project|{1} Will create 1 project|[2,*] Will create :count projects',
-    'approval_locations_link' => '{0} no open project linked|{1} link 1 open project|[2,*] link :count open projects',
-    'approval_locations_wait' => '{0} no row waits for a program|{1} 1 row waits for its program|[2,*] :count rows wait for their program',
+    'approval_locations_title' => 'What happens to the places',
+    'approval_locations_approved' => '{0} No place is approved yet|{1} 1 place approved|[2,*] :count places approved',
+    'approval_locations_waiting' => '{0} none waiting for its responsible|{1} 1 waiting for its responsible|[2,*] :count waiting for their responsible',
+    'approval_locations_wait' => '{0} no place waits for a program|{1} 1 place waits for its program|[2,*] :count places wait for their program',
 
     /* Y-09 slice 2: change requests on an approved proposal (D-89, D-89a). */
     'change' => [

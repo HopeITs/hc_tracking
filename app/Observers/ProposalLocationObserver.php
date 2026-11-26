@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Observers;
 
+use App\Models\Activity;
 use App\Models\Assignment;
 use App\Models\ProposalLocation;
 
@@ -18,10 +19,23 @@ use App\Models\ProposalLocation;
  * detachProject), so from Y-11 this observer is what keeps them from
  * outliving their row.
  *
- * The rows are history, not news: nothing is recorded and nobody is notified.
+ * It also records a new row's birth (Y-17): a place is an entry on the
+ * Projects screen, so it comes into being as `project.created` with the row
+ * as subject. That notification is the one its responsible answers with
+ * acknowledge or reject (`QuickActions`), and it is the event a hand-made
+ * project used to record — nothing creates one now (§8 drops
+ * `projects.create`), so the key is the row's alone and §8.5 keeps its name.
+ * A deleted row is still history: nothing is recorded for it.
  */
 class ProposalLocationObserver
 {
+    public function created(ProposalLocation $row): void
+    {
+        if (Activity::isRecording()) {
+            $row->recordActivity('project.created');
+        }
+    }
+
     public function deleting(ProposalLocation $row): void
     {
         Assignment::query()

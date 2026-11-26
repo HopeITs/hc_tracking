@@ -64,14 +64,14 @@
                     <p class="type-label mb-2 text-secondary-medium dark:text-ink-muted">{{ __('proposals.approval_preview') }}</p>
 
                     @php($locationPlan = $this->approvalLocations)
-                    @php($hasLocationPlan = $locationPlan['create'] + $locationPlan['link'] + $locationPlan['wait'] > 0)
+                    @php($hasLocationPlan = $locationPlan['approved'] + $locationPlan['waiting'] + $locationPlan['wait'] > 0)
 
                     @if ($hasLocationPlan)
                         <div class="mb-3 rounded-lg border border-board-line p-3 text-sm" data-test="approve-locations-preview">
                             <p class="font-semibold text-secondary-dark dark:text-ink">{{ __('proposals.approval_locations_title') }}</p>
                             <ul class="mt-1.5 grid gap-1 text-secondary-dark dark:text-ink">
-                                <li class="flex items-center gap-2" data-test="approve-locations-create"><flux:icon.plus-circle variant="micro" class="size-4 shrink-0" aria-hidden="true" />{{ trans_choice('proposals.approval_locations_create', $locationPlan['create'], ['count' => $locationPlan['create']]) }}</li>
-                                <li class="flex items-center gap-2" data-test="approve-locations-link"><flux:icon.link variant="micro" class="size-4 shrink-0" aria-hidden="true" />{{ trans_choice('proposals.approval_locations_link', $locationPlan['link'], ['count' => $locationPlan['link']]) }}</li>
+                                <li class="flex items-center gap-2" data-test="approve-locations-approved"><flux:icon.check-circle variant="micro" class="size-4 shrink-0" aria-hidden="true" />{{ trans_choice('proposals.approval_locations_approved', $locationPlan['approved'], ['count' => $locationPlan['approved']]) }}</li>
+                                <li class="flex items-center gap-2" data-test="approve-locations-waiting"><flux:icon.user-circle variant="micro" class="size-4 shrink-0" aria-hidden="true" />{{ trans_choice('proposals.approval_locations_waiting', $locationPlan['waiting'], ['count' => $locationPlan['waiting']]) }}</li>
                                 <li class="flex items-center gap-2" data-test="approve-locations-wait"><flux:icon.clock variant="micro" class="size-4 shrink-0" aria-hidden="true" />{{ trans_choice('proposals.approval_locations_wait', $locationPlan['wait'], ['count' => $locationPlan['wait']]) }}</li>
                             </ul>
                             @foreach ($locationPlan['warnings'] as $locationWarning)
@@ -83,8 +83,8 @@
                         </div>
                     @endif
 
-                    @if ($this->approvalPreview === [] && $locationPlan['create'] + $locationPlan['link'] === 0)
-                        <p class="text-sm text-status-critical" data-test="approve-no-projects">{{ __('proposals.link_project_first') }}</p>
+                    @if ($this->approvalPreview === [] && ! $hasLocationPlan)
+                        <p class="text-sm text-status-critical" data-test="approve-no-projects">{{ __('proposals.locations_required') }}</p>
                     @elseif ($this->approvalPreview !== [])
                         <ul class="divide-y divide-board-line rounded-lg border border-board-line">
                             @foreach ($this->approvalPreview as $previewProjectId => $previewProject)
@@ -113,7 +113,7 @@
         @endif
 
         <x-slot:actions>
-            <x-ui.button type="submit" tone="primary" wire:loading.attr="disabled" wire:target="approveProposal,approveFile" :disabled="! $showApproveModal || ($this->approvalPreview === [] && $this->approvalLocations['create'] + $this->approvalLocations['link'] === 0)" data-test="confirm-approve-button">
+            <x-ui.button type="submit" tone="primary" wire:loading.attr="disabled" wire:target="approveProposal,approveFile" :disabled="! $showApproveModal || ($this->approvalPreview === [] && $this->approvalLocations['approved'] + $this->approvalLocations['waiting'] + $this->approvalLocations['wait'] === 0)" data-test="confirm-approve-button">
                 {{ __('proposals.approve_proposal') }}
             </x-ui.button>
         </x-slot:actions>
