@@ -5,7 +5,7 @@ use App\Enums\ProposalStatus;
 use App\Enums\ReportTemplateLineStatus;
 use App\Enums\ReportTemplateStatus;
 use App\Enums\ResultType;
-use App\Events\ProjectActivated;
+use App\Events\LocationActivated;
 use App\Models\Activity;
 use App\Models\AnnualPlan;
 use App\Models\Indicator;
@@ -152,7 +152,7 @@ describe('report-templates:prefill-active', function () {
     });
 
     test('creates a pending template with the bank questions and pending lines for active projects only, without activating anything', function () {
-        Event::fake([ProjectActivated::class]);
+        Event::fake([LocationActivated::class]);
         NarrativeQuestion::factory()->monthly()->create();
         $questions = NarrativeQuestion::query()->active()->count();
         $proposalStatus = $this->proposal->status;
@@ -174,7 +174,7 @@ describe('report-templates:prefill-active', function () {
             ->and($this->closed->fresh()->status)->toBe(ProjectStatus::Closed)
             ->and($this->proposal->fresh()->status)->toBe($proposalStatus);
 
-        Event::assertNotDispatched(ProjectActivated::class);
+        Event::assertNotDispatched(LocationActivated::class);
     });
 
     test('a second run creates nothing and counts the lines already there', function () {

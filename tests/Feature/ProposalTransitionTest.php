@@ -31,7 +31,9 @@ function transitionableProposal(ProposalStatus $status): Proposal
         'requested_currency' => Currency::Usd,
     ]);
     $proposal->projects()->attach(Project::factory()->create()->id, ['target_beneficiaries' => 400]);
-    ProposalLocation::factory()->for($proposal)->complete()->create();
+    // Y-17: the `target_beneficiaries` requirement reads the proposal's own
+    // rows, not the project_proposal pivot.
+    ProposalLocation::factory()->for($proposal)->complete()->create(['target_beneficiaries' => 400]);
 
     return $proposal;
 }
@@ -108,12 +110,14 @@ test('a missing requirement refuses the move with its message and writes nothing
     'reason_min_10' => [ProposalStatus::Submitted, ProposalStatus::Rejected, ['reason' => 'No fit.', 'effective_date' => '2026-10-13'], fn () => null, 'reason', 'proposals.rejection_reason'],
     'effective_date' => [ProposalStatus::ProposalReview, ProposalStatus::Submitted, ['effective_date' => '2026-10-14'], fn () => null, 'effective_date', 'proposals.date_not_future'],
     'budget' => [ProposalStatus::ProposalDraft, ProposalStatus::ProposalReview, [], fn (Proposal $p) => $p->forceFill(['requested_budget' => null])->save(), 'budget', 'proposals.budget_required'],
-    'target_beneficiaries' => [ProposalStatus::ProposalReview, ProposalStatus::Submitted, ['effective_date' => '2026-10-13'], fn (Proposal $p) => $p->projects()->updateExistingPivot($p->projects()->value('projects.id'), ['target_beneficiaries' => null]), 'target_beneficiaries', 'proposals.beneficiaries_required'],
+    'target_beneficiaries' => [ProposalStatus::ProposalReview, ProposalStatus::Submitted, ['effective_date' => '2026-10-13'], fn (Proposal $p) => $p->locations()->update(['target_beneficiaries' => null]), 'target_beneficiaries', 'proposals.beneficiaries_required'],
 ]);
 
-test('every linked project needs beneficiaries before the proposal goes to review', function () {
+test('every place needs beneficiaries before the proposal goes to review', function () {
+    // Y-17: the requirement reads every row of the proposal, so a second
+    // place without a figure holds the move back.
     $proposal = transitionableProposal(ProposalStatus::ProposalDraft);
-    $proposal->projects()->attach(Project::factory()->create()->id, ['target_beneficiaries' => null]);
+    ProposalLocation::factory()->for($proposal)->complete()->create(['target_beneficiaries' => null]);
 
     $errors = refusedTransition(fn () => transition(userWithRole('Financial'), $proposal, ProposalStatus::ProposalReview));
 
@@ -132,7 +136,7 @@ test('a target outside the table is refused and writes nothing', function (Propo
 })->with([
     'concept note → approved' => [ProposalStatus::ConceptNote, ProposalStatus::Approved],
     'submitted → approved (ApproveProposal only)' => [ProposalStatus::Submitted, ProposalStatus::Approved],
-    'approved → active (ActivateProject only)' => [ProposalStatus::Approved, ProposalStatus::Active],
+    'approved → active (ActivateLocation only)' => [ProposalStatus::Approved, ProposalStatus::Active],
     'rejected → proposal draft (correction only)' => [ProposalStatus::Rejected, ProposalStatus::ProposalDraft],
     'completed → active (correction only)' => [ProposalStatus::Completed, ProposalStatus::Active],
     'concept note → submitted' => [ProposalStatus::ConceptNote, ProposalStatus::Submitted],
@@ -327,8 +331,9 @@ test('a concept note returned with a reason shows that reason to the proposal ed
 
 test('the status modal asks for the missing beneficiaries and the move then goes through', function () {
     $proposal = transitionableProposal(ProposalStatus::ProposalDraft);
-    $project = $proposal->projects()->first();
-    $proposal->projects()->updateExistingPivot($project->id, ['target_beneficiaries' => null]);
+    // Y-17: the figure the modal asks for belongs to the place.
+    $project = $proposal->locations()->sole();
+    $project->forceFill(['target_beneficiaries' => null])->save();
 
     $component = Livewire::actingAs(userWithRole('Financial'))
         ->test('pages::proposals.show', ['proposal' => $proposal])
@@ -342,5 +347,5 @@ test('the status modal asks for the missing beneficiaries and the move then goes
     $component->set('statusBeneficiaries.'.$project->id, '250')->call('changeStatus')->assertHasNoErrors();
 
     expect($proposal->fresh()->status)->toBe(ProposalStatus::ProposalReview)
-        ->and((int) $proposal->projects()->first()->pivot->target_beneficiaries)->toBe(250);
+        ->and((int) $proposal->locations()->sole()->target_beneficiaries)->toBe(250);
 });
