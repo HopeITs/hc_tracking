@@ -14,6 +14,7 @@ use App\Enums\ProposalStatus;
 use App\Models\Media;
 use App\Models\Project;
 use App\Models\Proposal;
+use App\Models\ProposalLocation;
 use App\Rules\SecureUpload;
 use Carbon\CarbonImmutable;
 use Flux\Flux;
@@ -34,7 +35,7 @@ use Livewire\Features\SupportFileUploads\TemporaryUploadedFile;
  *
  * @property-read Proposal|null $approvalSubject  #[Computed] approvalSubject()
  * @property-read array<int, array{name: string, outcome: string}> $approvalPreview  #[Computed] approvalPreview()
- * @property-read array{create: int, link: int, wait: int, warnings: list<string>} $approvalLocations  #[Computed] approvalLocations()
+ * @property-read array{approved: int, waiting: int, wait: int, warnings: list<string>} $approvalLocations  #[Computed] approvalLocations()
  */
 trait ManagesProposalApproval
 {
@@ -107,8 +108,11 @@ trait ManagesProposalApproval
     }
 
     /**
-     * What approving would do to each linked project, as text badges:
-     * funded, waits for the owner, extended or skipped.
+     * What approving would do to each of the proposal's places, as text
+     * badges: funded, waits for its responsible, extended or skipped.
+     *
+     * Y-17: the keys are location row ids, and a row is named by where it
+     * is (`ProposalLocation::label()`).
      *
      * @return array<int, array{name: string, outcome: string}>
      */
@@ -122,11 +126,21 @@ trait ManagesProposalApproval
         }
 
         $outcomes = app(ApproveProposal::class)->preview($subject);
-        $names = Project::query()->whereIn('id', array_keys($outcomes))->pluck('name', 'id');
+
+        if ($outcomes === []) {
+            return [];
+        }
+
+        $names = ProposalLocation::query()
+            ->whereKey(array_keys($outcomes))
+            ->with(['city', 'program', 'centers'])
+            ->get()
+            ->mapWithKeys(fn (ProposalLocation $row): array => [$row->id => $row->label()]);
+
         $preview = [];
 
-        foreach ($outcomes as $projectId => $outcome) {
-            $preview[$projectId] = ['name' => (string) $names->get($projectId), 'outcome' => $outcome];
+        foreach ($outcomes as $locationId => $outcome) {
+            $preview[$locationId] = ['name' => (string) $names->get($locationId), 'outcome' => $outcome];
         }
 
         return $preview;

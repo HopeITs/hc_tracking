@@ -42,7 +42,7 @@
                         return '';
                     }
 
-                    return @js(__('projects.breakdown_vs_headline'))
+                    return @js(e(__('projects.broken_down_of_headline', ['breakdown' => '__BREAKDOWN__', 'headline' => '__HEADLINE__'])))
                         .replace('__BREAKDOWN__', `<b class='form-section-figure'>${breakdown.toLocaleString()}</b>`)
                         .replace('__HEADLINE__', headline.toLocaleString());
                 },

@@ -18,7 +18,6 @@ use App\Models\Risk;
 use App\Models\Task;
 use App\Models\TransfersTracking;
 use App\Models\User;
-use Illuminate\Support\Facades\DB;
 use Livewire\Livewire;
 
 test('guests are redirected from project detail', function () {
@@ -289,46 +288,12 @@ test('project detail groups targets by result and shows their source, period and
         ->assertSeeText('No reports filed yet');
 });
 
-test('a proposal can be attached to and detached from a project', function () {
-    $user = User::factory()->role('General Manager')->create();
-    $project = projectWithRow();
-    $proposal = Proposal::factory()->create(['name' => 'Emergency WASH Response']);
-    $proposal->projects()->attach(projectWithRow());
-
-    Livewire::actingAs($user)
-        ->test('pages::projects.show', ['project' => rowFor($project)->slug])
-        ->set('tab', 'proposals')
-        ->set('proposalToAttach', (string) $proposal->id)
-        ->call('attachProposal')
-        ->assertHasNoErrors();
-
-    expect($project->proposals()->whereKey($proposal->id)->exists())->toBeTrue();
-
-    Livewire::actingAs($user)
-        ->test('pages::projects.show', ['project' => rowFor($project)->slug])
-        ->set('tab', 'proposals')
-        ->call('detachProposal', $proposal->id);
-
-    expect($project->proposals()->whereKey($proposal->id)->exists())->toBeFalse();
-});
-
-test('attaching the same proposal twice does not duplicate the pivot row', function () {
-    $user = User::factory()->role('General Manager')->create();
-    $project = projectWithRow();
-    $proposal = Proposal::factory()->create();
-    $project->proposals()->attach($proposal->id);
-
-    Livewire::actingAs($user)
-        ->test('pages::projects.show', ['project' => rowFor($project)->slug])
-        ->set('tab', 'proposals')
-        ->set('proposalToAttach', (string) $proposal->id)
-        ->call('attachProposal');
-
-    expect(DB::table('project_proposal')
-        ->where('project_id', $project->id)
-        ->where('proposal_id', $proposal->id)
-        ->count())->toBe(1);
-});
+/*
+| Y-17: the two cases on attaching and detaching a proposal went with the
+| feature — a proposal does not link projects (§6 removes
+| LinkProposalProject and UnlinkProposalProject), so the project page's
+| funding panel offers neither. They are named in the Y-17 handoff.
+*/
 
 test('project files list only this projects metadata and download through the authenticated route, never the raw storage path', function () {
     $user = User::factory()->role('General Manager')->create();
@@ -433,70 +398,38 @@ test('project detail renders a project with nothing attached', function () {
         ->assertSeeText(__('projects.tasks_raised_against_this_project_will_appear_here'));
 });
 
-test('the project page shows a linked proposal\'s internal number and lists attachable ones by number', function () {
+test('the place page shows its proposal internal number', function () {
     $user = User::factory()->role('General Manager')->create();
-    $project = projectWithRow();
+    $row = rowFor(projectWithRow());
     // D-93: the row carries one proposal, so that is the one the page names.
-    $linked = rowFor($project)->proposal;
-    $linked->update(['name' => 'Winter Shelter Kit', 'internal_project_number' => 'TEMP-0021']);
-    $project->proposals()->attach($linked->id);
-    Proposal::factory()->create(['name' => 'Cash for Work', 'internal_project_number' => 'HC-2026-093']);
+    $row->proposal->update(['name' => 'Winter Shelter Kit', 'internal_project_number' => 'TEMP-0021']);
 
     Livewire::actingAs($user)
-        ->test('pages::projects.show', ['project' => rowFor($project)->slug])
+        ->test('pages::projects.show', ['project' => $row->slug])
         ->set('tab', 'proposals')
-        ->assertSeeHtml('data-placeholder-chip="TEMP-0021"')
-        ->assertSee('Cash for Work · HC-2026-093');
+        ->assertSeeHtml('data-placeholder-chip="TEMP-0021"');
 });
 
-test('New Concept Note opens the proposal form for this project', function () {
-    $project = projectWithRow();
+test('New Concept Note opens the proposal form at this place', function () {
+    $row = rowFor(projectWithRow());
 
     Livewire::actingAs(User::factory()->role('Financial')->create())
-        ->test('pages::projects.show', ['project' => rowFor($project)->slug])
+        ->test('pages::projects.show', ['project' => $row->slug])
         ->assertSeeHtml('data-test="new-concept-note"')
-        ->assertSeeHtml(e(route('proposals.index', ['for_project' => $project->id])));
+        ->assertSeeHtml(e(route('proposals.index', ['for_project' => $row->id])));
 });
 
-test('New Concept Note is offered only to proposal creators on a project that can take a proposal', function (string $role, ProjectStatus $status) {
-    $project = Project::factory()->status($status)->create();
-    rowFor($project);
+test('New Concept Note is offered only to proposal creators', function () {
+    // Y-17: an archived place may be proposed again — the new proposal gets a
+    // row of its own (D-93), so there is no project to check for
+    // linkability. Only the permission decides.
+    $row = rowFor(Project::factory()->status(ProjectStatus::Archived)->create());
 
-    Livewire::actingAs(User::factory()->role($role)->create())
-        ->test('pages::projects.show', ['project' => rowFor($project)->slug])
+    Livewire::actingAs(User::factory()->role('Financial')->create())
+        ->test('pages::projects.show', ['project' => $row->slug])
+        ->assertSeeHtml('data-test="new-concept-note"');
+
+    Livewire::actingAs(User::factory()->role('Managers')->create())
+        ->test('pages::projects.show', ['project' => $row->slug])
         ->assertDontSeeHtml('data-test="new-concept-note"');
-})->with([
-    'no proposals.create' => ['Managers', ProjectStatus::Draft],
-    'archived project' => ['Financial', ProjectStatus::Archived],
-]);
-
-test('the project page names the place of its row, and carries no host-centre badge', function () {
-    // Y-16, D-93: the page is a location row, and a row has no host centre —
-    // `projects.host_center_id` is a project column Y-11 did not move. A row
-    // with no centre answers "field work" instead (D-88), so the badge is
-    // gone from this page. The directory still shows it while it is
-    // project-keyed. **Dev 1: the host centre either moves onto the row or
-    // retires with `projects` in Y-18.**
-    $user = User::factory()->role('General Manager')->create();
-    $idleb = insertHrCity('Idleb', 'إدلب');
-    $host = insertHrCenter(insertHrCity('Aleppo', 'حلب'), 'Head Office Aleppo', 'المكتب الرئيسي حلب');
-    $project = Project::factory()->hostedBy($host)->create(['name' => 'Wells Idleb', 'city_id' => $idleb]);
-    $row = rowFor($project);
-    $row->centers()->delete();
-    $row->update(['city_wide' => true]);
-
-    $this->actingAs($user)
-        ->get(route('projects.show', $row->fresh()))
-        ->assertOk()
-        ->assertSeeText('Idleb')
-        ->assertSeeText(__('proposals.location_field_work'))
-        ->assertDontSee('data-test="hosted-by-badge"', false);
-
-    $centered = projectWithRow(['name' => 'Aleppo Clinics', 'center_id' => $host]);
-
-    $this->actingAs($user)
-        ->get(route('projects.show', rowFor($centered)))
-        ->assertOk()
-        ->assertSeeText('Head Office Aleppo')
-        ->assertDontSee('data-test="hosted-by-badge"', false);
 });
