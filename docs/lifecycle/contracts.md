@@ -45,13 +45,13 @@ The one place for every name, value, signature, payload, column and permission t
 | proposal review | submitted | `effective_date`, `target_beneficiaries` | TransitionProposal |
 | submitted | proposal draft | `reason` (donor asked to resubmit) | TransitionProposal |
 | submitted | rejected | `reason_min_10`, `effective_date` | TransitionProposal |
-| submitted | approved | `locations_complete` (W-34a; was "≥ 1 linked project") | **ApproveProposal only** (T08) |
-| approved | active | — | **ActivateProject only** (T08; called by T33) |
+| submitted | approved | `locations_complete` (W-34a; was "≥ 1 linked project") | **ApproveProposal only** (T08). Y-17: at least one row is required and the `linked_project` requirement is removed |
+| approved | active | — | **ActivateLocation only** (Y-17, called by T33, once every non-archived row of the proposal is active) |
 | active | completed | `final_report`, `effective_date` | TransitionProposal |
 | rejected · completed | any live status except approved | `reason` | **CorrectProposalStatus only** (`is_correction = true`) |
 
 Key meanings:
-- `linked_project`: at least 1 linked project. Kept for one release behind the rows (W-34a: linking a project = a row with `project_id`), then removed.
+- `linked_project`: **removed by Y-17.** `locations_complete` already demands every row be complete, and a proposal no longer links projects.
 - `locations` (W-34a, D-62): at least 1 `proposal_locations` row with a city. Message `proposals.locations_required`.
 - `locations_complete` (W-34a, D-62): every `proposal_locations` row has program **and** responsible **and** (center or `city_wide` or `is_new`), and no `program_requests` row of the proposal is still `pending`. Checked by `ApproveProposal`. Message `proposals.locations_incomplete`.
 - `donor`: `donor_id` is set.
@@ -61,7 +61,7 @@ Key meanings:
 - `effective_date`: `before_or_equal:today`.
 - `remind_on`: `after:today`, stored in `proposals.status_remind_on`.
 - `budget`: `requested_budget` + `requested_currency` are set.
-- `target_beneficiaries`: `project_proposal.target_beneficiaries ≥ 1` on **every** linked project.
+- `target_beneficiaries`: `proposal_locations.target_beneficiaries ≥ 1` on **every** row of the proposal (Y-17; was `project_proposal.target_beneficiaries` on every linked project).
 - `final_report` (D-02c): the final-report milestone is complete, the `media` category `final_report` file exists, and `final_report_accepted_on` + `final_report_accepted_by` are set. A self-funded proposal needs only the milestone + file.
 
 Rules:
@@ -135,11 +135,16 @@ ClearProposalOnHold::handle(Proposal $proposal, ProposalStatus $expectedStatus, 
 //   Validation: city active in HR; centers belong to the city; program exists; responsible is an active HR employee;
 //   is_new + no program → both names required, creates/updates the program_requests row. Rows are replaced as a set
 //   inside the proposal transaction (diff by (city_id, program_id), delete removed); ProposalLocationsChanged after commit.
-//   `projectIds` (create) stays accepted for one release: each id becomes a row with `project_id` through LinkProposalProject.
-MaterialiseProposalLocations::handle(Proposal $proposal, int $actorId): MaterialisationResult   // W-34a slice 2, called inside ApproveProposal's transaction before ApproveProjectFromProposal
-    // MaterialisationResult (readonly): list<int> $createdProjectIds, list<int> $linkedProjectIds, list<int> $waitingLocationIds, list<string> $warnings (warning key: location_linked_existing)
+//   `projectIds` is **no longer accepted** (Y-17): a proposal does not link projects.
+MaterialiseProposalLocations::handle(Proposal $proposal, int $actorId): MaterialisationResult   // W-34a slice 2, called inside ApproveProposal's transaction
+    // Y-17: it no longer creates or links a project. For each complete row it calls
+    //   ApproveLocationFromProposal($row, 'proposal_approval') and reports what happened.
+    // MaterialisationResult (readonly): list<int> $approvedLocationIds, list<int> $waitingForOwnerLocationIds,
+    //   list<int> $waitingForProgramLocationIds, list<string> $warnings
     // preview(Proposal $proposal): MaterialisationResult  — read-only counts for the approve modal
-// LinkProposalProject / UnlinkProposalProject keep their signatures and also insert / delete the matching proposal_locations row (city, program, center copied from the project; responsible = projects.user_id; is_new = false).
+    //   ("N places approved, K waiting"; it no longer says "will create N projects")
+// Y-17 **removes** LinkProposalProject, UnlinkProposalProject, ReopenProjectAsDraft, SaveProject, CloseProject,
+// RestoreProject, ApproveProjectFromProposal and ActivateProject. Their work is done by the location actions of §3.
 
 // T07
 InviteDefaultReviewers::handle(Proposal $proposal, ReviewStage $stage): void   // called inside TransitionProposal's transaction
@@ -155,9 +160,10 @@ ApproveProposal::handle(Proposal $proposal, ProposalStatus $expectedFrom, array 
     // ApprovalResult (readonly): list<int> $approvedProjectIds, list<int> $waitingProjectIds, list<int> $skippedProjectIds, list<string> $warnings
     // W-32 (D-55b): $input gains nothing; for payroll actual_date_* default to the planned dates when absent; ApprovalResult lists are empty;
     // payroll → approved then active in one transaction (two notes), no project work, ProposalStatusChanged twice after commit
-ApproveProjectFromProposal::handle(Project $project, string $via): bool   // $via ∈ {proposal_approval, owner_acknowledgement}; idempotent
-ActivateProject::handle(Project $project, string $via): void              // Team B (T33) may call. Requires project approved + dated;
-                                                                          // moves its still-`approved` donor-approved proposals → active (one note each)
+// Y-17: ApproveProjectFromProposal and ActivateProject are removed; §3's
+// ApproveLocationFromProposal and ActivateLocation replace them. ApprovalResult's three
+// lists carry **row** ids (approvedLocationIds, waitingLocationIds, skippedLocationIds) and
+// outcomeFor() keeps its keys: funded, waiting, extended, skipped. (one note each)
 // W-07 (D-59), app/Actions/Proposals
 AddNegotiationNote::handle(Proposal $proposal, ProposalStatus $expectedStatus, array $input): ProposalStatusNote
     // @param array{text: string, file?: UploadedFile|null}; allowed only when status = submitted; Gate::authorize('update', $proposal); writes no status
@@ -165,8 +171,9 @@ AddNegotiationNote::handle(Proposal $proposal, ProposalStatus $expectedStatus, a
 ExtendProposal::handle(Proposal $proposal, ProposalStatus $expectedStatus, array $input): ProposalStatusNote
     // @param array{new_date_end: string, reason: string, file?: UploadedFile|null}; allowed only for active; Gate::authorize('update', $proposal);
     // new_date_end after the current effective end; not a status writer. Widens linked approved/active projects through App\Support\ProjectPeriods::widen()
-// App\Support\ProjectPeriods::widen(Project $project, CarbonImmutable $begin, CarbonImmutable $end): bool
-    // saves the wider dates (never shortens); dispatches ProjectPeriodChanged only when the project is active and the dates changed
+// App\Support\Locations\LocationPeriods::widen(ProposalLocation $row, CarbonImmutable $begin, CarbonImmutable $end): bool
+    // Y-17, replacing ProjectPeriods: saves the wider dates (never shortens); dispatches LocationPeriodChanged
+    // only when the row is active and the dates changed. ExtendProposal::widenLocations() calls it per dated row.
 
 // T09, app/Actions/FundingAgreements
 SaveFundingAgreement (existing; donor written from the proposal)
@@ -292,7 +299,7 @@ Nine roles (fixed): Super Admin, General Manager, Managers, MEAL, Financial, Med
 | `targets.create/update` | **MEAL only** (revoke from GM and Managers, D-23) | — |
 | `funding-agreements.view/create/update` | existing holders **+ Public Relations Manager** (D-31b) | — |
 | `proposals.update` | existing (Financial, PR Manager, GM) | also gates approve, transitions, final-report acceptance |
-| `projects.create` (W-34a, D-62) | existing (PR Manager, GM) **plus Financial** | approval materialises the proposal's projects through `SaveProject`, so every approver holds it; `permissions:sync` adds it |
+| ~~`projects.create`~~ | **removed by Y-17** | nothing creates a project by hand: a place exists because a proposal has it (D-84, D-87), so the proposal form is the only way in. `projects.update` and `projects.delete` gate the row's details and its archive |
 | `donors.approve` (W-04, D-57) | **General Manager** only (plus `Super Admin` through the administrator roles rule); `donors.create` is unchanged (PR, PR Manager, GM) | — |
 | `risk-library.manage` (W-09, D-61) | MEAL, General Manager; `risks.create/update/delete` keep their holders and now mean "on a proposal's logframe" | MEAL Manager slot holder (add, edit, remove, reorder library entries) |
 | `risks.create` / `risks.update` (Y-13, D-93) | existing holders, **or** the location row is in `User::ownedLocationIds()`: creating or changing a register risk is allowed either way. `risks.delete`, `attach` and `detach` are unchanged | the row's responsible employee, and the manager of the row's program |
