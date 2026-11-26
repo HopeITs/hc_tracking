@@ -49,6 +49,17 @@ final class ApproveLocationFromProposal
             $locked = ProposalLocation::query()->whereKey($row->getKey())->lockForUpdate()->firstOrFail();
             $proposal = Proposal::query()->whereKey($locked->proposal_id)->lockForUpdate()->firstOrFail();
 
+            // There is nothing to authorize when there is nothing to do: a
+            // proposal the donor has not funded, or a place whose
+            // responsible has rejected it, is left exactly as it is. The
+            // project twin checked this first too, and it matters — the
+            // acknowledgement path reaches here from the assignee's own
+            // answer, so refusing instead of standing still would 403
+            // someone for accepting an appointment.
+            if (! $this->isFunding($proposal) || $locked->isOwnerRejected()) {
+                return false;
+            }
+
             if ($via === 'proposal_approval') {
                 Gate::authorize('approve', $proposal);
             } else {
@@ -59,10 +70,6 @@ final class ApproveLocationFromProposal
                 }
 
                 Gate::authorize('approveProject', $assignment);
-            }
-
-            if (! $this->isFunding($proposal) || $locked->isOwnerRejected()) {
-                return false;
             }
 
             return match ($locked->status) {

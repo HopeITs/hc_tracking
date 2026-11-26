@@ -36,6 +36,31 @@ class ProposalLocationObserver
         }
     }
 
+    /**
+     * Putting someone new in charge of a place is `project.owner_changed`
+     * with the row as subject (Y-17). `HasAssignments` has already raised
+     * the appointment by now; this is the activity whose fan-out carries it
+     * to them, with the acknowledge and reject actions attached
+     * (`QuickActions`). `ProjectRecipients` reads
+     * `responsible_employee_id` from the change for exactly this event.
+     *
+     * Nothing else a row's save touches is recorded: `SaveProposal` records
+     * the set's change once, with counts.
+     */
+    public function updated(ProposalLocation $row): void
+    {
+        if (! Activity::isRecording() || ! $row->wasChanged('responsible_employee_id')) {
+            return;
+        }
+
+        $row->recordActivity('project.owner_changed', changes: [
+            'responsible_employee_id' => [
+                $row->getOriginal('responsible_employee_id'),
+                $row->responsible_employee_id,
+            ],
+        ]);
+    }
+
     public function deleting(ProposalLocation $row): void
     {
         Assignment::query()

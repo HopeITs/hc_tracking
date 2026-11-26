@@ -312,7 +312,14 @@ class Assignment extends Model
 
         $employee = app(EmployeeRecipients::class)->names([(int) $this->employee_id])[(int) $this->employee_id] ?? null;
 
-        $assignable->recordActivity($assignable->getMorphClass().'.'.$suffix, properties: [
+        // Y-17: a place is a location row, and its appointment events keep
+        // the `project.*` names — they name a screen and an ability, not a
+        // table (wave4/AGENT.md §8.5). Everything that routes them
+        // (EventCatalog, ProjectRecipients, the notification sentences) is
+        // keyed on those names.
+        $module = $assignable->getMorphClass() === 'proposal_location' ? 'project' : $assignable->getMorphClass();
+
+        $assignable->recordActivity($module.'.'.$suffix, properties: [
             ...($employee === null ? [] : ['employee' => $employee]),
             'assignment_id' => $this->id,
             'assigned_by' => $this->assigned_by,
