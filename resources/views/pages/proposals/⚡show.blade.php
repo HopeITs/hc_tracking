@@ -19,7 +19,6 @@ use App\Livewire\Concerns\Proposals\ManagesProposalExtension;
 use App\Livewire\Concerns\Proposals\ManagesProposalForm;
 use App\Livewire\Concerns\Proposals\ManagesProposalHold;
 use App\Livewire\Concerns\Proposals\ManagesProposalPlan;
-use App\Livewire\Concerns\Proposals\ManagesProposalRecord;
 use App\Livewire\Concerns\Proposals\ManagesProposalReviewers;
 use App\Livewire\Concerns\Proposals\ManagesProposalStatus;
 use App\Livewire\Concerns\Proposals\ReadsProposalAttention;
@@ -63,7 +62,6 @@ new #[Layout('layouts::desk'), Title('titles.proposal')] class extends Component
     use ManagesProposalForm;
     use ManagesProposalHold;
     use ManagesProposalPlan;
-    use ManagesProposalRecord;
     use ManagesProposalReviewers;
     use ManagesProposalStatus;
     use ManagesTransferForm;
@@ -405,7 +403,7 @@ new #[Layout('layouts::desk'), Title('titles.proposal')] class extends Component
     {
         unset(
             $this->proposal, $this->canRecordAgreement, $this->statusNotes, $this->agreements, $this->agreementRows, $this->fundingTranches, $this->donorReports, $this->agreementMoney, $this->moneyByCurrency,
-            $this->projects, $this->locationRows, $this->linkableProjects, $this->tasks, $this->targets, $this->reports,
+            $this->projects, $this->locationRows, $this->tasks, $this->targets, $this->reports,
             $this->planTaskRows, $this->planGroups, $this->planGanttPayload, $this->planWindow,
             $this->projectFiles, $this->conceptNoteFiles, $this->documents, $this->deadlines, $this->warnings, $this->lifecycle, $this->chronology,
             $this->arrivals, $this->vitals, $this->term, $this->tabs, $this->proposalFiles, $this->reviewStages, $this->needAssessments, $this->approvalSubject, $this->approvalPreview, $this->approvalLocations,

@@ -198,7 +198,7 @@ trait ReadsProjectStory
         switch ($stage) {
             case 0:
                 $text = (string) __('story.next.start_concept_note');
-                $href = $this->canStartConceptNote ? route('proposals.index', ['for_project' => $row->project_id]) : null;
+                $href = $this->canStartConceptNote ? route('proposals.index', ['for_project' => $row->id]) : null;
                 $label = (string) __('proposals.new_concept_note');
                 break;
             case 1:

@@ -187,7 +187,7 @@ new #[Layout('layouts::desk'), Title('titles.project')] class extends Component 
      */
     protected function resetPage(): void
     {
-        unset($this->location, $this->story, $this->attachedProposals, $this->fundingHistory, $this->planSummary, $this->canStartConceptNote, $this->embeddedProposalId);
+        unset($this->location, $this->story, $this->fundingHistory, $this->planSummary, $this->canStartConceptNote, $this->embeddedProposalId);
     }
 
     /**

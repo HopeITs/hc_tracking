@@ -3,7 +3,6 @@
 use App\Actions\Proposals\ApproveProposal;
 use App\Actions\Proposals\CloneProposalForRenewal;
 use App\Actions\Proposals\CorrectProposalStatus;
-use App\Actions\Proposals\LinkProposalProject;
 use App\Actions\Proposals\RecordFinalReportAcceptance;
 use App\Actions\Proposals\SaveProposal;
 use App\Actions\Proposals\TransitionProposal;
@@ -216,13 +215,13 @@ test('editing a payroll proposal keeps the narrative rule', function () {
         ->and($proposal->fresh()->narrative)->toBe(payrollNarrative());
 });
 
-test('a payroll proposal never links a project', function () {
+test('a payroll proposal has no place', function () {
+    // Y-17: LinkProposalProject is gone, so there is nothing to refuse; a
+    // payroll proposal simply carries no location row and no project.
     $this->actingAs(userWithRole('Financial'));
     $proposal = payrollProposal();
 
-    $errors = payrollRefusal(fn () => app(LinkProposalProject::class)->handle($proposal, Project::factory()->create()->id, 50));
-
-    expect($errors['projectIds'])->toBe([__('proposals.payroll_has_no_projects')])
+    expect($proposal->locations()->count())->toBe(0)
         ->and($proposal->projects()->count())->toBe(0);
 });
 

@@ -160,9 +160,6 @@
                                 </div>
                                 <div role="cell" data-label="{{ __('common.status') }}"><x-ui.enum-badge :case="$proposal->status" /></div>
                                 <div role="cell" class="dk-prow-acts">
-                                    @can('proposals.update')
-                                        <button type="button" class="dk-iconbtn dk-sm" wire:click="detachProposal({{ $proposal->id }})" aria-label="{{ __('projects.unlink_name', ['name' => $proposal->name]) }}" title="{{ __('projects.unlink_name', ['name' => $proposal->name]) }}"><x-desk.icon name="x" /></button>
-                                    @endcan
                                     @if ($this->canViewProposals())
                                         <a href="{{ $this->proposalStoryUrl($proposal->id, 'logframe') }}" wire:navigate class="dk-iconbtn dk-sm" data-test="proposal-logframe-link" aria-label="{{ __('story.open.logframe') }}" title="{{ __('story.open.logframe') }}"><x-desk.icon name="map" /></a>
                                     @endif
@@ -184,21 +181,6 @@
                 </div>
             @endif
 
-            @can('proposals.update')
-                <div class="dk-card-f" x-show="! linking">
-                    <button type="button" class="dk-btn dk-sm" @click="linking = true"><x-desk.icon name="plus" />{{ __('projects.link_a_proposal') }}</button>
-                </div>
-                <div class="dk-card-f dk-story-link" data-test="story-link-proposal" x-show="linking" x-cloak>
-                    <x-ui.select :label="__('projects.link_a_proposal')" wire:model="proposalToAttach">
-                        <flux:select.option value="">{{ __('common.select_a_proposal') }}</flux:select.option>
-                        @foreach ($this->attachableProposals as $proposalOption)
-                            <flux:select.option :value="$proposalOption->id" :wire:key="'attachable-'.$proposalOption->id">{{ $proposalOption->name }} · {{ $proposalOption->internal_project_number }}</flux:select.option>
-                        @endforeach
-                    </x-ui.select>
-                    <button type="button" class="dk-btn dk-sm" wire:click="attachProposal"><x-desk.icon name="plus" />{{ __('projects.link') }}</button>
-                    <button type="button" class="dk-btn dk-sm" @click="linking = false">{{ __('common.cancel') }}</button>
-                </div>
-            @endcan
         </div>
     </section>
 
