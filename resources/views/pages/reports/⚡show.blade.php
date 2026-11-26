@@ -42,10 +42,12 @@ new #[Layout('layouts::desk'), Title('titles.report')] class extends Component {
                 'lessons_learned', 'next_period_plans', 'submit_date', 'is_seen_by_meal', 'monthly_report_id',
             ])
             ->with([
-                'planIndicator:id,indicator_id,target,period,source_type,source_id,project_id',
+                'planIndicator:id,indicator_id,target,period,source_type,source_id,project_id,proposal_location_id',
                 'planIndicator.indicator:id,name,result_id,measure,unit',
                 'planIndicator.indicator.result:id,statement,type',
-                'planIndicator.project:id,name',
+                'planIndicator.location.city',
+                'planIndicator.location.program',
+                'planIndicator.location.centers',
                 'planIndicator.source',
                 // Every figure on the target, for its achievement by the shared rule.
                 'planIndicator.reports:id,plan_indicator_id,status,planned_date,value',
@@ -165,8 +167,8 @@ new #[Layout('layouts::desk'), Title('titles.report')] class extends Component {
         ],
         [
             'label' => __('common.project'),
-            'value' => $planIndicator->project?->name ?? __('common.organisation_wide'),
-            'href' => $planIndicator->project !== null ? route('projects.show', $planIndicator->project) : null,
+            'value' => $planIndicator->location?->label() ?? __('common.organisation_wide'),
+            'href' => $planIndicator->location !== null ? route('projects.show', $planIndicator->location) : null,
         ],
         ['label' => __('reports.committed_via'), 'value' => $sourceValue, 'href' => $sourceHref],
     ];
@@ -185,8 +187,8 @@ new #[Layout('layouts::desk'), Title('titles.report')] class extends Component {
     >
         <x-slot:meta>
             <span class="tabular-nums">{{ __('reports.period_to_date', ['date' => $report->planned_date?->translatedFormat(__('formats.date'))]) }}</span>
-            @if ($planIndicator->project !== null)
-                <a href="{{ route('projects.show', $planIndicator->project) }}" wire:navigate class="hover:underline">{{ $planIndicator->project->name }}</a>
+            @if ($planIndicator->location !== null)
+                <a href="{{ route('projects.show', $planIndicator->location) }}" wire:navigate class="hover:underline"><bdi>{{ $planIndicator->location->label() }}</bdi></a>
             @else
                 <span>{{ __('common.organisation_wide') }}</span>
             @endif

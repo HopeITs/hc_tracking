@@ -235,9 +235,9 @@ Route::middleware(['auth', EnsureTwoFactorIsEnabled::class])->group(function () 
         ->name('donor-reports.files.download');
 
     // The My Reporting Duties page is gone (Managers UAT, 2026-11-10): Donor
-    // Reports already shows each person the reports they are responsible for.
-    // The name stays only so links stored in old notifications still open.
-    Route::permanentRedirect('reporting-duties', '/donor-reports')
+    // "My reporting duties" is a view of the Report Tracker (2026-11-26). The
+    // name stays so links stored in old notifications still open.
+    Route::permanentRedirect('reporting-duties', '/active-reports?kind=duties')
         ->name('reporting-duties.index');
 
     Route::livewire('transfers', 'pages::transfers.index')

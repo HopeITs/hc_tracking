@@ -1,0 +1,689 @@
+<title>Report Tracker Redesign</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=IBM+Plex+Sans+Arabic:wght@400;600;700&display=swap">
+<style>
+/* Layout: prototype bar on top, then the Desk page: door grid (chooser) or a kind page (header, switcher, state chips, tailored body). */
+:root {
+  --bg: #f5f5f6; --paper: #ffffff; --sunk: #ebebed;
+  --ink: #232427; --ink-2: #58595b; --ink-3: #6d6e71; --faint: #939598;
+  --line: #e1e1e3; --line-2: #c6c7c9;
+  --brand: #be1f24; --brand-hover: #a81b20; --brand-wash: #f7e9e9;
+  --feature: #232427; --feature-ink: #ffffff; --feature-2: #b9babd; --feature-line: #3a3b40;
+  --shadow: 0 1px 2px rgb(0 0 0 / .05), 0 6px 20px -12px rgb(0 0 0 / .18);
+  --font: 'Inter', 'IBM Plex Sans Arabic', ui-sans-serif, system-ui, sans-serif;
+}
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) {
+  --bg: #111214; --paper: #1c1d20; --sunk: #16171a;
+  --ink: #ececee; --ink-2: #c4c6ca; --ink-3: #a8aaae; --faint: #8a8c93;
+  --line: #2e2f34; --line-2: #4a4b51;
+  --brand: #d4343a; --brand-hover: #e04046; --brand-wash: rgb(212 52 58 / .14);
+  --feature: #26272b; --feature-ink: #ececee; --feature-2: #a8aaae; --feature-line: #3a3b40;
+  --shadow: 0 1px 2px rgb(0 0 0 / .4), 0 8px 24px -14px rgb(0 0 0 / .7);
+  color-scheme: dark; } }
+:root[data-theme="dark"] {
+  --bg: #111214; --paper: #1c1d20; --sunk: #16171a;
+  --ink: #ececee; --ink-2: #c4c6ca; --ink-3: #a8aaae; --faint: #8a8c93;
+  --line: #2e2f34; --line-2: #4a4b51;
+  --brand: #d4343a; --brand-hover: #e04046; --brand-wash: rgb(212 52 58 / .14);
+  --feature: #26272b; --feature-ink: #ececee; --feature-2: #a8aaae; --feature-line: #3a3b40;
+  --shadow: 0 1px 2px rgb(0 0 0 / .4), 0 8px 24px -14px rgb(0 0 0 / .7);
+  color-scheme: dark; }
+
+* { box-sizing: border-box; }
+body { background: var(--bg); color: var(--ink); font-family: var(--font); font-size: 14px; line-height: 1.5; -webkit-font-smoothing: antialiased; }
+button { font: inherit; color: inherit; cursor: pointer; }
+:focus-visible { outline: 2px solid var(--brand); outline-offset: 2px; border-radius: 6px; }
+.num { font-variant-numeric: tabular-nums; }
+[dir="rtl"] .flip { transform: scaleX(-1); }
+
+/* Prototype bar (not part of the design) */
+.proto { position: sticky; top: env(safe-area-inset-top, 0px); z-index: 20; background: var(--sunk); border-bottom: 1px dashed var(--line-2); }
+body::before { content: ""; position: fixed; inset: 0 0 auto; height: env(safe-area-inset-top, 0px); z-index: 30; background: var(--sunk); }
+.proto-in { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 14px; padding-block: 8px; padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); max-width: 1240px; margin-inline: auto; font-size: 12px; color: var(--ink-3); }
+.proto b { font-size: 11px; letter-spacing: .1em; text-transform: uppercase; color: var(--ink-2); }
+.proto-group { display: inline-flex; align-items: center; gap: 6px; }
+.seg { display: inline-flex; padding: 2px; border-radius: 9px; background: var(--paper); border: 1px solid var(--line); }
+.seg button { border: 0; background: none; padding: 4px 10px; border-radius: 7px; font-size: 12px; font-weight: 600; color: var(--ink-3); }
+.seg button[aria-pressed="true"] { background: var(--ink); color: var(--paper); }
+.proto .link { border: 0; background: none; text-decoration: underline; font-size: 12px; color: var(--ink-2); }
+
+/* Page */
+.page { max-width: 1240px; margin-inline: auto; padding-block: 28px 64px; padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); }
+.back { display: inline-flex; align-items: center; gap: 6px; border: 0; background: none; padding: 0; font-size: 13px; font-weight: 600; color: var(--ink-3); }
+.back:hover { color: var(--ink); }
+.crumb { font-size: 12px; letter-spacing: .1em; text-transform: uppercase; font-weight: 600; color: var(--faint); margin-block: 14px 4px; }
+h1 { font-size: clamp(28px, 4vw, 34px); line-height: 1.2; font-weight: 700; margin: 0; letter-spacing: -.01em; text-wrap: balance; }
+.title-row { display: flex; flex-wrap: wrap; align-items: baseline; gap: 10px 14px; }
+.count { display: inline-grid; place-items: center; min-width: 30px; height: 26px; padding-inline: 9px; border-radius: 999px; background: var(--sunk); font-size: 13px; font-weight: 700; color: var(--ink-2); }
+.lede { margin: 6px 0 0; color: var(--ink-3); font-size: 15px; max-width: 62ch; }
+.lede strong { color: var(--ink); }
+
+/* Doors */
+.doors { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 16px; margin-top: 28px; align-items: stretch; }
+@media (max-width: 960px) { .doors { grid-template-columns: minmax(0, 1fr); } .doors .door.feature { order: -1; } }
+.door { position: relative; display: flex; flex-direction: column; gap: 14px; min-width: 0; text-align: start; padding: 22px; border-radius: 18px; border: 1px solid var(--line); background: var(--paper); box-shadow: var(--shadow); transition: transform .18s ease, border-color .18s ease, box-shadow .18s ease; }
+.door:hover { transform: translateY(-2px); border-color: var(--line-2); }
+.door-top { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; }
+.door-icon { display: grid; place-items: center; width: 42px; height: 42px; border-radius: 12px; background: var(--sunk); color: var(--ink-2); flex: none; }
+.door h2 { margin: 0; font-size: 19px; font-weight: 700; letter-spacing: -.005em; }
+.door p.what { margin: 2px 0 0; color: var(--ink-3); font-size: 13px; }
+.door .big { display: flex; align-items: baseline; gap: 8px; }
+.door .big b { font-size: 40px; line-height: 1; font-weight: 800; letter-spacing: -.02em; }
+.door .big span { font-size: 13px; font-weight: 600; color: var(--ink-3); }
+.door .stats { display: flex; flex-wrap: wrap; gap: 6px 16px; font-size: 12.5px; color: var(--ink-3); }
+.door .stats b { color: var(--ink); font-weight: 700; }
+.door .stats .late b { color: var(--brand); }
+.door .go { margin-top: auto; display: flex; align-items: center; justify-content: space-between; gap: 10px; padding-top: 14px; border-top: 1px solid var(--line); font-size: 13px; font-weight: 700; }
+.door .go span:first-child { color: var(--ink-3); font-weight: 500; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.door .arrow { display: grid; place-items: center; width: 30px; height: 30px; border-radius: 999px; background: var(--sunk); flex: none; transition: background .18s ease, color .18s ease; }
+.door:hover .arrow { background: var(--brand); color: #fff; }
+.door.feature { background: var(--feature); color: var(--feature-ink); border-color: var(--feature); }
+.door.feature p.what, .door.feature .stats, .door.feature .big span, .door.feature .go span:first-child { color: var(--feature-2); }
+.door.feature .stats b { color: var(--feature-ink); }
+.door.feature .door-icon { background: rgb(255 255 255 / .08); color: var(--feature-ink); }
+.door.feature .go { border-top-color: var(--feature-line); }
+.door.feature .arrow { background: var(--brand); color: #fff; }
+.feature-grid { display: grid; grid-template-columns: minmax(0, 1fr); gap: 14px; align-items: start; }
+.todo-list { display: grid; gap: 8px; margin: 0; padding: 0; list-style: none; }
+.todo-list li { display: flex; align-items: center; gap: 10px; padding: 10px 12px; border-radius: 12px; background: rgb(255 255 255 / .06); font-size: 13px; min-width: 0; }
+.todo-list li .t { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.todo-list li .d { color: var(--feature-2); font-size: 12px; white-space: nowrap; }
+.todo-list li .d.late { color: #ff8a8e; font-weight: 700; }
+@media (max-width: 760px) { .feature-grid { grid-template-columns: 1fr; } }
+.kind-tag { display: inline-flex; align-items: center; height: 20px; padding-inline: 7px; border-radius: 6px; font-size: 10.5px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; background: var(--sunk); color: var(--ink-2); flex: none; }
+.door.feature .kind-tag { background: rgb(255 255 255 / .1); color: var(--feature-ink); }
+
+/* mini viz in doors */
+.mini-months { display: grid; grid-template-columns: repeat(6, 1fr); gap: 6px; align-items: end; height: 64px; }
+.mini-months .col { display: flex; flex-direction: column-reverse; gap: 2px; height: 100%; }
+.mini-months .seg-v { border-radius: 3px; min-height: 3px; }
+.mini-months-labels { display: grid; grid-template-columns: repeat(6, 1fr); gap: 6px; font-size: 10.5px; color: var(--faint); text-align: center; margin-top: 4px; }
+.mini-bar { display: flex; height: 10px; border-radius: 999px; overflow: hidden; background: var(--sunk); gap: 2px; }
+.mini-bar i { display: block; height: 100%; }
+.next-due { display: flex; align-items: center; gap: 12px; padding: 12px; border-radius: 12px; background: var(--sunk); min-width: 0; }
+.next-due .cal { flex: none; width: 44px; border-radius: 9px; overflow: hidden; text-align: center; background: var(--paper); border: 1px solid var(--line); }
+.next-due .cal small { display: block; background: var(--brand); color: #fff; font-size: 9.5px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; padding-block: 2px; }
+.next-due .cal b { display: block; font-size: 18px; font-weight: 800; line-height: 1.6; }
+.next-due .txt { min-width: 0; font-size: 12.5px; color: var(--ink-3); }
+.next-due .txt b { display: block; color: var(--ink); font-size: 13.5px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.c-late { background: var(--brand); }
+.c-wait { background: var(--ink); }
+.c-draft { background: var(--line-2); }
+.c-done { background: var(--sunk); box-shadow: inset 0 0 0 1px var(--line-2); }
+
+/* Kind page */
+.kind-head { display: flex; flex-wrap: wrap; align-items: flex-end; justify-content: space-between; gap: 16px; }
+.switcher { display: flex; gap: 4px; padding: 4px; border-radius: 14px; background: var(--paper); border: 1px solid var(--line); overflow-x: auto; max-width: 100%; scrollbar-width: none; }
+.switcher button { display: inline-flex; align-items: center; gap: 8px; white-space: nowrap; border: 0; background: none; padding: 8px 12px; border-radius: 10px; font-size: 13px; font-weight: 600; color: var(--ink-3); transition: background .15s ease, color .15s ease; }
+.switcher button:hover { color: var(--ink); background: var(--sunk); }
+.switcher button[aria-current="page"] { background: var(--ink); color: var(--paper); }
+.switcher .n { display: inline-grid; place-items: center; min-width: 20px; height: 20px; padding-inline: 5px; border-radius: 999px; font-size: 11px; font-weight: 700; background: var(--sunk); color: var(--ink-2); }
+.switcher button[aria-current="page"] .n { background: var(--brand); color: #fff; }
+
+.summary { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 210px), 1fr)); gap: 12px; margin-top: 22px; }
+.sum { padding: 16px 18px; border-radius: 14px; background: var(--paper); border: 1px solid var(--line); min-width: 0; }
+.sum small { display: block; font-size: 11px; font-weight: 700; letter-spacing: .1em; text-transform: uppercase; color: var(--faint); }
+.sum b { display: block; font-size: 26px; font-weight: 800; line-height: 1.25; margin-top: 4px; letter-spacing: -.01em; }
+.sum span { font-size: 12.5px; color: var(--ink-3); }
+.sum.alert b { color: var(--brand); }
+.progress { height: 8px; border-radius: 999px; background: var(--sunk); overflow: hidden; margin-top: 10px; }
+.progress i { display: block; height: 100%; background: var(--ink); border-radius: inherit; }
+
+.toolbar { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 12px; margin-top: 22px; }
+.chips { display: flex; flex-wrap: wrap; gap: 6px; }
+.chip { display: inline-flex; align-items: center; gap: 7px; height: 34px; padding-inline: 12px; border-radius: 999px; border: 1px solid var(--line); background: var(--paper); font-size: 13px; font-weight: 600; color: var(--ink-2); }
+.chip:hover { border-color: var(--line-2); color: var(--ink); }
+.chip[aria-pressed="true"] { background: var(--ink); border-color: var(--ink); color: var(--paper); }
+.chip .dot { width: 8px; height: 8px; border-radius: 999px; flex: none; }
+.chip .n { font-size: 12px; font-weight: 700; opacity: .75; }
+.tools { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+.search { display: flex; align-items: center; gap: 8px; height: 36px; padding-inline: 12px; border-radius: 10px; border: 1px solid var(--line); background: var(--paper); color: var(--faint); min-width: 0; }
+.search input { border: 0; outline: 0; background: none; font: inherit; font-size: 13px; color: var(--ink); width: 200px; max-width: 46vw; }
+.select { height: 36px; padding-inline: 12px; border-radius: 10px; border: 1px solid var(--line); background: var(--paper); font-size: 13px; font-weight: 600; color: var(--ink-2); }
+
+.panel { margin-top: 16px; border-radius: 16px; background: var(--paper); border: 1px solid var(--line); overflow: hidden; }
+.panel-scroll { overflow-x: auto; }
+
+/* Monthly grid */
+table.grid { width: 100%; border-collapse: separate; border-spacing: 0; min-width: 820px; }
+.grid th, .grid td { padding: 10px 12px; border-bottom: 1px solid var(--line); text-align: center; vertical-align: middle; }
+.grid thead th { font-size: 11px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; color: var(--faint); background: var(--paper); position: sticky; top: 0; }
+.grid thead th.now { color: var(--ink); }
+.grid thead th .due { display: block; font-size: 10.5px; letter-spacing: 0; text-transform: none; font-weight: 500; color: var(--faint); }
+.grid th.place, .grid td.place { text-align: start; position: sticky; inset-inline-start: 0; background: var(--paper); z-index: 1; width: 300px; min-width: 260px; }
+.grid td.place b { display: block; font-size: 13.5px; font-weight: 700; }
+.grid td.place span { display: block; font-size: 12px; color: var(--ink-3); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 280px; }
+.grid tbody tr:last-child td { border-bottom: 0; }
+.grid tbody tr:hover td { background: color-mix(in srgb, var(--sunk) 55%, var(--paper)); }
+.grid td.owner { font-size: 12px; color: var(--ink-3); white-space: nowrap; text-align: end; }
+.grid td.col-now { background: color-mix(in srgb, var(--sunk) 45%, var(--paper)); }
+.behind { display: inline-flex; margin-top: 4px; font-size: 11px; font-weight: 700; color: var(--brand); }
+
+.cell { display: inline-flex; align-items: center; justify-content: center; gap: 5px; min-width: 92px; height: 30px; padding-inline: 10px; border-radius: 8px; font-size: 12px; font-weight: 700; border: 1px solid transparent; transition: transform .12s ease, opacity .2s ease; }
+.cell:hover { transform: scale(1.04); }
+.cell.late { background: var(--brand); color: #fff; }
+.cell.wait { background: var(--paper); color: var(--ink); border: 1.5px solid var(--ink); }
+.cell.draft { background: var(--paper); color: var(--ink-2); border: 1px dashed var(--line-2); }
+.cell.done { background: var(--sunk); color: var(--ink-3); }
+.cell.none { background: none; color: var(--line-2); cursor: default; font-weight: 500; }
+.cell.none:hover { transform: none; }
+.cell.dim { opacity: .18; }
+.legend { display: flex; flex-wrap: wrap; gap: 8px 18px; padding: 12px 16px; border-top: 1px solid var(--line); font-size: 12px; color: var(--ink-3); }
+.legend span { display: inline-flex; align-items: center; gap: 8px; }
+.legend .cell { min-width: 0; height: 20px; padding-inline: 8px; font-size: 10.5px; pointer-events: none; }
+
+/* List rows (indicator / mine / monthly list) */
+.group-h { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 12px 18px; background: var(--sunk); border-bottom: 1px solid var(--line); font-size: 12px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; color: var(--ink-2); }
+.group-h .why { text-transform: none; letter-spacing: 0; font-weight: 500; color: var(--faint); }
+.group-h.alert { color: var(--brand); }
+.row { display: grid; grid-template-columns: minmax(0, 2.2fr) minmax(0, 1.4fr) 120px 128px auto; align-items: center; gap: 16px; padding: 14px 18px; border-bottom: 1px solid var(--line); }
+.row:last-child { border-bottom: 0; }
+.row:hover { background: color-mix(in srgb, var(--sunk) 45%, var(--paper)); }
+.row .main { min-width: 0; }
+.row .main b { display: block; font-size: 14px; font-weight: 700; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.row .main span { display: block; font-size: 12.5px; color: var(--ink-3); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.row .meta { font-size: 12.5px; color: var(--ink-3); min-width: 0; }
+.row .meta b { color: var(--ink); font-weight: 600; }
+.when { font-size: 12.5px; color: var(--ink-2); }
+.when small { display: block; font-size: 11.5px; color: var(--faint); }
+.when.late small { color: var(--brand); font-weight: 700; }
+.pill { display: inline-flex; align-items: center; gap: 6px; height: 24px; padding-inline: 9px; border-radius: 999px; font-size: 11.5px; font-weight: 700; white-space: nowrap; }
+.pill.late { background: var(--brand-wash); color: var(--brand); }
+.pill.wait { background: var(--ink); color: var(--paper); }
+.pill.draft { background: var(--sunk); color: var(--ink-2); }
+.pill.done { background: none; color: var(--faint); box-shadow: inset 0 0 0 1px var(--line); }
+.act { display: inline-flex; align-items: center; gap: 6px; height: 32px; padding-inline: 12px; border-radius: 9px; border: 1px solid var(--line-2); background: var(--paper); font-size: 12.5px; font-weight: 700; white-space: nowrap; }
+.act:hover { border-color: var(--ink); }
+.act.primary { background: var(--brand); border-color: var(--brand); color: #fff; }
+.act.primary:hover { background: var(--brand-hover); }
+.target { min-width: 0; }
+.target .bar { position: relative; height: 6px; border-radius: 999px; background: var(--sunk); overflow: hidden; margin-top: 5px; }
+.target .bar i { position: absolute; inset-block: 0; inset-inline-start: 0; border-radius: inherit; background: var(--ink); }
+.target .bar i.pend { background: repeating-linear-gradient(135deg, var(--line-2) 0 3px, transparent 3px 6px); }
+.target small { font-size: 11.5px; color: var(--ink-3); }
+
+/* Donor lanes */
+.lanes { display: grid; grid-template-columns: repeat(4, minmax(250px, 1fr)); gap: 14px; margin-top: 16px; overflow-x: auto; padding-bottom: 6px; }
+.lane { min-width: 0; }
+.lane-h { display: flex; align-items: center; justify-content: space-between; padding: 4px 4px 10px; font-size: 12px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; color: var(--ink-2); }
+.lane-h.alert { color: var(--brand); }
+.lane-body { display: grid; gap: 10px; padding: 10px; border-radius: 16px; background: var(--sunk); min-height: 120px; align-content: start; }
+.dcard { display: grid; gap: 10px; text-align: start; padding: 14px; border-radius: 12px; background: var(--paper); border: 1px solid var(--line); transition: border-color .15s ease, transform .15s ease; }
+.dcard:hover { border-color: var(--line-2); transform: translateY(-1px); }
+.dcard.late { box-shadow: inset 3px 0 0 var(--brand); }
+[dir="rtl"] .dcard.late { box-shadow: inset -3px 0 0 var(--brand); }
+.dcard .donor { display: flex; align-items: center; justify-content: space-between; gap: 8px; font-size: 11.5px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; color: var(--ink-3); }
+.dcard h3 { margin: 0; font-size: 14px; font-weight: 700; }
+.dcard .prop { font-size: 12.5px; color: var(--ink-3); margin-top: -6px; }
+.dcard .foot { display: flex; align-items: center; justify-content: space-between; gap: 8px; font-size: 12px; color: var(--ink-3); padding-top: 10px; border-top: 1px solid var(--line); }
+.dcard .countdown { font-weight: 700; color: var(--ink); }
+.dcard .countdown.late { color: var(--brand); }
+.avatar { display: inline-grid; place-items: center; width: 24px; height: 24px; border-radius: 999px; background: var(--sunk); color: var(--ink-2); font-size: 10px; font-weight: 700; flex: none; }
+.who { display: inline-flex; align-items: center; gap: 6px; min-width: 0; }
+.lane-empty { font-size: 12.5px; color: var(--faint); text-align: center; padding: 18px 8px; }
+
+.empty { padding: 48px 24px; text-align: center; color: var(--ink-3); }
+.empty b { display: block; font-size: 16px; color: var(--ink); margin-bottom: 4px; }
+
+.banner { display: flex; align-items: center; gap: 10px; margin-top: 18px; padding: 10px 14px; border-radius: 12px; background: var(--paper); border: 1px solid var(--line); font-size: 13px; color: var(--ink-3); }
+
+.toast { position: fixed; inset-inline: 0; bottom: calc(18px + env(safe-area-inset-bottom, 0px)); margin-inline: auto; width: max-content; max-width: calc(100% - 32px); padding: 10px 16px; border-radius: 12px; background: var(--ink); color: var(--paper); font-size: 13px; font-weight: 600; box-shadow: var(--shadow); z-index: 40; }
+
+.view-in { animation: rise .28s ease both; }
+@keyframes rise { from { opacity: .4; transform: translateY(6px); } to { opacity: 1; transform: none; } }
+@media (prefers-reduced-motion: reduce) { .view-in { animation: none; } .door, .cell, .dcard { transition: none; } }
+
+@media (max-width: 860px) {
+  .row { grid-template-columns: minmax(0, 1fr) auto; }
+  .row .meta, .row .target-col { grid-column: 1 / -1; }
+  .row .when { order: 3; }
+  .lanes { grid-template-columns: repeat(4, minmax(240px, 82vw)); }
+}
+@media (max-width: 520px) { .search input { width: 130px; } .door .big b { font-size: 34px; } }
+
+.notes { margin-top: 48px; padding: 20px 22px; border-radius: 16px; border: 1px dashed var(--line-2); color: var(--ink-3); font-size: 13px; }
+.notes h2 { margin: 0 0 8px; font-size: 13px; letter-spacing: .1em; text-transform: uppercase; color: var(--ink-2); }
+.notes ul { margin: 0; padding-inline-start: 18px; display: grid; gap: 4px; }
+</style>
+
+<div class="proto" role="region" aria-label="Prototype controls">
+  <div class="proto-in">
+    <b>Prototype</b>
+    <span class="proto-group">Preview as
+      <span class="seg" id="roleSeg">
+        <button type="button" data-role="meal">MEAL</button>
+        <button type="button" data-role="manager">Program manager</button>
+        <button type="button" data-role="pr">Public relations</button>
+        <button type="button" data-role="field">Team member</button>
+      </span>
+    </span>
+    <span class="proto-group">Direction
+      <span class="seg" id="dirSeg">
+        <button type="button" data-dir="ltr">LTR</button>
+        <button type="button" data-dir="rtl">RTL</button>
+      </span>
+    </span>
+    <button type="button" class="link" id="resetVisit">Reset to first visit</button>
+  </div>
+</div>
+
+<main class="page" id="app" aria-live="polite"></main>
+<div class="toast" id="toast" hidden></div>
+
+<script>
+(() => {
+  const TODAY = new Date('2026-11-26T00:00:00');
+  const MONTHS = ['2026-06', '2026-07', '2026-08', '2026-09', '2026-10', '2026-11'];
+  const monthName = (k, long) => new Date(k + '-01T00:00:00').toLocaleString('en-GB', { month: long ? 'long' : 'short', year: long ? 'numeric' : undefined });
+  const dueOf = k => { const d = new Date(k + '-01T00:00:00'); d.setMonth(d.getMonth() + 1); d.setDate(6); return d; };
+  const fmt = d => d.toLocaleDateString('en-GB', { day: 'numeric', month: 'short' });
+  const days = d => Math.round((d - TODAY) / 864e5);
+  const ago = d => { const n = -days(d); return n === 1 ? '1 day late' : n + ' days late'; };
+  const inDays = d => { const n = days(d); return n < 0 ? (n === -1 ? 'yesterday' : -n + ' days ago') : n === 0 ? 'today' : n === 1 ? 'tomorrow' : 'in ' + n + ' days'; };
+  const initials = n => n.split(' ').map(p => p[0]).join('').slice(0, 2);
+  const esc = s => String(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+
+  /* Sample data, shaped like the real Report Tracker rows (names of people are invented). */
+  const places = [
+    { id: 1, place: 'Aleppo · Children University', props: 'Children University Aleppo – CP, Children University Aleppo – MCC', owner: 'Nadia Haddad', mine: false, cells: 'VVVVSD' },
+    { id: 2, place: 'Aleppo · Development Impact & Support Center', props: 'ADISC – MCC', owner: 'Nadia Haddad', mine: false, cells: 'VVVSLD' },
+    { id: 3, place: 'Aleppo · Leadership Empowerment', props: 'Leadership Aleppo – MCC', owner: 'Elias Mansour', mine: false, cells: 'VVVVVD' },
+    { id: 4, place: 'Aleppo · School to School', props: 'Educational equipment – Myriad', owner: 'You', mine: true, cells: 'LLLLLD' },
+    { id: 5, place: 'Aleppo · Relief Programs', props: 'Houses Restoration – CGR', owner: 'You', mine: true, cells: '--LLLD' },
+    { id: 6, place: 'Damascus · Development Impact & Support Center', props: 'DDISC – MCC', owner: 'Sami Khoury', mine: false, cells: 'VVVVSD' },
+    { id: 7, place: 'Damascus · Micro Project', props: 'Micro Projects Damascus – ACN', owner: 'You', mine: true, cells: 'VLLLLD' },
+    { id: 8, place: 'Homs · Leadership Empowerment', props: 'Leadership Homs – Missio Aachen', owner: 'Rana Tannous', mine: false, cells: 'VVVVVD' },
+    { id: 9, place: 'Homs · Micro Project', props: 'Micro Projects Homs – ACN', owner: 'Rana Tannous', mine: false, cells: 'VVVVSD' },
+    { id: 10, place: 'Homs · Children University', props: 'Children University Homs – CP', owner: 'Sami Khoury', mine: false, cells: 'VVVSVD' },
+  ];
+  const CELL = { V: 'done', S: 'wait', L: 'late', D: 'draft', '-': 'none' };
+
+  const donors = [
+    { id: 1, donor: 'UNICEF', title: 'Interim narrative report', prop: 'Children University Aleppo', due: '2026-11-18', state: 'overdue', owner: 'Rana Tannous', mine: true },
+    { id: 2, donor: 'UNICEF', title: 'Interim financial report', prop: 'Children University Aleppo', due: '2026-11-18', state: 'overdue', owner: 'Rana Tannous', mine: true },
+    { id: 3, donor: 'ECHO', title: 'Quarterly narrative report · Q3', prop: 'Houses Restoration', due: '2026-12-05', state: 'due', owner: 'You', mine: true },
+    { id: 4, donor: 'GIZ', title: 'Interim narrative report', prop: 'Micro Projects Damascus', due: '2026-12-15', state: 'due', owner: 'Elias Mansour', mine: false },
+    { id: 5, donor: 'Caritas Poland', title: 'Final narrative report', prop: 'Educational equipment', due: '2026-12-22', state: 'due', owner: 'Nadia Haddad', mine: false },
+    { id: 6, donor: 'SIDA', title: 'Annual narrative report', prop: 'Leadership Homs', due: '2027-01-31', state: 'due', owner: 'Sami Khoury', mine: false },
+    { id: 7, donor: 'OCHA', title: 'Final financial report', prop: 'Micro Projects Homs', due: '2027-02-15', state: 'due', owner: 'Rana Tannous', mine: false },
+    { id: 8, donor: 'ECHO', title: 'Quarterly narrative report · Q2', prop: 'Houses Restoration', due: '2026-09-05', state: 'submitted', owner: 'You', mine: false },
+    { id: 9, donor: 'UNICEF', title: 'Inception report', prop: 'Children University Aleppo', due: '2026-07-10', state: 'submitted', owner: 'Rana Tannous', mine: false },
+  ];
+
+  const indicators = [
+    { id: 1, name: 'Number of people reached', where: 'Annual plan 2026', date: '2026-03-31', status: 'draft', value: 340, target: 2000, approved: 41, author: 'Elias Mansour', mine: false },
+    { id: 2, name: 'Number of people reached', where: 'Micro Project Emergency Response', date: '2026-11-06', status: 'draft', value: 120, target: 600, approved: 55, author: 'You', mine: true },
+    { id: 3, name: 'Number of service points established', where: 'Annual plan 2026', date: '2026-08-29', status: 'draft', value: 3, target: 12, approved: 25, author: 'Sami Khoury', mine: false },
+    { id: 4, name: 'Number of service points established', where: 'Annual plan 2026', date: '2026-11-06', status: 'draft', value: 2, target: 12, approved: 25, author: 'You', mine: true },
+    { id: 5, name: 'Households receiving cash support', where: 'Houses Restoration – CGR', date: '2026-11-30', status: 'draft', value: 48, target: 150, approved: 62, author: 'You', mine: true },
+    { id: 6, name: 'Trained youth in employment (%)', where: 'Leadership Homs – Missio Aachen', date: '2026-12-15', status: 'draft', value: 38, target: 60, approved: 50, author: 'Rana Tannous', mine: false },
+    { id: 7, name: 'Children attending weekly sessions', where: 'Children University Aleppo – CP', date: '2026-10-31', status: 'reviewed', value: 420, target: 1800, approved: 58, author: 'Nadia Haddad', mine: false },
+    { id: 8, name: 'Micro-grants disbursed', where: 'Micro Projects Homs – ACN', date: '2026-10-31', status: 'reviewed', value: 14, target: 60, approved: 70, author: 'Rana Tannous', mine: false },
+    { id: 9, name: 'Teachers trained', where: 'Educational equipment – Myriad', date: '2026-09-30', status: 'reviewed', value: 22, target: 80, approved: 45, author: 'Sami Khoury', mine: false },
+    { id: 10, name: 'Number of people reached', where: 'Annual plan 2026', date: '2026-06-30', status: 'approved', value: 410, target: 2000, approved: 41, author: 'Elias Mansour', mine: false },
+    { id: 11, name: 'Houses restored', where: 'Houses Restoration – CGR', date: '2026-09-30', status: 'approved', value: 18, target: 40, approved: 45, author: 'You', mine: false },
+  ];
+
+  const ROLES = {
+    meal: { label: 'MEAL', kinds: ['monthly', 'donor'], validates: true },
+    manager: { label: 'Program manager', kinds: ['monthly', 'donor'], prepares: true },
+    pr: { label: 'Public relations', kinds: ['monthly', 'donor'], donorOwner: true },
+    field: { label: 'Team member', kinds: ['monthly'], prepares: true },
+  };
+
+  const KINDS = {
+    mine: { label: 'My reporting duties', icon: 'inbox' },
+    monthly: { label: 'Monthly reports', short: 'Monthly', what: 'One report per place, every month', icon: 'grid' },
+    donor: { label: 'Donor reports', short: 'Donor', what: 'What each agreement owes its donor, by due date', icon: 'send' },
+    indicator: { label: 'Indicator updates', short: 'Indicator', what: 'Figures filed against a target, waiting for approval', icon: 'target' },
+  };
+
+  const ICONS = {
+    inbox: '<path d="M3 13h5l1.5 3h5L16 13h5"/><path d="M5 5h14l2 8v6H3v-6z"/>',
+    grid: '<rect x="3" y="4" width="18" height="17" rx="2"/><path d="M3 9h18M8 4v17M13 4v17"/>',
+    send: '<path d="M4 12 20 4l-4 16-4-7z"/><path d="m12 13 8-9"/>',
+    target: '<circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="5"/><circle cx="12" cy="12" r="1.5"/>',
+    arrow: '<path d="M5 12h14M13 6l6 6-6 6"/>',
+    back: '<path d="M19 12H5M11 6l-6 6 6 6"/>',
+    search: '<circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/>',
+    check: '<path d="m5 12 5 5 9-10"/>',
+  };
+  const icon = (n, s = 18, cls = '') => `<svg class="${cls}" width="${s}" height="${s}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${ICONS[n]}</svg>`;
+
+  const store = {
+    get(k) { try { return localStorage.getItem(k); } catch { return null; } },
+    set(k, v) { try { v === null ? localStorage.removeItem(k) : localStorage.setItem(k, v); } catch {} },
+  };
+
+  const state = { role: store.get('rt-role') || 'meal', chip: {}, search: '' };
+  const role = () => ROLES[state.role];
+
+  /* ---------- derived counts, per role ---------- */
+  function monthlyCells() {
+    const out = [];
+    places.forEach(p => [...p.cells].forEach((c, i) => { if (c !== '-') out.push({ p, month: MONTHS[i], s: CELL[c] }); }));
+    return out;
+  }
+  function monthlyNeedsMe(c) {
+    const r = role();
+    if (r.validates && c.s === 'wait') return true;
+    if (r.prepares && c.p.mine && (c.s === 'late' || c.s === 'draft')) return true;
+    return false;
+  }
+  function visiblePlaces() { return state.role === 'field' ? places.filter(p => p.mine).slice(0, 2) : places; }
+  function donorNeedsMe(d) { return d.state !== 'submitted' && ((role().donorOwner && d.mine) || (state.role === 'meal' && d.owner === 'You')); }
+  function indLate(i) { return i.status === 'draft' && new Date(i.date) < TODAY; }
+  function indNeedsMe(i) { const r = role(); return (r.approves && i.status === 'reviewed') || (!!r.prepares && i.mine && i.status === 'draft'); }
+
+  function stats(kind) {
+    if (kind === 'monthly') {
+      const ids = new Set(visiblePlaces().map(p => p.id));
+      const cells = monthlyCells().filter(c => ids.has(c.p.id));
+      const open = cells.filter(c => c.s !== 'done');
+      return { needs: cells.filter(monthlyNeedsMe).length, late: cells.filter(c => c.s === 'late').length, open: open.length, wait: cells.filter(c => c.s === 'wait').length, done: cells.filter(c => c.s === 'done').length, cells };
+    }
+    if (kind === 'donor') {
+      const open = donors.filter(d => d.state !== 'submitted');
+      return { needs: donors.filter(donorNeedsMe).length, late: donors.filter(d => d.state === 'overdue').length, open: open.length, done: donors.length - open.length };
+    }
+    const open = indicators.filter(i => i.status !== 'approved');
+    return { needs: indicators.filter(indNeedsMe).length, late: indicators.filter(indLate).length, open: open.length, wait: indicators.filter(i => i.status === 'reviewed').length, done: indicators.length - open.length };
+  }
+  function myTodos() {
+    const r = role(), todos = [];
+    if (r.kinds.includes('monthly')) {
+      const byPlace = {};
+      stats('monthly').cells.filter(monthlyNeedsMe).forEach(c => {
+        const key = c.p.id + c.s;
+        (byPlace[key] ||= { kind: 'monthly', p: c.p, s: c.s, months: [] }).months.push(c.month);
+      });
+      Object.values(byPlace).forEach(g => {
+        const first = g.months[0], due = dueOf(first);
+        if (g.s === 'wait') g.months.forEach(m => todos.push({ kind: 'monthly', group: 'check', title: g.p.place, sub: monthName(m, true) + ' · submitted, waiting for your validation', due: dueOf(m), late: false, cta: 'Validate' }));
+        else todos.push({ kind: 'monthly', group: 'fill', title: g.p.place, sub: g.months.length > 1 ? g.months.length + ' months open: ' + monthName(g.months[0]) + ' – ' + monthName(g.months[g.months.length - 1]) : monthName(first, true), due, late: due < TODAY, cta: g.months.length > 1 ? 'Open oldest' : 'Fill in' });
+      });
+    }
+    if (r.kinds.includes('donor')) donors.filter(donorNeedsMe).forEach(d => todos.push({ kind: 'donor', group: 'send', title: d.title, sub: d.donor + ' · ' + d.prop, due: new Date(d.due), late: d.state === 'overdue', cta: 'Prepare' }));
+    if (r.kinds.includes('indicator')) indicators.filter(indNeedsMe).forEach(i => todos.push({ kind: 'indicator', group: i.status === 'reviewed' ? 'check' : 'fill', title: i.name, sub: i.where, due: new Date(i.date), late: indLate(i), cta: i.status === 'reviewed' ? 'Approve' : 'Finish draft' }));
+    return todos.sort((a, b) => (b.late - a.late) || (a.due - b.due));
+  }
+
+  /* ---------- routing ---------- */
+  const app = document.getElementById('app');
+  function current() {
+    const h = location.hash.slice(1);
+    const allowed = ['mine', ...role().kinds];
+    if (allowed.includes(h)) return h;
+    if (role().kinds.length === 1) return role().kinds[0];
+    const last = store.get('rt-last');
+    if (h === '' && last && allowed.includes(last) && store.get('rt-seen')) return last;
+    return 'doors';
+  }
+  function go(view) {
+    if (view !== 'doors') { store.set('rt-last', view); store.set('rt-seen', '1'); }
+    const target = view === 'doors' ? '#choose' : '#' + view;
+    if (location.hash === target) render(); else location.hash = target;
+  }
+  window.addEventListener('hashchange', render);
+
+  function render() {
+    const h = location.hash.slice(1);
+    const view = h === 'choose' ? 'doors' : current();
+    app.innerHTML = view === 'doors' ? doorsView() : kindView(view);
+    app.firstElementChild?.classList.add('view-in');
+    document.querySelectorAll('#roleSeg button').forEach(b => b.setAttribute('aria-pressed', String(b.dataset.role === state.role)));
+    document.querySelectorAll('#dirSeg button').forEach(b => b.setAttribute('aria-pressed', String(b.dataset.dir === document.documentElement.dir || (b.dataset.dir === 'ltr' && !document.documentElement.dir))));
+  }
+
+  /* ---------- door screen ---------- */
+  function doorsView() {
+    const r = role(), todos = myTodos(), lateTodos = todos.filter(t => t.late).length;
+    const firstDoor = door(r.kinds[0]), restDoors = r.kinds.slice(1).map(k => door(k)).join('');
+    return `<div>
+      <div class="crumb">Desk › Reports</div>
+      <h1>Report Tracker</h1>
+      <p class="lede">${todos.length ? `<strong>${todos.length} things wait on you</strong>${lateTodos ? `, ${lateTodos} of them late` : ''}. Pick what you want to look at.` : 'Nothing waits on you today. Pick what you want to look at.'}</p>
+      <div class="doors">
+        ${firstDoor}
+        <button type="button" class="door feature" data-go="mine">
+          <div class="feature-grid">
+            <div style="display:grid;gap:14px">
+              <div class="door-top"><div><h2>My reporting duties</h2><p class="what">Every kind of report, only the ones you need to act on</p></div><span class="door-icon">${icon('inbox', 20)}</span></div>
+              <div class="big"><b class="num">${todos.length}</b><span>to do</span></div>
+              <div class="stats"><span class="late"><b class="num" style="color:#ff8a8e">${lateTodos}</b> late</span><span><b class="num">${todos.filter(t => t.group === 'check').length}</b> to check</span><span><b class="num">${todos.filter(t => t.group !== 'check').length}</b> to fill in or send</span></div>
+            </div>
+            <ul class="todo-list">${todos.slice(0, 3).map(t => `<li><span class="kind-tag">${KINDS[t.kind].short}</span><span class="t">${esc(t.title)}</span><span class="d ${t.late ? 'late' : ''}">${t.late ? ago(t.due) : inDays(t.due)}</span></li>`).join('') || '<li><span class="t">You are all caught up.</span></li>'}</ul>
+          </div>
+          <div class="go"><span>${todos.length > 3 ? `and ${todos.length - 3} more` : 'Start with the oldest'}</span><span class="arrow">${icon('arrow', 16, 'flip')}</span></div>
+        </button>
+        ${restDoors}
+      </div>
+      ${notes()}
+    </div>`;
+  }
+  function door(k) {
+    const s = stats(k), K = KINDS[k];
+    let viz = '', next = '';
+    if (k === 'monthly') {
+      const per = MONTHS.map(m => { const c = s.cells.filter(x => x.month === m); return ['done', 'wait', 'draft', 'late'].map(t => [t, c.filter(x => x.s === t).length]); });
+      const max = Math.max(...per.map(p => p.reduce((a, [, n]) => a + n, 0)));
+      viz = `<div><div class="mini-months">${per.map(p => `<div class="col">${p.filter(([, n]) => n).map(([t, n]) => `<i class="seg-v c-${t}" style="height:${(n / max) * 100}%"></i>`).join('')}</div>`).join('')}</div><div class="mini-months-labels">${MONTHS.map(m => `<span>${monthName(m)}</span>`).join('')}</div></div>`;
+      next = s.late ? `${s.late} late across ${new Set(s.cells.filter(c => c.s === 'late').map(c => c.p.id)).size} places` : 'All months on time';
+    }
+    if (k === 'donor') {
+      const n = donors.filter(d => d.state !== 'submitted').sort((a, b) => new Date(a.due) - new Date(b.due))[0];
+      const d = new Date(n.due);
+      viz = `<div class="next-due"><div class="cal"><small>${d.toLocaleString('en-GB', { month: 'short' })}</small><b class="num">${d.getDate()}</b></div><div class="txt"><b>${esc(n.title)}</b>${esc(n.donor)} · ${n.state === 'overdue' ? `<span style="color:var(--brand);font-weight:700">${ago(d)}</span>` : inDays(d)}</div></div>`;
+      next = 'Next: ' + n.donor;
+    }
+    if (k === 'indicator') {
+      const total = indicators.length, late = s.late, wait = s.wait, draft = indicators.filter(i => i.status === 'draft').length - late;
+      viz = `<div><div class="mini-bar"><i class="c-late" style="width:${late / total * 100}%"></i><i class="c-wait" style="width:${wait / total * 100}%"></i><i class="c-draft" style="width:${draft / total * 100}%"></i><i class="c-done" style="width:${s.done / total * 100}%"></i></div><div class="stats" style="margin-top:8px"><span class="late"><b>${late}</b> late drafts</span><span><b>${wait}</b> waiting approval</span><span><b>${s.done}</b> approved</span></div></div>`;
+      next = wait ? `${wait} waiting for approval` : 'Nothing waiting';
+    }
+    return `<button type="button" class="door" data-go="${k}">
+      <div class="door-top"><div><h2>${K.label}</h2><p class="what">${K.what}</p></div><span class="door-icon">${icon(K.icon, 20)}</span></div>
+      <div class="big"><b class="num">${s.needs}</b><span>wait on you</span></div>
+      <div class="stats"><span class="late"><b class="num">${s.late}</b> late</span><span><b class="num">${s.open}</b> open</span><span><b class="num">${s.done}</b> done</span></div>
+      ${viz}
+      <div class="go"><span>${next}</span><span class="arrow">${icon('arrow', 16, 'flip')}</span></div>
+    </button>`;
+  }
+
+  /* ---------- kind page ---------- */
+  function kindView(k) {
+    const r = role(), single = r.kinds.length === 1;
+    const tabs = ['mine', ...r.kinds];
+    const count = k === 'mine' ? myTodos().length : stats(k).open;
+    const switcher = single ? '' : `<nav class="switcher" aria-label="Report kinds">${tabs.map(t => `<button type="button" data-go="${t}" ${t === k ? 'aria-current="page"' : ''}>${KINDS[t].short || KINDS[t].label}<span class="n num">${t === 'mine' ? myTodos().length : stats(t).needs}</span></button>`).join('')}</nav>`;
+    const body = { mine: mineBody, monthly: monthlyBody, donor: donorBody, indicator: indicatorBody }[k]();
+    return `<div>
+      ${single ? '' : `<button type="button" class="back" data-go="doors">${icon('back', 16, 'flip')} All report kinds</button>`}
+      <div class="crumb">Reports › ${KINDS[k].label}</div>
+      <div class="kind-head">
+        <div class="title-row"><h1>${KINDS[k].label}</h1><span class="count num">${count}</span></div>
+        ${switcher}
+      </div>
+      ${single ? `<div class="banner">${icon('check', 16)} You only prepare monthly reports, so the tracker opens them directly.</div>` : ''}
+      ${body}
+      ${notes()}
+    </div>`;
+  }
+
+  function chipsBar(k, defs, tools = '') {
+    const sel = state.chip[k] ?? defs[0].id;
+    return `<div class="toolbar"><div class="chips" role="group" aria-label="Show">${defs.map(d => `<button type="button" class="chip" data-chip="${k}:${d.id}" aria-pressed="${d.id === sel}">${d.dot ? `<span class="dot c-${d.dot}"></span>` : ''}${d.label}<span class="n num">${d.n}</span></button>`).join('')}</div>
+      <div class="tools"><label class="search">${icon('search', 15)}<input id="q-${k}" placeholder="Search place, donor, project" value="${esc(state.search)}" aria-label="Search"></label>${tools}</div></div>`;
+  }
+  const matches = (...t) => !state.search || t.join(' ').toLowerCase().includes(state.search.toLowerCase());
+
+  function monthlyBody() {
+    const s = stats('monthly'), ps = visiblePlaces();
+    const sel = state.chip.monthly ?? 'open';
+    const show = c => sel === 'open' ? c.s !== 'done' : sel === 'needs' ? monthlyNeedsMe(c) : sel === 'all' ? true : c.s === sel;
+    const oct = s.cells.filter(c => c.month === '2026-10'), octIn = oct.filter(c => c.s === 'done' || c.s === 'wait').length;
+    const defs = [
+      { id: 'open', label: 'Open', n: s.open },
+      { id: 'needs', label: 'Needs me', n: s.needs },
+      { id: 'late', label: 'Late', n: s.late, dot: 'late' },
+      { id: 'wait', label: 'To validate', n: s.wait, dot: 'wait' },
+      { id: 'done', label: 'Validated', n: s.done, dot: 'done' },
+    ];
+    const rows = ps.filter(p => matches(p.place, p.props)).map(p => {
+      const cells = [...p.cells].map((c, i) => ({ p, month: MONTHS[i], s: CELL[c] }));
+      const lateN = cells.filter(c => c.s === 'late').length;
+      return `<tr><td class="place"><b>${esc(p.place)}</b><span title="${esc(p.props)}">${esc(p.props)}</span>${lateN > 1 ? `<span class="behind">${lateN} months behind</span>` : ''}</td>
+        ${cells.map((c, i) => `<td class="${i === 5 ? 'col-now' : ''}">${cellHtml(c, show(c))}</td>`).join('')}
+        <td class="owner"><span class="who"><span class="avatar">${initials(p.owner)}</span>${esc(p.owner)}</span></td></tr>`;
+    }).join('');
+    return `<div class="summary">
+        <div class="sum"><small>October · due 6 Nov</small><b class="num">${octIn} of ${oct.length}</b><span>places submitted</span><div class="progress"><i style="width:${octIn / oct.length * 100}%"></i></div></div>
+        <div class="sum alert"><small>Late</small><b class="num">${s.late}</b><span>months not submitted after the due date</span></div>
+        <div class="sum"><small>To validate</small><b class="num">${s.wait}</b><span>submitted, waiting for MEAL</span></div>
+        <div class="sum"><small>November · open</small><b class="num">${s.cells.filter(c => c.month === '2026-11').length}</b><span>drafts, due 7 Dec</span></div>
+      </div>
+      ${chipsBar('monthly', defs, '<button class="select" type="button">All programs ▾</button><button class="select" type="button">Jun – Nov 2026 ▾</button>')}
+      <div class="panel"><div class="panel-scroll"><table class="grid">
+        <thead><tr><th class="place">Place · project</th>${MONTHS.map((m, i) => `<th class="${i === 5 ? 'now' : ''}">${monthName(m)}<span class="due">due ${fmt(dueOf(m))}</span></th>`).join('')}<th style="text-align:end">Prepared by</th></tr></thead>
+        <tbody>${rows || `<tr><td colspan="8"><div class="empty"><b>No place matches</b>Change the search and try again.</div></td></tr>`}</tbody>
+      </table></div>
+      <div class="legend"><span><i class="cell late">Late</i> not submitted after the due date</span><span><i class="cell wait">To validate</i> submitted, MEAL checks it</span><span><i class="cell draft">Draft</i> open, not due yet</span><span><i class="cell done">✓ Validated</i> finished</span><span><i class="cell none">—</i> no report that month</span></div></div>`;
+  }
+  function cellHtml(c, on) {
+    if (c.s === 'none') return `<span class="cell none" aria-label="No report">—</span>`;
+    const lbl = { late: ago(dueOf(c.month)).replace(' late', ''), wait: 'To validate', draft: 'Draft', done: '✓' }[c.s];
+    const text = c.s === 'late' ? 'Late · ' + lbl : lbl;
+    return `<button type="button" class="cell ${c.s} ${on ? '' : 'dim'}" data-open="${esc(c.p.place)} — ${monthName(c.month, true)}" aria-label="${esc(c.p.place)}, ${monthName(c.month, true)}: ${text}">${text}</button>`;
+  }
+
+  function donorBody() {
+    const open = donors.filter(d => d.state !== 'submitted' && matches(d.donor, d.title, d.prop));
+    const sel = state.chip.donor ?? 'all';
+    const filtered = (list) => sel === 'needs' ? list.filter(donorNeedsMe) : list;
+    const lanes = [
+      { id: 'overdue', label: 'Overdue', alert: true, items: open.filter(d => d.state === 'overdue') },
+      { id: 'soon', label: 'Due in 30 days', items: open.filter(d => d.state === 'due' && days(new Date(d.due)) <= 30) },
+      { id: 'later', label: 'Later', items: open.filter(d => d.state === 'due' && days(new Date(d.due)) > 30) },
+      { id: 'sent', label: 'Submitted', items: donors.filter(d => d.state === 'submitted' && matches(d.donor, d.title, d.prop)) },
+    ];
+    const s = stats('donor');
+    const defs = [{ id: 'all', label: 'Everyone’s', n: s.open }, { id: 'needs', label: 'Mine to send', n: s.needs }];
+    return `<div class="summary">
+        <div class="sum alert"><small>Overdue</small><b class="num">${s.late}</b><span>past the donor’s due date</span></div>
+        <div class="sum"><small>Due in 30 days</small><b class="num">${lanes[1].items.length}</b><span>next: ${esc(lanes[1].items[0]?.donor || '—')} · ${lanes[1].items[0] ? inDays(new Date(lanes[1].items[0].due)) : ''}</span></div>
+        <div class="sum"><small>Submitted this year</small><b class="num">${s.done}</b><span>sent to donors</span></div>
+      </div>
+      ${chipsBar('donor', defs, '<button class="select" type="button">All donors ▾</button>')}
+      <div class="lanes">${lanes.map(l => { const items = l.id === 'sent' ? l.items : filtered(l.items); return `<section class="lane"><div class="lane-h ${l.alert ? 'alert' : ''}"><span>${l.label}</span><span class="num">${items.length}</span></div><div class="lane-body">${items.map(dcard).join('') || '<div class="lane-empty">Nothing here</div>'}</div></section>`; }).join('')}</div>`;
+  }
+  function dcard(d) {
+    const due = new Date(d.due), late = d.state === 'overdue', sent = d.state === 'submitted';
+    return `<button type="button" class="dcard ${late ? 'late' : ''}" data-open="${esc(d.title)} · ${esc(d.donor)}">
+      <div class="donor"><span>${esc(d.donor)}</span>${late ? '<span class="pill late">Overdue</span>' : sent ? '<span class="pill done">✓ Sent</span>' : ''}</div>
+      <h3>${esc(d.title)}</h3><div class="prop">${esc(d.prop)}</div>
+      <div class="foot"><span class="who"><span class="avatar">${initials(d.owner)}</span>${esc(d.owner)}</span><span class="countdown ${late ? 'late' : ''}">${sent ? 'sent ' + fmt(due) : (late ? ago(due) : fmt(due) + ' · ' + inDays(due))}</span></div>
+    </button>`;
+  }
+
+  function indicatorBody() {
+    const s = stats('indicator');
+    const sel = state.chip.indicator ?? 'open';
+    const list = indicators.filter(i => matches(i.name, i.where, i.author));
+    const groups = [
+      { id: 'late', label: 'Late drafts', why: 'planned date passed, not sent for approval', alert: true, items: list.filter(indLate) },
+      { id: 'wait', label: 'Waiting for approval', why: 'MEAL approves, then it counts toward the target', items: list.filter(i => i.status === 'reviewed') },
+      { id: 'draft', label: 'Drafts', why: 'still being written', items: list.filter(i => i.status === 'draft' && !indLate(i)) },
+      { id: 'done', label: 'Approved', why: 'counted toward the target', items: list.filter(i => i.status === 'approved') },
+    ];
+    const pick = sel === 'open' ? groups.slice(0, 3) : sel === 'needs' ? [{ id: 'needs', label: 'Needs me', why: role().approves ? 'to approve, or your own drafts' : 'your own drafts', items: list.filter(indNeedsMe) }] : groups.filter(g => g.id === sel);
+    const defs = [
+      { id: 'open', label: 'Open', n: s.open },
+      { id: 'needs', label: 'Needs me', n: s.needs },
+      { id: 'late', label: 'Late', n: s.late, dot: 'late' },
+      { id: 'wait', label: 'Waiting approval', n: s.wait, dot: 'wait' },
+      { id: 'done', label: 'Approved', n: s.done, dot: 'done' },
+    ];
+    return `<div class="summary">
+        <div class="sum alert"><small>Late drafts</small><b class="num">${s.late}</b><span>oldest from ${fmt(new Date(indicators.filter(indLate).sort((a, b) => new Date(a.date) - new Date(b.date))[0].date))}</span></div>
+        <div class="sum"><small>Waiting for approval</small><b class="num">${s.wait}</b><span>not yet counted in targets</span></div>
+        <div class="sum"><small>Approved</small><b class="num">${s.done}</b><span>counted toward targets</span></div>
+      </div>
+      ${chipsBar('indicator', defs, '<button class="select" type="button">All projects ▾</button>')}
+      <div class="panel">${pick.map(g => `<div class="group-h ${g.alert ? 'alert' : ''}"><span>${g.label} · ${g.items.length}</span><span class="why">${g.why}</span></div>${g.items.map(indRow).join('') || '<div class="empty"><b>Nothing here</b>No report in this state.</div>'}`).join('')}</div>`;
+  }
+  function indRow(i) {
+    const late = indLate(i), d = new Date(i.date);
+    const pill = late ? '<span class="pill late">Late draft</span>' : i.status === 'reviewed' ? '<span class="pill wait">Waiting approval</span>' : i.status === 'draft' ? '<span class="pill draft">Draft</span>' : '<span class="pill done">✓ Approved</span>';
+    const pend = i.status !== 'approved' ? Math.min(100 - i.approved, Math.round(i.value / i.target * 100)) : 0;
+    const cta = (role().approves && i.status === 'reviewed') ? '<button type="button" class="act primary" data-open="' + esc(i.name) + '">Approve</button>' : (role().prepares && i.mine && i.status === 'draft') ? '<button type="button" class="act primary" data-open="' + esc(i.name) + '">Finish draft</button>' : '<button type="button" class="act" data-open="' + esc(i.name) + '">Open</button>';
+    return `<div class="row"><div class="main"><b>${esc(i.name)}</b><span>${esc(i.where)} · by ${esc(i.author)}</span></div>
+      <div class="target target-col"><small><b class="num" style="color:var(--ink)">${i.value.toLocaleString('en')}</b> this report · target <span class="num">${i.target.toLocaleString('en')}</span> · <b class="num">${i.approved}%</b> approved so far</small><div class="bar"><i style="width:${i.approved}%"></i><i class="pend" style="inset-inline-start:${i.approved}%;width:${pend}%"></i></div></div>
+      <div class="when ${late ? 'late' : ''}">${fmt(d)}<small>${late ? ago(d) : i.status === 'approved' ? 'planned date' : inDays(d)}</small></div>
+      <div>${pill}</div><div>${cta}</div></div>`;
+  }
+
+  function mineBody() {
+    const todos = myTodos().filter(t => matches(t.title, t.sub));
+    const groups = [
+      { id: 'fill', label: 'To fill in', why: 'reports you prepare', items: todos.filter(t => t.group === 'fill') },
+      { id: 'check', label: 'To check', why: role().validates ? 'validate monthly reports, approve indicator updates' : 'reports waiting on your decision', items: todos.filter(t => t.group === 'check') },
+      { id: 'send', label: 'To send to a donor', why: 'donor reports you are responsible for', items: todos.filter(t => t.group === 'send') },
+    ].filter(g => g.items.length);
+    const late = todos.filter(t => t.late).length;
+    return `<div class="summary">
+        <div class="sum alert"><small>Late</small><b class="num">${late}</b><span>past their due date</span></div>
+        <div class="sum"><small>Due this week</small><b class="num">${todos.filter(t => !t.late && days(t.due) <= 7).length}</b><span>until ${fmt(new Date(TODAY.getTime() + 7 * 864e5))}</span></div>
+        <div class="sum"><small>All to do</small><b class="num">${todos.length}</b><span>across ${new Set(todos.map(t => t.kind)).size} kinds of report</span></div>
+      </div>
+      <div class="toolbar"><div class="chips"><span class="chip" aria-pressed="true">Oldest first</span></div><div class="tools"><label class="search">${icon('search', 15)}<input id="q-mine" placeholder="Search" value="${esc(state.search)}" aria-label="Search"></label></div></div>
+      <div class="panel">${groups.map(g => `<div class="group-h"><span>${g.label} · ${g.items.length}</span><span class="why">${g.why}</span></div>${g.items.map(t => `<div class="row"><div class="main"><b>${esc(t.title)}</b><span>${esc(t.sub)}</span></div><div class="meta"><span class="kind-tag">${KINDS[t.kind].label}</span></div><div class="when ${t.late ? 'late' : ''}">${fmt(t.due)}<small>${t.late ? ago(t.due) : inDays(t.due)}</small></div><div>${t.late ? '<span class="pill late">Late</span>' : '<span class="pill draft">Open</span>'}</div><div><button type="button" class="act primary" data-open="${esc(t.title)}">${t.cta}</button></div></div>`).join('')}`).join('') || '<div class="empty"><b>You are all caught up</b>Nothing waits on you right now.</div>'}</div>`;
+  }
+
+  function notes() {
+    return `<aside class="notes"><h2>How this prototype maps to the real page</h2><ul>
+      <li>Doors and tabs only show kinds the role can open (same policies as today: monthly by preparer/validator, donor reports by funding view or being responsible).</li>
+      <li>Hand-recorded indicator reports are left out: every target is already reported through monthly reports.</li>
+      <li>One kind only → no door screen, the page opens straight on it. The last kind you chose is remembered; “All report kinds” brings the doors back.</li>
+      <li>Every cell, card and row opens the report’s own full page. No money is shown anywhere.</li>
+      <li>Sample figures and invented names; switch “Preview as” above to see each role.</li>
+    </ul></aside>`;
+  }
+
+  /* ---------- events ---------- */
+  const toast = document.getElementById('toast');
+  let toastT;
+  function say(msg) { toast.textContent = msg; toast.hidden = false; clearTimeout(toastT); toastT = setTimeout(() => { toast.hidden = true; }, 2200); }
+
+  app.addEventListener('click', e => {
+    const g = e.target.closest('[data-go]');
+    if (g) { state.search = ''; go(g.dataset.go); window.scrollTo({ top: 0 }); return; }
+    const c = e.target.closest('[data-chip]');
+    if (c) { const [k, id] = c.dataset.chip.split(':'); state.chip[k] = id; render(); return; }
+    const o = e.target.closest('[data-open]');
+    if (o) say('Opens “' + o.dataset.open + '” as its own page');
+  });
+  app.addEventListener('input', e => {
+    if (!e.target.id?.startsWith('q-')) return;
+    state.search = e.target.value;
+    const id = e.target.id, pos = e.target.selectionStart;
+    render();
+    const el = document.getElementById(id); if (el) { el.focus(); el.setSelectionRange(pos, pos); }
+  });
+  document.getElementById('roleSeg').addEventListener('click', e => {
+    const b = e.target.closest('[data-role]'); if (!b) return;
+    state.role = b.dataset.role; state.chip = {}; store.set('rt-role', state.role);
+    if (!['choose', 'mine', ...role().kinds].includes(location.hash.slice(1))) location.hash = '';
+    render();
+  });
+  document.getElementById('dirSeg').addEventListener('click', e => {
+    const b = e.target.closest('[data-dir]'); if (!b) return;
+    document.documentElement.dir = b.dataset.dir; render();
+  });
+  document.getElementById('resetVisit').addEventListener('click', () => {
+    store.set('rt-last', null); store.set('rt-seen', null); state.chip = {}; state.search = '';
+    if (location.hash) location.hash = ''; render();
+  });
+
+  render();
+})();
+</script>

@@ -18,7 +18,6 @@ enum ActiveReportType: string
 
     case Monthly = 'monthly';
     case Donor = 'donor';
-    case Report = 'report';
 
     /**
      * @return list<string>

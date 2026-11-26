@@ -109,7 +109,6 @@ return [
     'active_report_type' => [
         'monthly' => 'Monthly report',
         'donor' => 'Donor report',
-        'report' => 'Report',
     ],
     'donor_report_state' => [
         'due' => 'To submit',
