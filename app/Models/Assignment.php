@@ -319,7 +319,15 @@ class Assignment extends Model
         // keyed on those names.
         $module = $assignable->getMorphClass() === 'proposal_location' ? 'project' : $assignable->getMorphClass();
 
+        // An appointment sentence names the place the person is answerable
+        // for — «Program · City» — not the proposal. A proposal has many
+        // places, so naming it would send every person appointed under it the
+        // same sentence. `activityLabel()` is the proposal's name, which is
+        // right where a record is listed by name and wrong here.
+        $place = $assignable instanceof ProposalLocation ? ['label' => $assignable->label()] : [];
+
         $assignable->recordActivity($module.'.'.$suffix, properties: [
+            ...$place,
             ...($employee === null ? [] : ['employee' => $employee]),
             'assignment_id' => $this->id,
             'assigned_by' => $this->assigned_by,
