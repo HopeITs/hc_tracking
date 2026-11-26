@@ -10,7 +10,6 @@ use App\Enums\ProjectStatus;
 use App\Models\HrCenter;
 use App\Models\HrCity;
 use App\Models\HrEmployee;
-use App\Models\HrProgram;
 use App\Models\Program;
 use App\Models\Project;
 use App\Models\ProposalLocation;
@@ -390,7 +389,7 @@ trait ManagesProjectForm
     private function hrProgramName(int $programId): string
     {
         try {
-            $name = HrProgram::nameOf($programId);
+            $name = Program::nameOf($programId);
         } catch (QueryException) {
             $name = '';
         }

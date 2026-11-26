@@ -16,7 +16,6 @@ use App\Models\MonthlyReportAnswer;
 use App\Models\NarrativeQuestion;
 use App\Models\PlanIndicator;
 use App\Models\Program;
-use App\Models\ProgramRequest;
 use App\Models\Project;
 use App\Models\Proposal;
 use App\Models\ProposalLocation;
@@ -66,7 +65,6 @@ test('the seeders populate every table in the schema', function () {
         ProposalStatusNote::class,
         ProposalReviewer::class,
         ProposalLocation::class,
-        ProgramRequest::class,
         Account::class,
         TransfersTracking::class,
         MealCoverageAssignment::class,

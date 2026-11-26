@@ -55,6 +55,9 @@ new #[Layout('layouts::desk'), Title('titles.notification_rules')] class extends
 
     public int $stalledProposal = 30;
 
+    /** Days before an active proposal ends that Finance hears its agreement still has funds (D-60, W-33). */
+    public int $extensionLead = 60;
+
     public int $offTrackPace = 80;
 
     public string $dailyBriefTime = '07:30';
@@ -79,6 +82,7 @@ new #[Layout('layouts::desk'), Title('titles.notification_rules')] class extends
         'stalledReportDraft' => 'stalled_report_draft_days',
         'stalledReportReviewed' => 'stalled_report_reviewed_days',
         'stalledProposal' => 'stalled_proposal_days',
+        'extensionLead' => 'extension_lead_days',
         'offTrackPace' => 'off_track_pace_percent',
         'dailyBriefTime' => 'daily_brief_time',
         'weeklyDigestTime' => 'weekly_digest_time',
@@ -166,6 +170,7 @@ new #[Layout('layouts::desk'), Title('titles.notification_rules')] class extends
             'stalledReportDraft' => ['required', 'integer', 'between:1,365'],
             'stalledReportReviewed' => ['required', 'integer', 'between:1,365'],
             'stalledProposal' => ['required', 'integer', 'between:1,365'],
+            'extensionLead' => ['required', 'integer', 'between:1,365'],
             'offTrackPace' => ['required', 'integer', 'between:1,100'],
             'dailyBriefTime' => ['required', 'date_format:H:i'],
             'weeklyDigestTime' => ['required', 'date_format:H:i'],
@@ -473,6 +478,7 @@ new #[Layout('layouts::desk'), Title('titles.notification_rules')] class extends
                         @include('pages.admin._rules-row', ['property' => 'stalledReportDraft', 'label' => __('notifications.admin.stalled_report_draft')])
                         @include('pages.admin._rules-row', ['property' => 'stalledReportReviewed', 'label' => __('notifications.admin.stalled_report_reviewed')])
                         @include('pages.admin._rules-row', ['property' => 'stalledProposal', 'label' => __('notifications.admin.stalled_proposal')])
+                        @include('pages.admin._rules-row', ['property' => 'extensionLead', 'label' => __('notifications.admin.extension_lead'), 'hint' => __('notifications.admin.extension_lead_help')])
                     </div>
                 </section>
 

@@ -121,6 +121,7 @@ test('every proposal link opens the proposal page, with the tab and agreement de
     'bare' => [[], null],
     'a tab' => [['tab' => 'plan'], 'plan'],
     'the record-agreement link' => [['record_agreement' => '1'], null],
+    'the set-grant-dates link' => [['grant_dates' => '1'], null],
 ]);
 
 test('a reviewer opening a proposal lands on its own page, on the tab they ask for', function () {

@@ -145,7 +145,7 @@ trait FillsProposalCenters
 
         $locations = [];
 
-        foreach ($proposal->locations()->with(['centers', 'programRequest'])->get() as $row) {
+        foreach ($proposal->locations()->with('centers')->get() as $row) {
             $payload = $this->storedLocationPayload($row);
 
             if ($this->isFillableLocation($row) && isset($this->centerFill[$row->id])) {
@@ -185,7 +185,7 @@ trait FillsProposalCenters
     /**
      * The row as SaveProposal receives it, the same shape the form sends.
      *
-     * @return array{city_id: string, program_id: string|null, responsible_employee_id: string|null, center_ids: list<string>, city_wide: bool, is_new: bool, new_program_name_en: string, new_program_name_ar: string}
+     * @return array{city_id: string, program_id: string|null, responsible_employee_id: string|null, center_ids: list<string>, city_wide: bool, is_new: bool}
      */
     private function storedLocationPayload(ProposalLocation $row): array
     {
@@ -196,8 +196,6 @@ trait FillsProposalCenters
             'center_ids' => array_map('strval', $row->centerIds()),
             'city_wide' => (bool) $row->city_wide,
             'is_new' => (bool) $row->is_new,
-            'new_program_name_en' => $row->is_new ? ($row->programRequest->name_en ?? '') : '',
-            'new_program_name_ar' => $row->is_new ? ($row->programRequest->name_ar ?? '') : '',
         ];
     }
 }

@@ -54,7 +54,7 @@ function scopeIndicator(Project $project, Indicator $indicator): Indicator
 test('the targets tab lists the indicators of its proposals and of its program framework', function () {
     $otherProgramIndicator = Indicator::factory()->create([
         'result_id' => Result::factory()->create(['type' => ResultType::Output, 'program_id' => Program::factory()->create()->id])->id,
-        'name' => 'Seeds distributed',
+        'name_en' => 'Seeds distributed',
     ]);
     $elsewhere = Indicator::factory()->create([
         'result_id' => $this->programNode->id,

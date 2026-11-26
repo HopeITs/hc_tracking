@@ -9,7 +9,7 @@ use App\Models\Donor;
 use App\Models\HrCenter;
 use App\Models\HrCity;
 use App\Models\HrEmployee;
-use App\Models\HrProgram;
+use App\Models\Program;
 use App\Models\User;
 use App\Support\Reporting\PlaceBridge;
 use Carbon\CarbonImmutable;
@@ -216,7 +216,7 @@ final class ProposalChangeLines
     private static function programName(int $programId): string
     {
         try {
-            $name = HrProgram::nameOf($programId);
+            $name = Program::nameOf($programId);
         } catch (QueryException) {
             $name = '';
         }

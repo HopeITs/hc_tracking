@@ -52,16 +52,14 @@ test('a new proposal is created from location rows with their centers, without a
         ->set('locations.0.center_ids', [(string) $this->aleppoCenter, (string) $this->aleppoSecondCenter])
         ->call('addLocationRow')
         ->set('locations.1.city_id', (string) $this->homs)
-        ->set('locations.1.program_id', 'new')
-        ->set('locations.1.new_program_name_en', 'Youth Clubs')
-        ->set('locations.1.new_program_name_ar', 'نوادي الشباب')
+        ->assertDontSeeHtml('<option value="new">')
         ->set('locations.1.center_ids', [(string) $this->homsCenter])
         ->call('saveProposal')
         ->assertHasNoErrors()
         ->assertSet('showProposalModal', false);
 
     $proposal = Proposal::query()->sole();
-    $rows = $proposal->locations()->with(['centers', 'programRequest'])->get();
+    $rows = $proposal->locations()->with('centers')->get();
 
     expect($proposal->status)->toBe(ProposalStatus::ConceptNote)
         ->and(DB::table('project_proposal')->where('proposal_id', $proposal->id)->count())->toBe(0)
@@ -71,7 +69,7 @@ test('a new proposal is created from location rows with their centers, without a
         ->and($rows[0]->responsible_employee_id)->toBe($this->employee)
         ->and($rows[0]->centerIds())->toBe([$this->aleppoCenter, $this->aleppoSecondCenter])
         ->and($rows[1]->program_id)->toBeNull()
-        ->and($rows[1]->programRequest->name_ar)->toBe('نوادي الشباب')
+        ->and($rows[1]->is_new)->toBeFalse()
         ->and($rows[1]->centerIds())->toBe([$this->homsCenter]);
 });
 

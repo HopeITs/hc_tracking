@@ -21,7 +21,7 @@ function registerRow(string $city = 'Aleppo', string $program = 'Water'): Propos
 {
     $project = Project::factory()->create([
         'city_id' => insertHrCity($city, $city),
-        'program_id' => Program::factory()->create(['name' => $program])->id,
+        'program_id' => Program::factory()->create(['name_en' => $program])->id,
     ]);
 
     return ProposalLocation::factory()->forProject($project)->create();

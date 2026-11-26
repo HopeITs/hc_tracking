@@ -82,7 +82,7 @@
                     ...array_map(fn (array $row): string => 'beneficiaries.'.$row['id'], $projectRows),
                     ...collect(array_keys($locations))->flatMap(fn (int $index): array => array_map(
                         fn (string $field): string => "locations.{$index}.{$field}",
-                        ['city_id', 'program_id', 'responsible_employee_id', 'center_ids', 'city_wide', 'new_program_name_en', 'new_program_name_ar'],
+                        ['city_id', 'program_id', 'responsible_employee_id', 'center_ids', 'city_wide'],
                     ))->all(),
                 ],
                 __('proposals.concept_note.section') => ['conceptNote', 'conceptNoteFile'],
@@ -94,7 +94,7 @@
     ];
 
     /* The first location row that holds a failure, so the summary can name it. */
-    $firstFailingRow = collect(array_keys($locations))->first(fn (int $index): bool => collect(['city_id', 'program_id', 'responsible_employee_id', 'center_ids', 'city_wide', 'new_program_name_en', 'new_program_name_ar'])
+    $firstFailingRow = collect(array_keys($locations))->first(fn (int $index): bool => collect(['city_id', 'program_id', 'responsible_employee_id', 'center_ids', 'city_wide'])
         ->contains(fn (string $field): bool => $errors->has("locations.{$index}.{$field}")));
 
     $failingSections = array_keys(array_filter(
@@ -364,7 +364,6 @@
                             @php
                                 $isLinked = $location['project'] !== null;
                                 $cityCenters = $location['city_id'] === '' ? [] : ($centersByCity[(int) $location['city_id']] ?? []);
-                                $isNewProgram = $location['program_id'] === 'new';
                                 $isCityWide = $location['city_wide'];
                             @endphp
                             <li class="grid gap-x-4 gap-y-3 rounded-lg border border-secondary-soft p-3 @2xl/modal:grid-cols-2 dark:border-line" wire:key="proposal-location-{{ $location['key'] }}" data-proposal-location="{{ $index }}">
@@ -390,13 +389,7 @@
                                     @foreach ($programs as $program)
                                         <option value="{{ $program->id }}">{{ $program->name }}</option>
                                     @endforeach
-                                    <option value="new">{{ __('proposals.location_new_program') }}</option>
                                 </x-ui.form-select>
-
-                                @if ($isNewProgram)
-                                    <x-ui.form-input wire:model="locations.{{ $index }}.new_program_name_en" :label="__('proposals.location_program_name_en')" maxlength="255" required dir="ltr" />
-                                    <x-ui.form-input wire:model="locations.{{ $index }}.new_program_name_ar" :label="__('proposals.location_program_name_ar')" maxlength="255" required dir="rtl" />
-                                @endif
 
                                 <x-ui.form-select wire:model="locations.{{ $index }}.responsible_employee_id" :label="__('proposals.location_responsible')" :placeholder="__('proposals.location_select_responsible')" :help="__('proposals.location_responsible_help')" employees />
 

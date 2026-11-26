@@ -8,7 +8,6 @@ use App\Models\Indicator;
 use App\Models\LibraryIndicator;
 use App\Models\PlanIndicator;
 use App\Models\Program;
-use App\Models\ProgramRequest;
 use App\Models\Project;
 use App\Models\Proposal;
 use App\Models\ProposalLocation;
@@ -184,7 +183,6 @@ test('a row with no project yet takes a target with no project_id', function () 
 
 test('a row waiting for its program refuses a new value but lets a saved one be cleared (Y-10)', function () {
     $waiting = ProposalLocation::factory()->isNew()->create(['proposal_id' => $this->proposal->id, 'program_id' => null]);
-    ProgramRequest::factory()->create(['proposal_location_id' => $waiting->id]);
 
     expect(gridRefusal(fn () => saveGrid($this->proposal, [gridCell($this->indicator, $waiting, '10')])))
         ->toHaveKey('cells.0', [__('targets.cell_row_waiting_program')]);

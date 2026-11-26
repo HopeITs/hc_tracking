@@ -7,7 +7,6 @@ use App\Events\ProposalLocationsChanged;
 use App\Models\Activity;
 use App\Models\Donor;
 use App\Models\Program;
-use App\Models\ProgramRequest;
 use App\Models\Project;
 use App\Models\Proposal;
 use App\Models\ProposalLocation;
@@ -157,7 +156,6 @@ test('a proposal is created with its location rows and their centers', function 
         ->and((bool) $rows[1]['is_new'])->toBeFalse()
         ->and((int) $rows[1]['sort'])->toBe(1)
         ->and($rows[1]['center_ids'])->toBe([])
-        ->and(DB::table('program_requests')->count())->toBe(0)
         ->and($proposal->locations()->count())->toBe(2);
 });
 
@@ -249,64 +247,6 @@ test('a program must exist in tracking', function () {
     ]), $this->user));
 
     expect($errors['locations.0.program_id'])->toBe([__('proposals.location_choose_the_program')]);
-});
-
-test('a new row without a program must name the program in both languages', function () {
-    $errors = refusedLocations(fn () => app(SaveProposal::class)->handle(null, locationFormData([
-        aleppoRow(['program_id' => null]),
-        aleppoRow(['city_id' => $this->homs, 'center_ids' => [], 'program_id' => null, 'new_program_name_en' => 'Wells', 'new_program_name_ar' => '']),
-    ]), $this->user));
-
-    expect($errors['locations.0.new_program_name_en'])->toBe([__('proposals.location_program_name_required')])
-        ->and($errors['locations.1.new_program_name_ar'])->toBe([__('proposals.location_program_name_required')])
-        ->and($errors)->not->toHaveKey('locations.1.new_program_name_en');
-});
-
-// ── Program requests ────────────────────────────────────────────────────
-
-test('a new row without a program opens a pending program request on the proposal', function () {
-    $proposal = app(SaveProposal::class)->handle(null, locationFormData([
-        aleppoRow(['program_id' => null, 'new_program_name_en' => 'Wells', 'new_program_name_ar' => 'الآبار']),
-    ]), $this->user);
-
-    $row = storedRows($proposal)[0];
-    $request = DB::table('program_requests')->sole();
-
-    expect((int) $request->proposal_location_id)->toBe((int) $row['id'])
-        ->and($request->name_en)->toBe('Wells')
-        ->and($request->name_ar)->toBe('الآبار')
-        ->and($request->status)->toBe('pending')
-        ->and($request->hr_program_id)->toBeNull()
-        ->and((int) $request->requested_by)->toBe($this->user->id)
-        ->and($row['program_id'])->toBeNull()
-        ->and(Activity::query()->where('event', 'program_request.opened')->sole())
-        ->subject_type->toBe('proposal')
-        ->subject_id->toBe($proposal->id);
-});
-
-test('editing keeps a pending request on its row, renames it, and removes it with the row', function () {
-    $proposal = app(SaveProposal::class)->handle(null, locationFormData([
-        aleppoRow(['program_id' => null, 'new_program_name_en' => 'Wells', 'new_program_name_ar' => 'الآبار']),
-    ]), $this->user);
-    $requestId = (int) DB::table('program_requests')->value('id');
-
-    $proposal = app(SaveProposal::class)->handle($proposal, [
-        ...locationEditData($proposal),
-        'locations' => [aleppoRow(['program_id' => null, 'new_program_name_en' => 'Water Wells', 'new_program_name_ar' => 'آبار المياه'])],
-    ], $this->user);
-
-    expect(DB::table('program_requests')->sole())
-        ->id->toBe($requestId)
-        ->name_en->toBe('Water Wells')
-        ->status->toBe('pending');
-
-    app(SaveProposal::class)->handle($proposal, [
-        ...locationEditData($proposal),
-        'locations' => [['city_id' => $this->homs]],
-    ], $this->user);
-
-    expect(DB::table('program_requests')->count())->toBe(0)
-        ->and(storedRows($proposal))->toHaveCount(1);
 });
 
 // ── Edit: rows replaced as a set ────────────────────────────────────────
@@ -530,18 +470,13 @@ test('the backfill dry run is the default and writes nothing', function () {
 test('the location models read back through their relations and casts', function () {
     $location = ProposalLocation::factory()->create(['city_id' => $this->aleppo, 'program_id' => $this->program->id, 'is_new' => true]);
     $location->centers()->create(['center_id' => $this->aleppoCenter]);
-    $request = ProgramRequest::factory()->create(['proposal_location_id' => $location->id, 'requested_by' => $this->user->id]);
 
-    $location = $location->fresh(['centers', 'programRequest', 'proposal']);
+    $location = $location->fresh(['centers', 'proposal']);
 
     expect($location->is_new)->toBeTrue()
         ->and($location->centerIds())->toBe([$this->aleppoCenter])
-        ->and($location->programRequest?->id)->toBe($request->id)
-        ->and($location->programRequest?->status->value)->toBe('pending')
-        ->and($location->programRequest?->isPending())->toBeTrue()
         ->and($location->proposal)->toBeInstanceOf(Proposal::class)
-        ->and((new ProposalLocation)->getMorphClass())->toBe('proposal_location')
-        ->and((new ProgramRequest)->getMorphClass())->toBe('program_request');
+        ->and((new ProposalLocation)->getMorphClass())->toBe('proposal_location');
 });
 
 // ── Field work, no center (Y-01, D-88) ──────────────────────────────────

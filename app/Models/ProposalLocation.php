@@ -26,7 +26,6 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
-use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Database\Eloquent\Relations\MorphMany;
 use Illuminate\Database\Eloquent\Relations\MorphOne;
 use Illuminate\Support\Collection;
@@ -321,16 +320,6 @@ class ProposalLocation extends Model
     public function targets(): HasMany
     {
         return $this->hasMany(PlanIndicator::class, 'proposal_location_id');
-    }
-
-    /**
-     * The request opened when this row names a program HR does not have.
-     *
-     * @return HasOne<ProgramRequest, $this>
-     */
-    public function programRequest(): HasOne
-    {
-        return $this->hasOne(ProgramRequest::class);
     }
 
     /**

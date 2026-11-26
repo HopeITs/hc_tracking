@@ -6,7 +6,7 @@ use App\Models\User;
 use Livewire\Livewire;
 
 test('program cards print their labels instead of handing PHP to Alpine', function () {
-    $program = Program::factory()->create(['name' => 'Children University']);
+    $program = Program::factory()->create(['name_en' => 'Children University']);
 
     Livewire::actingAs(User::factory()->role('Super Admin')->create())
         ->test('pages::programs.index')
@@ -17,7 +17,7 @@ test('program cards print their labels instead of handing PHP to Alpine', functi
 
 test('the strategy page prints its menu and row labels instead of handing PHP to Alpine', function () {
     $strategy = Strategy::factory()->create();
-    $program = Program::factory()->create(['name' => 'Children University', 'strategy_id' => $strategy->id]);
+    $program = Program::factory()->create(['name_en' => 'Children University', 'strategy_id' => $strategy->id]);
 
     Livewire::actingAs(User::factory()->role('Super Admin')->create())
         ->test('pages::strategies.show', ['strategy' => $strategy])

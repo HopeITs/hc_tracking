@@ -74,7 +74,7 @@ class ActivityPlan extends Model
     {
         $proposal = (string) Proposal::query()->whereKey($this->proposal_id)->value('slug');
 
-        return $proposal.'-'.HrProgram::slugOf($this->program_id);
+        return $proposal.'-'.Program::slugOf($this->program_id);
     }
 
     /**

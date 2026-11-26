@@ -6,8 +6,6 @@ use App\Models\Program;
 use App\Models\Strategy;
 use Database\Factories\Concerns\CreatesHrRecords;
 use Illuminate\Database\Eloquent\Factories\Factory;
-use Illuminate\Support\Arr;
-use Illuminate\Support\Facades\DB;
 
 /**
  * @extends Factory<Program>
@@ -19,41 +17,26 @@ class ProgramFactory extends Factory
     /**
      * Define the model's default state.
      *
-     * A program is the tracking side of an HR program under the same id, so
-     * the factory writes the HR row first. `name` is not a tracking column: it
-     * only names that HR row (see newModel()). That only works against the test
-     * suite's in-memory HR database: the real `hr` connection is READ ONLY and
-     * rejects the insert, which is why seeders use real HR programs through
-     * Program::syncFromHr().
+     * Programs are tracking-owned since W-34b (D-68), so the factory writes
+     * the row here and nothing is inserted into the HR database — the old
+     * "create the HR program first, then the tracking row under its id" dance
+     * is gone. `name_ar` is left null, as it is on everything the one-time
+     * import brought over from HR, which had a single name.
      *
      * @return array<string, mixed>
      */
     public function definition(): array
     {
         return [
-            'name' => fake()->randomElement(['WASH', 'Shelter', 'Protection', 'Livelihoods', 'Health']),
-            'id' => fn (array $attributes): int => DB::connection('hr')->table('programs')->insertGetId([
-                'name' => $attributes['name'],
-                'code' => fake()->bothify('??####'),
-                'slug' => fake()->unique()->slug(),
-            ]),
+            'name_en' => fake()->randomElement(['WASH', 'Shelter', 'Protection', 'Livelihoods', 'Health']),
+            'code' => fake()->bothify('??####'),
             'strategy_id' => Strategy::factory(),
             'manager_id' => fn (): int => $this->createHrEmployee(),
         ];
     }
 
     /**
-     * Build the program without `name`, which lives in HR only.
-     *
-     * @param  array<string, mixed>  $attributes
-     */
-    public function newModel(array $attributes = []): Program
-    {
-        return parent::newModel(Arr::except($attributes, 'name'));
-    }
-
-    /**
-     * Indicate a program mirrored from HR that nobody has linked yet.
+     * Indicate a program nobody has linked to a strategy or a manager yet.
      */
     public function unassigned(): static
     {
@@ -61,5 +44,13 @@ class ProgramFactory extends Factory
             'strategy_id' => null,
             'manager_id' => null,
         ]);
+    }
+
+    /**
+     * Indicate a program that is no longer in use.
+     */
+    public function inactive(): static
+    {
+        return $this->state(['is_active' => false]);
     }
 }

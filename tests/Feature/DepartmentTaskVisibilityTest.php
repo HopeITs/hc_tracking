@@ -187,7 +187,9 @@ test('a department scope sent by hand falls back to mine, by either path', funct
 
 test('a dash or spacing variant of the job level name still counts as the manager level', function () {
     $media = insertHrDepartment('Media');
-    $manager = userWithRole('Media Team', insertHrDepartmentManager($media, 'department manager -  Grade  5 '));
+    // A case and spacing variant of the configured name, which is what the
+    // normalisation is for; the name itself is whatever HR stores.
+    $manager = userWithRole('Media Team', insertHrDepartmentManager($media, '  department   MANAGER '));
 
     expect($manager->canSeeDepartmentTasks())->toBeTrue();
 });

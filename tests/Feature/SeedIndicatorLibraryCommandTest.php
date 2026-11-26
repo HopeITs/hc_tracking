@@ -14,12 +14,9 @@ use Illuminate\Support\Facades\DB;
 /**
  * A tracking program whose HR row carries the given code, and its id.
  */
-function programWithHrCode(string $code): int
+function programWithCode(string $code): int
 {
-    $programId = Program::factory()->create()->id;
-    DB::connection('hr')->table('programs')->where('id', $programId)->update(['code' => $code]);
-
-    return $programId;
+    return Program::factory()->create(['code' => $code])->id;
 }
 
 /**
@@ -39,7 +36,7 @@ function linkedCode(int $indicatorId): ?string
 }
 
 test('every unlinked indicator is linked to a legacy entry and given its code', function () {
-    $outputId = outputUnderOutcome(programWithHrCode('002'));
+    $outputId = outputUnderOutcome(programWithCode('002'));
     $indicatorId = insertIndicator($outputId, 'Number of people reached');
 
     $this->artisan('meal:seed-indicator-library')->assertSuccessful();
@@ -56,7 +53,7 @@ test('every unlinked indicator is linked to a legacy entry and given its code', 
 });
 
 test('an indicator already in the library is left alone', function () {
-    $outputId = outputUnderOutcome(programWithHrCode('002'));
+    $outputId = outputUnderOutcome(programWithCode('002'));
     $entry = LibraryIndicator::factory()->create();
     $indicatorId = Indicator::factory()->create(['result_id' => $outputId, 'library_indicator_id' => $entry->id, 'code' => $entry->code])->id;
 
@@ -67,7 +64,7 @@ test('an indicator already in the library is left alone', function () {
 });
 
 test('the level comes from the node type and its place in the program framework', function () {
-    $programId = programWithHrCode('002');
+    $programId = programWithCode('002');
     $impactId = insertResult(null, $programId, ResultType::Impact);
     $firstOutcomeId = insertResult(null, $programId);
     $secondOutcomeId = insertResult(null, $programId);
@@ -95,7 +92,7 @@ test('the level comes from the node type and its place in the program framework'
 });
 
 test('an activity takes its output number and a cross-cutting result is CC', function () {
-    $programId = programWithHrCode('002');
+    $programId = programWithCode('002');
     $outcomeId = insertResult(null, $programId);
     insertResult($outcomeId, $programId, ResultType::Output);
     $secondOutputId = insertResult($outcomeId, $programId, ResultType::Output);
@@ -115,7 +112,7 @@ test('an activity takes its output number and a cross-cutting result is CC', fun
 });
 
 test('names that differ only in case, spacing or tashkeel share one entry', function () {
-    $programId = programWithHrCode('002');
+    $programId = programWithCode('002');
     $outcomeId = insertResult(null, $programId);
     // indicators_result_id_name_unique already folds these variants, so each sits on its own output.
     $ids = array_map(
@@ -130,9 +127,9 @@ test('names that differ only in case, spacing or tashkeel share one entry', func
 });
 
 test('one name used with two measures becomes two entries and a conflict line', function () {
-    $outputId = outputUnderOutcome(programWithHrCode('002'));
+    $outputId = outputUnderOutcome(programWithCode('002'));
     insertIndicator($outputId, 'Families reached');
-    Indicator::factory()->create(['result_id' => outputUnderOutcome(programWithHrCode('005')), 'name' => 'Families reached', 'measure' => IndicatorMeasure::Percentage]);
+    Indicator::factory()->create(['result_id' => outputUnderOutcome(programWithCode('005')), 'name' => 'Families reached', 'measure' => IndicatorMeasure::Percentage]);
 
     $this->artisan('meal:seed-indicator-library')
         ->expectsOutputToContain('Conflict: "Families reached" is used with more than one measure (numeric, percentage)')
@@ -142,8 +139,8 @@ test('one name used with two measures becomes two entries and a conflict line', 
 });
 
 test('an entry used in several programs, or in none, is institutional', function () {
-    insertIndicator(outputUnderOutcome(programWithHrCode('002')), 'Number of people reached');
-    insertIndicator(outputUnderOutcome(programWithHrCode('005')), 'Number of people reached');
+    insertIndicator(outputUnderOutcome(programWithCode('002')), 'Number of people reached');
+    insertIndicator(outputUnderOutcome(programWithCode('005')), 'Number of people reached');
     $withoutProgramId = insertIndicator(outputUnderOutcome(null), 'Number of sessions held');
 
     $this->artisan('meal:seed-indicator-library')->assertSuccessful();
@@ -153,7 +150,7 @@ test('an entry used in several programs, or in none, is institutional', function
 });
 
 test('a name is stored in the column of its script and English-only names are listed for review', function () {
-    $outputId = outputUnderOutcome(programWithHrCode('002'));
+    $outputId = outputUnderOutcome(programWithCode('002'));
     insertIndicator($outputId, 'عدد الأسر المستفيدة');
     insertIndicator($outputId, 'Number of people reached');
 
@@ -167,7 +164,7 @@ test('a name is stored in the column of its script and English-only names are li
 });
 
 test('a percentage entry has no unit and a fixed denominator', function () {
-    Indicator::factory()->create(['result_id' => outputUnderOutcome(programWithHrCode('002')), 'name' => 'Share of families reached', 'measure' => IndicatorMeasure::Percentage, 'unit' => '%']);
+    Indicator::factory()->create(['result_id' => outputUnderOutcome(programWithCode('002')), 'name' => 'Share of families reached', 'measure' => IndicatorMeasure::Percentage, 'unit' => '%']);
 
     $this->artisan('meal:seed-indicator-library')->assertSuccessful();
 
@@ -177,7 +174,7 @@ test('a percentage entry has no unit and a fixed denominator', function () {
 });
 
 test('a second run creates nothing', function () {
-    insertIndicator(outputUnderOutcome(programWithHrCode('002')), 'Number of people reached');
+    insertIndicator(outputUnderOutcome(programWithCode('002')), 'Number of people reached');
     $this->artisan('meal:seed-indicator-library')->assertSuccessful();
 
     $this->artisan('meal:seed-indicator-library')
@@ -188,7 +185,7 @@ test('a second run creates nothing', function () {
 });
 
 test('a later indicator joins the legacy entry with its name, never an entry MEAL made', function () {
-    $programId = programWithHrCode('002');
+    $programId = programWithCode('002');
     $outcomeId = insertResult(null, $programId);
     insertIndicator(insertResult($outcomeId, $programId, ResultType::Output), 'Number of people reached');
     $this->artisan('meal:seed-indicator-library')->assertSuccessful();
@@ -219,42 +216,42 @@ test('a dry run prints the proposed codes and changes nothing', function () {
     $this->assertDatabaseHas('indicators', ['id' => $indicatorId, 'library_indicator_id' => null, 'code' => null]);
 });
 
-test('a program code HR gives to two programs stops the run, naming it', function (bool $dryRun) {
-    $programId = programWithHrCode('003');
-    programWithHrCode('003');
+test('a program code two programs share stops the run, naming it', function (bool $dryRun) {
+    $programId = programWithCode('003');
+    programWithCode('003');
     $indicatorId = insertIndicator(outputUnderOutcome($programId), 'Number of people reached');
     insertIndicator(outputUnderOutcome(null), 'Number of sessions held');
 
     $this->artisan('meal:seed-indicator-library', ['--dry-run' => $dryRun])
         ->expectsOutputToContain('HC.OP1.1.1')
-        ->expectsOutputToContain('HR program code 003 is used by more than one program')
+        ->expectsOutputToContain('Program code 003 is used by more than one program')
         ->assertFailed();
 
     expect(LibraryIndicator::query()->count())->toBe(0);
     $this->assertDatabaseHas('indicators', ['id' => $indicatorId, 'library_indicator_id' => null]);
 })->with(['run' => false, 'dry run' => true]);
 
-test('a program with no code in HR stops the run, naming it', function () {
-    $programId = programWithHrCode('');
+test('a program with no code stops the run, naming it', function () {
+    $programId = programWithCode('');
     $indicatorId = insertIndicator(outputUnderOutcome($programId), 'Number of people reached');
 
     $this->artisan('meal:seed-indicator-library')
-        ->expectsOutputToContain("Program {$programId} has no code in HR.")
+        ->expectsOutputToContain("Program {$programId} does not exist or has no code.")
         ->assertFailed();
 
     expect(LibraryIndicator::query()->count())->toBe(0);
     $this->assertDatabaseHas('indicators', ['id' => $indicatorId, 'library_indicator_id' => null]);
 });
 
-test('a program code HR duplicates after the check is refused and nothing is written', function () {
-    $programId = programWithHrCode('002');
+test('a program code duplicated after the check is refused and nothing is written', function () {
+    $programId = programWithCode('002');
     $indicatorId = insertIndicator(outputUnderOutcome($programId), 'Number of people reached');
     $duplicated = false;
-    // The first HR read is the code check; HR gives the code to a second program right after it.
+    // A second program takes the same code right after the command's own check read it.
     DB::listen(function (QueryExecuted $query) use (&$duplicated): void {
-        if (! $duplicated && $query->connectionName === 'hr') {
+        if (! $duplicated && str_contains($query->sql, 'from `programs`')) {
             $duplicated = true;
-            insertHrProgram(code: '002');
+            Program::factory()->create(['code' => '002']);
         }
     });
 
@@ -267,8 +264,8 @@ test('a program code HR duplicates after the check is refused and nothing is wri
 });
 
 test('a parent in another program counts as no parent', function () {
-    $otherOutcomeId = insertResult(null, programWithHrCode('002'));
-    $programId = programWithHrCode('005');
+    $otherOutcomeId = insertResult(null, programWithCode('002'));
+    $programId = programWithCode('005');
     insertResult(null, $programId);
     $indicatorId = insertIndicator(insertResult($otherOutcomeId, $programId, ResultType::Output), 'Number of people reached');
 
@@ -289,7 +286,7 @@ test('more indicators than one write chunk holds are all linked', function () {
 });
 
 test('a later indicator joins a deactivated legacy entry with a warning', function () {
-    $programId = programWithHrCode('002');
+    $programId = programWithCode('002');
     $outcomeId = insertResult(null, $programId);
     insertIndicator(insertResult($outcomeId, $programId, ResultType::Output), 'Number of people reached');
     $this->artisan('meal:seed-indicator-library')->assertSuccessful();
@@ -305,7 +302,7 @@ test('a later indicator joins a deactivated legacy entry with a warning', functi
 });
 
 test('results that are each other\'s parents stop the run, naming them', function () {
-    $programId = programWithHrCode('002');
+    $programId = programWithCode('002');
     $firstOutputId = insertResult(insertResult(null, $programId), $programId, ResultType::Output);
     $secondOutputId = insertResult($firstOutputId, $programId, ResultType::Output);
     DB::table('results')->where('id', $firstOutputId)->update(['parent_id' => $secondOutputId]);
@@ -320,7 +317,7 @@ test('results that are each other\'s parents stop the run, naming them', functio
 });
 
 test('seeding the library records no activity', function () {
-    insertIndicator(outputUnderOutcome(programWithHrCode('002')), 'Number of people reached');
+    insertIndicator(outputUnderOutcome(programWithCode('002')), 'Number of people reached');
     $activities = Activity::query()->count();
 
     $this->artisan('meal:seed-indicator-library')->assertSuccessful();

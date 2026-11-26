@@ -68,7 +68,7 @@ test('the strategy page is its own full page with a back link and a breadcrumb t
 test('strategy detail shows the strategy, its year and span, and its programs with their manager', function () {
     $manager = insertHrEmployee(firstNameEn: 'Layla', lastNameEn: 'Haddad');
     $strategy = Strategy::factory()->create(['name' => 'Country Strategy', 'start_year' => 2026, 'end_year' => 2030]);
-    Program::factory()->create(['name' => 'Water Security', 'strategy_id' => $strategy->id, 'manager_id' => $manager]);
+    Program::factory()->create(['name_en' => 'Water Security', 'strategy_id' => $strategy->id, 'manager_id' => $manager]);
 
     $this->actingAs(User::factory()->role('General Manager')->create())
         ->get(route('strategies.show', $strategy))
@@ -98,8 +98,8 @@ test('the status pill and the date span follow the strategy years', function (in
 test('strategy detail does not show another strategy programs', function () {
     $subject = Strategy::factory()->create(['name' => 'Country Strategy']);
     $other = Strategy::factory()->create(['name' => 'Regional Strategy']);
-    Program::factory()->create(['name' => 'Water Security', 'strategy_id' => $subject->id]);
-    Program::factory()->create(['name' => 'Safe Shelter', 'strategy_id' => $other->id]);
+    Program::factory()->create(['name_en' => 'Water Security', 'strategy_id' => $subject->id]);
+    Program::factory()->create(['name_en' => 'Safe Shelter', 'strategy_id' => $other->id]);
 
     $this->actingAs(User::factory()->role('General Manager')->create())
         ->get(route('strategies.show', $subject))
@@ -170,9 +170,9 @@ test('each program row says in words where the program stands', function () {
 
 test('the attention list names the programs falling behind and links to the targets off pace', function () {
     $strategy = Strategy::factory()->create(['start_year' => 2026, 'end_year' => 2030]);
-    $alpha = Program::factory()->create(['name' => 'Alpha Program', 'strategy_id' => $strategy->id]);
-    $beta = Program::factory()->create(['name' => 'Beta Program', 'strategy_id' => $strategy->id]);
-    $steady = Program::factory()->create(['name' => 'Steady Program', 'strategy_id' => $strategy->id]);
+    $alpha = Program::factory()->create(['name_en' => 'Alpha Program', 'strategy_id' => $strategy->id]);
+    $beta = Program::factory()->create(['name_en' => 'Beta Program', 'strategy_id' => $strategy->id]);
+    $steady = Program::factory()->create(['name_en' => 'Steady Program', 'strategy_id' => $strategy->id]);
     foreach ([$alpha, $beta, $steady] as $program) {
         strategyPagePlan($program, 2026);
     }
@@ -228,8 +228,8 @@ test('the key figures are big typographic numbers, not stat tiles', function () 
 test('program rows under a pillar are listed by name with their project count', function () {
     $strategy = Strategy::factory()->create();
     $pillar = StrategicPillar::factory()->for($strategy)->create();
-    $zebra = Program::factory()->create(['name' => 'Zebra Program', 'strategy_id' => $strategy->id, 'strategic_pillar_id' => $pillar->id]);
-    Program::factory()->create(['name' => 'Alpha Program', 'strategy_id' => $strategy->id, 'strategic_pillar_id' => $pillar->id]);
+    $zebra = Program::factory()->create(['name_en' => 'Zebra Program', 'strategy_id' => $strategy->id, 'strategic_pillar_id' => $pillar->id]);
+    Program::factory()->create(['name_en' => 'Alpha Program', 'strategy_id' => $strategy->id, 'strategic_pillar_id' => $pillar->id]);
     Project::factory()->count(3)->create(['program_id' => $zebra->id]);
 
     $response = $this->actingAs(User::factory()->role('General Manager')->create())
@@ -319,7 +319,7 @@ test('no notice and no group when every program sits under a pillar', function (
 test('a pillar shows its first three programs and folds the rest behind a labelled toggle', function () {
     $strategy = Strategy::factory()->create();
     $pillar = StrategicPillar::factory()->for($strategy)->create();
-    $programs = Program::factory()->count(5)->sequence(fn ($sequence) => ['name' => 'Program '.($sequence->index + 1)])->create(['strategy_id' => $strategy->id, 'strategic_pillar_id' => $pillar->id]);
+    $programs = Program::factory()->count(5)->sequence(fn ($sequence) => ['name_en' => 'Program '.($sequence->index + 1)])->create(['strategy_id' => $strategy->id, 'strategic_pillar_id' => $pillar->id]);
 
     $html = $this->actingAs(User::factory()->role('General Manager')->create())
         ->get(route('strategies.show', $strategy))

@@ -11,7 +11,7 @@ use Livewire\Livewire;
 
 beforeEach(function () {
     $this->seed(RolesAndPermissionsSeeder::class);
-    $this->program = Program::factory()->create(['name' => 'Water Security']);
+    $this->program = Program::factory()->create(['name_en' => 'Water Security']);
     Result::factory()->create(['program_id' => $this->program->id, 'type' => ResultType::Impact]);
 });
 

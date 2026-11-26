@@ -4,13 +4,10 @@ declare(strict_types=1);
 
 namespace App\Support;
 
-use App\Enums\ProgramRequestStatus;
 use App\Models\PlanIndicator;
-use App\Models\ProgramRequest;
 use App\Models\Project;
 use App\Models\Proposal;
 use App\Models\ProposalLocation;
-use App\Models\User;
 use App\Support\Locations\ProjectLocationMirror;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Validation\ValidationException;
@@ -20,9 +17,9 @@ use Illuminate\Validation\ValidationException;
  *
  * Every entry point expects the proposal row already locked by its caller
  * (SaveProposal, LinkProposalProject, UnlinkProposalProject, the backfill)
- * and runs inside that caller's transaction. It writes rows and centers,
- * keeps the program request of a "needs a program" row in step, and returns
- * the counts the caller records and dispatches; it records nothing itself.
+ * and runs inside that caller's transaction. It writes rows and centers and
+ * returns the counts the caller records and dispatches; it records nothing
+ * itself.
  *
  * A row is identified by its city and program: the unique index
  * `(proposal_id, city_id, program_id)` leaves "no program yet" rows alone,
@@ -43,7 +40,7 @@ final class ProposalLocationRows
      * complete when it names a program and a responsible, stands for a
      * project, runs from at least one center (a project cannot be created
      * without a placement, W-01) or is city-wide field work with no center
-     * (D-88), and has no program request still pending.
+     * (D-88).
      * A proposal without rows is complete: it approves as before W-34a.
      *
      * @return list<int>
@@ -53,11 +50,10 @@ final class ProposalLocationRows
         $ids = [];
 
         /** @var ProposalLocation $row */
-        foreach ($proposal->locations()->with(['centers', 'programRequest'])->orderBy('sort')->orderBy('id')->get() as $row) {
+        foreach ($proposal->locations()->with('centers')->orderBy('sort')->orderBy('id')->get() as $row) {
             $isComplete = $row->program_id !== null
                 && $row->responsible_employee_id !== null
-                && ($row->project_id !== null || $row->city_wide || $row->centers->isNotEmpty())
-                && ! ($row->programRequest?->isPending() ?? false);
+                && ($row->project_id !== null || $row->city_wide || $row->centers->isNotEmpty());
 
             if (! $isComplete) {
                 $ids[] = $row->id;
@@ -70,10 +66,10 @@ final class ProposalLocationRows
     /**
      * Replace the proposal's rows with the normalised set the form sent.
      *
-     * @param  list<array{city_id: int, program_id: int|null, responsible_employee_id: int|null, center_ids: list<int>, is_new: bool, city_wide?: bool, new_program_name_en: string, new_program_name_ar: string}>  $rows
+     * @param  list<array{city_id: int, program_id: int|null, responsible_employee_id: int|null, center_ids: list<int>, is_new: bool, city_wide?: bool}>  $rows
      * @return array{added: int, removed: int, changed: int}
      */
-    public function replace(Proposal $locked, array $rows, User $actor): array
+    public function replace(Proposal $locked, array $rows): array
     {
         $existing = $this->existingByKey($locked);
         $sentKeys = $this->keyed($rows);
@@ -95,9 +91,8 @@ final class ProposalLocationRows
 
             if ($row === null) {
                 $row = $this->insert($locked, $sent, $sort);
-                $this->syncRequest($row, $sent, $actor);
                 $counts['added']++;
-            } elseif ($this->update($row, $sent, $sort, $actor)) {
+            } elseif ($this->update($row, $sent, $sort)) {
                 $counts['changed']++;
             }
 
@@ -214,7 +209,6 @@ final class ProposalLocationRows
         ])->save();
         $this->writeCenters($row, array_values(array_unique([...$row->centerIds(), ...$centerIds])));
         PlanIndicator::syncPlaceFromRow($row);
-        $row->programRequest()->where('status', ProgramRequestStatus::Pending->value)->delete();
 
         // A row that has just taken a project needs the whole mirror, not
         // only the columns: its sectors, the owner's acknowledgement and the
@@ -252,7 +246,7 @@ final class ProposalLocationRows
     private function existingByKey(Proposal $locked): array
     {
         /** @var Collection<int, ProposalLocation> $rows */
-        $rows = $locked->locations()->with(['centers', 'programRequest'])->orderBy('sort')->orderBy('id')->get();
+        $rows = $locked->locations()->with('centers')->orderBy('sort')->orderBy('id')->get();
         $byKey = [];
 
         foreach ($rows as $row) {
@@ -306,9 +300,9 @@ final class ProposalLocationRows
      * Bring a kept row in line with what was sent. A row that carries a
      * project stays linked and never new. Sort changes do not count.
      *
-     * @param  array{program_id: int|null, responsible_employee_id: int|null, center_ids: list<int>, is_new: bool, city_wide?: bool, new_program_name_en: string, new_program_name_ar: string}  $sent
+     * @param  array{program_id: int|null, responsible_employee_id: int|null, center_ids: list<int>, is_new: bool, city_wide?: bool}  $sent
      */
-    private function update(ProposalLocation $row, array $sent, int $sort, User $actor): bool
+    private function update(ProposalLocation $row, array $sent, int $sort): bool
     {
         $changed = false;
         $isNew = $row->project_id === null && $sent['is_new'];
@@ -339,7 +333,7 @@ final class ProposalLocationRows
             PlanIndicator::syncPlaceFromRow($row);
         }
 
-        return $this->syncRequest($row, $sent, $actor) || $changed;
+        return $changed;
     }
 
     /**
@@ -371,49 +365,5 @@ final class ProposalLocationRows
         }
 
         $row->unsetRelation('centers');
-    }
-
-    /**
-     * Open, rename or drop the program request of a row: a new row without
-     * a program needs one; any other row has none pending. Returns whether
-     * anything changed.
-     *
-     * @param  array{program_id: int|null, is_new: bool, new_program_name_en: string, new_program_name_ar: string}  $sent
-     */
-    private function syncRequest(ProposalLocation $row, array $sent, User $actor): bool
-    {
-        $request = $row->programRequest()->first();
-        $needsOne = $row->project_id === null && $sent['is_new'] && $sent['program_id'] === null;
-
-        if (! $needsOne) {
-            if ($request !== null && $request->isPending()) {
-                $request->delete();
-                $row->unsetRelation('programRequest');
-
-                return true;
-            }
-
-            return false;
-        }
-
-        if ($request === null) {
-            ProgramRequest::query()->create([
-                'proposal_location_id' => $row->id,
-                'name_en' => $sent['new_program_name_en'],
-                'name_ar' => $sent['new_program_name_ar'],
-                'requested_by' => $actor->id,
-            ]);
-            $row->unsetRelation('programRequest');
-
-            return true;
-        }
-
-        if ($request->name_en !== $sent['new_program_name_en'] || $request->name_ar !== $sent['new_program_name_ar']) {
-            $request->forceFill(['name_en' => $sent['new_program_name_en'], 'name_ar' => $sent['new_program_name_ar']])->save();
-
-            return true;
-        }
-
-        return false;
     }
 }

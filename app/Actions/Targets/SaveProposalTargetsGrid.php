@@ -51,14 +51,13 @@ final class SaveProposalTargetsGrid
     public const string SourceType = 'proposal';
 
     /**
-     * Whether a row still waits for its program: it has none yet, or its
-     * program request is pending (Y-10). Such a row takes no new or changed
-     * target; the grid shows its column disabled with the reason. Load
-     * `programRequest` on the row first.
+     * Whether a row still waits for its program: it has none yet (Y-10).
+     * Such a row takes no new or changed target; the grid shows its column
+     * disabled with the reason.
      */
     public static function isWaitingForProgram(ProposalLocation $row): bool
     {
-        return $row->program_id === null || ($row->programRequest?->isPending() ?? false);
+        return $row->program_id === null;
     }
 
     /**
@@ -100,7 +99,7 @@ final class SaveProposalTargetsGrid
                 ->keyBy('id');
 
             /** @var Collection<int, ProposalLocation> $rows */
-            $rows = $locked->locations()->with(['centers', 'programRequest'])->get()->keyBy('id');
+            $rows = $locked->locations()->with('centers')->get()->keyBy('id');
 
             $existing = PlanIndicator::query()
                 ->where('source_type', self::SourceType)

@@ -202,6 +202,7 @@ return [
         'project_ended' => 'انتهى المشروع «:subject» في :date',
         'on_hold_reminder' => 'المقترح «:subject» معلّق وقد حلّ موعد مراجعته (:date)',
         'logframe_confirmed' => 'اكتمل الإطار المنطقي للمقترح «:subject» — يمكنك المتابعة بالمؤشرات المستهدفة والخطة',
+        'ending_with_funds' => 'المقترح «:subject» ينتهي في :date ولا يزال في اتفاقيته مبالغ',
         'logframe_missing' => [
             'single' => 'البرنامج «:subject» ليس له إطار برنامج بعد — إنشاء إطار البرنامج',
             'grouped' => 'برامج ليس لها إطار برنامج بعد: :count — إنشاء إطار البرنامج',
@@ -273,6 +274,8 @@ return [
         'stalled_report_draft' => 'تقرير في المسودة',
         'stalled_report_reviewed' => 'تقرير بانتظار الاعتماد',
         'stalled_proposal' => 'مقترح لم تتغير حالته',
+        'extension_lead' => 'تنبيه التمديد',
+        'extension_lead_help' => 'المقترح النشط الذي ما زال في اتفاقيته مبالغ ينبّه المالية قبل انتهائه بهذا العدد من أيام العمل.',
 
         'off_track' => 'المؤشر خارج المسار تحت',
         'off_track_hint' => 'من التقدم المتوقع حتى اليوم.',
@@ -327,6 +330,7 @@ return [
             'transfer_mark_received' => 'تعليم كمستلمة',
             'agreement_record' => 'تسجيل الاتفاقية',
             'project_reassign' => 'إعادة التعيين',
+            'proposal_request_extension' => 'طلب تمديد',
             'assignment_acknowledge' => 'تأكيد الاستلام',
             'assignment_reject' => 'رفض',
             'alert_snooze' => 'تأجيل التذكير',
@@ -335,6 +339,7 @@ return [
         'snoozed' => 'أُجّل التذكير حتى الغد.',
         'opening' => 'جارٍ فتح الدفعة…',
         'opening_record' => 'جارٍ فتح السجل…',
+        'opening_extension' => 'جارٍ فتح التمديد…',
         'already_done' => 'أُنجز مسبقًا — لم يتغير شيء.',
         'already_started' => 'بدأ مسبقًا — لم يتغير شيء.',
         'forbidden' => 'ليس لديك صلاحية لذلك.',
@@ -421,6 +426,7 @@ return [
             'manager_removed' => 'أزال :actor :from من إدارة البرنامج «:subject»',
             'manager_and_strategy_changed' => 'ربط :actor البرنامج «:subject» بـ :strategy وجعل :to مديرًا له',
             'manager_changed_you' => 'جعلك :actor مديرًا للبرنامج «:subject»',
+            'renamed' => 'أعاد :actor تسمية البرنامج «:subject»',
             'updated' => 'حدّث :actor البرنامج «:subject»',
             'deleted' => 'حذف :actor البرنامج «:subject»',
             'logframe_missing' => [
@@ -622,16 +628,6 @@ return [
             'updated' => 'حدّث :actor المانح «:subject»',
             'deleted' => 'حذف :actor المانح «:subject»',
         ],
-        'program_request' => [
-            'opened' => [
-                'title' => 'برنامج مطلوب في HR',
-                'body' => 'يحتاج المقترح «:subject» إلى إنشاء البرنامج «:name» في HR',
-            ],
-            'linked' => [
-                'title' => 'ربط برنامج',
-                'body' => 'ربط :actor برنامج HR «:name» الذي طلبه المقترح «:subject»',
-            ],
-        ],
         'proposal' => [
             'waiting_on_you' => [
                 'finish_concept_note' => [
@@ -712,6 +708,10 @@ return [
                 'title' => 'إزالة خطر',
                 'body' => 'أزال :actor الخطر «:value» من «:subject»',
             ],
+            'stage_tasks_created' => [
+                'title' => 'إنشاء مهام المرحلة',
+                'body' => 'أُنشئت مهام الأقسام لـ«:subject»',
+            ],
             'locations_changed' => [
                 'title' => 'تغيير المواقع',
                 'body' => 'غيّر :actor مواقع المقترح «:subject»',
@@ -772,9 +772,19 @@ return [
                 'title' => 'المسؤول غادر',
                 'body' => 'ما زال «:subject» باسم شخص غادر',
             ],
+            'ending_with_funds' => [
+                'due' => [
+                    'title' => 'تنبيه تمديد',
+                    'body' => 'ينتهي المقترح «:subject» قريبًا ولا يزال في اتفاقيته مبالغ',
+                ],
+            ],
             'targets_saved' => [
                 'title' => 'حفظ المستهدفات',
                 'body' => 'حفظ :actor مستهدفات المقترح «:subject»',
+            ],
+            'grant_dates_set' => [
+                'title' => 'تحديد تواريخ المنحة',
+                'body' => 'حدّد :actor تواريخ المنحة للمقترح «:subject»',
             ],
             'plan_rebased' => [
                 'title' => 'نقل الخطة إلى مدة المنحة',
