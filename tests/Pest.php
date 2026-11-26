@@ -764,6 +764,59 @@ function proposalPlaceRow(): array
 }
 
 /**
+ * A complete place of the proposal whose responsible has acknowledged being
+ * in charge — what `ApproveProposal` needs to approve (Y-17).
+ *
+ * @param  array<string, mixed>  $attributes  passed to ProposalLocation::factory()
+ */
+function approvablePlace(Proposal $proposal, array $attributes = []): ProposalLocation
+{
+    $cityId = insertHrCity('Place '.Str::random(5), 'مكان');
+    $employeeId = insertHrEmployee($cityId);
+
+    $row = ProposalLocation::factory()->create([
+        'proposal_id' => $proposal->id,
+        'city_id' => $cityId,
+        'program_id' => Program::factory()->create(['manager_id' => $employeeId])->id,
+        'responsible_employee_id' => $employeeId,
+        'target_beneficiaries' => 10,
+        ...$attributes,
+    ]);
+    $row->centers()->create(['center_id' => insertHrCenter($cityId, 'C'.Str::random(6))]);
+    $row->currentAssignment('responsible_employee_id')?->forceFill([
+        'status' => AssignmentStatus::Acknowledged->value,
+        'responded_at' => now(),
+    ])->save();
+
+    return $row->fresh();
+}
+
+/**
+ * One complete location-row payload for `SaveProposal`'s `locations` key: a
+ * fresh HR city, a program, a responsible who manages it, and a center of
+ * that city.
+ *
+ * Y-17: a proposal is created with its places and links no project, so every
+ * fixture that creates one through SaveProposal sends at least one of these.
+ *
+ * @param  array<string, mixed>  $overrides
+ * @return array<string, mixed>
+ */
+function placePayload(array $overrides = []): array
+{
+    $cityId = insertHrCity('Place '.Str::random(5), 'مكان');
+    $employeeId = insertHrEmployee($cityId);
+
+    return [
+        'city_id' => $cityId,
+        'program_id' => Program::factory()->create(['manager_id' => $employeeId])->id,
+        'responsible_employee_id' => $employeeId,
+        'center_ids' => [insertHrCenter($cityId, 'C'.Str::random(6))],
+        ...$overrides,
+    ];
+}
+
+/**
  * The location row that carries this project (Y-16, D-93): the state the
  * Projects screen shows, where one entry is one row of one proposal.
  *

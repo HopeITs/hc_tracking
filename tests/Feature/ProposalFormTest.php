@@ -52,25 +52,6 @@ function proposalFormData(array $places, array $overrides = []): array
 }
 
 /**
- * One complete location-row payload: a fresh city, a program, a responsible
- * who manages it, and a center of that city.
- *
- * @return array<string, mixed>
- */
-function placePayload(): array
-{
-    $cityId = insertHrCity('Place '.Str::random(5), 'مكان');
-    $employeeId = insertHrEmployee($cityId);
-
-    return [
-        'city_id' => $cityId,
-        'program_id' => Program::factory()->create(['manager_id' => $employeeId])->id,
-        'responsible_employee_id' => $employeeId,
-        'center_ids' => [insertHrCenter($cityId, 'C'.Str::random(6))],
-    ];
-}
-
-/**
  * Edit data for an existing proposal, starting from its stored values.
  *
  * @param  array<string, mixed>  $overrides

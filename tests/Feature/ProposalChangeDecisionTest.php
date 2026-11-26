@@ -109,6 +109,8 @@ function decisionLinkedProposal(int $beneficiaries = 400): Proposal
     return Activity::withoutRecording(function () use ($beneficiaries): Proposal {
         $proposal = Proposal::factory()->create(['requested_budget' => '120000.00', 'requested_currency' => Currency::Usd]);
         $proposal->projects()->attach(Project::factory()->create(['name' => 'Water Network Rehabilitation'])->id, ['target_beneficiaries' => $beneficiaries]);
+        // Y-17: the figure and the place both belong to the row.
+        approvablePlace($proposal, ['target_beneficiaries' => $beneficiaries]);
         DB::table('proposals')->where('id', $proposal->id)->update(['status' => ProposalStatus::Approved->value]);
 
         return $proposal->fresh();
@@ -270,9 +272,11 @@ test('a review waiting in a slot with no holder is skipped inside approve and do
 });
 
 test('approving a beneficiaries change records proposal.beneficiaries_changed with the request reason', function () {
+    // Y-17: the figure belongs to the place, the payload names it by
+    // `location_id`, and a place is named by where it is.
     $proposal = decisionLinkedProposal();
-    $project = $proposal->projects()->sole();
-    $request = decisionRequest($proposal, ['beneficiaries' => [$project->id => 650]]);
+    $place = $proposal->locations()->sole();
+    $request = decisionRequest($proposal, ['beneficiaries' => [$place->id => 650]]);
     $request->forceFill(['reason' => 'The donor widened the target group.'])->save();
     decisionReviews($request, ChangeReviewVerdict::NoObjection, ChangeReviewVerdict::NoObjection);
 
@@ -280,10 +284,10 @@ test('approving a beneficiaries change records proposal.beneficiaries_changed wi
 
     $activity = Activity::query()->where('event', 'proposal.beneficiaries_changed')->sole();
 
-    expect(DB::table('project_proposal')->where('proposal_id', $proposal->id)->value('target_beneficiaries'))->toBe(650)
+    expect($place->fresh()->target_beneficiaries)->toBe(650)
         ->and($activity->properties['reason'])->toBe('The donor widened the target group.')
         ->and($activity->properties['projects'])->toEqual([
-            ['project_id' => $project->id, 'name' => 'Water Network Rehabilitation', 'from' => 400, 'to' => 650],
+            ['location_id' => $place->id, 'name' => $place->label(), 'from' => 400, 'to' => 650],
         ]);
 });
 

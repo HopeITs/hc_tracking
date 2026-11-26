@@ -170,11 +170,13 @@ final class TransitionProposal
             'donor' => $proposal->donor_id !== null && ! Donor::query()->pending()->whereKey($proposal->donor_id)->exists(),
             'planned_dates' => $proposal->planned_date_begin !== null && $proposal->planned_date_end !== null,
             'budget' => $proposal->requested_budget !== null && $proposal->requested_currency !== null,
-            // Y-17: the figure lives on the row, not on the project_proposal pivot.
-            'target_beneficiaries' => $proposal->locations()->exists()
-                && ! $proposal->locations()
-                    ->where(fn ($query) => $query->whereNull('target_beneficiaries')->orWhere('target_beneficiaries', '<', 1))
-                    ->exists(),
+            // Y-17: the figure lives on the row, not on the project_proposal
+            // pivot. "On every row" (contracts.md §2) is vacuously true for
+            // a proposal with none — the `locations` key is what refuses
+            // that, and it does so earlier in the table.
+            'target_beneficiaries' => ! $proposal->locations()
+                ->where(fn ($query) => $query->whereNull('target_beneficiaries')->orWhere('target_beneficiaries', '<', 1))
+                ->exists(),
             'final_report' => $this->hasFinalReport($proposal),
             'narrative' => Proposal::isNarrativeComplete($proposal->narrative),
             'reason', 'reason_min_10', 'effective_date' => true,

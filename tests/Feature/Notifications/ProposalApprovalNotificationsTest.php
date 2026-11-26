@@ -1,7 +1,6 @@
 <?php
 
 use App\Actions\Proposals\ApproveProposal;
-use App\Enums\AssignmentStatus;
 use App\Enums\ProposalStatus;
 use App\Models\Activity;
 use App\Models\Program;
@@ -74,9 +73,9 @@ test('approving writes the approved events on the proposal and none carries an a
         'planned_date_end' => '2027-10-31',
         'requested_budget' => '987654.00',
     ]);
-    $project = Project::factory()->create();
-    $project->currentAssignment('user_id')->forceFill(['status' => AssignmentStatus::Acknowledged])->save();
-    $proposal->projects()->attach($project->id, ['target_beneficiaries' => 10]);
+    // Y-17: approval completes the proposal's places, so it needs one with
+    // an acknowledged responsible; no project is created or linked.
+    $project = approvablePlace($proposal);
 
     $this->actingAs($actor);
     app(ApproveProposal::class)->handle($proposal, ProposalStatus::Submitted, [
@@ -109,9 +108,9 @@ test('the General Manager is told when the Public Relations Manager approves a p
         'planned_date_begin' => '2026-11-01',
         'planned_date_end' => '2027-10-31',
     ]);
-    $project = Project::factory()->create();
-    $project->currentAssignment('user_id')->forceFill(['status' => AssignmentStatus::Acknowledged])->save();
-    $proposal->projects()->attach($project->id, ['target_beneficiaries' => 10]);
+    // Y-17: approval completes the proposal's places, so it needs one with
+    // an acknowledged responsible; no project is created or linked.
+    $project = approvablePlace($proposal);
 
     $this->actingAs($actor);
     app(ApproveProposal::class)->handle($proposal, ProposalStatus::Submitted, [
@@ -135,6 +134,7 @@ test('a rolled-back approval leaves no activity and no notification', function (
     $proposal = Proposal::factory()->create(['status' => ProposalStatus::Submitted, 'planned_date_begin' => '2026-11-01', 'planned_date_end' => '2027-10-31']);
     $project = Project::factory()->create();
     $proposal->projects()->attach($project->id, ['target_beneficiaries' => 10]);
+    approvablePlace($proposal);
     $before = Activity::query()->count();
 
     $this->actingAs($actor);
