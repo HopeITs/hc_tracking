@@ -200,6 +200,14 @@ test('the sidebar folds each group into one row and opens the group of the curre
         ->assertSee('data-side-fly="projects_delivery"', false);
 });
 
+test('the sidebar redraws its unread badges when the bell announces new counts', function () {
+    $this->actingAs(User::factory()->role('Super Admin')->create())
+        ->get(route('projects.index'))
+        ->assertSee('x-on:notification-counts.window="syncCounts(', false)
+        ->assertSee('data-side-group-modules="', false)
+        ->assertSee('data-side-module="', false);
+});
+
 test('every wire:navigate link prefetches on hover unless it already names a modifier', function () {
     $html = Blade::render('<a href="/a" wire:navigate>A</a><a href="/b" wire:navigate.preserve-scroll>B</a>');
 

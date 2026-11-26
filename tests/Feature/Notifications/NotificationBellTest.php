@@ -122,6 +122,17 @@ test('a refresh tells the page the new counts', function () {
         ->assertDispatched('notification-counts', counts: ['total' => 1, 'critical' => 0, 'modules' => ['tasks' => 1]]);
 });
 
+test('after mark all read the refresh tells the sidebar every module is back to zero', function () {
+    $user = Activity::withoutRecording(fn () => User::factory()->create());
+    bellNotify($user);
+    bellNotify($user);
+
+    Livewire::actingAs($user)->test('notifications.bell')
+        ->call('markAllRead')
+        ->dispatch('notification-received')
+        ->assertDispatched('notification-counts', counts: ['total' => 0, 'critical' => 0, 'modules' => []]);
+});
+
 test('every authenticated page tells the script who is listening, and the desk has no notifications panel', function () {
     $user = Activity::withoutRecording(fn () => User::factory()->create());
 

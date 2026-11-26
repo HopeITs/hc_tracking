@@ -105,6 +105,51 @@ document.addEventListener('alpine:init', () => {
             }
         },
 
+        /*
+         * The unread counts changed in the bell (mark all read, one read, a new
+         * arrival): redraw every badge and dot from the fresh per-module counts,
+         * since the sidebar itself is only rendered once per page.
+         */
+        syncCounts(modules) {
+            const label = (count) => (count > 99 ? '99+' : String(count));
+            const countOf = (module) => Number(modules[module] ?? 0);
+            const show = (host, count, before = null) => {
+                let badge = host.querySelector(':scope > [data-side-badge]');
+
+                if (count <= 0) {
+                    badge?.remove();
+
+                    return;
+                }
+
+                if (! badge) {
+                    badge = document.createElement('span');
+                    badge.className = 'dk-side-badge dk-num';
+                    badge.setAttribute('data-side-badge', '');
+                    host.insertBefore(badge, before);
+                }
+
+                badge.textContent = label(count);
+            };
+
+            this.$root.querySelectorAll('a[data-side-module]').forEach((link) => {
+                show(link, countOf(link.dataset.sideModule));
+            });
+
+            this.$root.querySelectorAll('[data-side-group-modules]').forEach((toggle) => {
+                const total = toggle.dataset.sideGroupModules
+                    .split(',')
+                    .filter(Boolean)
+                    .reduce((sum, module) => sum + countOf(module), 0);
+
+                show(toggle, total, toggle.querySelector('.dk-side-gchev'));
+            });
+
+            Object.values(this.pages).forEach((page) => {
+                page.count = page.module ? countOf(page.module) : 0;
+            });
+        },
+
         rail() {
             return ! this.expanded && desktop();
         },
