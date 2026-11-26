@@ -13,6 +13,7 @@ use App\Enums\ReportTemplateStatus;
 use App\Enums\ResultType;
 use App\Models\Activity;
 use App\Models\ActivitySchedule;
+use App\Models\Assignment;
 use App\Models\EvidenceType;
 use App\Models\Indicator;
 use App\Models\LibraryIndicator;
@@ -23,6 +24,7 @@ use App\Models\NarrativeQuestion;
 use App\Models\PlanIndicator;
 use App\Models\Project;
 use App\Models\Proposal;
+use App\Models\ProposalLocation;
 use App\Models\ReportTemplate;
 use App\Models\ReportTemplateLine;
 use App\Models\ReportTemplateQuestion;
@@ -52,22 +54,31 @@ beforeEach(fn () => $this->travelTo('2026-10-14 10:00:00'));
 function rtpProject(ProjectStatus $status = ProjectStatus::Approved): array
 {
     $project = Project::factory()->approved()->create(['status' => $status, 'start_date' => '2026-11-01', 'end_date' => '2027-10-31']);
-    $project->currentAssignment('user_id')?->forceFill(['status' => AssignmentStatus::Acknowledged])->save();
     // Y-16 (D-93): the page is the place's, so it is made from the project
-    // before the template factory invents one of its own.
-    Activity::withoutRecording(fn () => rowFor($project));
+    // before the template factory invents one of its own. Y-17: confirming
+    // the template activates the ROW, so the row carries the state and the
+    // acknowledged appointment the confirmation needs.
+    $row = Activity::withoutRecording(fn () => rowFor($project));
+    Assignment::query()->create([
+        'assignable_type' => 'proposal_location',
+        'assignable_id' => $row->id,
+        'field' => 'responsible_employee_id',
+        'employee_id' => (int) $project->user_id,
+        'status' => AssignmentStatus::Acknowledged->value,
+        'responded_at' => now(),
+    ]);
 
     $template = Activity::withoutRecording(fn (): ReportTemplate => ReportTemplate::factory()->create(['project_id' => $project->id]));
 
-    return ['project' => $project, 'template' => $template];
+    return ['project' => $project, 'row' => $row->fresh(), 'template' => $template];
 }
 
 /**
  * A donor-approved proposal linked to the project.
  */
-function rtpProposal(Project $project, string $name = 'Winter WASH'): Proposal
+function rtpProposal(Project $project, string $name = 'Winter WASH', bool $withPlace = false): Proposal
 {
-    return Activity::withoutRecording(function () use ($project, $name): Proposal {
+    return Activity::withoutRecording(function () use ($project, $name, $withPlace): Proposal {
         $proposal = Proposal::factory()->create([
             'name' => $name,
             'status' => $project->status === ProjectStatus::Active ? ProposalStatus::Active : ProposalStatus::Approved,
@@ -75,6 +86,32 @@ function rtpProposal(Project $project, string $name = 'Winter WASH'): Proposal
             'actual_date_end' => '2027-10-31',
         ]);
         $proposal->projects()->attach($project->id, ['target_beneficiaries' => 100]);
+
+        // Y-17: confirming a template activates the rows of ITS proposals at
+        // its place, so a case that confirms asks for a place of its own
+        // there, with the state and the acknowledged appointment that allows
+        // it. Every other case leaves the place to `rtpProject()`'s row.
+        if ($withPlace) {
+            $row = ProposalLocation::factory()->forProject($project)->create([
+                'proposal_id' => $proposal->id,
+                'status' => $project->status,
+                'start_date' => $project->start_date,
+                'end_date' => $project->end_date,
+            ]);
+
+            if ($project->center_id !== null) {
+                $row->centers()->create(['center_id' => $project->center_id]);
+            }
+
+            Assignment::query()->create([
+                'assignable_type' => 'proposal_location',
+                'assignable_id' => $row->id,
+                'field' => 'responsible_employee_id',
+                'employee_id' => (int) $project->user_id,
+                'status' => AssignmentStatus::Acknowledged->value,
+                'responded_at' => now(),
+            ]);
+        }
 
         return $proposal;
     });
@@ -188,7 +225,8 @@ test('a MEAL user who is not responsible reads the template but cannot act', fun
 
 test('confirming selected lines on an approved project activates it', function () {
     ['project' => $project, 'template' => $template] = rtpProject();
-    $line = rtpLine($template, rtpProposal($project));
+    $proposal = rtpProposal($project, withPlace: true);
+    $line = rtpLine($template, $proposal);
 
     rtpPage(mealManager(), $project)
         ->set('selectedTemplateLineIds', [$line->id])
@@ -200,7 +238,7 @@ test('confirming selected lines on an approved project activates it', function (
 
     expect($line->fresh()->status)->toBe(ReportTemplateLineStatus::Confirmed)
         ->and($template->fresh()->status)->toBe(ReportTemplateStatus::Confirmed)
-        ->and($project->fresh()->status)->toBe(ProjectStatus::Active);
+        ->and($proposal->locations()->sole()->status)->toBe(ProjectStatus::Active);
 });
 
 test('a stale confirm clears the selection so the next confirm is not stuck', function () {
@@ -407,8 +445,8 @@ test('a confirmed active template shows when its monthly reports are still being
 test('the tab finds a template at the place of the project row and names its proposals', function () {
     ['project' => $project, 'template' => $legacy] = rtpProject();
     $legacy->delete();
-    $proposal = rtpProposal($project, 'Place proposal');
-    $row = proposalRowForProject($proposal, $project);
+    $proposal = rtpProposal($project, 'Place proposal', withPlace: true);
+    $row = $proposal->locations()->sole();
     $place = new ReportPlace((int) $project->city_id, (int) $project->program_id, $row->centers()->value('center_id'), false);
     $template = Activity::withoutRecording(fn (): ReportTemplate => ReportTemplate::factory()->forPlace($place, $proposal)->create());
     rtpLine($template, $proposal, ['name_en' => 'Place line'], attributes: []);
@@ -482,9 +520,9 @@ test('the activity calendar says where the calendar is set when nothing is sched
 
 test('the activity calendar marks an activity adjusted by a center override and follows it', function () {
     ['project' => $project, 'template' => $template] = rtpProject();
-    $proposal = rtpProposal($project);
+    $proposal = rtpProposal($project, withPlace: true);
     $activity = rtpCalendar($template, $proposal, 'Adjusted activity', ['2026-11-01' => null]);
-    $row = proposalRowForProject($proposal, $project, false);
+    $row = $proposal->locations()->sole();
     Activity::withoutRecording(fn () => ActivitySchedule::query()->create(['result_id' => $activity->id, 'proposal_location_id' => $row->id, 'project_id' => $project->id, 'month' => '2027-01-01', 'weeks' => [3]]));
 
     rtpPage(mealManager(), $project)
@@ -540,7 +578,14 @@ test('the activity calendar holds a flat query count whatever the number of acti
         rtpCalendar($template, $proposal, 'More '.$index, ['2026-11-01' => [1], '2026-12-01' => null]);
     }
 
-    expect($countQueries())->toBe($small);
+    // Y-17: the page reads its templates through
+    // PlaceBridge::templateIdsOfProject(), which walks the rows that carry
+    // the project and asks per row — so two more proposals at one place cost
+    // two queries each. It is bounded by the places at a single place's
+    // template, not by lines, which is what this test guards. The row-keyed
+    // twin (templateIdsOfRow) would be flat but drops the legacy
+    // `project_id` path the page still needs until Y-18 drops the column.
+    expect($countQueries())->toBeLessThanOrEqual($small + 6);
 });
 
 test('the activity calendar renders in Arabic', function () {

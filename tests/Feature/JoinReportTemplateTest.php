@@ -3,7 +3,6 @@
 use App\Actions\ReportTemplates\ConfirmReportTemplate;
 use App\Actions\ReportTemplates\JoinReportTemplate;
 use App\Models\LibraryIndicator;
-use App\Models\Project;
 use App\Models\ReportTemplate;
 use App\Models\ReportTemplatePlacement;
 use App\Support\Reporting\ReportPlace;
@@ -112,23 +111,17 @@ test('a proposal that is no longer donor-approved cannot join', function () {
 });
 
 test('a joined proposal project stays approved until its own pending lines are confirmed', function () {
+    // Y-17: the place is the row, and a joining proposal's own place stays
+    // approved until its own pending lines are confirmed.
     app(ConfirmReportTemplate::class)->handle($this->template, $this->template->lines()->pluck('id')->all());
-    $old = $this->fixture['project'];
-    $new = Project::factory()->approved()->create([
-        'program_id' => $old->program_id, 'city_id' => $old->city_id, 'center_id' => $old->center_id,
-        'start_date' => '2026-01-01', 'end_date' => '2026-12-31',
-    ]);
-    $new->currentAssignment('user_id')->forceFill(['status' => 'acknowledged'])->save();
-    $this->proposal->projects()->detach($old->id);
-    $this->proposal->projects()->attach($new->id);
-    $this->proposal->locations()->update(['project_id' => $new->id]);
-    $this->fixture['targets'][1]->forceFill(['project_id' => $new->id])->save();
+    $joining = $this->proposal->locations()->sole();
+    $joining->forceFill(['status' => 'approved'])->save();
 
     app(JoinReportTemplate::class)->handle($this->proposal, $this->template, []);
-    expect($new->fresh()->status->value)->toBe('approved');
+    expect($joining->fresh()->status->value)->toBe('approved');
     app(ConfirmReportTemplate::class)->handle($this->template, $this->template->lines()->where('status', 'pending')->pluck('id')->all());
 
-    expect($new->fresh()->status->value)->toBe('active');
+    expect($joining->fresh()->status->value)->toBe('active');
 });
 
 test('prefill previews preserve pending choices and joined selections', function () {

@@ -10,6 +10,7 @@ use App\Enums\ProposalStatus;
 use App\Enums\ResultType;
 use App\Models\Account;
 use App\Models\Activity;
+use App\Models\Assignment;
 use App\Models\Donor;
 use App\Models\DonorProposal;
 use App\Models\Indicator;
@@ -1361,7 +1362,23 @@ function placementFixture(bool $cityWide = false): array
             ]);
             $proposal->projects()->attach($project->id, ['target_beneficiaries' => 100]);
             $row = proposalRowForProject($proposal, $project, $cityWide ? false : $centerId);
-            $row->forceFill(['responsible_employee_id' => $project->user_id])->save();
+            // Y-17: the place is what MEAL confirms a template for, so it
+            // carries the project's approved state, its period and an
+            // acknowledged appointment.
+            $row->forceFill([
+                'responsible_employee_id' => $project->user_id,
+                'status' => $project->status,
+                'start_date' => $project->start_date,
+                'end_date' => $project->end_date,
+            ])->save();
+            Assignment::query()->create([
+                'assignable_type' => 'proposal_location',
+                'assignable_id' => $row->id,
+                'field' => 'responsible_employee_id',
+                'employee_id' => (int) $project->user_id,
+                'status' => AssignmentStatus::Acknowledged->value,
+                'responded_at' => now(),
+            ]);
             $targets[] = donorReportTarget($proposal, $project, $library);
             $proposals[] = $proposal;
         }
