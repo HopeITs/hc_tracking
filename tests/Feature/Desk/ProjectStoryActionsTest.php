@@ -51,7 +51,8 @@ test('archiving from the Story archives the place and offers Restore', function 
         ->assertSeeHtml('data-test="restore-project"')
         ->assertDontSeeHtml('data-test="archive-project"');
 
-    expect($this->project->fresh()->status)->toBe(ProjectStatus::Archived);
+    // Y-17: it is the row that carries the status.
+    expect($row->fresh()->status)->toBe(ProjectStatus::Archived);
 });
 
 test('a viewer without the archive permission sees no Restore on an archived project', function () {

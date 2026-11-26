@@ -619,7 +619,7 @@ return [
     'locations_none_yet' => 'No place recorded yet. Add one so the team knows which centers run this proposal.',
     'location_row_title' => 'Place :number',
     'location_linked_project' => '(linked project: :name)',
-    'location_linked_place_locked' => 'The linked project sets this. Unlink it in the Projects tab to change it.',
+    'location_approved_place_locked' => 'This place has been approved, so it cannot be moved. Archive it instead.',
     'remove_location' => 'Remove place :number',
     'add_location' => 'Add a place',
     'location_city' => 'City',

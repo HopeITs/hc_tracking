@@ -4,7 +4,6 @@ use App\Actions\Proposals\SaveProposal;
 use App\Enums\NotificationPriority;
 use App\Models\Activity;
 use App\Models\Donor;
-use App\Models\Project;
 use App\Models\Proposal;
 use App\Models\User;
 use App\Models\UserNotification;
@@ -132,11 +131,11 @@ test('the opened request names the typed program and never an amount', function 
 
 test('the linked request reaches the proposal owner, who needs no proposals.view for it', function () {
     $proposal = Activity::withoutRecording(fn () => Proposal::factory()->create());
+    // Y-17: the proposal's people are the responsibles of its places.
     $owner = Activity::withoutRecording(function () use ($proposal): User {
-        $project = Project::factory()->create();
-        $proposal->projects()->attach($project->id, ['target_beneficiaries' => 100]);
+        $place = approvablePlace($proposal);
 
-        return User::factory()->create(['employee_id' => $project->user_id]);
+        return User::factory()->create(['employee_id' => $place->responsible_employee_id]);
     });
     $actor = userWithRole('Managers');
 

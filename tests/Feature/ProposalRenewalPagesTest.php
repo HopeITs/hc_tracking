@@ -71,7 +71,10 @@ test('saving a renewal goes through the clone and lands a linked concept note', 
 
     expect($renewal->previous_proposal_id)->toBe($this->previous->id)
         ->and($renewal->status)->toBe(ProposalStatus::ConceptNote)
-        ->and($renewal->projects()->pluck('projects.id')->all())->toBe([$this->project->id])
+        // Y-17: the clone copies the previous proposal's **places**, and links
+        // no project (D-30, D-84).
+        ->and($renewal->projects()->count())->toBe(0)
+        ->and($renewal->locations()->pluck('city_id')->all())->toBe([$this->project->city_id])
         ->and($renewal->donor_id)->toBe($this->previous->donor_id);
 
     $form->assertSet('showProposalModal', false);

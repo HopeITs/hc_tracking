@@ -102,26 +102,6 @@ test('Financial and General Manager see the funding envelope, the amounts and a 
     expect($page->instance()->fundingByCurrency)->not->toBeEmpty();
 })->with(['Financial', 'General Manager']);
 
-test('a proposal editor without the money permissions links and unlinks proposals, choosing them by name', function () {
-    $project = projectWithRow();
-    $proposal = Proposal::factory()->create(['name' => 'Hilltop Schools']);
-    $proposal->projects()->attach(projectWithRow());
-
-    $page = Livewire::actingAs(userWithRole('Public Relations Manager'))
-        ->test('pages::projects.show', ['project' => rowFor($project)->slug])
-        ->set('tab', 'proposals')
-        ->assertSee('Hilltop Schools')
-        ->set('proposalToAttach', (string) $proposal->id)
-        ->call('attachProposal')
-        ->assertHasNoErrors();
-
-    expect($project->proposals()->count())->toBe(1);
-
-    $page->call('detachProposal', $proposal->id);
-
-    expect($project->proposals()->count())->toBe(0);
-});
-
 test('Public Relations Manager opens the proposal from the project page, sees the agreement budget but not the transfers', function () {
     ['project' => $project, 'proposal' => $proposal] = seedProjectMoneyFixture();
 

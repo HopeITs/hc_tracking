@@ -362,8 +362,10 @@
                     >
                         @foreach ($locations as $index => $location)
                             @php
-                                // Y-17: nothing links a project, so no row is locked by one.
-                                $isLinked = false;
+                                // Y-17: a row is locked by its own state — an
+                                // approved place is being delivered at — not by
+                                // a linked project.
+                                $isLinked = $location['locked'] ?? false;
                                 $cityCenters = $location['city_id'] === '' ? [] : ($centersByCity[(int) $location['city_id']] ?? []);
                                 $isNewProgram = $location['program_id'] === 'new';
                                 $isCityWide = $location['city_wide'];
@@ -378,13 +380,13 @@
                                     @endunless
                                 </div>
 
-                                <x-ui.form-select wire:model.live="locations.{{ $index }}.city_id" :label="__('proposals.location_city')" :placeholder="__('proposals.location_select_city')" required :disabled="$isLinked" :locked-reason="$isLinked ? __('proposals.location_linked_place_locked') : null">
+                                <x-ui.form-select wire:model.live="locations.{{ $index }}.city_id" :label="__('proposals.location_city')" :placeholder="__('proposals.location_select_city')" required :disabled="$isLinked" :locked-reason="$isLinked ? __('proposals.location_approved_place_locked') : null">
                                     @foreach ($cities as $city)
                                         <option value="{{ $city->id }}">{{ $city->name }}</option>
                                     @endforeach
                                 </x-ui.form-select>
 
-                                <x-ui.form-select wire:model.live="locations.{{ $index }}.program_id" :label="__('proposals.location_program')" :placeholder="__('proposals.location_select_program')" required :disabled="$isLinked" :locked-reason="$isLinked ? __('proposals.location_linked_place_locked') : null">
+                                <x-ui.form-select wire:model.live="locations.{{ $index }}.program_id" :label="__('proposals.location_program')" :placeholder="__('proposals.location_select_program')" required :disabled="$isLinked" :locked-reason="$isLinked ? __('proposals.location_approved_place_locked') : null">
                                     @foreach ($programs as $program)
                                         <option value="{{ $program->id }}">{{ $program->name }}</option>
                                     @endforeach

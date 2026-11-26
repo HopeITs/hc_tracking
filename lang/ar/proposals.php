@@ -619,7 +619,7 @@ return [
     'locations_none_yet' => 'لم يُسجَّل أي مكان بعد. أضف مكانًا ليعرف الفريق أي المراكز تنفّذ هذا المقترح.',
     'location_row_title' => 'المكان :number',
     'location_linked_project' => '(المشروع المرتبط: :name)',
-    'location_linked_place_locked' => 'يحدّد المشروع المرتبط هذه القيمة. افصله من تبويب المشاريع لتغييرها.',
+    'location_approved_place_locked' => 'تمّت الموافقة على هذا المكان، فلا يمكن نقله. أرشِفه بدلاً من ذلك.',
     'remove_location' => 'إزالة المكان :number',
     'add_location' => 'إضافة مكان',
     'location_city' => 'المدينة',

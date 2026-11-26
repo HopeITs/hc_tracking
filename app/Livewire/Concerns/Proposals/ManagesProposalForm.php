@@ -756,8 +756,16 @@ trait ManagesProposalForm
         }
     }
 
-    private function programName(int $programId): string
+    /**
+     * Y-17: a row still being filled in has no program yet, and the place then
+     * reads as its city alone.
+     */
+    private function programName(?int $programId): ?string
     {
+        if ($programId === null) {
+            return null;
+        }
+
         try {
             $name = HrProgram::nameOf($programId);
         } catch (QueryException) {
