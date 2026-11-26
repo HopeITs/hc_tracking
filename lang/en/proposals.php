@@ -598,6 +598,7 @@ return [
     'location_locked_after_approval' => 'This place is locked after approval. You can only add centers to a row that has none, or mark it field work.',
     'location_city_wide_has_centers' => 'A field-work row can’t also have centers. Remove the centers or untick Field work.',
     'location_has_targets' => 'A location you removed still has targets. Clear its targets on the Targets tab first, then remove it.',
+    'location_in_use' => 'A location you removed is already being delivered: it has milestones, risks, reported targets or a report template. Archive it instead of removing it.',
     'location_targets_title' => 'This location has targets',
     'location_targets_body' => '{1} One target is set for this location. It has to go before the location can be removed.|[2,*] :count targets are set for this location. They have to go before the location can be removed.',
     'location_targets_reported' => '{1} One of them has reports, so it can\'t be deleted.|[2,*] :count of them have reports, so they can\'t be deleted.',

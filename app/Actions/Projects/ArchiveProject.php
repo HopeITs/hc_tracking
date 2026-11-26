@@ -4,28 +4,24 @@ declare(strict_types=1);
 
 namespace App\Actions\Projects;
 
-use App\Enums\ProjectStatus;
+use App\Actions\Locations\ArchiveLocation;
 use App\Models\Project;
-use App\Support\Locations\ProjectLocationMirror;
-use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Gate;
+use App\Support\Locations\RowsOfProject;
 
 /**
- * Retire a project into the Archived state. Nothing is destroyed: this is how
- * a project leaves the active portfolio without losing its delivery record.
+ * Retire a project into the Archived state.
+ *
+ * Y-17 slice 1: the row is the writer, so this delegates to ArchiveLocation
+ * for each row the project carries and writes nothing itself.
+ *
+ * @deprecated Y-17 slice 3 removes it. Call ArchiveLocation on the row.
  */
-class ArchiveProject
+final class ArchiveProject
 {
-    public function __construct(private ProjectLocationMirror $mirror) {}
-
     public function handle(Project $project): void
     {
-        Gate::authorize('delete', $project);
-
-        DB::transaction(function () use ($project): void {
-            $project->update(['status' => ProjectStatus::Archived]);
-
-            $this->mirror->sync($project);
-        });
+        foreach (RowsOfProject::of($project) as $row) {
+            app(ArchiveLocation::class)->handle($row);
+        }
     }
 }

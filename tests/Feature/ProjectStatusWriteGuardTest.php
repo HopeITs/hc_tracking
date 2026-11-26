@@ -78,6 +78,16 @@ function projectStatusScannedSources(): array
     foreach ([app_path(), resource_path('views')] as $directory) {
         foreach (File::allFiles($directory) as $file) {
             $path = str_replace('\\', '/', substr($file->getPathname(), strlen(base_path()) + 1));
+
+            // Y-17 slice 1: the location actions write `proposal_locations`,
+            // which carries the SAME ProjectStatus enum, so the scan below
+            // cannot tell their writes from a project's. They are not
+            // §4 writers and are excluded rather than allowlisted. Slice 3
+            // replaces this whole file with LocationStatusWriteGuardTest.
+            if (str_starts_with($path, 'app/Actions/Locations/')) {
+                continue;
+            }
+
             $sources[$path] = $file->getContents();
         }
     }

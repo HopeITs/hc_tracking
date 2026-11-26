@@ -16,8 +16,8 @@ use App\Actions\Proposals\TransitionProposal;
 use App\Actions\Proposals\UnlinkProposalProject;
 use App\Enums\ReviewStage;
 use App\Events\FundingAgreementRecorded;
-use App\Events\ProjectActivated;
-use App\Events\ProjectPeriodChanged;
+use App\Events\LocationActivated;
+use App\Events\LocationPeriodChanged;
 use App\Events\ProposalStatusChanged;
 use App\Support\ApprovalResult;
 use App\Support\TransitionResult;
@@ -61,8 +61,8 @@ it('freezes each domain event constructor (contracts.md §5)', function (string 
     }
 })->with([
     'ProposalStatusChanged' => [ProposalStatusChanged::class, 'int $proposalId, App\Enums\ProposalStatus $from, App\Enums\ProposalStatus $to, ?int $actorId, bool $isCorrection = false'],
-    'ProjectActivated' => [ProjectActivated::class, 'int $projectId, ?int $proposalId, Carbon\CarbonImmutable $startDate, Carbon\CarbonImmutable $endDate, string $via'],
-    'ProjectPeriodChanged' => [ProjectPeriodChanged::class, 'int $projectId, Carbon\CarbonImmutable $oldStart, Carbon\CarbonImmutable $oldEnd, Carbon\CarbonImmutable $newStart, Carbon\CarbonImmutable $newEnd'],
+    'LocationActivated' => [LocationActivated::class, 'App\Models\ProposalLocation $row'],
+    'LocationPeriodChanged' => [LocationPeriodChanged::class, 'App\Models\ProposalLocation $row, Carbon\CarbonImmutable $oldStart, Carbon\CarbonImmutable $oldEnd, Carbon\CarbonImmutable $newStart, Carbon\CarbonImmutable $newEnd'],
     'FundingAgreementRecorded' => [FundingAgreementRecorded::class, 'int $fundingAgreementId, int $proposalId, ?int $actorId'],
 ]);
 

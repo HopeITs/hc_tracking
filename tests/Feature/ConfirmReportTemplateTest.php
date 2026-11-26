@@ -11,7 +11,7 @@ use App\Enums\ProjectStatus;
 use App\Enums\ProposalStatus;
 use App\Enums\ReportTemplateLineStatus;
 use App\Enums\ReportTemplateStatus;
-use App\Events\ProjectActivated;
+use App\Events\LocationActivated;
 use App\Models\Activity;
 use App\Models\EvidenceType;
 use App\Models\Indicator;
@@ -20,6 +20,7 @@ use App\Models\MealCoverageAssignment;
 use App\Models\PlanIndicator;
 use App\Models\Project;
 use App\Models\Proposal;
+use App\Models\ProposalLocation;
 use App\Models\ReportTemplate;
 use App\Models\ReportTemplateLine;
 use App\Models\User;
@@ -32,27 +33,30 @@ use Illuminate\Validation\ValidationException;
 
 /*
 | ConfirmReportTemplate, SaveReportTemplateLine and RetireReportTemplateLine
-| (contracts.md §12.4, T33). Confirmation activates an approved project only
-| through ActivateProject, in the same transaction; on an active project it
-| records report_template.lines_added for the owner instead.
+| (contracts.md §12.4, T33). Confirmation activates the approved location
+| rows at the template's place only through ActivateLocation, in the same
+| transaction (Y-17); on an active row it records
+| report_template.lines_added for the responsible instead.
 */
 
 beforeEach(fn () => $this->travelTo('2026-10-14 10:00:00'));
 
 /**
  * A pending template with one pending, library-linked monthly line on a
- * dated project with an acknowledged owner and one proposal.
+ * dated place with an acknowledged responsible and one proposal.
  *
- * @return array{project: Project, proposal: Proposal, template: ReportTemplate, line: ReportTemplateLine}
+ * Y-17: the place is the proposal's **location row** at the template's place,
+ * and that row is what confirmation activates. The project is kept until
+ * Y-18 for the template's legacy `project_id` and the targets' own column.
+ *
+ * @return array{project: Project, proposal: Proposal, row: ProposalLocation, template: ReportTemplate, line: ReportTemplateLine}
  */
 function rtFixture(ProjectStatus $status = ProjectStatus::Approved, CollectionFrequency $frequency = CollectionFrequency::Monthly): array
 {
-    // Created while recording: the owner assignment comes from the project's own hooks.
     $project = Project::factory()->approved()->create(['status' => $status, 'start_date' => '2026-11-01', 'end_date' => '2027-10-31']);
     $project->currentAssignment('user_id')?->forceFill(['status' => AssignmentStatus::Acknowledged])->save();
 
-    return Activity::withoutRecording(function () use ($project, $status, $frequency): array {
-
+    ['proposal' => $proposal, 'template' => $template, 'line' => $line] = Activity::withoutRecording(function () use ($project, $status, $frequency): array {
         $proposal = Proposal::factory()->create([
             'name' => 'Winter WASH',
             'status' => $status === ProjectStatus::Active ? ProposalStatus::Active : ProposalStatus::Approved,
@@ -62,10 +66,28 @@ function rtFixture(ProjectStatus $status = ProjectStatus::Approved, CollectionFr
         $proposal->projects()->attach($project->id, ['target_beneficiaries' => 100]);
 
         $template = ReportTemplate::factory()->create(['project_id' => $project->id]);
-        $line = rtLine($template, $proposal, $frequency);
 
-        return ['project' => $project, 'proposal' => $proposal, 'template' => $template, 'line' => $line];
+        return ['proposal' => $proposal, 'template' => $template, 'line' => rtLine($template, $proposal, $frequency)];
     });
+
+    // Created while recording: the assignment that the responsible
+    // acknowledges comes from the row's own hooks (Y-17).
+    $row = ProposalLocation::factory()->forProject($project)->create([
+        'proposal_id' => $proposal->id,
+        'city_id' => $template->city_id,
+        'program_id' => $template->program_id,
+        'city_wide' => $template->city_wide,
+        'status' => $status,
+        'start_date' => '2026-11-01',
+        'end_date' => '2027-10-31',
+    ]);
+    $row->currentAssignment('responsible_employee_id')?->forceFill(['status' => AssignmentStatus::Acknowledged])->save();
+
+    if ($template->center_id !== null) {
+        Activity::withoutRecording(fn () => $row->centers()->create(['center_id' => $template->center_id]));
+    }
+
+    return ['project' => $project, 'row' => $row, 'proposal' => $proposal, 'row' => $row, 'template' => $template, 'line' => $line];
 }
 
 /**
@@ -142,9 +164,9 @@ function rtCoverProject(int $projectId, int $employeeId): void
 
 test('confirming a line on an approved project activates it through ActivateProject once, after the commit', function () {
     $actor = mealManager();
-    ['project' => $project, 'proposal' => $proposal, 'template' => $template, 'line' => $line] = rtFixture();
+    ['project' => $project, 'row' => $row, 'proposal' => $proposal, 'template' => $template, 'line' => $line] = rtFixture();
     $owner = userWithRole('Team Member', $project->user_id);
-    Event::fake([ProjectActivated::class]);
+    Event::fake([LocationActivated::class]);
 
     $confirmed = rtConfirm($actor, $template, [$line->id]);
 
@@ -154,21 +176,20 @@ test('confirming a line on an approved project activates it through ActivateProj
         ->and($line->fresh()->status)->toBe(ReportTemplateLineStatus::Confirmed)
         ->and($line->fresh()->confirmed_by)->toBe($actor->id)
         ->and($line->fresh()->confirmed_at)->not->toBeNull()
-        ->and($project->fresh()->status)->toBe(ProjectStatus::Active)
+        ->and($row->fresh()->status)->toBe(ProjectStatus::Active)
         ->and($proposal->fresh()->status)->toBe(ProposalStatus::Active)
         ->and(Activity::query()->where('event', 'report_template.confirmed')->count())->toBe(1)
         ->and(Activity::query()->where('event', 'report_template.lines_added')->exists())->toBeFalse()
         ->and(sentencesFor($owner))->toContain($actor->name.' confirmed the report template of “'.$project->name.'”');
 
-    Event::assertDispatchedTimes(ProjectActivated::class, 1);
-    Event::assertDispatched(ProjectActivated::class, fn (ProjectActivated $event): bool => $event->projectId === $project->id
-        && $event->via === 'template_confirmation');
+    Event::assertDispatchedTimes(LocationActivated::class, 1);
+    Event::assertDispatched(LocationActivated::class, fn (LocationActivated $event): bool => $event->row->is($row));
 });
 
 test('a confirmation rolled back by its caller activates nothing and dispatches nothing', function () {
     $actor = mealManager();
-    ['project' => $project, 'template' => $template, 'line' => $line] = rtFixture();
-    Event::fake([ProjectActivated::class]);
+    ['project' => $project, 'row' => $row, 'template' => $template, 'line' => $line] = rtFixture();
+    Event::fake([LocationActivated::class]);
 
     expect(fn () => DB::transaction(function () use ($actor, $template, $line): void {
         rtConfirm($actor, $template, [$line->id]);
@@ -176,18 +197,17 @@ test('a confirmation rolled back by its caller activates nothing and dispatches 
         throw new RuntimeException('caller failed');
     }))->toThrow(RuntimeException::class);
 
-    expect($project->fresh()->status)->toBe(ProjectStatus::Approved)
+    expect($row->fresh()->status)->toBe(ProjectStatus::Approved)
         ->and($template->fresh()->status)->toBe(ReportTemplateStatus::Pending)
         ->and($line->fresh()->status)->toBe(ReportTemplateLineStatus::Pending);
 
-    Event::assertNotDispatched(ProjectActivated::class);
+    Event::assertNotDispatched(LocationActivated::class);
 });
 
 test('a template at a place activates the approved project of its row through the bridge, and one with no project only confirms', function () {
     $actor = mealManager();
-    ['project' => $project, 'proposal' => $proposal] = rtFixture();
-    $row = proposalRowForProject($proposal, $project);
-    $place = new ReportPlace((int) $project->city_id, (int) $project->program_id, $row->centers()->value('center_id'), false);
+    ['project' => $project, 'row' => $row, 'proposal' => $proposal] = rtFixture();
+    $place = new ReportPlace((int) $row->city_id, (int) $row->program_id, $row->centers()->value('center_id'), false);
     $template = ReportTemplate::factory()->forPlace($place, $proposal)->create();
     $line = Activity::withoutRecording(fn () => ReportTemplateLine::factory()->create([
         'report_template_id' => $template->id,
@@ -195,14 +215,14 @@ test('a template at a place activates the approved project of its row through th
         'effective_from' => '2026-11-01',
         'effective_to' => '2027-10-01',
     ]));
-    Event::fake([ProjectActivated::class]);
+    Event::fake([LocationActivated::class]);
 
     rtConfirm($actor, $template, [$line->id]);
 
     expect($template->fresh()->project_id)->toBeNull()
         ->and($template->fresh()->status)->toBe(ReportTemplateStatus::Confirmed)
-        ->and($project->fresh()->status)->toBe(ProjectStatus::Active);
-    Event::assertDispatchedTimes(ProjectActivated::class, 1);
+        ->and($row->fresh()->status)->toBe(ProjectStatus::Active);
+    Event::assertDispatchedTimes(LocationActivated::class, 1);
 
     $other = ReportTemplate::factory()->forPlace(new ReportPlace((int) $project->city_id, (int) $project->program_id, insertHrCenter((int) $project->city_id, 'No project '.Str::random(4)), false), $proposal)->create();
     $otherLine = Activity::withoutRecording(fn () => ReportTemplateLine::factory()->create([
@@ -215,33 +235,33 @@ test('a template at a place activates the approved project of its row through th
     rtConfirm($actor, $other, [$otherLine->id]);
 
     expect($other->fresh()->status)->toBe(ReportTemplateStatus::Confirmed);
-    Event::assertDispatchedTimes(ProjectActivated::class, 1);
+    Event::assertDispatchedTimes(LocationActivated::class, 1);
 });
 
 test('confirming no line is refused and writes nothing', function () {
     $actor = mealManager();
-    ['project' => $project, 'template' => $template, 'line' => $line] = rtFixture();
+    ['project' => $project, 'row' => $row, 'template' => $template, 'line' => $line] = rtFixture();
     $activities = Activity::query()->count();
-    Event::fake([ProjectActivated::class]);
+    Event::fake([LocationActivated::class]);
 
     expect(rtRefusal(fn () => rtConfirm($actor, $template, [])))->toBe(__('report_templates.confirm_at_least_one'))
         ->and($template->fresh()->status)->toBe(ReportTemplateStatus::Pending)
         ->and($line->fresh()->status)->toBe(ReportTemplateLineStatus::Pending)
-        ->and($project->fresh()->status)->toBe(ProjectStatus::Approved)
+        ->and($row->fresh()->status)->toBe(ProjectStatus::Approved)
         ->and(Activity::query()->count())->toBe($activities);
 
-    Event::assertNotDispatched(ProjectActivated::class);
+    Event::assertNotDispatched(LocationActivated::class);
 });
 
 test('a line whose library frequency has no automatic months is refused on library_default, with the whole batch', function (CollectionFrequency $frequency) {
     $actor = mealManager();
-    ['project' => $project, 'proposal' => $proposal, 'template' => $template, 'line' => $monthly] = rtFixture();
+    ['project' => $project, 'row' => $row, 'proposal' => $proposal, 'template' => $template, 'line' => $monthly] = rtFixture();
     $seasonal = rtLine($template, $proposal, $frequency);
 
     expect(rtRefusal(fn () => rtConfirm($actor, $template, [$monthly->id, $seasonal->id])))->toBe(__('report_templates.choose_measurement_months'))
         ->and($monthly->fresh()->status)->toBe(ReportTemplateLineStatus::Pending)
         ->and($seasonal->fresh()->status)->toBe(ReportTemplateLineStatus::Pending)
-        ->and($project->fresh()->status)->toBe(ProjectStatus::Approved);
+        ->and($row->fresh()->status)->toBe(ProjectStatus::Approved);
 })->with([
     'per season' => CollectionFrequency::PerSeason,
     'baseline-endline' => CollectionFrequency::BaselineEndline,
@@ -253,7 +273,7 @@ test('a per-season line with chosen months confirms', function () {
     ['template' => $template] = rtFixture();
     $proposal = Proposal::query()->firstOrFail();
     $seasonal = rtLine($template, $proposal, CollectionFrequency::PerSeason, attributes: ['schedule' => LineSchedule::SelectedMonths, 'schedule_months' => [3, 9]]);
-    Event::fake([ProjectActivated::class]);
+    Event::fake([LocationActivated::class]);
 
     rtConfirm($actor, $template, [$seasonal->id]);
 
@@ -262,17 +282,17 @@ test('a per-season line with chosen months confirms', function () {
 
 test('a target with no library link cannot be confirmed', function () {
     $actor = mealManager();
-    ['project' => $project, 'proposal' => $proposal, 'template' => $template] = rtFixture();
+    ['project' => $project, 'row' => $row, 'proposal' => $proposal, 'template' => $template] = rtFixture();
     $unlinked = rtLine($template, $proposal, linked: false);
 
     expect(rtRefusal(fn () => rtConfirm($actor, $template, [$unlinked->id])))->toBe(__('report_templates.link_library_first'))
         ->and($unlinked->fresh()->status)->toBe(ReportTemplateLineStatus::Pending)
-        ->and($project->fresh()->status)->toBe(ProjectStatus::Approved);
+        ->and($row->fresh()->status)->toBe(ProjectStatus::Approved);
 });
 
 test('new lines on an active project tell the owner the proposal and month range, with no activation', function () {
     $actor = mealManager();
-    ['project' => $project, 'template' => $template, 'line' => $first] = rtFixture(ProjectStatus::Active);
+    ['project' => $project, 'row' => $row, 'template' => $template, 'line' => $first] = rtFixture(ProjectStatus::Active);
     Activity::withoutRecording(function () use ($template, $first): void {
         $template->forceFill(['status' => ReportTemplateStatus::Confirmed, 'confirmed_at' => '2026-10-01 09:00:00'])->save();
         $first->forceFill(['status' => ReportTemplateLineStatus::Confirmed, 'confirmed_at' => '2026-10-01 09:00:00'])->save();
@@ -280,7 +300,7 @@ test('new lines on an active project tell the owner the proposal and month range
     $spring = Activity::withoutRecording(fn () => Proposal::factory()->create(['name' => 'Spring Hygiene', 'status' => ProposalStatus::Approved]));
     $newLine = rtLine($template, $spring, attributes: ['effective_from' => '2027-01-01', 'effective_to' => '2027-06-01']);
     $owner = userWithRole('Team Member', $project->user_id);
-    Event::fake([ProjectActivated::class]);
+    Event::fake([LocationActivated::class]);
 
     rtConfirm($actor, $template, [$newLine->id]);
 
@@ -288,32 +308,37 @@ test('new lines on an active project tell the owner the proposal and month range
 
     expect($newLine->fresh()->status)->toBe(ReportTemplateLineStatus::Confirmed)
         ->and($template->fresh()->confirmed_at->toDateTimeString())->toBe('2026-10-01 09:00:00')
-        ->and($project->fresh()->status)->toBe(ProjectStatus::Active)
+        ->and($row->fresh()->status)->toBe(ProjectStatus::Active)
         ->and($activity->properties['proposal_ids'])->toBe([$spring->id])
         ->and($activity->properties['from_month'])->toBe('2027-01')
         ->and($activity->properties['to_month'])->toBe('2027-06')
         ->and(sentencesFor($owner))->toContain($actor->name.' added indicators for “Spring Hygiene” to the report template of “'.$project->name.'”, from January 2027 to June 2027');
 
-    Event::assertNotDispatched(ProjectActivated::class);
+    Event::assertNotDispatched(LocationActivated::class);
 });
 
 test('a MEAL user who is not responsible for the project is refused', function () {
     holdMealManagerSlot();
     $outsider = userWithRole('MEAL', insertHrEmployee(firstNameEn: 'Rami'));
-    ['project' => $project, 'template' => $template, 'line' => $line] = rtFixture();
+    ['project' => $project, 'row' => $row, 'template' => $template, 'line' => $line] = rtFixture();
     $this->actingAs($outsider);
 
     expect(fn () => app(ConfirmReportTemplate::class)->handle($template, [$line->id]))->toThrow(AuthorizationException::class);
 
     expect($line->fresh()->status)->toBe(ReportTemplateLineStatus::Pending)
-        ->and($project->fresh()->status)->toBe(ProjectStatus::Approved);
+        ->and($row->fresh()->status)->toBe(ProjectStatus::Approved);
 });
 
 test('the officer assigned to the project is allowed though based in another governorate', function () {
     holdMealManagerSlot();
     $officer = userWithRole('MEAL', insertHrEmployee(insertHrCity('Homs', 'حمص'), 'Nour', 'Ali'));
-    ['project' => $project, 'template' => $template, 'line' => $line] = rtFixture();
+    ['project' => $project, 'row' => $row, 'template' => $template, 'line' => $line] = rtFixture();
     $template->forceFill(['center_id' => null, 'city_wide' => true])->save();
+    // The row is the place now (Y-17), so it moves with the template.
+    Activity::withoutRecording(function () use ($row): void {
+        $row->centers()->delete();
+        $row->forceFill(['city_wide' => true])->save();
+    });
     $place = $template->place();
     DB::table('meal_coverages')->insert([
         'scope_type' => 'place',
@@ -323,46 +348,46 @@ test('the officer assigned to the project is allowed though based in another gov
         'city_wide' => true,
         'employee_id' => $officer->employee_id,
     ]);
-    Event::fake([ProjectActivated::class]);
+    Event::fake([LocationActivated::class]);
 
     rtConfirm($officer, $template, [$line->id]);
 
-    expect($project->fresh()->status)->toBe(ProjectStatus::Active);
+    expect($row->fresh()->status)->toBe(ProjectStatus::Active);
 });
 
 test('the MEAL Manager slot holder is allowed on a project another officer covers', function () {
     $manager = mealManager();
-    ['project' => $project, 'template' => $template, 'line' => $line] = rtFixture();
+    ['project' => $project, 'row' => $row, 'template' => $template, 'line' => $line] = rtFixture();
     rtCoverProject($project->id, insertHrEmployee(firstNameEn: 'Nour'));
-    Event::fake([ProjectActivated::class]);
+    Event::fake([LocationActivated::class]);
 
     rtConfirm($manager, $template, [$line->id]);
 
-    expect($project->fresh()->status)->toBe(ProjectStatus::Active);
+    expect($row->fresh()->status)->toBe(ProjectStatus::Active);
 });
 
 test('confirming the same lines twice activates once; the second call is stale', function () {
     $actor = mealManager();
-    ['template' => $template, 'line' => $line] = rtFixture();
-    Event::fake([ProjectActivated::class]);
+    ['row' => $row, 'template' => $template, 'line' => $line] = rtFixture();
+    Event::fake([LocationActivated::class]);
 
     rtConfirm($actor, $template, [$line->id]);
 
     expect(rtRefusal(fn () => rtConfirm($actor, $template, [$line->id])))->toBe(__('report_templates.stale'));
 
-    Event::assertDispatchedTimes(ProjectActivated::class, 1);
+    Event::assertDispatchedTimes(LocationActivated::class, 1);
 });
 
 test('a line id from another template rejects the whole batch', function () {
     $actor = mealManager();
-    ['project' => $project, 'template' => $template, 'line' => $line] = rtFixture();
+    ['project' => $project, 'row' => $row, 'template' => $template, 'line' => $line] = rtFixture();
     ['line' => $foreign] = rtFixture();
 
     expect(fn () => rtConfirm($actor, $template, [$line->id, $foreign->id]))->toThrow(ModelNotFoundException::class);
 
     expect($line->fresh()->status)->toBe(ReportTemplateLineStatus::Pending)
         ->and($foreign->fresh()->status)->toBe(ReportTemplateLineStatus::Pending)
-        ->and($project->fresh()->status)->toBe(ProjectStatus::Approved);
+        ->and($row->fresh()->status)->toBe(ProjectStatus::Approved);
 });
 
 test('saving a line stores its schedule, collector, evidence and denominator', function () {

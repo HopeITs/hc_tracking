@@ -4,8 +4,8 @@ declare(strict_types=1);
 
 namespace App\Livewire\Concerns\Projects;
 
-use App\Actions\Projects\DeleteProjectFile;
-use App\Actions\Projects\SaveProjectFile;
+use App\Actions\Locations\DeleteLocationFile;
+use App\Actions\Locations\SaveLocationFile;
 use App\Enums\FileType;
 use App\Enums\MediaCollection;
 use App\Models\Media;
@@ -140,7 +140,7 @@ trait ManagesProjectFiles
 
     public function openCreateFileModal(): void
     {
-        Gate::authorize('update', $this->writableProject());
+        Gate::authorize('update', $this->location);
 
         $this->resetValidation();
         $this->editingFileId = null;
@@ -152,7 +152,7 @@ trait ManagesProjectFiles
 
     public function openEditFileModal(int $mediaId): void
     {
-        Gate::authorize('update', $this->writableProject());
+        Gate::authorize('update', $this->location);
 
         $media = $this->projectFile($mediaId);
 
@@ -165,7 +165,8 @@ trait ManagesProjectFiles
     }
 
     /**
-     * Create a new project file or update an existing one's metadata.
+     * Create a new file on the place or update an existing one's metadata
+     * (Y-17: the row owns its files).
      *
      * Create validates and stores the upload itself; edit changes only the
      * category and display name — swapping the underlying document is
@@ -173,7 +174,7 @@ trait ManagesProjectFiles
      */
     public function saveFile(): void
     {
-        Gate::authorize('update', $this->writableProject());
+        Gate::authorize('update', $this->location);
 
         if ($this->editingFileId === null) {
             $allowedTypes = implode(',', FileType::values());
@@ -189,7 +190,7 @@ trait ManagesProjectFiles
 
             abort_if(in_array($validated['fileCategory'], $this->hiddenCollections(), true), 403);
 
-            app(SaveProjectFile::class)->handle($this->writableProject(), null, $this->newFile, $validated);
+            app(SaveLocationFile::class)->handle($this->location, null, $this->newFile, $validated);
 
             $toast = __('projects.file_uploaded');
         } else {
@@ -204,7 +205,7 @@ trait ManagesProjectFiles
 
             abort_if(in_array($validated['fileCategory'], $this->hiddenCollections(), true), 403);
 
-            app(SaveProjectFile::class)->handle($this->writableProject(), $media, null, $validated);
+            app(SaveLocationFile::class)->handle($this->location, $media, null, $validated);
 
             $toast = __('projects.file_updated');
         }
@@ -217,7 +218,7 @@ trait ManagesProjectFiles
 
     public function confirmDeleteFile(int $mediaId): void
     {
-        Gate::authorize('update', $this->writableProject());
+        Gate::authorize('update', $this->location);
 
         $media = $this->projectFile($mediaId);
 
@@ -233,11 +234,11 @@ trait ManagesProjectFiles
      */
     public function deleteFile(): void
     {
-        Gate::authorize('update', $this->writableProject());
+        Gate::authorize('update', $this->location);
 
         $media = $this->projectFile($this->deletingFileId);
 
-        app(DeleteProjectFile::class)->handle($this->writableProject(), $media);
+        app(DeleteLocationFile::class)->handle($this->location, $media);
 
         $this->confirmingFileDelete = false;
         $this->deletingFileId = null;

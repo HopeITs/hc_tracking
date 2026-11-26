@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Support;
 
 use App\Enums\ProgramRequestStatus;
+use App\Models\ActivitySchedule;
 use App\Models\PlanIndicator;
 use App\Models\ProgramRequest;
 use App\Models\Project;
@@ -12,6 +13,7 @@ use App\Models\Proposal;
 use App\Models\ProposalLocation;
 use App\Models\User;
 use App\Support\Locations\ProjectLocationMirror;
+use App\Support\Reporting\PlaceBridge;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Validation\ValidationException;
 
@@ -82,7 +84,7 @@ final class ProposalLocationRows
 
         foreach ($existing as $key => $row) {
             if (! array_key_exists($key, $sentKeys) && $row->project_id === null) {
-                $this->refuseWhenRowHasTargets($row);
+                $this->refuseWhenRowInUse($row);
                 $row->delete();
                 $counts['removed']++;
                 unset($existing[$key]);
@@ -236,7 +238,7 @@ final class ProposalLocationRows
         $removed = 0;
 
         foreach ($locked->locations()->where('project_id', $projectId)->get() as $row) {
-            $this->refuseWhenRowHasTargets($row);
+            $this->refuseWhenRowInUse($row);
             $row->delete();
             $removed++;
         }
@@ -347,12 +349,27 @@ final class ProposalLocationRows
      * lose their place, and the foreign key restricts it anyway. MEAL clears
      * the row's targets first.
      *
+     * A row that is already being delivered is not removed either (Y-17):
+     * deleting it would take its milestones, risks, reported figures and
+     * report template with it (MediaOwnerObserver removes its files), and a
+     * place that has started belongs in the archive, not in the bin. This
+     * holds before approval too, because a row can carry a milestone or a
+     * risk while the proposal is still a draft.
+     *
      * @throws ValidationException under `locations`
      */
-    private function refuseWhenRowHasTargets(ProposalLocation $row): void
+    private function refuseWhenRowInUse(ProposalLocation $row): void
     {
         if ($row->targets()->exists()) {
             throw ValidationException::withMessages(['locations' => __('proposals.location_has_targets')]);
+        }
+
+        $inUse = $row->risks()->exists()
+            || ActivitySchedule::query()->where('proposal_location_id', $row->getKey())->exists()
+            || app(PlaceBridge::class)->templateIdsOfRow($row) !== [];
+
+        if ($inUse) {
+            throw ValidationException::withMessages(['locations' => __('proposals.location_in_use')]);
         }
     }
 

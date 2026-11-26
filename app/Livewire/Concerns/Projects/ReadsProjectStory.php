@@ -174,7 +174,7 @@ trait ReadsProjectStory
             return;
         }
 
-        $sent = $nudge->handle(auth()->user(), $this->writableProject(), $next['owner'], $note);
+        $sent = $nudge->handle(auth()->user(), $this->location, $next['owner'], $note);
 
         Flux::toast(text: $sent ? __('desk.nudged') : __('desk.nudged_already'), variant: $sent ? 'success' : null);
     }

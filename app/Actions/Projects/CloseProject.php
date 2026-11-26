@@ -4,46 +4,29 @@ declare(strict_types=1);
 
 namespace App\Actions\Projects;
 
-use App\Enums\ProjectStatus;
+use App\Actions\Locations\CloseLocation;
 use App\Models\Project;
-use App\Support\Locations\ProjectLocationMirror;
-use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Gate;
+use App\Support\Locations\RowsOfProject;
 use Illuminate\Validation\ValidationException;
 
 /**
  * Close an active project (contracts.md §3: active → closed, dates kept).
  *
- * The row is locked and its status re-read inside the transaction, so a
- * second close of the same project finds it closed and refuses: one change
- * is written. Authorization runs on the locked row (`ProjectPolicy::update`:
- * a projects.update holder, the owner or the program manager; never an
- * owner-rejected project).
+ * Y-17 slice 1: the row is the writer, so this delegates to CloseLocation
+ * for each row the project carries and writes nothing itself. It stays only
+ * so that a caller slice 1 has not moved keeps working.
+ *
+ * @deprecated Y-17 slice 3 removes it. Call CloseLocation on the row.
  */
 final class CloseProject
 {
-    public function __construct(private ProjectLocationMirror $mirror) {}
-
     /**
-     * @throws ValidationException when the project is not active
+     * @throws ValidationException when a row is not active
      */
     public function handle(Project $project): void
     {
-        DB::transaction(function () use ($project): void {
-            $locked = Project::query()->with('ownerAssignment')->whereKey($project->getKey())->lockForUpdate()->firstOrFail();
-
-            Gate::authorize('update', $locked);
-
-            if ($locked->status !== ProjectStatus::Active) {
-                throw ValidationException::withMessages(['status' => __('projects.close_only_active')]);
-            }
-
-            $locked->status = ProjectStatus::Closed;
-            $locked->save();
-
-            $this->mirror->sync($locked);
-        });
-
-        $project->refresh();
+        foreach (RowsOfProject::of($project) as $row) {
+            app(CloseLocation::class)->handle($row);
+        }
     }
 }

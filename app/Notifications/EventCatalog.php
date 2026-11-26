@@ -7,8 +7,8 @@ namespace App\Notifications;
 use App\Enums\EventImportance;
 use App\Enums\OversightMode;
 use App\Events\FundingAgreementRecorded;
-use App\Events\ProjectActivated;
-use App\Events\ProjectPeriodChanged;
+use App\Events\LocationActivated;
+use App\Events\LocationPeriodChanged;
 use App\Events\ProposalChangeDecided;
 use App\Events\ProposalChangeRequested;
 use App\Events\ProposalChangeReviewed;
@@ -155,8 +155,8 @@ final class EventCatalog
                 'project.owner_acknowledged' => self::entry('projects', $now, 'module_map', $all, activity: 'project.owner_acknowledged'),
                 'project.owner_declined' => self::entry('projects', $now, 'module_map', $all, activity: 'project.owner_declined'),
                 'project.approved' => self::entry('projects', $now, 'module_map', $all, critical: true, activity: 'project.approved'),
-                'project.activated' => self::entry('projects', $now, 'listener', $all, critical: true, event: ProjectActivated::class),
-                'project.period_changed' => self::entry('projects', $now, 'listener', $all, event: ProjectPeriodChanged::class),
+                'project.activated' => self::entry('projects', $now, 'listener', $all, critical: true, event: LocationActivated::class),
+                'project.period_changed' => self::entry('projects', $now, 'listener', $all, event: LocationPeriodChanged::class),
                 'project.started' => self::entry('projects', $now, 'scanner', $all),
                 'project.ended' => self::entry('projects', $now, 'scanner', $all),
                 'project.closed' => self::entry('projects', $now, 'module_map', $all, activity: 'project.closed'),

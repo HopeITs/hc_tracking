@@ -201,6 +201,8 @@ return [
     'hosted_by' => 'Hosted by :center',
     'hosted_location' => ':city · hosted by :center',
     'dates_prohibited_draft' => 'Project dates are set when the proposal is approved.',
+    'dates_set_by_the_grant' => 'Project dates come from the approved grant and are not edited here.',
+    'edit_what_this_place_delivers' => 'Change what this place delivers: its description, beneficiary targets and sectors.',
     'close_only_active' => 'Only an active project can be closed.',
     'no_active_proposal' => 'No active proposal',
     'close_project' => 'Close project',

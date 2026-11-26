@@ -4,12 +4,14 @@ declare(strict_types=1);
 
 namespace App\Models;
 
+use App\Actions\Locations\ApproveLocationFromProposal;
 use App\Concerns\HasAssignments;
 use App\Concerns\HasSlug;
 use App\Concerns\RecordsParentActivity;
 use App\Enums\AssignmentStatus;
 use App\Enums\ProjectStatus;
 use App\Enums\ProposalStatus;
+use App\Notifications\ActivityRecorder;
 use App\Notifications\TracksActivity;
 use App\Observers\MediaOwnerObserver;
 use App\Observers\ProposalLocationObserver;
@@ -90,7 +92,7 @@ use Illuminate\Support\Collection;
     'target_girls',
 ])]
 #[ObservedBy([MediaOwnerObserver::class, ProposalLocationObserver::class])]
-class ProposalLocation extends Model
+class ProposalLocation extends Model implements TracksActivity
 {
     /** @use HasFactory<ProposalLocationFactory> */
     use HasAssignments, HasFactory, HasSlug, RecordsParentActivity;
@@ -685,26 +687,62 @@ class ProposalLocation extends Model
     }
 
     /**
-     * The row's owner is asked to acknowledge being put in charge — but not
-     * before Y-17.
-     *
-     * Until then `projects` is the writer and the row is a mirror
-     * (wave4/AGENT.md §8.2): the project already asks its owner, and the
-     * acknowledgement is copied onto the row by the Y-11 backfill and, from
-     * slice 2, ProjectLocationMirror. Returning no field keeps
-     * HasAssignments' created/updated hook from asking the same person a
-     * second time, which would notify them twice for one appointment while
-     * "nothing a user sees changes". Y-17 returns
-     * `['responsible_employee_id']` here when the row becomes the writer.
-     *
-     * The readers (`assignments()`, `currentAssignment()`, `ownerAssignment()`)
-     * work regardless, and that is what the mirror and Y-12…Y-16 read.
+     * The row's responsible is asked to acknowledge being put in charge
+     * (Y-17): the row is the writer now, so the request is raised here and
+     * nowhere else. Until Y-17 the project asked and the mirror copied the
+     * answer onto the row.
      *
      * @return list<string>
      */
     public function assignmentFields(): array
     {
-        return [];
+        return ['responsible_employee_id'];
+    }
+
+    /**
+     * The responsible acknowledged being in charge: a draft that waits on a
+     * donor-approved proposal becomes approved. A no-op otherwise. The twin
+     * of `Project::assignmentAcknowledged()` (contracts.md §3).
+     */
+    public function assignmentAcknowledged(string $field): void
+    {
+        if ($field === 'responsible_employee_id') {
+            app(ApproveLocationFromProposal::class)->handle($this, 'owner_acknowledgement');
+        }
+    }
+
+    /**
+     * The row's own activities (Y-17). The row records no created / updated
+     * / deleted event of its own — `SaveProposal` records the set's change
+     * for the whole proposal — but it IS the subject of the lifecycle
+     * activities its actions write by hand, so it answers the recorder.
+     * The module and the event keys stay `projects` / `project.*`: they name
+     * a screen, not a table (wave4/AGENT.md §8.5).
+     *
+     * @param  array<string, array{0: mixed, 1: mixed}>  $changes
+     * @param  array<string, mixed>  $properties
+     */
+    public function recordActivity(string $event, array $changes = [], array $properties = []): ?Activity
+    {
+        return app(ActivityRecorder::class)->record($this, $event, $changes, $properties);
+    }
+
+    public function activityModule(): string
+    {
+        return 'projects';
+    }
+
+    public function activityProgramId(): ?int
+    {
+        return $this->program_id === null ? null : (int) $this->program_id;
+    }
+
+    /**
+     * @return list<string>
+     */
+    public function activityEmployeeFields(): array
+    {
+        return ['responsible_employee_id'];
     }
 
     public function activityParent(): (Model&TracksActivity)|null
