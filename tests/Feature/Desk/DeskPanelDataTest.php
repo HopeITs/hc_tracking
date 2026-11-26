@@ -23,6 +23,7 @@ use App\Models\Result;
 use App\Models\Task;
 use App\Models\TransfersTracking;
 use App\Models\User;
+use App\Notifications\SubjectLinks;
 use App\Support\Reporting\PlaceBridge;
 use Database\Seeders\RolesAndPermissionsSeeder;
 use Livewire\Livewire;
@@ -253,7 +254,7 @@ test('a target behind links to its indicator and to its place', function () {
     insertIndicatorProgress($indicator->id, $user->id, '2026-03-31', '10.00');
 
     Livewire::actingAs($user)->test('desk.panels.targets', ['size' => 'L'])
-        ->assertSeeHtml('href="'.route('indicators.index', ['inspect' => $indicator->id]).'" wire:navigate')
+        ->assertSeeHtml('href="'.app(SubjectLinks::class)->routeFor('indicator', $indicator->id).'" wire:navigate')
         ->assertSeeHtml('href="'.route('projects.show', $row).'" wire:navigate')
         ->assertSee('People reached')
         ->assertSee($row->label());

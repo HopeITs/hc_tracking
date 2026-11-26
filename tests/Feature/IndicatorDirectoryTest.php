@@ -671,7 +671,7 @@ test('the focus tabs and the indicator list render inside the Livewire component
     $user = User::factory()->role('General Manager')->create();
     Indicator::factory()->create(['result_id' => Result::factory()->create()->id, 'name' => 'People reached']);
 
-    $html = $this->actingAs($user)->get(route('indicators.index'))->assertOk()->getContent();
+    $html = Livewire::actingAs($user)->test('pages::indicators.index')->html();
 
     $document = new DOMDocument;
     @$document->loadHTML('<?xml encoding="utf-8"?>'.$html);

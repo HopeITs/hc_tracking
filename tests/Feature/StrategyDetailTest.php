@@ -183,7 +183,7 @@ test('the attention list names the programs falling behind and links to the targ
     $this->actingAs(User::factory()->role('General Manager')->create())
         ->get(route('strategies.show', $strategy))
         ->assertSee('<bdi>2</bdi> programs are falling behind: <bdi>Alpha Program</bdi> and <bdi>Beta Program</bdi>.', false)
-        ->assertSee(e(route('indicators.index', ['strategy' => $strategy->id, 'focus' => 'offtrack'])), false)
+        ->assertSee(e(route('results.index')), false)
         ->assertSeeText(__('strategies.see_targets'))
         ->assertSeeText(__('strategies.needs_attention_count', ['count' => 1]));
 });

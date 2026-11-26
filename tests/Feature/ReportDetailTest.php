@@ -8,6 +8,7 @@ use App\Models\PlanIndicator;
 use App\Models\Report;
 use App\Models\ReportFile;
 use App\Models\User;
+use App\Notifications\SubjectLinks;
 use Illuminate\Support\Facades\DB;
 use Livewire\Livewire;
 
@@ -250,13 +251,12 @@ test('the detail page rates the whole target from approved reports, not this one
 test('the detail page links back along the chain to the indicator and its targets', function () {
     $user = User::factory()->role('General Manager')->create();
     $report = Report::factory()->create();
-    $indicatorId = $report->planIndicator->indicator_id;
+    $framework = app(SubjectLinks::class)->routeFor('plan_indicator', $report->plan_indicator_id);
 
     $this->actingAs($user)
         ->get(route('reports.show', $report))
         ->assertOk()
-        ->assertSee(route('indicators.index', ['inspect' => $indicatorId]), false)
-        ->assertSee(route('targets.index', ['indicator' => $indicatorId]), false);
+        ->assertSee(e($framework), false);
 });
 
 /**

@@ -28,6 +28,9 @@ use App\Models\DonorReport;
 use App\Models\RiskLibrary;
 use App\Models\Task;
 use App\Models\User;
+use App\Notifications\SubjectLinks;
+use Illuminate\Http\RedirectResponse;
+use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Route;
 
@@ -140,11 +143,34 @@ Route::middleware(['auth', EnsureTwoFactorIsEnabled::class])->group(function () 
         ->can('indicator-library.view')
         ->name('indicator-library.index');
 
-    Route::livewire('indicators', 'pages::indicators.index')
+    Route::get('indicators', function (Request $request, SubjectLinks $links): RedirectResponse {
+        $indicatorId = $request->integer('inspect');
+        $destination = $indicatorId > 0 ? $links->routeFor('indicator', $indicatorId) : null;
+
+        $parameters = $request->boolean('create') || $request->query('quick') === 'create'
+            ? ['newIndicator' => 1, 'location' => $request->integer('location') ?: null]
+            : [];
+
+        return redirect()->to($destination ?? route('results.index', $parameters), 301);
+    })
         ->can('indicators.view')
         ->name('indicators.index');
 
-    Route::livewire('targets', 'pages::targets.index')
+    Route::get('targets', function (Request $request, SubjectLinks $links): RedirectResponse {
+        $indicatorId = $request->integer('indicator');
+        $destination = $indicatorId > 0 ? $links->routeFor('indicator', $indicatorId) : null;
+
+        if ($request->boolean('create') || $request->query('quick') === 'create') {
+            [$url, $fragment] = array_pad(explode('#', $destination ?? route('results.index'), 2), 2, null);
+            $url .= (str_contains($url, '?') ? '&' : '?').http_build_query([
+                'newTarget' => 1,
+                'targetIndicator' => $indicatorId > 0 && $destination !== null ? $indicatorId : null,
+            ]);
+            $destination = $url.($fragment === null ? '' : '#'.$fragment);
+        }
+
+        return redirect()->to($destination ?? route('results.index'), 301);
+    })
         ->can('targets.view')
         ->name('targets.index');
 

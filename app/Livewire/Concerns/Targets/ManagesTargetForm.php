@@ -12,6 +12,7 @@ use App\Models\PlanIndicator;
 use App\Models\Proposal;
 use App\Models\ProposalLocation;
 use Flux\Flux;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Relations\MorphTo;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Validation\Rule;
@@ -83,7 +84,7 @@ trait ManagesTargetForm
      */
     protected function canDelete(int $targetId): bool
     {
-        $target = PlanIndicator::query()->select(['id'])->withCount('reports')->find($targetId);
+        $target = $this->editableTargets()->select(['id'])->withCount('reports')->find($targetId);
 
         return $target !== null && $target->reports_count === 0;
     }
@@ -114,6 +115,18 @@ trait ManagesTargetForm
         return null;
     }
 
+    /** @return Builder<Indicator> */
+    protected function targetIndicators(): Builder
+    {
+        return Indicator::query();
+    }
+
+    /** @return Builder<PlanIndicator> */
+    protected function editableTargets(): Builder
+    {
+        return PlanIndicator::query()->whereIn('indicator_id', $this->targetIndicators()->select('id'));
+    }
+
     public function openCreateModal(): void
     {
         Gate::authorize('targets.create');
@@ -126,7 +139,7 @@ trait ManagesTargetForm
     {
         Gate::authorize('targets.update');
 
-        $target = PlanIndicator::query()
+        $target = $this->editableTargets()
             ->select(['id', 'source_type', 'source_id', 'indicator_id', 'target', 'project_id', 'proposal_location_id', 'period'])
             ->findOrFail($targetId);
 
@@ -175,7 +188,7 @@ trait ManagesTargetForm
             return;
         }
 
-        $indicator = Indicator::query()->with('result:id,program_id,proposal_id')->findOrFail((int) $validated['targetIndicatorId']);
+        $indicator = $this->targetIndicators()->with('result:id,program_id,proposal_id')->findOrFail((int) $validated['targetIndicatorId']);
         $row = null;
 
         if ($source instanceof Proposal) {
@@ -218,7 +231,7 @@ trait ManagesTargetForm
 
         $target = $this->editingTargetId === null
             ? new PlanIndicator
-            : PlanIndicator::query()->withCount('reports')->findOrFail($this->editingTargetId);
+            : $this->editableTargets()->withCount('reports')->findOrFail($this->editingTargetId);
 
         $target->fill([
             // The map key, never the class name.
@@ -341,7 +354,7 @@ trait ManagesTargetForm
             return;
         }
 
-        PlanIndicator::query()->findOrFail($this->deletingTargetId)->delete();
+        $this->editableTargets()->findOrFail($this->deletingTargetId)->delete();
 
         $this->cancelDelete();
         $this->resetPage();

@@ -22,7 +22,7 @@ use Livewire\Livewire;
  * @var list<string>
  */
 const DeskPageCardRoutes = [
-    'strategies.index', 'programs.index', 'annual-plans.index', 'results.index', 'indicator-library.index', 'indicators.index',
+    'strategies.index', 'programs.index', 'annual-plans.index', 'results.index', 'indicator-library.index',
     'reports.index', 'donor-reports.index', 'funding-agreements.index', 'admin.accounts.index', 'admin.users.index', 'activity.index',
     'admin.cities.index', 'admin.sectors.index', 'admin.risk-library.index', 'admin.evidence-types.index', 'admin.narrative-questions.index',
 ];

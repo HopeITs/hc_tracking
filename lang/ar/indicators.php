@@ -1,6 +1,7 @@
 <?php
 
 return [
+    'measurement_belongs_in_monthly_report' => 'سجّل هذا القياس في التقرير الشهري للتاريخ المحدد.',
     'add_indicator' => 'إضافة مؤشر',
     'add_the_first_indicator_against_a_result' => 'أضف أول مؤشر لنتيجة.',
     'against_percent_of_the_year_elapsed' => 'مقابل :percent% من السنة المنقضية',

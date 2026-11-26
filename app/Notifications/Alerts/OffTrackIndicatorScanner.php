@@ -33,7 +33,7 @@ final class OffTrackIndicatorScanner implements Scanner
             return 0;
         }
 
-        $indicators = Indicator::query()->notPaused()->with('progress')->get();
+        $indicators = Indicator::query()->notPaused()->with(['progress', 'approvedMonthlyMeasurements'])->get();
         $owners = $this->ownerUsers(array_values($indicators->pluck('project_id')->filter()->map(fn (mixed $id): int => (int) $id)->unique()->all()));
         $meal = $this->resolver->usersWithRoles(['MEAL']);
         $paceStage = 'pace:'.$now->year;
@@ -54,7 +54,7 @@ final class OffTrackIndicatorScanner implements Scanner
                 $this->ledger->release('off_track', 'indicator', $indicator->id, $paceStage);
             }
 
-            $lastReading = $indicator->progress->last()->date ?? $indicator->created_at;
+            $lastReading = $indicator->latestMeasurementDate() ?? $indicator->created_at;
 
             if ($lastReading !== null && $lastReading->lt($now->subMonths($this->windowMonths($indicator->frequency)))) {
                 $payload = $this->dispatcher->payload('indicators', NotificationPriority::Important, 'notifications.alerts.off_track.silent', [

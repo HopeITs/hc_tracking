@@ -1,6 +1,7 @@
 <?php
 
 return [
+    'measurement_belongs_in_monthly_report' => 'Record this measurement on the monthly report for the selected date.',
     'add_indicator' => 'Add indicator',
     'add_the_first_indicator_against_a_result' => 'Add the first indicator against a result.',
     'against_percent_of_the_year_elapsed' => 'Against :percent% of the year elapsed',

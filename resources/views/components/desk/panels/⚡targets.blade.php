@@ -31,10 +31,10 @@ new class extends Component
         $expected = min(100.0, max(0.0, ($start->diffInSeconds(now()) / $start->diffInSeconds($end)) * 100));
 
         return Indicator::query()
-            ->select(['id', 'name', 'code', 'project_id', 'proposal_location_id', 'measure', 'unit', 'baseline', 'target'])
+            ->select(['id', 'result_id', 'name', 'code', 'project_id', 'proposal_location_id', 'measure', 'unit', 'baseline', 'target'])
             ->whereNotNull('target')
             // Y-16 (D-93): an instance scoped to a place names that place.
-            ->with(['location:id,proposal_id,slug,city_id,city_wide,program_id', 'location.city:id,name_en,name_ar', 'location.program:id', 'location.centers', 'location.proposal:id,name', 'progress:id,indicator_id,date,value'])
+            ->with(['location:id,proposal_id,slug,city_id,city_wide,program_id', 'location.city:id,name_en,name_ar', 'location.program:id', 'location.centers', 'location.proposal:id,name', 'progress:id,indicator_id,date,value', 'result.proposal', 'approvedMonthlyMeasurements'])
             ->get()
             ->map(fn (Indicator $indicator): ?array => ($rag = $indicator->ragStatus($start, $end)) === null || $rag === RagStatus::Green ? null : [
                 'indicator' => $indicator,
@@ -69,7 +69,7 @@ new class extends Component
     $number = fn (?float $value): string => $value === null ? '—' : rtrim(rtrim(number_format($value, 2, '.', ','), '0'), '.');
 @endphp
 
-<x-desk.panel :empty="$rows->isEmpty()" :facets="$pg['facets']" id="targets" register="targets.index" :size="$size" :cols="$gridCols" :height="$gridRows" :index="$index" :total="$total" :count="$rows->count()">
+<x-desk.panel :empty="$rows->isEmpty()" :facets="$pg['facets']" id="targets" register="results.index" :size="$size" :cols="$gridCols" :height="$gridRows" :index="$index" :total="$total" :count="$rows->count()">
     @if ($pg['total'] > 0)
         <ul class="dk-tg" {{ $this->fitAttributes($pg) }}>
             @foreach ($pg['slice'] as $row)
@@ -78,7 +78,7 @@ new class extends Component
                     $unit = $indicator->unit ?? '';
                 @endphp
                 <li wire:key="ind-{{ $indicator->id }}">
-                    <span class="dk-tg-n" title="{{ $indicator->name }}@if ($indicator->location !== null) · {{ $indicator->location->label() }}@endif">@if (filled($indicator->code))<span class="dk-mono">{{ $indicator->code }}</span> @endif<a href="{{ route('indicators.index', ['inspect' => $indicator->id]) }}" wire:navigate data-indicator-link="{{ $indicator->id }}">{{ $indicator->name }}</a>@if ($indicator->location !== null)<span class="dk-is"> · <a href="{{ route('projects.show', $indicator->location) }}" wire:navigate>{{ $indicator->location->label() }}</a></span>@endif</span>
+                    <span class="dk-tg-n" title="{{ $indicator->name }}@if ($indicator->location !== null) · {{ $indicator->location->label() }}@endif">@if (filled($indicator->code))<span class="dk-mono">{{ $indicator->code }}</span> @endif<a href="{{ app(\App\Notifications\SubjectLinks::class)->frameworkRoute($indicator) ?? route('results.index') }}" wire:navigate data-indicator-link="{{ $indicator->id }}">{{ $indicator->name }}</a>@if ($indicator->location !== null)<span class="dk-is"> · <a href="{{ route('projects.show', $indicator->location) }}" wire:navigate>{{ $indicator->location->label() }}</a></span>@endif</span>
                     <span @class(['dk-pill dk-tg-s', 'dk-bad' => $row['rag'] === RagStatus::Red, 'dk-warn' => $row['rag'] === RagStatus::Amber])>{{ $row['rag']->label() }}</span>
                     <span class="dk-tg-b" title="{{ __('desk.plans_bar', ['done' => (int) round($row['achieved']), 'expected' => (int) round($row['expected'])]) }}"><span class="dk-meter dk-res"><b style="width:{{ round(min(100, max(0, $row['achieved'])), 1) }}%"></b><span class="dk-tick" style="inset-inline-start:{{ round($row['expected'], 1) }}%"></span></span></span>
                     <span class="dk-tg-v dk-num"><strong>{{ $number($row['latest']) }}</strong> / {{ $number((float) $indicator->target) }}@if ($unit !== '') {{ $unit }}@endif · {{ (int) round($row['achieved']) }}%</span>

@@ -1,19 +1,25 @@
 <?php
 
 use App\Enums\ResultType;
+use App\Livewire\Concerns\Indicators\ManagesIndicatorReadings;
 use App\Livewire\Concerns\Results\BuildsResultsFramework;
 use App\Livewire\Concerns\Results\BuildsResultsTree;
 use App\Livewire\Concerns\Results\ManagesProgramRisks;
 use App\Livewire\Concerns\Results\ManagesResultForm;
+use App\Models\Indicator;
 use App\Models\Program;
 use App\Models\Project;
 use App\Models\Proposal;
 use App\Models\Result;
+use App\Support\MonthlyReportLineBuilder;
+use Carbon\CarbonImmutable;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Gate;
+use Illuminate\Validation\ValidationException;
 use Livewire\Attributes\Computed;
 use Livewire\Attributes\Layout;
+use Livewire\Attributes\On;
 use Livewire\Attributes\Title;
 use Livewire\Attributes\Url;
 use Livewire\Component;
@@ -21,6 +27,7 @@ use Livewire\Component;
 new #[Layout('layouts::desk'), Title('titles.results_framework')] class extends Component {
     use BuildsResultsFramework;
     use BuildsResultsTree;
+    use ManagesIndicatorReadings;
     use ManagesProgramRisks;
     use ManagesResultForm;
 
@@ -65,6 +72,30 @@ new #[Layout('layouts::desk'), Title('titles.results_framework')] class extends 
     protected function frameworkResults(): Builder
     {
         return Result::query()->programFramework();
+    }
+
+    /** @return Builder<Indicator> */
+    protected function readingIndicators(): Builder
+    {
+        return Indicator::query()->whereIn('result_id', $this->frameworkResults()->select('id'));
+    }
+
+    protected function authorizeReadingPeriod(Indicator $indicator, CarbonImmutable $date): void
+    {
+        if (app(MonthlyReportLineBuilder::class)->canCarryMeasurement($indicator, $date)) {
+            throw ValidationException::withMessages(['progressDate' => __('indicators.measurement_belongs_in_monthly_report')]);
+        }
+    }
+
+    protected function forgetIndicators(): void
+    {
+        $this->forgetFramework();
+    }
+
+    #[On('framework-target-saved')]
+    public function refreshFrameworkTargets(): void
+    {
+        $this->forgetFramework();
     }
 
     /**
@@ -196,8 +227,10 @@ new #[Layout('layouts::desk'), Title('titles.results_framework')] class extends 
 
     @include('pages.results._index-result-modal')
     @include('pages.results._index-risk-modal')
+    @include('pages.indicators._index-reading-modal')
 
-    <livewire:indicators.quick-form />
+    <livewire:indicators.quick-form :open-on-load="request()->boolean('newIndicator')" :initial-location-id="request()->integer('location') ?: null" />
+    <livewire:targets.framework-form :open-on-load="request()->boolean('newTarget')" :initial-indicator-id="request()->integer('targetIndicator') ?: null" />
 
     <x-ui.confirm-modal
         permanent

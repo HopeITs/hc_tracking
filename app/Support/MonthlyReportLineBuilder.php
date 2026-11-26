@@ -8,7 +8,9 @@ use App\Enums\DonorAttribution;
 use App\Enums\IndicatorCollector;
 use App\Enums\MonthlyReportStatus;
 use App\Enums\ReportTemplateLineStatus;
+use App\Models\Indicator;
 use App\Models\MonthlyReport;
+use App\Models\MonthlyReportLineShare;
 use App\Models\PlanIndicator;
 use App\Models\ReportTemplate;
 use App\Models\ReportTemplateLine;
@@ -39,6 +41,27 @@ use Illuminate\Support\Facades\DB;
  */
 final class MonthlyReportLineBuilder
 {
+    public function canCarryMeasurement(Indicator $indicator, CarbonImmutable $date): bool
+    {
+        $month = $date->startOfMonth();
+        $hasShare = MonthlyReportLineShare::query()
+            ->whereHas('planIndicator', fn ($query) => $query->where('indicator_id', $indicator->id))
+            ->whereHas('line.monthlyReport', fn ($query) => $query->where('period', $month->toDateString()))
+            ->exists();
+
+        if ($hasShare) {
+            return true;
+        }
+
+        return $indicator->library_indicator_id !== null
+            && ReportTemplateLine::query()
+                ->where('status', ReportTemplateLineStatus::Confirmed)
+                ->whereHas('planIndicator', fn ($query) => $query->where('indicator_id', $indicator->id))
+                ->with(['planIndicator.indicator.libraryIndicator', 'planIndicator.source'])
+                ->get()
+                ->contains(fn (ReportTemplateLine $line): bool => $line->isDueIn($month) && self::covers($line->planIndicator, $month));
+    }
+
     /**
      * Add the missing lines and shares of a draft report.
      *

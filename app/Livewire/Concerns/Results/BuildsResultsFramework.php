@@ -67,6 +67,7 @@ trait BuildsResultsFramework
                         'location.centers',
                         'location.proposal:id,name',
                         'progress:id,indicator_id,date,value',
+                        'approvedMonthlyMeasurements',
                         'planIndicators' => fn ($query) => $query
                             ->select(['id', 'indicator_id', 'source_type', 'source_id', 'target', 'project_id', 'center_id', 'period'])
                             ->with([
@@ -227,7 +228,7 @@ trait BuildsResultsFramework
             foreach ($result->indicators as $indicator) {
                 $achieved = $indicator->percentAchieved();
                 $status = $indicator->ragStatus($windowStart, $windowEnd);
-                $latestReading = $indicator->progress->last();
+                $latestDate = $indicator->latestMeasurementDate();
                 $targetRows = [];
 
                 foreach ($indicator->planIndicators as $target) {
@@ -248,7 +249,7 @@ trait BuildsResultsFramework
                 }
 
                 // Never read, or not read within its own cadence: the figure is old.
-                if ($latestReading === null || $latestReading->date->startOfDay()->diffInDays($today, false) > $indicator->frequency->freshnessDays()) {
+                if ($latestDate === null || $latestDate->startOfDay()->diffInDays($today, false) > $indicator->frequency->freshnessDays()) {
                     $old++;
                 }
 
@@ -267,7 +268,7 @@ trait BuildsResultsFramework
                     'rag' => $status,
                     'targets' => count($targetRows),
                     'latest' => $indicator->latestValue(),
-                    'latestDate' => $latestReading?->date,
+                    'latestDate' => $latestDate,
                     'series' => $indicator->progress->map(fn ($reading): float => (float) $reading->value)->all(),
                     'targetRows' => $targetRows,
                 ];

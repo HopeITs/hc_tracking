@@ -21,6 +21,32 @@ test('guests are redirected from the results framework', function () {
     $this->get(route('results.index'))->assertRedirect(route('login'));
 });
 
+test('the framework target form opens a target for its program indicator', function () {
+    $user = User::factory()->role('Super Admin')->create();
+    $indicator = Indicator::factory()->for(Result::factory())->create();
+
+    Livewire::actingAs($user)
+        ->test('targets.framework-form')
+        ->call('openCreateModal', $indicator->id)
+        ->assertSet('showTargetModal', true)
+        ->assertSet('targetIndicatorId', (string) $indicator->id);
+});
+
+test('MEAL can record a program indicator reading without an eligible monthly report', function () {
+    $user = User::factory()->role('MEAL')->create();
+    $indicator = Indicator::factory()->for(Result::factory())->create();
+
+    Livewire::actingAs($user)
+        ->test('pages::results.index')
+        ->call('openProgressModal', $indicator->id)
+        ->set('progressValue', '12')
+        ->call('saveProgress')
+        ->assertHasNoErrors();
+
+    expect($indicator->fresh()->latestValue())->toBe(12.0)
+        ->and($indicator->progress()->sole()->recorded_by)->toBe($user->id);
+});
+
 test('results render as a nested logframe grouped by program', function () {
     $user = User::factory()->role('General Manager')->create();
     $program = Program::factory()->create(['name' => 'Water Security']);

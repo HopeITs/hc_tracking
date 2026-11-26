@@ -4,10 +4,15 @@ use App\Models\Activity;
 use App\Models\Donor;
 use App\Models\DonorProposal;
 use App\Models\DonorReport;
+use App\Models\Indicator;
 use App\Models\MonthlyReport;
+use App\Models\PlanIndicator;
+use App\Models\Proposal;
 use App\Models\Report;
+use App\Models\Result;
 use App\Models\Risk;
 use App\Models\Strategy;
+use App\Models\User;
 use App\Notifications\NotificationPresenter;
 use App\Notifications\SubjectLinks;
 
@@ -27,14 +32,48 @@ test('every directory-only subject type leads to its directory', function (strin
     expect(app(SubjectLinks::class)->routeFor($type, 5))->toBe($expected());
 })->with([
     'risk' => ['risk', fn () => route('risks.index')],
-    'indicator' => ['indicator', fn () => route('indicators.index', ['inspect' => 5])],
     'library indicator' => ['library_indicator', fn () => route('indicator-library.index', ['entry' => 5])],
-    'target' => ['plan_indicator', fn () => route('targets.index')],
     'result' => ['result', fn () => route('results.index')],
     'transfer' => ['transfer', fn () => route('transfers.index')],
     'account' => ['account', fn () => route('admin.accounts.index')],
     'supervision' => ['supervision', fn () => route('admin.users.index', ['tab' => 'supervision'])],
 ]);
+
+test('indicator and target notifications open their proposal logframe', function () {
+    [$indicator, $target, $proposal] = Activity::withoutRecording(function (): array {
+        $proposal = Proposal::factory()->create();
+        $result = Result::factory()->for($proposal)->create();
+        $indicator = Indicator::factory()->for($result)->create();
+        $target = PlanIndicator::factory()->forProposal($proposal)->for($indicator)->create();
+
+        return [$indicator, $target, $proposal];
+    });
+    $links = app(SubjectLinks::class);
+    $logframe = route('proposals.show', ['proposal' => $proposal, 'ptab' => 'logframe']);
+
+    expect($links->routeFor('indicator', $indicator->id))->toBe($logframe)
+        ->and($links->routeFor('plan_indicator', $target->id))->toBe($logframe);
+
+    $this->actingAs(User::factory()->role('Super Admin')->create())
+        ->get(route('indicators.index', ['inspect' => $indicator->id]))
+        ->assertStatus(301)
+        ->assertRedirect($logframe);
+
+    $this->get(route('targets.index', ['indicator' => $indicator->id]))
+        ->assertStatus(301)
+        ->assertRedirect($logframe);
+
+    $this->get(route('targets.index', ['indicator' => $indicator->id, 'create' => 1]))
+        ->assertStatus(301)
+        ->assertRedirect($logframe.'&newTarget=1&targetIndicator='.$indicator->id);
+});
+
+test('program indicator notifications open the result row', function () {
+    $indicator = Activity::withoutRecording(fn () => Indicator::factory()->for(Result::factory())->create());
+
+    expect(app(SubjectLinks::class)->routeFor('indicator', $indicator->id))
+        ->toBe(route('results.index', ['program' => 'none']).'#framework-result-'.$indicator->result_id);
+});
 
 test('routeFor returns null for a show-route subject that no longer exists', function () {
     expect(app(SubjectLinks::class)->routeFor('report', 999999))->toBeNull();

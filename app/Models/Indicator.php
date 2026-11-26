@@ -5,9 +5,11 @@ declare(strict_types=1);
 namespace App\Models;
 
 use App\Concerns\RecordsActivity;
+use App\Enums\DonorAttribution;
 use App\Enums\IndicatorMeasure;
 use App\Enums\Period;
 use App\Enums\RagStatus;
+use App\Enums\ReportStatus;
 use App\Notifications\TracksActivity;
 use Carbon\CarbonImmutable;
 use Database\Factories\IndicatorFactory;
@@ -19,6 +21,7 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\HasManyThrough;
 
 /**
  * @property int $id
@@ -147,6 +150,20 @@ class Indicator extends Model implements TracksActivity
     }
 
     /**
+     * @return HasManyThrough<Report, PlanIndicator, $this>
+     */
+    public function approvedMonthlyMeasurements(): HasManyThrough
+    {
+        return $this->hasManyThrough(Report::class, PlanIndicator::class)
+            ->with('monthlyReport.template.program')
+            ->whereNotNull('reports.monthly_report_line_share_id')
+            ->where('reports.status', ReportStatus::Approved->value)
+            ->whereNotNull('reports.value')
+            ->orderByDesc('reports.planned_date')
+            ->orderByDesc('reports.id');
+    }
+
+    /**
      * The most recent recorded value, or null when nothing has been recorded.
      *
      * Answers from a loaded `progress` relation when there is one, so rendering
@@ -154,15 +171,47 @@ class Indicator extends Model implements TracksActivity
      */
     public function latestValue(): ?float
     {
-        if ($this->relationLoaded('progress')) {
-            $latest = $this->getRelation('progress')->last();
+        return $this->latestMeasurement()['value'] ?? null;
+    }
 
-            return $latest === null ? null : (float) $latest->value;
+    public function latestMeasurementDate(): ?CarbonImmutable
+    {
+        return $this->latestMeasurement()['date'] ?? null;
+    }
+
+    /** @return array{value: float, date: CarbonImmutable}|null */
+    private function latestMeasurement(): ?array
+    {
+        $manual = $this->relationLoaded('progress')
+            ? $this->progress->last()
+            : $this->progress()->reorder()->orderByDesc('date')->orderByDesc('id')->first();
+
+        $measurements = $this->relationLoaded('approvedMonthlyMeasurements')
+            ? $this->approvedMonthlyMeasurements
+            : $this->approvedMonthlyMeasurements()->get();
+        $latest = $measurements->first();
+
+        if ($latest !== null && ($manual === null || $latest->planned_date->gte($manual->date))) {
+            $shares = $measurements
+                ->filter(fn (Report $report): bool => $report->planned_date->isSameMonth($latest->planned_date))
+                ->unique(fn (Report $report): string => $report->monthlyReport?->template?->program?->donor_attribution === DonorAttribution::Shared
+                    ? 'shared:'.$report->monthly_report_id
+                    : 'share:'.$report->id);
+
+            $value = (float) $shares->sum('value');
+
+            if ($this->measure !== IndicatorMeasure::Numeric) {
+                $ratios = $shares->filter(fn (Report $report): bool => $report->numerator !== null && (float) $report->denominator > 0);
+                $denominator = (float) $ratios->sum('denominator');
+                $value = $denominator > 0
+                    ? round((float) $ratios->sum('numerator') / $denominator * ($this->measure === IndicatorMeasure::Percentage ? 100 : 1), 2)
+                    : (float) $latest->value;
+            }
+
+            return ['value' => $value, 'date' => CarbonImmutable::instance($latest->planned_date)];
         }
 
-        $value = $this->progress()->reorder()->orderByDesc('date')->orderByDesc('id')->value('value');
-
-        return $value === null ? null : (float) $value;
+        return $manual === null ? null : ['value' => (float) $manual->value, 'date' => CarbonImmutable::instance($manual->date)];
     }
 
     /**

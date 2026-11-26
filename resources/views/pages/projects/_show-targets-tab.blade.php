@@ -2,7 +2,7 @@
         <x-ui.panel :title="__('projects.project_indicators')" :count="$this->projectIndicators->sum(fn (array $group): int => $group['indicators']->count())" :subtitle="__('projects.project_indicators_subtitle')" class="mb-6" data-tour="project-indicators">
             @can('indicators.create')
                 <x-slot:toolbar>
-                    <x-ui.button tone="primary" size="sm" icon="plus" :href="route('indicators.index', ['create' => 1, 'location' => $this->locationId])" wire:navigate data-new-indicator>
+                    <x-ui.button tone="primary" size="sm" icon="plus" :href="route('results.index', ['newIndicator' => 1, 'location' => $this->locationId])" wire:navigate data-new-indicator>
                         {{ __('projects.new_indicator') }}
                     </x-ui.button>
                 </x-slot:toolbar>

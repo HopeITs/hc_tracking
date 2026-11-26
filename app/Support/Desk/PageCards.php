@@ -12,7 +12,6 @@ use App\Support\Desk\Cards\AnnualPlansCard;
 use App\Support\Desk\Cards\CitiesCard;
 use App\Support\Desk\Cards\DonorReportsCard;
 use App\Support\Desk\Cards\EvidenceTypesCard;
-use App\Support\Desk\Cards\IndicatorsCard;
 use App\Support\Desk\Cards\LibraryCard;
 use App\Support\Desk\Cards\NarrativeQuestionsCard;
 use App\Support\Desk\Cards\PageCard;
@@ -44,7 +43,6 @@ final class PageCards
         'annual-plans.index' => AnnualPlansCard::class,
         'results.index' => ResultsCard::class,
         'indicator-library.index' => LibraryCard::class,
-        'indicators.index' => IndicatorsCard::class,
         'reports.index' => ReportsCard::class,
         'donor-reports.index' => DonorReportsCard::class,
         'funding-agreements.index' => AgreementsCard::class,
@@ -65,7 +63,7 @@ final class PageCards
      */
     private const array Icons = [
         'strategies.index' => 'chart', 'programs.index' => 'folder', 'annual-plans.index' => 'cal', 'results.index' => 'chart',
-        'indicator-library.index' => 'file', 'indicators.index' => 'chart', 'reports.index' => 'file', 'donor-reports.index' => 'file',
+        'indicator-library.index' => 'file', 'reports.index' => 'file', 'donor-reports.index' => 'file',
         'funding-agreements.index' => 'coins', 'admin.accounts.index' => 'coins', 'admin.users.index' => 'users', 'activity.index' => 'undo',
         'admin.cities.index' => 'map', 'admin.sectors.index' => 'grid', 'admin.risk-library.index' => 'info', 'admin.evidence-types.index' => 'file',
         'admin.narrative-questions.index' => 'info',
