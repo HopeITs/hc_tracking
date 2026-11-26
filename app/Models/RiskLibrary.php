@@ -4,11 +4,13 @@ declare(strict_types=1);
 
 namespace App\Models;
 
+use App\Actions\Results\CopyResultTree;
 use Carbon\CarbonImmutable;
 use Database\Factories\RiskLibraryFactory;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Attributes\Scope;
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\HasMany;
@@ -95,6 +97,41 @@ class RiskLibrary extends Model
     protected function ordered(Builder $query): void
     {
         $query->orderBy($query->qualifyColumn('sort_order'))->orderBy($query->qualifyColumn('id'));
+    }
+
+    /**
+     * Remember the titles MEAL typed on a framework risk: reuse the entry
+     * that already says the same (either language, trimmed, spaces collapsed,
+     * case-insensitive), else append a new active one. A switched-off entry
+     * is reused as it is, never switched back on.
+     */
+    public static function rememberTitles(string $titleAr, string $titleEn): self
+    {
+        $entry = self::query()->ordered()->get()->first(
+            fn (self $candidate): bool => CopyResultTree::sameWords($candidate->title_ar, $titleAr)
+                || CopyResultTree::sameWords($candidate->title_en, $titleEn),
+        );
+
+        if ($entry !== null) {
+            return $entry;
+        }
+
+        $entry = new self;
+        $entry->fill(['title_ar' => trim($titleAr), 'title_en' => trim($titleEn)]);
+        $entry->sort_order = (int) self::query()->max('sort_order') + 1;
+        $entry->save();
+
+        return $entry;
+    }
+
+    /**
+     * The titles offered while MEAL types a risk: active entries, in order.
+     *
+     * @return Collection<int, self>
+     */
+    public static function suggestions(): Collection
+    {
+        return self::query()->active()->ordered()->get(['id', 'title_ar', 'title_en']);
     }
 
     /**

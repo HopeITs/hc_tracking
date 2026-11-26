@@ -42,7 +42,7 @@ final class FrameworkChecks
         $noTarget = $indicators->whereNull('target')->count();
         $activities = $results->filter(fn (Result $result): bool => $result->type === ResultType::Activity);
         $loose = $activities->whereNull('parent_id')->count();
-        $risks = Risk::query()->where('proposal_id', $proposalId)->count();
+        $risks = Risk::query()->onLogframeOf($proposalId)->count();
         $assumptions = Assumption::query()->where('proposal_id', $proposalId)->count();
 
         return [

@@ -230,37 +230,9 @@ describe('the starting list', function () {
             ->and(RiskLibrary::query()->count())->toBe(1);
     });
 
-    it('ships the MEAL risk matrix as its starting list, well formed and in matrix order', function () {
-        $list = DefaultRiskLibrary::all();
-
-        expect($list)->toHaveCount(18)
-            ->and(collect($list)->pluck('title_en')->duplicates())->toBeEmpty()
-            ->and(collect($list)->pluck('title_ar')->duplicates())->toBeEmpty()
-            ->and(collect($list)->pluck('category')->unique()->values()->all())
-            ->toBe(['Context', 'Economic empowerment', 'Youth and students', 'Children and parenting']);
-
-        foreach ($list as $entry) {
-            expect($entry['title_en'])->not->toBe('')
-                ->and(mb_strlen($entry['title_en']))->toBeLessThanOrEqual(255)
-                ->and($entry['title_ar'])->not->toBe('')
-                ->and(mb_strlen($entry['title_ar']))->toBeLessThanOrEqual(255)
-                ->and(mb_strlen((string) $entry['category']))->toBeLessThanOrEqual(40);
-        }
-    });
-
-    it('seeds the starting list once, active and in order, both languages stored', function () {
-        $list = DefaultRiskLibrary::all();
-
-        expect(DefaultRiskLibrary::ensure())->toBe(18)
+    it('ships an empty starting list, so seeding adds nothing and the library fills from typed titles', function () {
+        expect(DefaultRiskLibrary::all())->toBe([])
             ->and(DefaultRiskLibrary::ensure())->toBe(0)
-            ->and(RiskLibrary::query()->count())->toBe(18);
-
-        $seeded = RiskLibrary::query()->active()->ordered()->get();
-
-        expect($seeded->pluck('title_en')->all())->toBe(array_column($list, 'title_en'))
-            ->and($seeded->pluck('title_ar')->all())->toBe(array_column($list, 'title_ar'))
-            ->and($seeded->pluck('category')->all())->toBe(array_column($list, 'category'))
-            ->and($seeded->pluck('default_likelihood')->unique()->all())->toBe([null])
-            ->and($seeded->pluck('default_severity')->unique()->all())->toBe([null]);
+            ->and(RiskLibrary::query()->count())->toBe(0);
     });
 });

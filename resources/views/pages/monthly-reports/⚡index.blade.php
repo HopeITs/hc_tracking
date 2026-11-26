@@ -29,7 +29,8 @@ use Livewire\Attributes\Title;
 use Livewire\Attributes\Url;
 use Livewire\Component;
 
-new #[Layout('layouts::desk'), Title('titles.monthly_reports')] class extends Component {
+new #[Layout('layouts::desk'), Title('titles.monthly_reports')] class extends Component
+{
     use FiltersReportPlaces;
 
     #[Url(except: '')]
@@ -98,9 +99,117 @@ new #[Layout('layouts::desk'), Title('titles.monthly_reports')] class extends Co
         }
     }
 
+    /** Narrows the validation queue by place or proposal name, in memory. */
+    #[Url(except: '')]
+    public string $search = '';
+
+    /** The queue's sort column: 'wait' (longest first), 'program', 'city' or 'month'. */
+    #[Url(except: 'wait')]
+    public string $sort = 'wait';
+
+    #[Url(except: 'desc')]
+    public string $direction = 'desc';
+
+    /**
+     * A column heading was clicked: sort by it, or flip it when it already is.
+     */
+    public function sortQueue(string $column): void
+    {
+        if (! in_array($column, ['wait', 'program', 'city', 'month'], true)) {
+            return;
+        }
+
+        if ($this->sort === $column) {
+            $this->direction = $this->direction === 'asc' ? 'desc' : 'asc';
+
+            return;
+        }
+
+        $this->sort = $column;
+        $this->direction = $column === 'wait' ? 'desc' : 'asc';
+    }
+
+    /**
+     * The validation queue as the table draws it: the filters, the search and
+     * the sort, each row with its program, city and center apart. Submitted
+     * reports come before validated ones whatever the sort.
+     *
+     * @return \Illuminate\Support\Collection<int, array{report: MonthlyReport, program: string, city: string, center: ?string, proposals: list<array{id: int, slug: string, name: string, number: string|null}>, proposalsText: string, waitingDays: ?int}>
+     */
+    #[Computed]
+    public function queueRows(): \Illuminate\Support\Collection
+    {
+        $parts = app(MonthlyReportNames::class)->placePartsFor($this->filteredQueue->pluck('template'));
+        $needle = mb_strtolower(trim($this->search));
+
+        $rows = $this->filteredQueue->map(function (MonthlyReport $report) use ($parts): array {
+            $templateId = $report->report_template_id;
+            $place = $parts[$templateId] ?? ['city' => null, 'program' => null, 'center' => null];
+            $queued = $this->queueNames[$templateId] ?? ['proposals' => [], 'proposalsText' => ''];
+            $isWaiting = $report->status === MonthlyReportStatus::Submitted && $report->submitted_at !== null;
+
+            return [
+                'report' => $report,
+                'program' => (string) ($place['program'] ?? ''),
+                'city' => (string) ($place['city'] ?? ''),
+                'center' => $place['center'],
+                'proposals' => $queued['proposals'],
+                'proposalsText' => $queued['proposalsText'],
+                'waitingDays' => $isWaiting ? (int) $report->submitted_at->startOfDay()->diffInDays(CarbonImmutable::today()) : null,
+            ];
+        });
+
+        if ($needle !== '') {
+            $rows = $rows->filter(fn (array $row): bool => str_contains(mb_strtolower($row['program'].' '.$row['city'].' '.($row['center'] ?? '').' '.$row['proposalsText']), $needle));
+        }
+
+        $flip = $this->direction === 'asc' ? 1 : -1;
+
+        return $rows->sort(function (array $a, array $b) use ($flip): int {
+            $submittedFirst = ($a['waitingDays'] === null) <=> ($b['waitingDays'] === null);
+
+            if ($submittedFirst !== 0) {
+                return $submittedFirst;
+            }
+
+            $byColumn = match ($this->sort) {
+                'program' => strcasecmp($a['program'], $b['program']) ?: strcasecmp($a['city'], $b['city']),
+                'city' => strcasecmp($a['city'], $b['city']) ?: strcasecmp($a['program'], $b['program']),
+                'month' => $a['report']->period <=> $b['report']->period,
+                // Longest waiting = earliest submission, to the second, so the list, "Start reviewing" and the report page's "Next report" walk one order.
+                default => ($b['report']->submitted_at?->getTimestamp() ?? 0) <=> ($a['report']->submitted_at?->getTimestamp() ?? 0),
+            };
+
+            return ($byColumn * $flip) ?: $a['report']->id <=> $b['report']->id;
+        })->values();
+    }
+
+    /**
+     * Where "Start reviewing" goes: the first submitted report of the table.
+     */
+    #[Computed]
+    public function firstToReview(): ?MonthlyReport
+    {
+        return $this->queueRows->first(fn (array $row): bool => $row['waitingDays'] !== null)['report'] ?? null;
+    }
+
+    /** Rows of the validation queue drawn so far; "Show more" adds a page. */
+    public int $queueLimit = 25;
+
+    public function showMoreQueue(): void
+    {
+        $this->queueLimit += 25;
+    }
+
+    public function updatedSearch(): void
+    {
+        $this->queueLimit = 25;
+    }
+
     public function updatedTab(): void
     {
         $this->show = '';
+        $this->queueLimit = 25;
     }
 
     /** A center pre-selects its city. */
@@ -678,7 +787,7 @@ new #[Layout('layouts::desk'), Title('titles.monthly_reports')] class extends Co
 
     public function clearFilters(): void
     {
-        $this->reset('proposal', 'city', 'program', 'center', 'from', 'to', 'status', 'show');
+        $this->reset('proposal', 'city', 'program', 'center', 'from', 'to', 'status', 'show', 'search');
         $this->resetErrorBag('from');
     }
 
@@ -735,7 +844,7 @@ new #[Layout('layouts::desk'), Title('titles.monthly_reports')] class extends Co
 
 @php
     $extractionFiltersAreActive = $this->extractionFiltersAreActive;
-    $filtersAreActive = $extractionFiltersAreActive || ($tab === 'validate' && ($status !== 'submitted' || $show === 'not_seen'));
+    $filtersAreActive = $extractionFiltersAreActive || ($tab === 'validate' && ($status !== 'submitted' || $show === 'not_seen' || trim($search) !== ''));
     $listFilter = $this->extractionFilter;
     $centerValue = match (true) {
         $listFilter->cityWide && $listFilter->cityId !== null => 'field-'.$listFilter->cityId,
@@ -751,7 +860,7 @@ new #[Layout('layouts::desk'), Title('titles.monthly_reports')] class extends Co
     class="@container/directory"
     heading-id="monthly-reports-heading"
     :title="__('titles.monthly_reports')"
-    :count="$tab === 'validate' ? $this->filteredQueue->count() : null"
+    :count="$tab === 'validate' ? $this->queueRows->count() : null"
     data-monthly-reports-intro
     :view="$tab"
     view-model="tab"
@@ -760,6 +869,18 @@ new #[Layout('layouts::desk'), Title('titles.monthly_reports')] class extends Co
         'validate' => $this->canValidate ? ['icon' => 'check', 'label' => __('monthly_reports.tab_validate')] : null,
     ])"
 >
+        @if ($tab === 'validate')
+            @if ($this->firstToReview !== null)
+                <x-slot:actions>
+                    <a class="dk-btn dk-primary" href="{{ route('monthly-reports.show', $this->firstToReview) }}" wire:navigate data-start-reviewing>{{ __('monthly_reports.start_reviewing') }}<span aria-hidden="true" class="rtl:-scale-x-100">→</span></a>
+                </x-slot:actions>
+            @endif
+
+            <x-slot:search>
+                <x-desk.register-search :label="__('monthly_reports.search_queue')" :placeholder="__('monthly_reports.search_queue')" wire:model.live.debounce.250ms="search" data-queue-search />
+            </x-slot:search>
+        @endif
+
         {{-- The D-79 filters on both tabs (Y-05), read through ReportExtraction like the monthly matrix. --}}
         <x-slot:filters>
             <div class="contents" data-list-filters>
@@ -824,7 +945,7 @@ new #[Layout('layouts::desk'), Title('titles.monthly_reports')] class extends Co
         </x-slot:filters>
 
 
-    <div class="flex max-w-3xl flex-col gap-8">
+    <div @class(['flex flex-col gap-6', 'max-w-3xl gap-8!' => $tab !== 'validate'])>
         {{-- The headline figures as large type that also filters the list: still type on the page, not stat tiles (.ai/rules/pages.md). --}}
         @if ($this->figures !== [])
             <div class="dk-figs-lg" role="group" aria-label="{{ __('monthly_reports.figures_label') }}" data-figures>

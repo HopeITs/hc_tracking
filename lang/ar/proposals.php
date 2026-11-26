@@ -1098,12 +1098,15 @@ return [
         'results' => 'نتائج',
         'indicators' => 'مؤشرات',
         'targets' => 'أهداف',
+        'risks' => 'مخاطر',
         'copy' => 'نسخ إلى هذا المقترح',
         'nothing_ticked' => 'لم يُحدد شيء للنسخ.',
-        'copied' => 'نُسخ :results و:indicators و:targets من إطار البرنامج',
+        'copied' => 'نُسخ :results و:indicators و:targets و:risks من إطار البرنامج',
         'n_results' => '{0} 0 نتائج|{1} نتيجة واحدة|{2} نتيجتان|[3,10] :count نتائج|[11,*] :count نتيجة',
         'n_indicators' => '{0} 0 مؤشرات|{1} مؤشر واحد|{2} مؤشران|[3,10] :count مؤشرات|[11,*] :count مؤشرًا',
         'n_targets' => '{0} 0 أهداف|{1} هدف واحد|{2} هدفان|[3,10] :count أهداف|[11,*] :count هدفًا',
+        'n_risks' => '{0} 0 مخاطر|{1} خطر واحد|{2} خطران|[3,10] :count مخاطر|[11,*] :count خطرًا',
+        'risks_title' => 'المخاطر',
     ],
 
     'sections' => [

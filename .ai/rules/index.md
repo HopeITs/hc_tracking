@@ -5,6 +5,7 @@ Before planning or editing, find the row whose globs match the file's path and r
 | Applies to | Rule file |
 | --- | --- |
 | app/Actions/Fortify/AuthenticateWithHrAccount.php | .ai/rules/actions-fortify.md |
+| app/Actions/Risks/** | .ai/rules/actions-risks.md |
 | resources/views/pages/activity/** | .ai/rules/activity.md |
 | {resources/views/pages/transfers/**,resources/views/pages/funding-agreements/**,resources/views/pages/donors/**,resources/views/pages/proposals/**,resources/views/pages/admin/⚡accounts.blade.php} | .ai/rules/admin.md |
 | app/Notifications/Alerts/** | .ai/rules/alerts.md |
@@ -18,6 +19,7 @@ Before planning or editing, find the row whose globs match the file's path and r
 | resources/views/components/funding/** | .ai/rules/components-funding.md |
 | resources/views/components/navigation/sidebar.blade.php | .ai/rules/components-navigation.md |
 | {public/sw.js,public/manifest.webmanifest,resources/js/notifications.js,resources/views/components/notifications/toasts.blade.php} | .ai/rules/components-notifications.md |
+| app/Actions/Results/**,app/Livewire/Concerns/Proposals/ManagesFrameworkBoard.php,resources/views/components/proposals/_framework-picker.blade.php | .ai/rules/components-proposals.md |
 | resources/views/components/ui/**, resources/views/components/ui/{logframe-node.blade.php,logframe.blade.php,target-lineage.blade.php}, resources/views/components/ui/framework-node.blade.php, resources/views/components/ui/multi-select-popover.blade.php | .ai/rules/components-ui.md |
 | resources/views/components/app-logo.blade.php, resources/views/layouts/auth/simple.blade.php | .ai/rules/components.md |
 | {app/Models/User.php,app/Models/Program.php,app/Models/Hr*.php,app/Models/Concerns/RemembersHrLookup.php,database/factories/{UserFactory,ProgramFactory}.php} | .ai/rules/concerns-factories.md |
@@ -46,9 +48,8 @@ Before planning or editing, find the row whose globs match the file's path and r
 | {resources/views/components/ui/gantt.blade.php,resources/js/gantt/**,app/Livewire/Concerns/*Gantt.php} | .ai/rules/livewire-concerns.md |
 | {app/Models/User.php,app/Console/Commands/**,app/Http/Middleware/**,app/Actions/Fortify/**} | .ai/rules/middleware-actions-fortify.md |
 | {config/database.php,.env.example,database/migrations/**} | .ai/rules/migrations.md |
-| resources/views/pages/tasks/** | .ai/rules/task-calendar.md |
 | {app/Models/Hr*.php,app/Support/EmployeeProfile.php,app/Models/Concerns/RemembersHrLookup.php} | .ai/rules/models-concerns.md |
-| app/Models/**, app/Models/Account.php, app/Models/Hr*.php, app/Models/Program.php, app/Models/User.php, app/Models/Task.php | .ai/rules/models.md |
+| app/Models/**, app/Models/Account.php, app/Models/Hr*.php, app/Models/Program.php, app/Models/User.php, app/Models/Task.php, app/Models/Risk.php | .ai/rules/models.md |
 | resources/views/pages/monthly-reports/** | .ai/rules/monthly-reports.md |
 | resources/views/pages/admin/*narrative-questions* | .ai/rules/narrative-questions.md |
 | {app/Http/Middleware/SetLocale.php,app/Http/Controllers/SwitchLocaleController.php,resources/views/components/navigation/sidebar.blade.php,resources/css/*.css} | .ai/rules/navigation-css.md |
@@ -77,11 +78,13 @@ Before planning or editing, find the row whose globs match the file's path and r
 | resources/views/pages/strategies/⚡show.blade.php, resources/views/pages/strategies/⚡index.blade.php | .ai/rules/strategies.md |
 | {app/Support/AgreementMoney.php,app/Support/Tranches.php,app/Models/TransfersTracking.php} | .ai/rules/support-models.md |
 | resources/views/pages/targets/**, app/Livewire/Concerns/Targets/** | .ai/rules/targets.md |
+| resources/views/pages/tasks/** | .ai/rules/task-calendar.md |
 | resources/views/pages/tasks/**, resources/views/pages/tasks/_list-group.blade.php | .ai/rules/tasks.md |
 | tests/** | .ai/rules/tests.md |
 | resources/views/pages/transfers/** | .ai/rules/transfers.md |
 | resources/views/{components/ui/page-header.blade.php,pages/**}, resources/views/{components/ui/header-filter-select.blade.php,pages/**}, resources/views/components/ui/detail-header.blade.php | .ai/rules/ui.md |
 | {app/Notifications/**,resources/views/pages/notifications/**,resources/views/components/notifications/**} | .ai/rules/views-components-notifications.md |
+| {app/Livewire/Concerns/Proposals/**,resources/views/components/proposals/**} | .ai/rules/views-components-proposals.md |
 | {app/Models/PlanIndicator.php,resources/views/pages/{results,indicators,targets}/**,resources/views/components/ui/framework-node.blade.php} | .ai/rules/views-components-ui.md |
 | {lang/**,resources/views/**,app/Enums/**} | .ai/rules/views-enums.md |
 | {app/Models/**,routes/web.php,resources/views/pages/**} | .ai/rules/views-pages.md |

@@ -32,6 +32,13 @@
 >
     <x-slot:actions>
         <x-monthly-reports.state-chip :state="$headerState" class="px-2.5! py-1! text-sm!" />
+        {{-- Walk the validation queue: the next submitted report waiting on this validator, the longest-waiting first. --}}
+        @if ($this->nextToValidate !== null)
+            <a class="dk-btn dk-ghost dk-sm" href="{{ route('monthly-reports.show', $this->nextToValidate) }}" wire:navigate
+               aria-label="{{ __('monthly_reports.next_report_label', ['name' => $this->nextToValidate->period->translatedFormat('F Y')]) }}" data-next-to-validate="{{ $this->nextToValidate->id }}">
+                {{ __('monthly_reports.next_report') }}<span aria-hidden="true" class="rtl:-scale-x-100">→</span>
+            </a>
+        @endif
     </x-slot:actions>
 
     {{-- Each part of the place and the proposals under its own label; the proposals tell two reports of one place and month apart. --}}

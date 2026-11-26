@@ -88,7 +88,7 @@ final class TransitionProposal
                 app(InviteDefaultReviewers::class)->handle($locked, $reviewStage);
             }
 
-            ProposalStatusChanged::dispatch($locked->id, $from, $to, Auth::id());
+            ProposalStatusChanged::dispatch($locked->id, $from, $to, Auth::user()?->id);
 
             return new TransitionResult($note, $this->warnings($locked, $to));
         });

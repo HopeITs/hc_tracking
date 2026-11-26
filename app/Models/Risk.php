@@ -9,6 +9,8 @@ use App\Notifications\TracksActivity;
 use Carbon\CarbonImmutable;
 use Database\Factories\RiskFactory;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
+use Illuminate\Database\Eloquent\Attributes\Scope;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -23,6 +25,8 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
  * @property int|null $library_risk_id
  * @property int|null $proposal_id
  * @property int|null $result_id
+ * @property int|null $program_id
+ * @property int|null $copied_from_id
  * @property bool $happened
  * @property int|null $likelihood
  * @property int|null $severity
@@ -30,7 +34,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
  * @property CarbonImmutable|null $created_at
  * @property CarbonImmutable|null $updated_at
  */
-#[Fillable(['impact', 'name', 'name_en', 'project_id', 'proposal_location_id', 'library_risk_id', 'proposal_id', 'result_id', 'happened', 'likelihood', 'severity', 'solution'])]
+#[Fillable(['impact', 'name', 'name_en', 'project_id', 'proposal_location_id', 'library_risk_id', 'proposal_id', 'result_id', 'program_id', 'copied_from_id', 'happened', 'likelihood', 'severity', 'solution'])]
 class Risk extends Model implements TracksActivity
 {
     /** @use HasFactory<RiskFactory> */
@@ -77,6 +81,58 @@ class Risk extends Model implements TracksActivity
     public function proposal(): BelongsTo
     {
         return $this->belongsTo(Proposal::class);
+    }
+
+    /**
+     * The program whose results framework carries this risk (null for a
+     * proposal risk).
+     *
+     * @return BelongsTo<Program, $this>
+     */
+    public function program(): BelongsTo
+    {
+        return $this->belongsTo(Program::class);
+    }
+
+    /**
+     * The program risk this proposal risk was copied from; null when it was
+     * typed on the proposal itself or the source was deleted.
+     *
+     * @return BelongsTo<Risk, $this>
+     */
+    public function copiedFrom(): BelongsTo
+    {
+        return $this->belongsTo(self::class, 'copied_from_id');
+    }
+
+    /**
+     * The risks of one program's results framework.
+     *
+     * @param  Builder<Risk>  $query
+     */
+    #[Scope]
+    protected function onProgram(Builder $query, int $programId): void
+    {
+        $query->where('program_id', $programId)->whereNull('proposal_id');
+    }
+
+    /**
+     * The logframe risks of one proposal, leaving out its register (location) risks.
+     *
+     * @param  Builder<Risk>  $query
+     */
+    #[Scope]
+    protected function onLogframeOf(Builder $query, int $proposalId): void
+    {
+        $query->where('proposal_id', $proposalId)->whereNull('proposal_location_id');
+    }
+
+    /**
+     * Whether this proposal risk was copied from a program risk (remove only).
+     */
+    public function isCopied(): bool
+    {
+        return $this->copied_from_id !== null;
     }
 
     /**
@@ -143,7 +199,9 @@ class Risk extends Model implements TracksActivity
 
     public function activityProgramId(): ?int
     {
-        return ProposalLocation::programIdFor($this->activityAttribute('proposal_location_id'));
+        $programId = $this->activityAttribute('program_id');
+
+        return $programId !== null ? (int) $programId : ProposalLocation::programIdFor($this->activityAttribute('proposal_location_id'));
     }
 
     /**

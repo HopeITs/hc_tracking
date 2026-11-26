@@ -395,7 +395,7 @@ trait ReadsProposalAttention
 
         return $this->attentionFrameworkMemo = [
             'unmeasured' => $results->filter(fn (Result $result): bool => in_array($result->type, [ResultType::Outcome, ResultType::Output], true) && $result->indicators_count === 0)->values(),
-            'happened' => Risk::query()->select(['id', 'name', 'proposal_id'])->where('proposal_id', $this->proposalId)->where('happened', true)->get(),
+            'happened' => Risk::query()->select(['id', 'name', 'proposal_id'])->onLogframeOf($this->proposalId)->where('happened', true)->get(),
             'indicatorCount' => $indicators->count(),
             'noTarget' => $indicators->whereNull('target')->count(),
             'loose' => $results->filter(fn (Result $result): bool => $result->type === ResultType::Activity && $result->parent_id === null)->count(),

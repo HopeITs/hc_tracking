@@ -121,7 +121,7 @@ final class MonthlyReportActivities
      *
      * @return Collection<int, Proposal>
      */
-    private static function proposalsOf(MonthlyReport $report): Collection
+    public static function proposalsOf(MonthlyReport $report): Collection
     {
         $statuses = array_map(fn (ProposalStatus $status): string => $status->value, ProposalStatus::approvedByDonor());
 

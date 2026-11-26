@@ -28,7 +28,7 @@ use App\Support\MonthlyReportPreparers;
  *   Manager slot, else, while the slot is vacant, an active Public Relations
  *   Manager. Never the requester or the preparer.
  *
- * Super Admin passes every check technically but is never a tested path (D-20a).
+ * Super Admin validates any report but their own (the queue shows every place).
  */
 class MonthlyReportPolicy
 {
@@ -173,6 +173,10 @@ class MonthlyReportPolicy
             || $user->hasRole('General Manager')
             || in_array($user->id, [$monthlyReport->prepared_by, $monthlyReport->submitted_by], true)) {
             return false;
+        }
+
+        if ($user->hasRole('Super Admin')) {
+            return true;
         }
 
         $template = $monthlyReport->relationLoaded('template')

@@ -311,6 +311,21 @@ test('the validator queue holds the officer\'s projects, every project for the s
         ->and(MonthlyReport::query()->validatableBy(userWithRole('General Manager'))->count())->toBe(0);
 });
 
+test('the Super Admin queue holds every submitted report except their own, and they may validate it', function () {
+    $superAdmin = userWithRole('Super Admin');
+    $elsewhere = Activity::withoutRecording(fn () => MonthlyReport::factory()->submitted()->create([
+        'project_id' => Project::factory()->active()->create(['city_id' => insertHrCity('Homs'), 'center_id' => null]),
+        'period' => '2026-10-01',
+    ]));
+    $own = Activity::withoutRecording(fn () => MonthlyReport::factory()->submitted()->create([
+        'period' => '2026-11-01', 'prepared_by' => $superAdmin->id, 'submitted_by' => $superAdmin->id,
+    ]));
+
+    expect(MonthlyReport::query()->validatableBy($superAdmin)->pluck('id')->all())->toBe([$elsewhere->id])
+        ->and($superAdmin->can('validate', $elsewhere))->toBeTrue()
+        ->and($superAdmin->can('validate', $own))->toBeFalse();
+});
+
 test('with nobody responsible any MEAL role holder sees the project in the queue', function () {
     $report = monthlyReportIn($this->project, MonthlyReportStatus::Submitted, $this->owner);
     $meal = userWithRole('MEAL', insertHrEmployee(firstNameEn: 'Huda', lastNameEn: 'Meal'));

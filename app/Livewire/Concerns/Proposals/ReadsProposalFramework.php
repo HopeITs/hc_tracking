@@ -24,8 +24,8 @@ use Livewire\Attributes\Computed;
  * shaped for the three layouts (Results chain, Matrix, Activity board).
  *
  * Builds on BuildsResultsFramework::allResults() (results with indicators,
- * targets and reports) and adds risks, assumptions and the activities'
- * statuses in three more queries. Nothing here queries per row.
+ * targets and reports) and adds assumptions, the activities' statuses and
+ * the logframe risk count (risks sit on the whole framework, not a result). Nothing here queries per row.
  *
  * @property-read Collection<int, Result> $allResults  #[Computed] allResults()
  * @property-read array{results: array<int, array<string, mixed>>, activities: array<int, array<string, mixed>>, roots: list<int>, children: array<int, list<int>>, counts: array<string, int>} $framework  #[Computed] framework()
@@ -45,7 +45,6 @@ trait ReadsProposalFramework
         $all = $this->allResults;
         $ids = $all->pluck('id')->all();
 
-        $risks = Risk::query()->select(['id', 'name', 'result_id', 'happened', 'likelihood', 'severity'])->where('proposal_id', $this->proposalId)->orderBy('id')->get()->groupBy('result_id');
         $assumptions = Assumption::query()->where('proposal_id', $this->proposalId)->orderBy('id')->get()->groupBy('result_id');
         $statuses = ProjectActivityStatus::query()->whereIn('result_id', $ids)->get(['result_id', 'status'])->groupBy('result_id');
 
@@ -74,9 +73,6 @@ trait ReadsProposalFramework
                 'parent' => $result->parent_id,
                 'statement' => $result->statement,
                 'indicators' => $indicators,
-                'risks' => ($risks->get($result->id) ?? collect())->map(fn (Risk $risk): array => [
-                    'id' => $risk->id, 'name' => $risk->name, 'happened' => $risk->happened, 'likelihood' => $risk->likelihood, 'severity' => $risk->severity,
-                ])->values()->all(),
                 'assumptions' => ($assumptions->get($result->id) ?? collect())->map(fn (Assumption $assumption): array => [
                     'id' => $assumption->id, 'statement' => $assumption->statement, 'status' => $assumption->status,
                 ])->values()->all(),
@@ -94,7 +90,7 @@ trait ReadsProposalFramework
             $results[$id]['issues'] = $this->issuesOf($result, $activities);
         }
 
-        $counts['risks'] = $risks->flatten()->count();
+        $counts['risks'] = Risk::query()->onLogframeOf($this->proposalId)->count();
         $counts['assumptions'] = $assumptions->flatten()->count();
 
         // A result whose parent is not in this framework is shown as a root.
@@ -179,12 +175,6 @@ trait ReadsProposalFramework
 
         if ($late > 0) {
             $issues[] = trans_choice('proposals.framework.issue_late', $late, ['count' => $late]);
-        }
-
-        $happened = count(array_filter($result['risks'], fn (array $risk): bool => $risk['happened']));
-
-        if ($happened > 0) {
-            $issues[] = trans_choice('proposals.framework.issue_risks_happened', $happened, ['count' => $happened]);
         }
 
         $atRisk = count(array_filter($result['assumptions'], fn (array $assumption): bool => $assumption['status'] !== AssumptionStatus::Holds));

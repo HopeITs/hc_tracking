@@ -132,7 +132,7 @@ new #[Layout('layouts::desk'), Title('titles.risks')] class extends Component {
         $search = trim($this->search);
         $places = $this->searchedPlaceIds;
 
-        return $this->whereLocationInStrategy(Risk::query(), 'risks.proposal_location_id')
+        return $this->whereLocationInStrategy(Risk::query()->whereNull('risks.program_id'), 'risks.proposal_location_id')
             ->when($search !== '', function ($query) use ($search, $places): void {
                 $query->where(Like::everyWord($search, fn ($query, string $word) => $query
                     ->where(Like::word('name', $word))
@@ -346,7 +346,7 @@ new #[Layout('layouts::desk'), Title('titles.risks')] class extends Component {
     /** Quick-toggle a risk's materialised state directly from its card, without opening the edit modal. */
     public function setHappened(int $riskId, bool $happened): void
     {
-        $risk = Risk::query()->findOrFail($riskId);
+        $risk = Risk::query()->whereNull('program_id')->findOrFail($riskId);
 
         Gate::authorize('update', $risk);
 

@@ -1,20 +1,25 @@
 <?php
 
+use App\Enums\MonthlyReportStatus;
 use App\Livewire\Concerns\MonthlyReports\EditsMonthlyReportActivities;
 use App\Livewire\Concerns\MonthlyReports\EditsMonthlyReportLines;
+use App\Livewire\Concerns\MonthlyReports\EditsMonthlyReportRisks;
 use App\Livewire\Concerns\MonthlyReports\ManagesMonthlyReportFiles;
 use App\Livewire\Concerns\MonthlyReports\ReadsMonthlyReport;
 use App\Livewire\Concerns\MonthlyReports\ReadsMonthlyReportContext;
 use App\Livewire\Concerns\MonthlyReports\RunsMonthlyReportWorkflow;
 use App\Models\MonthlyReport;
 use Illuminate\Support\Facades\Gate;
+use Livewire\Attributes\Computed;
 use Livewire\Attributes\Layout;
 use Livewire\Attributes\Title;
 use Livewire\Component;
 
-new #[Layout('layouts::desk'), Title('titles.monthly_report')] class extends Component {
+new #[Layout('layouts::desk'), Title('titles.monthly_report')] class extends Component
+{
     use EditsMonthlyReportActivities;
     use EditsMonthlyReportLines;
+    use EditsMonthlyReportRisks;
     use ManagesMonthlyReportFiles;
     use ReadsMonthlyReport;
     use ReadsMonthlyReportContext;
@@ -28,6 +33,41 @@ new #[Layout('layouts::desk'), Title('titles.monthly_report')] class extends Com
         $this->renderedStatus = $monthlyReport->status->value;
         $this->seedFigures();
         $this->seedNarrative();
+        $this->seedRisks();
+    }
+
+    /**
+     * The submitted report after this one in the validator's queue, in the
+     * order "To validate" lists it (oldest submission first), wrapping to the
+     * start, so a validator walks the queue without going back to the list
+     * and a skipped report comes round again last. Null for anyone with no
+     * queue, or an empty one.
+     */
+    #[Computed]
+    public function nextToValidate(): ?MonthlyReport
+    {
+        $user = auth()->user();
+
+        if (! $user->can('reports.approve') || $user->hasRole('General Manager')) {
+            return null;
+        }
+
+        $queue = fn () => MonthlyReport::query()
+            ->validatableBy($user)
+            ->where('status', MonthlyReportStatus::Submitted)
+            ->whereKeyNot($this->monthlyReportId)
+            ->orderBy('submitted_at')
+            ->orderBy('id');
+        $columns = ['id', 'slug', 'report_template_id', 'period'];
+        $current = MonthlyReport::query()->whereKey($this->monthlyReportId)->first(['id', 'submitted_at']);
+
+        // Forward from this report in the queue's order, then back to its start: skipping a report never bounces between two.
+        $after = $current?->submitted_at === null ? null : $queue()
+            ->where(fn ($later) => $later->where('submitted_at', '>', $current->submitted_at)
+                ->orWhere(fn ($tie) => $tie->where('submitted_at', $current->submitted_at)->where('id', '>', $current->id)))
+            ->first($columns);
+
+        return $after ?? $queue()->first($columns);
     }
 };
 ?>
@@ -91,6 +131,8 @@ new #[Layout('layouts::desk'), Title('titles.monthly_report')] class extends Com
 
                 @include('pages.monthly-reports._show-answers')
             @endif
+
+            @include('pages.monthly-reports._show-risks')
         </div>
 
         @include('pages.monthly-reports._show-aside')

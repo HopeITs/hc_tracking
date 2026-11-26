@@ -13,7 +13,7 @@
     foreach ($fw['roots'] as $rootId) {
         $walk($rootId, 0);
     }
-    $columns = array_values(array_filter($this::LAYERS, fn (string $layer): bool => $layers[$layer] ?? false));
+    $columns = array_values(array_filter($this::LAYERS, fn (string $layer): bool => $layer !== 'risks' && ($layers[$layer] ?? false)));
     $num = fn (?float $value): string => $value === null ? '' : rtrim(rtrim(number_format($value, 2, '.', ''), '0'), '.');
 @endphp
 
@@ -70,12 +70,6 @@
                                     @else
                                         <span class="pp-small">—</span>
                                     @endif
-                                    @break
-                                @case('risks')
-                                    @foreach ($node['risks'] as $risk)
-                                        <span class="pp-mx-item" dir="auto">{{ \Illuminate\Support\Str::limit($risk['name'], 70) }} @if ($risk['happened'])<span class="pp-mini pp-mini-red">{{ __('proposals.framework.happened') }}</span>@endif</span>
-                                    @endforeach
-                                    @if ($this->canManageRisks)<button type="button" class="pp-mx-add" wire:click="openRisks({{ $id }})">+ {{ __('proposals.framework.add') }}</button>@endif
                                     @break
                                 @case('assumptions')
                                     @foreach ($node['assumptions'] as $assumption)

@@ -3,6 +3,7 @@
 use App\Enums\ResultType;
 use App\Livewire\Concerns\Results\BuildsResultsFramework;
 use App\Livewire\Concerns\Results\BuildsResultsTree;
+use App\Livewire\Concerns\Results\ManagesProgramRisks;
 use App\Livewire\Concerns\Results\ManagesResultForm;
 use App\Models\Program;
 use App\Models\Project;
@@ -20,6 +21,7 @@ use Livewire\Component;
 new #[Layout('layouts::desk'), Title('titles.results_framework')] class extends Component {
     use BuildsResultsFramework;
     use BuildsResultsTree;
+    use ManagesProgramRisks;
     use ManagesResultForm;
 
     #[Url(except: '')]
@@ -193,6 +195,7 @@ new #[Layout('layouts::desk'), Title('titles.results_framework')] class extends 
     @endif
 
     @include('pages.results._index-result-modal')
+    @include('pages.results._index-risk-modal')
 
     <livewire:indicators.quick-form />
 

@@ -259,3 +259,22 @@ test('only someone who may edit indicators can click one open; a PR officer just
         ->call('setLayout', 'matrix')
         ->assertDontSeeHtml($opensEditor);
 });
+
+test('risks sit in one section under the whole framework, not under an output, and cards keep to four rows until Show all', function () {
+    $outcome = frameworkResult(ResultType::Outcome);
+    $output = frameworkResult(ResultType::Output, $outcome);
+    Risk::factory()->rated(1, 1)->create(['proposal_id' => $this->proposal->id, 'result_id' => $output->id, 'name' => 'Minor delay', 'name_en' => null, 'project_id' => null]);
+    Risk::factory()->rated(3, 3)->create(['proposal_id' => $this->proposal->id, 'name' => 'Border closure', 'name_en' => null, 'project_id' => null]);
+    Assumption::factory()->count(5)->create(['proposal_id' => $this->proposal->id, 'result_id' => $output->id]);
+
+    frameworkBox($this->meal)
+        ->call('toggleChild', $output->id)
+        ->assertSeeHtml('data-test="proposal-risks"')
+        ->assertSee(__('results_framework.risks_heading').' · 2')
+        ->assertSee(['Minor delay', 'Border closure'])
+        ->assertDontSeeHtml('pp-fw-score-high')
+        ->assertSee(__('proposals.framework.show_all', ['count' => 5]))
+        ->assertSeeHtml('x-show="all" x-cloak')
+        ->call('toggleLayer', 'risks')
+        ->assertDontSeeHtml('data-test="proposal-risks"');
+});
