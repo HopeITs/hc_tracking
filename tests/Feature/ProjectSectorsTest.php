@@ -7,7 +7,6 @@ use App\Models\Program;
 use App\Models\Project;
 use App\Models\Sector;
 use App\Models\User;
-use App\Support\Locations\ProjectLocationMirror;
 use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
@@ -250,12 +249,10 @@ describe('display', function () {
         $wash = Sector::factory()->create(['name_en' => 'WASH']);
         $clinic = projectWithRow(['name' => 'Clinic project']);
         $wells = projectWithRow(['name' => 'Wells project']);
-        $clinic->sectors()->attach($health->id);
-        $wells->sectors()->attach($wash->id);
-        // Y-16 (D-93): the register filters places, which carry their own
-        // sectors; SyncProjectSectors is what mirrors them in the application.
-        app(ProjectLocationMirror::class)->syncSectors($clinic);
-        app(ProjectLocationMirror::class)->syncSectors($wells);
+        // Y-17 (D-93): the register filters places, and a place carries its
+        // own sectors — SyncLocationSectors is their one writer.
+        rowFor($clinic)->sectors()->attach($health->id);
+        rowFor($wells)->sectors()->attach($wash->id);
 
         Livewire::actingAs(userWithRole('General Manager'))->test('pages::projects.index')
             ->set('view', 'list')

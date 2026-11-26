@@ -356,9 +356,8 @@ class ProposalLocation extends Model implements TracksActivity
     }
 
     /**
-     * The sectors this row covers (contracts.md §7, §12.5), the twin of
-     * `Project::sectors()`. Written only by the Y-11 backfill and, from
-     * slice 2, ProjectLocationMirror.
+     * The sectors this row covers (contracts.md §7, §12.5). Written only
+     * by SyncLocationSectors (Y-17), which is their one writer.
      *
      * @return BelongsToMany<Sector, $this>
      */

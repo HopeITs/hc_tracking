@@ -770,8 +770,7 @@ function proposalPlaceRow(): array
  * One line for the tests that navigate to `projects.index` or `projects.show`,
  * composing with any factory state the test already uses. The proposal is
  * approved unless a proposal is given, because a project exists only once
- * one was (D-84), and the row
- * mirrors what Y-11 moved onto it so `locations:verify-mirror` stays happy.
+ * one was (D-84), and the row carries the state the Projects screen shows.
  * The row takes the project's own centre when it has one and is "centre not
  * set" otherwise (D-82) — never a centre invented for it.
  */

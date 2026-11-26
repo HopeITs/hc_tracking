@@ -8,7 +8,6 @@ use App\Actions\Sectors\SaveSector;
 use App\Models\Project;
 use App\Models\Sector;
 use App\Support\DefaultSectors;
-use App\Support\Locations\ProjectLocationMirror;
 use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
@@ -260,10 +259,9 @@ describe('active and inactive sectors', function () {
         $active = Sector::factory()->create(['name_en' => 'Still offered']);
         $inactive = sectorInUse(['name_en' => 'Withdrawn', 'is_active' => false]);
         $project = $inactive->projects()->sole();
-        // Y-16 (D-93): the page shows the place's sectors, mirrored from the
-        // project by SyncProjectSectors in the application.
+        // Y-17 (D-93): the page shows the place's own sectors.
         $row = rowFor($project);
-        app(ProjectLocationMirror::class)->syncSectors($project);
+        $row->sectors()->attach($inactive->id);
 
         expect(Sector::query()->active()->pluck('id')->all())->toBe([$active->id])
             ->and(Sector::pickerOptions([])->pluck('id')->all())->toBe([$active->id])
