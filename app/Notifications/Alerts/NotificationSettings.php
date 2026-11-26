@@ -15,6 +15,15 @@ final class NotificationSettings
 {
     private const CacheKey = 'notifications.settings';
 
+    /**
+     * The stored values, read once per request: the class is bound scoped, and
+     * due-date maths asks for a setting per working day, so going to the cache
+     * store each time cost hundreds of queries on the Report Tracker.
+     *
+     * @var array<string, mixed>|null
+     */
+    private ?array $loaded = null;
+
     public function get(string $key): mixed
     {
         $stored = $this->stored();
@@ -44,6 +53,7 @@ final class NotificationSettings
         );
 
         Cache::forget(self::CacheKey);
+        $this->loaded = null;
     }
 
     /**
@@ -51,7 +61,7 @@ final class NotificationSettings
      */
     private function stored(): array
     {
-        return Cache::rememberForever(self::CacheKey, fn (): array => DB::table('notification_settings')
+        return $this->loaded ??= Cache::rememberForever(self::CacheKey, fn (): array => DB::table('notification_settings')
             ->pluck('value', 'key')
             ->map(fn (string $value): mixed => json_decode($value, true))
             ->all());

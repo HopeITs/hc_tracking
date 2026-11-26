@@ -39,6 +39,7 @@ use App\Support\Desk\Destinations;
 use App\Support\Desk\PageCards;
 use App\Support\Desk\Panels;
 use App\Support\Desk\Shortcuts;
+use App\Support\Reporting\ActiveReports;
 use App\Support\RouteSlugs;
 use App\Support\SupervisionMap;
 use Carbon\Carbon;
@@ -158,6 +159,29 @@ class AppServiceProvider extends ServiceProvider
         $this->configureLivewire();
         $this->configureRateLimiting();
         $this->configureDateLocale();
+        $this->forgetActiveReportsOnChange();
+    }
+
+    /**
+     * The Report Tracker keeps each viewer's rows for a few minutes
+     * (ActiveReports); a change to any record they are read from forgets them.
+     */
+    protected function forgetActiveReportsOnChange(): void
+    {
+        $models = [
+            MonthlyReport::class,
+            DonorReport::class,
+            ReportTemplate::class,
+            ProposalLocation::class,
+            Proposal::class,
+            DonorProposal::class,
+            Donor::class,
+        ];
+
+        foreach ($models as $model) {
+            $model::saved(fn () => ActiveReports::forget());
+            $model::deleted(fn () => ActiveReports::forget());
+        }
     }
 
     /**
