@@ -27,6 +27,7 @@ use App\Models\Proposal;
 use App\Models\ProposalChangeRequest;
 use App\Models\ProposalLocation;
 use App\Models\Report;
+use App\Models\ReportTemplate;
 use App\Models\Result;
 use App\Models\Role;
 use App\Models\Sector;
@@ -762,6 +763,118 @@ function proposalPlaceRow(): array
 }
 
 /**
+ * The location row that carries this project (Y-16, D-93): the state the
+ * Projects screen shows, where one entry is one row of one proposal.
+ *
+ * One line for the tests that navigate to `projects.index` or `projects.show`,
+ * composing with any factory state the test already uses. The proposal is
+ * approved unless a proposal is given, because a project exists only once
+ * one was (D-84), and the row
+ * mirrors what Y-11 moved onto it so `locations:verify-mirror` stays happy.
+ * The row takes the project's own centre when it has one and is "centre not
+ * set" otherwise (D-82) — never a centre invented for it.
+ */
+function rowFor(Project $project, ?Proposal $proposal = null): ProposalLocation
+{
+    return Activity::withoutRecording(function () use ($project, $proposal): ProposalLocation {
+        $existing = ProposalLocation::query()->where('project_id', $project->id)->orderBy('id')->first();
+
+        if ($existing !== null) {
+            return $existing;
+        }
+
+        // The row's proposal carries the project's own name, so a register
+        // that names the proposal (Y-16) reads as the fixture wrote it. The
+        // project id is appended only when another proposal already holds
+        // that name: faker repeats names, and the slug the name produces is
+        // unique (Y-11).
+        $proposal ??= Proposal::factory()->running()->create(array_filter([
+            'name' => Proposal::query()->where('name', $project->name)->exists() ? $project->name.' #'.$project->id : $project->name,
+            'planned_date_begin' => $project->start_date?->toDateString(),
+            'planned_date_end' => $project->end_date?->toDateString(),
+        ]));
+
+        $row = ProposalLocation::factory()->forProject($project)->create([
+            'proposal_id' => $proposal->id,
+            'status' => $project->status,
+            'start_date' => $project->start_date,
+            'end_date' => $project->end_date,
+            'target_beneficiaries' => $project->target_beneficiaries,
+            'target_men' => $project->target_men,
+            'target_women' => $project->target_women,
+            'target_boys' => $project->target_boys,
+            'target_girls' => $project->target_girls,
+            'description' => $project->description,
+            'schedule_weekend' => $project->schedule_weekend,
+            'working_days' => $project->working_days,
+        ]);
+
+        if ($project->center_id !== null) {
+            $row->centers()->create(['center_id' => $project->center_id]);
+        }
+
+        return $row;
+    });
+}
+
+/**
+ * A monthly report at a location row's place (Y-16).
+ *
+ * A report belongs to a template, and a template reaches a row by matching
+ * its place, so a test that wants "this row's report" needs a template at
+ * that place. ReportTemplateFactory carries a legacy template with a row of
+ * its own (Y-03); that second row is removed here, since it would sit at the
+ * same place and read the same report (D-77 is tested on its own).
+ *
+ * @param  array<string, mixed>  $attributes  passed to MonthlyReport::factory()
+ */
+function reportAtRow(ProposalLocation $row, array $attributes = []): MonthlyReport
+{
+    return Activity::withoutRecording(function () use ($row, $attributes): MonthlyReport {
+        $template = ReportTemplate::query()
+            ->where('city_id', $row->city_id)
+            ->where('program_id', $row->program_id)
+            ->first();
+
+        if ($template === null) {
+            $template = ReportTemplate::factory()->create([
+                'project_id' => $row->project_id,
+                'city_id' => $row->city_id,
+                'program_id' => $row->program_id,
+                'center_id' => $row->centerIds()[0] ?? null,
+                'city_wide' => $row->city_wide,
+            ]);
+
+            ProposalLocation::query()
+                ->where('city_id', $row->city_id)
+                ->where('program_id', $row->program_id)
+                ->whereKeyNot($row->id)
+                ->delete();
+        }
+
+        return MonthlyReport::factory()->create([
+            'report_template_id' => $template->id,
+            'project_id' => $row->project_id,
+            ...$attributes,
+        ]);
+    });
+}
+
+/**
+ * A project and the row that carries it, for the common case with no factory
+ * state (Y-16).
+ *
+ * @param  array<string, mixed>  $attributes  passed to Project::factory()
+ */
+function projectWithRow(array $attributes = []): Project
+{
+    $project = Project::factory()->create($attributes);
+    rowFor($project);
+
+    return $project;
+}
+
+/**
  * A location row of the proposal that carries the project (Y-02): the
  * project's city and program, and one center (a new HR center of the city
  * unless one is given; `null` makes the row city-wide).
@@ -1075,7 +1188,12 @@ function donorReportProposal(array $attributes = [], bool $internal = false, boo
 }
 
 /**
- * A center (project) linked to the proposal with its beneficiaries.
+ * A center of the proposal with its beneficiaries: a project, the location row
+ * that carries it (Y-11, Y-16 — the row holds `target_beneficiaries` and is
+ * what the aggregator reads) and a report template at the row's place (Y-02).
+ *
+ * Still returns the project, which most call sites pass around; ask
+ * donorReportRow() for its row.
  */
 function donorReportCenter(Proposal $proposal, DonorAttribution $attribution = DonorAttribution::Shared, ?int $beneficiaries = 100, ?Program $program = null): Project
 {
@@ -1086,8 +1204,42 @@ function donorReportCenter(Proposal $proposal, DonorAttribution $attribution = D
         ]);
         $proposal->projects()->attach($project->id, ['target_beneficiaries' => $beneficiaries]);
 
+        ProposalLocation::query()->where('proposal_id', $proposal->id)->where('project_id', $project->id)->first()
+            ?? ProposalLocation::factory()->forProject($project)->create([
+                'proposal_id' => $proposal->id,
+                'target_beneficiaries' => $beneficiaries,
+            ]);
+
+        ReportTemplate::query()->where('project_id', $project->id)->first()
+            ?? ReportTemplate::factory()->create(['project_id' => $project->id]);
+
         return $project;
     });
+}
+
+/**
+ * The location row of the proposal that carries the center, created on first
+ * ask. Two proposals may each have a row at one place (D-77), so a center
+ * attached to a second proposal gets its own row with that proposal's
+ * beneficiaries.
+ */
+function donorReportRow(Proposal $proposal, Project $center): ProposalLocation
+{
+    $row = ProposalLocation::query()->where('proposal_id', $proposal->id)->where('project_id', $center->id)->first();
+
+    if ($row !== null) {
+        return $row;
+    }
+
+    $beneficiaries = DB::table('project_proposal')
+        ->where('proposal_id', $proposal->id)
+        ->where('project_id', $center->id)
+        ->value('target_beneficiaries');
+
+    return Activity::withoutRecording(fn (): ProposalLocation => ProposalLocation::factory()->forProject($center)->create([
+        'proposal_id' => $proposal->id,
+        'target_beneficiaries' => $beneficiaries === null ? null : (int) $beneficiaries,
+    ]));
 }
 
 /**
@@ -1113,6 +1265,7 @@ function donorReportTarget(Proposal $proposal, Project $center, LibraryIndicator
         return PlanIndicator::factory()->forProposal($proposal)->create([
             'indicator_id' => $instance->id,
             'project_id' => $center->id,
+            'proposal_location_id' => donorReportRow($proposal, $center)->id,
             'target' => $target,
         ]);
     });

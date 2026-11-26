@@ -12,6 +12,7 @@
             $groupProgram = collect($nodes)->map(fn (array $node) => $node['result']->program)->filter()->first();
             $groupKey = $groupProgram?->id ?? 'none';
             $canAddFreeActivity = auth()->user()->can('results.create');
+            $canManageRisks = $groupProgram !== null && auth()->user()->can('manageFramework', [\App\Models\Risk::class, $groupProgram]);
             $freeActivityHeadingShown = false;
         @endphp
         <section
@@ -53,6 +54,36 @@
                 @if ($canAddFreeActivity)
                     <div class="flex flex-wrap items-center gap-2 border-t border-dashed border-secondary-soft pt-4 dark:border-line">
                         <x-ui.button tone="ghost" size="sm" icon="plus" class="ms-auto" wire:click="openCreateActivity({{ $groupProgram?->id ?? 'null' }})" data-test="add-free-activity-{{ $groupKey }}">{{ __('results_framework.add_free_activity') }}</x-ui.button>
+                    </div>
+                @endif
+
+                @if ($groupProgram !== null)
+                    {{-- The program's risks: the whole framework, not one statement (ManagesProgramRisks). --}}
+                    @php $groupRisks = $this->programRisks->get($groupProgram->id, collect()); @endphp
+                    <div class="rounded-panel border border-panel-border bg-white px-4 py-3 dark:bg-surface-1" data-test="program-risks-{{ $groupKey }}">
+                        <div class="flex flex-wrap items-center gap-2">
+                            <h3 class="type-label text-secondary-dark dark:text-ink">{{ __('results_framework.risks_heading') }} · {{ $groupRisks->count() }}</h3>
+                            @if ($canManageRisks)
+                                <x-ui.button tone="ghost" size="sm" icon="plus" class="ms-auto" wire:click="openRiskForm({{ $groupProgram->id }})" data-test="add-program-risk-{{ $groupKey }}">{{ __('results_framework.add_risk') }}</x-ui.button>
+                            @endif
+                        </div>
+
+                        @if ($groupRisks->isEmpty())
+                            <p class="type-meta mt-2 text-secondary-medium dark:text-ink-muted">{{ __('results_framework.no_program_risks') }}</p>
+                        @else
+                            <ul class="divide-y divide-panel-border">
+                                @foreach ($groupRisks as $risk)
+                                    <x-risks.row :risk="$risk" wire:key="program-risk-{{ $risk->id }}">
+                                        @if ($canManageRisks)
+                                            <x-slot:actions>
+                                                <x-ui.button tone="ghost" size="sm" icon="pencil-square" wire:click="openRiskForm({{ $groupProgram->id }}, {{ $risk->id }})" :aria-label="__('results_framework.edit_risk')" :title="__('results_framework.edit_risk')" data-test="edit-program-risk-{{ $risk->id }}" />
+                                                <x-ui.button tone="ghost" size="sm" icon="trash" wire:click="deleteRisk({{ $groupProgram->id }}, {{ $risk->id }})" wire:confirm="{{ __('results_framework.remove_risk_confirm') }}" :aria-label="__('results_framework.remove_risk')" :title="__('results_framework.remove_risk')" data-test="remove-program-risk-{{ $risk->id }}" />
+                                            </x-slot:actions>
+                                        @endif
+                                    </x-risks.row>
+                                @endforeach
+                            </ul>
+                        @endif
                     </div>
                 @endif
             </div>

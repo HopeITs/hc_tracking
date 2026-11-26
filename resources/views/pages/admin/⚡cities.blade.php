@@ -3,7 +3,7 @@
 use App\Livewire\Concerns\Admin\ManagesMealCoverage;
 use App\Support\Like;
 use App\Models\HrCity;
-use App\Models\Project;
+use App\Models\ProposalLocation;
 use Illuminate\Pagination\LengthAwarePaginator;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Number;
@@ -201,12 +201,14 @@ new #[Layout('layouts::desk'), Title('titles.city_directory')] class extends Com
     #[Computed]
     public function projectStatsByCity(): Collection
     {
-        return Project::query()
+        // Y-16 (D-93): the places in each city, which is what the projects
+        // register counts when it is filtered by that city.
+        return ProposalLocation::query()
             ->select(['city_id', 'program_id', 'status', 'target_beneficiaries'])
             ->get()
             ->groupBy('city_id')
             ->map(function (Collection $projects): array {
-                $open = $projects->filter(fn (Project $project): bool => $project->status->isOpen())->count();
+                $open = $projects->filter(fn (ProposalLocation $project): bool => $project->status->isOpen())->count();
 
                 return [
                     'total' => $projects->count(),

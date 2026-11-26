@@ -877,12 +877,6 @@ return [
     ],
 
     'framework' => [
-        'choose_proposal' => 'Choose a proposal',
-        'indicator' => 'Indicator',
-        'assumptions_risks' => 'Assumptions and risks',
-        'add_row_below' => 'Add row below',
-        'add_child_row' => 'Add child row',
-        'remove_row' => 'Remove',
         'title' => 'Logical framework',
         'intro' => 'Click a result to open it. Choose what to show under each result.',
         'payroll_none' => 'A payroll proposal has no logical framework, targets, projects, plan or donor reports.',
@@ -1107,12 +1101,15 @@ return [
         'results' => 'results',
         'indicators' => 'indicators',
         'targets' => 'targets',
+        'risks' => 'risks',
         'copy' => 'Copy into this proposal',
         'nothing_ticked' => 'Nothing is ticked to copy.',
-        'copied' => 'Copied :results, :indicators, :targets from the program framework',
+        'copied' => 'Copied :results, :indicators, :targets, :risks from the program framework',
         'n_results' => '{0} 0 results|{1} :count result|[2,*] :count results',
         'n_indicators' => '{0} 0 indicators|{1} :count indicator|[2,*] :count indicators',
         'n_targets' => '{0} 0 targets|{1} :count target|[2,*] :count targets',
+        'n_risks' => '{0} 0 risks|{1} :count risk|[2,*] :count risks',
+        'risks_title' => 'Risks',
     ],
 
     'sections' => [

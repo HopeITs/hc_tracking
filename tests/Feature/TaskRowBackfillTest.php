@@ -31,7 +31,9 @@ function taskBackfillProject(string $begin = '2026-01-01', string $end = '2026-1
 }
 
 /**
- * A task raised straight against a project.
+ * A task raised straight against a project. Named apart from
+ * ProgramTasksTabTest's own helper: Pest's test helpers share one global
+ * scope, so two files cannot both declare `backfillProjectTask()`.
  */
 function backfillProjectTask(Project $project, ?string $dueDate, ?string $createdAt = null): Task
 {

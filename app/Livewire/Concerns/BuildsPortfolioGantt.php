@@ -10,8 +10,8 @@ use App\Enums\ProposalStatus;
 use App\Models\Donor;
 use App\Models\DonorProposal;
 use App\Models\HrEmployee;
-use App\Models\Project;
 use App\Models\Proposal;
+use App\Models\ProposalLocation;
 use Carbon\CarbonImmutable;
 use Illuminate\Database\Eloquent\Collection as EloquentCollection;
 use Illuminate\Support\Collection;
@@ -143,14 +143,15 @@ trait BuildsPortfolioGantt
                 // A proposal row keeps its own span; the projects it funds are listed, not rolled into it.
                 $rows->push([...$this->proposalRow($proposal, $groupId, 1, $wbs), 'summary' => false]);
 
-                foreach ($proposal->projects->sortBy('start_date')->values() as $projectIndex => $project) {
+                // Y-16 (D-93): the places the proposal funds, each named by it.
+                foreach ($proposal->locations->sortBy('start_date')->values() as $projectIndex => $project) {
                     $rows->push($this->ganttRow(
                         id: 'funded-'.$proposal->id.'-'.$project->id,
                         parent: 'proposal-'.$proposal->id,
                         depth: 2,
                         kind: 'project',
                         wbs: $wbs.'.'.($projectIndex + 1),
-                        name: $project->name,
+                        name: $project->label(),
                         start: $project->start_date,
                         end: $project->end_date ?? $project->start_date,
                         status: $project->status->value,
@@ -220,17 +221,17 @@ trait BuildsPortfolioGantt
     }
 
     /**
-     * The projects on the timeline, narrowed by the page filters.
+     * The places on the timeline, narrowed by the page filters (Y-16, D-93).
      *
-     * @return EloquentCollection<int, Project>
+     * @return EloquentCollection<int, ProposalLocation>
      */
     private function timelineProjects(?int $programId, ?string $status): EloquentCollection
     {
-        return Project::query()
-            ->select(['id', 'name', 'status', 'start_date', 'end_date', 'program_id', 'user_id', 'schedule_weekend'])
+        return ProposalLocation::query()
+            ->select(['id', 'proposal_id', 'project_id', 'slug', 'status', 'start_date', 'end_date', 'program_id', 'city_id', 'city_wide', 'responsible_employee_id', 'schedule_weekend'])
             ->when($programId !== null, fn ($query) => $query->where('program_id', $programId))
-            ->when($status !== null && $status !== '', fn ($query) => $query->where('status', $status))
-            ->with(['program:id', 'user:id,first_name_en,last_name_en,first_name_ar,last_name_ar'])
+            ->when($status !== null && $status !== '', fn ($query) => $query->where('proposal_locations.status', $status))
+            ->with(['program:id', 'responsible:id,first_name_en,last_name_en,first_name_ar,last_name_ar', 'city:id,name_en,name_ar', 'centers', 'proposal:id,name'])
             ->orderBy('start_date')
             ->orderBy('id')
             ->get();
@@ -241,7 +242,7 @@ trait BuildsPortfolioGantt
      * projects. Group numbering continues after
      * whatever top-level rows are already on the chart.
      *
-     * @param  EloquentCollection<int, Project>  $projects
+     * @param  EloquentCollection<int, ProposalLocation>  $projects
      * @param  Collection<int, GanttRow>  $rows
      */
     private function pushProjectGroups(EloquentCollection $projects, string $groupBy, Collection $rows): void
@@ -271,7 +272,7 @@ trait BuildsPortfolioGantt
             $groups = [];
 
             foreach (ProjectStatus::live() as $status) {
-                $inStatus = $projects->filter(fn (Project $project): bool => $project->status === $status);
+                $inStatus = $projects->filter(fn (ProposalLocation $project): bool => $project->status === $status);
 
                 if ($inStatus->isNotEmpty()) {
                     $groups[] = ['id' => 'status-'.$status->value, 'name' => $status->label(), 'projects' => $inStatus];
@@ -284,12 +285,12 @@ trait BuildsPortfolioGantt
         if ($groupBy === 'owner') {
             return array_values($projects
                 ->toBase()
-                ->groupBy(fn (Project $project): int => (int) $project->user_id)
+                ->groupBy(fn (ProposalLocation $project): int => (int) $project->responsible_employee_id)
                 ->map(
-                    /** @param Collection<int, Project> $owned */
+                    /** @param Collection<int, ProposalLocation> $owned */
                     fn (Collection $owned, int $userId): array => [
                         'id' => 'owner-'.($userId === 0 ? 'none' : $userId),
-                        'name' => $owned->first()->user->name ?? (string) __('gantt.no_owner'),
+                        'name' => $owned->first()->responsible->name ?? (string) __('gantt.no_owner'),
                         'projects' => $owned,
                     ],
                 )
@@ -301,10 +302,10 @@ trait BuildsPortfolioGantt
 
         return array_values($projects
             ->toBase()
-            ->groupBy(fn (Project $project): string => $project->program->name ?? '—')
+            ->groupBy(fn (ProposalLocation $project): string => $project->program->name ?? '—')
             ->sortKeys()
             ->map(
-                /** @param Collection<int, Project> $inProgram */
+                /** @param Collection<int, ProposalLocation> $inProgram */
                 function (Collection $inProgram, int|string $name) use (&$index): array {
                     return ['id' => 'program-'.(++$index), 'name' => (string) $name, 'projects' => $inProgram];
                 },
@@ -317,7 +318,7 @@ trait BuildsPortfolioGantt
      *
      * @param  Collection<int, GanttRow>  $rows
      */
-    private function pushProjectBranch(Project $project, string $parentRowId, int $depth, string $wbs, Collection $rows): void
+    private function pushProjectBranch(ProposalLocation $project, string $parentRowId, int $depth, string $wbs, Collection $rows): void
     {
         $rowId = 'project-'.$project->id;
 
@@ -327,14 +328,14 @@ trait BuildsPortfolioGantt
             depth: $depth,
             kind: 'project',
             wbs: $wbs,
-            name: $project->name,
+            name: $project->headline(),
             start: $project->start_date,
             end: $project->end_date ?? $project->start_date,
             status: $project->status->value,
             statusLabel: $project->status->label(),
             tone: $this->projectTone($project),
-            owner: $project->user?->name,
-            ownerAvatar: $project->user === null ? null : HrEmployee::avatarUrl($project->user->id),
+            owner: $project->responsible?->name,
+            ownerAvatar: $project->responsible === null ? null : HrEmployee::avatarUrl($project->responsible->id),
             url: route('projects.show', $project),
         ) + [
             'planUrl' => route('projects.show', $project),
@@ -464,7 +465,7 @@ trait BuildsPortfolioGantt
         };
     }
 
-    private function projectTone(Project $project): string
+    private function projectTone(ProposalLocation $project): string
     {
         return match (true) {
             $project->status === ProjectStatus::Archived => 'muted',

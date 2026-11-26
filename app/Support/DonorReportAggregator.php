@@ -22,12 +22,13 @@ use App\Models\MonthlyReportFile;
 use App\Models\MonthlyReportLineBreakdown;
 use App\Models\MonthlyReportLineShare;
 use App\Models\PlanIndicator;
-use App\Models\Project;
 use App\Models\Proposal;
+use App\Models\ProposalLocation;
 use App\Models\Report;
 use App\Models\ReportTemplateLine;
 use App\Models\Result;
 use App\Models\TransfersTracking;
+use App\Support\Locations\MonthlyReportsAtRows;
 use Carbon\CarbonImmutable;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Relations\Relation;
@@ -60,7 +61,7 @@ final class DonorReportAggregator
      */
     public function aggregate(Proposal $proposal, CarbonImmutable $start, CarbonImmutable $end, bool $includeFinance): array
     {
-        $proposal->loadMissing(['donor', 'donorProposals', 'projects.program']);
+        $proposal->loadMissing(['donor', 'donorProposals', 'locations.program', 'locations.city', 'locations.centers']);
 
         if ($proposal->donor->is_internal) {
             throw ValidationException::withMessages(['proposalId' => __('donor_reports.self_funded')]);
@@ -77,18 +78,19 @@ final class DonorReportAggregator
         $monthEnd = $end->endOfMonth()->startOfDay();
         $grantStart = ($proposal->actual_date_begin ?? $start)->startOfDay();
         $grantStart = $grantStart->gt($start) ? $start : $grantStart;
-        /** @var Collection<int, Project> $centers */
-        $centers = $proposal->projects->keyBy('id');
+        /** @var Collection<int, ProposalLocation> $centers */
+        $centers = $proposal->locations->keyBy('id');
         $agreement = $proposal->donorProposals->first();
+        $templatesByRow = $this->templateIdsByRow($centers);
 
         $targets = $this->targets($proposal, $grantStart, $monthEnd);
         $shares = $this->shares($targets);
         $retired = $this->retiredTargetIds($targets);
         $reports = MonthlyReport::query()
-            ->whereIn('project_id', $centers->keys())
+            ->whereIn('report_template_id', array_merge(...array_values($templatesByRow)) ?: [0])
             ->whereBetween('period', [$start->startOfMonth()->toDateString(), $end->toDateString()])
             ->orderBy('period')->orderBy('project_id')
-            ->get(['id', 'project_id', 'period', 'status']);
+            ->get(['id', 'project_id', 'report_template_id', 'period', 'status']);
         $validatedIds = array_values(array_map(fn (mixed $id): int => (int) $id, $reports->where('status', MonthlyReportStatus::Validated)->pluck('id')->all()));
         $breakdowns = $this->breakdowns($targets, $shares);
 
@@ -106,15 +108,19 @@ final class DonorReportAggregator
                 'months' => array_map(fn (CarbonImmutable $month): string => $month->format('Y-m'), MonthlyReportGenerator::monthsBetween($start, $end)),
             ],
             'header' => $this->header($proposal, $agreement),
-            'centers' => array_values($centers->map(fn (Project $project): array => [
-                'project_id' => $project->id,
-                'name' => $project->name,
-                'center_id' => $project->center_id,
-                'beneficiaries' => $this->beneficiaries($project),
+            // A centre is a place now (Y-16, contracts §14): the row supplies
+            // the name, the centre and the beneficiaries. The keys are frozen,
+            // so `project_id` stays and carries the row's project while one is
+            // still written (until Y-18).
+            'centers' => array_values($centers->map(fn (ProposalLocation $row): array => [
+                'project_id' => $row->project_id,
+                'name' => $row->label(),
+                'center_id' => $row->centerIds()[0] ?? null,
+                'beneficiaries' => $this->beneficiaries($row),
             ])->all()),
             'indicators' => $rows['rows'],
             'historical' => $this->indicatorRows($historical, $context)['rows'],
-            'activities' => $this->activities($proposal, $centers, $start, $end),
+            'activities' => $this->activities($proposal, $templatesByRow, $start, $end),
             'narratives' => $this->narratives($validatedIds, $reports),
             'files' => $this->files($validatedIds, $reports),
             'completeness' => [
@@ -151,7 +157,7 @@ final class DonorReportAggregator
         return PlanIndicator::query()
             ->where('source_type', 'proposal')
             ->where('source_id', $proposal->id)
-            ->whereNotNull('project_id')
+            ->whereNotNull('proposal_location_id')
             ->with([
                 'indicator.libraryIndicator',
                 'reports' => fn (Relation $query) => $query
@@ -161,7 +167,7 @@ final class DonorReportAggregator
                     ->select(['id', 'plan_indicator_id', 'monthly_report_id', 'monthly_report_line_share_id', 'status', 'planned_date', 'value', 'numerator', 'denominator']),
             ])
             ->orderBy('id')
-            ->get(['id', 'source_type', 'source_id', 'indicator_id', 'project_id', 'target']);
+            ->get(['id', 'source_type', 'source_id', 'indicator_id', 'project_id', 'proposal_location_id', 'target']);
     }
 
     /**
@@ -276,7 +282,7 @@ final class DonorReportAggregator
                     'plan_indicator_id' => $target->id,
                     'project_id' => (int) $target->project_id,
                     'target' => (float) $target->target,
-                    'beneficiaries' => $this->beneficiaries($context['centers']->get($target->project_id)),
+                    'beneficiaries' => $this->beneficiaries($context['centers']->get($target->proposal_location_id)),
                     'period' => $period['figure'],
                     'cumulative' => $toDate['figure'],
                     'achievement' => $trackingOnly ? null : $this->achievement($toDate['figure']['value'], (float) $target->target),
@@ -407,9 +413,9 @@ final class DonorReportAggregator
      */
     private function isShared(PlanIndicator $target, array $context): bool
     {
-        $project = $context['centers']->get($target->project_id);
+        $row = $context['centers']->get($target->proposal_location_id);
 
-        if ($project?->program?->donor_attribution !== DonorAttribution::Shared) {
+        if ($row?->program?->donor_attribution !== DonorAttribution::Shared) {
             return false;
         }
 
@@ -444,7 +450,7 @@ final class DonorReportAggregator
                 $mirrors = $mirrors->take(1);
             }
 
-            $split = $context['centers']->get($target->project_id)?->program?->donor_attribution === DonorAttribution::Split;
+            $split = $context['centers']->get($target->proposal_location_id)?->program?->donor_attribution === DonorAttribution::Split;
             $sums = [];
 
             foreach ($mirrors as $mirror) {
@@ -529,10 +535,14 @@ final class DonorReportAggregator
      * entry on or before the end) and the months in the period it was being
      * carried out (started, ongoing, completed or conducted).
      *
-     * @param  Collection<int, Project>  $centers
+     * The entries are reached through the templates at the proposal's rows'
+     * places (Y-16), not through `monthly_reports.project_id`; the output key
+     * stays `project_id` because the shape is frozen.
+     *
+     * @param  array<int, list<int>>  $templatesByRow
      * @return list<array<string, mixed>>
      */
-    private function activities(Proposal $proposal, Collection $centers, CarbonImmutable $start, CarbonImmutable $end): array
+    private function activities(Proposal $proposal, array $templatesByRow, CarbonImmutable $start, CarbonImmutable $end): array
     {
         $activities = Result::query()
             ->where('proposal_id', $proposal->id)
@@ -540,14 +550,16 @@ final class DonorReportAggregator
             ->orderBy('id')
             ->get(['id', 'statement']);
 
-        if ($activities->isEmpty() || $centers->isEmpty()) {
+        $templateIds = $templatesByRow === [] ? [] : array_merge(...array_values($templatesByRow));
+
+        if ($activities->isEmpty() || $templateIds === []) {
             return [];
         }
 
         $entries = MonthlyReportActivityEntry::query()
             ->join('monthly_reports', 'monthly_reports.id', '=', 'monthly_report_activity_entries.monthly_report_id')
             ->whereIn('monthly_report_activity_entries.result_id', $activities->modelKeys())
-            ->whereIn('monthly_reports.project_id', $centers->keys())
+            ->whereIn('monthly_reports.report_template_id', $templateIds)
             ->where('monthly_reports.status', MonthlyReportStatus::Validated)
             ->where('monthly_reports.period', '<=', $end->toDateString())
             ->whereNotNull('monthly_report_activity_entries.status')
@@ -657,11 +669,25 @@ final class DonorReportAggregator
         ];
     }
 
-    private function beneficiaries(?Project $project): ?int
+    /**
+     * The beneficiaries a location row carries (Y-11): the pivot's
+     * `target_beneficiaries` moved onto the row.
+     */
+    private function beneficiaries(?ProposalLocation $row): ?int
     {
-        $value = $project?->getRelationValue('pivot')?->getAttribute('target_beneficiaries');
+        return $row?->target_beneficiaries === null ? null : (int) $row->target_beneficiaries;
+    }
 
-        return $value === null ? null : (int) $value;
+    /**
+     * The report templates at each row's place, in the one place that match
+     * is defined (App\Support\Locations\MonthlyReportsAtRows).
+     *
+     * @param  Collection<int, ProposalLocation>  $rows
+     * @return array<int, list<int>> row id => template ids
+     */
+    private function templateIdsByRow(Collection $rows): array
+    {
+        return app(MonthlyReportsAtRows::class)->templateIdsByRow($rows);
     }
 
     /**

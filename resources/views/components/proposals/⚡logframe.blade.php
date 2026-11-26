@@ -48,10 +48,7 @@ new class extends Component {
     use CopiesProgramFramework;
     use EditsCentreTargets;
     use ManagesFrameworkBoard;
-    use ManagesProposalRisks {
-        attachRisks as attachLibraryRisks;
-        detachRisk as detachLibraryRisk;
-    }
+    use ManagesProposalRisks;
     use ManagesResultForm;
     use ReadsProposalFramework;
 
@@ -114,68 +111,6 @@ new class extends Component {
         abort_if($this->proposal->isPayroll(), 404);
         $this->formProposalId = $proposalId;
         $this->applyPrefs();
-    }
-
-    #[Computed]
-    public function tableResults(): \Illuminate\Database\Eloquent\Collection
-    {
-        $results = $this->frameworkResults()
-            ->withCount('children')
-            ->with(['indicators.libraryIndicator', 'indicators.project'])
-            ->orderByRaw('COALESCE(logframe_position, id)')
-            ->orderBy('id')
-            ->get();
-        $children = $results->groupBy(fn (Result $result): int => $result->parent_id ?? 0);
-        $ordered = $results->take(0);
-        $append = function (Result $result) use (&$append, $children, $ordered): void {
-            $ordered->push($result);
-
-            foreach ($children->get($result->id, []) as $child) {
-                $append($child);
-            }
-        };
-
-        foreach ($results->whereNull('parent_id') as $root) {
-            $append($root);
-        }
-
-        $ordered = $ordered->merge($results);
-        $search = mb_strtolower(trim($this->search));
-        if ($search === '') {
-            return $ordered;
-        }
-
-        $included = [];
-        $resultsById = $results->keyBy('id');
-        foreach ($ordered as $result) {
-            $matches = str_contains(mb_strtolower($result->statement), $search)
-                || $result->indicators->contains(fn ($indicator): bool => str_contains(
-                    mb_strtolower($indicator->libraryIndicator?->localizedName() ?? $indicator->name),
-                    $search,
-                ));
-            if ($matches) {
-                for ($ancestor = $result; $ancestor !== null && ! isset($included[$ancestor->id]); $ancestor = $resultsById->get($ancestor->parent_id)) {
-                    $included[$ancestor->id] = true;
-                }
-            }
-        }
-
-        return $ordered->filter(fn (Result $result): bool => isset($included[$result->id]));
-    }
-
-    #[Computed]
-    public function tableAssumptions(): \Illuminate\Support\Collection
-    {
-        return Assumption::query()->where('proposal_id', $this->proposalId)->whereNotNull('result_id')->orderBy('id')->get()->groupBy('result_id');
-    }
-
-    public function addRowBelow(int $resultId): void
-    {
-        $result = $this->frameworkResults()->findOrFail($resultId);
-        $this->openCreateModal($result->parent_id);
-        $this->insertAfterResultId = $result->id;
-        $this->resultType = $result->type->value;
-        $this->resultProgramId = (string) ($result->program_id ?? '');
     }
 
     protected function fixedProposalId(): ?int
@@ -623,7 +558,7 @@ new class extends Component {
                 return true;
             }
 
-            $text = $result['statement'].' '.implode(' ', array_column($result['indicators'], 'name')).' '.implode(' ', array_column($result['risks'], 'name')).' '.implode(' ', array_column($result['assumptions'], 'statement'))
+            $text = $result['statement'].' '.implode(' ', array_column($result['indicators'], 'name')).' '.implode(' ', array_column($result['assumptions'], 'statement'))
                 .' '.implode(' ', array_map(fn (int $id): string => $framework['activities'][$id]['name'] ?? '', $result['activities']));
 
             return str_contains(mb_strtolower($text), $query);
@@ -658,7 +593,6 @@ new class extends Component {
      */
     private function forgetBox(): void
     {
-        unset($this->tableResults, $this->tableAssumptions);
         unset($this->allResults, $this->framework, $this->visibleIds, $this->rail, $this->subtreeTotals, $this->focusedId, $this->checks, $this->logframeTask, $this->taskPeople, $this->proposalRisks);
     }
 
@@ -671,15 +605,11 @@ new class extends Component {
         $this->forgetBox();
     }
 
-    public function attachRisks(): void
+    /**
+     * A risk write changes the layer counts and warnings too.
+     */
+    protected function forgetRisks(): void
     {
-        $this->attachLibraryRisks();
-        $this->forgetBox();
-    }
-
-    public function detachRisk(int $riskId): void
-    {
-        $this->detachLibraryRisk($riskId);
         $this->forgetBox();
     }
 };

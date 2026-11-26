@@ -229,7 +229,7 @@ class HrEmployee extends HrModel
                 'value' => (string) $employee->id,
                 'label' => $employee->name.' · '.$employee->secondary_name,
                 'detail' => static::positionSummary($employee->id) ?? (string) __('common.no_active_position'),
-                'photo' => static::pathOnly(static::avatarUrl($employee->id)),
+                'photo' => self::pathOnly(static::avatarUrl($employee->id)),
                 'inactive' => ! (EmployeeProfile::for($employee->id)['is_active'] ?? false),
             ])->all(),
         ));
@@ -243,10 +243,11 @@ class HrEmployee extends HrModel
      */
     private static function pathOnly(string $url): string
     {
-        $path = parse_url($url, PHP_URL_PATH) ?? '/';
+        $path = parse_url($url, PHP_URL_PATH);
         $query = parse_url($url, PHP_URL_QUERY);
+        $path = is_string($path) ? $path : '/';
 
-        return $query === null ? $path : $path.'?'.$query;
+        return is_string($query) ? $path.'?'.$query : $path;
     }
 
     /**
@@ -357,6 +358,17 @@ class HrEmployee extends HrModel
     public function projects(): HasMany
     {
         return $this->hasMany(Project::class, 'user_id');
+    }
+
+    /**
+     * The places this employee is responsible for (Y-16, D-93): the twin of
+     * `projects()`, which goes with the `projects` table in Y-18.
+     *
+     * @return HasMany<ProposalLocation, $this>
+     */
+    public function locations(): HasMany
+    {
+        return $this->hasMany(ProposalLocation::class, 'responsible_employee_id');
     }
 
     /**

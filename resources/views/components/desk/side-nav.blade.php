@@ -20,6 +20,7 @@
         'label' => $item['label'],
         'href' => route($item['route']),
         'count' => $countOf($item),
+        'module' => $item['module'],
     ])->all();
     $pins = collect($user->nav_pins ?? [])->filter(fn (mixed $pin): bool => is_string($pin) && $pages->has($pin))->values()->all();
 
@@ -32,9 +33,13 @@
             'kind' => __('navigation.kind_'.$entry['kind']),
         ])->values()->all();
 
-    /* Inside a project, the sidebar leads with that project's own sections. */
+    /* Inside a project, the sidebar leads with that row's own sections. Y-16
+       (D-93): projects.show carries a slug, not a bound model, because an old
+       project slug must redirect to its row (D-94) rather than 404. */
     $project = $routeName === 'projects.show' ? request()->route('project') : null;
-    $project = $project instanceof \App\Models\Project ? $project : null;
+    $project = is_string($project)
+        ? app(\App\Support\Locations\LocationFromSlug::class)->row($project)
+        : null;
     $sections = [];
 
     if ($project !== null) {
@@ -65,6 +70,7 @@
     @class(['dk-side dk-scope', 'dk-side-ondesk' => $onDesk])
     aria-label="{{ __('navigation.application_navigation') }}"
     x-data="hcSideNav({ pins: @js($pins), pages: @js($pinnable), pinUrl: @js(route('nav.pins.toggle')), context: @js($project !== null) })"
+    x-on:notification-counts.window="syncCounts($event.detail?.counts?.modules ?? {})"
     data-side-nav
 >
     <div class="dk-side-h">
@@ -87,7 +93,8 @@
                     <flux:icon.arrow-left variant="micro" class="size-4 rtl:-scale-x-100" />
                     <span class="dk-side-l">{{ __('navigation.all_pages') }}</span>
                 </button>
-                <p class="dk-side-ctx-t" title="{{ $project->name }}">{{ $project->name }}</p>
+                {{-- The row names its place (Y-16). --}}
+                <p class="dk-side-ctx-t" dir="auto" title="{{ $project->label() }}">{{ $project->label() }}</p>
                 <ul>
                     @foreach ($sections as $section)
                         <li>
@@ -124,6 +131,7 @@
                             aria-controls="dk-side-list-{{ $group['group'] }}"
                             data-fly="{{ $group['group'] }}"
                             data-side-group-toggle="{{ $group['group'] }}"
+                            data-side-group-modules="{{ collect($group['items'])->pluck('module')->filter()->implode(',') }}"
                             @if ($isDue) title="{{ __('navigation.due_soon') }}" data-side-due @endif
                         >
                             <span class="dk-side-icw"><flux:icon :name="$group['icon']" variant="outline" class="dk-side-ic" /></span>
@@ -148,6 +156,7 @@
                                     @if ($current) aria-current="page" @endif
                                     data-label="{{ $item['label'] }}"
                                     data-side-link="{{ $item['route'] }}"
+                                    @if ($item['module'] !== null) data-side-module="{{ $item['module'] }}" @endif
                                     data-desk-route="{{ $item['route'] }}"
                                 >
                                     @if ($flat)
@@ -176,11 +185,11 @@
                         @foreach ($group['items'] as $item)
                             @php $count = $countOf($item); @endphp
                             <div class="dk-side-li">
-                            <a href="{{ route($item['route']) }}" wire:navigate role="menuitem" @class(['dk-side-a', 'dk-side-sub', 'dk-on' => $isCurrent($item['route'])]) @if ($isCurrent($item['route'])) aria-current="page" @endif data-desk-route="{{ $item['route'] }}">
+                            <a href="{{ route($item['route']) }}" wire:navigate role="menuitem" @class(['dk-side-a', 'dk-side-sub', 'dk-on' => $isCurrent($item['route'])]) @if ($isCurrent($item['route'])) aria-current="page" @endif @if ($item['module'] !== null) data-side-module="{{ $item['module'] }}" @endif data-desk-route="{{ $item['route'] }}">
                                 <flux:icon :name="$item['hero']" variant="outline" class="dk-side-fly-ic" />
                                 <span class="dk-side-l">{{ $item['label'] }}</span>
                                 @if ($count > 0)
-                                    <span class="dk-side-badge dk-num">{{ $badge($count) }}</span>
+                                    <span class="dk-side-badge dk-num" data-side-badge>{{ $badge($count) }}</span>
                                 @endif
                             </a>
                             @if ($onDesk)

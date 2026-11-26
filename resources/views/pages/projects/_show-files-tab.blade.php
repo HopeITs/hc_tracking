@@ -5,10 +5,10 @@
     viewers without funding-agreements.view.
 --}}
 @php
-    $canEditFiles = auth()->user()->can('update', $this->project);
+    $canEditFiles = auth()->user()->can('update', $this->location);
 @endphp
 <div data-test="story-files">
-    @if ($this->project->media->isEmpty())
+    @if ($this->location->media->isEmpty())
         <p class="dk-small"><strong>{{ __('common.no_files_recorded') }}</strong></p>
         <p class="dk-small dk-muted">{{ __('projects.file_records_for_this_project_will_appear_here') }}</p>
     @else
@@ -43,7 +43,7 @@
                         </span>
                     </div>
                     <span class="dk-pr-r">
-                        <a class="dk-iconbtn dk-sm" href="{{ route('projects.files.download', [$this->project, $media]) }}" aria-label="{{ __('common.download_name', ['name' => $media->original_name]) }}" title="{{ __('common.download_name', ['name' => $media->original_name]) }}"><x-desk.icon name="download" /></a>
+                        <a class="dk-iconbtn dk-sm" href="{{ route('projects.files.download', [$this->location, $media]) }}" aria-label="{{ __('common.download_name', ['name' => $media->original_name]) }}" title="{{ __('common.download_name', ['name' => $media->original_name]) }}"><x-desk.icon name="download" /></a>
                         @if ($canEditFiles)
                             <button type="button" class="dk-iconbtn dk-sm" wire:click="openEditFileModal({{ $media->id }})" aria-label="{{ __('common.edit_name', ['name' => $media->original_name]) }}" title="{{ __('common.edit_name', ['name' => $media->original_name]) }}"><x-desk.icon name="edit" /></button>
                             <button type="button" class="dk-iconbtn dk-sm dk-danger" wire:click="confirmDeleteFile({{ $media->id }})" aria-label="{{ __('common.delete_name', ['name' => $media->original_name]) }}" title="{{ __('common.delete_name', ['name' => $media->original_name]) }}"><x-desk.icon name="x" /></button>

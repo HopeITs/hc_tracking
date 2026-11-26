@@ -2,7 +2,9 @@
 
 use App\Enums\ActiveReportType;
 use App\Models\Donor;
+use App\Models\DonorReport;
 use App\Models\Program;
+use App\Models\Report;
 use App\Support\Reporting\ActiveReportRow;
 use App\Support\Reporting\ActiveReports;
 use Illuminate\Pagination\LengthAwarePaginator;
@@ -15,9 +17,10 @@ use Livewire\Component;
 use Livewire\WithPagination;
 
 /*
-| Active Reports (M-02): one table of every report still open, whatever its
-| kind: monthly, donor and existing reports. "Needs me" lists what waits on
-| the viewer; "All" lists everything they may open. Each row opens its own
+| Report Tracker (M-02): one table of every report, whatever its kind:
+| monthly, donor and existing reports. "Needs me" lists what waits on the
+| viewer; "All" lists everything still open they may open; "Done" lists the
+| finished ones (read only when that tab is open). Each row opens its own
 | record; permissions are each record's own, none is added here.
 */
 new #[Layout('layouts::desk'), Title('titles.active_reports')] class extends Component {
@@ -78,16 +81,57 @@ new #[Layout('layouts::desk'), Title('titles.active_reports')] class extends Com
     }
 
     /**
-     * The rows the filters keep, whichever tab: the tab counts read these.
+     * Every finished report the viewer may open; read only on the Done tab.
+     *
+     * @return Collection<int, ActiveReportRow>
+     */
+    #[Computed]
+    public function closedRows(): Collection
+    {
+        return app(ActiveReports::class)->for(auth()->user(), closed: true);
+    }
+
+    /**
+     * The rows of the open tab before any filter: the open reports, or the finished ones on Done.
+     *
+     * @return Collection<int, ActiveReportRow>
+     */
+    private function tabRows(): Collection
+    {
+        return $this->tab === 'done' ? $this->closedRows : $this->rows;
+    }
+
+    /**
+     * The open rows the filters keep, whichever tab: the tab counts read these.
      *
      * @return Collection<int, ActiveReportRow>
      */
     #[Computed]
     public function filtered(): Collection
     {
+        return $this->applyFilters($this->rows);
+    }
+
+    /**
+     * The finished rows the filters keep.
+     *
+     * @return Collection<int, ActiveReportRow>
+     */
+    #[Computed]
+    public function filteredDone(): Collection
+    {
+        return $this->applyFilters($this->closedRows);
+    }
+
+    /**
+     * @param  Collection<int, ActiveReportRow>  $rows
+     * @return Collection<int, ActiveReportRow>
+     */
+    private function applyFilters(Collection $rows): Collection
+    {
         $needle = mb_strtolower(trim($this->search));
 
-        return $this->rows->filter(fn (ActiveReportRow $row): bool => ($this->type === '' || $row->type->value === $this->type)
+        return $rows->filter(fn (ActiveReportRow $row): bool => ($this->type === '' || $row->type->value === $this->type)
             && ($this->status === '' || $row->status->value === $this->status)
             && ($this->program === '' || $row->programId === (int) $this->program)
             && ($this->donor === '' || $row->donorId === (int) $this->donor)
@@ -112,7 +156,11 @@ new #[Layout('layouts::desk'), Title('titles.active_reports')] class extends Com
     #[Computed]
     public function page(): LengthAwarePaginator
     {
-        $rows = $this->tab === 'needs' ? $this->filtered->where('needsMe', true)->values() : $this->filtered;
+        $rows = match ($this->tab) {
+            'needs' => $this->filtered->where('needsMe', true)->values(),
+            'done' => $this->filteredDone,
+            default => $this->filtered,
+        };
         $current = max(1, $this->getPage());
 
         return new LengthAwarePaginator($rows->forPage($current, self::PerPage)->values(), $rows->count(), self::PerPage, $current, ['path' => route('active-reports.index')]);
@@ -126,7 +174,7 @@ new #[Layout('layouts::desk'), Title('titles.active_reports')] class extends Com
     #[Computed]
     public function statusOptions(): array
     {
-        return $this->rows->unique(fn (ActiveReportRow $row): string => $row->status->value)
+        return $this->tabRows()->unique(fn (ActiveReportRow $row): string => $row->status->value)
             ->mapWithKeys(fn (ActiveReportRow $row): array => [$row->status->value => $row->status->label()])
             ->sort()
             ->all();
@@ -140,7 +188,7 @@ new #[Layout('layouts::desk'), Title('titles.active_reports')] class extends Com
     #[Computed]
     public function programOptions(): array
     {
-        $ids = $this->rows->pluck('programId')->filter()->unique()->all();
+        $ids = $this->tabRows()->pluck('programId')->filter()->unique()->all();
 
         return Program::options()->filter(fn (Program $program): bool => in_array($program->id, $ids, true))
             ->mapWithKeys(fn (Program $program): array => [$program->id => $program->name])
@@ -155,19 +203,43 @@ new #[Layout('layouts::desk'), Title('titles.active_reports')] class extends Com
     #[Computed]
     public function donorOptions(): Collection
     {
-        $ids = $this->rows->pluck('donorId')->filter()->unique()->all();
+        $ids = $this->tabRows()->pluck('donorId')->filter()->unique()->all();
 
         return $ids === [] ? new Collection : Donor::query()->whereKey($ids)->orderBy('name')->get(['id', 'name']);
     }
 
+    /**
+     * The kinds of report the viewer may have: the Type filter lists these, whatever is open
+     * today. Monthly reports are open to anyone who may view reports (their place decides
+     * which rows); donor and existing reports follow their own policy.
+     *
+     * @return list<ActiveReportType>
+     */
+    #[Computed]
+    public function typeOptions(): array
+    {
+        $user = auth()->user();
+
+        return array_values(array_filter(ActiveReportType::cases(), fn (ActiveReportType $type): bool => match ($type) {
+            ActiveReportType::Monthly => true,
+            ActiveReportType::Donor => $user->can('viewAny', DonorReport::class),
+            ActiveReportType::Report => $user->can('viewAny', Report::class),
+        }));
+    }
+
     private function normaliseFilters(): void
     {
-        if (! in_array($this->tab, ['needs', 'all'], true)) {
+        if (! in_array($this->tab, ['needs', 'all', 'done'], true)) {
             $this->tab = 'needs';
         }
 
         if (! in_array($this->type, ActiveReportType::values(), true)) {
             $this->type = '';
+        }
+
+        // A status the open tab does not have (Draft on Done) would only show an empty list.
+        if ($this->status !== '' && ! array_key_exists($this->status, $this->statusOptions)) {
+            $this->status = '';
         }
 
         foreach (['program', 'donor'] as $filter) {
@@ -186,6 +258,7 @@ new #[Layout('layouts::desk'), Title('titles.active_reports')] class extends Com
 @php
     $muted = 'text-secondary-medium dark:text-ink-muted';
     $page = $this->page;
+    $typeOptions = $this->typeOptions;
     $moreFiltersOn = $status !== '' || $program !== '' || $donor !== '' || $period !== '';
     $monthFieldClass = 'block h-9 w-full min-w-0 touch-manipulation rounded-[10px] border border-(--line-2) bg-(--paper) px-2.5 text-[12.5px] font-semibold text-(--ink) hover:border-(--ink-3) max-[720px]:h-11';
     $monthLabelClass = 'mb-1.5 block text-[11px] font-semibold uppercase leading-4 tracking-[0.1em] text-secondary-medium dark:text-ink-muted';
@@ -195,12 +268,13 @@ new #[Layout('layouts::desk'), Title('titles.active_reports')] class extends Com
     class="@container"
     heading-id="active-reports-heading"
     :title="__('titles.active_reports')"
-    :count="$this->counts[$tab]"
+    :count="$tab === 'done' ? $this->filteredDone->count() : $this->counts[$tab]"
     :view="$tab"
     view-model="tab"
     :views="[
         'needs' => ['icon' => 'check', 'label' => __('active_reports.tab_needs').' · '.$this->counts['needs'], 'test' => 'active-reports-tab-needs'],
         'all' => ['icon' => 'table', 'label' => __('active_reports.tab_all').' · '.$this->counts['all'], 'test' => 'active-reports-tab-all'],
+        'done' => ['icon' => 'check-circle', 'label' => __('active_reports.tab_done'), 'test' => 'active-reports-tab-done'],
     ]"
     data-active-reports
 >
@@ -208,12 +282,14 @@ new #[Layout('layouts::desk'), Title('titles.active_reports')] class extends Com
         <x-desk.register-search :label="__('active_reports.search_reports')" :placeholder="__('active_reports.search_placeholder')" wire:model.live.debounce.300ms="search" />
     </x-slot:search>
     <x-slot:filters>
-        <x-ui.header-filter-select :label="__('active_reports.type')" wire:model.live="type" :value="$type">
-            <option value="">{{ __('active_reports.all_types') }}</option>
-            @foreach (ActiveReportType::cases() as $typeOption)
-                <option value="{{ $typeOption->value }}">{{ $typeOption->label() }}</option>
-            @endforeach
-        </x-ui.header-filter-select>
+        @if (count($typeOptions) > 1 || $type !== '')
+            <x-ui.header-filter-select :label="__('active_reports.type')" wire:model.live="type" :value="$type">
+                <option value="">{{ __('active_reports.all_types') }}</option>
+                @foreach ($typeOptions as $typeOption)
+                    <option value="{{ $typeOption->value }}">{{ $typeOption->label() }}</option>
+                @endforeach
+            </x-ui.header-filter-select>
+        @endif
 
         <div class="contents" x-data="{ open: @js($moreFiltersOn) }">
             <button type="button" class="dk-btn" x-on:click="open = ! open" x-bind:aria-expanded="open.toString()" data-test="more-filters-button">
@@ -251,8 +327,8 @@ new #[Layout('layouts::desk'), Title('titles.active_reports')] class extends Com
         </div>
     </x-slot:filters>
 
-    @if ($this->rows->isEmpty())
-        <x-ui.empty-state icon="document-check" :heading="__('active_reports.none')" :body="__('active_reports.none_body')" />
+    @if ($tab === 'done' ? $this->closedRows->isEmpty() : $this->rows->isEmpty())
+        <x-ui.empty-state icon="document-check" :heading="$tab === 'done' ? __('active_reports.none_done') : __('active_reports.none')" :body="$tab === 'done' ? __('active_reports.none_done_body') : __('active_reports.none_body')" />
     @elseif ($page->isEmpty())
         @if ($tab === 'needs' && $this->counts['needs'] === 0 && $this->filtered->isNotEmpty())
             <x-ui.empty-state icon="check-circle" :heading="__('active_reports.none_needs')" :body="__('active_reports.none_needs_body')">

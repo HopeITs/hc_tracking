@@ -64,9 +64,9 @@ new class extends Component {
 
     public function projectOf(DonorReport $report): string
     {
-        $proposal = $report->donorProposal?->proposal;
-
-        return $proposal?->projects->first()?->name ?? $proposal?->name ?? '—';
+        // Y-16 (D-93): the report reports for a proposal's places; its own
+        // name is the proposal's, so that is what the panel shows.
+        return $report->donorProposal?->proposal?->name ?? '—';
     }
 
     /**

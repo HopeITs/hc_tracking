@@ -38,7 +38,7 @@ final class RecordFinalReportAcceptance
             }
 
             $locked->final_report_accepted_on = $acceptedOn->startOfDay();
-            $locked->final_report_accepted_by = Auth::id();
+            $locked->final_report_accepted_by = Auth::user()?->id;
             $locked->saveQuietly();
 
             $locked->recordActivity('proposal.final_report_accepted');

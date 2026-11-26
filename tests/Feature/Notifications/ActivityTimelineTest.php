@@ -101,9 +101,9 @@ test('the task page folds its activity and builds the timeline only when opened'
 });
 
 test('the project Story shows its activity timeline in the side column', function () {
-    $project = Activity::withoutRecording(fn () => Project::factory()->create());
+    $project = Activity::withoutRecording(fn () => rowFor(Project::factory()->create()));
 
-    Livewire::actingAs(Activity::withoutRecording(fn () => User::factory()->create()))->test('pages::projects.show', ['project' => $project])
+    Livewire::actingAs(Activity::withoutRecording(fn () => User::factory()->create()))->test('pages::projects.show', ['project' => $project->slug])
         ->assertSeeLivewire('activity.timeline');
 });
 

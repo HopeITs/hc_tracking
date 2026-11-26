@@ -46,7 +46,7 @@
                 </div>
             </x-ui.form-section>
 
-            <x-ui.form-section :title="__('targets.section_commitment')" :fields="['targetValue', 'targetPeriod', 'targetProjectId', 'targetLocationId']">
+            <x-ui.form-section :title="__('targets.section_commitment')" :fields="['targetValue', 'targetPeriod', 'targetLocationId']">
                 <div class="grid gap-x-4 gap-y-3 @2xl/modal:grid-cols-2">
                     <x-ui.form-input wire:model="targetValue" :label="$formIsPercentage ? __('targets.target_value_percent') : __('targets.target_value')" type="number" step="0.01" min="0" :max="$formIsPercentage ? 100 : null" :suffix="$formIsPercentage ? '%' : null" required />
 
@@ -57,37 +57,27 @@
                         :options="collect(Period::cases())->map(fn (Period $periodCase): array => ['value' => $periodCase->value, 'label' => $periodCase->label()])->all()"
                     />
 
-                    @if ($targetSourceType === 'proposal')
                     <x-ui.form-select
                         wire:model="targetLocationId"
                         :label="__('targets.location')"
-                        :help="$targetSourceId === '' ? null : ($this->formLocationOptions === [] ? __('targets.no_locations') : __('targets.location_help'))"
-                        required
+                        :disabled="$formIndicator?->proposal_location_id !== null"
+                        :locked-reason="$formIndicator?->location !== null ? __('targets.scoped_to_project', ['project' => $formIndicator->location->label()]) : null"
+                        :required="$targetSourceType === 'proposal'"
+                        :help="$targetSourceId === '' ? null : ($this->formLocationOptions === [] ? __('targets.no_locations') : ($targetSourceType === 'proposal' ? __('targets.location_help') : __('targets.only_projects_in_the_plan_program_are_offered')))"
                         class="@2xl/modal:col-span-2"
                         data-test="target-location-select"
                     >
-                        <option value="">{{ __('targets.choose_the_location') }}</option>
-                        @foreach ($this->formLocationOptions as $locationOption)
-                            <option value="{{ $locationOption['id'] }}">{{ $locationOption['label'] }}</option>
-                        @endforeach
-                    </x-ui.form-select>
-                    @else
-                    <x-ui.form-select
-                        wire:model="targetProjectId"
-                        :label="__('common.project')"
-                        :disabled="$formIndicator?->project_id !== null"
-                        :locked-reason="$formIndicator?->project !== null ? __('targets.scoped_to_project', ['project' => $formIndicator->project->name]) : null"
-                        :help="$targetSourceId !== '' ? ($targetSourceType === 'proposal' ? __('targets.only_projects_the_proposal_funds_are_offered') : __('targets.only_projects_in_the_plan_program_are_offered')) : null"
-                        class="@2xl/modal:col-span-2"
-                    >
-                        @if ($formIndicator?->project_id === null)
+                        {{-- A proposal target must name one of its proposal's rows; an
+                             annual-plan target may stay organisation-wide (Y-16, D-93). --}}
+                        @if ($targetSourceType === 'proposal')
+                            <option value="">{{ __('targets.choose_the_location') }}</option>
+                        @elseif ($formIndicator?->proposal_location_id === null)
                             <option value="">{{ __('common.organisation_wide') }}</option>
                         @endif
-                        @foreach ($this->formProjectOptions as $projectOption)
-                            <option value="{{ $projectOption->id }}">{{ $projectOption->name }}</option>
+                        @foreach ($this->formLocationOptions as $locationOption)
+                            <option value="{{ $locationOption['id'] }}" dir="auto">{{ $locationOption['label'] }}</option>
                         @endforeach
                     </x-ui.form-select>
-                    @endif
                 </div>
             </x-ui.form-section>
         @endif

@@ -104,6 +104,40 @@ final class ProjectSuccessor
     }
 
     /**
+     * The successor row of each of many projects, in one query.
+     *
+     * The twin of rowFor() for a list: a page that shows one link per project
+     * would otherwise ask once per line. Same rule, same order.
+     *
+     * @param  list<int>  $projectIds
+     * @return array<int, ProposalLocation> project id => its row
+     */
+    public function rowForMany(array $projectIds): array
+    {
+        if ($projectIds === []) {
+            return [];
+        }
+
+        /** @var Collection<int, ProposalLocation> $rows */
+        $rows = ProposalLocation::query()
+            ->whereIn('project_id', $projectIds)
+            ->with(['proposal' => fn ($query) => $query->select(self::ProposalColumns)])
+            ->get();
+
+        return $rows
+            ->groupBy('project_id')
+            ->map(fn (Collection $group): ProposalLocation => $group
+                ->sortByDesc(fn (ProposalLocation $row): string => sprintf(
+                    '%s|%020d',
+                    $this->beginOf($row->proposal)?->toDateString() ?? '0000-00-00',
+                    $row->proposal->id,
+                ))
+                ->first())
+            ->mapWithKeys(fn (ProposalLocation $row, mixed $projectId): array => [(int) $projectId => $row])
+            ->all();
+    }
+
+    /**
      * Whether the proposal's period covers the date. A proposal missing
      * either end of its period covers nothing: it cannot be compared.
      */

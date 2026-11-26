@@ -45,6 +45,21 @@ enum ProjectStatus: string implements HasStatusTone
     }
 
     /**
+     * The status values of work still being delivered, from isOpen() so
+     * there is one list. The twin of `Project::openStatusValues()`, which
+     * goes with the `projects` table in Y-18.
+     *
+     * @return list<string>
+     */
+    public static function openValues(): array
+    {
+        return array_values(array_map(
+            fn (self $status): string => $status->value,
+            array_filter(self::cases(), fn (self $status): bool => $status->isOpen()),
+        ));
+    }
+
+    /**
      * Every status a project can be in today: all of them but the retired
      * `submitted`. Pickers, filters, charts and the lifecycle bar iterate
      * this, never `cases()`.

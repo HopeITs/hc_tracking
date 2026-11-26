@@ -32,6 +32,20 @@ test('with several active contracts the latest start date wins and a warning is 
     Log::shouldHaveReceived('warning')->once();
 });
 
+test('the several-active-contracts warning is logged once per employee, not on every reload', function () {
+    Log::spy();
+    $departmentId = insertHrDepartment();
+    $employeeId = insertHrEmployee();
+    insertHrContract($employeeId, insertHrPosition($departmentId, 'Earlier'), startDate: '2025-03-01 00:00:00');
+    insertHrContract($employeeId, insertHrPosition($departmentId, 'Later'), startDate: '2026-03-01 00:00:00');
+
+    EmployeeProfile::for($employeeId);
+    EmployeeProfile::forgetRememberedLookup();
+    EmployeeProfile::for($employeeId);
+
+    Log::shouldHaveReceived('warning')->once();
+});
+
 test('the profile carries level, grade, department, program, center, city and direct manager', function () {
     $cityId = insertHrCity('Idlib', 'إدلب');
     $centerId = insertHrCenter($cityId);

@@ -8,7 +8,7 @@ use App\Models\AnnualPlan;
 use App\Models\Donor;
 use App\Models\Indicator;
 use App\Models\Program;
-use App\Models\Project;
+use App\Models\ProposalLocation;
 use App\Models\Proposal;
 use App\Models\Risk;
 use App\Models\Strategy;
@@ -281,12 +281,12 @@ new class extends Component {
     private function countOf(string $module, bool $mine): ?int
     {
         $query = match ($module) {
-            'projects' => Project::query(),
+            'projects' => ProposalLocation::query()->with(['city:id,name_en,name_ar', 'program:id', 'centers', 'proposal:id,name']),
             'proposals' => Proposal::query(),
             'donors' => Donor::query(),
             'tasks' => Task::query()->whereNull('parent_task_id')->where('status', '!=', TaskStatus::Done)
                 ->when($mine, fn (Builder $query) => $query->whereHas('taskAssignees', fn (Builder $assignee) => $assignee->where('employee_id', auth()->user()->employee_id ?? 0))),
-            'risks' => Risk::query(),
+            'risks' => Risk::query()->whereNull('program_id'),
             'transfers' => TransfersTracking::query(),
             'indicators' => Indicator::query(),
             'annual-plans' => AnnualPlan::query(),
@@ -306,7 +306,17 @@ new class extends Component {
     private function records(string $terms, ?string $entity): array
     {
         $sources = [
-            'projects' => [Project::query(), 'name', 'folder', __('common.projects'), fn (Project $project): array => ['label' => $project->name, 'sub' => __('common.projects'), 'href' => route('projects.show', $project)]],
+            // Y-16 (D-93): a result is a place, named by its proposal.
+            'projects' => [
+                // A row is named by its proposal, joined so the search and the
+                // order can read that one column.
+                ProposalLocation::query()
+                    ->join('proposals', 'proposals.id', '=', 'proposal_locations.proposal_id')
+                    ->select('proposal_locations.*')
+                    ->with(['city:id,name_en,name_ar', 'program:id', 'centers', 'proposal:id,name']),
+                'proposals.name', 'folder', __('common.projects'),
+                fn (ProposalLocation $project): array => ['label' => $project->headline().' · '.$project->label(), 'sub' => __('common.projects'), 'href' => route('projects.show', $project)],
+            ],
             'proposals' => [Proposal::query(), 'name', 'file', __('common.proposals'), fn (Proposal $proposal): array => ['label' => $proposal->name, 'sub' => $proposal->status->label(), 'href' => route('proposals.show', $proposal)]],
             'donors' => [Donor::query(), 'name', 'users', __('common.donors'), fn (Donor $donor): array => ['label' => $donor->name, 'sub' => __('common.donors'), 'href' => route('donors.show', $donor)]],
             'tasks' => [Task::query()->whereNull('parent_task_id'), 'title', 'check', __('common.tasks'), fn (Task $task): array => ['label' => $task->title, 'sub' => $task->status->label(), 'href' => route('tasks.show', $task)]],

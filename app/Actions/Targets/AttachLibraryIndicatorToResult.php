@@ -6,8 +6,8 @@ namespace App\Actions\Targets;
 
 use App\Models\Indicator;
 use App\Models\LibraryIndicator;
-use App\Models\Project;
 use App\Models\Proposal;
+use App\Models\ProposalLocation;
 use App\Models\Result;
 use App\Support\ProposalFramework;
 use Illuminate\Database\UniqueConstraintViolationException;
@@ -33,20 +33,20 @@ use Illuminate\Validation\ValidationException;
  */
 final class AttachLibraryIndicatorToResult
 {
-    public function forResult(Result $result, int $libraryIndicatorId, ?int $projectId = null): Indicator
+    public function forResult(Result $result, int $libraryIndicatorId, ?int $locationId = null): Indicator
     {
         Gate::authorize('indicators.create');
 
-        return DB::transaction(function () use ($result, $libraryIndicatorId, $projectId): Indicator {
+        return DB::transaction(function () use ($result, $libraryIndicatorId, $locationId): Indicator {
             $proposal = $result->proposal_id === null ? null : Proposal::query()->findOrFail($result->proposal_id);
             if ($proposal !== null) {
                 Gate::authorize('view', $proposal);
             }
 
-            if ($projectId !== null) {
-                $project = Project::query()->findOrFail($projectId);
-                if (($result->program_id !== null && $project->program_id !== $result->program_id)
-                    || ($proposal !== null && ! $proposal->projects()->whereKey($projectId)->exists())) {
+            if ($locationId !== null) {
+                $row = ProposalLocation::query()->findOrFail($locationId);
+                if (($result->program_id !== null && $row->program_id !== $result->program_id)
+                    || ($proposal !== null && $row->proposal_id !== $proposal->id)) {
                     $this->refuse('result', __('indicators.this_project_does_not_deliver_the_result_program'));
                 }
             }
@@ -68,8 +68,8 @@ final class AttachLibraryIndicatorToResult
                 $indicator = $this->attachEntry($entry, $locked);
             }
 
-            if ($projectId !== null) {
-                $indicator->update(['project_id' => $projectId]);
+            if ($locationId !== null) {
+                $indicator->update(['proposal_location_id' => $locationId]);
             }
 
             return $indicator;

@@ -84,7 +84,7 @@ function seedMediaMoneyFixture(): array
 test('Media Team sees no funding figures on the project page or its proposals tab (MD-02)', function () {
     ['project' => $project] = seedMediaMoneyFixture();
 
-    Livewire::actingAs(userWithRole('Media Team'))->test('pages::projects.show', ['project' => $project])
+    Livewire::actingAs(userWithRole('Media Team'))->test('pages::projects.show', ['project' => rowFor($project)->slug])
         ->assertOk()
         ->assertDontSee('864,209')
         ->assertDontSee('135,791')
@@ -131,8 +131,8 @@ test('Media Team cannot edit, archive or delete projects (MD-03)', function () {
     $project = Project::factory()->create();
     $projects = fn () => Livewire::actingAs(userWithRole('Media Team'))->test('pages::projects.index');
 
-    $projects()->call('openEditModal', $project->id)->assertForbidden();
-    $projects()->call('confirmArchive', $project->id)->assertForbidden();
+    $projects()->call('openEditModal', rowFor($project)->id)->assertForbidden();
+    $projects()->call('confirmArchive', rowFor($project)->id)->assertForbidden();
 
     expect(Project::query()->find($project->id))->not->toBeNull();
 });

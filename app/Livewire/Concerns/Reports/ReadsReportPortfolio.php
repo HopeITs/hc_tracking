@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace App\Livewire\Concerns\Reports;
 
 use App\Models\PlanIndicator;
-use App\Models\Project;
+use App\Models\ProposalLocation;
 use App\Models\Report;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Collection;
@@ -14,7 +14,7 @@ use Livewire\Attributes\Computed;
 
 /**
  * The portfolio side of reports/index: the pulse figures above the feed, the
- * project-and-target grouping behind the portfolio view, and the label of the
+ * row-and-target grouping behind the portfolio view, and the label of the
  * target the feed is narrowed to.
  *
  * Used by reports/index only. The page provides the #[Url] view and target
@@ -87,11 +87,12 @@ trait ReadsReportPortfolio
     }
 
     /**
-     * Reports grouped by project, then by target, for the portfolio view.
+     * Reports grouped by location row, then by target, for the portfolio view
+     * (Y-16, D-93).
      *
      * Both levels sort worst-achievement-first: a manager opening the
      * portfolio should see what needs attention before anything else,
-     * without having to hunt for it. A project or target with no scorable
+     * without having to hunt for it. A row or target with no scorable
      * achievement (no positive target) sorts after every scored one, then
      * alphabetically, so it is never mistaken for a top performer.
      *
@@ -100,7 +101,7 @@ trait ReadsReportPortfolio
      * applies here too, so switching views never changes what is being looked
      * at, only how it is shaped.
      *
-     * @return SupportCollection<int, array{project: Project|null, reportCount: int, avgAchievement: int|null, indicators: SupportCollection<int, array{planIndicator: PlanIndicator, reports: Collection<int, Report>, latest: Report, trend: array<int, float>, achievement: int|null}>}>
+     * @return SupportCollection<int, array{location: ProposalLocation|null, reportCount: int, avgAchievement: int|null, indicators: SupportCollection<int, array{planIndicator: PlanIndicator, reports: Collection<int, Report>, latest: Report, trend: array<int, float>, achievement: int|null}>}>
      */
     #[Computed]
     public function portfolio(): SupportCollection
@@ -117,9 +118,9 @@ trait ReadsReportPortfolio
             ->get();
 
         return $reports
-            ->groupBy(fn (Report $report): int => $report->planIndicator->project_id ?? 0)
-            ->map(function (Collection $projectReports): array {
-                $indicators = $projectReports
+            ->groupBy(fn (Report $report): int => $report->planIndicator->proposal_location_id ?? 0)
+            ->map(function (Collection $rowReports): array {
+                $indicators = $rowReports
                     ->groupBy('plan_indicator_id')
                     ->map(function (Collection $rows): array {
                         /** @var PlanIndicator $planIndicator */
@@ -145,13 +146,13 @@ trait ReadsReportPortfolio
                 $scored = $indicators->pluck('achievement')->filter(fn (?int $value): bool => $value !== null);
 
                 return [
-                    'project' => $projectReports->first()->planIndicator->project,
-                    'reportCount' => $projectReports->count(),
+                    'location' => $rowReports->first()->planIndicator->location,
+                    'reportCount' => $rowReports->count(),
                     'avgAchievement' => $scored->isEmpty() ? null : (int) round($scored->average()),
                     'indicators' => $indicators,
                 ];
             })
-            ->sortBy(fn (array $group): string => $group['project']->name ?? '')
+            ->sortBy(fn (array $group): string => $group['location']?->label() ?? '')
             ->sortBy(fn (array $group): int => $group['avgAchievement'] ?? PHP_INT_MAX)
             ->values();
     }
@@ -167,7 +168,7 @@ trait ReadsReportPortfolio
         }
 
         $target = PlanIndicator::query()
-            ->with(['indicator:id,name,measure', 'project:id,name', 'source'])
+            ->with(['indicator:id,name,measure', 'location', 'location.city', 'location.program', 'location.centers', 'source'])
             ->find((int) $this->target);
 
         return $target === null ? null : $this->targetLabel($target);

@@ -204,6 +204,8 @@ function seedProposalPaperwork(): array
     ['proposal' => $proposal] = seedMoneyPagesFixture();
     $project = Project::factory()->create();
     $proposal->projects()->attach($project);
+    // Y-16 (D-93): grant paper is filed on the place the proposal pays for.
+    $row = proposalRowForProject($proposal, $project);
 
     $file = fn (string $mediableType, int $mediableId, MediaCollection $collection, string $name): Media => Media::factory()->create([
         'mediable_type' => $mediableType,
@@ -218,7 +220,7 @@ function seedProposalPaperwork(): array
         'proposal' => $proposal,
         'note' => $file('proposal', $proposal->id, MediaCollection::Proposal, 'concept-note.pdf'),
         'agreement' => $file('proposal', $proposal->id, MediaCollection::Agreement, 'signed-agreement.pdf'),
-        'mou' => $file('project', $project->id, MediaCollection::Mou, 'signed-mou.pdf'),
+        'mou' => $file('proposal_location', $row->id, MediaCollection::Mou, 'signed-mou.pdf'),
     ];
 
     foreach (['note', 'agreement', 'mou'] as $key) {

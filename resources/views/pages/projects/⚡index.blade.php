@@ -10,7 +10,7 @@ use App\Livewire\Concerns\Projects\SummarisesProjectFunding;
 use App\Livewire\Concerns\Projects\UnblocksProjects;
 use App\Models\HrEmployee;
 use App\Models\Program;
-use App\Models\Project;
+use App\Models\ProposalLocation;
 use App\Notifications\UnreadSubjects;
 use Carbon\CarbonImmutable;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
@@ -78,40 +78,41 @@ new #[Layout('layouts::desk'), Title('titles.projects')] class extends Component
     #[Computed]
     public function unreadIds(): array
     {
-        return app(UnreadSubjects::class)->ids(auth()->user(), 'project');
+        return app(UnreadSubjects::class)->ids(auth()->user(), 'proposal_location');
     }
 
-    /** @return LengthAwarePaginator<int, Project> */
+    /** @return LengthAwarePaginator<int, ProposalLocation> */
     #[Computed]
     public function projects(): LengthAwarePaginator
     {
-        $query = Project::query()
+        $query = ProposalLocation::query()
             ->select([
-                'id',
-                'slug',
-                'name',
-                'status',
-                'start_date',
-                'end_date',
-                'target_beneficiaries',
-                'target_men',
-                'target_women',
-                'target_boys',
-                'target_girls',
-                'city_id',
-                'center_id',
-                'host_center_id',
-                'program_id',
-                'user_id',
-                'updated_at',
+                'proposal_locations.id',
+                'proposal_locations.proposal_id',
+                'proposal_locations.slug',
+                'proposal_locations.status',
+                'proposal_locations.start_date',
+                'proposal_locations.end_date',
+                'proposal_locations.target_beneficiaries',
+                'proposal_locations.target_men',
+                'proposal_locations.target_women',
+                'proposal_locations.target_boys',
+                'proposal_locations.target_girls',
+                'proposal_locations.city_id',
+                'proposal_locations.city_wide',
+                'proposal_locations.program_id',
+                'proposal_locations.project_id',
+                'proposal_locations.responsible_employee_id',
+                'proposal_locations.updated_at',
             ])
             ->with([
                 'city:id,name_en,name_ar',
+                'centers',
                 'program:id,strategy_id',
                 'program.strategy:id,name',
-                'user:id,first_name_en,last_name_en,first_name_ar,last_name_ar',
+                'proposal:id,name,status',
+                'responsible',
                 'ownerAssignment',
-                'proposals:proposals.id,proposals.status',
             ])
             // Only the list view's preview shows the sectors.
             ->when($this->view === 'list', fn (Builder $query) => $query->with([
@@ -119,8 +120,7 @@ new #[Layout('layouts::desk'), Title('titles.projects')] class extends Component
             ]))
             ->withCount([
                 'risks',
-                'planIndicators',
-                'proposals',
+                'targets',
                 'indicators',
                 'media' => fn ($query) => $query->whereNotIn('collection', $this->hiddenCollections()),
                 'risks as materialised_risks_count' => fn ($query) => $query->where('happened', true),
@@ -144,12 +144,14 @@ new #[Layout('layouts::desk'), Title('titles.projects')] class extends Component
         return HrEmployee::pickerOptions();
     }
 
-    /** Whether the list behind the "projects without a center" warning is open. */
+    /** Whether the list behind the "places without a center" warning is open. */
     public bool $showProjectsWithoutCenter = false;
 
     /**
-     * How many projects are not yet mapped to an HR center (D-30c), counted
+     * How many rows are not yet mapped to an HR center (D-30c), counted
      * only for those who manage the portfolio; nobody else pays for the query.
+     *
+     * A city-wide row is field work (D-88), so it is placed, not unmapped.
      */
     #[Computed]
     public function projectsWithoutCenterCount(): int
@@ -158,14 +160,13 @@ new #[Layout('layouts::desk'), Title('titles.projects')] class extends Component
             return 0;
         }
 
-        // A hosted project (W-01) is placed, not unmapped.
-        return Project::query()->whereNull('center_id')->whereNull('host_center_id')->count();
+        return ProposalLocation::query()->where('city_wide', false)->whereDoesntHave('centers')->count();
     }
 
     /**
-     * The unmapped projects themselves, loaded only once the warning is opened.
+     * The unmapped rows themselves, loaded only once the warning is opened.
      *
-     * @return Collection<int, Project>
+     * @return Collection<int, ProposalLocation>
      */
     #[Computed]
     public function projectsWithoutCenter(): Collection
@@ -174,11 +175,13 @@ new #[Layout('layouts::desk'), Title('titles.projects')] class extends Component
             return new Collection;
         }
 
-        return Project::query()
-            ->whereNull('center_id')
-            ->whereNull('host_center_id')
-            ->orderBy('name')
-            ->get(['id', 'slug', 'name']);
+        return ProposalLocation::query()
+            ->where('city_wide', false)
+            ->whereDoesntHave('centers')
+            ->with(['city:id,name_en,name_ar', 'program:id', 'centers'])
+            ->get(['id', 'slug', 'proposal_id', 'city_id', 'program_id', 'city_wide'])
+            ->sortBy(fn (ProposalLocation $row): string => $row->label())
+            ->values();
     }
 };
 ?>
@@ -233,8 +236,8 @@ new #[Layout('layouts::desk'), Title('titles.projects')] class extends Component
         'risks' => ['label' => __('projects.lens_risks'), 'hint' => __('projects.lens_risks_hint')],
     ];
 
-    /* How much of a project's own window has passed, as a percentage. */
-    $elapsedOf = function (Project $project) use ($today): ?float {
+    /* How much of a row's own window has passed, as a percentage. */
+    $elapsedOf = function (ProposalLocation $project) use ($today): ?float {
         if ($project->start_date === null || $project->end_date === null || $project->end_date->lt($project->start_date)) {
             return null;
         }
@@ -248,7 +251,7 @@ new #[Layout('layouts::desk'), Title('titles.projects')] class extends Component
        timeline can never disagree about what "slipping" means. Only two
        appearances exist — needs attention (primary) and calm (grey) — so the
        words carry the meaning and the colour only raises a hand. */
-    $scheduleOf = function (Project $project) use ($today, $elapsedOf): array {
+    $scheduleOf = function (ProposalLocation $project) use ($today, $elapsedOf): array {
         $progress = $this->progressFor($project);
         $elapsed = $elapsedOf($project);
         $isFinished = in_array($project->status, [ProjectStatus::Closed, ProjectStatus::Archived], true);
@@ -292,11 +295,9 @@ new #[Layout('layouts::desk'), Title('titles.projects')] class extends Component
     :view="$view"
     :views="$viewOptions"
 >
-    <x-slot:actions>
-        @can('create', App\Models\Project::class)
-            <button type="button" class="dk-btn dk-primary" wire:click="openCreateModal" data-test="create-project-button" data-quick-create><x-desk.icon name="plus" />{{ __('projects.add_project') }}</button>
-        @endcan
-    </x-slot:actions>
+    {{-- Y-16 (D-84, D-87): nothing creates a project by hand any more. One
+         entry here is a location row, and a row exists because a proposal has
+         it, so the way in is the proposal form. --}}
     <x-slot:search>
         <x-desk.register-search :label="__('projects.search_projects')" :placeholder="__('projects.project_city_program_or_owner')" wire:model.live.debounce.300ms="search" />
     </x-slot:search>
@@ -378,7 +379,7 @@ new #[Layout('layouts::desk'), Title('titles.projects')] class extends Component
                 @if ($showProjectsWithoutCenter)
                     <span class="dk-pjnote-list">
                         @foreach ($this->projectsWithoutCenter as $unmappedProject)
-                            <a href="{{ route('projects.show', $unmappedProject) }}" wire:navigate>{{ $unmappedProject->name }}</a>
+                            <a href="{{ route('projects.show', $unmappedProject) }}" wire:navigate>{{ $unmappedProject->headline() }} · {{ $unmappedProject->label() }}</a>
                         @endforeach
                     </span>
                 @endif
@@ -393,13 +394,11 @@ new #[Layout('layouts::desk'), Title('titles.projects')] class extends Component
             <x-ui.empty-state
                 icon="rectangle-stack"
                 :heading="$filtersAreActive ? __('projects.no_matching_projects') : __('common.no_projects_yet')"
-                :body="$filtersAreActive ? __('common.change_the_search_or_filters_and_try_again') : __('projects.add_the_first_project_and_place_it_in_a_city_and_program')"
+                :body="$filtersAreActive ? __('common.change_the_search_or_filters_and_try_again') : __('projects.appear_when_a_proposal_is_approved')"
             >
                 <x-slot:action>
                     @if ($filtersAreActive)
                         <x-ui.button size="sm" wire:click="clearFilters">{{ __('common.reset_filters') }}</x-ui.button>
-                    @else
-                        @can('create', App\Models\Project::class)<x-ui.button size="sm" tone="primary" icon="plus" wire:click="openCreateModal">{{ __('projects.add_project') }}</x-ui.button>@endcan
                     @endif
                 </x-slot:action>
             </x-ui.empty-state>
@@ -449,7 +448,7 @@ new #[Layout('layouts::desk'), Title('titles.projects')] class extends Component
         close="cancelArchive"
         tone="neutral"
         :title="__('projects.archive_this_project')"
-        :message="$this->archivingProject !== null ? __('projects.archiving_keeps_everything', ['name' => $this->archivingProject['project']->name]) : null"
+        :message="$this->archivingProject !== null ? __('projects.archiving_keeps_everything', ['name' => $this->archivingProject['project']->headline()]) : null"
         confirm="archiveProject"
         :confirm-label="__('projects.archive_project')"
         confirm-test="confirm-archive-project"

@@ -12,13 +12,14 @@ test('a project running past the grant term is flagged', function () {
         'planned_date_end' => '2026-12-31',
     ]);
 
-    $proposal->projects()->attach(
-        Project::factory()->create([
-            'name' => 'Overrunning Water Network',
-            'start_date' => '2026-02-01',
-            'end_date' => '2027-06-30',
-        ])
-    );
+    $project = Project::factory()->create([
+        'name' => 'Overrunning Water Network',
+        'start_date' => '2026-02-01',
+        'end_date' => '2027-06-30',
+    ]);
+    $proposal->projects()->attach($project);
+    // Y-16 (D-93): the section lists the proposal's places and dates them.
+    proposalRowForProject($proposal, $project)->update(['start_date' => '2026-02-01', 'end_date' => '2027-06-30']);
 
     Livewire::actingAs($user)
         ->test('pages::proposals.show', ['proposal' => $proposal])
@@ -35,17 +36,19 @@ test('a project ending inside the grant term is not flagged', function () {
         'planned_date_end' => '2026-12-31',
     ]);
 
-    $proposal->projects()->attach(
-        Project::factory()->create([
-            'name' => 'Contained Mobile Clinic',
-            'start_date' => '2026-02-01',
-            'end_date' => '2026-11-30',
-        ])
-    );
+    $project = Project::factory()->create([
+        'name' => 'Contained Mobile Clinic',
+        'start_date' => '2026-02-01',
+        'end_date' => '2026-11-30',
+    ]);
+    $proposal->projects()->attach($project);
+    // Y-16 (D-93): the section lists the proposal's places and dates them.
+    $row = proposalRowForProject($proposal, $project);
+    $row->update(['start_date' => '2026-02-01', 'end_date' => '2026-11-30']);
 
     Livewire::actingAs($user)
         ->test('pages::proposals.show', ['proposal' => $proposal])
         ->set('tab', 'projects')
-        ->assertSee('Contained Mobile Clinic')
+        ->assertSee($row->fresh()->load(['city', 'program', 'centers', 'proposal'])->headline())
         ->assertDontSeeHtml('data-outruns-grant');
 });

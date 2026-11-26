@@ -23,7 +23,7 @@ return [
     'sectors' => 'القطاعات',
     'risk_library' => 'مكتبة المخاطر',
     'evidence_types' => 'أنواع الشواهد',
-    'active_reports' => 'التقارير المفتوحة',
+    'active_reports' => 'متابعة التقارير',
     'monthly_reports' => 'التقارير الشهرية',
     'report_templates' => 'قوالب بانتظار التأكيد',
     'narrative_questions' => 'بنك الأسئلة السردية',

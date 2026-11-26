@@ -44,7 +44,8 @@ test('list rows carry a dot only for records with unread notifications', functio
         ->assertDontSeeHtml('data-unread-dot="'.$type.'-'.$quiet->id.'"');
 })->with([
     'tasks' => ['tasks.index', 'task', fn () => Task::factory()->create()],
-    'projects' => ['projects.index', 'project', fn () => Project::factory()->create()],
+    // Y-16 (D-93): the register lists places, so the dot is a place's.
+    'projects' => ['projects.index', 'proposal_location', fn () => rowFor(Project::factory()->create())],
     'reports' => ['reports.index', 'report', fn () => Report::factory()->create()],
     'proposals' => ['proposals.index', 'proposal', fn () => Proposal::factory()->create()],
 ]);
@@ -58,7 +59,7 @@ test('record headers carry the dot only while the record has unread notification
     $this->actingAs($viewer)->get(route($route, $quiet))->assertDontSeeHtml('data-unread-dot');
 })->with([
     'task' => ['tasks.show', 'task', fn () => Task::factory()->create()],
-    'project' => ['projects.show', 'project', fn () => Project::factory()->create()],
+    'project' => ['projects.show', 'proposal_location', fn () => rowFor(Project::factory()->create())],
     'report' => ['reports.show', 'report', fn () => Report::factory()->create()],
     'proposal' => ['proposals.show', 'proposal', fn () => Proposal::factory()->create()],
     'program' => ['programs.show', 'program', fn () => Program::factory()->create()],

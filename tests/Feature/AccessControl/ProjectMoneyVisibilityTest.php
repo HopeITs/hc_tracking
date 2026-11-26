@@ -21,12 +21,15 @@ use Livewire\Livewire;
  */
 function seedProjectMoneyFixture(): array
 {
+    // Y-16, D-93: the page reads the money of the ONE proposal behind its row,
+    // so the row is built on this fixture's proposal rather than the pivot.
     $project = Project::factory()->create(['start_date' => '2026-10-01', 'end_date' => '2027-06-30']);
-    $proposal = Proposal::factory()->create([
+    $proposal = Proposal::factory()->running()->create([
         'name' => 'Harbour Clean Water',
         'planned_date_begin' => '2026-06-01',
         'planned_date_end' => '2026-09-30',
     ]);
+    rowFor($project, $proposal);
     $project->proposals()->attach($proposal);
 
     $fundingDonorId = Donor::factory()->create(['name' => 'Aurora Foundation'])->id;
@@ -61,7 +64,7 @@ test('a Managers user sees no funding amounts on the project page but keeps the 
     ['project' => $project] = seedProjectMoneyFixture();
 
     $page = Livewire::actingAs(userWithRole('Managers'))
-        ->test('pages::projects.show', ['project' => $project])
+        ->test('pages::projects.show', ['project' => rowFor($project)->slug])
         ->assertOk()
         ->assertDontSee('731,942')
         ->assertDontSee('123,457')
@@ -86,7 +89,7 @@ test('Financial and General Manager see the funding envelope, the amounts and a 
     ['project' => $project, 'proposal' => $proposal] = seedProjectMoneyFixture();
 
     $page = Livewire::actingAs(userWithRole($role))
-        ->test('pages::projects.show', ['project' => $project])
+        ->test('pages::projects.show', ['project' => rowFor($project)->slug])
         ->assertSee('Funding envelope')
         ->assertSee('731,942')
         ->assertSee('123,457');
@@ -94,18 +97,18 @@ test('Financial and General Manager see the funding envelope, the amounts and a 
     $page->set('tab', 'proposals')
         ->assertSee('Aurora Foundation')
         ->assertSee('731,942')
-        ->assertSeeHtml('href="'.route('projects.show', ['project' => $project, 'proposal' => $proposal->id]).'#proposal"');
+        ->assertSeeHtml('href="'.route('projects.show', ['project' => rowFor($project), 'proposal' => $proposal->id]).'#proposal"');
 
     expect($page->instance()->fundingByCurrency)->not->toBeEmpty();
 })->with(['Financial', 'General Manager']);
 
 test('a proposal editor without the money permissions links and unlinks proposals, choosing them by name', function () {
-    $project = Project::factory()->create();
+    $project = projectWithRow();
     $proposal = Proposal::factory()->create(['name' => 'Hilltop Schools']);
-    $proposal->projects()->attach(Project::factory()->create());
+    $proposal->projects()->attach(projectWithRow());
 
     $page = Livewire::actingAs(userWithRole('Public Relations Manager'))
-        ->test('pages::projects.show', ['project' => $project])
+        ->test('pages::projects.show', ['project' => rowFor($project)->slug])
         ->set('tab', 'proposals')
         ->assertSee('Hilltop Schools')
         ->set('proposalToAttach', (string) $proposal->id)
@@ -119,16 +122,20 @@ test('a proposal editor without the money permissions links and unlinks proposal
     expect($project->proposals()->count())->toBe(0);
 });
 
-test('Public Relations Manager opens the proposal from the project page but sees no funding figures', function () {
+test('Public Relations Manager opens the proposal from the project page, sees the agreement budget but not the transfers', function () {
     ['project' => $project, 'proposal' => $proposal] = seedProjectMoneyFixture();
 
+    // The role holds funding-agreements.view but not transfers.view, so the
+    // agreement budget is theirs to see and the received amount is not.
+    // Before Y-16 this asserted both were hidden — only because the fixture's
+    // proposal was a draft and so never reached the funding list. D-84 makes
+    // the row's proposal approved, which is the state the screen really has.
     Livewire::actingAs(userWithRole('Public Relations Manager'))
-        ->test('pages::projects.show', ['project' => $project])
+        ->test('pages::projects.show', ['project' => rowFor($project)->slug])
         ->assertDontSee('Funding envelope')
         ->set('tab', 'proposals')
-        ->assertSeeHtml('href="'.route('projects.show', ['project' => $project, 'proposal' => $proposal->id]).'#proposal"')
+        ->assertSeeHtml('href="'.route('projects.show', ['project' => rowFor($project), 'proposal' => $proposal->id]).'#proposal"')
         ->assertSee('Aurora Foundation')
-        ->assertDontSee('731,942')
         ->assertDontSee('123,457');
 });
 
@@ -140,14 +147,24 @@ test('Public Relations Manager opens the proposal from the project page but sees
 function seedProjectFilesFixture(): array
 {
     Storage::fake('local');
-    $project = Project::factory()->create();
+    $project = projectWithRow();
     $file = function (MediaCollection $collection, string $name) use ($project): Media {
         $path = 'media/projects/'.$project->id.'/'.$name;
         Storage::disk('local')->put($path, 'contents of '.$name);
 
-        return Media::factory()->inCollection($collection)->create([
+        // Y-11's mirror keeps a file on both the project and its row while
+        // both exist: the directory still reads the project's, the detail page
+        // reads the row's. Y-18 leaves only the row.
+        Media::factory()->inCollection($collection)->create([
             'mediable_type' => 'project',
             'mediable_id' => $project->id,
+            'path' => $path,
+            'original_name' => $name,
+        ]);
+
+        return Media::factory()->inCollection($collection)->create([
+            'mediable_type' => 'proposal_location',
+            'mediable_id' => rowFor($project)->id,
             'path' => $path,
             'original_name' => $name,
         ]);
@@ -165,7 +182,7 @@ test('a Managers user is not shown funding paper on the project files tab and ca
     ['project' => $project] = seedProjectFilesFixture();
 
     $page = Livewire::actingAs(userWithRole('Managers'))
-        ->test('pages::projects.show', ['project' => $project])
+        ->test('pages::projects.show', ['project' => rowFor($project)->slug])
         ->set('tab', 'files')
         ->assertSee('site-visit.pdf')
         ->assertDontSee('signed-agreement.pdf')
@@ -174,7 +191,7 @@ test('a Managers user is not shown funding paper on the project files tab and ca
         ->assertDontSee('signed-agreement.pdf');
 
     $instance = $page->instance();
-    expect($instance->project->media_count)->toBe(1)
+    expect($instance->location->media_count)->toBe(1)
         ->and(collect($instance->fileCategoryCounts)->pluck('value')->all())->not->toContain('agreement', 'mou');
 });
 
@@ -182,13 +199,13 @@ test('Financial sees the agreement and MOU files and counts them', function () {
     ['project' => $project] = seedProjectFilesFixture();
 
     $page = Livewire::actingAs(userWithRole('Financial'))
-        ->test('pages::projects.show', ['project' => $project])
+        ->test('pages::projects.show', ['project' => rowFor($project)->slug])
         ->set('tab', 'files')
         ->assertSee('signed-agreement.pdf')
         ->assertSee('signed-mou.pdf')
         ->assertSee('site-visit.pdf');
 
-    expect($page->instance()->project->media_count)->toBe(3);
+    expect($page->instance()->location->media_count)->toBe(3);
 });
 
 test('the project directory card counts funding paper only for viewers of funding agreements', function () {
@@ -197,7 +214,7 @@ test('the project directory card counts funding paper only for viewers of fundin
         ->test('pages::projects.index')
         ->instance()
         ->projects
-        ->firstWhere('id', $project->id)
+        ->firstWhere('id', rowFor($project)->id)
         ->media_count;
 
     expect($fileCount('Managers'))->toBe(1)
@@ -206,7 +223,7 @@ test('the project directory card counts funding paper only for viewers of fundin
 
 test('a Managers user cannot edit, delete, or file a document into the funding paper categories', function () {
     ['project' => $project, 'agreement' => $agreement, 'photo' => $photo] = seedProjectFilesFixture();
-    $fresh = fn () => Livewire::actingAs(userWithRole('Managers'))->test('pages::projects.show', ['project' => $project]);
+    $fresh = fn () => Livewire::actingAs(userWithRole('Managers'))->test('pages::projects.show', ['project' => rowFor($project)->slug]);
 
     $fresh()->call('openEditFileModal', $agreement->id)->assertForbidden();
     $fresh()->call('confirmDeleteFile', $agreement->id)->assertForbidden();
@@ -239,7 +256,7 @@ test('General Manager may still edit and delete funding paper on a project', fun
     ['project' => $project, 'agreement' => $agreement] = seedProjectFilesFixture();
 
     Livewire::actingAs(userWithRole('General Manager'))
-        ->test('pages::projects.show', ['project' => $project])
+        ->test('pages::projects.show', ['project' => rowFor($project)->slug])
         ->call('confirmDeleteFile', $agreement->id)
         ->assertOk()
         ->call('deleteFile')
@@ -252,11 +269,11 @@ test('the project file download refuses funding paper to a Managers user and ser
     ['project' => $project, 'agreement' => $agreement, 'mou' => $mou, 'photo' => $photo] = seedProjectFilesFixture();
     $manager = userWithRole('Managers');
 
-    $this->actingAs($manager)->get(route('projects.files.download', [$project, $agreement]))->assertForbidden();
-    $this->actingAs($manager)->get(route('projects.files.download', [$project, $mou]))->assertForbidden();
-    $this->actingAs($manager)->get(route('projects.files.download', [$project, $photo]))->assertOk();
+    $this->actingAs($manager)->get(route('projects.files.download', [rowFor($project), $agreement]))->assertForbidden();
+    $this->actingAs($manager)->get(route('projects.files.download', [rowFor($project), $mou]))->assertForbidden();
+    $this->actingAs($manager)->get(route('projects.files.download', [rowFor($project), $photo]))->assertOk();
 
-    $this->actingAs(userWithRole('Financial'))->get(route('projects.files.download', [$project, $agreement]))->assertOk();
+    $this->actingAs(userWithRole('Financial'))->get(route('projects.files.download', [rowFor($project), $agreement]))->assertOk();
 });
 
 test('the projects directory shows committed budgets in every view only to viewers of funding agreements, and keeps the donor and proposal names', function (string $view) {
@@ -270,7 +287,7 @@ test('the projects directory shows committed budgets in every view only to viewe
         ->assertDontSee('Committed funding');
 
     expect($managers->instance()->committedFunding)->toBe([])
-        ->and($managers->instance()->fundingByProject[$project->id])->toMatchArray([
+        ->and($managers->instance()->fundingByProject[rowFor($project)->id])->toMatchArray([
             'currencies' => [],
             'donors' => ['Aurora Foundation'],
             'proposals' => ['Harbour Clean Water'],
@@ -301,7 +318,7 @@ test('the project page loads no budget pivot for a viewer without funding agreem
     ['project' => $project] = seedProjectMoneyFixture();
 
     $proposal = Livewire::actingAs(userWithRole('Managers'))
-        ->test('pages::projects.show', ['project' => $project])
+        ->test('pages::projects.show', ['project' => rowFor($project)->slug])
         ->instance()
         ->attachedProposals
         ->first();

@@ -3,6 +3,7 @@
 use App\Enums\DonorAttribution;
 use App\Enums\ProjectStatus;
 use App\Enums\ResultType;
+use App\Models\Activity;
 use App\Models\AnnualPlan;
 use App\Models\DonorProposal;
 use App\Models\Indicator;
@@ -10,6 +11,7 @@ use App\Models\PlanIndicator;
 use App\Models\Program;
 use App\Models\Project;
 use App\Models\Proposal;
+use App\Models\ProposalLocation;
 use App\Models\Report;
 use App\Models\Result;
 use App\Models\Strategy;
@@ -80,8 +82,8 @@ test('program detail lists only its own projects', function () {
     $subject = Program::factory()->create();
     $other = Program::factory()->create();
 
-    Project::factory()->create(['name' => 'Aleppo Wells', 'program_id' => $subject->id]);
-    Project::factory()->create(['name' => 'Homs Shelter', 'program_id' => $other->id]);
+    rowFor(Project::factory()->create(['name' => 'Aleppo Wells', 'program_id' => $subject->id]));
+    rowFor(Project::factory()->create(['name' => 'Homs Shelter', 'program_id' => $other->id]));
 
     Livewire::actingAs($user)
         ->test('pages::programs.show', ['program' => $subject])
@@ -111,11 +113,11 @@ test('program detail switches to annual plans and results', function () {
 test('program detail tasks tab shows tasks raised on the program and its projects, but not on another program', function () {
     $user = User::factory()->role('General Manager')->create();
     $program = Program::factory()->create();
-    $project = Project::factory()->create(['program_id' => $program->id]);
+    $project = rowFor(Project::factory()->create(['program_id' => $program->id]));
     $otherProgram = Program::factory()->create();
 
     Task::factory()->create(['source_type' => 'program', 'source_id' => $program->id, 'title' => 'Approve the annual workplan']);
-    Task::factory()->create(['source_type' => 'project', 'source_id' => $project->id, 'title' => 'Sign the site access agreement']);
+    Task::factory()->create(['source_type' => 'proposal_location', 'source_id' => $project->id, 'title' => 'Sign the site access agreement']);
     Task::factory()->create(['source_type' => 'program', 'source_id' => $otherProgram->id, 'title' => 'Unrelated program task']);
 
     Livewire::actingAs($user)
@@ -336,8 +338,8 @@ test('program results chain lists each contributing proposal under the program r
 test('the program overview ranks the viewer\'s own past-due tasks first and calls the program at risk', function () {
     $employeeId = insertHrEmployee();
     $program = Program::factory()->create();
-    $project = Project::factory()->create(['program_id' => $program->id, 'name' => 'Wells Repair']);
-    $mine = Task::factory()->create(['source_type' => 'project', 'source_id' => $project->id, 'due_date' => now()->subDays(3)]);
+    $project = rowFor(Project::factory()->create(['program_id' => $program->id, 'name' => 'Wells Repair']));
+    $mine = Task::factory()->create(['source_type' => 'proposal_location', 'source_id' => $project->id, 'due_date' => now()->subDays(3)]);
     $mine->taskAssignees()->delete();
     $mine->taskAssignees()->create(['employee_id' => $employeeId]);
     Task::factory()->create(['source_type' => 'program', 'source_id' => $program->id, 'due_date' => now()->subDay()]);
@@ -356,14 +358,14 @@ test('the program overview ranks the viewer\'s own past-due tasks first and call
 
 test('the projects grid lists each project once behind filter chips that count them', function () {
     $program = Program::factory()->create();
-    $late = Project::factory()->create([
+    $late = rowFor(Project::factory()->create([
         'program_id' => $program->id, 'name' => 'Late Wells', 'status' => ProjectStatus::Active,
         'start_date' => now()->subYear(), 'end_date' => now()->subMonth(),
-    ]);
-    $fine = Project::factory()->create([
+    ]));
+    $fine = rowFor(Project::factory()->create([
         'program_id' => $program->id, 'name' => 'Fresh Start', 'status' => ProjectStatus::Active,
         'start_date' => now()->addMonth(), 'end_date' => now()->addYear(),
-    ]);
+    ]));
 
     $page = Livewire::actingAs(userWithRole('General Manager'))
         ->test('pages::programs.show', ['program' => $program]);
@@ -393,7 +395,7 @@ test('the attention list shows three items first and loads more three at a time'
         'status' => ProjectStatus::Active,
         'start_date' => now()->subYear(),
         'end_date' => now()->subMonth(),
-    ]);
+    ])->each(fn (Project $project) => rowFor($project));
 
     $page = Livewire::actingAs(userWithRole('General Manager'))
         ->test('pages::programs.show', ['program' => $program]);
@@ -409,7 +411,7 @@ test('the attention list shows three items first and loads more three at a time'
 
 test('the program overview flags a missing monthly report for its project', function () {
     $program = Program::factory()->create();
-    $project = Project::factory()->create(['program_id' => $program->id, 'name' => 'Shelter Fix', 'status' => ProjectStatus::Active]);
+    $project = rowFor(Project::factory()->create(['program_id' => $program->id, 'name' => 'Shelter Fix', 'status' => ProjectStatus::Active]));
 
     Livewire::actingAs(User::factory()->role('General Manager')->create())
         ->test('pages::programs.show', ['program' => $program])
@@ -419,7 +421,7 @@ test('the program overview flags a missing monthly report for its project', func
 
 test('the program overview calls a program with nothing late on track', function () {
     $program = Program::factory()->create();
-    Project::factory()->create(['program_id' => $program->id, 'status' => ProjectStatus::Closed]);
+    rowFor(Project::factory()->create(['program_id' => $program->id, 'status' => ProjectStatus::Closed]));
 
     Livewire::actingAs(User::factory()->role('General Manager')->create())
         ->test('pages::programs.show', ['program' => $program])
@@ -430,7 +432,7 @@ test('the program overview calls a program with nothing late on track', function
 test('the program overview shows money only to holders of both money permissions', function () {
     $this->seed(RolesAndPermissionsSeeder::class);
     $program = Program::factory()->create();
-    Project::factory()->create(['program_id' => $program->id]);
+    rowFor(Project::factory()->create(['program_id' => $program->id]));
 
     Livewire::actingAs(User::factory()->create())
         ->test('pages::programs.show', ['program' => $program])
@@ -461,10 +463,13 @@ test('old timeline tab links and unknown tabs fall back to the overview', functi
 test('the program overview totals money per project and counts an agreement shared by two projects once', function () {
     $this->seed(RolesAndPermissionsSeeder::class);
     $program = Program::factory()->create();
-    $first = Project::factory()->create(['program_id' => $program->id]);
-    $second = Project::factory()->create(['program_id' => $program->id]);
     $proposal = Proposal::factory()->create();
-    $proposal->projects()->attach([$first->id, $second->id]);
+    // Y-16 (D-93): one proposal, two of its places.
+    $first = rowFor(Project::factory()->create(['program_id' => $program->id]), $proposal);
+    $second = Activity::withoutRecording(fn () => ProposalLocation::factory()->forProject(Project::factory()->create(['program_id' => $program->id]))->create([
+        'proposal_id' => $proposal->id,
+        'program_id' => $program->id,
+    ]));
     $agreement = DonorProposal::factory()->create(['proposal_id' => $proposal->id, 'budget' => '1000.00', 'currency' => 'USD']);
     TransfersTracking::factory()->create(['donor_proposal_id' => $agreement->id, 'net_amount_received' => '400.00']);
 
@@ -478,8 +483,8 @@ test('the program overview totals money per project and counts an agreement shar
 
 test('a project needs attention only once its past-due tasks reach the threshold', function () {
     $program = Program::factory()->create();
-    $project = Project::factory()->create(['program_id' => $program->id, 'status' => ProjectStatus::Closed]);
-    $pastDue = fn () => Task::factory()->create(['source_type' => 'project', 'source_id' => $project->id, 'due_date' => now()->subDays(2)]);
+    $project = rowFor(Project::factory()->create(['program_id' => $program->id, 'status' => ProjectStatus::Closed]));
+    $pastDue = fn () => Task::factory()->create(['source_type' => 'proposal_location', 'source_id' => $project->id, 'due_date' => now()->subDays(2)]);
     $needsAttention = fn (): bool => Livewire::actingAs(User::factory()->role('General Manager')->create())
         ->test('pages::programs.show', ['program' => $program])
         ->instance()->projectLedger[0]['needsAttention'];
@@ -495,11 +500,11 @@ test('a project needs attention only once its past-due tasks reach the threshold
 
 test('the tasks tab lists each project beside the picked project tasks, the late ones first', function () {
     $program = Program::factory()->create();
-    $project = Project::factory()->create(['program_id' => $program->id, 'name' => 'Late Project']);
-    $other = Project::factory()->create(['program_id' => $program->id, 'name' => 'Calm Project']);
-    Task::factory()->create(['source_type' => 'project', 'source_id' => $project->id, 'title' => 'Late one', 'due_date' => now()->subDay()]);
-    Task::factory()->create(['source_type' => 'project', 'source_id' => $project->id, 'title' => 'Soon one', 'due_date' => now()->addWeek()]);
-    Task::factory()->create(['source_type' => 'project', 'source_id' => $other->id, 'title' => 'Calm one', 'due_date' => now()->addWeek()]);
+    $project = rowFor(Project::factory()->create(['program_id' => $program->id, 'name' => 'Late Project']));
+    $other = rowFor(Project::factory()->create(['program_id' => $program->id, 'name' => 'Calm Project']));
+    Task::factory()->create(['source_type' => 'proposal_location', 'source_id' => $project->id, 'title' => 'Late one', 'due_date' => now()->subDay()]);
+    Task::factory()->create(['source_type' => 'proposal_location', 'source_id' => $project->id, 'title' => 'Soon one', 'due_date' => now()->addWeek()]);
+    Task::factory()->create(['source_type' => 'proposal_location', 'source_id' => $other->id, 'title' => 'Calm one', 'due_date' => now()->addWeek()]);
 
     Livewire::actingAs(User::factory()->role('General Manager')->create())
         ->test('pages::programs.show', ['program' => $program])
@@ -519,9 +524,8 @@ test('the tasks tab lists each project beside the picked project tasks, the late
 test('a late transfer is listed for attention but does not flag the project card', function () {
     $this->seed(RolesAndPermissionsSeeder::class);
     $program = Program::factory()->create();
-    $project = Project::factory()->create(['program_id' => $program->id, 'status' => ProjectStatus::Closed]);
     $proposal = Proposal::factory()->create();
-    $proposal->projects()->attach($project->id);
+    $project = rowFor(Project::factory()->create(['program_id' => $program->id, 'status' => ProjectStatus::Closed]), $proposal);
     $agreement = DonorProposal::factory()->create(['proposal_id' => $proposal->id, 'currency' => 'USD']);
     TransfersTracking::factory()->create([
         'donor_proposal_id' => $agreement->id,

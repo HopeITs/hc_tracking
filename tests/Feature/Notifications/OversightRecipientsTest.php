@@ -3,6 +3,7 @@
 use App\Models\Activity;
 use App\Models\MealCoverageAssignment;
 use App\Models\Project;
+use App\Models\ProposalLocation;
 use App\Notifications\Alerts\NotificationSettings;
 use App\Notifications\Recipients\OversightRecipients;
 use Database\Seeders\RolesAndPermissionsSeeder;
@@ -20,19 +21,24 @@ function oversight(): OversightRecipients
 }
 
 /**
- * A project whose MEAL officer is the given employee.
+ * A place whose MEAL officer is the given employee (Y-16, D-93).
  */
-function projectWithOfficer(int $employeeId): Project
+function projectWithOfficer(int $employeeId): ProposalLocation
 {
-    return Activity::withoutRecording(function () use ($employeeId): Project {
-        $project = Project::factory()->create();
-        MealCoverageAssignment::factory()->forProject($project->id)->create(['employee_id' => $employeeId]);
+    return Activity::withoutRecording(function () use ($employeeId): ProposalLocation {
+        // A place with no centre is "centre not set" (D-82) and carries no
+        // officer of its own, so the row runs from a centre.
+        $city = insertHrCity();
+        $row = rowFor(Project::factory()->create(['city_id' => $city, 'center_id' => insertHrCenter($city)]));
+        // The officer covers the row's place (D-75), which is how the row
+        // reaches its MEAL officer now.
+        MealCoverageAssignment::factory()->forPlace($row->place())->create(['employee_id' => $employeeId]);
 
-        return $project;
+        return $row;
     });
 }
 
-test('an all-mode event reaches MEAL, the project officer and General Management', function () {
+test('an all-mode event reaches MEAL, the place officer and General Management', function () {
     $officerEmployee = insertHrEmployee();
     $officer = userWithRole('Managers', $officerEmployee);
     $project = projectWithOfficer($officerEmployee);
@@ -43,7 +49,7 @@ test('an all-mode event reaches MEAL, the project officer and General Management
         ->and(oversight()->management())->toBe([$this->generalManager->id]);
 });
 
-test('without a project only the MEAL role holders stand for MEAL', function () {
+test('without a place only the MEAL role holders stand for MEAL', function () {
     expect(oversight()->userIdsFor('library_indicator.created'))
         ->toEqualCanonicalizing([$this->meal->id, $this->generalManager->id]);
 });

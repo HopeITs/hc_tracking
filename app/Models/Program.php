@@ -399,6 +399,17 @@ class Program extends Model implements TracksActivity
     }
 
     /**
+     * The places delivered under this program (Y-16, D-93): the twin of
+     * `projects()`, which goes with the `projects` table in Y-18.
+     *
+     * @return HasMany<ProposalLocation, $this>
+     */
+    public function locations(): HasMany
+    {
+        return $this->hasMany(ProposalLocation::class);
+    }
+
+    /**
      * The annual operational plans written for this program.
      *
      * @return HasMany<AnnualPlan, $this>

@@ -15,6 +15,7 @@ use App\Models\ReportTemplate;
 use App\Models\ReportTemplateLine;
 use App\Models\ReportTemplatePlacement;
 use App\Models\User;
+use App\Support\Locations\ProjectSuccessor;
 use App\Support\Reporting\PlaceBridge;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Facades\DB;
@@ -130,6 +131,10 @@ final class ReportTemplateQueue
         $knownCityIds = $templates->pluck('city_id')->unique()->values()->all();
         $cities = HrCity::query()->whereKey($knownCityIds)->get(['id', 'name_en', 'name_ar'])->keyBy('id');
 
+        // Y-16 (D-93): Review opens the place the template is for. Resolved
+        // for the whole queue in one query, so the page does not ask per line.
+        $reviewRows = app(ProjectSuccessor::class)->rowForMany($projects->keys()->map(intval(...))->all());
+
         $rows = [];
 
         foreach ($templates as $template) {
@@ -141,6 +146,7 @@ final class ReportTemplateQueue
             $rows[] = [
                 'template' => $template,
                 'project' => $project,
+                'reviewRow' => $project === null ? null : ($reviewRows[$project->id] ?? null),
                 'name' => $project->name ?? (string) $template->program?->name,
                 'status' => $template->status,
                 'pendingLineCount' => (int) $groups->sum('line_count'),

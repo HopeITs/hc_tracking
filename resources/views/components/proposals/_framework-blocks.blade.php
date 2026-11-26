@@ -1,6 +1,6 @@
 {{--
-    The editable lists under one result (indicators, activities, risks,
-    assumptions), shared by the tree node and the outcome tabs. Expects
+    The editable lists under one result (indicators, activities,
+    assumptions; risks sit on the whole framework, _framework-risks), shared by the tree node and the outcome tabs. Expects
     $node, $resultId and $only (null for every layer the person shows, or
     the layers to keep).
 
@@ -11,21 +11,9 @@
 @php
     $cap = $only === null ? 4 : null;
     $number = fn ($value): string => rtrim(rtrim(number_format((float) $value, 2, '.', ''), '0'), '.');
-    $ratingKey = fn ($value): string => ['1' => 'low', '2' => 'medium', '3' => 'high'][(string) min(3, max(1, (int) $value))];
     $showIndicators = ($only === null || in_array('indicators', $only, true)) && ($layers['indicators'] ?? false);
     $showActivities = ($only === null || in_array('activities', $only, true)) && ($layers['activities'] ?? false) && $node['type'] === \App\Enums\ResultType::Output;
-    $showRisks = ($only === null || in_array('risks', $only, true)) && ($layers['risks'] ?? false);
     $showAssumptions = ($only === null || in_array('assumptions', $only, true)) && ($layers['assumptions'] ?? false);
-    $risks = collect($node['risks'])
-        ->map(function (array $risk): array {
-            $risk['score'] = max(1, (int) $risk['likelihood']) * max(1, (int) $risk['severity']);
-            $risk['level'] = $risk['score'] >= 6 ? 'high' : ($risk['score'] >= 3 ? 'medium' : 'low');
-
-            return $risk;
-        })
-        ->sortByDesc('score')
-        ->values()
-        ->all();
 @endphp
 <div @class(['pp-blocks', 'pp-fw', 'pp-fw-capped' => $cap !== null])>
     @if ($showIndicators)
@@ -67,7 +55,7 @@
         </div>
     @endif
 
-    @if ($showActivities || $showRisks || $showAssumptions)
+    @if ($showActivities || $showAssumptions)
         <div class="pp-fw-trio">
             @if ($showActivities)
                 @php
@@ -97,31 +85,6 @@
                         <div class="pp-fw-empty">{{ __('proposals.framework.none_yet') }}</div>
                     @endforelse
                     @include('components.proposals._framework-blocks-foot', ['total' => $total, 'board' => true])
-                </div>
-            @endif
-
-            @if ($showRisks)
-                @php
-                    $total = count($risks);
-                @endphp
-                <div class="pp-fw-card pp-fw-list" x-data="{ all: false }">
-                    <div class="pp-fw-hd"><b>{{ __('proposals.framework.layer_risks') }} · {{ $total }}</b>@if ($this->canManageRisks && in_array($node['type'], [\App\Enums\ResultType::Outcome, \App\Enums\ResultType::Output], true))<button type="button" class="pp-link" wire:click="openRisks({{ $resultId }})" data-test="result-risks-{{ $resultId }}">+ {{ __('proposals.framework.add') }}</button>@endif</div>
-                    @forelse ($risks as $index => $risk)
-                        <div class="pp-fw-row" wire:key="risk-{{ $risk['id'] }}" @if ($cap !== null && $index >= $cap) x-show="all" x-cloak @endif>
-                            <span @class(['pp-fw-score', 'pp-fw-score-'.$risk['level']]) title="{{ __('proposals.framework.risk_score_'.$risk['level']) }}">{{ __('proposals.framework.risk_letter_'.$risk['level']) }}</span>
-                            <span class="pp-fw-body">
-                                <span class="pp-fw-name" dir="auto">{{ $risk['name'] }}</span>
-                                <span class="pp-fw-sub">
-                                    @if ($risk['likelihood'])<span>{{ __('risks.likelihood').': '.__('risks.rating_'.$ratingKey($risk['likelihood'])) }}</span>@endif
-                                    @if ($risk['severity'])<span>{{ __('risks.severity').': '.__('risks.rating_'.$ratingKey($risk['severity'])) }}</span>@endif
-                                </span>
-                            </span>
-                            @if ($risk['happened'])<span class="pp-fw-tag">{{ __('proposals.framework.happened') }}</span>@else<span></span>@endif
-                        </div>
-                    @empty
-                        <div class="pp-fw-empty">{{ __('proposals.framework.none_yet') }}</div>
-                    @endforelse
-                    @include('components.proposals._framework-blocks-foot', ['total' => $total, 'board' => false])
                 </div>
             @endif
 

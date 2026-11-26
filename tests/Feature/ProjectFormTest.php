@@ -39,7 +39,7 @@ test('the create dialog is titled «Add center» and an edit keeps «Edit projec
     $project = Project::factory()->create(['center_id' => $this->idlibCenterId, 'city_id' => $this->idlibId, 'program_id' => $this->program->id]);
 
     Livewire::actingAs($this->user)->test('pages::projects.index')
-        ->call('openEditModal', $project->id)
+        ->call('openEditModal', rowFor($project)->id)
         ->assertSee(__('projects.edit_project'));
 });
 

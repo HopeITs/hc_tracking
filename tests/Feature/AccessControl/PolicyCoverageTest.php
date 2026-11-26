@@ -31,6 +31,7 @@ use App\Models\MonthlyReportLine;
 use App\Models\MonthlyReportLineBreakdown;
 use App\Models\MonthlyReportLineShare;
 use App\Models\MonthlyReportReopenRequest;
+use App\Models\MonthlyReportRisk;
 use App\Models\NotificationMute;
 use App\Models\Permission;
 use App\Models\PlanIndicator;
@@ -105,6 +106,7 @@ function modelsGuardedWithoutPolicy(): array
         KnownDevice::class => [null, 'The signed-in user\'s own sign-in devices only.'],
         Media::class => [null, 'Files follow their owner\'s policy (project, proposal) and the download controllers check it.'],
         MonthlyReportActivityEntry::class => ['reports', 'Part of its monthly report (MonthlyReportPolicy::update); written only by SaveMonthlyReportActivities.'],
+        MonthlyReportRisk::class => ['reports', 'Part of its monthly report (MonthlyReportPolicy::update); written only by SaveMonthlyReportRisks.'],
         MonthlyReportAnswer::class => ['reports', 'Part of its monthly report (MonthlyReportPolicy::update); written only by SaveMonthlyReportAnswers.'],
         MonthlyReportFile::class => ['reports', 'Part of its monthly report (MonthlyReportPolicy::update, fillMealLines); loaded through the report and downloaded through T17B\'s protected route.'],
         MonthlyReportLine::class => ['reports', 'Part of its monthly report (MonthlyReportPolicy::update, fillMealLines); loaded through the report.'],

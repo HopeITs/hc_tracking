@@ -9,7 +9,7 @@ use App\Enums\NotificationPriority;
 use App\Enums\ProjectStatus;
 use App\Models\Indicator;
 use App\Models\Program;
-use App\Models\Project;
+use App\Models\ProposalLocation;
 use App\Models\Result;
 use App\Models\Role;
 use App\Models\User;
@@ -188,7 +188,7 @@ final class MonthlyDigestScanner implements Scanner
     }
 
     /**
-     * Projects that started or ended in the month and actually ran.
+     * Places that started or ended in the month and actually ran (Y-16, D-93).
      *
      * @return list<Fact>
      */
@@ -198,15 +198,15 @@ final class MonthlyDigestScanner implements Scanner
         $to = $month->endOfMonth()->toDateString();
         $facts = [];
 
-        Project::query()
-            ->whereIn('status', [ProjectStatus::Active, ProjectStatus::Closed, ProjectStatus::Archived])
+        ProposalLocation::query()
+            ->whereIn('proposal_locations.status', [ProjectStatus::Active, ProjectStatus::Closed, ProjectStatus::Archived])
             ->where(fn ($query) => $query->whereBetween('start_date', [$from, $to])->orWhereBetween('end_date', [$from, $to]))
             ->toBase()
             ->get(['id', 'program_id', 'start_date', 'end_date'])
-            ->each(function (object $project) use (&$facts, $from, $to): void {
-                foreach (['started' => $project->start_date, 'ended' => $project->end_date] as $bucket => $date) {
+            ->each(function (object $row) use (&$facts, $from, $to): void {
+                foreach (['started' => $row->start_date, 'ended' => $row->end_date] as $bucket => $date) {
                     if ($date !== null && $date >= $from && $date <= $to) {
-                        $facts[] = ['id' => (int) $project->id, 'program_id' => $project->program_id === null ? null : (int) $project->program_id, 'bucket' => $bucket];
+                        $facts[] = ['id' => (int) $row->id, 'program_id' => $row->program_id === null ? null : (int) $row->program_id, 'bucket' => $bucket];
                     }
                 }
             });
@@ -224,7 +224,12 @@ final class MonthlyDigestScanner implements Scanner
         $asOf = $month->endOfMonth()->min(CarbonImmutable::now());
         $indicators = Indicator::query()->with('progress')->get();
         $resultPrograms = Result::query()->whereIn('id', $indicators->pluck('result_id')->filter()->unique()->all())->pluck('program_id', 'id');
-        $projectPrograms = Project::query()->whereIn('id', $indicators->pluck('project_id')->filter()->unique()->all())->pluck('program_id', 'id');
+        // An instance scoped to a place rolls up to that place's program; one
+        // that still carries only a project is answered by its row (D-94).
+        $projectPrograms = ProposalLocation::query()
+            ->whereIn('project_id', $indicators->pluck('project_id')->filter()->unique()->all())
+            ->orderBy('id')
+            ->pluck('program_id', 'project_id');
         $facts = [];
 
         foreach ($indicators as $indicator) {

@@ -8,9 +8,11 @@ use App\Actions\Proposals\LinkProposalProject;
 use App\Actions\Proposals\UnlinkProposalProject;
 use App\Enums\Currency;
 use App\Enums\ProposalPhase;
+use App\Enums\ProposalStatus;
 use App\Models\DonorProposal;
 use App\Models\Project;
 use App\Models\Proposal;
+use App\Models\ProposalLocation;
 use Flux\Flux;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Support\Facades\Auth;
@@ -25,8 +27,8 @@ use Livewire\Attributes\Computed;
  * Used by projects/show only. The page provides projectId and the #[Computed]
  * project(); canViewAgreements() comes from ChecksFinanceVisibility.
  *
- * @property int $projectId
- * @property-read Project $project  #[Computed] project()
+ * @property int $locationId
+ * @property-read ProposalLocation $location  #[Computed] location()
  * @property-read Collection<int, Proposal> $attachedProposals  #[Computed] attachedProposals()
  */
 trait ReadsProjectFunding
@@ -60,7 +62,8 @@ trait ReadsProjectFunding
 
         return DonorProposal::query()
             ->select(['id', 'proposal_id', 'currency', 'budget'])
-            ->whereHas('proposal.projects', fn ($query) => $query->whereKey($this->projectId))
+            // A row is of one proposal (D-93), so its money is that one's.
+            ->where('proposal_id', $this->location->proposal_id)
             ->with(['transfers:id,donor_proposal_id,net_amount_received'])
             ->get()
             ->groupBy(fn (DonorProposal $donorProposal) => $donorProposal->currency->value)
@@ -87,7 +90,10 @@ trait ReadsProjectFunding
         $viewer = Auth::user();
         $needsReviewerRows = $viewer?->employee_id !== null && ! $viewer->can('proposals.view');
 
-        return $this->project->proposals()
+        // A row is of exactly one proposal (D-93), so its funding is that one;
+        // the shape stays a collection because the view lists it.
+        return Proposal::query()
+            ->whereKey($this->location->proposal_id)
             ->select(['proposals.id', 'proposals.name', 'proposals.internal_project_number', 'proposals.status', 'proposals.planned_date_begin', 'proposals.planned_date_end'])
             ->with('donorNames:id,name')
             ->when($needsReviewerRows, fn ($query) => $query->with(['reviewers' => fn ($query) => $query
@@ -104,22 +110,63 @@ trait ReadsProjectFunding
     }
 
     /**
-     * The project's funding history (T10): every proposal across the years,
+     * The place's funding history (T10): every proposal across the years,
      * oldest first, with its donor, status and planned and actual years. A
      * renewal names the number it renews. Names, dates and statuses only: no
      * money, so it is the same for every viewer.
+     *
+     * A place is of exactly one proposal (Y-16, D-93), but its history is
+     * that proposal **and the renewal chain it sits in** — a grant renewed
+     * for a third year is the same work at the same place, and the page is
+     * where that is read. The chain is walked rather than joined: it is a
+     * handful of rows, and `previous_proposal_id` is a single link each way.
      *
      * @return Collection<int, Proposal>
      */
     #[Computed]
     public function fundingHistory(): Collection
     {
-        return $this->project->proposals()
+        return Proposal::query()
+            ->whereKey($this->renewalChainIds())
             ->select(['proposals.id', 'proposals.slug', 'proposals.name', 'proposals.internal_project_number', 'proposals.status', 'proposals.donor_id', 'proposals.previous_proposal_id', 'proposals.planned_date_begin', 'proposals.planned_date_end', 'proposals.actual_date_begin', 'proposals.actual_date_end'])
             ->with(['donor:id,name', 'previousProposal:id,internal_project_number'])
             ->orderBy('proposals.planned_date_begin')
             ->orderBy('proposals.id')
             ->get();
+    }
+
+    /**
+     * Every proposal in the renewal chain the place's own proposal sits in:
+     * the ones it renews, and the ones that renew it.
+     *
+     * Capped so a cycle in the data cannot spin: a chain of twenty renewals
+     * is already beyond anything the organisation has filed.
+     *
+     * @return list<int>
+     */
+    private function renewalChainIds(): array
+    {
+        $ids = [];
+        $cursor = (int) $this->location->proposal_id;
+
+        while ($cursor > 0 && ! in_array($cursor, $ids, true) && count($ids) < 20) {
+            $ids[] = $cursor;
+            $cursor = (int) (Proposal::query()->whereKey($cursor)->toBase()->value('previous_proposal_id') ?? 0);
+        }
+
+        $frontier = $ids;
+
+        while ($frontier !== [] && count($ids) < 20) {
+            $next = array_values(array_diff(
+                Proposal::query()->whereIn('previous_proposal_id', $frontier)->toBase()->pluck('id')->map(intval(...))->all(),
+                $ids,
+            ));
+
+            $ids = array_merge($ids, $next);
+            $frontier = $next;
+        }
+
+        return $ids;
     }
 
     /**
@@ -132,7 +179,15 @@ trait ReadsProjectFunding
     #[Computed]
     public function fundingSources(): Collection
     {
-        return $this->project->fundingSources($this->canViewAgreements());
+        $statuses = array_values(array_filter(ProposalStatus::cases(), fn (ProposalStatus $status): bool => $status->isApprovedByDonor()));
+        $columns = ['proposals.id', 'proposals.name', 'proposals.slug', 'proposals.status', 'proposals.donor_id'];
+
+        return Proposal::query()
+            ->whereKey($this->location->proposal_id)
+            ->whereIn('proposals.status', $statuses)
+            ->select($this->canViewAgreements() ? [...$columns, 'proposals.requested_budget', 'proposals.requested_currency'] : $columns)
+            ->with('donor:id,name')
+            ->get();
     }
 
     /**
@@ -194,13 +249,13 @@ trait ReadsProjectFunding
     public function attachableProposals(): Collection
     {
         if (! (auth()->user()?->can('proposals.update') ?? false)
-            || ! Project::query()->linkableToProposals()->whereKey($this->projectId)->exists()) {
+            || ! Project::query()->linkableToProposals()->whereKey($this->location->project_id)->exists()) {
             return new Collection;
         }
 
         return Proposal::query()
             ->select(['id', 'name', 'internal_project_number', 'status'])
-            ->whereDoesntHave('projects', fn ($query) => $query->whereKey($this->projectId))
+            ->whereDoesntHave('projects', fn ($query) => $query->whereKey($this->locationId))
             ->orderBy('name')
             ->orderBy('id')
             ->get();
@@ -219,7 +274,7 @@ trait ReadsProjectFunding
         return $user !== null
             && $user->can('create', Proposal::class)
             && $user->can('projects.view')
-            && Project::query()->linkableToProposals()->whereKey($this->projectId)->exists();
+            && Project::query()->linkableToProposals()->whereKey($this->location->project_id)->exists();
     }
 
     /**
@@ -237,13 +292,13 @@ trait ReadsProjectFunding
         ]);
 
         try {
-            app(LinkProposalProject::class)->handle(Proposal::query()->findOrFail((int) $validated['proposalToAttach']), $this->projectId);
+            app(LinkProposalProject::class)->handle(Proposal::query()->findOrFail((int) $validated['proposalToAttach']), (int) $this->location->project_id);
         } catch (ValidationException $exception) {
             throw ValidationException::withMessages(['proposalToAttach' => $exception->validator->errors()->all()]);
         }
 
         $this->proposalToAttach = '';
-        unset($this->project, $this->attachedProposals, $this->attachableProposals);
+        unset($this->location, $this->attachedProposals, $this->attachableProposals);
 
         Flux::toast(variant: 'success', text: __('projects.proposal_linked_to_this_project'));
     }
@@ -256,7 +311,7 @@ trait ReadsProjectFunding
     public function detachProposal(int $proposalId): void
     {
         try {
-            app(UnlinkProposalProject::class)->handle(Proposal::query()->findOrFail($proposalId), $this->projectId);
+            app(UnlinkProposalProject::class)->handle(Proposal::query()->findOrFail($proposalId), (int) $this->location->project_id);
         } catch (ValidationException $exception) {
             $this->setErrorBag($exception->validator->errors());
             Flux::toast(variant: 'danger', text: $exception->validator->errors()->first());
@@ -264,7 +319,7 @@ trait ReadsProjectFunding
             return;
         }
 
-        unset($this->project, $this->attachedProposals, $this->attachableProposals);
+        unset($this->location, $this->attachedProposals, $this->attachableProposals);
 
         Flux::toast(variant: 'success', text: __('projects.proposal_unlinked_from_this_project'));
     }

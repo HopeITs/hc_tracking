@@ -7,7 +7,6 @@ namespace App\Livewire\Concerns\Calendar;
 use App\Models\Donor;
 use App\Models\DonorReport;
 use App\Models\MonthlyReport;
-use App\Models\Project;
 use App\Models\Proposal;
 use App\Models\ProposalStatusNote;
 use App\Models\Report;
@@ -24,7 +23,7 @@ use Livewire\Attributes\Computed;
  * Used by calendar/index only. The #[Computed] calendar() comes from
  * BuildsCalendarGrid, canViewAgreements() from ChecksFinanceVisibility.
  *
- * @property-read array{month: CarbonImmutable, weeks: ?array<int, array<int, CarbonImmutable>>, days: ?array<int, CarbonImmutable>, tasksByDay: \Illuminate\Support\Collection<string, Collection<int, Task>>, reportsByDay: \Illuminate\Support\Collection<string, Collection<int, Report>>, monthlyReportsByDay: \Illuminate\Support\Collection<string, Collection<int, MonthlyReport>>, proposalsByDay: \Illuminate\Support\Collection<string, Collection<int, Proposal>>, transfersByDay: \Illuminate\Support\Collection<string, Collection<int, TransfersTracking>>, donorFollowUpsByDay: \Illuminate\Support\Collection<string, Collection<int, Donor>>, donorReportsByDay: \Illuminate\Support\Collection<string, Collection<int, DonorReport>>, projectStartsByDay: \Illuminate\Support\Collection<string, Collection<int, Project>>, projectEndsByDay: \Illuminate\Support\Collection<string, Collection<int, Project>>, reviewMeetingsByDay: \Illuminate\Support\Collection<string, Collection<int, ProposalStatusNote>>, unscheduledTasks: Collection<int, Task>, nowOffsetPercent: float} $calendar  #[Computed] calendar()
+ * @property-read array{month: CarbonImmutable, weeks: ?array<int, array<int, CarbonImmutable>>, days: ?array<int, CarbonImmutable>, tasksByDay: \Illuminate\Support\Collection<string, Collection<int, Task>>, reportsByDay: \Illuminate\Support\Collection<string, Collection<int, Report>>, monthlyReportsByDay: \Illuminate\Support\Collection<string, Collection<int, MonthlyReport>>, proposalsByDay: \Illuminate\Support\Collection<string, Collection<int, Proposal>>, transfersByDay: \Illuminate\Support\Collection<string, Collection<int, TransfersTracking>>, donorFollowUpsByDay: \Illuminate\Support\Collection<string, Collection<int, Donor>>, donorReportsByDay: \Illuminate\Support\Collection<string, Collection<int, DonorReport>>, projectStartsByDay: \Illuminate\Support\Collection<string, Collection<int, ProposalLocation>>, projectEndsByDay: \Illuminate\Support\Collection<string, Collection<int, ProposalLocation>>, reviewMeetingsByDay: \Illuminate\Support\Collection<string, Collection<int, ProposalStatusNote>>, unscheduledTasks: Collection<int, Task>, nowOffsetPercent: float} $calendar  #[Computed] calendar()
  */
 trait ShowsCalendarDay
 {
@@ -111,12 +110,13 @@ trait ShowsCalendarDay
             $rows->push(['type' => 'donor', 'kind' => 'link', 'id' => $donorReport->id, 'url' => route('funding-agreements.show', $donorReport->donorProposal), 'title' => $donorReport->title, 'subLabel' => __('calendar.donor_report_due')]);
         }
 
-        foreach ($calendar['projectStartsByDay']->get($date, new Collection) as $project) {
-            $rows->push(['type' => 'project', 'kind' => 'link', 'id' => $project->id, 'url' => route('projects.show', $project), 'title' => $project->name, 'subLabel' => __('calendar.project_starts')]);
+        // Y-16 (D-93): a dated row is a place, named by its proposal.
+        foreach ($calendar['projectStartsByDay']->get($date, new Collection) as $row) {
+            $rows->push(['type' => 'project', 'kind' => 'link', 'id' => $row->id, 'url' => route('projects.show', $row), 'title' => $row->headline(), 'subLabel' => __('calendar.project_starts')]);
         }
 
-        foreach ($calendar['projectEndsByDay']->get($date, new Collection) as $project) {
-            $rows->push(['type' => 'project', 'kind' => 'link', 'id' => $project->id, 'url' => route('projects.show', $project), 'title' => $project->name, 'subLabel' => __('calendar.project_ends')]);
+        foreach ($calendar['projectEndsByDay']->get($date, new Collection) as $row) {
+            $rows->push(['type' => 'project', 'kind' => 'link', 'id' => $row->id, 'url' => route('projects.show', $row), 'title' => $row->headline(), 'subLabel' => __('calendar.project_ends')]);
         }
 
         return $rows;

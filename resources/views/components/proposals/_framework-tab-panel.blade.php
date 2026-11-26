@@ -1,6 +1,6 @@
 {{--
     One outcome tab's panel: statement, the two folded lists (indicators;
-    risks and assumptions) and its outputs, each output folded. Alpine
+    assumptions) and its outputs, each output folded. Alpine
     (x-data on _framework-tabs) shows it; the server hides every panel but
     the one in front on first paint. Expects $panelId and $position.
 --}}
@@ -8,9 +8,8 @@
     $current = $fw['results'][$panelId];
     $inFront = $panelId === $focusedId;
     $children = array_values(array_filter($fw['children'][$panelId] ?? [], fn (int $id): bool => in_array($id, $visible, true)));
-    $raCount = count($current['risks']) + count($current['assumptions']);
-    $raBad = collect($current['risks'])->where('happened', true)->count()
-        + collect($current['assumptions'])->filter(fn (array $a): bool => $a['status'] !== \App\Enums\AssumptionStatus::Holds)->count();
+    $raCount = count($current['assumptions']);
+    $raBad = collect($current['assumptions'])->filter(fn (array $a): bool => $a['status'] !== \App\Enums\AssumptionStatus::Holds)->count();
     $childLabel = $current['type'] === \App\Enums\ResultType::Outcome ? 'output' : 'outcome';
     $hidden = fn (bool $shown): string => $shown ? '' : 'style="display: none"';
     $pen = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg>';
@@ -35,7 +34,7 @@
                 {{ trans_choice('proposals.framework.count_indicators', count($current['indicators']), ['count' => count($current['indicators'])]) }}
             </button>
         @endif
-        @if (($layers['risks'] ?? false) || ($layers['assumptions'] ?? false))
+        @if ($layers['assumptions'] ?? false)
             <button type="button" @class(['pp-ot-chip', 'pp-on' => $inFront && in_array($drawer, ['ra', 'all'], true)]) x-bind:class="{ 'pp-on': drawer === 'ra' || drawer === 'all' }" x-on:click="flip('ra')" x-bind:aria-expanded="drawer === 'ra' || drawer === 'all'" data-test="drawer-ra-{{ $panelId }}">
                 {{ trans_choice('proposals.framework.sum_ra', $raCount, ['count' => $raCount]) }}
                 @if ($raBad > 0) · <span class="pp-ot-bad">{{ trans_choice('proposals.framework.sum_need_look', $raBad, ['count' => $raBad]) }}</span>@endif
@@ -51,9 +50,9 @@
             @include('components.proposals._framework-blocks', ['node' => $current, 'resultId' => $panelId, 'only' => ['indicators']])
         </div>
     @endif
-    @if (($layers['risks'] ?? false) || ($layers['assumptions'] ?? false))
+    @if ($layers['assumptions'] ?? false)
         <div class="pp-ot-drawer" x-show="drawer === 'ra' || drawer === 'all'" {!! $hidden($inFront && in_array($drawer, ['ra', 'all'], true)) !!}>
-            @include('components.proposals._framework-blocks', ['node' => $current, 'resultId' => $panelId, 'only' => ['risks', 'assumptions']])
+            @include('components.proposals._framework-blocks', ['node' => $current, 'resultId' => $panelId, 'only' => ['assumptions']])
         </div>
     @endif
 

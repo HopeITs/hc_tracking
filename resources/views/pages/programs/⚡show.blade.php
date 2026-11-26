@@ -13,7 +13,8 @@ use App\Livewire\Concerns\Programs\TracksProgramHealth;
 use App\Livewire\Concerns\Results\FiltersResultsChain;
 use App\Models\MonthlyReport;
 use App\Models\Program;
-use App\Models\Project;
+use App\Models\ProposalLocation;
+use App\Support\Locations\MonthlyReportsAtRows;
 use App\Models\Risk;
 use App\Models\Task;
 use Illuminate\Database\Eloquent\Builder;
@@ -49,6 +50,7 @@ new #[Layout('layouts::desk'), Title('titles.program')] class extends Component 
     {
         $this->programId = $program->id;
         $this->tab = $this->resolveTab($this->tab);
+        $this->adoptLegacyChainCenter();
     }
 
     public function updatedTab(): void
@@ -95,14 +97,16 @@ new #[Layout('layouts::desk'), Title('titles.program')] class extends Component 
         }
 
         $month = CarbonImmutable::today()->subMonthNoOverflow()->startOfMonth();
-        $reports = MonthlyReport::query()
-            ->whereIn('project_id', Project::query()->select('id')->where('program_id', $this->programId))
-            ->whereDate('period', $month->toDateString());
+        // Y-16 (D-93): a report belongs to a template, and a template reaches
+        // a place; the program's reports are the ones at its places.
+        $reports = collect(app(MonthlyReportsAtRows::class)->reportsByRow($this->allProjects, ['id', 'report_template_id', 'period', 'status']))
+            ->flatten(1)
+            ->filter(fn (MonthlyReport $report): bool => $report->period->toDateString() === $month->toDateString());
 
         return [
             'month' => $month->translatedFormat('F'),
-            'total' => (clone $reports)->count(),
-            'validated' => (clone $reports)->where('status', MonthlyReportStatus::Validated->value)->count(),
+            'total' => $reports->count(),
+            'validated' => $reports->where('status', MonthlyReportStatus::Validated)->count(),
         ];
     }
 
@@ -115,7 +119,7 @@ new #[Layout('layouts::desk'), Title('titles.program')] class extends Component 
                 Risk::query()
                     ->selectRaw('count(*)')
                     ->where('happened', false)
-                    ->whereIn('project_id', Project::query()
+                    ->whereIn('proposal_location_id', ProposalLocation::query()
                         ->select('id')
                         ->whereColumn('program_id', 'programs.id')),
                 'open_risks_count',
@@ -129,25 +133,26 @@ new #[Layout('layouts::desk'), Title('titles.program')] class extends Component 
     }
 
     /**
-     * Every project under this program — used to name and group tasks on
-     * the Tasks tab.
+     * Every place under this program (Y-16, D-93) — used to name and group
+     * tasks on the Tasks tab and to reach the program's monthly reports.
      *
-     * @return Collection<int, Project>
+     * @return Collection<int, ProposalLocation>
      */
     #[Computed]
     public function allProjects(): Collection
     {
-        return Project::query()
-            ->select(['id', 'name'])
+        return ProposalLocation::query()
+            ->select(['id', 'proposal_id', 'project_id', 'slug', 'city_id', 'city_wide', 'program_id'])
             ->where('program_id', $this->programId)
-            ->orderBy('name')
-            ->orderBy('id')
-            ->get();
+            ->with(['city:id,name_en,name_ar', 'program:id', 'centers', 'proposal:id,name'])
+            ->get()
+            ->sortBy(fn (ProposalLocation $row): string => $row->headline())
+            ->values();
     }
 
     /**
      * Tasks reachable from this program: raised straight against the
-     * program or against one of its projects.
+     * program or against one of its places.
      *
      * @return Collection<int, Task>
      */
@@ -165,13 +170,13 @@ new #[Layout('layouts::desk'), Title('titles.program')] class extends Component 
     }
 
     /**
-     * The project a task lands on, for grouping on the Tasks tab: a
-     * project-sourced task names itself. A program-direct task has no project
-     * and groups separately.
+     * The place a task lands on, for grouping on the Tasks tab: a
+     * place-sourced task names itself (Y-16, D-93). A program-direct task has
+     * no place and groups separately.
      */
     protected function taskProjectId(Task $task): ?int
     {
-        return $task->source_type === 'project' ? $task->source_id : null;
+        return $task->source_type === 'proposal_location' ? $task->source_id : null;
     }
 
     /**
@@ -192,7 +197,7 @@ new #[Layout('layouts::desk'), Title('titles.program')] class extends Component 
     protected function quickTaskTarget(): string
     {
         if ($this->taskGroupBy === 'project' && str_starts_with($this->taskBucket, 'project-')) {
-            return 'project:'.(int) substr($this->taskBucket, strlen('project-'));
+            return 'location:'.(int) substr($this->taskBucket, strlen('project-'));
         }
 
         return 'program';

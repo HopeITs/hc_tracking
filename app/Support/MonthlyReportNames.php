@@ -73,10 +73,12 @@ final class MonthlyReportNames
      * The place of one template split into its city, program and center, for
      * a header that labels each part instead of joining them with dots.
      *
+     * @param  array<int, string>|null  $cities  city names already read (placePartsFor())
      * @return array{city: string|null, program: string|null, center: string|null}
      */
-    public function placeParts(ReportTemplate $template): array
+    public function placeParts(ReportTemplate $template, ?array $cities = null): array
     {
+        $cities ??= $this->cityNames(new Collection([$template]));
         $center = match (true) {
             $template->city_wide => (string) __('monthly_reports.place_field_work'),
             $template->center_id !== null => HrCenter::remembered($template->center_id)->name,
@@ -84,10 +86,29 @@ final class MonthlyReportNames
         };
 
         return [
-            'city' => $this->cityNames(new Collection([$template]))[$template->city_id] ?? null,
+            'city' => $cities[$template->city_id] ?? null,
             'program' => Program::nameOf($template->program_id) ?: null,
             'center' => filled($center) ? $center : null,
         ];
+    }
+
+    /**
+     * placeParts() of many templates with one city query, keyed by template id.
+     *
+     * @param  iterable<ReportTemplate>  $templates
+     * @return array<int, array{city: string|null, program: string|null, center: string|null}>
+     */
+    public function placePartsFor(iterable $templates): array
+    {
+        $templates = new Collection(collect($templates)->filter()->unique('id')->values()->all());
+
+        if ($templates->isEmpty()) {
+            return [];
+        }
+
+        $cities = $this->cityNames($templates);
+
+        return $templates->mapWithKeys(fn (ReportTemplate $template): array => [$template->id => $this->placeParts($template, $cities)])->all();
     }
 
     /**

@@ -428,8 +428,9 @@ test('the report trail shows evidence files and MEAL visibility', function () {
 
 test('the indicator chain can open the commit form already tied to an indicator', function () {
     $user = mealManager();
-    $project = Project::factory()->create();
-    $indicator = Indicator::factory()->create(['project_id' => $project->id, 'frequency' => Period::Monthly]);
+    $program = Program::factory()->create();
+    $row = ProposalLocation::factory()->create(['program_id' => $program->id]);
+    $indicator = Indicator::factory()->create(['proposal_location_id' => $row->id, 'frequency' => Period::Monthly]);
 
     Livewire::actingAs($user)
         ->withQueryParams(['indicator' => $indicator->id, 'create' => 1])
@@ -437,21 +438,29 @@ test('the indicator chain can open the commit form already tied to an indicator'
         ->assertSet('showTargetModal', true)
         ->assertSet('targetIndicatorId', (string) $indicator->id)
         ->assertSet('targetPeriod', Period::Monthly->value)
-        ->assertSet('targetProjectId', (string) $project->id);
+        // No source is chosen yet, so no row can be offered or filled in.
+        ->assertSet('targetLocationId', '');
 });
 
-test('the form offers only the plans and projects that fit the chosen indicator and source', function () {
+test('the form offers only the plans and location rows that fit the chosen indicator and source', function () {
     $user = mealManager();
     $program = Program::factory()->create();
     $indicator = Indicator::factory()->for(Result::factory()->for($program))->create();
     $fittingPlan = AnnualPlan::factory()->for($program)->create();
     AnnualPlan::factory()->create();
-    $programProject = Project::factory()->for($program)->create();
-    Project::factory()->create();
 
+    // An annual-plan target may name a row of the plan's own program (Y-16).
+    $programRow = ProposalLocation::factory()->create(['program_id' => $program->id]);
+    ProposalLocation::factory()->create(['program_id' => Program::factory()->create()->id]);
+
+    // A proposal target may name only a row of that proposal — whatever
+    // program it sits in, which is why this one is in another program and so
+    // is not offered for the annual plan above.
     $proposal = Proposal::factory()->create();
-    $funded = Project::factory()->create();
-    $proposal->projects()->attach($funded);
+    $ownRow = ProposalLocation::factory()->create([
+        'proposal_id' => $proposal->id,
+        'program_id' => Program::factory()->create()->id,
+    ]);
 
     $component = Livewire::actingAs($user)
         ->test('pages::targets.index')
@@ -461,10 +470,10 @@ test('the form offers only the plans and projects that fit the chosen indicator 
     expect(collect($component->instance()->sourceOptions())->pluck('id')->all())->toBe([$fittingPlan->id]);
 
     $component->set('targetSourceId', (string) $fittingPlan->id);
-    expect($component->instance()->formProjectOptions()->modelKeys())->toBe([$programProject->id]);
+    expect(collect($component->instance()->formLocationOptions())->pluck('id')->all())->toBe([$programRow->id]);
 
     $component->set('targetSourceType', 'proposal')->set('targetSourceId', (string) $proposal->id);
-    expect($component->instance()->formProjectOptions()->modelKeys())->toBe([$funded->id]);
+    expect(collect($component->instance()->formLocationOptions())->pluck('id')->all())->toBe([$ownRow->id]);
 });
 
 test('a target that does not fit its chain is refused', function () {
@@ -720,13 +729,19 @@ test('a filter with no match offers a way out and the delete dialog names the ta
         ->assertSee('Delete the target for “Meals served”?');
 });
 
-test('a saved form target carries the place of its project, and re-pointing it rewrites the place (Y-08)', function () {
+test('a saved form target carries the place of its row, and re-pointing it rewrites the place (Y-08, Y-16)', function () {
     $user = mealManager();
     $program = Program::factory()->create();
     $indicator = Indicator::factory()->for(Result::factory()->for($program))->create();
     $plan = AnnualPlan::factory()->for($program)->create();
-    $first = Project::factory()->for($program)->create(['center_id' => 9201]);
-    $second = Project::factory()->for($program)->create(['center_id' => 9202]);
+
+    $firstCity = insertHrCity();
+    $first = ProposalLocation::factory()->create(['program_id' => $program->id, 'city_id' => $firstCity]);
+    $first->centers()->create(['center_id' => insertHrCenter($firstCity, 'First centre')]);
+
+    $secondCity = insertHrCity();
+    $second = ProposalLocation::factory()->create(['program_id' => $program->id, 'city_id' => $secondCity]);
+    $secondCentre = $second->centers()->create(['center_id' => insertHrCenter($secondCity, 'Second centre')]);
 
     Livewire::actingAs($user)
         ->test('pages::targets.index')
@@ -734,23 +749,23 @@ test('a saved form target carries the place of its project, and re-pointing it r
         ->set('targetIndicatorId', (string) $indicator->id)
         ->set('targetSourceType', 'annual_plan')
         ->set('targetSourceId', (string) $plan->id)
-        ->set('targetProjectId', (string) $first->id)
+        ->set('targetLocationId', (string) $first->id)
         ->set('targetValue', '500')
         ->call('saveTarget')
         ->assertHasNoErrors();
 
     $target = PlanIndicator::query()->sole();
-    expect($target->place()?->centerId)->toBe(9201)
-        ->and($target->city_id)->toBe($first->city_id)
-        ->and($target->program_id)->toBe($program->id);
+    expect($target->city_id)->toBe($firstCity)
+        ->and($target->program_id)->toBe($program->id)
+        ->and($target->proposal_location_id)->toBe($first->id);
 
     Livewire::actingAs($user)
         ->test('pages::targets.index')
         ->call('openEditModal', $target->id)
-        ->set('targetProjectId', (string) $second->id)
+        ->set('targetLocationId', (string) $second->id)
         ->call('saveTarget')
         ->assertHasNoErrors();
 
-    expect($target->refresh()->place()?->centerId)->toBe(9202)
-        ->and($target->city_id)->toBe($second->city_id);
+    expect($target->refresh()->place()?->centerId)->toBe($secondCentre->center_id)
+        ->and($target->city_id)->toBe($secondCity);
 });

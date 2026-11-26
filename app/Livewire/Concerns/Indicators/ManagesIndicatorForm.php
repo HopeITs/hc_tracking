@@ -9,8 +9,8 @@ use App\Enums\Period;
 use App\Models\Indicator;
 use App\Models\PlanIndicator;
 use App\Models\Program;
-use App\Models\Project;
 use App\Models\Proposal;
+use App\Models\ProposalLocation;
 use App\Models\Result;
 use Flux\Flux;
 use Illuminate\Database\Eloquent\Collection;
@@ -23,14 +23,19 @@ use Livewire\Attributes\Locked;
 
 /**
  * The indicator dialog on indicators/index: create, edit and delete an
- * indicator, with the project picker limited to the result's program and
+ * indicator, with the location-row picker limited to the result's program and
  * the measure locked once targets exist.
+ *
+ * Y-16 (D-93): an instance is scoped to one place of a proposal, so the picker
+ * offers location rows, not projects. `project_id` is left as it is on an
+ * existing instance and null on a new one: the project writers still fill it
+ * until Y-18, and nothing reads it here any more.
  *
  * Used by indicators/index and the in-place form on a results framework
  * (components/indicators/quick-form). The host provides forgetIndicators()
  * and resetPage() (WithPagination's on the directory).
  *
- * @property-read Collection<int, Project> $projectOptions  #[Computed] projectOptions()
+ * @property-read Collection<int, ProposalLocation> $locationOptions  #[Computed] locationOptions()
  */
 trait ManagesIndicatorForm
 {
@@ -56,7 +61,7 @@ trait ManagesIndicatorForm
 
     public string $frequency = 'quarterly';
 
-    public string $indicatorProjectId = '';
+    public string $indicatorLocationId = '';
 
     public bool $showDeleteModal = false;
 
@@ -93,35 +98,40 @@ trait ManagesIndicatorForm
     }
 
     /**
-     * Projects an indicator on the chosen result may be scoped to: those
-     * delivering the result's program, or every project when the result sits
-     * in no program.
+     * Location rows an indicator on the chosen result may be scoped to: the
+     * rows of the result's program, or every row when the result sits in no
+     * program (Y-16, D-93).
      *
-     * @return Collection<int, Project>
+     * A row still waiting for its program is never offered: it has no place
+     * yet, so nothing can be scoped to it.
+     *
+     * @return Collection<int, ProposalLocation>
      */
     #[Computed]
-    public function projectOptions(): Collection
+    public function locationOptions(): Collection
     {
         $programId = $this->formResultProgramId();
 
-        return Project::query()
-            ->select(['id', 'name', 'program_id'])
+        return ProposalLocation::query()
+            ->select(['id', 'proposal_id', 'city_id', 'program_id', 'city_wide'])
+            ->whereNotNull('program_id')
             ->when($programId !== null, fn ($query) => $query->where('program_id', $programId))
-            ->orderBy('name')
-            ->orderBy('id')
-            ->get();
+            ->with(['proposal:id,name', 'city', 'program', 'centers'])
+            ->get()
+            ->sortBy(fn (ProposalLocation $row): string => ($row->proposal->name ?? '').' '.$row->label())
+            ->values();
     }
 
     /**
-     * A project chosen for the old result may not deliver the new one's
-     * program, so it is dropped rather than carried to the save.
+     * A row chosen for the old result may not sit in the new one's program,
+     * so it is dropped rather than carried to the save.
      */
     public function updatedIndicatorResultId(): void
     {
-        unset($this->projectOptions);
+        unset($this->locationOptions);
 
-        if ($this->indicatorProjectId !== '' && ! $this->projectOptions->contains('id', (int) $this->indicatorProjectId)) {
-            $this->indicatorProjectId = '';
+        if ($this->indicatorLocationId !== '' && ! $this->locationOptions->contains('id', (int) $this->indicatorLocationId)) {
+            $this->indicatorLocationId = '';
         }
     }
 
@@ -154,7 +164,7 @@ trait ManagesIndicatorForm
 
         $indicator = Indicator::query()
             ->when($this->indicatorFormProposalId() !== null, fn ($query) => $query->whereHas('result', fn ($result) => $result->proposalFramework($this->indicatorFormProposalId())))
-            ->select(['id', 'name', 'result_id', 'project_id', 'measure', 'unit', 'baseline', 'target', 'frequency', 'library_indicator_id'])
+            ->select(['id', 'name', 'result_id', 'project_id', 'proposal_location_id', 'measure', 'unit', 'baseline', 'target', 'frequency', 'library_indicator_id'])
             ->findOrFail($indicatorId);
 
         $this->resetValidation();
@@ -167,7 +177,7 @@ trait ManagesIndicatorForm
         $this->baseline = $indicator->baseline === null ? '' : (string) $indicator->baseline;
         $this->target = $indicator->target === null ? '' : (string) $indicator->target;
         $this->frequency = $indicator->frequency->value;
-        $this->indicatorProjectId = (string) ($indicator->project_id ?? '');
+        $this->indicatorLocationId = (string) ($indicator->proposal_location_id ?? '');
         $this->showIndicatorModal = true;
     }
 
@@ -202,7 +212,7 @@ trait ManagesIndicatorForm
             'baseline' => ['nullable', 'numeric', 'min:0', $valueCeiling],
             'target' => ['nullable', 'numeric', 'min:0', $valueCeiling],
             'frequency' => ['required', new Enum(Period::class)],
-            'indicatorProjectId' => ['nullable', 'integer', Rule::exists(Project::class, 'id')],
+            'indicatorLocationId' => ['nullable', 'integer', Rule::exists(ProposalLocation::class, 'id')],
         ], [
             'name.required' => __('indicators.enter_the_indicator_name'),
             'indicatorResultId.required' => __('indicators.select_the_result_this_indicator_measures'),
@@ -213,16 +223,20 @@ trait ManagesIndicatorForm
             'target.max' => __('indicators.a_percentage_cannot_exceed_100'),
         ] : []));
 
+        $indicator = $this->editingIndicatorId === null
+            ? new Indicator
+            : Indicator::query()->findOrFail($this->editingIndicatorId);
+
         $result = Result::query()
             ->when($this->indicatorFormProposalId() !== null, fn ($query) => $query->proposalFramework($this->indicatorFormProposalId()))
             ->select(['id', 'program_id', 'proposal_id'])->findOrFail((int) $validated['indicatorResultId']);
-        $projectId = $validated['indicatorProjectId'] === '' || $validated['indicatorProjectId'] === null
+        $locationId = $validated['indicatorLocationId'] === '' || $validated['indicatorLocationId'] === null
             ? null
-            : (int) $validated['indicatorProjectId'];
+            : (int) $validated['indicatorLocationId'];
 
-        if ($projectId !== null && $result->program_id !== null
-            && Project::query()->whereKey($projectId)->value('program_id') !== $result->program_id) {
-            $this->addError('indicatorProjectId', __('indicators.this_project_does_not_deliver_the_result_program'));
+        if ($locationId !== null && $result->program_id !== null
+            && ProposalLocation::query()->whereKey($locationId)->value('program_id') !== $result->program_id) {
+            $this->addError('indicatorLocationId', __('indicators.this_project_does_not_deliver_the_result_program'));
 
             return;
         }
@@ -235,7 +249,7 @@ trait ManagesIndicatorForm
             'baseline' => $validated['baseline'] === '' || $validated['baseline'] === null ? null : $validated['baseline'],
             'target' => $validated['target'] === '' || $validated['target'] === null ? null : $validated['target'],
             'frequency' => $validated['frequency'],
-            'project_id' => $projectId,
+            'proposal_location_id' => $locationId,
         ]);
 
         if ($indicator->exists && ! $this->changeKeepsTargetsInChain($indicator, $result)) {
@@ -257,8 +271,8 @@ trait ManagesIndicatorForm
      *
      * The measure is locked once targets exist: it decides how their reports
      * add up (summed or latest), so switching it would silently rewrite every
-     * achievement figure. A new result or project is checked against each
-     * target with PlanIndicator::chainIssuesFor(), and refused only when it
+     * achievement figure. A new result or row is checked against each
+     * target with PlanIndicator::chainIssuesForRow(), and refused only when it
      * introduces a problem the target did not already have — a row that was
      * already out of step must not block an unrelated fix.
      */
@@ -267,8 +281,8 @@ trait ManagesIndicatorForm
         $targets = PlanIndicator::query()
             ->where('indicator_id', $indicator->id)
             ->with([
-                'project:id,program_id',
-                'source' => fn (MorphTo $morphTo) => $morphTo->morphWith([Proposal::class => ['projects:id']]),
+                'location:id,proposal_id,program_id',
+                'source' => fn (MorphTo $morphTo) => $morphTo->morphWith([Proposal::class => []]),
             ])
             ->get();
 
@@ -282,7 +296,7 @@ trait ManagesIndicatorForm
             return false;
         }
 
-        if (! $indicator->isDirty(['result_id', 'project_id'])) {
+        if (! $indicator->isDirty(['result_id', 'proposal_location_id'])) {
             return true;
         }
 
@@ -291,13 +305,13 @@ trait ManagesIndicatorForm
 
         foreach ($targets as $target) {
             $introduced = array_diff(
-                PlanIndicator::chainIssuesFor($target->source, $after, $target->project),
-                PlanIndicator::chainIssuesFor($target->source, $before, $target->project),
+                PlanIndicator::chainIssuesForRow($target->source, $after, $target->location),
+                PlanIndicator::chainIssuesForRow($target->source, $before, $target->location),
             );
 
             if ($introduced !== []) {
                 $this->addError(
-                    $indicator->isDirty('result_id') ? 'indicatorResultId' : 'indicatorProjectId',
+                    $indicator->isDirty('result_id') ? 'indicatorResultId' : 'indicatorLocationId',
                     __('indicators.this_change_would_break_a_committed_target', ['issue' => __(reset($introduced))]),
                 );
 
@@ -379,7 +393,7 @@ trait ManagesIndicatorForm
         $this->baseline = '';
         $this->target = '';
         $this->frequency = 'quarterly';
-        $this->indicatorProjectId = '';
+        $this->indicatorLocationId = '';
     }
 
     protected function indicatorFormProposalId(): ?int

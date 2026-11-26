@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Http\Middleware;
 
+use App\Support\Locations\LocationFromSlug;
 use Closure;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Http\Request;
@@ -51,6 +52,13 @@ class RemembersRecentRecord
         }
 
         $record = $request->route()->parameter($page['parameter']);
+
+        // Y-16: `projects.show` carries a slug, not a bound model, because an old
+        // project slug has to redirect to its row rather than 404 (D-94). A
+        // 200 means the slug was a row's, so resolve it here.
+        if (is_string($record) && $page['kind'] === 'project') {
+            $record = app(LocationFromSlug::class)->row($record);
+        }
 
         if (! $record instanceof Model || ! method_exists($record, 'activityLabel')) {
             return $response;

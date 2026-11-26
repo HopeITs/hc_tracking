@@ -50,7 +50,16 @@ enum PlanWeekStatus: string
      */
     public function rank(): int
     {
-        return array_search($this, [self::Cancelled, self::Suspended, self::Rescheduled, self::NotStarted, self::Started, self::Ongoing, self::Completed, self::Conducted], true);
+        return match ($this) {
+            self::Cancelled => 0,
+            self::Suspended => 1,
+            self::Rescheduled => 2,
+            self::NotStarted => 3,
+            self::Started => 4,
+            self::Ongoing => 5,
+            self::Completed => 6,
+            self::Conducted => 7,
+        };
     }
 
     /**

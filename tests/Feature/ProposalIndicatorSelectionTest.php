@@ -28,6 +28,8 @@ beforeEach(function () {
     $this->proposal = Proposal::factory()->create();
     $this->project = Project::factory()->create(['program_id' => $this->program->id]);
     DB::table('project_proposal')->insert(['project_id' => $this->project->id, 'proposal_id' => $this->proposal->id]);
+    // Y-16 (D-93): the proposal's programs are read from its places.
+    proposalRowForProject($this->proposal, $this->project);
 
     $this->output = Result::factory()->create([
         'type' => ResultType::Output,

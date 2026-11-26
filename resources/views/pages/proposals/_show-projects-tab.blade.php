@@ -27,7 +27,7 @@
                 <div class="flex flex-col gap-8">
                     @foreach ($this->projects as $project)
                         @php
-                            $projectTasks = $this->tasks->filter(fn (\App\Models\Task $task): bool => $task->source_type === 'project' && $task->source_id === $project->id);
+                            $projectTasks = $this->tasks->filter(fn (\App\Models\Task $task): bool => $task->source_type === 'proposal_location' && $task->source_id === $project->id);
                             $projectDone = $projectTasks->where('status', TaskStatus::Done)->count();
                             // Work scheduled past the grant's own end has no funding behind it after that date.
                             $runsPastTheGrant = $project->end_date !== null
@@ -45,9 +45,9 @@
 
                             <div class="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
                                 <div class="min-w-0">
-                                    <a href="{{ route('projects.show', $project) }}" wire:navigate class="text-base font-bold underline-offset-4 hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-secondary-medium {{ $inkText }}">{{ $project->name }}</a>
+                                    <a href="{{ route('projects.show', $project) }}" wire:navigate class="text-base font-bold underline-offset-4 hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-secondary-medium {{ $inkText }}">{{ $project->headline() }}</a>
                                     <p class="mt-0.5 flex flex-wrap items-center gap-x-2 gap-y-0.5 text-xs {{ $mutedText }}">
-                                        <span>{{ $project->program->name }}</span>
+                                        <span>{{ $project->program?->name ?? '—' }}</span>
                                         <span aria-hidden="true">·</span>
                                         <span>{{ $project->city?->name ?? __('common.unknown_city') }}</span>
                                         @if ($project->start_date !== null || $project->end_date !== null)
@@ -74,7 +74,7 @@
                                 <div class="flex shrink-0 items-center gap-1">
                                     <x-ui.enum-badge :case="$project->status" />
                                     @can('update', $this->proposal)
-                                    <x-ui.button tone="ghost" size="sm" icon="link-slash" class="size-9! touch-manipulation" wire:click="confirmUnlinkProject({{ $project->id }})" :aria-label="__('proposals.unlink_project_name', ['name' => $project->name])" data-test="unlink-project-{{ $project->id }}" />
+                                    <x-ui.button tone="ghost" size="sm" icon="link-slash" class="size-9! touch-manipulation" wire:click="confirmUnlinkProject({{ $project->project_id }})" :aria-label="__('proposals.unlink_project_name', ['name' => $project->headline()])" data-test="unlink-project-{{ $project->id }}" />
                                     @endcan
                                 </div>
                             </div>

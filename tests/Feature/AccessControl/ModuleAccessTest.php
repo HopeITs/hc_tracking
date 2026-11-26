@@ -20,7 +20,7 @@ dataset('module pages', [
     'annual plans' => [fn (): string => route('annual-plans.index')],
     'annual plan' => [fn (): string => route('annual-plans.show', AnnualPlan::factory()->create())],
     'projects' => [fn (): string => route('projects.index')],
-    'project' => [fn (): string => route('projects.show', Project::factory()->create())],
+    'project' => [fn (): string => route('projects.show', rowFor(Project::factory()->create()))],
     'risks' => [fn (): string => route('risks.index')],
     'results' => [fn (): string => route('results.index')],
     'indicators' => [fn (): string => route('indicators.index')],

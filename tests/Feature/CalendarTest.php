@@ -10,6 +10,7 @@ use App\Models\MonthlyReport;
 use App\Models\MonthlyReportLine;
 use App\Models\Project;
 use App\Models\Proposal;
+use App\Models\ProposalLocation;
 use App\Models\Report;
 use App\Models\Task;
 use App\Models\TransfersTracking;
@@ -271,7 +272,7 @@ test('turning off a type filter hides that type\'s chips without affecting the o
     $employeeId = insertHrEmployee();
     $user = linkUserToEmployee(User::factory()->role('General Manager')->create(), $employeeId);
 
-    $project = Project::factory()->create(['user_id' => $employeeId, 'start_date' => Carbon::create(2026, 6, 15), 'end_date' => Carbon::create(2026, 12, 31)]);
+    $project = rowFor(Project::factory()->create(['user_id' => $employeeId, 'start_date' => Carbon::create(2026, 6, 15), 'end_date' => Carbon::create(2026, 12, 31)]));
     $task = calendarTask($employeeId, Carbon::create(2026, 6, 15));
 
     Livewire::actingAs($user)
@@ -344,16 +345,16 @@ test('a linked user sees start/end dates for their own projects, and not another
     $otherEmployeeId = insertHrEmployee(firstNameEn: 'Rana', lastNameEn: 'Nassar');
     $user = linkUserToEmployee(User::factory()->role('General Manager')->create(), $employeeId);
 
-    $mine = Project::factory()->create([
+    $mine = rowFor(Project::factory()->create([
         'user_id' => $employeeId,
         'start_date' => Carbon::create(2026, 6, 15),
         'end_date' => Carbon::create(2026, 6, 20),
-    ]);
-    $notMine = Project::factory()->create([
+    ]));
+    $notMine = rowFor(Project::factory()->create([
         'user_id' => $otherEmployeeId,
         'start_date' => Carbon::create(2026, 6, 15),
         'end_date' => Carbon::create(2026, 6, 20),
-    ]);
+    ]));
 
     Livewire::actingAs($user)
         ->test('pages::calendar.index')
@@ -372,11 +373,12 @@ test('a linked user sees deadlines for proposals funding their own projects, and
     $myProject = Project::factory()->create(['user_id' => $employeeId]);
     $theirProject = Project::factory()->create(['user_id' => $otherEmployeeId]);
 
+    // Y-16 (D-93): the proposal reaches the employee through its place.
     $mine = Proposal::factory()->create(['planned_date_end' => Carbon::create(2026, 6, 15)]);
-    $mine->projects()->attach($myProject);
+    rowFor($myProject, $mine);
 
     $notMine = Proposal::factory()->create(['planned_date_end' => Carbon::create(2026, 6, 15)]);
-    $notMine->projects()->attach($theirProject);
+    rowFor($theirProject, $notMine);
 
     Livewire::actingAs($user)
         ->test('pages::calendar.index')
@@ -394,7 +396,7 @@ test('a linked user sees transfer dates for funding agreements under their own p
     $theirProject = Project::factory()->create(['user_id' => $otherEmployeeId]);
 
     $myProposal = Proposal::factory()->create();
-    $myProposal->projects()->attach($myProject);
+    rowFor($myProject, $myProposal);
     $myAgreement = DonorProposal::factory()->create(['proposal_id' => $myProposal->id]);
     $mine = TransfersTracking::factory()->create([
         'donor_proposal_id' => $myAgreement->id,
@@ -402,7 +404,7 @@ test('a linked user sees transfer dates for funding agreements under their own p
     ]);
 
     $theirProposal = Proposal::factory()->create();
-    $theirProposal->projects()->attach($theirProject);
+    rowFor($theirProject, $theirProposal);
     $theirAgreement = DonorProposal::factory()->create(['proposal_id' => $theirProposal->id]);
     $notMine = TransfersTracking::factory()->create([
         'donor_proposal_id' => $theirAgreement->id,
@@ -425,14 +427,14 @@ test('a linked user sees donor follow-ups and donor report deadlines tied to the
     $theirProject = Project::factory()->create(['user_id' => $otherEmployeeId]);
 
     $myProposal = Proposal::factory()->create();
-    $myProposal->projects()->attach($myProject);
+    rowFor($myProject, $myProposal);
     $myDonor = Donor::factory()->create(['next_step_due_on' => Carbon::create(2026, 6, 15)]);
     Proposal::query()->whereKey($myProposal->id)->update(['donor_id' => $myDonor->id]);
     $myAgreement = DonorProposal::factory()->create(['proposal_id' => $myProposal->id, 'donor_id' => $myDonor->id]);
     $myReport = DonorReport::factory()->create(['donor_proposal_id' => $myAgreement->id, 'due_on' => Carbon::create(2026, 6, 15)]);
 
     $theirProposal = Proposal::factory()->create();
-    $theirProposal->projects()->attach($theirProject);
+    rowFor($theirProject, $theirProposal);
     $theirDonor = Donor::factory()->create(['next_step_due_on' => Carbon::create(2026, 6, 15)]);
     Proposal::query()->whereKey($theirProposal->id)->update(['donor_id' => $theirDonor->id]);
     $theirAgreement = DonorProposal::factory()->create(['proposal_id' => $theirProposal->id, 'donor_id' => $theirDonor->id]);
@@ -451,13 +453,12 @@ test('toggling off the new type filters hides their chips without affecting the 
     $employeeId = insertHrEmployee();
     $user = linkUserToEmployee(User::factory()->role('General Manager')->create(), $employeeId);
 
-    $project = Project::factory()->create([
+    $proposal = Proposal::factory()->create(['planned_date_end' => Carbon::create(2026, 6, 15)]);
+    $project = rowFor(Project::factory()->create([
         'user_id' => $employeeId,
         'start_date' => Carbon::create(2026, 6, 15),
         'end_date' => Carbon::create(2026, 6, 20),
-    ]);
-    $proposal = Proposal::factory()->create(['planned_date_end' => Carbon::create(2026, 6, 15)]);
-    $proposal->projects()->attach($project);
+    ]), $proposal);
 
     Livewire::actingAs($user)
         ->test('pages::calendar.index')
@@ -600,11 +601,11 @@ test('an impossible anchor date in the URL falls back to today', function (strin
 test('the related-dates panel lists both occurrences of a composite type with click-through', function () {
     $employeeId = insertHrEmployee();
     $user = linkUserToEmployee(User::factory()->role('General Manager')->create(), $employeeId);
-    $project = Project::factory()->create([
+    $project = rowFor(Project::factory()->create([
         'user_id' => $employeeId,
         'start_date' => Carbon::today()->addDays(5),
         'end_date' => Carbon::today()->addDays(35),
-    ]);
+    ]));
 
     Livewire::actingAs($user)
         ->test('pages::calendar.index')
@@ -617,7 +618,7 @@ test('the related-dates panel lists both occurrences of a composite type with cl
         ->call('toggleType', 'donor')
         ->assertSet('showProjects', true)
         ->assertSee('data-test="calendar-focused-list"', false)
-        ->assertSee($project->name)
+        ->assertSee($project->headline())
         ->assertSee(__('calendar.project_starts'))
         ->assertSee(__('calendar.project_ends'));
 });
@@ -630,7 +631,7 @@ test('the related-dates panel lists upcoming project ends instead of past projec
         ['name' => 'Closing Soon A', 'start_date' => Carbon::create(2024, 3, 1), 'end_date' => Carbon::create(2026, 12, 31)],
         ['name' => 'Closing Soon B', 'start_date' => Carbon::create(2024, 7, 1), 'end_date' => Carbon::create(2026, 12, 31)],
         ['name' => 'Closing Later', 'start_date' => Carbon::create(2025, 1, 1), 'end_date' => Carbon::create(2027, 3, 31)],
-    )->create(['user_id' => $employeeId]);
+    )->create(['user_id' => $employeeId])->map(fn (Project $project): ProposalLocation => rowFor($project));
 
     $component = Livewire::actingAs($user)
         ->test('pages::calendar.index')
@@ -641,7 +642,7 @@ test('the related-dates panel lists upcoming project ends instead of past projec
     expect($items)->toHaveCount(3)
         ->and($items->pluck('subLabel')->unique()->all())->toBe([__('calendar.project_ends')])
         ->and($items->pluck('id')->all())->toEqualCanonicalizing($projects->pluck('id')->all())
-        ->and($items->last()['title'])->toBe('Closing Later');
+        ->and($items->last()['title'])->toContain('Closing Later');
 
     $component->assertSeeText(trans_choice('calendar.items_count', 3, ['count' => 3]));
 });
@@ -650,11 +651,11 @@ test('the related-dates panel falls back to the most recent past dates across bo
     $this->travelTo(Carbon::create(2026, 11, 6, 9));
     $employeeId = insertHrEmployee();
     $user = linkUserToEmployee(User::factory()->role('General Manager')->create(), $employeeId);
-    $project = Project::factory()->create([
+    $project = rowFor(Project::factory()->create([
         'user_id' => $employeeId,
         'start_date' => Carbon::create(2024, 3, 1),
         'end_date' => Carbon::create(2026, 9, 30),
-    ]);
+    ]));
 
     $items = Livewire::actingAs($user)
         ->test('pages::calendar.index')
@@ -729,16 +730,15 @@ test('the task and day-detail forms are rendered only while their modals are ope
 test('an active proposal with an extended end shows on the extended day, marked as extended', function () {
     $employeeId = insertHrEmployee();
     $user = linkUserToEmployee(User::factory()->role('General Manager')->create(), $employeeId);
-    $project = Project::factory()->create(['user_id' => $employeeId]);
-
     $extended = Proposal::factory()->create([
         'status' => 'active',
         'planned_date_end' => Carbon::create(2026, 6, 15),
         'extended_date_end' => Carbon::create(2026, 8, 20),
     ]);
     $plain = Proposal::factory()->create(['status' => 'active', 'planned_date_end' => Carbon::create(2026, 6, 16)]);
-    $extended->projects()->attach($project);
-    $plain->projects()->attach($project);
+    // Y-16 (D-93): a row is of one proposal, so two proposals mean two places.
+    rowFor(Project::factory()->create(['user_id' => $employeeId]), $extended);
+    rowFor(Project::factory()->create(['user_id' => $employeeId]), $plain);
 
     Livewire::actingAs($user)->test('pages::calendar.index')->set('month', '2026-06')
         ->assertDontSee('data-test="calendar-proposal-'.$extended->id.'"', false)
@@ -782,8 +782,8 @@ test('a task, report and project whose date passed with the work unfinished are 
     $lateReport = Report::factory()->create(['user_id' => $user->id, 'planned_date' => Carbon::create(2026, 6, 10), 'status' => ReportStatus::Draft]);
     $approvedReport = Report::factory()->create(['user_id' => $user->id, 'planned_date' => Carbon::create(2026, 6, 10), 'status' => ReportStatus::Approved]);
 
-    $openProject = Project::factory()->status(ProjectStatus::Active)->create(['user_id' => $employeeId, 'start_date' => Carbon::create(2025, 1, 1), 'end_date' => Carbon::create(2026, 6, 10)]);
-    $closedProject = Project::factory()->status(ProjectStatus::Closed)->create(['user_id' => $employeeId, 'start_date' => Carbon::create(2025, 1, 1), 'end_date' => Carbon::create(2026, 6, 10)]);
+    $openProject = rowFor(Project::factory()->status(ProjectStatus::Active)->create(['user_id' => $employeeId, 'start_date' => Carbon::create(2025, 1, 1), 'end_date' => Carbon::create(2026, 6, 10)]));
+    $closedProject = rowFor(Project::factory()->status(ProjectStatus::Closed)->create(['user_id' => $employeeId, 'start_date' => Carbon::create(2025, 1, 1), 'end_date' => Carbon::create(2026, 6, 10)]));
 
     Livewire::actingAs($user)
         ->test('pages::calendar.index')
@@ -794,7 +794,7 @@ test('a task, report and project whose date passed with the work unfinished are 
         ->assertDontSee('data-test="calendar-late-report-'.$approvedReport->id.'"', false)
         ->assertSee('data-test="calendar-late-project-end-'.$openProject->id.'"', false)
         ->assertDontSee('data-test="calendar-late-project-end-'.$closedProject->id.'"', false)
-        ->assertSeeText(__('calendar.ends_name', ['name' => $openProject->name]));
+        ->assertSeeText(__('calendar.ends_name', ['name' => $openProject->headline()]));
 });
 
 test('a monthly report appears on its due date and is marked late once that date passes as a draft', function () {
@@ -847,10 +847,23 @@ test('focusing on monthly reports lists their due dates in the related-dates pan
         ->and($items->first()['date']->toDateString())->toBe(MonthlyReportPeriods::for($report->template)->dueDate(CarbonImmutable::create(2026, 7, 1))->toDateString());
 });
 
+/**
+ * The place of a project, carried by a proposal whose own deadline is years
+ * away (Y-16, D-93): these tests are about a place's own start and end chips,
+ * so the proposal must add no deadline chip inside the months they read.
+ */
+function calendarRow(Project $project): ProposalLocation
+{
+    return rowFor($project, Proposal::factory()->running()->create([
+        'planned_date_begin' => Carbon::create(2030, 1, 1),
+        'planned_date_end' => Carbon::create(2030, 12, 31),
+    ]));
+}
+
 test('a busy day shows its item count for phone screens', function () {
     $employeeId = insertHrEmployee();
     $user = linkUserToEmployee(User::factory()->role('General Manager')->create(), $employeeId);
-    Project::factory()->count(3)->create(['user_id' => $employeeId, 'start_date' => Carbon::create(2025, 1, 1), 'end_date' => Carbon::create(2026, 12, 31)]);
+    Project::factory()->count(3)->create(['user_id' => $employeeId, 'start_date' => Carbon::create(2025, 1, 1), 'end_date' => Carbon::create(2026, 12, 31)])->each(fn (Project $project) => calendarRow($project));
 
     Livewire::actingAs($user)
         ->test('pages::calendar.index')
@@ -896,8 +909,8 @@ test('"Only" keeps the month on screen when it already has that type', function 
 test('a busy day shows three chips and a "+N more" button to the rest', function () {
     $employeeId = insertHrEmployee();
     $user = linkUserToEmployee(User::factory()->role('General Manager')->create(), $employeeId);
-    Project::factory()->count(5)->create(['user_id' => $employeeId, 'start_date' => Carbon::create(2025, 1, 1), 'end_date' => Carbon::create(2026, 12, 30)]);
-    Project::factory()->count(2)->create(['user_id' => $employeeId, 'start_date' => Carbon::create(2025, 1, 1), 'end_date' => Carbon::create(2026, 12, 29)]);
+    Project::factory()->count(5)->create(['user_id' => $employeeId, 'start_date' => Carbon::create(2025, 1, 1), 'end_date' => Carbon::create(2026, 12, 30)])->each(fn (Project $project) => calendarRow($project));
+    Project::factory()->count(2)->create(['user_id' => $employeeId, 'start_date' => Carbon::create(2025, 1, 1), 'end_date' => Carbon::create(2026, 12, 29)])->each(fn (Project $project) => calendarRow($project));
 
     Livewire::actingAs($user)
         ->test('pages::calendar.index')
@@ -961,13 +974,13 @@ test('rejected and completed proposals leave the calendar, and an extended propo
     $this->travelTo(Carbon::create(2026, 7, 1, 9));
     $employeeId = insertHrEmployee();
     $user = linkUserToEmployee(User::factory()->role('General Manager')->create(), $employeeId);
-    $project = Project::factory()->create(['user_id' => $employeeId]);
-
     $rejected = Proposal::factory()->create(['status' => 'rejected', 'planned_date_end' => Carbon::create(2026, 8, 5)]);
     $completed = Proposal::factory()->create(['status' => 'completed', 'planned_date_end' => Carbon::create(2026, 8, 6)]);
     $extended = Proposal::factory()->create(['status' => 'active', 'planned_date_end' => Carbon::create(2026, 6, 15), 'extended_date_end' => Carbon::create(2026, 8, 20)]);
+
+    // Y-16 (D-93): a row is of one proposal, so each proposal gets its own place.
     foreach ([$rejected, $completed, $extended] as $proposal) {
-        $proposal->projects()->attach($project);
+        rowFor(Project::factory()->create(['user_id' => $employeeId]), $proposal);
     }
 
     $html = Livewire::actingAs($user)->test('pages::calendar.index')->set('month', '2026-08')

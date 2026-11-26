@@ -49,7 +49,7 @@ test('indicator and data-gap alerts are never sent on a non-working day', functi
     $meal = userWithRole('MEAL');
     Activity::withoutRecording(function (): void {
         Indicator::factory()->create(['frequency' => 'monthly', 'target' => null, 'created_at' => '2026-01-01']);
-        Project::factory()->status(ProjectStatus::Active)->create(['end_date' => '2026-01-31']);
+        rowFor(Project::factory()->status(ProjectStatus::Active)->create(['end_date' => '2026-01-31']));
     });
     $sunday = CarbonImmutable::parse('2026-03-01 06:00');
 
@@ -61,7 +61,7 @@ test('indicator and data-gap alerts are never sent on a non-working day', functi
 test('data gaps fire at most once a week', function () {
     $ownerEmployee = insertHrEmployee();
     $owner = userWithRole('Managers', $ownerEmployee);
-    Activity::withoutRecording(fn () => Project::factory()->status(ProjectStatus::Active)->create(['user_id' => $ownerEmployee, 'end_date' => '2026-01-31']));
+    Activity::withoutRecording(fn () => rowFor(Project::factory()->status(ProjectStatus::Active)->create(['user_id' => $ownerEmployee, 'end_date' => '2026-01-31'])));
     $scanner = app(DataGapScanner::class);
 
     $first = $scanner->scan(CarbonImmutable::parse('2026-09-21 06:00'));

@@ -55,14 +55,14 @@ class SaveLibraryIndicator
     }
 
     /** @param array<string, mixed> $input */
-    public function createForResult(Result $result, array $input, ?int $projectId = null): Indicator
+    public function createForResult(Result $result, array $input, ?int $locationId = null): Indicator
     {
         Gate::authorize('indicators.create');
 
-        return DB::transaction(function () use ($result, $input, $projectId): Indicator {
+        return DB::transaction(function () use ($result, $input, $locationId): Indicator {
             $entry = $this->save(null, $input);
 
-            $indicator = app(AttachLibraryIndicatorToResult::class)->forResult($result, $entry->id, $projectId);
+            $indicator = app(AttachLibraryIndicatorToResult::class)->forResult($result, $entry->id, $locationId);
             $indicator->update(['unit' => $entry->unit]);
 
             return $indicator;

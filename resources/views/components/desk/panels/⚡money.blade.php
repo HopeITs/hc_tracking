@@ -41,8 +41,8 @@ new class extends Component {
             ->with([
                 'donor:id,name',
                 'proposal:id,name',
-                'proposal.projects:id,name,program_id',
-                'proposal.projects.program:id',
+                'proposal.locations:id,proposal_id,program_id',
+                'proposal.locations.program:id',
                 'transfers' => fn ($query) => $query->select(['id', 'donor_proposal_id', 'payment_amount', 'amount_transfered_currency', 'scheduled_date', 'transfer_date', 'ar_status', 'net_amount_received', 'amount_received_currency']),
             ])
             ->get()
@@ -55,11 +55,12 @@ new class extends Component {
                 $open = $agreement->transfers->filter(fn (TransfersTracking $transfer): bool => $transfer->ar_status === ArStatus::Pending)->sortBy('scheduled_date');
                 $next = $open->first();
                 $nextState = $next === null ? null : ($next->transfer_date !== null ? 'transit' : ($next->scheduled_date?->lt(today()) ? 'late' : 'upcoming'));
-                $project = $agreement->proposal?->projects->first();
+                // Y-16 (D-93): the first place the agreement funds.
+                $project = $agreement->proposal?->locations->first();
 
                 return [
                     'agreement' => $agreement,
-                    'name' => $project?->name ?? $agreement->proposal?->name ?? '—',
+                    'name' => $agreement->proposal?->name ?? '—',
                     'donor' => $agreement->donor?->name ?? '—',
                     'program' => $project?->program_id === null ? null : $project->program?->name,
                     'committed' => $committed,

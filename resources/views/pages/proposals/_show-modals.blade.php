@@ -114,7 +114,7 @@
         wire:model="showUnlinkModal"
         tone="neutral"
         :title="__('proposals.stop_funding_this_project')"
-        :message="$unlinkingProjectId !== null && ($unlinking = $this->projects->firstWhere('id', $unlinkingProjectId)) !== null ? __('proposals.unlink_project_consequence', ['name' => $unlinking->name]) : null"
+        :message="$unlinkingProjectId !== null && ($unlinking = $this->projects->firstWhere('project_id', $unlinkingProjectId)) !== null ? __('proposals.unlink_project_consequence', ['name' => $unlinking->headline()]) : null"
         confirm="unlinkProject"
         :confirm-label="$this->unlinkDeletesTargets ? __('proposals.unlink_with_targets') : __('proposals.unlink_project')"
         confirm-test="confirm-unlink-project"
@@ -255,7 +255,7 @@
         $previewMeta = $previewFile === null ? null : collect([
             \Illuminate\Support\Str::upper($previewFile->type->value),
             $previewFile->collection->label(),
-            $previewFile->mediable_type === 'project' && $previewFile->mediable !== null ? $previewFile->mediable->name : null,
+            $previewFile->mediable_type === 'proposal_location' && $previewFile->mediable !== null ? $previewFile->mediable->headline() : null,
             $previewFile->size !== null ? \Illuminate\Support\Number::fileSize($previewFile->size, precision: 1) : null,
             $this->documents->count() > 1 ? __('reports.preview_position', [
                 'position' => $this->documents->search(fn ($candidate) => $candidate->id === $previewFile->id) + 1,

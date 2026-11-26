@@ -88,10 +88,13 @@ trait ManagesReportForm
     public function targetOptions(): array
     {
         return array_values(PlanIndicator::query()
-            ->select(['id', 'indicator_id', 'source_type', 'source_id', 'target', 'period', 'project_id'])
+            ->select(['id', 'indicator_id', 'source_type', 'source_id', 'target', 'period', 'project_id', 'proposal_location_id'])
             ->with([
                 'indicator:id,name,measure',
-                'project:id,name',
+                'location',
+                'location.city',
+                'location.program',
+                'location.centers',
                 'source',
             ])
             ->get()
@@ -122,7 +125,7 @@ trait ManagesReportForm
         return implode(' · ', [
             $target->indicator->name,
             $committedIn,
-            $target->project->name ?? __('common.organisation_wide'),
+            $target->location?->label() ?? __('common.organisation_wide'),
             __('reports.target_of_value', ['value' => $figure]),
         ]);
     }

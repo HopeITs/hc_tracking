@@ -10,12 +10,12 @@ use App\Models\Indicator;
 use App\Models\PlanIndicator;
 use App\Models\Project;
 use App\Models\Proposal;
+use App\Models\ProposalLocation;
 use App\Models\Result;
 use App\Models\Risk;
 use App\Models\Task;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Collection;
-use Illuminate\Support\Facades\DB;
 use Livewire\Attributes\Computed;
 
 /**
@@ -25,8 +25,8 @@ use Livewire\Attributes\Computed;
  * Used by projects/show only. The page provides projectId and the #[Computed]
  * project().
  *
- * @property int $projectId
- * @property-read Project $project  #[Computed] project()
+ * @property int $locationId
+ * @property-read ProposalLocation $location  #[Computed] location()
  * @property-read Collection<int, Task> $tasks  #[Computed] tasks()
  * @property-read Collection<int, PlanIndicator> $targets  #[Computed] targets()
  */
@@ -43,8 +43,8 @@ trait ReadsProjectDelivery
         return Task::query()
             ->select(['id', 'source_type', 'source_id', 'title', 'status', 'priority', 'due_date', 'progress_percentage'])
             ->with(['taskAssignees.employee:id,first_name_en,last_name_en,first_name_ar,last_name_ar', 'source'])
-            ->where('source_type', 'project')
-            ->where('source_id', $this->projectId)
+            ->where('source_type', 'proposal_location')
+            ->where('source_id', $this->locationId)
             ->orderByRaw('due_date is null, due_date')
             ->orderBy('id')
             ->get();
@@ -85,20 +85,17 @@ trait ReadsProjectDelivery
     #[Computed]
     public function riskAwareness(): Collection
     {
-        $rowIds = DB::table('proposal_locations')->select('id')->where('project_id', $this->projectId);
-
+        // The row's own register risks, plus the logframe risks of the one
+        // proposal behind it (D-93): a row is of exactly one proposal, so the
+        // pivot is gone and so is the "rows carrying this project" lookup.
         return Risk::query()
             ->select(['id', 'name', 'name_en', 'impact', 'solution', 'happened', 'likelihood', 'severity', 'project_id', 'proposal_location_id', 'proposal_id', 'result_id'])
             ->with(['proposal:id,name', 'location:id,program_id,city_id', 'location.program:id'])
             ->where(fn (Builder $query) => $query
                 ->where(fn (Builder $logframe) => $logframe
                     ->whereNull('proposal_location_id')
-                    ->whereIn('proposal_id', DB::table('project_proposal')->select('proposal_id')->where('project_id', $this->projectId)))
-                ->orWhereIn('proposal_location_id', $rowIds)
-                ->orWhere(fn (Builder $unmapped) => $unmapped
-                    ->whereNull('proposal_location_id')
-                    ->whereNull('proposal_id')
-                    ->where('project_id', $this->projectId)))
+                    ->where('proposal_id', $this->location->proposal_id))
+                ->orWhere('proposal_location_id', $this->locationId))
             ->orderByDesc('happened')
             ->orderBy('id')
             ->get();
@@ -109,9 +106,9 @@ trait ReadsProjectDelivery
     public function targets(): Collection
     {
         return PlanIndicator::query()
-            ->select(['id', 'source_type', 'source_id', 'indicator_id', 'target', 'project_id', 'period'])
-            ->where('project_id', $this->projectId)
-            ->with(['indicator:id,name,result_id,measure,unit', 'indicator.result:id,statement,type'])
+            ->select(['id', 'source_type', 'source_id', 'indicator_id', 'target', 'project_id', 'proposal_location_id', 'period'])
+            ->where('proposal_location_id', $this->locationId)
+            ->with(['indicator:id,name,result_id,proposal_location_id,measure,unit', 'indicator.result:id,statement,type'])
             ->withCount('reports')
             ->orderBy('id')
             ->get();
@@ -155,17 +152,18 @@ trait ReadsProjectDelivery
     #[Computed]
     public function projectIndicators(): \Illuminate\Support\Collection
     {
-        $proposalIds = $this->project->proposals->modelKeys();
-        $programId = $this->project->program_id;
+        $proposalIds = array_filter([$this->location->proposal_id]);
+        $programId = $this->location->program_id;
 
         $indicators = Indicator::query()
-            ->select(['id', 'name', 'code', 'result_id', 'library_indicator_id', 'project_id', 'measure', 'unit'])
+            ->select(['id', 'name', 'code', 'result_id', 'library_indicator_id', 'project_id', 'proposal_location_id', 'measure', 'unit'])
             ->whereIn('result_id', Result::query()
                 ->select('id')
                 ->where(fn (Builder $query): Builder => $query
                     ->whereIn('proposal_id', $proposalIds)
                     ->orWhere(fn (Builder $programFramework): Builder => $programFramework->whereNull('proposal_id')->where('program_id', $programId ?? 0))))
-            ->where(fn (Builder $query): Builder => $query->whereNull('project_id')->orWhere('project_id', $this->projectId))
+            // An instance is unscoped, or scoped to this row (Y-16, D-93).
+            ->where(fn (Builder $query): Builder => $query->whereNull('proposal_location_id')->orWhere('proposal_location_id', $this->locationId))
             ->with([
                 'result:id,statement,type,proposal_id,program_id',
                 'result.proposal:id,name,slug',

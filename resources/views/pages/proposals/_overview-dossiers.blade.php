@@ -162,16 +162,16 @@
 
                                 {{-- Projects --}}
                                 <div class="min-w-0" data-connection="projects">
-                                    <p class="type-label {{ $mutedText }}">{{ __('common.projects') }} <span class="tabular-nums">· {{ $proposal->projects->count() }}</span></p>
-                                    @if ($proposal->projects->isEmpty())
+                                    <p class="type-label {{ $mutedText }}">{{ __('common.projects') }} <span class="tabular-nums">· {{ $proposal->locations->count() }}</span></p>
+                                    @if ($proposal->locations->isEmpty())
                                         <p class="mt-2 text-sm {{ $mutedText }}">{{ __('proposals.no_projects_linked') }}</p>
                                     @else
                                         <ul class="relative mt-1 flex flex-col" role="list">
                                             <span class="absolute start-[0.1875rem] top-4 bottom-4 w-px bg-secondary-soft dark:bg-line-strong" aria-hidden="true"></span>
-                                            @foreach ($proposal->projects as $project)
+                                            @foreach ($proposal->locations as $project)
                                                 <li class="relative flex min-h-9 items-center gap-x-2.5 gap-y-0.5 py-1 ps-5" wire:key="proposal-{{ $proposal->id }}-project-{{ $project->id }}">
                                                     <span class="absolute start-0 size-2 rounded-full border-2 border-secondary-dark bg-white dark:border-ink-muted dark:bg-surface-1" aria-hidden="true"></span>
-                                                    <a href="{{ route('projects.show', $project) }}" wire:navigate class="min-w-0 text-sm leading-snug font-semibold underline-offset-4 hover:underline {{ $inkText }}">{{ $project->name }}</a>
+                                                    <a href="{{ route('projects.show', $project) }}" wire:navigate class="min-w-0 text-sm leading-snug font-semibold underline-offset-4 hover:underline {{ $inkText }}">{{ $project->headline() }} <span class="type-meta">· {{ $project->label() }}</span></a>
                                                     <span class="shrink-0 text-[11px] {{ $mutedText }}">{{ $project->status->label() }}</span>
                                                 </li>
                                             @endforeach

@@ -1,10 +1,13 @@
 <?php
 
 return [
-    'search_reports' => 'Search open reports',
+    'search_reports' => 'Search reports',
     'search_placeholder' => 'Name, place or proposal',
     'tab_needs' => 'Needs me',
     'tab_all' => 'All',
+    'tab_done' => 'Done',
+    'none_done' => 'No finished reports',
+    'none_done_body' => 'Reports that are validated, approved or submitted appear here.',
     'type' => 'Type',
     'all_types' => 'All types',
     'more_filters' => 'More filters',

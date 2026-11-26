@@ -5,6 +5,7 @@ use App\Models\Donor;
 use App\Models\DonorProposal;
 use App\Models\Program;
 use App\Models\Project;
+use App\Models\Proposal;
 use App\Models\Task;
 use App\Models\User;
 use Livewire\Livewire;
@@ -32,6 +33,19 @@ test('"what is late?" lists every late item the viewer may see, worst first', fu
         ->and(array_column($results['groups'][0]['items'], 'label'))->toBe(['Very late', 'Slightly late']);
 });
 
+/**
+ * The proposal part of each Ask result label: a place is listed as
+ * "<proposal> · <place>" (Y-16, D-93), and these tests are about the name
+ * the search matched.
+ *
+ * @param  array<int, array{label: string}>  $items
+ * @return list<string>
+ */
+function askNames(array $items): array
+{
+    return array_map(fn (array $item): string => trim(explode(' · ', $item['label'])[0]), $items);
+}
+
 test('"money" answers per currency only for people who see funding agreements and transfers', function () {
     DonorProposal::factory()->create(['budget' => 1000, 'currency' => Currency::Usd]);
 
@@ -40,10 +54,10 @@ test('"money" answers per currency only for people who see funding agreements an
 });
 
 test('names find projects and donors the viewer may open, and never the others', function () {
-    Project::factory()->create(['name' => 'Aleppo Wells']);
+    rowFor(Project::factory()->create(['name' => 'Aleppo Wells']), Proposal::factory()->running()->create(['name' => 'Aleppo Wells']));
     Donor::factory()->create(['name' => 'Aleppo Foundation']);
 
-    $labels = fn (User $user): array => collect(askAs($user, 'aleppo')['groups'])->flatMap(fn (array $group) => array_column($group['items'], 'label'))->all();
+    $labels = fn (User $user): array => collect(askAs($user, 'aleppo')['groups'])->flatMap(fn (array $group) => askNames($group['items']))->all();
 
     expect($labels(User::factory()->role('Financial')->create()))->toContain('Aleppo Wells', 'Aleppo Foundation')
         ->and($labels(User::factory()->role('Team Member')->create()))->toContain('Aleppo Wells')->not->toContain('Aleppo Foundation');
@@ -90,7 +104,7 @@ test('"my tasks this week" lists only my open tasks due within seven days', func
 });
 
 test('"how many projects" counts only what the viewer may see', function () {
-    Project::factory()->count(3)->create();
+    Project::factory()->count(3)->create()->each(fn (Project $project) => rowFor($project));
 
     expect(askAs(User::factory()->role('Super Admin')->create(), 'how many projects')['answers'][0]['title'])->toBe('3 projects')
         ->and(askAs(User::factory()->create(), 'how many projects')['answers'][0]['title'])->toBe('0 projects');
@@ -119,27 +133,27 @@ test('English typed on the Arabic keyboard layout finds what it meant, and says 
 });
 
 test('Arabic typed on the English keyboard layout finds what it meant', function () {
-    Project::factory()->create(['name' => 'حلب']);
+    rowFor(Project::factory()->create(['name' => 'حلب']), Proposal::factory()->running()->create(['name' => 'حلب']));
 
     $results = askAs(User::factory()->role('Super Admin')->create(), 'pgf');
 
     expect($results['corrected'])->toBe('حلب')
-        ->and(array_column(collect($results['groups'])->firstWhere('name', __('common.projects'))['items'], 'label'))->toBe(['حلب']);
+        ->and(askNames(collect($results['groups'])->firstWhere('name', __('common.projects'))['items']))->toBe(['حلب']);
 });
 
 test('a query that already finds something is never swapped to the other layout', function () {
-    Project::factory()->create(['name' => 'Aleppo Wells']);
+    rowFor(Project::factory()->create(['name' => 'Aleppo Wells']), Proposal::factory()->running()->create(['name' => 'Aleppo Wells']));
 
     expect(askAs(User::factory()->role('Super Admin')->create(), 'aleppo')['corrected'])->toBeNull();
 });
 
 test('mixed text typed partly on the wrong layout is read word by word', function () {
-    Project::factory()->create(['name' => 'Aleppo Wells']);
+    rowFor(Project::factory()->create(['name' => 'Aleppo Wells']), Proposal::factory()->running()->create(['name' => 'Aleppo Wells']));
 
     $results = askAs(User::factory()->role('Super Admin')->create(), 'شمثححخ wells');
 
     expect($results['corrected'])->toBe('aleppo wells')
-        ->and(array_column(collect($results['groups'])->firstWhere('name', __('common.projects'))['items'], 'label'))->toBe(['Aleppo Wells']);
+        ->and(askNames(collect($results['groups'])->firstWhere('name', __('common.projects'))['items']))->toBe(['Aleppo Wells']);
 });
 
 test('the other layout wins when the typed text only finds weaker matches', function () {
@@ -149,31 +163,31 @@ test('the other layout wins when the typed text only finds weaker matches', func
 });
 
 test('Arabic names are found whatever form of alef, taa marbuta or yaa is typed', function (string $typed) {
-    Project::factory()->create(['name' => 'مدرسة الإغاثة في مستشفى']);
+    rowFor(Project::factory()->create(['name' => 'مدرسة الإغاثة في مستشفى']), Proposal::factory()->running()->create(['name' => 'مدرسة الإغاثة في مستشفى']));
 
-    $labels = array_column(collect(askAs(User::factory()->role('Super Admin')->create(), $typed)['groups'])->firstWhere('name', __('common.projects'))['items'] ?? [], 'label');
+    $labels = askNames(collect(askAs(User::factory()->role('Super Admin')->create(), $typed)['groups'])->firstWhere('name', __('common.projects'))['items'] ?? []);
 
     expect($labels)->toBe(['مدرسة الإغاثة في مستشفى']);
 })->with(['مدرسة', 'مدرسه', 'اغاثه', 'إغاثة', 'مستشفي']);
 
 test('a word one typo from a module name is also searched as a name', function () {
-    Project::factory()->create(['name' => 'آبار حلب']);
+    rowFor(Project::factory()->create(['name' => 'آبار حلب']), Proposal::factory()->running()->create(['name' => 'آبار حلب']));
 
     $results = askAs(User::factory()->role('Super Admin')->create(), 'ابار');
 
-    expect(array_column(collect($results['groups'])->firstWhere('name', __('common.projects'))['items'] ?? [], 'label'))->toBe(['آبار حلب']);
+    expect(askNames(collect($results['groups'])->firstWhere('name', __('common.projects'))['items'] ?? []))->toBe(['آبار حلب']);
 });
 
 test('names stored with tashkeel are found without it', function () {
-    Project::factory()->create(['name' => 'مَدْرَسَة الأمل']);
+    rowFor(Project::factory()->create(['name' => 'مَدْرَسَة الأمل']), Proposal::factory()->running()->create(['name' => 'مَدْرَسَة الأمل']));
 
     $results = askAs(User::factory()->role('Super Admin')->create(), 'مدرسة');
 
-    expect(array_column(collect($results['groups'])->firstWhere('name', __('common.projects'))['items'] ?? [], 'label'))->toBe(['مَدْرَسَة الأمل']);
+    expect(askNames(collect($results['groups'])->firstWhere('name', __('common.projects'))['items'] ?? []))->toBe(['مَدْرَسَة الأمل']);
 });
 
 test('a correct Arabic search that finds a record is never swapped for a page match', function () {
-    Project::factory()->create(['name' => 'حلب']);
+    rowFor(Project::factory()->create(['name' => 'حلب']), Proposal::factory()->running()->create(['name' => 'حلب']));
 
     expect(askAs(User::factory()->role('Super Admin')->create(), 'حلب')['corrected'])->toBeNull();
 });

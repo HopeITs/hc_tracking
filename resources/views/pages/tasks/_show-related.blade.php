@@ -1,17 +1,17 @@
-{{-- The "Related to" card on ⚡show.blade.php, under Details: what the task belongs to and why it exists. Each source shows its own facts (a proposal its donor and dates, a project its program and dates, a program its manager); the source loads its relations in task(). The name links to the record for whoever may open it. --}}
+{{-- The "Related to" card on ⚡show.blade.php, under Details: what the task belongs to and why it exists. Each source shows its own facts (a proposal its donor and dates, a place its program and dates, a program its manager); the source loads its relations in task(). The name links to the record for whoever may open it. Y-16 (D-93): a delivery task belongs to a **place**. --}}
 @use('App\Enums\TaskKind')
 @php
     $relatedSource = $this->task->source;
     $relatedUrl = match (true) {
         $relatedSource instanceof \App\Models\Proposal => route('proposals.show', $relatedSource),
-        $relatedSource instanceof \App\Models\Project => route('projects.show', $relatedSource),
+        $relatedSource instanceof \App\Models\ProposalLocation => route('projects.show', $relatedSource),
         $relatedSource instanceof \App\Models\Program => route('programs.show', $relatedSource),
         default => null,
     };
     $relatedUrl = $relatedUrl !== null && auth()->user()->can('view', $relatedSource) ? $relatedUrl : null;
     $relatedType = match (true) {
         $relatedSource instanceof \App\Models\Proposal => __('tasks.related.proposal'),
-        $relatedSource instanceof \App\Models\Project => __('tasks.related.project'),
+        $relatedSource instanceof \App\Models\ProposalLocation => __('tasks.related.project'),
         $relatedSource instanceof \App\Models\Program => __('tasks.related.program'),
         default => null,
     };
@@ -32,13 +32,13 @@
             $relatedRows[] = [__('tasks.related.actual_end'), $formatDate($relatedSource->effectiveDateEnd())];
         }
 
-        if ($relatedSource->projects->isNotEmpty()) {
-            $relatedRows[] = [__('tasks.related.projects'), $relatedSource->projects->pluck('name')->join(', ')];
+        if ($relatedSource->locations->isNotEmpty()) {
+            $relatedRows[] = [__('tasks.related.projects'), $relatedSource->locations->map(fn ($place): string => $place->label())->join(', ')];
         }
-    } elseif ($relatedSource instanceof \App\Models\Project) {
+    } elseif ($relatedSource instanceof \App\Models\ProposalLocation) {
         $relatedRows = [
             [__('tasks.related.program'), $relatedSource->program?->name ?? '—'],
-            [__('tasks.related.manager'), $relatedSource->user?->name ?? '—'],
+            [__('tasks.related.manager'), $relatedSource->responsible?->name ?? '—'],
             [__('tasks.related.city'), $relatedSource->city?->name ?? '—'],
             [__('tasks.related.start'), $formatDate($relatedSource->start_date)],
             [__('tasks.related.end'), $formatDate($relatedSource->end_date)],
@@ -48,19 +48,19 @@
             $relatedRows[] = [__('tasks.related.beneficiaries'), number_format((int) $relatedSource->target_beneficiaries)];
         }
 
-        if ($relatedSource->proposals->isNotEmpty()) {
-            $relatedRows[] = [__('tasks.related.proposals'), $relatedSource->proposals->pluck('name')->join(', ')];
-            $donorNames = $relatedSource->proposals->pluck('donor.name')->filter()->unique();
+        // A row is of exactly one proposal (D-93).
+        if ($relatedSource->proposal !== null) {
+            $relatedRows[] = [__('tasks.related.proposals'), $relatedSource->proposal->name];
 
-            if ($donorNames->isNotEmpty()) {
-                $relatedRows[] = [__('tasks.related.donor'), $donorNames->join(', ')];
+            if ($relatedSource->proposal->donor?->name !== null) {
+                $relatedRows[] = [__('tasks.related.donor'), $relatedSource->proposal->donor->name];
             }
         }
     } elseif ($relatedSource instanceof \App\Models\Program) {
         $relatedRows = [
             [__('tasks.related.manager'), $relatedSource->manager?->name ?? '—'],
             [__('tasks.related.strategy'), $relatedSource->strategy?->name ?? '—'],
-            [__('tasks.related.projects_count'), (string) $relatedSource->projects_count],
+            [__('tasks.related.projects_count'), (string) $relatedSource->locations_count],
         ];
     }
 

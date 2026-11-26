@@ -12,7 +12,6 @@
     $countFor = [
         'indicators' => count($node['indicators']),
         'activities' => count($node['activities']),
-        'risks' => count($node['risks']),
         'assumptions' => count($node['assumptions']),
     ];
 @endphp

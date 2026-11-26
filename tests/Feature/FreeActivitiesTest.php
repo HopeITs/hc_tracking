@@ -58,7 +58,10 @@ test('a MEAL officer sees free activities but no button to add one', function ()
 test('a proposal framework lists an activity linked to no output among those still needing one', function () {
     $program = Program::factory()->create();
     $proposal = Proposal::factory()->create(['status' => ProposalStatus::ConceptNote]);
-    $proposal->projects()->attach(Project::factory()->create(['program_id' => $program->id]));
+    $project = Project::factory()->create(['program_id' => $program->id]);
+    $proposal->projects()->attach($project);
+    // Y-16 (D-93): the proposal's programs are read from its places.
+    proposalRowForProject($proposal, $project);
 
     $tab = Livewire::actingAs(mealManager())->test('proposals.logframe', ['proposalId' => $proposal->id]);
 

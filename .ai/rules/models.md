@@ -6,6 +6,7 @@ paths:
   - app/Models/Program.php
   - app/Models/User.php
   - app/Models/Task.php
+  - app/Models/Risk.php
 ---
 
 # Models
@@ -66,3 +67,6 @@ Sort-by-assignee (`orderByAssigneeName` in `app/Livewire/Concerns/Tasks/FiltersT
 
 ## Tracked models record activity through TracksActivity + RecordsActivity
 Any model activity is recorded against implements App\Notifications\TracksActivity and uses App\Concerns\RecordsActivity (child rows like assignees/files use RecordsParentActivity and record on their parent). activityEvents() lists meaningful fields → event suffix; other field changes log as "{type}.updated" without notifying. Its morph key must be in AppServiceProvider::configureMorphMap() and MorphMapTest. Read attributes via activityAttribute() (strict mode), never lazy-load relations in activity hooks.
+
+## Risk scopes and copied risks
+Use Risk::onProgram($id) and Risk::onLogframeOf($id) (the latter excludes register/location risks). isCopied() means copied_from_id is set: copied risks are remove-only. activityProgramId() prefers program_id.

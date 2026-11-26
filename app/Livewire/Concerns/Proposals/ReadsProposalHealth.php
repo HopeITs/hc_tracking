@@ -11,8 +11,8 @@ use App\Models\Donor;
 use App\Models\DonorProposal;
 use App\Models\DonorReport;
 use App\Models\PlanIndicator;
-use App\Models\Project;
 use App\Models\Proposal;
+use App\Models\ProposalLocation;
 use App\Models\Report;
 use App\Models\Task;
 use Carbon\CarbonImmutable;
@@ -158,7 +158,7 @@ trait ReadsProposalHealth
                 'project-'.$project->id,
                 'project',
                 $project->end_date,
-                __('proposals.project_ends', ['project' => $project->name]),
+                __('proposals.project_ends', ['project' => $project->headline()]),
                 $project->program->name,
                 route('projects.show', $project),
                 'projects',
@@ -293,7 +293,7 @@ trait ReadsProposalHealth
             ];
         }
 
-        $outrunning = $this->projects->filter(fn (Project $project): bool => $project->end_date !== null
+        $outrunning = $this->projects->filter(fn (ProposalLocation $project): bool => $project->end_date !== null
             && $this->proposal->planned_date_end !== null
             && $project->end_date->gt($this->proposal->planned_date_end))->count();
 

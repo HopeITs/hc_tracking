@@ -7,9 +7,9 @@ namespace App\Notifications\Alerts;
 use App\Enums\NotificationPriority;
 use App\Enums\Period;
 use App\Models\Indicator;
-use App\Models\Project;
 use App\Notifications\EmployeeRecipients;
 use App\Notifications\RecipientResolver;
+use App\Support\Locations\ProjectSuccessor;
 use Carbon\CarbonImmutable;
 
 /**
@@ -102,12 +102,27 @@ final class OffTrackIndicatorScanner implements Scanner
     }
 
     /**
+     * The owner of each place a target is committed at (Y-16, D-93). A target
+     * that still carries only a project is answered by the row that took that
+     * project over (D-94).
+     *
      * @param  list<int>  $projectIds
      * @return array<int, int> project id => owner user id
      */
     private function ownerUsers(array $projectIds): array
     {
-        $ownerEmployees = Project::query()->whereIn('id', $projectIds)->pluck('user_id', 'id')->map(fn ($id): int => (int) $id)->all();
+        $successor = app(ProjectSuccessor::class);
+        $ownerEmployees = [];
+
+        foreach ($projectIds as $projectId) {
+            $row = $successor->rowFor($projectId);
+            $employeeId = $row?->responsible_employee_id;
+
+            if ($employeeId !== null) {
+                $ownerEmployees[$projectId] = (int) $employeeId;
+            }
+        }
+
         $users = $this->employees->usersFor(array_values($ownerEmployees));
 
         return array_filter(array_map(fn (int $employeeId): ?int => $users[$employeeId] ?? null, $ownerEmployees));

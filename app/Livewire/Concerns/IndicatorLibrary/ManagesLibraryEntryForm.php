@@ -15,7 +15,7 @@ use App\Enums\IndicatorCollector;
 use App\Enums\IndicatorMeasure;
 use App\Models\LibraryIndicator;
 use App\Models\Program;
-use App\Models\Project;
+use App\Models\ProposalLocation;
 use App\Models\Result;
 use App\Support\ProposalFramework;
 use Flux\Flux;
@@ -56,7 +56,7 @@ trait ManagesLibraryEntryForm
     public ?int $entryProposalId = null;
 
     #[Locked]
-    public ?int $entryProjectId = null;
+    public ?int $entryLocationId = null;
 
     /**
      * The form, keyed by library_indicators column, plus `institutional`.
@@ -111,7 +111,7 @@ trait ManagesLibraryEntryForm
         $this->showEntryModal = true;
     }
 
-    protected function openEntryForResult(?Result $result, ?int $proposalId = null, ?int $projectId = null): void
+    protected function openEntryForResult(?Result $result, ?int $proposalId = null, ?int $locationId = null): void
     {
         if (Gate::denies('indicators.create')) {
             Gate::authorize('viewAny', LibraryIndicator::class);
@@ -124,7 +124,7 @@ trait ManagesLibraryEntryForm
         $this->resetEntryForm();
         $this->attachingEntry = true;
         $this->entryProposalId = $result?->proposal_id ?? $proposalId;
-        $this->entryProjectId = $projectId;
+        $this->entryLocationId = $locationId;
         $this->entryResultId = (string) ($result?->id ?? '');
         $this->fixedEntryResultId = $result?->id;
         $this->showEntryModal = true;
@@ -163,8 +163,8 @@ trait ManagesLibraryEntryForm
             ->when($this->fixedEntryResultId !== null, fn (Builder $query) => $query->whereKey($this->fixedEntryResultId))
             ->when($this->entryProposalId !== null, fn (Builder $query) => $query->proposalFramework($this->entryProposalId))
             ->when($this->entryProposalId === null && Gate::denies('proposals.view'), fn (Builder $query) => $query->programFramework())
-            ->when($this->entryProjectId !== null, function (Builder $query): void {
-                $programId = Project::query()->findOrFail($this->entryProjectId)->program_id;
+            ->when($this->entryLocationId !== null, function (Builder $query): void {
+                $programId = ProposalLocation::query()->findOrFail($this->entryLocationId)->program_id;
                 $query->where(fn (Builder $scope) => $scope->whereNull('program_id')->orWhere('program_id', $programId));
             });
     }
@@ -212,7 +212,7 @@ trait ManagesLibraryEntryForm
             return;
         }
 
-        $this->writeAttachedEntry(fn (Result $result) => app(AttachLibraryIndicatorToResult::class)->forResult($result, $libraryIndicatorId, $this->entryProjectId));
+        $this->writeAttachedEntry(fn (Result $result) => app(AttachLibraryIndicatorToResult::class)->forResult($result, $libraryIndicatorId, $this->entryLocationId));
     }
 
     public function openEditModal(int $libraryIndicatorId): void
@@ -258,7 +258,7 @@ trait ManagesLibraryEntryForm
     public function saveEntry(): void
     {
         if ($this->attachingEntry) {
-            $this->writeAttachedEntry(fn (Result $result) => app(SaveLibraryIndicator::class)->createForResult($result, $this->entryInput(), $this->entryProjectId));
+            $this->writeAttachedEntry(fn (Result $result) => app(SaveLibraryIndicator::class)->createForResult($result, $this->entryInput(), $this->entryLocationId));
 
             return;
         }
@@ -430,7 +430,7 @@ trait ManagesLibraryEntryForm
         $this->resetValidation();
         $this->attachingEntry = false;
         $this->entryProposalId = null;
-        $this->entryProjectId = null;
+        $this->entryLocationId = null;
         $this->entryResultId = '';
         $this->fixedEntryResultId = null;
         $this->entrySearch = '';

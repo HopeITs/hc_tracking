@@ -227,7 +227,7 @@ trait ReadsProposalAttention
             foreach ($this->projects as $project) {
                 if ($grantEnd !== null && $project->end_date !== null && $project->end_date->gt($grantEnd)) {
                     $over = (int) $grantEnd->diffInDays($project->end_date);
-                    $push('project-outrun-'.$project->id, 'projects', true, __('proposals.attention.project_outrun', ['project' => $project->name, 'end' => $project->end_date->translatedFormat(__('formats.date')), 'grant' => $grantEnd->translatedFormat(__('formats.date'))]), trans_choice('proposals.attention.days_over', $over, ['count' => $over]), ['label' => __('proposals.attention.fix_open'), 'url' => route('projects.show', $project)], 'card');
+                    $push('project-outrun-'.$project->id, 'projects', true, __('proposals.attention.project_outrun', ['project' => $project->headline(), 'end' => $project->end_date->translatedFormat(__('formats.date')), 'grant' => $grantEnd->translatedFormat(__('formats.date'))]), trans_choice('proposals.attention.days_over', $over, ['count' => $over]), ['label' => __('proposals.attention.fix_open'), 'url' => route('projects.show', $project)], 'card');
                 }
             }
 
@@ -395,7 +395,7 @@ trait ReadsProposalAttention
 
         return $this->attentionFrameworkMemo = [
             'unmeasured' => $results->filter(fn (Result $result): bool => in_array($result->type, [ResultType::Outcome, ResultType::Output], true) && $result->indicators_count === 0)->values(),
-            'happened' => Risk::query()->select(['id', 'name', 'proposal_id'])->where('proposal_id', $this->proposalId)->where('happened', true)->get(),
+            'happened' => Risk::query()->select(['id', 'name', 'proposal_id'])->onLogframeOf($this->proposalId)->where('happened', true)->get(),
             'indicatorCount' => $indicators->count(),
             'noTarget' => $indicators->whereNull('target')->count(),
             'loose' => $results->filter(fn (Result $result): bool => $result->type === ResultType::Activity && $result->parent_id === null)->count(),

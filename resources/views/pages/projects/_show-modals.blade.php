@@ -34,7 +34,7 @@
         permanent
         wire:model="confirmingFileDelete"
         :title="__('projects.delete_this_file')"
-        :message="$deletingFileId !== null && ($deletingMedia = $this->project->media->firstWhere('id', $deletingFileId)) !== null ? __('projects.deleting_the_file_also_removes_it_from_storage', ['name' => $deletingMedia->original_name]) : null"
+        :message="$deletingFileId !== null && ($deletingMedia = $this->location->media->firstWhere('id', $deletingFileId)) !== null ? __('projects.deleting_the_file_also_removes_it_from_storage', ['name' => $deletingMedia->original_name]) : null"
         confirm="deleteFile"
         :confirm-label="__('projects.delete_this_file')"
         confirm-test="confirm-delete-project-file"

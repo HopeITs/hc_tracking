@@ -45,10 +45,10 @@
                         x-show="find === '' || {{ Js::from($projectText) }}.includes(find.trim().toLowerCase())">
                         <p class="px-3 pt-1 text-[11px] font-bold tracking-wide text-secondary-medium uppercase dark:text-ink-muted">{{ $project['name'] }}</p>
 
-                        <label class="{{ $optionClasses }}" data-move-target="project:{{ $project['id'] }}">
-                            <input type="radio" wire:model="moveTarget" value="project:{{ $project['id'] }}" class="{{ $radioClasses }}" />
+                        <label class="{{ $optionClasses }}" data-move-target="location:{{ $project['id'] }}">
+                            <input type="radio" wire:model="moveTarget" value="location:{{ $project['id'] }}" class="{{ $radioClasses }}" />
                             <span class="min-w-0 truncate">{{ __('tasks.move_whole_project') }}</span>
-                            @if ($currentTarget === 'project:'.$project['id'])
+                            @if ($currentTarget === 'location:'.$project['id'])
                                 {!! $currentBadge !!}
                             @endif
                         </label>

@@ -29,13 +29,13 @@ new class extends Component {
     #[Locked]
     public ?int $proposalId = null;
 
-    public function mount(?int $proposalId = null, ?int $initialResultId = null, bool $openOnLoad = false, ?int $initialProjectId = null): void
+    public function mount(?int $proposalId = null, ?int $initialResultId = null, bool $openOnLoad = false, ?int $initialLocationId = null): void
     {
         $this->proposalId = $proposalId;
 
         if ($openOnLoad && auth()->user()?->can('indicators.create')) {
             $result = $initialResultId === null ? null : Result::query()->findOrFail($initialResultId);
-            $this->openEntryForResult($result, $proposalId, $initialProjectId);
+            $this->openEntryForResult($result, $proposalId, $initialLocationId);
         }
     }
 

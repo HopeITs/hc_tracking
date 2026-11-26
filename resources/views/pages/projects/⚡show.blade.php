@@ -1,7 +1,7 @@
 <?php
 
 use App\Actions\Projects\CloseProject;
-use App\Actions\Targets\ScopeIndicatorToProject;
+use App\Actions\Targets\ScopeIndicatorToLocation;
 use App\Enums\ProjectStatus;
 use App\Livewire\Concerns\AddsQuickTask;
 use App\Livewire\Concerns\ChecksFinanceVisibility;
@@ -14,9 +14,12 @@ use App\Livewire\Concerns\Projects\ReadsProjectDelivery;
 use App\Livewire\Concerns\Projects\ReadsProjectFunding;
 use App\Livewire\Concerns\Projects\ReadsProjectStory;
 use App\Enums\AssignmentStatus;
+use App\Models\HrCenter;
 use App\Models\HrEmployee;
 use App\Models\Program;
 use App\Models\Project;
+use App\Models\ProposalLocation;
+use App\Support\Locations\LocationFromSlug;
 use Flux\Flux;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Database\QueryException;
@@ -45,8 +48,12 @@ new #[Layout('layouts::desk'), Title('titles.project')] class extends Component 
     use ReadsProjectStory;
     use WithFileUploads;
 
+    /**
+     * The location row this page shows (Y-16, D-93). One entry on the
+     * Projects screen is one row of one proposal.
+     */
     #[Locked]
-    public int $projectId;
+    public int $locationId;
 
     #[Url(except: 'tasks')]
     public string $tab = 'tasks';
@@ -62,11 +69,27 @@ new #[Layout('layouts::desk'), Title('titles.project')] class extends Component 
     #[Url(as: 'respond', except: '')]
     public string $respond = '';
 
-    public function mount(Project $project): void
+    /**
+     * The URL slug is resolved here rather than by implicit binding, because
+     * an old project slug must redirect to the row that took it over (D-94)
+     * instead of 404ing.
+     */
+    public function mount(string $project): mixed
     {
-        $this->projectId = $project->id;
+        $resolver = app(LocationFromSlug::class);
+        $row = $resolver->row($project);
 
-        $assignment = $project->currentAssignment('user_id');
+        if ($row === null) {
+            $successor = $resolver->successorOfProjectSlug($project);
+
+            abort_if($successor === null, 404);
+
+            return $this->redirectRoute('projects.show', [$successor, ...request()->query()], navigate: false);
+        }
+
+        $this->locationId = $row->id;
+
+        $assignment = $row->currentOwnerAssignment();
 
         if ($assignment !== null && Auth::user() !== null && $assignment->status === AssignmentStatus::Pending && $assignment->isFor(Auth::user())) {
             $assignment->markSeen();
@@ -78,7 +101,9 @@ new #[Layout('layouts::desk'), Title('titles.project')] class extends Component 
 
         $this->respond = '';
 
-        $this->section = $this->resolveSection($project);
+        $this->section = $this->resolveSection($row);
+
+        return null;
     }
 
     /**
@@ -87,7 +112,7 @@ new #[Layout('layouts::desk'), Title('titles.project')] class extends Component 
      * proposal opens Funding; otherwise a running project opens on its work
      * and every other one on its overview.
      */
-    private function resolveSection(Project $project): string
+    private function resolveSection(ProposalLocation $row): string
     {
         if (in_array($this->section, ['overview', 'work', 'funding', 'files'], true)) {
             return $this->section;
@@ -97,7 +122,7 @@ new #[Layout('layouts::desk'), Title('titles.project')] class extends Component 
             in_array($this->tab, ['files', 'activity'], true) => 'files',
             $this->tab === 'proposals', $this->storyProposal !== '', request()->query('ptab') !== null => 'funding',
             $this->tab !== 'tasks' => 'work',
-            $project->status === ProjectStatus::Active => 'work',
+            $row->status === ProjectStatus::Active => 'work',
             default => 'overview',
         };
     }
@@ -107,7 +132,7 @@ new #[Layout('layouts::desk'), Title('titles.project')] class extends Component 
 
     public function confirmClose(): void
     {
-        Gate::authorize('update', Project::query()->findOrFail($this->projectId));
+        Gate::authorize('update', $this->location);
 
         $this->showCloseModal = true;
     }
@@ -119,7 +144,7 @@ new #[Layout('layouts::desk'), Title('titles.project')] class extends Component 
     public function closeProject(): void
     {
         try {
-            app(CloseProject::class)->handle(Project::query()->findOrFail($this->projectId));
+            app(CloseProject::class)->handle($this->writableProject());
         } catch (ValidationException $exception) {
             $this->showCloseModal = false;
             Flux::toast(variant: 'danger', text: $exception->validator->errors()->first());
@@ -162,7 +187,7 @@ new #[Layout('layouts::desk'), Title('titles.project')] class extends Component 
      */
     protected function resetPage(): void
     {
-        unset($this->project, $this->story, $this->attachedProposals, $this->fundingHistory, $this->planSummary, $this->canStartConceptNote, $this->embeddedProposalId);
+        unset($this->location, $this->story, $this->attachedProposals, $this->fundingHistory, $this->planSummary, $this->canStartConceptNote, $this->embeddedProposalId);
     }
 
     /**
@@ -173,45 +198,46 @@ new #[Layout('layouts::desk'), Title('titles.project')] class extends Component 
     {
         Gate::authorize('indicators.update');
 
-        app(ScopeIndicatorToProject::class)->handle(Project::query()->findOrFail($this->projectId), $indicatorId);
+        app(ScopeIndicatorToLocation::class)->handle($this->location, $indicatorId);
 
         unset($this->projectIndicators);
 
         Flux::toast(variant: 'success', text: __('projects.indicator_scoped'));
     }
 
+    /**
+     * The project this row still carries, for the write buttons only.
+     *
+     * This slice moves the page's reads to the row; its writes (edit, archive,
+     * restore, close, reopen, files, acknowledge) still call the project
+     * actions and the mirror keeps the row in step. Y-17 flips them.
+     */
+    protected function writableProject(): Project
+    {
+        return Project::query()->findOrFail($this->location->project_id);
+    }
+
+    /**
+     * The location row this page reads, with everything it shows off it: the
+     * status, the period, the calendar, the five beneficiary figures, the
+     * description, its sectors, its files and its responsible's appointment
+     * (all Y-11), and its place through `label()`.
+     */
     #[Computed]
-    public function project(): Project
+    public function location(): ProposalLocation
     {
         $hiddenCollections = $this->hiddenCollections();
 
-        return Project::query()
-            ->select([
-                'id',
-                'name',
-                'description',
-                'status',
-                'start_date',
-                'end_date',
-                'schedule_weekend',
-                'target_beneficiaries',
-                'target_men',
-                'target_women',
-                'target_boys',
-                'target_girls',
-                'city_id',
-                'center_id',
-                'host_center_id',
-                'program_id',
-                'user_id',
-                'updated_at',
-            ])
+        return ProposalLocation::query()
             ->with([
-                'city:id,name_en,name_ar',
+                // A row is of one proposal (D-93), so its funding is that one.
+                'proposal:id,name,slug,status,donor_id',
+                'city',
                 'program:id,strategy_id',
                 'program.strategy:id,name',
-                'user:id,first_name_en,last_name_en,first_name_ar,last_name_ar',
-                'proposals:proposals.id,proposals.status',
+                'centers',
+                'responsible:id,first_name_en,last_name_en,first_name_ar,last_name_ar',
+                'project:id,slug',
                 'sectors' => fn ($query) => $query->select(['sectors.id', 'sectors.name_ar', 'sectors.name_en', 'sectors.is_active'])->ordered(),
                 'ownerAssignment',
                 'media' => fn ($query) => $query
@@ -222,11 +248,10 @@ new #[Layout('layouts::desk'), Title('titles.project')] class extends Component 
                     ->orderByDesc('id'),
             ])
             ->withCount([
-                'planIndicators',
-                'proposals',
+                'targets',
                 'media' => fn ($query) => $query->whereNotIn('collection', $hiddenCollections),
             ])
-            ->findOrFail($this->projectId);
+            ->findOrFail($this->locationId);
     }
 
     /**
@@ -237,7 +262,7 @@ new #[Layout('layouts::desk'), Title('titles.project')] class extends Component 
      */
     protected function quickTaskSource(): array
     {
-        return ['type' => 'project', 'id' => $this->projectId];
+        return ['type' => 'proposal_location', 'id' => $this->locationId];
     }
 
     protected function quickTaskCreated(): void
@@ -254,14 +279,16 @@ new #[Layout('layouts::desk'), Title('titles.project')] class extends Component 
     #[Computed]
     public function centerSummary(): ?array
     {
-        $centerId = $this->project->center_id;
+        // A row may hold several centres (D-90); the header summarises the
+        // first, and `label()` names them all. A field-work row has none.
+        $centerId = $this->location->centerIds()[0] ?? null;
 
         if ($centerId === null) {
             return null;
         }
 
         try {
-            $center = $this->project->center();
+            $center = HrCenter::remembered($centerId);
         } catch (QueryException) {
             return ['id' => $centerId, 'name' => null, 'inactive' => false, 'unavailable' => true];
         }
@@ -280,7 +307,7 @@ new #[Layout('layouts::desk'), Title('titles.project')] class extends Component 
     {
         $tabs = [
             ['key' => 'tasks', 'label' => __('common.tasks'), 'count' => $this->tasks->count()],
-            ['key' => 'targets', 'label' => __('common.targets'), 'count' => $this->project->plan_indicators_count],
+            ['key' => 'targets', 'label' => __('common.targets'), 'count' => $this->location->targets_count],
         ];
 
         if ($this->canViewReportTemplate) {
@@ -380,7 +407,7 @@ new #[Layout('layouts::desk'), Title('titles.project')] class extends Component 
         close="cancelArchive"
         tone="neutral"
         :title="__('projects.archive_this_project')"
-        :message="$this->archivingProject !== null ? __('projects.archiving_keeps_everything', ['name' => $this->archivingProject['project']->name]) : null"
+        :message="$this->archivingProject !== null ? __('projects.archiving_keeps_everything', ['name' => $this->archivingProject['project']->headline()]) : null"
         confirm="archiveProject"
         :confirm-label="__('projects.archive_project')"
         confirm-test="confirm-archive-project"

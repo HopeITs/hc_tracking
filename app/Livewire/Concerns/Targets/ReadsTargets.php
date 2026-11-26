@@ -46,7 +46,7 @@ trait ReadsTargets
         $resultIds = $this->resultPage->pluck('result_id')->all();
 
         return $this->matchingTargets()
-            ->select(['id', 'source_type', 'source_id', 'indicator_id', 'target', 'project_id', 'period', 'updated_at'])
+            ->select(['id', 'source_type', 'source_id', 'indicator_id', 'target', 'project_id', 'proposal_location_id', 'period', 'updated_at'])
             ->selectRaw(PlanIndicator::achievedValueSql().' as actual_value')
             ->selectRaw(PlanIndicator::pendingValueSql().' as pending_value')
             ->selectRaw("(select count(*) from reports r where r.plan_indicator_id = plan_indicators.id and r.status = 'reviewed') as reviewed_count")
@@ -57,13 +57,17 @@ trait ReadsTargets
                 // the source was removed by a write that fired no model events.
                 'source' => fn (MorphTo $morphTo) => $morphTo->morphWith([
                     AnnualPlan::class => ['program:id'],
-                    // projects: which projects the proposal funds, for chainIssues().
-                    Proposal::class => [$this->donorRelation().':id,name', 'projects:id'],
+                    Proposal::class => [$this->donorRelation().':id,name'],
                 ]),
-                'indicator:id,name,result_id,project_id,measure,unit,baseline',
+                'indicator:id,name,result_id,project_id,proposal_location_id,measure,unit,baseline',
                 'indicator.result:id,statement,type,program_id,proposal_id',
-                'project:id,name,city_id,program_id',
-                'project.city:id,name_en,name_ar',
+                'location:id,proposal_id,project_id,city_id,program_id,city_wide',
+                'location.city',
+                'location.program',
+                'location.centers',
+                // The row names the place; its project only supplies the
+                // projects.show slug until Y-16 slice 2 binds the row.
+                'location.project:id,slug',
             ])
             ->withCount('reports')
             // Keep a result's indicators together so the page reads as groups.

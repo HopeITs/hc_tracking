@@ -13,7 +13,7 @@
                                     $money = $this->agreementMoney($agreement);
                                     $budget = (float) $agreement->budget;
                                     $agreementName = $agreement->donor->name.' · '.$agreement->proposal->name;
-                                    $projects = $agreement->proposal->projects;
+                                    $projects = $agreement->proposal->locations;
                                     $placed = $agreement->transfers->filter(fn ($transfer) => $transfer->scheduled_date !== null)->values();
                                     $offsets = $placed->map(fn ($transfer) => $this->monthOffset($calendar['start'], $transfer->scheduled_date));
                                     $lastReceived = $placed->filter(fn ($transfer) => $transfer->ar_status === \App\Enums\ArStatus::Received)->keys()->last();
@@ -228,7 +228,7 @@
                                                         <dd class="mt-1 flex flex-wrap gap-x-3 gap-y-1">
                                                             @forelse ($projects as $project)
                                                                 <a href="{{ route('projects.show', $project) }}" wire:navigate class="inline-flex items-center gap-1.5 font-bold underline-offset-4 hover:underline {{ $inkText }}" wire:key="agreement-{{ $agreement->id }}-project-{{ $project->id }}">
-                                                                    <span class="size-1.5 shrink-0 rounded-full border border-secondary-dark dark:border-ink-muted" aria-hidden="true"></span>{{ $project->name }}
+                                                                    <span class="size-1.5 shrink-0 rounded-full border border-secondary-dark dark:border-ink-muted" aria-hidden="true"></span>{{ $project->headline() }}
                                                                 </a>
                                                             @empty
                                                                 <span class="{{ $mutedText }}">{{ __('funding_agreements.no_projects_linked_yet') }}</span>

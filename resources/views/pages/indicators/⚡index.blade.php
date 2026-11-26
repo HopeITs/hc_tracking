@@ -10,8 +10,9 @@ use App\Livewire\Concerns\Indicators\ManagesIndicatorReadings;
 use App\Livewire\Concerns\Indicators\PresentsIndicators;
 use App\Livewire\Concerns\Indicators\SummarisesIndicators;
 use App\Models\Indicator;
-use App\Models\Project;
+use App\Models\ProposalLocation;
 use App\Models\Result;
+use App\Support\Locations\ProjectSuccessor;
 use Illuminate\Support\Facades\Gate;
 use Livewire\Attributes\Layout;
 use Livewire\Attributes\Locked;
@@ -71,7 +72,7 @@ new #[Layout('layouts::desk'), Title('titles.indicators')] class extends Compone
     public ?int $initialIndicatorResultId = null;
 
     #[Locked]
-    public ?int $initialIndicatorProjectId = null;
+    public ?int $initialIndicatorLocationId = null;
 
     #[Locked]
     public bool $openIndicatorEntryOnLoad = false;
@@ -96,22 +97,24 @@ new #[Layout('layouts::desk'), Title('titles.indicators')] class extends Compone
      *
      * `?create=<result id>` opens the indicator form already tied to that
      * statement (the results framework's "Add indicator");
-     * `?create=1&project=<project id>` opens it already scoped to that project
-     * (the project page's "New indicator"); `?inspect=<id>` opens one
-     * indicator's chain. Read once here rather than bound with #[Url], so
+     * `?create=1&location=<row id>` opens it already scoped to that location
+     * row (the project page's "New indicator", Y-16); `?inspect=<id>` opens
+     * one indicator's chain. Read once here rather than bound with #[Url], so
      * closing the dialog and refreshing does not reopen it.
+     *
+     * `?create=1&project=<project id>` still works: a saved link is answered
+     * by the row that took the project's place (ProjectSuccessor, D-94), the
+     * same courtesy Y-05 gave the matrix's `?center=`. Y-18 drops it.
      */
     public function mount(): void
     {
         $create = request()->integer('create');
-        $createForProject = request()->integer('project');
+        $createForLocation = $this->createLocationId();
 
         if ($create > 0 && Gate::allows('indicators.create')) {
-            if ($createForProject > 0) {
-                if (Project::query()->whereKey($createForProject)->exists()) {
-                    $this->openIndicatorEntryOnLoad = true;
-                    $this->initialIndicatorProjectId = $createForProject;
-                }
+            if ($createForLocation !== null) {
+                $this->openIndicatorEntryOnLoad = true;
+                $this->initialIndicatorLocationId = $createForLocation;
             } elseif (Result::query()->whereKey($create)->exists()) {
                 $this->openIndicatorEntryOnLoad = true;
                 $this->initialIndicatorResultId = $create;
@@ -123,6 +126,25 @@ new #[Layout('layouts::desk'), Title('titles.indicators')] class extends Compone
         if ($inspect > 0 && Indicator::query()->whereKey($inspect)->exists()) {
             $this->openInspectModal($inspect);
         }
+    }
+
+    /**
+     * The location row a `?create=1` deep link scopes the new indicator to:
+     * `?location=<row id>` directly, or the successor row of an old
+     * `?project=<project id>` link (D-94). Null when neither is given or the
+     * id matches nothing.
+     */
+    private function createLocationId(): ?int
+    {
+        $locationId = request()->integer('location');
+
+        if ($locationId > 0) {
+            return ProposalLocation::query()->whereKey($locationId)->exists() ? $locationId : null;
+        }
+
+        $projectId = request()->integer('project');
+
+        return $projectId > 0 ? app(ProjectSuccessor::class)->rowFor($projectId)?->id : null;
     }
 
     public function updatedSearch(): void
@@ -304,7 +326,7 @@ new #[Layout('layouts::desk'), Title('titles.indicators')] class extends Compone
     @include('pages.indicators._index-inspect-modal')
 
     @include('pages.indicators._index-form-modal')
-    <livewire:indicators.quick-form :initial-result-id="$initialIndicatorResultId" :initial-project-id="$initialIndicatorProjectId" :open-on-load="$openIndicatorEntryOnLoad" />
+    <livewire:indicators.quick-form :initial-result-id="$initialIndicatorResultId" :initial-location-id="$initialIndicatorLocationId" :open-on-load="$openIndicatorEntryOnLoad" />
 
     @include('pages.indicators._index-reading-modal')
 </x-desk.register>

@@ -127,7 +127,7 @@ test('a status sent with the form never reaches the project', function () {
     ]);
 
     Livewire::actingAs($this->user)->test('pages::projects.index')
-        ->call('openEditModal', $project->id)
+        ->call('openEditModal', rowFor($project)->id)
         ->set('status', 'archived')
         ->set('name', 'Renamed')
         ->call('saveProject')
@@ -137,7 +137,7 @@ test('a status sent with the form never reaches the project', function () {
 });
 
 test('the date inputs are not rendered for a draft', function () {
-    $draft = Project::factory()->create([
+    $draft = projectWithRow([
         'center_id' => $this->centerId,
         'city_id' => $this->cityId,
         'program_id' => $this->program->id,
@@ -150,7 +150,7 @@ test('the date inputs are not rendered for a draft', function () {
         ->assertDontSeeHtml('wire:model="startDate"')
         ->assertDontSeeHtml('wire:model="endDate"')
         ->call('closeProjectModal')
-        ->call('openEditModal', $draft->id)
+        ->call('openEditModal', rowFor($draft)->id)
         ->assertDontSeeHtml('wire:model="startDate"');
 });
 
@@ -163,7 +163,7 @@ test('the dates of an active project are editable', function () {
     ]);
 
     Livewire::actingAs($this->user)->test('pages::projects.index')
-        ->call('openEditModal', $project->id)
+        ->call('openEditModal', rowFor($project)->id)
         ->assertSeeHtml('wire:model="startDate"')
         ->set('startDate', '2026-03-01')
         ->set('endDate', '2027-02-28')
@@ -177,7 +177,7 @@ test('the dates of an active project are editable', function () {
 });
 
 test('editing a draft keeps its status and writes no dates', function () {
-    $project = Project::factory()->create([
+    $project = projectWithRow([
         'center_id' => $this->centerId,
         'city_id' => $this->cityId,
         'program_id' => $this->program->id,
@@ -185,7 +185,7 @@ test('editing a draft keeps its status and writes no dates', function () {
     ]);
 
     Livewire::actingAs($this->user)->test('pages::projects.index')
-        ->call('openEditModal', $project->id)
+        ->call('openEditModal', rowFor($project)->id)
         ->set('name', 'Renamed')
         ->call('saveProject')
         ->assertHasNoErrors();
@@ -217,7 +217,7 @@ test('restore is refused while another open project holds the center and program
         'city_id' => $this->cityId,
         'program_id' => $this->program->id,
     ]);
-    Project::factory()->create([
+    projectWithRow([
         'name' => 'Idlib Micro',
         'center_id' => $this->centerId,
         'city_id' => $this->cityId,
@@ -257,7 +257,7 @@ test('archiving keeps the dates for a later restore', function () {
 });
 
 test('the retire migration maps legacy submitted and approved projects', function () {
-    $row = fn (string $status, ?string $start) => Project::factory()->create([
+    $row = fn (string $status, ?string $start) => projectWithRow([
         'status' => $status,
         'start_date' => $start,
         'end_date' => $start === null ? null : '2027-01-01',
@@ -286,22 +286,25 @@ test('the retire migration maps legacy submitted and approved projects', functio
 });
 
 test('a draft with dates is only allowed behind a donor-approved proposal', function () {
-    $dated = Project::factory()->create(['start_date' => '2026-01-01', 'end_date' => '2026-12-31']);
-    $approved = Project::factory()->create(['start_date' => '2026-01-01', 'end_date' => '2026-12-31']);
+    $dated = projectWithRow(['start_date' => '2026-01-01', 'end_date' => '2026-12-31']);
+    $approved = projectWithRow(['start_date' => '2026-01-01', 'end_date' => '2026-12-31']);
     Proposal::factory()->create(['status' => ProposalStatus::Approved])->projects()->attach($approved->id);
 
     expect(draftsHoldingDatesWithoutApproval())->toBe([$dated->id]);
 });
 
 test('a draft project page shows the no-active-proposal badge', function () {
+    // Y-16, D-93: the badge reads the ONE proposal behind the row, so the row
+    // is built on a terminal proposal to have none in play, then on a live one.
     $draft = Project::factory()->create();
+    $row = rowFor($draft, Proposal::factory()->create(['status' => ProposalStatus::Rejected]));
 
-    Livewire::actingAs($this->user)->test('pages::projects.show', ['project' => $draft])
+    Livewire::actingAs($this->user)->test('pages::projects.show', ['project' => $row->slug])
         ->assertSeeHtml('data-test="no-active-proposal"');
 
-    Proposal::factory()->create(['status' => ProposalStatus::ProposalDraft])->projects()->attach($draft->id);
+    DB::table('proposals')->where('id', $row->proposal_id)->update(['status' => ProposalStatus::ProposalDraft->value]);
 
-    Livewire::actingAs($this->user)->test('pages::projects.show', ['project' => $draft])
+    Livewire::actingAs($this->user)->test('pages::projects.show', ['project' => $row->slug])
         ->assertDontSeeHtml('data-test="no-active-proposal"');
 });
 
@@ -312,16 +315,19 @@ test('the draft messages read in Arabic', function () {
         ->assertHasErrors(['startDate'])
         ->assertSee('تُحدَّد تواريخ المشروع عند اعتماد المقترح');
 
+    // Y-16, D-93: "no active proposal" reads the one proposal behind the row,
+    // so the row is built on a terminal one.
     $draft = Project::factory()->create();
+    $row = rowFor($draft, Proposal::factory()->create(['status' => ProposalStatus::Rejected]));
 
-    Livewire::actingAs($this->user)->test('pages::projects.show', ['project' => $draft])
+    Livewire::actingAs($this->user)->test('pages::projects.show', ['project' => $row->slug])
         ->assertSee('لا يوجد مقترح فعّال');
 });
 
 test('the draft invariant holds after an approval: waiting drafts hold dates, acknowledged ones are approved', function () {
     $proposal = Proposal::factory()->create(['status' => ProposalStatus::Submitted, 'planned_date_begin' => '2026-11-01', 'planned_date_end' => '2027-10-31']);
-    $waiting = Project::factory()->create();
-    $acknowledged = Project::factory()->create();
+    $waiting = projectWithRow();
+    $acknowledged = projectWithRow();
     $acknowledged->currentAssignment('user_id')->forceFill(['status' => AssignmentStatus::Acknowledged])->save();
     $proposal->projects()->attach([$waiting->id => ['target_beneficiaries' => 10], $acknowledged->id => ['target_beneficiaries' => 10]]);
 

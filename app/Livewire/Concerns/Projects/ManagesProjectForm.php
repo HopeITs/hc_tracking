@@ -12,6 +12,7 @@ use App\Models\HrCity;
 use App\Models\HrEmployee;
 use App\Models\Program;
 use App\Models\Project;
+use App\Models\ProposalLocation;
 use App\Support\SimilarProjects;
 use Flux\Flux;
 use Illuminate\Database\Eloquent\Builder;
@@ -414,8 +415,19 @@ trait ManagesProjectForm
         $this->showProjectModal = true;
     }
 
-    public function openEditModal(int $projectId): void
+    /**
+     * Open the form on the project a **location row** stands for (Y-16): the
+     * directory lists rows, while the form still writes the project until
+     * Y-17 moves the writers. The row is reached by its own key and answers
+     * for the permission; `project_id` leads to the record being edited
+     * (never the row's own id — they are different keys).
+     */
+    public function openEditModal(int $locationId): void
     {
+        $row = ProposalLocation::query()->select(['id', 'project_id'])->findOrFail($locationId);
+
+        Gate::authorize('update', $row);
+
         $project = Project::query()
             ->select([
                 'id',
@@ -435,9 +447,7 @@ trait ManagesProjectForm
                 'program_id',
                 'user_id',
             ])
-            ->findOrFail($projectId);
-
-        Gate::authorize('update', $project);
+            ->findOrFail($row->project_id);
 
         $this->resetValidation();
         $this->editingProjectId = $project->id;

@@ -8,7 +8,7 @@ use App\Enums\ProjectStatus;
 use App\Models\HrCity;
 use App\Models\HrEmployee;
 use App\Models\Program;
-use App\Models\Project;
+use App\Models\ProposalLocation;
 use App\Models\Sector;
 use App\Support\Desk\ProjectStage;
 use App\Support\Like;
@@ -24,6 +24,12 @@ use Livewire\Attributes\Computed;
  * Used by projects/index only. The page keeps the #[Url] filter properties
  * (search, city, program, strategy, owner, status, view, sort, lens); the list
  * query (`projects()`) and the funding figures call applyFilters() from here.
+ *
+ * Y-16 (D-93): the directory lists **location rows**. Every filter keeps its
+ * URL name so saved links keep working, and each reads the row's own twin of
+ * what it read on the project: `owner` the responsible employee, `name` the
+ * row's proposal (a row is of exactly one), `unfunded` a row whose proposal
+ * has no agreement yet.
  *
  * @property string $search
  * @property string $city
@@ -120,7 +126,7 @@ trait FiltersProjectDirectory
     }
 
     /**
-     * The projects on the selected stage (App\Support\Desk\ProjectStage),
+     * The location rows on the selected stage (App\Support\Desk\ProjectStage),
      * read once per request however many queries filter by it.
      *
      * @return list<int>
@@ -128,7 +134,7 @@ trait FiltersProjectDirectory
     #[Computed]
     public function stageProjectIds(): array
     {
-        return $this->stage === '' ? [] : ProjectStage::projectIdsAt((int) $this->stage);
+        return $this->stage === '' ? [] : ProjectStage::locationIdsAt((int) $this->stage);
     }
 
     /**
@@ -250,8 +256,8 @@ trait FiltersProjectDirectory
      * method, so a filter can never mean one thing in the board and another in
      * the counts above it.
      *
-     * @param  Builder<Project>  $query
-     * @return Builder<Project>
+     * @param  Builder<ProposalLocation>  $query
+     * @return Builder<ProposalLocation>
      */
     protected function applyFilters(Builder $query, bool $includeStatus = true, bool $includeLens = true): Builder
     {
@@ -261,53 +267,61 @@ trait FiltersProjectDirectory
         return $query
             ->when($search !== '', function (Builder $query) use ($search, $matches): void {
                 $query->where(Like::everyWord($search, fn (Builder $query, string $word) => $query
-                    ->where(Like::word('name', $word))
+                    // A row is named by its proposal, its place and its programme.
+                    ->whereHas('proposal', fn (Builder $proposal) => $proposal->where(Like::word('proposals.name', $word)))
                     ->orWhereIn('city_id', $matches['cities'][$word] ?? [])
                     ->orWhereIn('program_id', Program::idsMatchingName($word, acrossLayouts: false))
-                    ->orWhereIn('user_id', $matches['owners'][$word] ?? [])));
+                    ->orWhereIn('responsible_employee_id', $matches['owners'][$word] ?? [])));
             })
             ->when($this->city !== '', fn (Builder $query) => $query->where('city_id', (int) $this->city))
             ->when($this->program !== '', fn (Builder $query) => $query->where('program_id', (int) $this->program))
             ->when($this->strategy !== '', fn (Builder $query) => $query->whereHas('program', fn ($query) => $query->where('strategy_id', (int) $this->strategy)))
-            ->when($this->owner !== '', fn (Builder $query) => $query->where('user_id', (int) $this->owner))
+            ->when($this->owner !== '', fn (Builder $query) => $query->where('responsible_employee_id', (int) $this->owner))
             ->when($this->sector !== '', fn (Builder $query) => $query->whereHas('sectors', fn (Builder $query) => $query->whereKey((int) $this->sector)))
-            ->when($this->stage !== '', fn (Builder $query) => $query->whereIn('id', $this->stageProjectIds))
-            ->when($includeStatus && $this->status !== '', fn (Builder $query) => $query->where('status', $this->status))
+            ->when($this->stage !== '', fn (Builder $query) => $query->whereIn('proposal_locations.id', $this->stageProjectIds))
+            ->when($includeStatus && $this->status !== '', fn (Builder $query) => $query->where('proposal_locations.status', $this->status))
             ->when($includeLens && $this->lens !== '', fn (Builder $query) => $this->applyLens($query));
     }
 
     /**
-     * @param  Builder<Project>  $query
-     * @return Builder<Project>
+     * @param  Builder<ProposalLocation>  $query
+     * @return Builder<ProposalLocation>
      */
     protected function applyLens(Builder $query): Builder
     {
         return match ($this->lens) {
-            'unfunded' => $query->doesntHave('proposals'),
-            'overdue' => $query->where('status', ProjectStatus::Active->value)->whereDate('end_date', '<', today()),
+            // Every row has a proposal (D-84, D-87), so "unfunded" now means
+            // the place whose proposal carries no donor agreement yet.
+            'unfunded' => $query->whereDoesntHave('proposal.donorProposals'),
+            'overdue' => $query->where('proposal_locations.status', ProjectStatus::Active->value)->whereDate('end_date', '<', today()),
             'risks' => $query->whereHas('risks', fn ($query) => $query->where('happened', true)),
             default => $query,
         };
     }
 
     /**
-     * @param  Builder<Project>  $query
-     * @return Builder<Project>
+     * @param  Builder<ProposalLocation>  $query
+     * @return Builder<ProposalLocation>
      */
     protected function applySort(Builder $query): Builder
     {
         // Nulls sort last in both date orders, which is what the raw
-        // "is null" ordering in front of each column buys.
+        // "is null" ordering in front of each column buys. A row's name is
+        // its proposal's (D-93), read through a join so it can be ordered on.
+        $byName = fn (Builder $query): Builder => $query
+            ->leftJoin('proposals', 'proposals.id', '=', 'proposal_locations.proposal_id')
+            ->orderBy('proposals.name');
+
         return match ($this->sort) {
-            'start_date' => $query->orderByRaw('start_date is null')->orderBy('start_date')->orderBy('name'),
-            'end_date' => $query->orderByRaw('end_date is null')->orderBy('end_date')->orderBy('name'),
-            'updated_at' => $query->orderByDesc('updated_at')->orderByDesc('id'),
-            default => $query->orderBy('name')->orderBy('id'),
+            'start_date' => $byName($query->orderByRaw('proposal_locations.start_date is null')->orderBy('proposal_locations.start_date')),
+            'end_date' => $byName($query->orderByRaw('proposal_locations.end_date is null')->orderBy('proposal_locations.end_date')),
+            'updated_at' => $query->orderByDesc('proposal_locations.updated_at')->orderByDesc('proposal_locations.id'),
+            default => $byName($query)->orderBy('proposal_locations.id'),
         };
     }
 
     /**
-     * How many projects sit in each lifecycle state.
+     * How many location rows sit in each lifecycle state.
      *
      * The rail ignores the status filter so it always shows where the rest of
      * the filtered portfolio sits; every other filter still applies.
@@ -317,10 +331,10 @@ trait FiltersProjectDirectory
     #[Computed]
     public function statusCounts(): array
     {
-        return $this->applyFilters(Project::query(), includeStatus: false)
+        return $this->applyFilters(ProposalLocation::query(), includeStatus: false)
             ->toBase()
-            ->groupBy('status')
-            ->selectRaw('status, count(*) as aggregate')
+            ->groupBy('proposal_locations.status')
+            ->selectRaw('proposal_locations.status, count(*) as aggregate')
             ->pluck('aggregate', 'status')
             ->map(fn ($count): int => (int) $count)
             ->all();
@@ -340,12 +354,12 @@ trait FiltersProjectDirectory
     {
         $today = today()->toDateString();
 
-        $row = $this->applyFilters(Project::query(), includeStatus: false, includeLens: false)
+        $row = $this->applyFilters(ProposalLocation::query(), includeStatus: false, includeLens: false)
             ->toBase()
             ->selectRaw(
-                'sum(case when not exists (select 1 from project_proposal where project_proposal.project_id = projects.id) then 1 else 0 end) as unfunded_count, '
-                .'sum(case when projects.status = ? and projects.end_date < ? then 1 else 0 end) as overdue_count, '
-                .'sum(case when exists (select 1 from risks where risks.project_id = projects.id and risks.happened = 1) then 1 else 0 end) as risks_count',
+                'sum(case when not exists (select 1 from donor_proposal where donor_proposal.proposal_id = proposal_locations.proposal_id) then 1 else 0 end) as unfunded_count, '
+                .'sum(case when proposal_locations.status = ? and proposal_locations.end_date < ? then 1 else 0 end) as overdue_count, '
+                .'sum(case when exists (select 1 from risks where risks.proposal_location_id = proposal_locations.id and risks.happened = 1) then 1 else 0 end) as risks_count',
                 [
                     ProjectStatus::Active->value,
                     $today,

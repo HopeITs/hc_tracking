@@ -9,7 +9,7 @@ use App\Livewire\Concerns\Tasks\ManagesTaskAttachments;
 use App\Livewire\Concerns\Tasks\MovesTask;
 use App\Models\HrEmployee;
 use App\Models\Program;
-use App\Models\Project;
+use App\Models\ProposalLocation;
 use App\Models\Proposal;
 use App\Models\Task;
 use App\Models\TaskAttachment;
@@ -71,7 +71,7 @@ new #[Layout('layouts::desk'), Title('titles.task')] class extends Component
     #[Computed]
     public function pausedProjectIds(): array
     {
-        return Project::pausedIds();
+        return ProposalLocation::pausedIds();
     }
 
     /**
@@ -133,11 +133,12 @@ new #[Layout('layouts::desk'), Title('titles.task')] class extends Component
             ->with([
                 'source' => fn (MorphTo $source) => $source
                     ->morphWith([
-                        Proposal::class => ['donor:id,name', 'projects:id,slug,name'],
-                        Project::class => ['program', 'user', 'city', 'proposals:id,slug,name,donor_id', 'proposals.donor:id,name'],
+                        Proposal::class => ['donor:id,name', 'locations:id,proposal_id,slug,city_id,city_wide,program_id'],
+                        // Y-16 (D-93): a task's place, with what the header names.
+                        ProposalLocation::class => ['program', 'responsible', 'city', 'centers', 'proposal:id,slug,name,donor_id', 'proposal.donor:id,name'],
                         Program::class => ['manager', 'strategy:id,name'],
                     ])
-                    ->morphWithCount([Program::class => ['projects']]),
+                    ->morphWithCount([Program::class => ['locations']]),
                 'planMilestone:id,activity_plan_id,title',
                 'planMilestone.plan:id,slug',
                 'taskAssignees.employee:id,first_name_en,last_name_en,first_name_ar,last_name_ar',

@@ -226,8 +226,10 @@ test('a file uploads to the proposal and downloads only through its own proposal
 test('grant paperwork on funded projects is listed, their photos are not', function () {
     $project = Project::factory()->create();
     $this->proposal->projects()->attach($project);
-    Media::factory()->create(['mediable_type' => 'project', 'mediable_id' => $project->id, 'collection' => MediaCollection::Mou, 'original_name' => 'mou.pdf']);
-    Media::factory()->create(['mediable_type' => 'project', 'mediable_id' => $project->id, 'collection' => MediaCollection::Photo, 'original_name' => 'site.jpg']);
+    // Y-16 (D-93): files hang off the place the proposal pays for.
+    $row = proposalRowForProject($this->proposal, $project);
+    Media::factory()->create(['mediable_type' => 'proposal_location', 'mediable_id' => $row->id, 'collection' => MediaCollection::Mou, 'original_name' => 'mou.pdf']);
+    Media::factory()->create(['mediable_type' => 'proposal_location', 'mediable_id' => $row->id, 'collection' => MediaCollection::Photo, 'original_name' => 'site.jpg']);
 
     proposalPage()->set('tab', 'documents')
         ->assertSeeText('mou.pdf')
@@ -360,8 +362,9 @@ test('the preview steps through every document on the tab and wraps around', fun
     Storage::fake('local');
     $funded = Project::factory()->create();
     $this->proposal->projects()->attach($funded);
+    $fundedRow = proposalRowForProject($this->proposal, $funded);
     $own = Media::factory()->create(['mediable_type' => 'proposal', 'mediable_id' => $this->proposal->id]);
-    $projectFile = Media::factory()->create(['mediable_type' => 'project', 'mediable_id' => $funded->id, 'collection' => MediaCollection::Mou]);
+    $projectFile = Media::factory()->create(['mediable_type' => 'proposal_location', 'mediable_id' => $fundedRow->id, 'collection' => MediaCollection::Mou]);
     $unrelated = Media::factory()->create();
 
     proposalPage()

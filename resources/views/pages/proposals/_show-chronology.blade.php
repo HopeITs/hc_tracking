@@ -119,7 +119,7 @@
                             @forelse ($chronology['projects'] as $bar)
                                 <li class="relative h-7" wire:key="chrono-project-{{ $bar['id'] }}">
                                     <a
-                                        href="{{ route('projects.show', tap(new Project, fn ($project) => $project->id = $bar['id'])) }}"
+                                        href="{{ route('projects.show', $bar['slug']) }}"
                                         wire:navigate
                                         class="absolute top-0 flex h-7 min-w-0 items-center rounded-sm bg-funding-soft px-2 text-[11px] font-semibold text-funding transition-colors hover:bg-funding hover:text-white dark:hover:text-surface-0 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-secondary-medium dark:text-ink"
                                         style="inset-inline-start: {{ $bar['start'] }}%; width: {{ $bar['width'] }}%"

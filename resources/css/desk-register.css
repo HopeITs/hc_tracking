@@ -61,9 +61,6 @@
 
     /* Filter pickers sit inline in the bar: the label is read by screen readers only. */
     .dk-reg-bar [data-header-filter-select] { flex: 0 1 190px; min-width: 150px; }
-    .dk-reg-bar [data-header-filter-select] .filter-picker > [data-flux-button] > span { min-width: 0; }
-    .dk-reg-bar [data-header-filter-select] .filter-picker > [data-flux-button] > span > .truncate { display: block; }
-    .dk-reg-bar [data-header-filter-select] .filter-picker > [data-flux-button] > svg { flex-shrink: 0; }
     @media (max-width: 720px) {
         .dk-reg-bar [data-header-filter-select] { flex: 1 1 calc(50% - 4px); min-width: 0; }
         .dk-reg-q { max-width: none; }

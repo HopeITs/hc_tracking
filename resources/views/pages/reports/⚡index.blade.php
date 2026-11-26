@@ -7,7 +7,7 @@ use App\Livewire\Concerns\ManagesReportForm;
 use App\Livewire\Concerns\Reports\ReadsReportPortfolio;
 use App\Models\AnnualPlan;
 use App\Models\PlanIndicator;
-use App\Models\Project;
+use App\Models\ProposalLocation;
 use App\Models\Proposal;
 use App\Models\Report;
 use App\Models\User;
@@ -42,8 +42,13 @@ new #[Layout('layouts::desk'), Title('titles.reports')] class extends Component 
     #[Url(except: '')]
     public string $author = '';
 
+    /**
+     * The location row the feed is narrowed to (Y-16, D-93), or `none` for
+     * targets committed organisation-wide. A saved `?project=<id>` link is
+     * answered by the row that took that project over (D-94); Y-18 drops that.
+     */
     #[Url(except: '')]
-    public string $project = '';
+    public string $location = '';
 
     /**
      * Narrows the feed to one target. Set by the "Record a report" and report
@@ -117,7 +122,7 @@ new #[Layout('layouts::desk'), Title('titles.reports')] class extends Component 
         $this->resetPage();
     }
 
-    public function updatedProject(): void
+    public function updatedLocation(): void
     {
         $this->resetPage();
     }
@@ -146,7 +151,7 @@ new #[Layout('layouts::desk'), Title('titles.reports')] class extends Component 
         $this->status = '';
         $this->seenByMeal = '';
         $this->author = '';
-        $this->project = '';
+        $this->location = '';
         $this->target = '';
         $this->overdue = '';
         $this->focus = '';
@@ -176,9 +181,9 @@ new #[Layout('layouts::desk'), Title('titles.reports')] class extends Component 
                     ->orWhereHas('planIndicator.project', Like::word('name', $word))));
             })
             ->when($this->author !== '', fn ($query) => $query->where('user_id', (int) $this->author))
-            ->when($this->project === 'none', fn ($query) => $query->whereHas('planIndicator', fn ($query) => $query->whereNull('project_id')))
-            ->when($this->project !== '' && $this->project !== 'none', fn ($query) => $query
-                ->whereHas('planIndicator', fn ($query) => $query->where('project_id', (int) $this->project)))
+            ->when($this->location === 'none', fn ($query) => $query->whereHas('planIndicator', fn ($query) => $query->whereNull('proposal_location_id')))
+            ->when($this->location !== '' && $this->location !== 'none', fn ($query) => $query
+                ->whereHas('planIndicator', fn ($query) => $query->where('proposal_location_id', (int) $this->location)))
             ->when($this->target !== '', fn ($query) => $query->where('plan_indicator_id', (int) $this->target))
             ->when($this->strategyFilter !== null, fn ($query) => $query
                 ->whereHas('planIndicator', fn ($query) => $this->whereInStrategy($query, 'plan_indicators.project_id')));
@@ -241,9 +246,12 @@ new #[Layout('layouts::desk'), Title('titles.reports')] class extends Component 
     private function targetRelations(): array
     {
         return [
-            'planIndicator:id,indicator_id,target,period,source_type,source_id,project_id',
+            'planIndicator:id,indicator_id,target,period,source_type,source_id,project_id,proposal_location_id',
             'planIndicator.indicator:id,name,measure,unit',
-            'planIndicator.project:id,name',
+            'planIndicator.location',
+            'planIndicator.location.city',
+            'planIndicator.location.program',
+            'planIndicator.location.centers',
             'planIndicator.reports:id,plan_indicator_id,status,planned_date,value',
             'planIndicator.source' => fn (MorphTo $morphTo) => $morphTo->morphWith([AnnualPlan::class => [], Proposal::class => []]),
         ];
@@ -282,16 +290,24 @@ new #[Layout('layouts::desk'), Title('titles.reports')] class extends Component 
         return User::query()->select(['id', 'hr_user_id'])->orderByName()->get();
     }
 
-    /** @return Collection<int, Project> */
+    /**
+     * The location rows some target is committed at (Y-16).
+     *
+     * @return list<array{id: int, label: string}>
+     */
     #[Computed]
-    public function projectOptions(): Collection
+    public function locationOptions(): array
     {
-        return Project::query()
-            ->select(['id', 'name'])
-            ->whereIn('id', PlanIndicator::query()->select('project_id')->whereNotNull('project_id'))
-            ->orderBy('name')
-            ->orderBy('id')
+        $rows = ProposalLocation::query()
+            ->whereIn('id', PlanIndicator::query()->select('proposal_location_id')->whereNotNull('proposal_location_id'))
+            ->with(['proposal:id,name', 'city', 'program', 'centers'])
             ->get();
+
+        return $rows
+            ->sortBy(fn (ProposalLocation $row): string => ($row->proposal->name ?? '').' '.$row->label())
+            ->map(fn (ProposalLocation $row): array => ['id' => $row->id, 'label' => ($row->proposal->name ?? '').' · '.$row->label()])
+            ->values()
+            ->all();
     }
 
     protected function reportSaved(Report $report, bool $isCreate): void
@@ -307,7 +323,7 @@ new #[Layout('layouts::desk'), Title('titles.reports')] class extends Component 
 ?>
 
 @php
-    $filtersAreActive = $search !== '' || $status !== '' || $seenByMeal !== '' || $author !== '' || $project !== '' || $target !== '' || $overdue !== '' || $focus !== '' || $this->strategyFilter !== null;
+    $filtersAreActive = $search !== '' || $status !== '' || $seenByMeal !== '' || $author !== '' || $location !== '' || $target !== '' || $overdue !== '' || $focus !== '' || $this->strategyFilter !== null;
     $focusCounts = $this->focusCounts;
     $insights = ['total' => $focusCounts['total']];
 
@@ -386,11 +402,11 @@ new #[Layout('layouts::desk'), Title('titles.reports')] class extends Component 
     <x-slot:filters>
             <x-desk.strategy-chip :strategy="$this->strategyFilter" />
 
-            <x-ui.header-filter-select :label="__('common.project')" wire:model.live="project" :value="$project">
+            <x-ui.header-filter-select :label="__('common.project')" wire:model.live="location" :value="$location">
                 <option value="">{{ __('targets.any_project') }}</option>
                 <option value="none">{{ __('common.organisation_wide') }}</option>
-                @foreach ($this->projectOptions as $projectOption)
-                    <option value="{{ $projectOption->id }}">{{ $projectOption->name }}</option>
+                @foreach ($this->locationOptions as $locationOption)
+                    <option value="{{ $locationOption['id'] }}" dir="auto">{{ $locationOption['label'] }}</option>
                 @endforeach
             </x-ui.header-filter-select>
 

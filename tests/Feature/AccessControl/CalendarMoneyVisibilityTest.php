@@ -22,6 +22,9 @@ function seedCalendarMoneyFixture(int $employeeId): array
     $project = Project::factory()->create(['user_id' => $employeeId]);
     $proposal = Proposal::factory()->create(['name' => 'Harbour Clean Water', 'planned_date_end' => '2026-06-15']);
     $proposal->projects()->attach($project);
+    // Y-16 (D-93): the calendar reads the proposal's places, and shows a
+    // money item to the person responsible for one of them.
+    proposalRowForProject($proposal, $project)->update(['responsible_employee_id' => $employeeId]);
 
     $donor = Donor::factory()->create(['name' => 'Aurora Foundation', 'next_step_due_on' => '2026-06-15']);
     Proposal::query()->whereKey($proposal->id)->update(['donor_id' => $donor->id]);

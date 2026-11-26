@@ -325,8 +325,8 @@
                                                     @endcan
                                                     <span class="block truncate text-[11px] {{ $mutedText }}">
                                                         {{ $agreement->proposal?->status->label() }}
-                                                        @if ($agreement->proposal?->projects->isNotEmpty())
-                                                            · {{ trans_choice('common.count_project', $agreement->proposal->projects->count(), ['count' => $agreement->proposal->projects->count()]) }}
+                                                        @if ($agreement->proposal?->locations->isNotEmpty())
+                                                            · {{ trans_choice('common.count_project', $agreement->proposal->locations->count(), ['count' => $agreement->proposal->locations->count()]) }}
                                                         @endif
                                                     </span>
                                                 </span>

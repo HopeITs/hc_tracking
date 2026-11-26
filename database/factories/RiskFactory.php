@@ -2,7 +2,9 @@
 
 namespace Database\Factories;
 
+use App\Models\Program;
 use App\Models\Project;
+use App\Models\Proposal;
 use App\Models\ProposalLocation;
 use App\Models\Risk;
 use Illuminate\Database\Eloquent\Factories\Factory;
@@ -38,6 +40,30 @@ class RiskFactory extends Factory
             'proposal_location_id' => $row->id,
             'proposal_id' => $row->proposal_id,
             'project_id' => $row->project_id,
+        ]);
+    }
+
+    /**
+     * Put the risk on a program's results framework (no project, no proposal).
+     */
+    public function onProgram(Program $program): static
+    {
+        return $this->state(fn (array $attributes): array => [
+            'program_id' => $program->id,
+            'project_id' => null,
+            'proposal_id' => null,
+        ]);
+    }
+
+    /**
+     * Put the risk on a proposal's logframe (no location row, no project).
+     */
+    public function onProposalFramework(Proposal $proposal): static
+    {
+        return $this->state(fn (array $attributes): array => [
+            'proposal_id' => $proposal->id,
+            'proposal_location_id' => null,
+            'project_id' => null,
         ]);
     }
 
