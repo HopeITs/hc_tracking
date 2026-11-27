@@ -2,43 +2,34 @@
 
 declare(strict_types=1);
 
-namespace App\Actions\Projects;
+namespace App\Actions\Locations;
 
-use App\Models\Project;
+use App\Models\ProposalLocation;
 use App\Models\Sector;
-use App\Support\Locations\ProjectLocationMirror;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Validation\ValidationException;
 
 /**
- * Set the sectors a project covers (contracts.md §12.5, D-47). The one
- * writer of `project_sector`.
+ * Set the sectors a location row covers (contracts.md §12.5, D-47). The one
+ * writer of `proposal_location_sector`, and the twin of the former
+ * SyncProjectSectors moved onto the row (Y-17).
  *
- * Only active sectors can be chosen; an inactive one the project already has
- * may stay. With `$requireOne` (a new project, T05's SaveProject) at least
- * one is required. The whole batch is refused when any id is not a usable
- * sector, and a change is recorded as `project.sectors_changed` with sector
- * names only.
- *
- * Authorization is `update` on the project, except for a project created in
- * this same request, which needs `create`: Public Relations Manager may
- * create projects without holding projects.update.
+ * Only active sectors can be chosen; an inactive one the row already has may
+ * stay. With `$requireOne` at least one is required. The whole batch is
+ * refused when any id is not a usable sector, and a change is recorded as
+ * `project.sectors_changed` with sector names only.
  */
-final class SyncProjectSectors
+final class SyncLocationSectors
 {
-    public function __construct(private ProjectLocationMirror $mirror) {}
-
     /**
      * @param  list<int>  $sectorIds
      *
      * @throws ValidationException under the `sectorIds` key
      */
-    public function handle(Project $project, array $sectorIds, bool $requireOne = false): void
+    public function handle(ProposalLocation $row, array $sectorIds, bool $requireOne = false): void
     {
-        $project->wasRecentlyCreated
-            ? Gate::authorize('create', Project::class)
-            : Gate::authorize('update', $project);
+        Gate::authorize('update', $row);
 
         $chosen = $this->normalize($sectorIds);
 
@@ -46,8 +37,8 @@ final class SyncProjectSectors
             throw ValidationException::withMessages(['sectorIds' => __('sectors.choose_at_least_one')]);
         }
 
-        DB::transaction(function () use ($project, $chosen): void {
-            $locked = Project::query()->whereKey($project->getKey())->lockForUpdate()->firstOrFail();
+        DB::transaction(function () use ($row, $chosen): void {
+            $locked = ProposalLocation::query()->whereKey($row->getKey())->lockForUpdate()->firstOrFail();
 
             /** @var list<int> $current */
             $current = array_values($locked->sectors()->pluck('sectors.id')->map(fn (mixed $id): int => (int) $id)->all());
@@ -71,23 +62,23 @@ final class SyncProjectSectors
             /** @var list<int> $removed */
             $removed = array_map(intval(...), $result['detached']);
 
-            if ($added !== [] || $removed !== []) {
-                $names = Sector::query()->whereIn('id', [...$added, ...$removed])->ordered()->pluck('name_ar', 'id');
-                $addedNames = array_values($names->only($added)->all());
-                $removedNames = array_values($names->only($removed)->all());
-
-                $locked->recordActivity('project.sectors_changed', properties: [
-                    'added' => $addedNames === [] ? '—' : implode('، ', $addedNames),
-                    'removed' => $removedNames === [] ? '—' : implode('، ', $removedNames),
-                    'added_sectors' => $addedNames,
-                    'removed_sectors' => $removedNames,
-                ]);
+            if ($added === [] && $removed === []) {
+                return;
             }
 
-            $this->mirror->syncSectors($locked);
+            $names = Sector::query()->whereIn('id', [...$added, ...$removed])->ordered()->pluck('name_ar', 'id');
+            $addedNames = array_values($names->only($added)->all());
+            $removedNames = array_values($names->only($removed)->all());
+
+            $locked->recordActivity('project.sectors_changed', properties: [
+                'added' => $addedNames === [] ? '—' : implode('، ', $addedNames),
+                'removed' => $removedNames === [] ? '—' : implode('، ', $removedNames),
+                'added_sectors' => $addedNames,
+                'removed_sectors' => $removedNames,
+            ]);
         });
 
-        $project->unsetRelation('sectors');
+        $row->unsetRelation('sectors');
     }
 
     /**

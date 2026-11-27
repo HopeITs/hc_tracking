@@ -33,12 +33,13 @@ trait ManagesProjectAssignment
     public string $assignmentNote = '';
 
     /**
-     * The owner assignment that stands for this project right now.
+     * The appointment that stands for this place right now (Y-17: the row
+     * is where the responsible is asked and answers).
      */
     #[Computed]
     public function ownerAssignment(): ?Assignment
     {
-        return $this->writableProject()->currentAssignment('user_id')?->load('assigner');
+        return $this->location->currentAssignment('responsible_employee_id')?->load('assigner');
     }
 
     public function openAssignmentModal(string $mode): void

@@ -47,6 +47,60 @@ final class PlaceBridge
     }
 
     /**
+     * The location rows of the proposals being confirmed that sit at the
+     * template's place, locked in id order (Y-17). The row twin of
+     * projectsForConfirmation(): activation belongs to the row now, so the
+     * caller never needs the project behind it.
+     *
+     * @param  list<int>  $proposalIds
+     * @return \Illuminate\Database\Eloquent\Collection<int, ProposalLocation>
+     */
+    public function rowsForConfirmation(ReportTemplate $template, array $proposalIds): \Illuminate\Database\Eloquent\Collection
+    {
+        $place = $template->place();
+
+        $ids = ProposalLocation::query()->whereIn('proposal_id', $proposalIds)
+            ->where('city_id', $place->cityId)->where('program_id', $place->programId)
+            ->with('centers')->get()
+            ->filter(fn (ProposalLocation $row): bool => $place->isUnset()
+                || ($place->cityWide ? $row->city_wide : $row->centers->contains('center_id', $place->centerId)))
+            ->modelKeys();
+
+        return ProposalLocation::query()->whereKey($ids)->orderBy('id')->lockForUpdate()->get();
+    }
+
+    /**
+     * The confirmed templates that cover one location row (Y-17): the row
+     * twin of templateIdsOfProject(), for the months a widened row needs.
+     *
+     * @return list<int>
+     */
+    public function templateIdsOfRow(ProposalLocation $row): array
+    {
+        if ($row->program_id === null) {
+            return [];
+        }
+
+        $ids = [];
+
+        foreach ($this->placesOfRows(collect([$row])) as $place) {
+            $ids = [...$ids, ...ReportTemplate::query()
+                ->where('city_id', $place->cityId)
+                ->where('program_id', $place->programId)
+                ->where('city_wide', $place->cityWide)
+                ->where('center_id', $place->centerId)
+                ->whereHas('proposals', fn ($query) => $query->whereKey($row->proposal_id))
+                ->pluck('id')
+                ->all()];
+        }
+
+        $ids = array_values(array_unique(array_map(intval(...), $ids)));
+        sort($ids);
+
+        return $ids;
+    }
+
+    /**
      * The place of a target, read from its own columns (Y-08, D-85): no
      * `projects` read is left in it. Null for a target with no place and for a
      * shared target (D-90).

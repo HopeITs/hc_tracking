@@ -11,6 +11,7 @@ use App\Enums\ProposalStatus;
 use App\Enums\ReviewStage;
 use App\Models\HrEmployee;
 use App\Models\Proposal;
+use App\Models\ProposalLocation;
 use App\Models\ProposalReviewer;
 use App\Support\ProposalTransitions;
 use Flux\Flux;
@@ -175,17 +176,21 @@ trait ManagesProposalStatus
             return [];
         }
 
-        return $subject->projects()
-            ->select(['projects.id', 'projects.name'])
-            ->where(fn ($query) => $query->whereNull('project_proposal.target_beneficiaries')->orWhere('project_proposal.target_beneficiaries', '<', 1))
-            ->orderBy('projects.id')
+        // Y-17: the figure lives on the location row, and a row is named by
+        // its place.
+        return $subject->locations()
+            ->with(['city', 'program', 'centers'])
+            ->where(fn ($query) => $query->whereNull('target_beneficiaries')->orWhere('target_beneficiaries', '<', 1))
+            ->orderBy('sort')
+            ->orderBy('id')
             ->get()
-            ->map(fn ($project): array => ['id' => (int) $project->id, 'name' => (string) $project->name])
+            ->map(fn (ProposalLocation $row): array => ['id' => $row->id, 'name' => $row->label()])
             ->all();
     }
 
     /**
-     * Validate and save the counts typed for the missing projects. An empty
+     * Validate and save the counts typed for the places still missing one.
+     * An empty
      * count, or one that is not a whole number of at least 1, stops the move
      * with a field error.
      */
@@ -206,7 +211,10 @@ trait ManagesProposalStatus
         $this->validate($rules, [], collect($missing)->mapWithKeys(fn (array $row): array => ['statusBeneficiaries.'.$row['id'] => $row['name']])->all());
 
         foreach ($missing as $row) {
-            $proposal->projects()->updateExistingPivot($row['id'], ['target_beneficiaries' => (int) $this->statusBeneficiaries[$row['id']]]);
+            ProposalLocation::query()
+                ->where('proposal_id', $proposal->id)
+                ->whereKey($row['id'])
+                ->update(['target_beneficiaries' => (int) $this->statusBeneficiaries[$row['id']]]);
         }
     }
 

@@ -16,6 +16,9 @@ beforeEach(function () {
     $this->proposal = Activity::withoutRecording(fn () => Proposal::factory()->create(['status' => ProposalStatus::ProposalDraft->value]));
     $this->project = Activity::withoutRecording(fn () => Project::factory()->create(['user_id' => $this->ownerEmployee]));
     DB::table('project_proposal')->insert(['project_id' => $this->project->id, 'proposal_id' => $this->proposal->id]);
+    // Y-17: the proposal's places are its own rows, and the person who
+    // answers for a place is the row's responsible.
+    Activity::withoutRecording(fn () => rowFor($this->project, $this->proposal));
 });
 
 test('the owner of a project the proposal funds can work on it and move it on', function () {

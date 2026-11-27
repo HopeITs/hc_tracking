@@ -98,13 +98,15 @@ final class InviteDefaultReviewers
             }
         }
 
-        $projects = $proposal->projects()->orderBy('projects.id')->get(['projects.id', 'projects.user_id', 'projects.program_id']);
-        $managers = Program::query()->whereKey($projects->pluck('program_id')->filter()->unique()->all())->pluck('manager_id', 'id');
+        // Y-17: the proposal's places are its rows, so the responsibles and
+        // the managers of their programs are the candidates.
+        $rows = $proposal->locations()->orderBy('proposal_locations.id')->get(['id', 'responsible_employee_id', 'program_id']);
+        $managers = Program::query()->whereKey($rows->pluck('program_id')->filter()->unique()->all())->pluck('manager_id', 'id');
 
-        foreach ($projects as $project) {
-            $add($project->user_id, ReviewerSlot::ProjectOwner);
+        foreach ($rows as $row) {
+            $add($row->responsible_employee_id, ReviewerSlot::ProjectOwner);
 
-            $managerId = $managers->get($project->program_id);
+            $managerId = $managers->get($row->program_id);
             $add($managerId === null ? null : (int) $managerId, ReviewerSlot::ProgramManager);
         }
 

@@ -14,7 +14,6 @@ use App\Livewire\Concerns\Proposals\DecidesProposalChange;
 use App\Livewire\Concerns\Proposals\ManagesProposalApproval;
 use App\Livewire\Concerns\Proposals\ManagesProposalFiles;
 use App\Livewire\Concerns\Proposals\ManagesProposalForm;
-use App\Livewire\Concerns\Proposals\ManagesProposalRecord;
 use App\Livewire\Concerns\Proposals\ManagesProposalReviewers;
 use App\Livewire\Concerns\Proposals\ManagesProposalStatus;
 use App\Livewire\Concerns\Proposals\ReadsProposalDelivery;
@@ -44,7 +43,6 @@ abstract class ProposalsShowPageHost extends Component
     use ManagesProposalApproval;
     use ManagesProposalFiles;
     use ManagesProposalForm;
-    use ManagesProposalRecord;
     use ManagesProposalReviewers;
     use ManagesProposalStatus;
     use ManagesTransferForm;

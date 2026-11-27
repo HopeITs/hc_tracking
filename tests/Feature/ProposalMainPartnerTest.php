@@ -24,7 +24,7 @@ function partnerProposalData(array $overrides = []): array
     return [
         'name' => 'Winter Shelter Response',
         'donorId' => Donor::factory()->create(['name' => 'GIZ'])->id,
-        'projectIds' => [Project::factory()->create()->id],
+        'locations' => [placePayload()],
         'beneficiaries' => [],
         'plannedDateBegin' => '2026-11-01',
         'plannedDateEnd' => '2027-10-31',

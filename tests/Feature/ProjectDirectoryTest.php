@@ -106,134 +106,22 @@ test('the stage URL filter selects the projects the Desk puts on that stage, and
         ->assertSeeHtml('href="'.route('projects.index', ['stage' => 5]).'"');
 });
 
-test('a project is created as a dateless draft with independent beneficiary targets', function () {
+/*
+| Y-17: the four cases that drove the create form are gone with it — §8 of
+| the [contract] drops `projects.create`, so nothing creates a place by hand
+| (a place exists because a proposal has it, D-84/D-87). They are named in
+| the Y-17 handoff: creating a dateless draft with independent targets,
+| normalising nullable details, the create form's required fields, and a
+| centre HR does not know.
+*/
+
+test('the edit form loads what the place delivers and saves it, keeping its status', function () {
+    // Y-17: the form changes the description, the five targets and the
+    // sectors. The name, the placement, the owner and the dates are not
+    // offered — a place is named by where it is, placed by its proposal and
+    // dated by the grant.
     $user = User::factory()->role('General Manager')->create();
-    $city = insertHrCity();
-    $owner = insertHrEmployee();
-    $program = Program::factory()->create(['manager_id' => $owner]);
-
-    Livewire::actingAs($user)
-        ->test('pages::projects.index')
-        ->call('openCreateModal')
-        ->set('sectorIds', newProjectSectorIds())
-        ->set('name', '  Idlib Water Network  ')
-        ->set('description', '  Restores reliable household water access.  ')
-        ->set('targetBeneficiaries', '1000')
-        ->set('targetMen', '180')
-        ->set('targetWomen', '220')
-        ->set('targetBoys', '140')
-        ->set('targetGirls', '160')
-        ->set('centerId', (string) insertHrCenter($city))
-        ->set('programId', (string) $program->id)
-        ->set('userId', (string) $owner)
-        ->call('saveProject')
-        ->assertHasNoErrors()
-        ->assertSet('showProjectModal', false);
-
-    $project = Project::query()->where('name', 'Idlib Water Network')->sole();
-
-    expect($project->description)->toBe('Restores reliable household water access.')
-        ->and($project->status)->toBe(ProjectStatus::Draft)
-        ->and($project->start_date)->toBeNull()
-        ->and($project->end_date)->toBeNull()
-        ->and($project->target_beneficiaries)->toBe(1000)
-        ->and($project->targetDemographicTotal())->toBe(700)
-        ->and($project->city_id)->toBe($city)
-        ->and($project->program_id)->toBe($program->id)
-        ->and($project->user_id)->toBe($owner);
-});
-
-test('nullable project details are normalized before saving', function () {
-    $user = User::factory()->role('General Manager')->create();
-    $city = insertHrCity();
-    $owner = insertHrEmployee();
-    $program = Program::factory()->create(['manager_id' => $owner]);
-
-    Livewire::actingAs($user)
-        ->test('pages::projects.index')
-        ->call('openCreateModal')
-        ->set('sectorIds', newProjectSectorIds())
-        ->set('name', 'Project without targets')
-        ->set('description', '   ')
-        ->set('centerId', (string) insertHrCenter($city))
-        ->set('programId', (string) $program->id)
-        ->set('userId', (string) $owner)
-        ->call('saveProject')
-        ->assertHasNoErrors();
-
-    $project = Project::query()->where('name', 'Project without targets')->sole();
-
-    expect($project->description)->toBeNull()
-        ->and($project->start_date)->toBeNull()
-        ->and($project->end_date)->toBeNull()
-        ->and($project->target_beneficiaries)->toBeNull()
-        ->and($project->targetDemographicTotal())->toBeNull();
-});
-
-test('creating a project requires a name a center a program and an owner', function () {
-    $user = User::factory()->role('General Manager')->create();
-
-    Livewire::actingAs($user)
-        ->test('pages::projects.index')
-        ->call('openCreateModal')
-        ->set('sectorIds', newProjectSectorIds())
-        ->set('name', '')
-        ->set('centerId', '')
-        ->set('programId', '')
-        ->set('userId', '')
-        ->call('saveProject')
-        ->assertHasErrors(['name', 'centerId', 'programId', 'userId']);
-
-    expect(Project::query()->count())->toBe(0);
-});
-
-test('a project cannot be placed at a center that does not exist in hr', function () {
-    $user = User::factory()->role('General Manager')->create();
-
-    Livewire::actingAs($user)
-        ->test('pages::projects.index')
-        ->call('openCreateModal')
-        ->set('sectorIds', newProjectSectorIds())
-        ->set('name', 'Ghost Center Project')
-        ->set('centerId', '999999')
-        ->set('programId', (string) Program::factory()->create()->id)
-        ->set('userId', (string) $user->id)
-        ->call('saveProject')
-        ->assertHasErrors(['centerId']);
-
-    expect(Project::query()->count())->toBe(0);
-});
-
-test('project lifecycle dates and targets reject invalid values', function () {
-    $user = User::factory()->role('General Manager')->create();
-    $city = insertHrCity();
-    $owner = insertHrEmployee();
-    $program = Program::factory()->create(['manager_id' => $owner]);
-
-    Livewire::actingAs($user)
-        ->test('pages::projects.index')
-        ->call('openCreateModal')
-        ->set('sectorIds', newProjectSectorIds())
-        ->set('name', 'Invalid Project')
-        ->set('centerId', (string) insertHrCenter($city))
-        ->set('programId', (string) $program->id)
-        ->set('userId', (string) $owner)
-        ->set('startDate', '2026-09-10')
-        ->set('endDate', '2026-09-09')
-        ->set('targetBeneficiaries', '-1')
-        ->set('targetMen', '1.5')
-        ->set('targetWomen', '-2')
-        ->set('targetBoys', 'not-a-number')
-        ->set('targetGirls', '-3')
-        ->call('saveProject')
-        ->assertHasErrors(['endDate', 'targetBeneficiaries', 'targetMen', 'targetWomen', 'targetBoys', 'targetGirls']);
-
-    expect(Project::query()->count())->toBe(0);
-});
-
-test('a project can be renamed and moved to another center while keeping its status', function () {
-    $user = User::factory()->role('General Manager')->create();
-    $project = projectWithRow([
+    $row = rowFor(projectWithRow([
         'name' => 'Old Name',
         'description' => 'Original scope',
         'status' => ProjectStatus::Approved,
@@ -244,45 +132,30 @@ test('a project can be renamed and moved to another center while keeping its sta
         'target_women' => 120,
         'target_boys' => 80,
         'target_girls' => 90,
-    ]);
-    $row = rowFor($project);
-    $newCity = insertHrCity('Hama');
+    ]));
 
     Livewire::actingAs($user)
         ->test('pages::projects.index')
         ->call('openEditModal', $row->id)
-        ->assertSet('name', 'Old Name')
         ->assertSet('description', 'Original scope')
-        ->assertSet('startDate', '2026-01-01')
-        ->assertSet('endDate', '2026-12-31')
         ->assertSet('targetBeneficiaries', '500')
         ->assertSet('targetMen', '100')
         ->assertSet('targetWomen', '120')
         ->assertSet('targetBoys', '80')
         ->assertSet('targetGirls', '90')
-        ->set('name', 'New Name')
-        ->set('description', '  Updated scope  ')
-        ->set('startDate', '2026-02-01')
-        ->set('endDate', '2027-01-31')
-        ->set('centerId', (string) insertHrCenter($newCity))
-        ->set('targetBeneficiaries', '450')
-        ->set('targetMen', '100')
-        ->set('targetWomen', '120')
-        ->set('targetBoys', '80')
-        ->set('targetGirls', '90')
+        ->assertDontSeeHtml('wire:model.live.debounce.400ms="name"')
+        ->assertDontSeeHtml('wire:model.live="cityId"')
+        ->assertDontSeeHtml('wire:model="userId"')
+        ->set('description', 'Revised scope')
+        ->set('targetMen', '110')
         ->call('saveProject')
         ->assertHasNoErrors();
 
-    $project->refresh();
-
-    expect($project->name)->toBe('New Name')
-        ->and($project->description)->toBe('Updated scope')
-        ->and($project->status)->toBe(ProjectStatus::Approved)
-        ->and($project->start_date?->toDateString())->toBe('2026-02-01')
-        ->and($project->end_date?->toDateString())->toBe('2027-01-31')
-        ->and($project->city_id)->toBe($newCity)
-        ->and($project->target_beneficiaries)->toBe(450)
-        ->and($project->targetDemographicTotal())->toBe(390);
+    expect($row->fresh())
+        ->description->toBe('Revised scope')
+        ->target_men->toBe(110)
+        ->status->toBe(ProjectStatus::Approved)
+        ->start_date->toDateString()->toBe('2026-01-01');
 });
 
 test('the project directory offers no delete action', function () {
@@ -602,11 +475,10 @@ test('every view opens a project through the same eye action instead of a clicka
     }
 });
 
-test('a project is archived rather than deleted, keeping every record it carries', function () {
+test('a place is archived rather than deleted, keeping every record it carries', function () {
     $user = User::factory()->role('General Manager')->create();
     $row = rowFor(Project::factory()->active()->create(['name' => 'Wells Of Hope']));
-    $project = $row->project;
-    Risk::factory()->create(['project_id' => $project->id, 'proposal_location_id' => $row->id]);
+    Risk::factory()->create(['project_id' => $row->project_id, 'proposal_location_id' => $row->id]);
 
     Livewire::actingAs($user)->test('pages::projects.index')
         ->call('confirmArchive', $row->id)
@@ -617,29 +489,27 @@ test('a project is archived rather than deleted, keeping every record it carries
         ->assertSet('archivingProjectId', null)
         ->assertSet('showArchiveModal', false);
 
-    expect($project->fresh()->status)->toBe(ProjectStatus::Archived)
+    expect($row->fresh()->status)->toBe(ProjectStatus::Archived)
         // Archiving destroys nothing.
-        ->and(Risk::query()->where('project_id', $project->id)->count())->toBe(1);
+        ->and(Risk::query()->where('proposal_location_id', $row->id)->count())->toBe(1);
 });
 
-test('an archived project can be restored back into the portfolio as a draft', function () {
+test('an archived place can be restored back into the portfolio as a draft', function () {
     $user = User::factory()->role('General Manager')->create();
-    $project = Project::factory()->create(['name' => 'Wells Of Hope', 'status' => ProjectStatus::Archived]);
-    $row = rowFor($project);
+    $row = rowFor(Project::factory()->create(['name' => 'Wells Of Hope', 'status' => ProjectStatus::Archived]));
 
     Livewire::actingAs($user)->test('pages::projects.index')->call('restoreProject', $row->id);
 
-    expect($project->fresh()->status)->toBe(ProjectStatus::Draft);
+    expect($row->fresh()->status)->toBe(ProjectStatus::Draft);
 });
 
-test('restoring only applies to archived projects', function () {
+test('restoring only applies to archived places', function () {
     $user = User::factory()->role('General Manager')->create();
-    $project = Project::factory()->active()->create(['name' => 'Wells Of Hope']);
-    $row = rowFor($project);
+    $row = rowFor(Project::factory()->active()->create(['name' => 'Wells Of Hope']));
 
     Livewire::actingAs($user)->test('pages::projects.index')->call('restoreProject', $row->id);
 
-    expect($project->fresh()->status)->toBe(ProjectStatus::Active);
+    expect($row->fresh()->status)->toBe(ProjectStatus::Active);
 });
 
 test('cancelling the archive confirmation leaves the project where it was', function () {
@@ -700,10 +570,15 @@ test('every view offers archive for a live project and restore for an archived o
     }
 });
 
-test('the project form lays its fields along a three-section rail with no native selects', function () {
+test('the place form lays its fields along a rail with no pickers and no native selects', function () {
+    // Y-17: the form offers the description, the sectors and the five
+    // targets. The placement pickers (centre, city, host centre, programme,
+    // owner) are gone with the create path, so the only `data-form-select`
+    // left is none at all.
     $user = User::factory()->role('General Manager')->create();
+    $row = rowFor(projectWithRow());
 
-    $html = Livewire::actingAs($user)->test('pages::projects.index')->call('openCreateModal')->html();
+    $html = Livewire::actingAs($user)->test('pages::projects.index')->call('openEditModal', $row->id)->html();
 
     $document = new DOMDocument;
     @$document->loadHTML('<?xml encoding="utf-8" ?>'.$html);
@@ -718,60 +593,58 @@ test('the project form lays its fields along a three-section rail with no native
         ->and($headings)->toBe(['Details', 'Placement', 'Beneficiaries'])
         ->and($xpath->query($dialog.'//section[@data-optional]//*[contains(@class, "form-section-title")]')->item(0)?->textContent)->toBe('Beneficiaries')
         ->and($xpath->query($dialog.'//select')->length)->toBe(0)
-        // Center, city and host center (the last two only while no center is chosen, W-01), program, owner.
-        ->and($xpath->query($dialog.'//*[@data-form-select]')->length)->toBe(5)
+        ->and($xpath->query($dialog.'//*[@data-form-select]')->length)->toBe(0)
         ->and($xpath->query($dialog.'[@*[name()="wire:close"]="closeProjectModal"]')->length)->toBe(1)
         ->and($xpath->query($dialog.'//form[@*[name()="wire:submit"]="saveProject"]')->length)->toBe(1);
 });
 
-test('a failed project save points at the rail sections that hold the problems', function () {
+test('a negative or fractional target is refused and the place is left alone', function () {
     $user = User::factory()->role('General Manager')->create();
+    $row = rowFor(projectWithRow(['target_beneficiaries' => 500]));
 
     Livewire::actingAs($user)
         ->test('pages::projects.index')
-        ->call('openCreateModal')
-        ->set('sectorIds', newProjectSectorIds())
+        ->call('openEditModal', $row->id)
+        ->set('targetBeneficiaries', '-1')
+        ->set('targetMen', '1.5')
+        ->set('targetWomen', '-2')
+        ->set('targetBoys', 'not-a-number')
+        ->set('targetGirls', '-3')
         ->call('saveProject')
-        ->assertHasErrors(['name', 'centerId', 'programId', 'userId'])
-        ->assertSeeText('1 field needs attention')
-        ->assertSeeText('3 fields need attention')
-        ->assertSeeHtml('aria-invalid="true"');
+        ->assertHasErrors(['targetBeneficiaries', 'targetMen', 'targetWomen', 'targetBoys', 'targetGirls']);
+
+    expect($row->fresh()->target_beneficiaries)->toBe(500);
 });
 
-test('editing a project shows its saved choices in the form pickers', function () {
+test('editing a place shows where it is, read-only', function () {
     $user = User::factory()->role('General Manager')->create();
     $city = insertHrCity('Idlib', 'إدلب');
-    $owner = insertHrEmployee(firstNameEn: 'Lina', lastNameEn: 'Haddad', firstNameAr: 'لينا', lastNameAr: 'حداد');
-    $program = Program::factory()->create();
-    $project = Project::factory()->create([
+    $row = rowFor(Project::factory()->create([
         'status' => ProjectStatus::Active,
         'city_id' => $city,
         'center_id' => insertHrCenter($city, 'Hope Center Idlib', 'مركز الأمل إدلب'),
-        'program_id' => $program->id,
-        'user_id' => $owner,
-    ]);
-    $row = rowFor($project);
+        'program_id' => Program::factory()->create()->id,
+        'user_id' => insertHrEmployee(firstNameEn: 'Lina', lastNameEn: 'Haddad', firstNameAr: 'لينا', lastNameAr: 'حداد'),
+    ]));
 
-    $html = Livewire::actingAs($user)->test('pages::projects.index')->call('openEditModal', $row->id)->html();
-
-    $document = new DOMDocument;
-    @$document->loadHTML('<?xml encoding="utf-8" ?>'.$html);
-    $xpath = new DOMXPath($document);
-    $triggerLabel = fn (string $model): string => trim($xpath->query('//*[@data-form-select="'.$model.'"]//*[@data-trigger-label]')->item(0)->textContent);
-
-    expect($triggerLabel('centerId'))->toBe('Hope Center Idlib')
-        ->and($triggerLabel('programId'))->toBe($program->name)
-        ->and($triggerLabel('userId'))->toBe('Lina Haddad · لينا حداد');
+    Livewire::actingAs($user)->test('pages::projects.index')
+        ->call('openEditModal', $row->id)
+        ->assertSet('editingPlaceLabel', $row->label())
+        ->assertSeeText($row->label())
+        // The grant sets the period; the dialog says so rather than offering it.
+        ->assertSeeText('Project dates come from the approved grant')
+        ->assertDontSeeHtml('data-form-select="centerId"')
+        ->assertDontSeeHtml('data-form-select="userId"');
 });
 
-test('the project form is rendered only while its modal is open', function () {
+test('the place form is rendered only while its modal is open', function () {
     $user = User::factory()->role('General Manager')->create();
+    $row = rowFor(projectWithRow());
 
     Livewire::actingAs($user)
         ->test('pages::projects.index')
         ->assertDontSeeHtml('wire:model="targetBeneficiaries"')
-        ->call('openCreateModal')
-        ->set('sectorIds', newProjectSectorIds())
+        ->call('openEditModal', $row->id)
         ->assertSeeHtml('wire:model="targetBeneficiaries"');
 });
 

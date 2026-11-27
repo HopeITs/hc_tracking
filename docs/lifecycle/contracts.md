@@ -45,13 +45,13 @@ The one place for every name, value, signature, payload, column and permission t
 | proposal review | submitted | `effective_date`, `target_beneficiaries` | TransitionProposal |
 | submitted | proposal draft | `reason` (donor asked to resubmit) | TransitionProposal |
 | submitted | rejected | `reason_min_10`, `effective_date` | TransitionProposal |
-| submitted | approved | `locations_complete` (W-34a; was "≥ 1 linked project") | **ApproveProposal only** (T08) |
-| approved | active | — | **ActivateProject only** (T08; called by T33) |
+| submitted | approved | `locations_complete` (W-34a; was "≥ 1 linked project") | **ApproveProposal only** (T08). Y-17: at least one row is required and the `linked_project` requirement is removed |
+| approved | active | — | **ActivateLocation only** (Y-17, called by T33, once every non-archived row of the proposal is active) |
 | active | completed | `final_report`, `effective_date` | TransitionProposal |
 | rejected · completed | any live status except approved | `reason` | **CorrectProposalStatus only** (`is_correction = true`) |
 
 Key meanings:
-- `linked_project`: at least 1 linked project. Kept for one release behind the rows (W-34a: linking a project = a row with `project_id`), then removed.
+- `linked_project`: **removed by Y-17.** `locations_complete` already demands every row be complete, and a proposal no longer links projects.
 - `locations` (W-34a, D-62): at least 1 `proposal_locations` row with a city. Message `proposals.locations_required`.
 - `locations_complete` (W-34a, D-62): every `proposal_locations` row has program **and** responsible **and** (center or `city_wide` or `is_new`). (The pending `program_requests` clause was retired 25 Nov with the table.) Checked by `ApproveProposal`. Message `proposals.locations_incomplete`.
 - `donor`: `donor_id` is set.
@@ -61,7 +61,7 @@ Key meanings:
 - `effective_date`: `before_or_equal:today`.
 - `remind_on`: `after:today`, stored in `proposals.status_remind_on`.
 - `budget`: `requested_budget` + `requested_currency` are set.
-- `target_beneficiaries`: `project_proposal.target_beneficiaries ≥ 1` on **every** linked project.
+- `target_beneficiaries`: `proposal_locations.target_beneficiaries ≥ 1` on **every** row of the proposal (Y-17; was `project_proposal.target_beneficiaries` on every linked project).
 - `final_report` (D-02c): the final-report milestone is complete, the `media` category `final_report` file exists, and `final_report_accepted_on` + `final_report_accepted_by` are set. A self-funded proposal needs only the milestone + file.
 
 Rules:
@@ -77,29 +77,20 @@ Rules:
 - `final_report` for payroll with an internal (self-funded) donor = the `final_report` file only.
 - Hold (W-06) is allowed for a `submitted` payroll proposal; extension (W-08) for an `active` one (no projects to widen).
 
-## §3 Project statuses and transitions
-`App\Enums\ProjectStatus`: Draft `draft`, **Approved `approved` (live)**, Active `active`, Closed `closed`, Archived `archived`. `Submitted` is `@deprecated` (history only). `ProjectStatus::live()` = draft, approved, active, closed, archived. **Open** = draft, approved, active (`isOpen()`).
+## §3 Location statuses and transitions
+A location row has a `status` (`ProjectStatus` values: `draft`, `approved`, `active`, `closed`, `archived`). The transition table and its guards are those of the former project table, with the row in place of the project and these actions as the **only** writers of `proposal_locations.status` (`LocationStatusWriteGuardTest`):
+- `ApproveLocationFromProposal::handle(ProposalLocation $row, string $via): bool` (`$via` ∈ `proposal_approval`, `owner_acknowledgement`; idempotent): `draft` → `approved` once the proposal is approved **and** the row's responsible has acknowledged; sets the row's dates from the proposal.
+- `ActivateLocation::handle(ProposalLocation $row, string $via): void` (`$via` ∈ `template_confirmation`): `approved` and dated → `active`; when every row of the proposal that is not archived is active, moves the proposal `approved` → `active`.
+- `CloseLocation`, `ArchiveLocation`, `RestoreLocation`, `ReopenLocationAsDraft`: as their project twins.
+- `SaveLocationDetails::handle(ProposalLocation $row, array $data, User $actor): ProposalLocation`: description, calendar, the five targets, sectors. City, program, centers and responsible are changed only through `SaveProposal` (before approval) or a change request (Y-09).
+- `SaveLocationFile`, `DeleteLocationFile`: as their project twins.
 
-| From | To | Trigger | Writer (only) | Dates |
-|---|---|---|---|---|
-| — | draft | project created (center + program required) | project form → `SaveProject` (T05) | none (prohibited) |
-| draft | approved | a linked proposal is approved **and** the owner has acknowledged (either order) | `ApproveProjectFromProposal` (T08) | set: earliest begin / latest end of its donor-approved proposals |
-| approved | active | MEAL confirms the project's report template (≥ 1 confirmed line) | `ActivateProject` (T08), called by `ConfirmReportTemplate` (T33) | kept |
-| approved · active | (dates extended) | another proposal of the project is approved | `ApproveProjectFromProposal` (T08) | never shortened; `ProjectPeriodChanged` only when the project is `active` |
-| active | closed | manual (`ProjectPolicy::update`) | `CloseProject` (T05) | kept |
-| closed | draft | linked to a new proposal | `ReopenProjectAsDraft` (T06) | cleared (history in Activity Log) |
-| any | archived | manual (`projects.delete`) | `ArchiveProject` (existing) | kept |
-| archived | closed / draft | restore: `closed` if dated, else `draft` (D-27) | `RestoreProject` (T05) | kept |
-
-- **One open project per (`center_id`, `program_id`)** (D-30a): checked server-side, inside the transaction, under a lock, by `Project::openProjectFor(?int $centerId, int $cityId, int $programId, ?int $exceptId = null): ?Project` (T30, W-01: keyed on `center_id ?? city_id`). Create, restore, reopen-as-draft and link all reuse it. No DB unique index.
-- A draft holds dates **only** while it is linked to a donor-approved proposal and waits for its owner's acknowledgement (badge "Awaiting owner acknowledgement"). The project form never gives a draft dates. Approved and active projects always hold dates. Invariant test: `ProjectDraftLifecycleTest` (T05, extended by T08).
-- Owner-rejected projects (`isOwnerRejected()`, ASG-03) are skipped by approval and stay locked.
-- Defensive data migration (T05): legacy `submitted` → `draft` (no dates) or `active` (dated); legacy `approved` → `active` when dated, else `draft`. Print counts before and after.
+**The open-project rule (L94) is withdrawn.** Two proposals may each have a row at the same city, program and center; whether they share a monthly report is MEAL's choice (D-77). `openProjectFor` is removed.
 
 ## §4 Status writers (guard tests enforce this)
-- `proposals.status` is written only in: `App\Actions\Proposals\TransitionProposal`, `CorrectProposalStatus`, `ApproveProposal`, `App\Actions\Projects\ActivateProject`, and the T04 data migration. Enforced by `tests/Feature/ProposalStatusWriteGuardTest.php` (source scan). `status` is **not** in `Proposal`'s `#[Fillable]`.
+- `proposals.status` is written only in: `App\Actions\Proposals\TransitionProposal`, `CorrectProposalStatus`, `ApproveProposal`, `App\Actions\Locations\ActivateLocation` (Y-17), and the T04 data migration. Enforced by `tests/Feature/ProposalStatusWriteGuardTest.php` (source scan). `status` is **not** in `Proposal`'s `#[Fillable]`.
 - **W-06:** `proposals.on_hold_since` is set and cleared only in `App\Actions\Proposals\SetProposalOnHold` and `ClearProposalOnHold`, which write no status; `TransitionProposal` and `ApproveProposal` clear it as part of the move they make, and the W-06 data migration sets it once. Enforced by a second source scan in the same guard test. `on_hold_since` is **not** in `Proposal`'s `#[Fillable]`.
-- `projects.status` is written only in: `SaveProject` (create = draft), `ApproveProjectFromProposal`, `ActivateProject`, `CloseProject`, `ReopenProjectAsDraft`, `ArchiveProject`, `RestoreProject`, and the T05 data migration. Enforced by `tests/Feature/ProjectStatusWriteGuardTest.php` (T05; T08 extends its allowlist).
+- **Y-17: nothing writes the `projects` table.** `proposal_locations.status` is written only in `App\Actions\Locations\{ApproveLocationFromProposal, ActivateLocation, CloseLocation, ArchiveLocation, RestoreLocation, ReopenLocationAsDraft}` (§3). Enforced by `tests/Feature/LocationStatusWriteGuardTest.php`, which scans `app/` and `resources/views/` for both: a writer of a row's status outside that list, and **any** write to `projects` (`Project::create`, `->save()` on a `Project`, a `DB::table('projects')` write, `projects()->attach/detach/sync`). It replaces `ProjectStatusWriteGuardTest`.
 
 ## §5 Domain events
 Plain Laravel event classes in `app/Events/`, `final`, readonly promoted properties, implementing `ShouldDispatchAfterCommit`. They are dispatched **only after commit**; a refused or rolled-back action dispatches nothing. Listeners are queued, retried, idempotent, and never call back into Phase 1 actions (except the `§6` entry points marked "Team B may call").
@@ -107,9 +98,9 @@ Plain Laravel event classes in `app/Events/`, `final`, readonly promoted propert
 | Event | Constructor | Dispatched by | Consumers |
 |---|---|---|---|
 | `ProposalStatusChanged` | `int $proposalId, ProposalStatus $from, ProposalStatus $to, ?int $actorId, bool $isCorrection = false` | every proposal status writer (§4), once per move | T21 (`proposal.status_changed`), T31 (rebase on `to = approved`), T33 (template pre-fill on `to = approved`) |
-| `ProjectActivated` | `int $projectId, ?int $proposalId, CarbonImmutable $startDate, CarbonImmutable $endDate, string $via` | `ActivateProject`; `$via` ∈ {`template_confirmation`} | T21 (monthly reports are generated from `ReportTemplateConfirmed` since Y-03) |
+| `LocationActivated` (Y-17; replaces `ProjectActivated`) | `ProposalLocation $row` | `ActivateLocation`; `$via` ∈ {`template_confirmation`} | T21 (monthly reports are generated from `ReportTemplateConfirmed` since Y-03). The notification key `project.activated` keeps its name |
 | `ReportTemplateConfirmed` (Y-03, ratified by Dev 1 on 17 Nov) | `int $templateId` | `ConfirmReportTemplate` when the template first turns `confirmed` | T17 (generate the template's monthly reports) |
-| `ProjectPeriodChanged` | `int $projectId, CarbonImmutable $oldStart, CarbonImmutable $oldEnd, CarbonImmutable $newStart, CarbonImmutable $newEnd` | `ApproveProjectFromProposal` when an **active** project's dates change | T17 (add months), T21 |
+| `LocationPeriodChanged` (Y-17; replaces `ProjectPeriodChanged`) | `ProposalLocation $row, CarbonImmutable $oldStart, CarbonImmutable $oldEnd, CarbonImmutable $newStart, CarbonImmutable $newEnd` | `LocationPeriods::widen()` when an **active** row's dates change | T17 (add months), T21. The notification key `project.period_changed` keeps its name |
 | `FundingAgreementRecorded` | `int $fundingAgreementId, int $proposalId, ?int $actorId` (`$fundingAgreementId` = `donor_proposal.id`) | `SaveFundingAgreement` on create | T09 (`GenerateExpectedTransfers`), T21 |
 | `ProposalLocationsChanged` (W-34a, D-62) | `int $proposalId, ?int $actorId, int $added, int $removed, int $changed` (counts only, no names) | `SaveProposal` when the location rows changed; `LinkProposalProject` / `UnlinkProposalProject` | no notification, activity only (`proposal.locations_changed`); W-35 |
 
@@ -144,11 +135,16 @@ ClearProposalOnHold::handle(Proposal $proposal, ProposalStatus $expectedStatus, 
 //   Validation: city active in HR; centers belong to the city; program exists; responsible is an active HR employee;
 //   (25 Nov, W-34b slice 2: no program names, no program requests.) Rows are replaced as a set
 //   inside the proposal transaction (diff by (city_id, program_id), delete removed); ProposalLocationsChanged after commit.
-//   `projectIds` (create) stays accepted for one release: each id becomes a row with `project_id` through LinkProposalProject.
-MaterialiseProposalLocations::handle(Proposal $proposal, int $actorId): MaterialisationResult   // W-34a slice 2, called inside ApproveProposal's transaction before ApproveProjectFromProposal
-    // MaterialisationResult (readonly): list<int> $createdProjectIds, list<int> $linkedProjectIds, list<int> $waitingLocationIds, list<string> $warnings (warning key: location_linked_existing)
+//   `projectIds` is **no longer accepted** (Y-17): a proposal does not link projects.
+MaterialiseProposalLocations::handle(Proposal $proposal, int $actorId): MaterialisationResult   // W-34a slice 2, called inside ApproveProposal's transaction
+    // Y-17: it no longer creates or links a project. For each complete row it calls
+    //   ApproveLocationFromProposal($row, 'proposal_approval') and reports what happened.
+    // MaterialisationResult (readonly): list<int> $approvedLocationIds, list<int> $waitingForOwnerLocationIds,
+    //   list<int> $waitingForProgramLocationIds, list<string> $warnings
     // preview(Proposal $proposal): MaterialisationResult  — read-only counts for the approve modal
-// LinkProposalProject / UnlinkProposalProject keep their signatures and also insert / delete the matching proposal_locations row (city, program, center copied from the project; responsible = projects.user_id; is_new = false).
+    //   ("N places approved, K waiting"; it no longer says "will create N projects")
+// Y-17 **removes** LinkProposalProject, UnlinkProposalProject, ReopenProjectAsDraft, SaveProject, CloseProject,
+// RestoreProject, ApproveProjectFromProposal and ActivateProject. Their work is done by the location actions of §3.
 
 // T07
 InviteDefaultReviewers::handle(Proposal $proposal, ReviewStage $stage): void   // called inside TransitionProposal's transaction
@@ -164,9 +160,10 @@ ApproveProposal::handle(Proposal $proposal, ProposalStatus $expectedFrom, array 
     // ApprovalResult (readonly): list<int> $approvedProjectIds, list<int> $waitingProjectIds, list<int> $skippedProjectIds, list<string> $warnings
     // W-32 (D-55b): $input gains nothing; for payroll actual_date_* default to the planned dates when absent; ApprovalResult lists are empty;
     // payroll → approved then active in one transaction (two notes), no project work, ProposalStatusChanged twice after commit
-ApproveProjectFromProposal::handle(Project $project, string $via): bool   // $via ∈ {proposal_approval, owner_acknowledgement}; idempotent
-ActivateProject::handle(Project $project, string $via): void              // Team B (T33) may call. Requires project approved + dated;
-                                                                          // moves its still-`approved` donor-approved proposals → active (one note each)
+// Y-17: ApproveProjectFromProposal and ActivateProject are removed; §3's
+// ApproveLocationFromProposal and ActivateLocation replace them. ApprovalResult's three
+// lists carry **row** ids (approvedLocationIds, waitingLocationIds, skippedLocationIds) and
+// outcomeFor() keeps its keys: funded, waiting, extended, skipped. (one note each)
 // W-07 (D-59), app/Actions/Proposals
 AddNegotiationNote::handle(Proposal $proposal, ProposalStatus $expectedStatus, array $input): ProposalStatusNote
     // @param array{text: string, file?: UploadedFile|null}; allowed only when status = submitted; Gate::authorize('update', $proposal); writes no status
@@ -174,8 +171,9 @@ AddNegotiationNote::handle(Proposal $proposal, ProposalStatus $expectedStatus, a
 ExtendProposal::handle(Proposal $proposal, ProposalStatus $expectedStatus, array $input): ProposalStatusNote
     // @param array{new_date_end: string, reason: string, file?: UploadedFile|null}; allowed only for active; Gate::authorize('update', $proposal);
     // new_date_end after the current effective end; not a status writer. Widens linked approved/active projects through App\Support\ProjectPeriods::widen()
-// App\Support\ProjectPeriods::widen(Project $project, CarbonImmutable $begin, CarbonImmutable $end): bool
-    // saves the wider dates (never shortens); dispatches ProjectPeriodChanged only when the project is active and the dates changed
+// App\Support\Locations\LocationPeriods::widen(ProposalLocation $row, CarbonImmutable $begin, CarbonImmutable $end): bool
+    // Y-17, replacing ProjectPeriods: saves the wider dates (never shortens); dispatches LocationPeriodChanged
+    // only when the row is active and the dates changed. ExtendProposal::widenLocations() calls it per dated row.
 
 // T09, app/Actions/FundingAgreements
 SaveFundingAgreement (existing; donor written from the proposal)
@@ -302,7 +300,7 @@ Nine roles (fixed): Super Admin, General Manager, Managers, MEAL, Financial, Med
 | `targets.create/update` | **MEAL only** (revoke from GM and Managers, D-23) | — |
 | `funding-agreements.view/create/update` | existing holders **+ Public Relations Manager** (D-31b) | — |
 | `proposals.update` | existing (Financial, PR Manager, GM) | also gates approve, transitions, final-report acceptance |
-| `projects.create` (W-34a, D-62) | existing (PR Manager, GM) **plus Financial** | approval materialises the proposal's projects through `SaveProject`, so every approver holds it; `permissions:sync` adds it |
+| ~~`projects.create`~~ | **removed by Y-17** | nothing creates a project by hand: a place exists because a proposal has it (D-84, D-87), so the proposal form is the only way in. `projects.update` and `projects.delete` gate the row's details and its archive |
 | `donors.approve` (W-04, D-57) | **General Manager** only (plus `Super Admin` through the administrator roles rule); `donors.create` is unchanged (PR, PR Manager, GM) | — |
 | `risk-library.manage` (W-09, D-61) | MEAL, General Manager; `risks.create/update/delete` keep their holders and now mean "on a proposal's logframe" | MEAL Manager slot holder (add, edit, remove, reorder library entries) |
 | `risks.create` / `risks.update` (Y-13, D-93) | existing holders, **or** the location row is in `User::ownedLocationIds()`: creating or changing a register risk is allowed either way. `risks.delete`, `attach` and `detach` are unchanged | the row's responsible employee, and the manager of the row's program |
@@ -459,7 +457,7 @@ final class App\Support\SupervisionMap {
     - `per-season` / `baseline-endline` / `one-time` → never automatically (MEAL must choose `selected_months` or `once_after_months`).
   - `monthly` → every month; `selected_months` → listed calendar months; `once_after_months` → month (`effective_from` + N).
 - **Pre-fill** (listener `PrefillReportTemplates`, queued, idempotent): on `ProposalStatusChanged` with `to = approved`. For each place of the proposal (`PlaceBridge::placesOfProposal`): a `report_templates` row at that place linked to the proposal (pending, questions copied) unless the proposal is already linked to a template there; a **pending** line per library-linked `plan_indicator` of that proposal and project (`effective_from`/`effective_to` = the months of the proposal's actual dates). Targets without a library link are listed as "Link it to the library first". MEAL gets a "Confirm template" notification (`report_template.pending`).
-- **Confirm** (`ConfirmReportTemplate::handle(ReportTemplate $template, list<int> $lineIds): ReportTemplate`): ≥ 1 line must end up `confirmed`. If the project is `approved`, call `ActivateProject($project, 'template_confirmation')` (T08) **in the same transaction**. If it's `active`, the newly confirmed lines notify the manager: "New indicators for proposal X, from month A to month B" (`report_template.lines_added`). Nothing is retroactive; no report is reopened (D-41).
+- **Confirm** (`ConfirmReportTemplate::handle(ReportTemplate $template, list<int> $lineIds): ReportTemplate`): ≥ 1 line must end up `confirmed`. `ConfirmReportTemplate` calls `ActivateLocation` for each row of the template's proposals at its place (Y-17), **in the same transaction**. If it's `active`, the newly confirmed lines notify the manager: "New indicators for proposal X, from month A to month B" (`report_template.lines_added`). Nothing is retroactive; no report is reopened (D-41).
 - After confirmation, changes apply only to monthly reports still in `draft` (T17 Refresh Lines). `RetireReportTemplateLine` sets `effective_to` = the current month, so the line stops from next month.
 - **Org-wide indicators (D-44):** `HC.*` library entries; a yearly target per center as an `annual_plan` `plan_indicators` row. Command `annual-plans:ensure-2026 {--dry-run}` creates the 2026 annual plan per program if missing (2026 only).
 - **Launch backfill (D-45):** `report-templates:prefill-active {--dry-run}` creates pending templates for projects already `active`. They stay active; their lines appear after confirmation. It lists (ids only) the `fixed`-basis lines missing `fixed_denominator`; filling them is a human step (PR Manager, T06 post-approval edit), checked by T27 before go.

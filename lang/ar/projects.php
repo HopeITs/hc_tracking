@@ -201,6 +201,8 @@ return [
     'hosted_by' => 'يتابعه مركز :center',
     'hosted_location' => ':city · يتابعه مركز :center',
     'dates_prohibited_draft' => 'تُحدَّد تواريخ المشروع عند اعتماد المقترح',
+    'dates_set_by_the_grant' => 'تواريخ المشروع تأتي من المنحة المعتمدة ولا تُحرَّر هنا',
+    'edit_what_this_place_delivers' => 'عدّل ما يقدّمه هذا المكان: وصفه ومستهدفات المستفيدين والقطاعات',
     'close_only_active' => 'لا يُغلق إلا مشروع نشط',
     'no_active_proposal' => 'لا يوجد مقترح فعّال',
     'close_project' => 'إغلاق المشروع',

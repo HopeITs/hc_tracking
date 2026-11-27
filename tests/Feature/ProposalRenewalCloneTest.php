@@ -34,15 +34,17 @@ beforeEach(function () {
  * An approved proposal on one project with a framework, a task,
  * a target with an approved report, and the things a renewal must not copy.
  *
- * @return array{previous: Proposal, project: Project, root: Result, target: PlanIndicator}
+ * @return array{previous: Proposal, project: Project, row: ProposalLocation, root: Result, target: PlanIndicator}
  */
 function renewalSource(array $projectState = []): array
 {
     return Activity::withoutRecording(function () use ($projectState): array {
         $program = Program::factory()->create();
-        $centerId = insertHrCenter(insertHrCity());
+        $cityId = insertHrCity();
+        $centerId = insertHrCenter($cityId);
         $project = Project::factory()->status(ProjectStatus::Active)->create([
             'program_id' => $program->id,
+            'city_id' => $cityId,
             'center_id' => $centerId,
             ...$projectState,
         ]);
@@ -57,6 +59,15 @@ function renewalSource(array $projectState = []): array
         ]);
         $previous->projects()->attach($project->id, ['target_beneficiaries' => 400]);
 
+        // Y-17: the renewal copies the previous proposal's ROWS, so the
+        // source needs one. The project stays for the targets' own
+        // `project_id`, which Y-18 drops.
+        $sourceRow = ProposalLocation::factory()->forProject($project)->create([
+            'proposal_id' => $previous->id,
+            'target_beneficiaries' => 400,
+        ]);
+        $sourceRow->centers()->create(['center_id' => $centerId]);
+
         $root = Result::factory()->type(ResultType::Impact)->create(['program_id' => $program->id, 'proposal_id' => $previous->id]);
         $outcome = Result::factory()->childOf($root)->type(ResultType::Outcome)->create(['program_id' => $program->id, 'proposal_id' => $previous->id]);
 
@@ -70,7 +81,7 @@ function renewalSource(array $projectState = []): array
         DonorProposal::factory()->create(['proposal_id' => $previous->id, 'donor_id' => $previous->donor_id]);
         ProposalReviewer::factory()->create(['proposal_id' => $previous->id]);
 
-        return compact('previous', 'project', 'root', 'target');
+        return ['previous' => $previous, 'project' => $project, 'row' => $sourceRow, 'root' => $root, 'target' => $target];
     });
 }
 
@@ -106,8 +117,8 @@ function renewalData(array $overrides = []): array
     return ['internalProjectNumber' => 'HC-2027-001', ...$overrides];
 }
 
-test('a renewal is a concept note linked to the source with its donor, projects, beneficiaries and notes', function () {
-    ['previous' => $previous, 'project' => $project] = renewalSource();
+test('a renewal is a concept note linked to the source with its donor, places, beneficiaries and notes', function () {
+    ['previous' => $previous, 'row' => $row] = renewalSource();
     $actor = renewalActor();
 
     $result = app(CloneProposalForRenewal::class)->handle($previous, renewalData(), $actor);
@@ -121,7 +132,10 @@ test('a renewal is a concept note linked to the source with its donor, projects,
         ->and($renewal->actual_date_begin)->toBeNull()
         ->and($renewal->planned_date_begin->toDateString())->toBe('2027-01-01')
         ->and($renewal->planned_date_end->toDateString())->toBe('2027-12-31')
-        ->and(DB::table('project_proposal')->where('proposal_id', $renewal->id)->pluck('target_beneficiaries', 'project_id')->all())->toBe([$project->id => 400])
+        // Y-17: the renewal gets a row of its own at the same place, with
+        // the figure carried over, and links no project.
+        ->and(DB::table('project_proposal')->where('proposal_id', $renewal->id)->count())->toBe(0)
+        ->and($renewal->locations()->pluck('target_beneficiaries', 'city_id')->all())->toBe([$row->city_id => 400])
         ->and(DB::table('proposal_status_notes')->where('proposal_id', $renewal->id)->count())->toBe(1)
         ->and($result['skippedProjects'])->toBe([])
         ->and($result['copied']['results'])->toBe(2);
@@ -191,15 +205,16 @@ test('without results.create the framework is skipped and the rest is created', 
         ->and($result['skippedParts'])->toBe(['framework']);
 });
 
-test('an inactive center skips its project and names it', function () {
-    ['previous' => $previous, 'project' => $project] = renewalSource();
-    $other = Project::factory()->create(['program_id' => $project->program_id, 'center_id' => insertHrCenter(insertHrCity('Idlib', 'إدلب'), 'Hope Idlib', 'أمل إدلب', false)]);
-    $previous->projects()->attach($other->id, ['target_beneficiaries' => 10]);
+test('a place whose only center HR has closed is named and left out', function () {
+    ['previous' => $previous, 'row' => $row] = renewalSource();
+    $idlib = insertHrCity('Idlib', 'إدلب');
+    $closed = ProposalLocation::factory()->complete()->create(['proposal_id' => $previous->id, 'city_id' => $idlib, 'target_beneficiaries' => 10]);
+    $closed->centers()->create(['center_id' => insertHrCenter($idlib, 'Hope Idlib', 'أمل إدلب', false)]);
 
     $result = app(CloneProposalForRenewal::class)->handle($previous, renewalData(), renewalActor());
 
-    expect($result['skippedProjects'])->toBe([$other->name])
-        ->and($result['proposal']->projects()->pluck('projects.id')->all())->toBe([$project->id]);
+    expect($result['skippedProjects'])->toBe([$closed->fresh()->label()])
+        ->and($result['proposal']->locations()->pluck('city_id')->all())->toBe([$row->city_id]);
 });
 
 test('an inactive library indicator is skipped and named', function () {
@@ -213,14 +228,22 @@ test('an inactive library indicator is skipped and named', function () {
         ->and($result['copied']['indicators'])->toBe(0);
 });
 
-test('a closed project with a newer open sibling is replaced by the open one', function () {
-    ['previous' => $previous, 'project' => $project] = renewalSource(['status' => ProjectStatus::Closed, 'start_date' => '2026-01-01', 'end_date' => '2026-12-31']);
-    $open = Project::factory()->create(['program_id' => $project->program_id, 'center_id' => $project->center_id]);
+test('a renewal looks up, reopens or replaces no project', function () {
+    // Y-17: a renewal is a new proposal with its own rows (D-30). The place
+    // being closed, and another project standing at it, change nothing.
+    ['previous' => $previous, 'project' => $project, 'row' => $row] = renewalSource(['status' => ProjectStatus::Closed, 'start_date' => '2026-01-01', 'end_date' => '2026-12-31']);
+    $row->forceFill(['status' => ProjectStatus::Closed])->save();
+    $sibling = Project::factory()->create(['program_id' => $project->program_id, 'city_id' => $project->city_id, 'center_id' => $project->center_id]);
+    $before = DB::table('projects')->count();
 
     $result = app(CloneProposalForRenewal::class)->handle($previous, renewalData(), renewalActor());
 
-    expect($result['proposal']->projects()->pluck('projects.id')->all())->toBe([$open->id])
-        ->and($result['replacedProjects'])->toBe([$project->name]);
+    expect($result['replacedProjects'])->toBe([])
+        ->and($result['proposal']->locations()->pluck('city_id')->all())->toBe([$row->city_id])
+        ->and($result['proposal']->projects()->count())->toBe(0)
+        ->and(DB::table('projects')->count())->toBe($before)
+        ->and($sibling->fresh()->status)->toBe(ProjectStatus::Draft)
+        ->and($project->fresh()->status)->toBe(ProjectStatus::Closed);
 });
 
 test('a double click returns the same draft and a second user gets their own', function () {
@@ -279,7 +302,9 @@ test('a proposal cannot renew itself or one of its successors', function () {
 test('deleting the previous proposal keeps the renewal and clears the link', function () {
     $previous = Activity::withoutRecording(function (): Proposal {
         $proposal = Proposal::factory()->running()->create();
-        $proposal->projects()->attach(Project::factory()->create()->id, ['target_beneficiaries' => 5]);
+        $cityId = insertHrCity();
+        $row = ProposalLocation::factory()->complete()->create(['proposal_id' => $proposal->id, 'city_id' => $cityId, 'target_beneficiaries' => 5]);
+        $row->centers()->create(['center_id' => insertHrCenter($cityId)]);
 
         return $proposal;
     });
@@ -359,10 +384,10 @@ test('a lock held by the same user and source makes a parallel call return the e
 });
 
 test('a renewal copies the location rows that still stand, with their centers', function () {
-    ['previous' => $previous, 'project' => $project] = renewalSource();
+    ['previous' => $previous, 'project' => $project, 'row' => $sourceRow] = renewalSource();
+    // The source's own row gains a second center, so the copy carries both.
     $projectCenter = insertHrCenter($project->city_id, 'Second Center', 'المركز الثاني');
-    ProposalLocation::factory()->forProject($project)->create(['proposal_id' => $previous->id])
-        ->centers()->create(['center_id' => $projectCenter]);
+    $sourceRow->centers()->create(['center_id' => $projectCenter]);
 
     $homs = insertHrCity('Homs', 'حمص');
     $homsCenter = insertHrCenter($homs, 'Hope Center Homs', 'مركز الأمل حمص');
@@ -380,8 +405,10 @@ test('a renewal copies the location rows that still stand, with their centers', 
     $rows = $renewal->locations()->with('centers')->get();
 
     expect($rows)->toHaveCount(2)
-        ->and($rows[0]->project_id)->toBe($project->id)
-        ->and($rows[0]->centerIds())->toBe([$projectCenter])
+        // Y-17: a copied row carries no project (D-93: the renewal is a new
+        // proposal with rows of its own).
+        ->and($rows[0]->project_id)->toBeNull()
+        ->and($rows[0]->centerIds())->toEqualCanonicalizing([$project->center_id, $projectCenter])
         ->and($rows[1]->city_id)->toBe($homs)
         ->and($rows[1]->program_id)->toBe($homsProgram->id)
         ->and($rows[1]->responsible_employee_id)->toBeNull()

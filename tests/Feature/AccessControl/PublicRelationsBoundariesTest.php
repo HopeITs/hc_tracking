@@ -33,7 +33,8 @@ test('the fundraiser moves a proposal from review to submitted (PR-01)', functio
         'requested_currency' => Currency::Usd,
     ]);
     $proposal->projects()->attach(Project::factory()->create()->id, ['target_beneficiaries' => 400]);
-    ProposalLocation::factory()->for($proposal)->complete()->create();
+    // Y-17: the beneficiary figure the transitions require is the row's.
+    ProposalLocation::factory()->for($proposal)->complete()->create(['target_beneficiaries' => 100]);
 
     $this->actingAs($this->fundraiser);
     app(TransitionProposal::class)->handle($proposal, ProposalStatus::Submitted, ProposalStatus::ProposalReview, ['effective_date' => '2026-10-13']);

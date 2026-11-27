@@ -2,27 +2,30 @@
 
 use App\Actions\Proposals\ApproveProposal;
 use App\Actions\Proposals\MaterialiseProposalLocations;
+use App\Enums\AssignmentStatus;
+use App\Enums\ProjectStatus;
 use App\Enums\ProposalStatus;
 use App\Events\ProposalStatusChanged;
-use App\Models\Activity;
 use App\Models\Program;
 use App\Models\Project;
 use App\Models\Proposal;
 use App\Models\ProposalLocation;
 use App\Models\User;
 use Illuminate\Auth\Access\AuthorizationException;
-use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Event;
 use Illuminate\Validation\ValidationException;
 
 /*
-| W-34a slice 2 (D-62): approving a proposal materialises the projects its
-| location rows still lack, inside the approval transaction and before the
-| linked projects are approved. Drafts are created only through SaveProject
-| and linked only through LinkProposalProject; an open project already at the
-| row's center and program is reused with a warning; rows that carry a
-| project are skipped, so a second run writes nothing.
+| W-34a slice 2 (D-62), as Y-17 leaves it: approving a proposal completes its
+| location rows, inside the approval transaction. **No project is created or
+| linked** — a place IS a row (D-93) — so the rows take their dates from the
+| grant and reach `approved` as soon as their responsible has acknowledged.
+|
+| Seven cases went with the feature they guarded, named in the Y-17 handoff:
+| the four on creating a draft through SaveProject and linking it, the two on
+| reusing the open project of a place (rule L94 is withdrawn, D-77) and the
+| one on `projects.create`, a permission §8 removes.
 */
 
 beforeEach(function () {
@@ -39,7 +42,8 @@ beforeEach(function () {
 
 /**
  * A submitted proposal with the given location rows (each row: attributes
- * plus an optional `center_ids` list).
+ * plus an optional `center_ids` list). Every row's responsible has
+ * acknowledged being in charge unless the row says `acknowledged => false`.
  *
  * @param  list<array<string, mixed>>  $rows
  */
@@ -53,7 +57,8 @@ function proposalWithRows(array $rows, ProposalStatus $status = ProposalStatus::
 
     foreach ($rows as $sort => $row) {
         $centerIds = $row['center_ids'] ?? [];
-        unset($row['center_ids']);
+        $acknowledged = $row['acknowledged'] ?? true;
+        unset($row['center_ids'], $row['acknowledged']);
 
         $location = ProposalLocation::factory()->for($proposal)->create([
             'program_id' => test()->program->id,
@@ -65,6 +70,10 @@ function proposalWithRows(array $rows, ProposalStatus $status = ProposalStatus::
 
         foreach ($centerIds as $centerId) {
             $location->centers()->create(['center_id' => $centerId]);
+        }
+
+        if ($acknowledged) {
+            $location->currentAssignment('responsible_employee_id')?->forceFill(['status' => AssignmentStatus::Acknowledged])->save();
         }
     }
 
@@ -124,93 +133,52 @@ function rowsOf(Proposal $proposal): array
     return DB::table('proposal_locations')->where('proposal_id', $proposal->id)->orderBy('sort')->orderBy('id')->get()->all();
 }
 
-// ── Creating ────────────────────────────────────────────────────────────
+// ── Completing the rows ─────────────────────────────────────────────────
 
-test('a new row becomes a draft through SaveProject, linked to the proposal and written back on the row', function () {
-    $proposal = proposalWithRows([newRow()]);
+test('an approval creates no project at all and approves every complete row', function () {
+    // One row per (proposal, city, program): the second place is another city.
+    $homs = insertHrCity('Homs', 'حمص');
+    $proposal = proposalWithRows([newRow(), ['city_id' => $homs, 'center_ids' => [insertHrCenter($homs, 'Hope Center Homs', 'مركز الأمل حمص')]]]);
 
     $result = approveWithRows($this->approver, $proposal);
 
-    $project = DB::table('projects')->sole();
-    $row = rowsOf($proposal)[0];
-
-    expect($project->status)->toBe('draft')
-        ->and((int) $project->center_id)->toBe($this->aleppoCenter)
-        ->and($project->host_center_id)->toBeNull()
-        ->and((int) $project->city_id)->toBe($this->aleppo)
-        ->and((int) $project->program_id)->toBe($this->program->id)
-        ->and((int) $project->user_id)->toBe($this->manager)
-        ->and($project->start_date)->not->toBeNull()
-        ->and(DB::table('project_sector')->count())->toBe(0)
-        ->and(DB::table('project_proposal')->where('proposal_id', $proposal->id)->pluck('project_id')->all())->toEqual([$project->id])
-        ->and((int) $row->project_id)->toBe((int) $project->id)
-        ->and((bool) $row->is_new)->toBeFalse()
+    expect(DB::table('projects')->count())->toBe(0)
+        ->and(DB::table('project_proposal')->count())->toBe(0)
         ->and($proposal->fresh()->status)->toBe(ProposalStatus::Approved)
-        ->and($result->approvedProjectIds)->toBe([])
-        ->and($result->waitingProjectIds)->toBe([(int) $project->id])
-        ->and($result->warnings)->not->toContain('location_linked_existing');
+        ->and($result->approvedLocationIds)->toHaveCount(2);
 
-    expect(Activity::query()->where('subject_type', 'project')->where('event', 'project.created')->count())->toBe(1)
-        ->and(Activity::query()->where('subject_type', 'proposal')->where('event', 'proposal.project_linked')->count())->toBe(1);
+    foreach (rowsOf($proposal) as $row) {
+        expect($row->status)->toBe(ProjectStatus::Approved->value)
+            ->and($row->project_id)->toBeNull()
+            ->and($row->start_date)->toBe('2026-11-01')
+            ->and($row->end_date)->toBe('2027-10-31');
+    }
 });
 
-test('a row linked at approval is mirrored at once (Y-11 slice 2)', function () {
+test('a row whose responsible has not acknowledged is dated and left waiting', function () {
+    $proposal = proposalWithRows([newRow(['acknowledged' => false])]);
+    $this->actingAs($this->approver);
+
+    approveWithRows($this->approver, $proposal);
+    $result = app(MaterialiseProposalLocations::class)->handle($proposal->fresh(), $this->approver->id);
+
+    expect($result->approvedLocationIds)->toBe([])
+        ->and($result->waitingForOwnerLocationIds)->toBe([(int) rowsOf($proposal)[0]->id])
+        ->and(rowsOf($proposal)[0]->status)->toBe(ProjectStatus::Draft->value)
+        ->and(rowsOf($proposal)[0]->start_date)->toBe('2026-11-01');
+});
+
+test('a row already approved is skipped, so a second run writes nothing', function () {
     $proposal = proposalWithRows([newRow()]);
+    $this->actingAs($this->approver);
 
-    approveWithRows($this->approver, $proposal);
+    $first = app(MaterialiseProposalLocations::class)->handle($proposal, $this->approver->id);
+    $second = app(MaterialiseProposalLocations::class)->handle($proposal->fresh(), $this->approver->id);
 
-    $project = DB::table('projects')->sole();
-    $row = rowsOf($proposal)[0];
-
-    // The row carries the project's status, period and calendar the moment it
-    // takes it, so `locations:verify-mirror` is clean straight after approval.
-    expect($row->status)->toBe($project->status)
-        ->and($row->start_date)->toBe($project->start_date)
-        ->and($row->end_date)->toBe($project->end_date)
-        ->and($row->schedule_weekend)->toBe($project->schedule_weekend)
-        ->and($row->slug)->not->toBeNull();
-
-    expect(Artisan::call('locations:verify-mirror'))->toBe(0);
-});
-
-test('a row with two centers creates one draft per center and keeps the first on the row', function () {
-    $proposal = proposalWithRows([newRow(['center_ids' => [$this->aleppoCenter, $this->aleppoEast]])]);
-
-    approveWithRows($this->approver, $proposal);
-
-    $projects = DB::table('projects')->orderBy('id')->get();
-    $rows = rowsOf($proposal);
-
-    expect($projects)->toHaveCount(2)
-        ->and($projects->pluck('center_id')->map(fn ($id): int => (int) $id)->all())->toBe([$this->aleppoCenter, $this->aleppoEast])
-        ->and(DB::table('project_proposal')->where('proposal_id', $proposal->id)->count())->toBe(2)
-        ->and($rows)->toHaveCount(1)
-        ->and((int) $rows[0]->project_id)->toBe((int) $projects[0]->id)
-        ->and(DB::table('proposal_location_centers')->where('proposal_location_id', $rows[0]->id)->count())->toBe(2);
-});
-
-test('an open project already at the center and program is linked instead of created, with a warning', function () {
-    $open = Project::factory()->create(['city_id' => $this->aleppo, 'center_id' => $this->aleppoCenter, 'program_id' => $this->program->id]);
-    $proposal = proposalWithRows([newRow()]);
-
-    $result = approveWithRows($this->approver, $proposal);
-
-    expect(DB::table('projects')->count())->toBe(1)
-        ->and(DB::table('project_proposal')->where('proposal_id', $proposal->id)->pluck('project_id')->all())->toEqual([$open->id])
-        ->and((int) rowsOf($proposal)[0]->project_id)->toBe($open->id)
-        ->and($result->warnings)->toContain('location_linked_existing')
-        ->and($result->waitingProjectIds)->toBe([$open->id]);
-});
-
-test('a row that already carries a project is skipped', function () {
-    $project = Project::factory()->create(['city_id' => $this->aleppo, 'center_id' => $this->aleppoCenter, 'program_id' => $this->program->id]);
-    $proposal = proposalWithRows([['city_id' => $this->aleppo, 'project_id' => $project->id, 'is_new' => false, 'center_ids' => [$this->aleppoCenter]]]);
-    $proposal->projects()->attach($project->id, ['target_beneficiaries' => 100]);
-
-    approveWithRows($this->approver, $proposal);
-
-    expect(DB::table('projects')->count())->toBe(1)
-        ->and($proposal->fresh()->status)->toBe(ProposalStatus::Approved);
+    // The proposal has no grant dates yet, so the first run only reports.
+    expect($second->approvedLocationIds)->toBe([])
+        ->and($second->waitingForOwnerLocationIds)->toBe($first->waitingForOwnerLocationIds)
+        ->and(DB::table('projects')->count())->toBe(0);
 });
 
 // ── Completeness ────────────────────────────────────────────────────────
@@ -229,62 +197,41 @@ test('a row with no program blocks the approval and writes nothing', function ()
     Event::assertNotDispatched(ProposalStatusChanged::class);
 });
 
-test('a new row without a center cannot become a project and blocks the approval', function () {
+test('a new row without a center blocks the approval', function () {
     $proposal = proposalWithRows([newRow(['center_ids' => []])]);
 
     $errors = refusedRowsApproval(fn () => approveWithRows($this->approver, $proposal));
 
     expect($errors['locations_complete'])->toBe([__('proposals.locations_incomplete')])
-        ->and(DB::table('projects')->count())->toBe(0)
         ->and($proposal->fresh()->status)->toBe(ProposalStatus::Submitted);
 });
 
-// ── Owner ───────────────────────────────────────────────────────────────
+// ── Somebody must answer for the place ──────────────────────────────────
 
-test('the responsible owns the project when they manage a program, else the program manager does', function () {
-    $otherProgram = Program::factory()->create(['manager_id' => $this->employee]);
-    $plainEmployee = insertHrEmployee($this->aleppo, 'Omar', 'Nasser', 'عمر', 'ناصر');
-    $proposal = proposalWithRows([
-        newRow(['responsible_employee_id' => $plainEmployee]),
-        ['city_id' => $this->aleppo, 'program_id' => $otherProgram->id, 'responsible_employee_id' => $this->employee, 'center_ids' => [$this->aleppoEast]],
-    ]);
-
-    approveWithRows($this->approver, $proposal);
-
-    $owners = DB::table('projects')->orderBy('id')->pluck('user_id', 'program_id')->map(fn ($id): int => (int) $id)->all();
-
-    expect($owners)->toBe([$this->program->id => $this->manager, $otherProgram->id => $this->employee]);
-});
-
-test('a row whose program has no manager and whose responsible manages none is refused', function () {
+test('a row whose program has no manager and no responsible is refused', function () {
     $this->program->forceFill(['manager_id' => null])->save();
-    $proposal = proposalWithRows([newRow(['responsible_employee_id' => $this->employee])]);
+    $proposal = proposalWithRows([newRow(['responsible_employee_id' => null])]);
 
     $errors = refusedRowsApproval(fn () => approveWithRows($this->approver, $proposal));
 
-    expect($errors['locations_complete'])->toBe([__('proposals.location_owner_required', ['city' => 'Aleppo'])])
-        ->and(DB::table('projects')->count())->toBe(0)
+    expect($errors['locations_complete'])->toBe([__('proposals.locations_incomplete')])
         ->and($proposal->fresh()->status)->toBe(ProposalStatus::Submitted);
+});
+
+test('the materialiser refuses a row that names neither a responsible nor a program manager', function () {
+    $this->program->forceFill(['manager_id' => null])->save();
+    $proposal = proposalWithRows([newRow(['responsible_employee_id' => null])]);
+    $this->actingAs($this->approver);
+
+    $errors = refusedRowsApproval(fn () => app(MaterialiseProposalLocations::class)->handle($proposal, $this->approver->id));
+
+    expect($errors['locations_complete'])->toBe([__('proposals.location_owner_required', ['city' => 'Aleppo'])])
+        ->and(rowsOf($proposal)[0]->status)->toBe(ProjectStatus::Draft->value);
 });
 
 // ── Idempotency, lock, rollback ─────────────────────────────────────────
 
-test('materialising twice creates and links nothing the second time', function () {
-    $proposal = proposalWithRows([newRow()]);
-    $this->actingAs($this->approver);
-
-    $first = app(MaterialiseProposalLocations::class)->handle($proposal, $this->approver->id);
-    $second = app(MaterialiseProposalLocations::class)->handle($proposal->fresh(), $this->approver->id);
-
-    expect($first->createdProjectIds)->toHaveCount(1)
-        ->and($second->createdProjectIds)->toBe([])
-        ->and($second->linkedProjectIds)->toBe([])
-        ->and($second->warnings)->toBe([])
-        ->and(DB::table('projects')->count())->toBe(1)
-        ->and(DB::table('project_proposal')->count())->toBe(1);
-});
-
-test('a double submit approves once: one note, one project, one event', function () {
+test('a double submit approves once: one note, one event, no project', function () {
     $proposal = proposalWithRows([newRow()]);
     Event::fake([ProposalStatusChanged::class]);
 
@@ -293,12 +240,12 @@ test('a double submit approves once: one note, one project, one event', function
 
     expect($errors['status'][0])->toBe(__('proposals.already_approved'))
         ->and($proposal->statusNotes()->count())->toBe(1)
-        ->and(DB::table('projects')->count())->toBe(1);
+        ->and(DB::table('projects')->count())->toBe(0);
 
     Event::assertDispatchedTimes(ProposalStatusChanged::class, 1);
 });
 
-test('a failure after the approval rolls the created projects back and dispatches nothing', function () {
+test('a failure after the approval rolls the rows back and dispatches nothing', function () {
     $proposal = proposalWithRows([newRow()]);
     Event::fake([ProposalStatusChanged::class]);
 
@@ -311,65 +258,32 @@ test('a failure after the approval rolls the created projects back and dispatche
     } catch (RuntimeException) {
     }
 
-    expect(DB::table('projects')->count())->toBe(0)
-        ->and(rowsOf($proposal)[0]->project_id)->toBeNull()
+    expect(rowsOf($proposal)[0]->status)->toBe(ProjectStatus::Draft->value)
+        ->and(rowsOf($proposal)[0]->start_date)->toBeNull()
         ->and($proposal->fresh()->status)->toBe(ProposalStatus::Submitted);
 
     Event::assertNotDispatched(ProposalStatusChanged::class);
 });
 
-test('a refused donor input leaves no materialised project behind', function () {
+test('a refused donor input leaves the rows untouched', function () {
     $proposal = proposalWithRows([newRow()]);
 
     $errors = refusedRowsApproval(fn () => approveWithRows($this->approver, $proposal, ['approval_note' => 'short']));
 
     expect($errors)->toHaveKey('approval_note')
-        ->and(DB::table('projects')->count())->toBe(0)
-        ->and(rowsOf($proposal)[0]->project_id)->toBeNull();
+        ->and(rowsOf($proposal)[0]->status)->toBe(ProjectStatus::Draft->value)
+        ->and(rowsOf($proposal)[0]->start_date)->toBeNull();
 });
 
 // ── Authorization ───────────────────────────────────────────────────────
 
-test('approving without proposals.update is forbidden and creates nothing', function () {
+test('approving without proposals.approve is forbidden and writes nothing', function () {
     $proposal = proposalWithRows([newRow()]);
 
     expect(fn () => approveWithRows(userWithRole('Team Member'), $proposal))->toThrow(AuthorizationException::class);
 
-    expect(DB::table('projects')->count())->toBe(0)
+    expect(rowsOf($proposal)[0]->status)->toBe(ProjectStatus::Draft->value)
         ->and($proposal->fresh()->status)->toBe(ProposalStatus::Submitted);
-});
-
-test('the Public Relations Manager may approve rows that create projects: the role holds projects.create', function () {
-    $proposal = proposalWithRows([newRow()]);
-
-    approveWithRows(userWithRole('Public Relations Manager'), $proposal);
-
-    expect($proposal->fresh()->status)->toBe(ProposalStatus::Approved)
-        ->and(DB::table('projects')->count())->toBe(1);
-});
-
-test('an approver without projects.create cannot approve rows that would create projects', function () {
-    $proposal = proposalWithRows([newRow()]);
-    $approver = userWithRole('Team Member');
-    $approver->givePermissionTo(['proposals.update', 'proposals.approve']);
-
-    expect(fn () => approveWithRows($approver, $proposal))->toThrow(AuthorizationException::class);
-
-    expect(DB::table('projects')->count())->toBe(0)
-        ->and($proposal->fresh()->status)->toBe(ProposalStatus::Submitted)
-        ->and($proposal->statusNotes()->count())->toBe(0);
-});
-
-test('an approver without projects.create still approves rows that only reuse open projects', function () {
-    $open = Project::factory()->create(['city_id' => $this->aleppo, 'center_id' => $this->aleppoCenter, 'program_id' => $this->program->id]);
-    $proposal = proposalWithRows([newRow()]);
-    $approver = userWithRole('Team Member');
-    $approver->givePermissionTo(['proposals.update', 'proposals.approve']);
-
-    approveWithRows($approver, $proposal);
-
-    expect($proposal->fresh()->status)->toBe(ProposalStatus::Approved)
-        ->and((int) rowsOf($proposal)[0]->project_id)->toBe($open->id);
 });
 
 test('the materialiser itself refuses a user who may not approve the proposal', function () {
@@ -378,19 +292,17 @@ test('the materialiser itself refuses a user who may not approve the proposal', 
 
     expect(fn () => app(MaterialiseProposalLocations::class)->handle($proposal, auth()->id()))->toThrow(AuthorizationException::class);
 
-    expect(DB::table('projects')->count())->toBe(0);
+    expect(rowsOf($proposal)[0]->status)->toBe(ProjectStatus::Draft->value);
 });
 
 // ── Preview ─────────────────────────────────────────────────────────────
 
-test('the preview counts what approval would create, reuse and wait for, and writes nothing', function () {
-    $open = Project::factory()->create(['city_id' => $this->aleppo, 'center_id' => $this->aleppoCenter, 'program_id' => $this->program->id]);
+test('the preview counts the places that would be approved, those waiting and those without a program, and writes nothing', function () {
     $homs = insertHrCity('Homs', 'حمص');
     $homsCenter = insertHrCenter($homs, 'Hope Center Homs', 'مركز الأمل حمص');
-    $homsEast = insertHrCenter($homs, 'Hope Center Homs East', 'مركز الأمل حمص الشرقي');
     $proposal = proposalWithRows([
         newRow(),
-        ['city_id' => $homs, 'center_ids' => [$homsCenter, $homsEast]],
+        ['city_id' => $homs, 'center_ids' => [$homsCenter], 'acknowledged' => false],
         ['city_id' => $homs, 'program_id' => null, 'center_ids' => [$homsCenter]],
     ]);
     $rows = rowsOf($proposal);
@@ -398,11 +310,10 @@ test('the preview counts what approval would create, reuse and wait for, and wri
 
     $preview = app(MaterialiseProposalLocations::class)->preview($proposal);
 
-    expect($preview->createdProjectIds)->toBe([(int) $rows[1]->id, (int) $rows[1]->id])
-        ->and($preview->linkedProjectIds)->toBe([$open->id])
-        ->and($preview->waitingLocationIds)->toBe([(int) $rows[2]->id])
-        ->and($preview->warnings)->toBe(['location_linked_existing'])
-        ->and(DB::table('projects')->count())->toBe(1)
-        ->and(DB::table('project_proposal')->count())->toBe(0)
-        ->and(rowsOf($proposal)[0]->project_id)->toBeNull();
+    expect($preview->approvedLocationIds)->toBe([(int) $rows[0]->id])
+        ->and($preview->waitingForOwnerLocationIds)->toBe([(int) $rows[1]->id])
+        ->and($preview->waitingForProgramLocationIds)->toBe([(int) $rows[2]->id])
+        ->and($preview->warnings)->toBe([])
+        ->and(DB::table('projects')->count())->toBe(0)
+        ->and(rowsOf($proposal)[0]->status)->toBe(ProjectStatus::Draft->value);
 });

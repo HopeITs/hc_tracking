@@ -362,7 +362,10 @@
                     >
                         @foreach ($locations as $index => $location)
                             @php
-                                $isLinked = $location['project'] !== null;
+                                // Y-17: a row is locked by its own state — an
+                                // approved place is being delivered at — not by
+                                // a linked project.
+                                $isLinked = $location['locked'] ?? false;
                                 $cityCenters = $location['city_id'] === '' ? [] : ($centersByCity[(int) $location['city_id']] ?? []);
                                 $isCityWide = $location['city_wide'];
                             @endphp
@@ -370,22 +373,19 @@
                                 <div class="flex items-center justify-between gap-2 @2xl/modal:col-span-2">
                                     <p class="min-w-0 truncate text-sm font-semibold text-secondary-dark dark:text-ink">
                                         {{ __('proposals.location_row_title', ['number' => $index + 1]) }}
-                                        @if ($isLinked)
-                                            <span class="ms-1 text-xs font-normal {{ $mutedText }}" dir="auto" data-test="location-linked-project">{{ __('proposals.location_linked_project', ['name' => $location['project']]) }}</span>
-                                        @endif
                                     </p>
                                     @unless ($isLinked)
                                         <x-ui.button type="button" tone="ghost" size="sm" icon="x-mark" class="size-9! shrink-0" wire:click="removeLocationRow({{ $index }})" :aria-label="__('proposals.remove_location', ['number' => $index + 1])" data-test="remove-location" />
                                     @endunless
                                 </div>
 
-                                <x-ui.form-select wire:model.live="locations.{{ $index }}.city_id" :label="__('proposals.location_city')" :placeholder="__('proposals.location_select_city')" required :disabled="$isLinked" :locked-reason="$isLinked ? __('proposals.location_linked_place_locked') : null">
+                                <x-ui.form-select wire:model.live="locations.{{ $index }}.city_id" :label="__('proposals.location_city')" :placeholder="__('proposals.location_select_city')" required :disabled="$isLinked" :locked-reason="$isLinked ? __('proposals.location_approved_place_locked') : null">
                                     @foreach ($cities as $city)
                                         <option value="{{ $city->id }}">{{ $city->name }}</option>
                                     @endforeach
                                 </x-ui.form-select>
 
-                                <x-ui.form-select wire:model.live="locations.{{ $index }}.program_id" :label="__('proposals.location_program')" :placeholder="__('proposals.location_select_program')" required :disabled="$isLinked" :locked-reason="$isLinked ? __('proposals.location_linked_place_locked') : null">
+                                <x-ui.form-select wire:model.live="locations.{{ $index }}.program_id" :label="__('proposals.location_program')" :placeholder="__('proposals.location_select_program')" required :disabled="$isLinked" :locked-reason="$isLinked ? __('proposals.location_approved_place_locked') : null">
                                     @foreach ($programs as $program)
                                         <option value="{{ $program->id }}">{{ $program->name }}</option>
                                     @endforeach

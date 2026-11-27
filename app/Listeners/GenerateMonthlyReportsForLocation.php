@@ -7,7 +7,7 @@ namespace App\Listeners;
 use App\Enums\NotificationKind;
 use App\Enums\NotificationPriority;
 use App\Enums\ReportTemplateStatus;
-use App\Events\ProjectPeriodChanged;
+use App\Events\LocationPeriodChanged;
 use App\Events\ReportTemplateConfirmed;
 use App\Models\MonthlyReport;
 use App\Models\ReportTemplate;
@@ -33,9 +33,9 @@ use Throwable;
  * then one grouped `monthly_reports.generated` notification to the
  * template's preparers: the responsibles of its location rows at its place
  * (D-84, MonthlyReportPreparers), named by its proposals and place (Y-03
- * slice 3); on ProjectPeriodChanged the new months of every confirmed
- * template of the project, without a notification (`project.period_changed`
- * already tells the owner). Existing reports are never touched or deleted.
+ * slice 3); on LocationPeriodChanged the new months of every confirmed
+ * template of the row (Y-17), without a notification
+ * (`project.period_changed` already tells the responsible). Existing reports are never touched or deleted.
  *
  * Queued, retried and idempotent: MonthlyReportGenerator creates only the
  * missing months, so a re-delivered event creates and notifies nothing. The
@@ -44,7 +44,7 @@ use Throwable;
  * runs inline (sync) it is reported and the job failed, never thrown into
  * the request that confirmed the template.
  */
-final class GenerateMonthlyReportsForProject implements ShouldQueue
+final class GenerateMonthlyReportsForLocation implements ShouldQueue
 {
     use InteractsWithQueue;
 
@@ -82,14 +82,14 @@ final class GenerateMonthlyReportsForProject implements ShouldQueue
     }
 
     /**
-     * The project's confirmed templates (PlaceBridge::templateIdsOfProject())
-     * get the months of their window they do not have yet. The templates and
+     * The row's confirmed templates (PlaceBridge::templateIdsOfRow()) get
+     * the months of their window they do not have yet. The templates and
      * their proposals load in two queries, whatever their number.
      */
-    public function handleProjectPeriodChanged(ProjectPeriodChanged $event): void
+    public function handleLocationPeriodChanged(LocationPeriodChanged $event): void
     {
         $this->guarded(function () use ($event): void {
-            $templateIds = app(PlaceBridge::class)->templateIdsOfProject($event->projectId);
+            $templateIds = app(PlaceBridge::class)->templateIdsOfRow($event->row);
 
             if ($templateIds === []) {
                 return;

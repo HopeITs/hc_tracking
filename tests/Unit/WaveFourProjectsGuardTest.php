@@ -7,7 +7,7 @@ declare(strict_types=1);
  * files Y-02 creates or lists; later tasks add theirs. Do not add a file to
  * the allow-list without Dev 1.
  *
- * Y-11 (Dev 1, 23 Nov): `LocationBackfill` and `ProjectLocationMirror` copy
+ * Y-11 (Dev 1, 23 Nov), removed by Y-17: `LocationBackfill` and `ProjectLocationMirror` copied
  * `projects` onto the location rows while `projects` is still the writer, so
  * they must read it. Both are removed by Y-18.
  */
@@ -39,7 +39,9 @@ it('names the Project model only in the place bridge', function (): void {
         ...glob(dirname(__DIR__, 2).'/app/Support/Locations/*.php'),
     ];
 
-    $allowed = ['PlaceBridge.php', 'LocationBackfill.php', 'ProjectLocationMirror.php'];
+    // Y-17 removed LocationBackfill and ProjectLocationMirror with the
+    // mirror itself, so PlaceBridge is the last class that may name Project.
+    $allowed = ['PlaceBridge.php'];
 
     $offenders = [];
 

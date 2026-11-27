@@ -2,7 +2,6 @@
 
 use App\Actions\ProposalPlan\RebaseProposalPlan;
 use App\Actions\Proposals\ApproveProposal;
-use App\Enums\AssignmentStatus;
 use App\Enums\ProposalStatus;
 use App\Events\ProposalStatusChanged;
 use App\Models\Activity;
@@ -31,8 +30,9 @@ function rebaseTestProposal(): Proposal
             'planned_date_end' => '2027-10-31',
         ]);
         $project = Project::factory()->create();
-        $project->currentAssignment('user_id')?->forceFill(['status' => AssignmentStatus::Acknowledged])->save();
         $proposal->projects()->attach($project->id, ['target_beneficiaries' => 100]);
+        // Y-17: approval completes the proposal's places.
+        approvablePlace($proposal, ['target_beneficiaries' => 100]);
 
         return $proposal;
     });
@@ -124,7 +124,8 @@ test('approval moves the plan to the grant period once and cuts dates at the gra
 test('the system logs the rebase with the cut rows and tells the project owner', function () {
     $proposal = rebaseTestProposal();
     $project = $proposal->projects()->sole();
-    $owner = userWithRole('Managers', (int) $project->user_id);
+    // Y-17: the rebase tells the responsibles of the proposal's places.
+    $owner = userWithRole('Managers', (int) $proposal->locations()->sole()->responsible_employee_id);
     rebaseTestTask($proposal, '2026-11-01', '2026-11-30');
     $late = rebaseTestTask($proposal, '2027-09-01', '2027-10-31', ['title' => 'Endline survey']);
     $lateTask = rebaseTestTask($proposal, null, '2027-10-15', ['title' => 'Print the endline banners']);
@@ -146,7 +147,7 @@ test('the system logs the rebase with the cut rows and tells the project owner',
 
 test('nobody is told when no date reaches past the grant end', function () {
     $proposal = rebaseTestProposal();
-    userWithRole('Managers', (int) $proposal->projects()->sole()->user_id);
+    userWithRole('Managers', (int) $proposal->locations()->sole()->responsible_employee_id);
     $planTask = rebaseTestTask($proposal, '2026-11-01', '2026-11-30');
 
     rebaseTestApprove($proposal, grantEnd: '2027-12-31');

@@ -5,10 +5,10 @@ declare(strict_types=1);
 namespace App\Livewire\Concerns\Proposals;
 
 use App\Actions\Targets\ClearLocationTargets;
+use App\Enums\ProjectStatus;
 use App\Models\HrCenter;
 use App\Models\HrCity;
 use App\Models\Program;
-use App\Models\Project;
 use App\Models\Proposal;
 use App\Models\ProposalLocation;
 use App\Support\TargetCounts;
@@ -44,7 +44,7 @@ trait EditsProposalLocations
      * `project` names the linked project of a row that has one; neither is
      * sent.
      *
-     * @var list<array{key: string, city_id: string, program_id: string, responsible_employee_id: string, center_ids: list<string>, city_wide: bool, is_new: bool, project: string|null, location_id: int|null}>
+     * @var list<array{key: string, city_id: string, program_id: string, responsible_employee_id: string, center_ids: list<string>, city_wide: bool, is_new: bool, locked: bool, location_id: int|null}>
      */
     public array $locations = [];
 
@@ -138,12 +138,19 @@ trait EditsProposalLocations
     }
 
     /**
-     * Remove a row. A row that stands for a linked project stays: only
-     * unlinking the project on the Projects tab removes it.
+     * Remove a row.
+     *
+     * Y-17: a row is no longer kept by the project it stood for — nothing
+     * links projects. What keeps a row now is its own state: a row that has
+     * been approved is being delivered at, and a place that has started
+     * belongs in the archive, not in the bin. Beyond that,
+     * `ProposalLocationRows::refuseWhenRowInUse()` refuses on save, with
+     * `proposals.location_in_use`, a row that carries targets, risks,
+     * milestones or a report template.
      */
     public function removeLocationRow(int $index): void
     {
-        if (! isset($this->locations[$index]) || $this->locations[$index]['project'] !== null) {
+        if (! isset($this->locations[$index]) || $this->locations[$index]['locked']) {
             return;
         }
 
@@ -296,7 +303,7 @@ trait EditsProposalLocations
     {
         $rows = ProposalLocation::query()
             ->where('proposal_id', $proposalId)
-            ->with(['centers', 'project:id,name'])
+            ->with(['centers'])
             ->orderBy('sort')
             ->orderBy('id')
             ->get();
@@ -309,7 +316,9 @@ trait EditsProposalLocations
             'center_ids' => array_map('strval', $row->centerIds()),
             'city_wide' => (bool) $row->city_wide,
             'is_new' => (bool) $row->is_new,
-            'project' => $row->project?->name,
+            // Y-17: an approved row is being delivered at, so its place is
+            // fixed and it cannot be removed from the form.
+            'locked' => $row->status !== ProjectStatus::Draft,
             'location_id' => $row->id,
         ])->all());
 
@@ -358,12 +367,11 @@ trait EditsProposalLocations
     }
 
     /**
-     * @param  array{city_id: string, program_id: string, responsible_employee_id: string, center_ids: list<string>, city_wide: bool, is_new: bool, project: string|null, location_id?: int|null}  $row
+     * @param  array{city_id: string, program_id: string, responsible_employee_id: string, center_ids: list<string>, city_wide: bool, is_new: bool, locked?: bool, location_id?: int|null}  $row
      */
     private function isBlankLocationRow(array $row): bool
     {
-        return $row['project'] === null
-            && $row['city_id'] === ''
+        return $row['city_id'] === ''
             && $row['program_id'] === ''
             && $row['responsible_employee_id'] === ''
             && $row['center_ids'] === []
@@ -371,7 +379,7 @@ trait EditsProposalLocations
     }
 
     /**
-     * @return array{key: string, city_id: string, program_id: string, responsible_employee_id: string, center_ids: list<string>, city_wide: bool, is_new: bool, project: null, location_id: null}
+     * @return array{key: string, city_id: string, program_id: string, responsible_employee_id: string, center_ids: list<string>, city_wide: bool, is_new: bool, locked: false, location_id: null}
      */
     private function blankLocationRow(): array
     {
@@ -383,7 +391,7 @@ trait EditsProposalLocations
             'center_ids' => [],
             'city_wide' => false,
             'is_new' => false,
-            'project' => null,
+            'locked' => false,
             'location_id' => null,
         ];
     }
@@ -393,13 +401,14 @@ trait EditsProposalLocations
      * the project page): its city, program, responsible and center. The
      * project is not linked; the row is a place like any other.
      */
-    protected function seedLocationRowFromProject(Project $project): void
+    protected function seedLocationRowFromPlace(ProposalLocation $place): void
     {
         $row = $this->blankLocationRow();
-        $row['city_id'] = (string) $project->city_id;
-        $row['program_id'] = (string) $project->program_id;
-        $row['responsible_employee_id'] = $project->user_id !== null ? (string) $project->user_id : '';
-        $row['center_ids'] = $project->center_id !== null ? [(string) $project->center_id] : [];
+        $row['city_id'] = (string) $place->city_id;
+        $row['program_id'] = $place->program_id !== null ? (string) $place->program_id : '';
+        $row['responsible_employee_id'] = $place->responsible_employee_id !== null ? (string) $place->responsible_employee_id : '';
+        $row['center_ids'] = array_map(strval(...), $place->centerIds());
+        $row['city_wide'] = $place->city_wide;
 
         $this->locations = [$row];
     }

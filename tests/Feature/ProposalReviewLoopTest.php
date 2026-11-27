@@ -54,17 +54,38 @@ function configureReviewSlot(ReviewerSlot $slot, ?int $positionId): void
 }
 
 /**
- * A proposal at the given status with one linked project that meets every
- * transition requirement.
+ * A proposal at the given status with one place that meets every transition
+ * requirement (Y-17: the reviewers invited are the rows' responsibles and
+ * the managers of their programs).
  */
 function reviewableProposal(ProposalStatus $status = ProposalStatus::ConceptNote): Proposal
 {
     $proposal = Proposal::factory()->create(['status' => $status, 'requested_budget' => '120000.00', 'requested_currency' => Currency::Usd]);
     $project = Project::factory()->create();
     $proposal->projects()->attach($project->id, ['target_beneficiaries' => 400]);
-    ProposalLocation::factory()->for($proposal)->forProject($project)->create();
+    ProposalLocation::factory()->for($proposal)->forProject($project)->create(['target_beneficiaries' => 100]);
 
     return $proposal;
+}
+
+/**
+ * A second place of the proposal, with its own program and responsible.
+ */
+function reviewablePlace(Proposal $proposal): ProposalLocation
+{
+    $cityId = insertHrCity('Place '.Str::random(5), 'مكان');
+    // Two people, so the place brings both a project_owner and a
+    // program_manager slot in: one employee would take only the first.
+    $responsible = insertHrEmployee($cityId);
+    $manager = insertHrEmployee($cityId);
+
+    return ProposalLocation::factory()->create([
+        'proposal_id' => $proposal->id,
+        'city_id' => $cityId,
+        'program_id' => Program::factory()->create(['manager_id' => $manager])->id,
+        'responsible_employee_id' => $responsible,
+        'target_beneficiaries' => 120,
+    ]);
 }
 
 /**
@@ -105,9 +126,9 @@ function notificationKeysOf(User $user): array
  *
  * @return array{owner: int, programManager: int}
  */
-function projectPeople(Project $project): array
+function projectPeople(ProposalLocation $row): array
 {
-    return ['owner' => (int) $project->user_id, 'programManager' => (int) Program::query()->whereKey($project->program_id)->value('manager_id')];
+    return ['owner' => (int) $row->responsible_employee_id, 'programManager' => (int) Program::query()->whereKey($row->program_id)->value('manager_id')];
 }
 
 beforeEach(fn () => $this->travelTo('2026-10-13 10:00:00'));
@@ -122,7 +143,7 @@ test('entering concept note review invites the four slots, the project owner and
     }
 
     $proposal = reviewableProposal();
-    $people = projectPeople($proposal->projects()->sole());
+    $people = projectPeople($proposal->locations()->sole());
     $actor = userWithRole('Financial');
     $reviewerUsers = array_map(fn (int $employeeId): User => userWithRole('Team Member', $employeeId), [...array_values($holders), ...array_values($people)]);
 
@@ -153,7 +174,7 @@ test('entering concept note review invites the four slots, the project owner and
 test('re-entering a review adds only newly linked people and re-notifies only those who have not seen it', function () {
     $mealManager = holdReviewSlot(ReviewerSlot::MealManager);
     $proposal = reviewableProposal();
-    $first = projectPeople($proposal->projects()->sole());
+    $first = projectPeople($proposal->locations()->sole());
     $actor = userWithRole('Financial');
     $mealUser = userWithRole('Team Member', $mealManager);
     $ownerUser = userWithRole('Team Member', $first['owner']);
@@ -162,8 +183,8 @@ test('re-entering a review adds only newly linked people and re-notifies only th
     ProposalReviewer::query()->where('employee_id', $mealManager)->update(['seen_at' => now()]);
     moveProposal($actor, $proposal->fresh(), ProposalStatus::ConceptNote, ['reason' => 'Rework the problem statement.']);
 
-    $second = Project::factory()->create();
-    $proposal->projects()->attach($second->id, ['target_beneficiaries' => 120]);
+    // Y-17: a newly linked **place** is what brings new people in.
+    $second = reviewablePlace($proposal);
     $financeManager = holdReviewSlot(ReviewerSlot::FinanceManager);
 
     moveProposal($actor, $proposal->fresh(), ProposalStatus::ConceptNoteReview);
@@ -209,7 +230,7 @@ test('the review rows of one stage never count for the other', function () {
 
 test('a person in two slots gets one row with the higher slot, and an inactive reviewer keeps the row but is not notified', function () {
     $proposal = reviewableProposal();
-    $people = projectPeople($proposal->projects()->sole());
+    $people = projectPeople($proposal->locations()->sole());
     holdReviewSlot(ReviewerSlot::Ceo, $people['owner']);
     DB::connection('hr')->table('employees')->where('id', $people['programManager'])->update(['is_active' => false]);
     $inactiveUser = userWithRole('Team Member', $people['programManager']);
@@ -331,7 +352,7 @@ test('an added reviewer hears at once and General Management through oversight, 
 
 test('marking as seen tells the project owner at once; it is a digest event, so oversight waits for the daily summary', function () {
     $proposal = reviewableProposal(ProposalStatus::ConceptNoteReview);
-    $owner = projectPeople($proposal->projects()->sole())['owner'];
+    $owner = projectPeople($proposal->locations()->sole())['owner'];
     ProposalReviewer::factory()->create(['proposal_id' => $proposal->id, 'stage' => ReviewStage::ConceptNote, 'employee_id' => $owner, 'slot' => ReviewerSlot::ProjectOwner]);
     $ownerUser = userWithRole('Team Member', $owner);
     $readerId = insertHrEmployee(firstNameEn: 'Reader');
@@ -349,7 +370,7 @@ test('a reviewer with results.create attaches a need assessment and the loop hea
     $mealManager = holdReviewSlot(ReviewerSlot::MealManager);
     $mealManagerUser = userWithRole('MEAL', $mealManager);
     $proposal = reviewableProposal(ProposalStatus::ConceptNoteReview);
-    $owner = projectPeople($proposal->projects()->sole())['owner'];
+    $owner = projectPeople($proposal->locations()->sole())['owner'];
     $ownerUser = userWithRole('Team Member', $owner);
     ProposalReviewer::factory()->create(['proposal_id' => $proposal->id, 'stage' => ReviewStage::ConceptNote, 'employee_id' => $owner, 'slot' => ReviewerSlot::ProjectOwner]);
     $officerId = insertHrEmployee(firstNameEn: 'Officer');

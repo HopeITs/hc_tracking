@@ -4,11 +4,11 @@ declare(strict_types=1);
 
 namespace App\Support;
 
+use App\Models\ActivitySchedule;
 use App\Models\PlanIndicator;
-use App\Models\Project;
 use App\Models\Proposal;
 use App\Models\ProposalLocation;
-use App\Support\Locations\ProjectLocationMirror;
+use App\Support\Reporting\PlaceBridge;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Validation\ValidationException;
 
@@ -16,31 +16,29 @@ use Illuminate\Validation\ValidationException;
  * The one writer of `proposal_locations` rows (contracts.md §7, W-34a).
  *
  * Every entry point expects the proposal row already locked by its caller
- * (SaveProposal, LinkProposalProject, UnlinkProposalProject, the backfill)
- * and runs inside that caller's transaction. It writes rows and centers and
- * returns the counts the caller records and dispatches; it records nothing
- * itself.
+ * (SaveProposal) and runs inside that caller's transaction. It writes rows
+ * and centers and returns the counts the caller records and dispatches; it
+ * records nothing itself.
  *
  * A row is identified by its city and program: the unique index
  * `(proposal_id, city_id, program_id)` leaves "no program yet" rows alone,
- * so the application keeps at most one of those per city. Rows that carry a
- * project are owned by the link: a replacement updates them but never
- * deletes them, only UnlinkProposalProject does. After approval only
- * fillEmpty writes: centers or `city_wide` on a row that has neither (D-83).
+ * so the application keeps at most one of those per city. After approval
+ * only fillEmpty writes: centers or `city_wide` on a row that has neither
+ * (D-83).
  *
- * Targets follow their row (Y-10): every change of a row's centers,
- * field-work flag or project calls PlanIndicator::syncPlaceFromRow() in the
- * same transaction, and a row that carries targets is never removed.
+ * Targets follow their row (Y-10): every change of a row's centers or
+ * field-work flag calls PlanIndicator::syncPlaceFromRow() in the same
+ * transaction, and a row that carries targets is never removed.
  */
 final class ProposalLocationRows
 {
     /**
      * The rows that keep the proposal from being approved: the one
      * definition of the `locations_complete` key (contracts.md §2). A row is
-     * complete when it names a program and a responsible, stands for a
-     * project, runs from at least one center (a project cannot be created
-     * without a placement, W-01) or is city-wide field work with no center
-     * (D-88).
+     * complete when it names a program and a responsible, and runs from at
+     * least one center or is city-wide field work with no center (D-88).
+     * Y-17: "stands for a project" is gone — a place IS a row (D-93), so
+     * there is nothing for it to stand for.
      * A proposal without rows is complete: it approves as before W-34a.
      *
      * @return list<int>
@@ -53,7 +51,7 @@ final class ProposalLocationRows
         foreach ($proposal->locations()->with('centers')->orderBy('sort')->orderBy('id')->get() as $row) {
             $isComplete = $row->program_id !== null
                 && $row->responsible_employee_id !== null
-                && ($row->project_id !== null || $row->city_wide || $row->centers->isNotEmpty());
+                && ($row->city_wide || $row->centers->isNotEmpty());
 
             if (! $isComplete) {
                 $ids[] = $row->id;
@@ -77,8 +75,8 @@ final class ProposalLocationRows
         $kept = [];
 
         foreach ($existing as $key => $row) {
-            if (! array_key_exists($key, $sentKeys) && $row->project_id === null) {
-                $this->refuseWhenRowHasTargets($row);
+            if (! array_key_exists($key, $sentKeys)) {
+                $this->refuseWhenRowInUse($row);
                 $row->delete();
                 $counts['removed']++;
                 unset($existing[$key]);
@@ -151,94 +149,6 @@ final class ProposalLocationRows
     }
 
     /**
-     * Give a linked project its row: the row waiting on the project's city
-     * and program is filled, else a new row is added with the project's
-     * placement. Returns the counts of what changed.
-     *
-     * @return array{added: int, removed: int, changed: int}
-     */
-    public function attachProject(Proposal $locked, Project $project): array
-    {
-        $counts = ['added' => 0, 'removed' => 0, 'changed' => 0];
-
-        if ($locked->locations()->where('project_id', $project->id)->exists()) {
-            return $counts;
-        }
-
-        $row = $locked->locations()
-            ->where('city_id', $project->city_id)
-            ->where('program_id', $project->program_id)
-            ->with('centers')
-            ->first();
-
-        $centerIds = $project->center_id === null ? [] : [(int) $project->center_id];
-
-        if ($row === null) {
-            $row = new ProposalLocation([
-                'proposal_id' => $locked->id,
-                'city_id' => $project->city_id,
-                'program_id' => $project->program_id,
-                'responsible_employee_id' => $project->user_id,
-                'is_new' => false,
-                'project_id' => $project->id,
-                'sort' => (int) $locked->locations()->max('sort') + ($locked->locations()->exists() ? 1 : 0),
-            ]);
-            $row->save();
-            $this->writeCenters($row, $centerIds);
-            app(ProjectLocationMirror::class)->apply($project);
-            $counts['added']++;
-
-            return $counts;
-        }
-
-        if ($row->project_id !== null) {
-            // A second project on the same city and program (another center):
-            // the row keeps its first project and gains the center.
-            $this->writeCenters($row, array_values(array_unique([...$row->centerIds(), ...$centerIds])));
-            PlanIndicator::syncPlaceFromRow($row);
-            app(ProjectLocationMirror::class)->apply($project);
-            $counts['changed']++;
-
-            return $counts;
-        }
-
-        $row->forceFill([
-            'project_id' => $project->id,
-            'is_new' => false,
-            'responsible_employee_id' => $row->responsible_employee_id ?? $project->user_id,
-        ])->save();
-        $this->writeCenters($row, array_values(array_unique([...$row->centerIds(), ...$centerIds])));
-        PlanIndicator::syncPlaceFromRow($row);
-
-        // A row that has just taken a project needs the whole mirror, not
-        // only the columns: its sectors, the owner's acknowledgement and the
-        // files have never been written. Approval links its rows through here.
-        app(ProjectLocationMirror::class)->apply($project);
-
-        $counts['changed']++;
-
-        return $counts;
-    }
-
-    /**
-     * Remove the row of an unlinked project. Returns the counts of what changed.
-     *
-     * @return array{added: int, removed: int, changed: int}
-     */
-    public function detachProject(Proposal $locked, int $projectId): array
-    {
-        $removed = 0;
-
-        foreach ($locked->locations()->where('project_id', $projectId)->get() as $row) {
-            $this->refuseWhenRowHasTargets($row);
-            $row->delete();
-            $removed++;
-        }
-
-        return ['added' => 0, 'removed' => $removed, 'changed' => 0];
-    }
-
-    /**
      * The proposal's rows keyed by city and program.
      *
      * @return array<string, ProposalLocation>
@@ -297,15 +207,14 @@ final class ProposalLocationRows
     }
 
     /**
-     * Bring a kept row in line with what was sent. A row that carries a
-     * project stays linked and never new. Sort changes do not count.
+     * Bring a kept row in line with what was sent. Sort changes do not count.
      *
      * @param  array{program_id: int|null, responsible_employee_id: int|null, center_ids: list<int>, is_new: bool, city_wide?: bool}  $sent
      */
     private function update(ProposalLocation $row, array $sent, int $sort): bool
     {
         $changed = false;
-        $isNew = $row->project_id === null && $sent['is_new'];
+        $isNew = $sent['is_new'];
         $cityWide = $sent['city_wide'] ?? false;
         $centerIds = $cityWide ? [] : $sent['center_ids'];
         $placeChanged = $row->city_wide !== $cityWide;
@@ -341,12 +250,27 @@ final class ProposalLocationRows
      * lose their place, and the foreign key restricts it anyway. MEAL clears
      * the row's targets first.
      *
+     * A row that is already being delivered is not removed either (Y-17):
+     * deleting it would take its milestones, risks, reported figures and
+     * report template with it (MediaOwnerObserver removes its files), and a
+     * place that has started belongs in the archive, not in the bin. This
+     * holds before approval too, because a row can carry a milestone or a
+     * risk while the proposal is still a draft.
+     *
      * @throws ValidationException under `locations`
      */
-    private function refuseWhenRowHasTargets(ProposalLocation $row): void
+    private function refuseWhenRowInUse(ProposalLocation $row): void
     {
         if ($row->targets()->exists()) {
             throw ValidationException::withMessages(['locations' => __('proposals.location_has_targets')]);
+        }
+
+        $inUse = $row->risks()->exists()
+            || ActivitySchedule::query()->where('proposal_location_id', $row->getKey())->exists()
+            || app(PlaceBridge::class)->templateIdsOfRow($row) !== [];
+
+        if ($inUse) {
+            throw ValidationException::withMessages(['locations' => __('proposals.location_in_use')]);
         }
     }
 

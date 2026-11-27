@@ -187,41 +187,42 @@ it('takes the row center over the project center for a proposal target (Y-10)', 
 });
 
 it('turns a row target shared in the same save when a second center is added (Y-10)', function (): void {
-    $first = Project::factory()->create(['city_id' => $this->cityId, 'program_id' => $this->program->id, 'center_id' => $this->centerA]);
-    $second = Project::factory()->create(['city_id' => $this->cityId, 'program_id' => $this->program->id, 'center_id' => $this->centerB]);
-    $row = bridgeRow($this->proposal, $this->cityId, $this->program, [$this->centerA], ['project_id' => $first->id]);
-    $target = PlanIndicator::factory()->forProposal($this->proposal)->create(['project_id' => $first->id]);
+    // Y-17: a second centre reaches the row through the proposal form
+    // (ProposalLocationRows::replace), not by linking a second project.
+    $row = bridgeRow($this->proposal, $this->cityId, $this->program, [$this->centerA]);
+    $target = PlanIndicator::factory()->forProposal($this->proposal)->create([
+        'proposal_location_id' => $row->id,
+        ...PlanIndicator::placeColumnsForRow($row),
+    ]);
 
     expect($target->refresh()->only(['proposal_location_id', 'center_id', 'all_centers']))->toBe(['proposal_location_id' => $row->id, 'center_id' => $this->centerA, 'all_centers' => false]);
 
-    DB::transaction(fn () => app(ProposalLocationRows::class)->attachProject($this->proposal, $second));
+    DB::transaction(fn () => app(ProposalLocationRows::class)->replace($this->proposal, [[
+        'city_id' => $this->cityId,
+        'program_id' => $this->program->id,
+        'responsible_employee_id' => null,
+        'center_ids' => [$this->centerA, $this->centerB],
+        'is_new' => false,
+    ]]));
 
-    expect($target->refresh()->only(['proposal_location_id', 'project_id', 'center_id', 'all_centers']))->toBe([
+    expect($target->refresh()->only(['proposal_location_id', 'center_id', 'all_centers']))->toBe([
         'proposal_location_id' => $row->id,
-        'project_id' => $first->id,
         'center_id' => null,
         'all_centers' => true,
     ])
         ->and($this->bridge->targetCoversPlace($target, new ReportPlace($this->cityId, $this->program->id, $this->centerB, false)))->toBeTrue();
 });
 
-it('gives a row target the project the approval links to its row (Y-10)', function (): void {
-    $row = bridgeRow($this->proposal, $this->cityId, $this->program, [$this->centerA]);
-    $target = PlanIndicator::factory()->forProposal($this->proposal)->create(['proposal_location_id' => $row->id, ...PlanIndicator::placeColumnsForRow($row)]);
-    $project = Project::factory()->create(['city_id' => $this->cityId, 'program_id' => $this->program->id, 'center_id' => $this->centerA]);
-
-    DB::transaction(fn () => app(ProposalLocationRows::class)->attachProject($this->proposal, $project));
-
-    expect($target->refresh()->project_id)->toBe($project->id);
-});
-
 it('refuses to remove a row that still has targets (Y-10)', function (): void {
+    // Y-17: detachProject went with the link, so the refusal is reached
+    // through replace() — the only writer of the set that is left.
     $row = bridgeRow($this->proposal, $this->cityId, $this->program, [$this->centerA]);
-    $project = Project::factory()->create(['city_id' => $this->cityId, 'program_id' => $this->program->id]);
-    $row->forceFill(['project_id' => $project->id])->save();
-    PlanIndicator::factory()->forProposal($this->proposal)->create(['project_id' => $project->id]);
+    PlanIndicator::factory()->forProposal($this->proposal)->create([
+        'proposal_location_id' => $row->id,
+        ...PlanIndicator::placeColumnsForRow($row),
+    ]);
 
-    expect(fn () => app(ProposalLocationRows::class)->detachProject($this->proposal, $project->id))
+    expect(fn () => DB::transaction(fn () => app(ProposalLocationRows::class)->replace($this->proposal, [])))
         ->toThrow(ValidationException::class, __('proposals.location_has_targets'));
     expect(ProposalLocation::query()->whereKey($row->id)->exists())->toBeTrue();
 });

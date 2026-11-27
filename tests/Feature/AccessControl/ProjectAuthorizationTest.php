@@ -37,21 +37,27 @@ test('the owner edits their project and uploads a file, but cannot archive it', 
     ($this->index)($this->owner)->call('confirmArchive', $this->rowId)->assertForbidden();
 });
 
-test('an owner\'s edit keeps the project\'s program and owner', function () {
-    $otherProgram = Program::factory()->create();
-
-    ($this->index)($this->owner)
+test('an owner\'s edit offers no program or owner field, so it cannot move the place', function () {
+    // Y-17: the place, its program and its responsible come from the proposal
+    // (D-93), so the delivery form has no field for any of them — the owner
+    // edits what delivery owns and nothing else.
+    $page = ($this->index)($this->owner)
         ->call('openEditModal', $this->rowId)
-        ->set('name', 'Renamed by owner')
-        ->set('programId', (string) $otherProgram->id)
-        ->set('userId', (string) insertHrEmployee())
+        ->assertDontSeeHtml('wire:model="programId"')
+        ->assertDontSeeHtml('wire:model="userId"')
+        ->assertDontSeeHtml('wire:model="name"')
+        ->set('description', 'Rewritten by the owner')
         ->call('saveProject')
         ->assertHasNoErrors();
 
-    expect($this->project->fresh())
-        ->name->toBe('Renamed by owner')
+    expect(property_exists($page->instance(), 'name'))->toBeFalse()
+        ->and(property_exists($page->instance(), 'programId'))->toBeFalse()
+        ->and(property_exists($page->instance(), 'userId'))->toBeFalse();
+
+    expect(rowFor($this->project)->fresh())
+        ->description->toBe('Rewritten by the owner')
         ->program_id->toBe($this->project->program_id)
-        ->user_id->toBe($this->ownerEmployee);
+        ->responsible_employee_id->toBe($this->ownerEmployee);
 });
 
 test('an owner cannot archive a project', function () {
@@ -59,7 +65,7 @@ test('an owner cannot archive a project', function () {
         ->call('confirmArchive', $this->rowId)
         ->assertForbidden();
 
-    expect($this->project->fresh()->status)->not->toBe(ProjectStatus::Archived);
+    expect(rowFor($this->project)->fresh()->status)->not->toBe(ProjectStatus::Archived);
 });
 
 test('a program manager edits any project in their program', function () {
@@ -70,12 +76,14 @@ test('a program manager edits any project in their program', function () {
     ($this->index)($programManager)->call('openEditModal', $this->rowId)->assertOk();
 });
 
-test('managers archive and restore projects', function () {
+test('managers archive and restore places', function () {
     $manager = userWithRole('Managers');
+    // Y-17: archiving writes the location row, not the project.
+    $row = rowFor($this->project);
 
     ($this->index)($manager)->call('confirmArchive', $this->rowId)->call('archiveProject');
-    expect($this->project->fresh()->status)->toBe(ProjectStatus::Archived);
+    expect($row->fresh()->status)->toBe(ProjectStatus::Archived);
 
     ($this->index)($manager)->call('restoreProject', $this->rowId);
-    expect($this->project->fresh()->status)->not->toBe(ProjectStatus::Archived);
+    expect($row->fresh()->status)->not->toBe(ProjectStatus::Archived);
 });

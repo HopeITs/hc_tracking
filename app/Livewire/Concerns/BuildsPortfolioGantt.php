@@ -197,10 +197,15 @@ trait BuildsPortfolioGantt
             ));
             $this->rollUp($rows, 0);
 
-            $projects = $proposal->projects()
-                ->select(['projects.id', 'projects.name', 'projects.status', 'projects.start_date', 'projects.end_date', 'projects.user_id'])
-                ->with('user:id,first_name_en,last_name_en,first_name_ar,last_name_ar')
-                ->orderBy('projects.start_date')
+            // Y-17: the proposal delivers at its own location rows (D-93), and
+            // pushProjectBranch() has taken a row since Y-16. Reading the
+            // project pivot here showed nothing for a proposal whose places
+            // have no project, which is every proposal from Y-17 on.
+            $projects = $proposal->locations()
+                ->select(['id', 'proposal_id', 'project_id', 'slug', 'status', 'start_date', 'end_date', 'program_id', 'city_id', 'city_wide', 'responsible_employee_id', 'schedule_weekend'])
+                ->with(['program:id', 'responsible:id,first_name_en,last_name_en,first_name_ar,last_name_ar', 'city:id,name_en,name_ar', 'centers', 'proposal:id,name'])
+                ->orderBy('start_date')
+                ->orderBy('id')
                 ->get();
 
             if ($projects->isNotEmpty()) {

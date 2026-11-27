@@ -606,6 +606,7 @@ return [
     'location_locked_after_approval' => 'This place is locked after approval. You can only add centers to a row that has none, or mark it field work.',
     'location_city_wide_has_centers' => 'A field-work row can’t also have centers. Remove the centers or untick Field work.',
     'location_has_targets' => 'A location you removed still has targets. Clear its targets on the Targets tab first, then remove it.',
+    'location_in_use' => 'A location you removed is already being delivered: it has milestones, risks, reported targets or a report template. Archive it instead of removing it.',
     'location_targets_title' => 'This location has targets',
     'location_targets_body' => '{1} One target is set for this location. It has to go before the location can be removed.|[2,*] :count targets are set for this location. They have to go before the location can be removed.',
     'location_targets_reported' => '{1} One of them has reports, so it can\'t be deleted.|[2,*] :count of them have reports, so they can\'t be deleted.',
@@ -625,7 +626,7 @@ return [
     'locations_none_yet' => 'No place recorded yet. Add one so the team knows which centers run this proposal.',
     'location_row_title' => 'Place :number',
     'location_linked_project' => '(linked project: :name)',
-    'location_linked_place_locked' => 'The linked project sets this. Unlink it in the Projects tab to change it.',
+    'location_approved_place_locked' => 'This place has been approved, so it cannot be moved. Archive it instead.',
     'remove_location' => 'Remove place :number',
     'add_location' => 'Add a place',
     'location_city' => 'City',
@@ -666,10 +667,11 @@ return [
     'location_status_missing_center' => 'Missing center',
     'location_status_missing_responsible' => 'Missing responsible',
     'location_status_waiting_program' => 'Waiting for program',
-    'approval_locations_title' => 'What happens to the location rows',
-    'approval_locations_create' => '{0} No new project|{1} Will create 1 project|[2,*] Will create :count projects',
-    'approval_locations_link' => '{0} no open project linked|{1} link 1 open project|[2,*] link :count open projects',
-    'approval_locations_wait' => '{0} no row waits for a program|{1} 1 row waits for its program|[2,*] :count rows wait for their program',
+    'location_program_pending' => 'New program: :name',
+    'approval_locations_title' => 'What happens to the places',
+    'approval_locations_approved' => '{0} No place is approved yet|{1} 1 place approved|[2,*] :count places approved',
+    'approval_locations_waiting' => '{0} none waiting for its responsible|{1} 1 waiting for its responsible|[2,*] :count waiting for their responsible',
+    'approval_locations_wait' => '{0} no place waits for a program|{1} 1 place waits for its program|[2,*] :count places wait for their program',
 
     /* Y-09 slice 2: change requests on an approved proposal (D-89, D-89a). */
     'change' => [

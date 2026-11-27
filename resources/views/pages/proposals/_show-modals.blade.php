@@ -1,6 +1,6 @@
 {{--
     Every dialog of proposals/show, in page order: status, proposal form,
-    agreement, tranche, unlink, file, file preview, file delete and add
+    agreement, tranche, file, file preview, file delete and add
     task. Included by ⚡show.blade.php.
 --}}
 @use('App\Enums\FileType')
@@ -108,29 +108,6 @@
             :confirming-delete="$confirmingTransferDelete"
         />
     @endcanany
-
-    <x-ui.confirm-modal
-        icon="link-slash"
-        wire:model="showUnlinkModal"
-        tone="neutral"
-        :title="__('proposals.stop_funding_this_project')"
-        :message="$unlinkingProjectId !== null && ($unlinking = $this->projects->firstWhere('project_id', $unlinkingProjectId)) !== null ? __('proposals.unlink_project_consequence', ['name' => $unlinking->headline()]) : null"
-        confirm="unlinkProject"
-        :confirm-label="$this->unlinkDeletesTargets ? __('proposals.unlink_with_targets') : __('proposals.unlink_project')"
-        confirm-test="confirm-unlink-project"
-    >
-        @if ($showUnlinkModal)
-            @if ($unlinkTargets['count'] > 0)
-                <x-proposals.targets-notice
-                    :body="trans_choice('proposals.location_targets_body', $unlinkTargets['count'], ['count' => $unlinkTargets['count']])"
-                    :reported="$unlinkTargets['reported'] > 0 ? trans_choice('proposals.location_targets_reported', $unlinkTargets['reported'], ['count' => $unlinkTargets['reported']]) : null"
-                    :no-right="$unlinkTargets['reported'] === 0 && ! $this->unlinkDeletesTargets ? __('proposals.location_targets_no_right') : null"
-                    :url="route('proposals.show', ['proposal' => $this->proposal, 'tab' => 'targets'])"
-                />
-            @endif
-            <flux:error name="project" />
-        @endif
-    </x-ui.confirm-modal>
 
     <x-ui.modal
         wire:model="showNegotiationModal"

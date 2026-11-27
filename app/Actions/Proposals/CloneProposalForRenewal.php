@@ -11,8 +11,8 @@ use App\Models\HrCenter;
 use App\Models\HrCity;
 use App\Models\HrEmployee;
 use App\Models\Indicator;
-use App\Models\Project;
 use App\Models\Proposal;
+use App\Models\ProposalLocation;
 use App\Models\Result;
 use App\Models\Task;
 use App\Models\User;
@@ -134,11 +134,10 @@ final class CloneProposalForRenewal
             return $this->result($this->clonePayroll($previous, $data, $user));
         }
 
-        $projects = $this->projects($previous);
-        $locations = $this->locations($previous);
+        ['rows' => $locations, 'beneficiaries' => $beneficiaries, 'skipped' => $skippedPlaces] = $this->locations($previous);
 
-        if ($projects['ids'] === [] && $locations === []) {
-            throw ValidationException::withMessages(['projectIds' => __('proposals.link_at_least_one_project')]);
+        if ($locations === []) {
+            throw ValidationException::withMessages(['locations' => __('proposals.locations_required')]);
         }
 
         ['begin' => $begin, 'end' => $end] = $this->plannedDates($previous, $data);
@@ -147,9 +146,10 @@ final class CloneProposalForRenewal
             'name' => isset($data['name']) && $data['name'] !== '' ? (string) $data['name'] : $previous->name,
             'donorId' => $previous->donor_id,
             ...$this->partnerPayload($previous),
-            'projectIds' => $projects['ids'],
-            ...($locations === [] ? [] : ['locations' => $locations]),
-            'beneficiaries' => $projects['beneficiaries'],
+            'locations' => $locations,
+            // The renewal's rows do not exist yet, so the figures are copied
+            // onto them below, by place (Y-17).
+            'beneficiaries' => [],
             'plannedDateBegin' => $begin->toDateString(),
             'plannedDateEnd' => $end->toDateString(),
             'notes' => array_key_exists('notes', $data) ? $data['notes'] : $previous->notes,
@@ -176,7 +176,9 @@ final class CloneProposalForRenewal
             $skippedParts[] = 'plan';
         }
 
-        return $this->result($renewal, $projects['skipped'], $projects['replaced'], $skippedIndicators, $skippedParts, $plan);
+        $this->copyBeneficiaries($renewal, $beneficiaries);
+
+        return $this->result($renewal, $skippedPlaces, [], $skippedIndicators, $skippedParts, $plan);
     }
 
     /**
@@ -225,28 +227,49 @@ final class CloneProposalForRenewal
 
     /**
      * The previous proposal's location rows for the renewal: city, program,
-     * responsible and centers, merged by SaveProposal onto the rows its
-     * linked projects bring. Only rows that still stand are copied: a row
-     * without a program (its request belongs to the old proposal) or in a
-     * city HR has closed is left out, and a responsible who has left is
-     * dropped, so the renewal is never refused for last year's place.
+     * responsible and centers, which SaveProposal creates as the renewal's
+     * own rows (Y-17: no project is looked up or linked). Only rows that
+     * still stand are copied: a row without a program (its request belongs
+     * to the old proposal) or in a city HR has closed is left out, and a
+     * responsible who has left is dropped, so the renewal is never refused
+     * for last year's place.
      *
-     * @return list<array{city_id: int, program_id: int, responsible_employee_id: int|null, center_ids: list<int>}>
+     * `beneficiaries` is keyed `city:program`, the pair a copied row is
+     * matched back by, and `skipped` names the places left out.
+     *
+     * @return array{rows: list<array{city_id: int, program_id: int, responsible_employee_id: int|null, center_ids: list<int>, city_wide: bool}>, beneficiaries: array<string, int|null>, skipped: list<string>}
      */
     private function locations(Proposal $previous): array
     {
-        $rows = $previous->locations()->whereNotNull('program_id')->with('centers')->get();
+        $rows = $previous->locations()->whereNotNull('program_id')->with(['centers', 'city', 'program'])->orderBy('sort')->orderBy('id')->get();
 
         if ($rows->isEmpty()) {
-            return [];
+            return ['rows' => [], 'beneficiaries' => [], 'skipped' => []];
         }
 
         $activeCities = HrCity::query()->whereKey($rows->pluck('city_id')->unique()->all())->where('is_active', true)->pluck('id')->map(fn (mixed $id): int => (int) $id)->all();
         $activeEmployees = HrEmployee::query()->whereKey($rows->pluck('responsible_employee_id')->filter()->unique()->all())->where('is_active', true)->pluck('id')->map(fn (mixed $id): int => (int) $id)->all();
+        $centerIds = $rows->flatMap(fn (ProposalLocation $row): array => $row->centerIds())->unique()->all();
+        $activeCenters = HrCenter::query()->whereKey($centerIds)->where('is_active', true)->pluck('id')->map(fn (mixed $id): int => (int) $id)->all();
+
         $copied = [];
+        $beneficiaries = [];
+        $skipped = [];
 
         foreach ($rows as $row) {
             if (! in_array((int) $row->city_id, $activeCities, true)) {
+                $skipped[] = $row->label();
+
+                continue;
+            }
+
+            // Only the centers HR still runs come across; a row left with
+            // none, and not field work, is named and left out (D-88).
+            $centers = array_values(array_filter($row->centerIds(), fn (int $id): bool => in_array($id, $activeCenters, true)));
+
+            if ($centers === [] && ! $row->city_wide) {
+                $skipped[] = $row->label();
+
                 continue;
             }
 
@@ -254,11 +277,36 @@ final class CloneProposalForRenewal
                 'city_id' => (int) $row->city_id,
                 'program_id' => (int) $row->program_id,
                 'responsible_employee_id' => in_array((int) $row->responsible_employee_id, $activeEmployees, true) ? (int) $row->responsible_employee_id : null,
-                'center_ids' => $row->centerIds(),
+                'center_ids' => $centers,
+                'city_wide' => $row->city_wide,
             ];
+
+            $beneficiaries[$row->city_id.':'.$row->program_id] = $row->target_beneficiaries === null ? null : (int) $row->target_beneficiaries;
         }
 
-        return $copied;
+        return ['rows' => $copied, 'beneficiaries' => $beneficiaries, 'skipped' => $skipped];
+    }
+
+    /**
+     * Carry each copied place's beneficiary figure onto the renewal's own
+     * row (Y-17): the rows are created by SaveProposal, so they are matched
+     * back by city and program, the key a row is identified by.
+     *
+     * @param  array<string, int|null>  $beneficiaries  "cityId:programId" => count
+     */
+    private function copyBeneficiaries(Proposal $renewal, array $beneficiaries): void
+    {
+        if ($beneficiaries === []) {
+            return;
+        }
+
+        foreach ($renewal->locations()->get(['id', 'city_id', 'program_id']) as $row) {
+            $key = $row->city_id.':'.$row->program_id;
+
+            if (($beneficiaries[$key] ?? null) !== null) {
+                ProposalLocation::query()->whereKey($row->id)->update(['target_beneficiaries' => $beneficiaries[$key]]);
+            }
+        }
     }
 
     /**
@@ -279,62 +327,6 @@ final class CloneProposalForRenewal
             : $begin->addDays($span);
 
         return ['begin' => $begin, 'end' => $end];
-    }
-
-    /**
-     * The projects the renewal links: the previous proposal's, minus those
-     * that cannot take a proposal or whose HR center is inactive (named), with
-     * a closed project replaced by the open one of its center and program.
-     *
-     * @return array{ids: list<int>, beneficiaries: array<int, int|null>, map: array<int, int>, skipped: list<string>, replaced: list<string>}
-     */
-    private function projects(Proposal $previous): array
-    {
-        $linked = $previous->projects()
-            ->select(['projects.id', 'projects.name', 'projects.status', 'projects.city_id', 'projects.center_id', 'projects.host_center_id', 'projects.program_id'])
-            ->orderBy('projects.id')
-            ->get();
-
-        $linkable = Project::query()->linkableToProposals()->whereKey($linked->modelKeys())->pluck('id')->all();
-        $centers = HrCenter::query()->whereIn('id', $linked->pluck('center_id')->filter()->unique()->all())->pluck('is_active', 'id');
-
-        $ids = [];
-        $beneficiaries = [];
-        $map = [];
-        $skipped = [];
-        $replaced = [];
-
-        foreach ($linked as $project) {
-            /** @var int|string|null $stored */
-            $stored = $project->getRelation('pivot')->getAttribute('target_beneficiaries');
-            $isInactive = $project->center_id !== null && $centers->has($project->center_id) && ! $centers->get($project->center_id);
-
-            if (! in_array($project->id, $linkable, true) || $isInactive) {
-                $skipped[] = $project->name;
-
-                continue;
-            }
-
-            $target = $project;
-
-            if ($project->status->value === 'closed' && ($project->center_id !== null || $project->host_center_id !== null)) {
-                $open = Project::openProjectFor($project->center_id, (int) $project->city_id, $project->program_id, $project->id);
-
-                if ($open !== null) {
-                    $target = $open;
-                    $replaced[] = $project->name;
-                }
-            }
-
-            $map[$project->id] = $target->id;
-
-            if (! in_array($target->id, $ids, true)) {
-                $ids[] = $target->id;
-                $beneficiaries[$target->id] = $stored === null ? null : (int) $stored;
-            }
-        }
-
-        return ['ids' => $ids, 'beneficiaries' => $beneficiaries, 'map' => $map, 'skipped' => $skipped, 'replaced' => $replaced];
     }
 
     /**

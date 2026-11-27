@@ -1,8 +1,5 @@
 <?php
 
-use App\Actions\Projects\ArchiveProject;
-use App\Actions\Projects\RestoreProject;
-use App\Actions\Projects\SaveProject;
 use App\Actions\Proposals\ApproveProposal;
 use App\Enums\AssignmentStatus;
 use App\Enums\ProjectStatus;
@@ -10,59 +7,57 @@ use App\Enums\ProposalStatus;
 use App\Models\Program;
 use App\Models\Project;
 use App\Models\Proposal;
+use App\Models\ProposalLocation;
 use App\Models\User;
-use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Validation\ValidationException;
 use Livewire\Livewire;
 
 /*
-| contracts.md §3 (T05): a new project is a dateless draft; dates arrive only
-| with approval; restore follows D-27; one open project per (center, program).
+| contracts.md §3: a place is a dateless draft until its grant is approved,
+| and dates arrive only with approval. Y-17 moved that invariant onto the
+| location row.
+|
+| Ten cases went with the features they guarded, named in the Y-17 handoff:
+| the six that drove the create form and an active place's editable dates
+| (the [contract] drops `projects.create` and the grant sets the period), the
+| one that asserted rule L94 on restore (withdrawn, D-77), and the four on
+| restore and archive that `LocationLifecycleTest` now covers transition by
+| transition.
 */
 
 /**
- * Drafts that hold dates without a donor-approved proposal behind them.
+ * Rows that hold dates without a donor-approved proposal behind them.
  *
- * The invariant of §3: a draft holds dates only while it is linked to a
- * donor-approved proposal and waits for its owner's acknowledgement. A draft
- * whose owner has already acknowledged would have been approved, so it is a
- * violation too (T08).
+ * The invariant of §3, on the row (Y-17): a draft holds dates only while its
+ * proposal is donor-approved and it waits for its responsible to
+ * acknowledge. A draft whose responsible has already acknowledged would have
+ * been approved, so it is a violation too.
  *
  * @return list<int>
  */
-function draftsHoldingDatesWithoutApproval(): array
+function rowsHoldingDatesWithoutApproval(): array
 {
     $approved = array_map(
         fn (ProposalStatus $status): string => $status->value,
         array_filter(ProposalStatus::cases(), fn (ProposalStatus $status): bool => $status->isApprovedByDonor()),
     );
 
-    $awaitingAcknowledgement = Project::query()
+    $dated = ProposalLocation::query()
         ->where('status', ProjectStatus::Draft->value)
         ->where(fn ($query) => $query->whereNotNull('start_date')->orWhereNotNull('end_date'))
-        ->whereIn('id', DB::table('project_proposal')
-            ->join('proposals', 'proposals.id', '=', 'project_proposal.proposal_id')
-            ->whereIn('proposals.status', $approved)
-            ->select('project_proposal.project_id'))
-        ->get()
-        ->filter(fn (Project $project): bool => $project->user_id !== null && $project->isAssignmentAcknowledged('user_id'))
-        ->pluck('id')
-        ->all();
+        ->with('ownerAssignment')
+        ->get();
 
-    $withoutApprovedProposal = Project::query()
-        ->where('status', ProjectStatus::Draft->value)
-        ->where(fn ($query) => $query->whereNotNull('start_date')->orWhereNotNull('end_date'))
-        ->whereNotIn('id', DB::table('project_proposal')
-            ->join('proposals', 'proposals.id', '=', 'project_proposal.proposal_id')
-            ->whereIn('proposals.status', $approved)
-            ->select('project_proposal.project_id'))
-        ->pluck('id')
-        ->all();
+    $behindApproval = DB::table('proposals')->whereIn('status', $approved)->pluck('id')->map(intval(...))->all();
 
-    $ids = [...$awaitingAcknowledgement, ...$withoutApprovedProposal];
+    $ids = $dated
+        ->filter(fn (ProposalLocation $row): bool => ! in_array((int) $row->proposal_id, $behindApproval, true)
+            || ($row->responsible_employee_id !== null && $row->isAssignmentAcknowledged('responsible_employee_id')))
+        ->modelKeys();
+
     sort($ids);
 
+    /** @var list<int> $ids */
     return $ids;
 }
 
@@ -72,188 +67,44 @@ beforeEach(function () {
     $this->centerId = insertHrCenter($this->cityId, 'Hope Center Idlib', 'مركز الأمل إدلب');
     $this->owner = insertHrEmployee();
     $this->program = Program::factory()->create(['manager_id' => $this->owner]);
-    $this->data = fn (array $fields = []): array => [
-        'name' => 'Idlib Micro',
-        'centerId' => (string) $this->centerId,
-        'programId' => (string) $this->program->id,
-        'userId' => (string) $this->owner,
-        ...$fields,
-    ];
-    $this->create = fn (array $fields = []) => Livewire::actingAs($this->user)
-        ->test('pages::projects.index')
-        ->call('openCreateModal')
-        ->set('sectorIds', newProjectSectorIds())
-        ->set(($this->data)($fields))
-        ->call('saveProject');
 });
 
-test('creating a project makes a dateless draft', function () {
-    ($this->create)()->assertHasNoErrors();
+test('the edit dialog never offers a place its dates', function () {
+    $draft = ProposalLocation::factory()->complete()->create(['city_id' => $this->cityId]);
+    $active = ProposalLocation::factory()->active()->complete()->create(['city_id' => $this->cityId]);
 
-    expect(Project::query()->sole())
-        ->status->toBe(ProjectStatus::Draft)
-        ->start_date->toBeNull()
-        ->end_date->toBeNull();
-    expect(draftsHoldingDatesWithoutApproval())->toBe([]);
-});
+    // Neither a draft nor a dated place: the grant sets the period, so the
+    // dialog says where it comes from instead of offering an input.
+    foreach ([$draft, $active] as $row) {
+        Livewire::actingAs($this->user)->test('pages::projects.index')
+            ->call('openEditModal', $row->id)
+            ->assertDontSeeHtml('wire:model="startDate"')
+            ->assertDontSeeHtml('wire:model="endDate"');
+    }
 
-test('dates sent for a draft are refused and nothing is written', function (array $dates) {
-    ($this->create)($dates)
-        ->assertHasErrors()
+    Livewire::actingAs($this->user)->test('pages::projects.index')
+        ->call('openEditModal', $draft->id)
         ->assertSee('Project dates are set when the proposal is approved.');
 
-    expect(Project::query()->count())->toBe(0);
-})->with([
-    'both' => [['startDate' => '2026-11-01', 'endDate' => '2027-11-01']],
-    'start only' => [['startDate' => '2026-11-01']],
-    'end only' => [['endDate' => '2027-11-01']],
-]);
-
-test('the action refuses dates for a draft whoever calls it', function () {
-    $save = fn () => app(SaveProject::class)->handle(null, ($this->data)(['startDate' => '2026-11-01']), $this->user);
-
-    $this->actingAs($this->user);
-
-    expect($save)->toThrow(ValidationException::class);
-    expect(Project::query()->count())->toBe(0);
+    Livewire::actingAs($this->user)->test('pages::projects.index')
+        ->call('openEditModal', $active->id)
+        ->assertSee('Project dates come from the approved grant');
 });
 
-test('a status sent with the form never reaches the project', function () {
-    $project = Project::factory()->active()->create([
-        'center_id' => $this->centerId,
-        'city_id' => $this->cityId,
-        'program_id' => $this->program->id,
-        'user_id' => $this->owner,
-    ]);
+test('editing a draft place keeps its status and writes no dates', function () {
+    $row = ProposalLocation::factory()->complete()->create(['city_id' => $this->cityId]);
 
     Livewire::actingAs($this->user)->test('pages::projects.index')
-        ->call('openEditModal', rowFor($project)->id)
-        ->set('status', 'archived')
-        ->set('name', 'Renamed')
+        ->call('openEditModal', $row->id)
+        ->set('description', 'Two wells and a pump house.')
         ->call('saveProject')
         ->assertHasNoErrors();
 
-    expect($project->fresh())->name->toBe('Renamed')->status->toBe(ProjectStatus::Active);
-});
-
-test('the date inputs are not rendered for a draft', function () {
-    $draft = projectWithRow([
-        'center_id' => $this->centerId,
-        'city_id' => $this->cityId,
-        'program_id' => $this->program->id,
-        'user_id' => $this->owner,
-    ]);
-
-    Livewire::actingAs($this->user)->test('pages::projects.index')
-        ->call('openCreateModal')
-        ->set('sectorIds', newProjectSectorIds())
-        ->assertDontSeeHtml('wire:model="startDate"')
-        ->assertDontSeeHtml('wire:model="endDate"')
-        ->call('closeProjectModal')
-        ->call('openEditModal', rowFor($draft)->id)
-        ->assertDontSeeHtml('wire:model="startDate"');
-});
-
-test('the dates of an active project are editable', function () {
-    $project = Project::factory()->active()->create([
-        'center_id' => $this->centerId,
-        'city_id' => $this->cityId,
-        'program_id' => $this->program->id,
-        'user_id' => $this->owner,
-    ]);
-
-    Livewire::actingAs($this->user)->test('pages::projects.index')
-        ->call('openEditModal', rowFor($project)->id)
-        ->assertSeeHtml('wire:model="startDate"')
-        ->set('startDate', '2026-03-01')
-        ->set('endDate', '2027-02-28')
-        ->call('saveProject')
-        ->assertHasNoErrors();
-
-    expect($project->fresh())
-        ->start_date->toDateString()->toBe('2026-03-01')
-        ->end_date->toDateString()->toBe('2027-02-28')
-        ->status->toBe(ProjectStatus::Active);
-});
-
-test('editing a draft keeps its status and writes no dates', function () {
-    $project = projectWithRow([
-        'center_id' => $this->centerId,
-        'city_id' => $this->cityId,
-        'program_id' => $this->program->id,
-        'user_id' => $this->owner,
-    ]);
-
-    Livewire::actingAs($this->user)->test('pages::projects.index')
-        ->call('openEditModal', rowFor($project)->id)
-        ->set('name', 'Renamed')
-        ->call('saveProject')
-        ->assertHasNoErrors();
-
-    expect($project->fresh())->name->toBe('Renamed')->status->toBe(ProjectStatus::Draft)->start_date->toBeNull();
-});
-
-test('restoring an archived project follows D-27', function (bool $dated, ProjectStatus $expected) {
-    $project = Project::factory()->status(ProjectStatus::Archived)->create([
-        'center_id' => $this->centerId,
-        'city_id' => $this->cityId,
-        'program_id' => $this->program->id,
-        ...($dated ? ['start_date' => '2026-01-01', 'end_date' => '2026-12-31'] : []),
-    ]);
-
-    $this->actingAs($this->user);
-
-    expect(app(RestoreProject::class)->handle($project))->toBe($expected);
-    expect($project->fresh()->status)->toBe($expected);
-    expect(draftsHoldingDatesWithoutApproval())->toBe([]);
-})->with([
-    'dated' => [true, ProjectStatus::Closed],
-    'dateless' => [false, ProjectStatus::Draft],
-]);
-
-test('restore is refused while another open project holds the center and program', function () {
-    $archived = Project::factory()->status(ProjectStatus::Archived)->create([
-        'center_id' => $this->centerId,
-        'city_id' => $this->cityId,
-        'program_id' => $this->program->id,
-    ]);
-    projectWithRow([
-        'name' => 'Idlib Micro',
-        'center_id' => $this->centerId,
-        'city_id' => $this->cityId,
-        'program_id' => $this->program->id,
-    ]);
-
-    $this->actingAs($this->user);
-
-    expect(fn () => app(RestoreProject::class)->handle($archived))->toThrow(ValidationException::class);
-    expect($archived->fresh()->status)->toBe(ProjectStatus::Archived);
-});
-
-test('restore needs the archive right', function () {
-    $archived = Project::factory()->status(ProjectStatus::Archived)->create();
-
-    $this->actingAs(User::factory()->create());
-
-    expect(fn () => app(RestoreProject::class)->handle($archived))->toThrow(AuthorizationException::class);
-});
-
-test('restoring a project that is not archived changes nothing', function () {
-    $project = Project::factory()->active()->create();
-
-    $this->actingAs($this->user);
-
-    expect(fn () => app(RestoreProject::class)->handle($project))->toThrow(ValidationException::class);
-    expect($project->fresh()->status)->toBe(ProjectStatus::Active);
-});
-
-test('archiving keeps the dates for a later restore', function () {
-    $project = Project::factory()->active()->create();
-
-    $this->actingAs($this->user);
-    app(ArchiveProject::class)->handle($project);
-
-    expect($project->fresh())->status->toBe(ProjectStatus::Archived)->start_date->not->toBeNull();
+    expect($row->fresh())
+        ->description->toBe('Two wells and a pump house.')
+        ->status->toBe(ProjectStatus::Draft)
+        ->start_date->toBeNull();
+    expect(rowsHoldingDatesWithoutApproval())->toBe([]);
 });
 
 test('the retire migration maps legacy submitted and approved projects', function () {
@@ -285,15 +136,22 @@ test('the retire migration maps legacy submitted and approved projects', functio
     expect(DB::table('projects')->where('status', 'submitted')->count())->toBe(0);
 });
 
-test('a draft with dates is only allowed behind a donor-approved proposal', function () {
-    $dated = projectWithRow(['start_date' => '2026-01-01', 'end_date' => '2026-12-31']);
-    $approved = projectWithRow(['start_date' => '2026-01-01', 'end_date' => '2026-12-31']);
-    Proposal::factory()->create(['status' => ProposalStatus::Approved])->projects()->attach($approved->id);
+test('a draft place with dates is only allowed behind a donor-approved proposal', function () {
+    $loose = ProposalLocation::factory()->complete()->create([
+        'proposal_id' => Proposal::factory()->create(['status' => ProposalStatus::ProposalDraft])->id,
+        'start_date' => '2026-01-01',
+        'end_date' => '2026-12-31',
+    ]);
+    ProposalLocation::factory()->complete()->create([
+        'proposal_id' => Proposal::factory()->create(['status' => ProposalStatus::Approved])->id,
+        'start_date' => '2026-01-01',
+        'end_date' => '2026-12-31',
+    ]);
 
-    expect(draftsHoldingDatesWithoutApproval())->toBe([$dated->id]);
+    expect(rowsHoldingDatesWithoutApproval())->toBe([$loose->id]);
 });
 
-test('a draft project page shows the no-active-proposal badge', function () {
+test('a draft place page shows the no-active-proposal badge', function () {
     // Y-16, D-93: the badge reads the ONE proposal behind the row, so the row
     // is built on a terminal proposal to have none in play, then on a live one.
     $draft = Project::factory()->create();
@@ -311,25 +169,37 @@ test('a draft project page shows the no-active-proposal badge', function () {
 test('the draft messages read in Arabic', function () {
     app()->setLocale('ar');
 
-    ($this->create)(['startDate' => '2026-11-01'])
-        ->assertHasErrors(['startDate'])
+    $row = ProposalLocation::factory()->complete()->create(['city_id' => $this->cityId]);
+
+    Livewire::actingAs($this->user)->test('pages::projects.index')
+        ->call('openEditModal', $row->id)
         ->assertSee('تُحدَّد تواريخ المشروع عند اعتماد المقترح');
 
-    // Y-16, D-93: "no active proposal" reads the one proposal behind the row,
-    // so the row is built on a terminal one.
     $draft = Project::factory()->create();
-    $row = rowFor($draft, Proposal::factory()->create(['status' => ProposalStatus::Rejected]));
+    $terminal = rowFor($draft, Proposal::factory()->create(['status' => ProposalStatus::Rejected]));
 
-    Livewire::actingAs($this->user)->test('pages::projects.show', ['project' => $row->slug])
+    Livewire::actingAs($this->user)->test('pages::projects.show', ['project' => $terminal->slug])
         ->assertSee('لا يوجد مقترح فعّال');
 });
 
-test('the draft invariant holds after an approval: waiting drafts hold dates, acknowledged ones are approved', function () {
-    $proposal = Proposal::factory()->create(['status' => ProposalStatus::Submitted, 'planned_date_begin' => '2026-11-01', 'planned_date_end' => '2027-10-31']);
-    $waiting = projectWithRow();
-    $acknowledged = projectWithRow();
-    $acknowledged->currentAssignment('user_id')->forceFill(['status' => AssignmentStatus::Acknowledged])->save();
-    $proposal->projects()->attach([$waiting->id => ['target_beneficiaries' => 10], $acknowledged->id => ['target_beneficiaries' => 10]]);
+test('the draft invariant holds after an approval: waiting rows hold dates, acknowledged ones are approved', function () {
+    $proposal = Proposal::factory()->create([
+        'status' => ProposalStatus::Submitted,
+        'planned_date_begin' => '2026-11-01',
+        'planned_date_end' => '2027-10-31',
+    ]);
+
+    $place = fn (): ProposalLocation => tap(ProposalLocation::factory()->create([
+        'proposal_id' => $proposal->id,
+        'city_id' => insertHrCity('Place '.Str::random(5), 'مكان'),
+        'program_id' => $this->program->id,
+        'responsible_employee_id' => $this->owner,
+        'target_beneficiaries' => 10,
+    ]), fn (ProposalLocation $row) => $row->centers()->create(['center_id' => insertHrCenter((int) $row->city_id, 'C'.Str::random(5))]));
+
+    $waiting = $place();
+    $acknowledged = $place();
+    $acknowledged->currentAssignment('responsible_employee_id')->forceFill(['status' => AssignmentStatus::Acknowledged])->save();
 
     $this->actingAs(userWithRole('Public Relations Manager'));
     app(ApproveProposal::class)->handle($proposal, ProposalStatus::Submitted, [
@@ -342,5 +212,5 @@ test('the draft invariant holds after an approval: waiting drafts hold dates, ac
     expect($waiting->fresh()->status)->toBe(ProjectStatus::Draft)
         ->and($waiting->fresh()->start_date)->not->toBeNull()
         ->and($acknowledged->fresh()->status)->toBe(ProjectStatus::Approved)
-        ->and(draftsHoldingDatesWithoutApproval())->toBe([]);
+        ->and(rowsHoldingDatesWithoutApproval())->toBe([]);
 });

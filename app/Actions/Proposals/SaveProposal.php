@@ -13,7 +13,6 @@ use App\Models\HrCenter;
 use App\Models\HrCity;
 use App\Models\HrEmployee;
 use App\Models\Program;
-use App\Models\Project;
 use App\Models\Proposal;
 use App\Models\ProposalLocation;
 use App\Models\ProposalStatusNote;
@@ -33,11 +32,11 @@ use Illuminate\Validation\Validator as ValidatorInstance;
  *
  * A new proposal always starts at `concept note` (the column default; this
  * action never writes the status) with its first audit note, is linked to
- * its projects through LinkProposalProject and, for a skipped concept note,
+ * its location rows through ProposalLocationRows and, for a skipped concept note,
  * moved to `proposal draft` through TransitionProposal, all in one
  * transaction. An edit never touches links or status: it changes the details,
  * the donor while the concept note is still in the house, the budget (money
- * holders only) and the beneficiaries of the projects already linked.
+ * holders only) and the beneficiaries of its own location rows.
  *
  * Location rows (contracts.md §7, W-34a, D-62) come in `locations`: the set
  * is validated as a whole, then replaced under the proposal lock through
@@ -47,30 +46,27 @@ use Illuminate\Validation\Validator as ValidatorInstance;
  * fill only: a row with no center and not city-wide may gain centers or be
  * marked city-wide through ProposalLocationRows::fillEmpty, anything else is
  * refused as `proposals.location_locked_after_approval`; no project is
- * created or linked by it (D-74).
- * On create, each `projectIds` entry (the project a create was opened
- * from, or a renewal's projects) becomes a row with `project_id` through
- * LinkProposalProject; a create that sends `locations` needs no project.
+ * created or linked by it (D-74, Y-17).
+ *
  * A payroll proposal (D-55b, W-32) is chosen on create only and never changes
- * kind. It needs a narrative, links no project and starts in `proposal
+ * kind. It needs a narrative, has no place and starts in `proposal
  * draft`: created at the concept note like any other, then moved on at once
  * with the standard payroll note, the same hop as the D-03 skip.
  */
 final class SaveProposal
 {
     /**
-     * `kind`, `projectIds`, `startingStage`, `skipReason` and
+     * `kind`, `startingStage`, `skipReason` and
      * `previousProposalId` (the proposal a renewal renews, set only by
      * CloneProposalForRenewal) are read on create only;
      * `kind` is raw form input, validated as a ProposalKind value (default
      * `project`); `startingStage` is validated as `concept note` or
      * `proposal draft` and ignored for payroll, which always starts in draft.
      * `beneficiaries` is keyed by project id; payroll ignores it and
-     * `projectIds`. `narrative` is read for payroll only. The budget fields
      * are ignored entirely for a user who may not see money. `locations`, when
      * sent, replaces the rows (a fill only once approved); an edit that omits it leaves them alone.
      *
-     * @param  array{kind?: ?string, name: string, donorId: int|string|null, mainPartnerId?: int|string|null, partnerIds?: list<int|string>, narrative?: ?string, projectIds?: list<int|string>, locations?: list<array{city_id: int|string|null, program_id?: int|string|null, responsible_employee_id?: int|string|null, center_ids?: list<int|string>, is_new?: bool|int|string|null, city_wide?: bool|int|string|null}>, beneficiaries?: array<int|string, int|string|null>, beneficiariesReason?: ?string, requestedBudget?: string|int|float|null, requestedCurrency?: ?string, plannedDateBegin: ?string, plannedDateEnd: ?string, notes?: ?string, conceptNote?: ?string, startingStage?: string, skipReason?: ?string, previousProposalId?: int|null}  $data
+     * @param  array{kind?: ?string, name: string, donorId: int|string|null, mainPartnerId?: int|string|null, partnerIds?: list<int|string>, narrative?: ?string, locations?: list<array{city_id: int|string|null, program_id?: int|string|null, responsible_employee_id?: int|string|null, center_ids?: list<int|string>, is_new?: bool|int|string|null, city_wide?: bool|int|string|null}>, beneficiaries?: array<int|string, int|string|null>, beneficiariesReason?: ?string, requestedBudget?: string|int|float|null, requestedCurrency?: ?string, plannedDateBegin: ?string, plannedDateEnd: ?string, notes?: ?string, conceptNote?: ?string, startingStage?: string, skipReason?: ?string, previousProposalId?: int|null}  $data
      */
     public function handle(?Proposal $existing, array $data, User $actor): Proposal
     {
@@ -88,12 +84,9 @@ final class SaveProposal
         $this->validate($input, $actor, null, false);
 
         $kind = ProposalKind::from((string) $input['kind']);
-        $projectIds = $this->projectIds($input);
-        sort($projectIds);
-        $beneficiaries = $this->beneficiaries($input);
         $rows = $this->locationRows($input);
 
-        $proposal = DB::transaction(function () use ($input, $actor, $kind, $projectIds, $beneficiaries, $rows): Proposal {
+        $proposal = DB::transaction(function () use ($input, $actor, $kind, $rows): Proposal {
             $proposal = new Proposal;
             $proposal->kind = $kind;
             $this->fillDetails($proposal, $input, $actor);
@@ -113,10 +106,6 @@ final class SaveProposal
                 'changed_by' => $actor->id,
                 'is_correction' => false,
             ]);
-
-            foreach ($projectIds as $projectId) {
-                app(LinkProposalProject::class)->handle($proposal, $projectId, $beneficiaries[$projectId] ?? null);
-            }
 
             if ($rows !== null) {
                 $this->announceLocations($proposal, app(ProposalLocationRows::class)->replace($proposal, $rows), $actor);
@@ -148,8 +137,8 @@ final class SaveProposal
             $input = $this->normalize([...$data, 'kind' => $locked->kind->value]);
             $rows = $this->locationRows($input);
 
-            /** @var Collection<int, Project> $linked */
-            $linked = $locked->projects()->select(['projects.id', 'projects.name'])->orderBy('projects.id')->get();
+            /** @var Collection<int, ProposalLocation> $linked */
+            $linked = $locked->locations()->with(['city', 'program', 'centers'])->orderBy('proposal_locations.id')->get();
             $isApproved = $locked->status->isApprovedByDonor();
 
             $this->validate($input, $actor, $locked, $isApproved && $this->beneficiaryChanges($linked, $input) !== [], $linked);
@@ -165,9 +154,7 @@ final class SaveProposal
             $locked->save();
             $this->savePartners($locked, $input, $actor);
 
-            foreach ($changes as $change) {
-                $locked->projects()->updateExistingPivot($change['project_id'], ['target_beneficiaries' => $change['to']]);
-            }
+            $this->writeBeneficiaries($changes);
 
             if ($isApproved && $changes !== []) {
                 $locked->recordActivity('proposal.beneficiaries_changed', [], [
@@ -199,12 +186,8 @@ final class SaveProposal
      * would, without the fill-only limit on `locations`. Writes nothing. The
      * caller holds the proposal's lock and has authorized the request.
      *
-     * A row that still carries a legacy `project_id` cannot be dropped or
-     * moved to another city or program (`proposals.location_row_has_project`)
-     * until Stage B; its centers and responsible may change.
-     *
      * @param  array<string, mixed>  $data
-     * @return list<array{field: string, from: mixed, to: mixed, row?: array{city_id: int, program_id: int|null}, project_id?: int}>
+     * @return list<array{field: string, from: mixed, to: mixed, row?: array{city_id: int, program_id: int|null}, location_id?: int}>
      *
      * @throws ValidationException
      */
@@ -212,8 +195,8 @@ final class SaveProposal
     {
         $input = $this->normalize([...$this->currentForm($locked), ...$data, 'kind' => $locked->kind->value]);
 
-        /** @var Collection<int, Project> $linked */
-        $linked = $locked->projects()->select(['projects.id', 'projects.name'])->orderBy('projects.id')->get();
+        /** @var Collection<int, ProposalLocation> $linked */
+        $linked = $locked->locations()->with(['city', 'program', 'centers'])->orderBy('proposal_locations.id')->get();
 
         $this->validate($input, $actor, $locked, false, $linked, viaChangeRequest: true);
 
@@ -227,7 +210,7 @@ final class SaveProposal
 
     /**
      * Write an approved change request (contracts.md §6, Y-09): the details,
-     * the beneficiaries of the linked projects and the rows through
+     * the beneficiaries of its rows and the rows themselves through
      * ProposalLocationRows::replace(), without the post-approval lock. A
      * beneficiaries change still records `proposal.beneficiaries_changed`
      * with the request's reason. The caller has re-checked the request with
@@ -240,16 +223,14 @@ final class SaveProposal
         $input = $this->normalize([...$this->currentForm($locked), ...$payload, 'kind' => $locked->kind->value]);
         $rows = $this->locationRows($input);
 
-        /** @var Collection<int, Project> $linked */
-        $linked = $locked->projects()->select(['projects.id', 'projects.name'])->orderBy('projects.id')->get();
+        /** @var Collection<int, ProposalLocation> $linked */
+        $linked = $locked->locations()->with(['city', 'program', 'centers'])->orderBy('proposal_locations.id')->get();
         $changes = $this->beneficiaryChanges($linked, $input);
 
         $this->fillDetails($locked, $input, $actor);
         $locked->save();
 
-        foreach ($changes as $change) {
-            $locked->projects()->updateExistingPivot($change['project_id'], ['target_beneficiaries' => $change['to']]);
-        }
+        $this->writeBeneficiaries($changes);
 
         if ($changes !== []) {
             $locked->recordActivity('proposal.beneficiaries_changed', [], [
@@ -291,8 +272,8 @@ final class SaveProposal
      * for a money holder who sent it; the concept note only when sent.
      *
      * @param  array<string, mixed>  $input
-     * @param  Collection<int, Project>  $linked
-     * @return list<array{field: string, from: mixed, to: mixed, project_id?: int}>
+     * @param  Collection<int, ProposalLocation>  $linked
+     * @return list<array{field: string, from: mixed, to: mixed, location_id?: int}>
      */
     private function detailDifferences(Proposal $proposal, array $input, User $actor, Collection $linked): array
     {
@@ -334,7 +315,7 @@ final class SaveProposal
         }
 
         foreach ($this->beneficiaryChanges($linked, $input) as $change) {
-            $differences[] = ['field' => 'beneficiaries', 'project_id' => $change['project_id'], 'from' => $change['from'], 'to' => $change['to']];
+            $differences[] = ['field' => 'beneficiaries', 'location_id' => $change['location_id'], 'from' => $change['from'], 'to' => $change['to']];
         }
 
         return $differences;
@@ -428,9 +409,8 @@ final class SaveProposal
         $data['startingStage'] ??= ProposalStatus::ConceptNote->value;
         $data['beneficiaries'] ??= [];
 
-        // A payroll proposal links no project and always starts in draft.
+        // A payroll proposal has no place and always starts in draft.
         if ($data['kind'] === ProposalKind::Payroll->value) {
-            $data['projectIds'] = [];
             $data['beneficiaries'] = [];
             $data['startingStage'] = ProposalStatus::ProposalDraft->value;
             $data['skipReason'] = null;
@@ -444,7 +424,7 @@ final class SaveProposal
      * locked row and $linked its current projects.
      *
      * @param  array<string, mixed>  $input
-     * @param  Collection<int, Project>|null  $linked
+     * @param  Collection<int, ProposalLocation>|null  $linked
      */
     private function validate(array $input, User $actor, ?Proposal $proposal, bool $requiresBeneficiariesReason, ?Collection $linked = null, bool $viaChangeRequest = false): void
     {
@@ -484,12 +464,14 @@ final class SaveProposal
         }
 
         if ($proposal === null && ! $isPayroll) {
-            // A form that sends its rows needs no project: the rows are the place (W-34a slice 3).
-            $rules['projectIds'] = array_key_exists('locations', $input) ? ['bail', 'nullable', 'array'] : ['bail', 'required_without:locations', 'array'];
-            $rules['locations'] = ['bail', 'required_without:projectIds', 'array'];
+            // Y-17: the rows ARE the place, so a proposal links no project
+            // and `projectIds` is refused outright.
+            $rules['projectIds'] = ['prohibited'];
+            $rules['locations'] = ['bail', 'required', 'array'];
             $rules['startingStage'] = ['required', Rule::in([ProposalStatus::ConceptNote->value, ProposalStatus::ProposalDraft->value])];
             $rules['skipReason'] = ['nullable', 'required_if:startingStage,'.ProposalStatus::ProposalDraft->value, 'string', 'min:10', 'max:5000'];
-            $messages['projectIds.required_without'] = __('proposals.link_at_least_one_project');
+            $messages['projectIds.prohibited'] = __('proposals.locations_required');
+            $messages['locations.required'] = __('proposals.locations_required');
             $messages['skipReason.required_if'] = __('proposals.explain_why_the_concept_note_is_skipped');
             $messages['skipReason.min'] = __('proposals.explain_why_the_concept_note_is_skipped');
         } else {
@@ -528,9 +510,8 @@ final class SaveProposal
                 $validator->errors()->add('narrative', __('proposals.narrative_required'));
             }
 
-            $allowedKeys = $proposal === null
-                ? $this->checkProjects($validator, $input, $actor)
-                : array_values(array_map(fn (Project $project): int => $project->id, $linked?->all() ?? []));
+            // Y-17: beneficiaries are keyed by location row id.
+            $allowedKeys = array_values(array_map(fn (ProposalLocation $row): int => $row->id, $linked?->all() ?? []));
 
             $this->checkBeneficiaryKeys($validator, $input, $allowedKeys);
 
@@ -729,35 +710,8 @@ final class SaveProposal
     }
 
     /**
-     * Refuse any chosen project that is gone, tampered with or not linkable
-     * (contracts.md §3), using the same query that builds the picker. Returns
-     * the chosen ids.
-     *
-     * @param  array<string, mixed>  $input
-     * @return list<int>
-     */
-    private function checkProjects(ValidatorInstance $validator, array $input, User $actor): array
-    {
-        if (! is_array($input['projectIds'] ?? null) || $input['projectIds'] === []) {
-            return [];
-        }
-
-        $ids = $this->projectIds($input);
-
-        $linkableCount = $actor->can('projects.view')
-            ? Project::query()->linkableToProposals()->whereKey($ids)->count()
-            : 0;
-
-        if ($linkableCount !== count($ids)) {
-            $validator->errors()->add('projectIds', __('proposals.that_project_is_no_longer_available'));
-        }
-
-        return $ids;
-    }
-
-    /**
-     * Beneficiaries may only be given for the chosen (create) or linked
-     * (edit) projects.
+     * Beneficiaries may only be given for the proposal's own location rows
+     * (Y-17).
      *
      * @param  array<string, mixed>  $input
      * @param  list<int>  $allowedKeys
@@ -770,7 +724,7 @@ final class SaveProposal
 
         foreach (array_keys($input['beneficiaries']) as $key) {
             if (! in_array((int) $key, $allowedKeys, true) || (string) (int) $key !== (string) $key) {
-                $validator->errors()->add('beneficiaries', __('proposals.that_project_is_no_longer_available'));
+                $validator->errors()->add('beneficiaries', __('proposals.locations_required'));
 
                 return;
             }
@@ -986,30 +940,33 @@ final class SaveProposal
     }
 
     /**
-     * Each linked project whose beneficiaries the form changes, with its name
-     * (a people count, never money).
+     * Each location row whose beneficiaries the form changes, named by its
+     * place (a people count, never money).
      *
-     * @param  Collection<int, Project>  $linked
+     * Y-17: the figure lives on `proposal_locations.target_beneficiaries`,
+     * which Y-11 moved onto the row, not on the `project_proposal` pivot.
+     * The payload shape is unchanged apart from `location_id` standing in
+     * for `project_id`.
+     *
+     * @param  Collection<int, ProposalLocation>  $rows
      * @param  array<string, mixed>  $input
-     * @return list<array{project_id: int, name: string, from: int|null, to: int|null}>
+     * @return list<array{location_id: int, name: string, from: int|null, to: int|null}>
      */
-    private function beneficiaryChanges(Collection $linked, array $input): array
+    private function beneficiaryChanges(Collection $rows, array $input): array
     {
         $submitted = is_array($input['beneficiaries']) ? $input['beneficiaries'] : [];
         $changes = [];
 
-        foreach ($linked as $project) {
-            if (! array_key_exists($project->id, $submitted)) {
+        foreach ($rows as $row) {
+            if (! array_key_exists($row->id, $submitted)) {
                 continue;
             }
 
-            /** @var int|string|null $stored */
-            $stored = $project->getRelation('pivot')->getAttribute('target_beneficiaries');
-            $from = $stored === null ? null : (int) $stored;
-            $to = $this->beneficiaryCount($submitted[$project->id]);
+            $from = $row->target_beneficiaries === null ? null : (int) $row->target_beneficiaries;
+            $to = $this->beneficiaryCount($submitted[$row->id]);
 
             if ($from !== $to) {
-                $changes[] = ['project_id' => $project->id, 'name' => $project->name, 'from' => $from, 'to' => $to];
+                $changes[] = ['location_id' => $row->id, 'name' => $row->label(), 'from' => $from, 'to' => $to];
             }
         }
 
@@ -1017,36 +974,18 @@ final class SaveProposal
     }
 
     /**
-     * The chosen project ids as distinct integers (create only).
+     * Write each changed figure onto its row (Y-17). The caller holds the
+     * proposal's lock and runs inside its transaction.
      *
-     * @param  array<string, mixed>  $input
-     * @return list<int>
+     * @param  list<array{location_id: int, name: string, from: int|null, to: int|null}>  $changes
      */
-    private function projectIds(array $input): array
+    private function writeBeneficiaries(array $changes): void
     {
-        $submitted = is_array($input['projectIds'] ?? null) ? $input['projectIds'] : [];
-
-        return array_values(array_unique(array_map(
-            fn (mixed $id): int => is_numeric($id) ? (int) $id : 0,
-            array_values($submitted),
-        )));
-    }
-
-    /**
-     * The submitted beneficiaries as project id => count (null when empty).
-     *
-     * @param  array<string, mixed>  $input
-     * @return array<int, int|null>
-     */
-    private function beneficiaries(array $input): array
-    {
-        $result = [];
-
-        foreach (is_array($input['beneficiaries']) ? $input['beneficiaries'] : [] as $projectId => $count) {
-            $result[(int) $projectId] = $this->beneficiaryCount($count);
+        foreach ($changes as $change) {
+            ProposalLocation::query()
+                ->whereKey($change['location_id'])
+                ->update(['target_beneficiaries' => $change['to']]);
         }
-
-        return $result;
     }
 
     private function beneficiaryCount(mixed $value): ?int

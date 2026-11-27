@@ -22,7 +22,7 @@ function proposalStatusWriters(): array
         'app/Actions/Proposals/TransitionProposal.php',
         'app/Actions/Proposals/CorrectProposalStatus.php',
         'app/Actions/Proposals/ApproveProposal.php',
-        'app/Actions/Projects/ActivateProject.php',
+        'app/Actions/Locations/ActivateLocation.php',
     ];
 }
 

@@ -2,7 +2,6 @@
 
 declare(strict_types=1);
 
-use App\Support\Locations\LocationBackfill;
 use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\DB;
@@ -27,7 +26,16 @@ return new class extends Migration
         // purpose: they say what a human has to fix, and they are reachable
         // in a test without any DDL (MySQL commits implicitly on DDL, which
         // would break RefreshDatabase's transaction).
-        $rowless = app(LocationBackfill::class)->run(apply: false)['projects_without_row'];
+        // Y-17: the check is a query of its own rather than a call into
+        // LocationBackfill, which Y-17 removes with the mirror. A migration
+        // that has landed must keep running whatever the application code
+        // does next.
+        $rowless = DB::table('projects')
+            ->whereNotIn('id', DB::table('proposal_locations')->whereNotNull('project_id')->select('project_id'))
+            ->orderBy('id')
+            ->pluck('id')
+            ->map(fn (mixed $id): int => (int) $id)
+            ->all();
 
         if ($rowless !== []) {
             throw new RuntimeException(
