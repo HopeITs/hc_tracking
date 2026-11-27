@@ -51,7 +51,8 @@ test('a Super Admin sidebar lists every page, grouped like the old sidebar, the 
     expect(array_column($groups, 'group'))->toBe(['overview', 'strategy_planning', 'projects_delivery', 'monitoring_evaluation', 'funding_finance', 'workspace', 'administration', 'you'])
         ->and($groups[0]['items'][0]['route'])->toBe('dashboard')
         ->and(array_column($groups[6]['items'], 'route'))->toContain('admin.users.index', 'activity.index', 'admin.cities.index')
-        ->and(array_column($groups[3]['items'], 'route'))->toContain('report-templates.index');
+        ->and(array_column($groups[3]['items'], 'route'))->toContain('report-templates.index', 'results.index')
+        ->not->toContain('indicators.index', 'targets.index');
 });
 
 test('a Team Member sidebar leaves out the pages their role cannot open', function () {
@@ -86,6 +87,13 @@ test('the old My Reporting Duties address leads to My reporting duties in the Re
         ->get('/reporting-duties')
         ->assertRedirect(route('active-reports.index', ['kind' => 'duties']));
 });
+
+test('the retired indicator and target addresses permanently redirect to the framework', function (string $routeName) {
+    $this->actingAs(User::factory()->role('Super Admin')->create())
+        ->get(route($routeName))
+        ->assertStatus(301)
+        ->assertRedirect(route('results.index'));
+})->with(['indicators.index', 'targets.index']);
 
 test('the Report Tracker replaces the report registers in the sidebar; the builder and the matrix stay', function () {
     $user = User::factory()->role('Super Admin')->create();

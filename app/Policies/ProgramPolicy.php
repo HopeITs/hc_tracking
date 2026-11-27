@@ -8,8 +8,9 @@ use App\Models\Program;
 use App\Models\User;
 
 /**
- * Programs mirror HR and are never created or deleted here; tracking only
- * assigns a program's strategy and manager, which stays with programs.update.
+ * Programs are tracking-owned (D-68): they are added with programs.create and
+ * edited (names, code, active flag, strategy, manager) with programs.update.
+ * They are never deleted; an unused program is made inactive instead.
  */
 class ProgramPolicy
 {
@@ -42,7 +43,7 @@ class ProgramPolicy
      */
     public function create(User $user): bool
     {
-        return false;
+        return $user->can('programs.create');
     }
 
     /**

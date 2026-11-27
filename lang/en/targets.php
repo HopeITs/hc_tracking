@@ -140,7 +140,7 @@ return [
     'column_field_work' => 'Field work',
     'column_center_not_set' => 'Center not set',
     'column_shared_target' => 'One target for these centers together',
-    'column_waiting_program' => 'Waiting for its program; targets open once HR creates it.',
+    'column_waiting_program' => 'Pick a program for this location first; targets open once it has one.',
     'cell_row_waiting_program' => 'This location is still waiting for its program, so it takes no new target yet.',
     'location_targets_reported' => 'Some targets of this location have reports, so they can\'t be deleted.',
     'save_grid' => 'Save targets',

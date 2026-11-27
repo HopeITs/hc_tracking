@@ -10,6 +10,7 @@ use App\Models\ProposalLocation;
 use App\Models\Report;
 use App\Models\ReportFile;
 use App\Models\User;
+use App\Notifications\SubjectLinks;
 use Illuminate\Support\Facades\DB;
 use Livewire\Livewire;
 
@@ -252,17 +253,16 @@ test('the detail page rates the whole target from approved reports, not this one
 test('the detail page links back along the chain to the indicator and its targets', function () {
     $user = User::factory()->role('General Manager')->create();
     $report = Report::factory()->create();
-    $indicatorId = $report->planIndicator->indicator_id;
+    $framework = app(SubjectLinks::class)->routeFor('plan_indicator', $report->plan_indicator_id);
 
     $this->actingAs($user)
         ->get(route('reports.show', $report))
         ->assertOk()
-        ->assertSee(route('indicators.index', ['inspect' => $indicatorId]), false)
-        ->assertSee(route('targets.index', ['indicator' => $indicatorId]), false);
+        ->assertSee(e($framework), false);
 });
 
 /**
- * A mirror row of a monthly report (contracts §13 "Mirrors in reports").
+ * A mirror row of a monthly report (contracts Â§13 "Mirrors in reports").
  */
 function monthlyMirror(ReportStatus $status, User $author): Report
 {
@@ -311,7 +311,7 @@ test('the report form refuses to open, save or delete a monthly report mirror', 
 
 test('report detail names the place its target is committed at and links to it', function () {
     $user = User::factory()->role('General Manager')->create();
-    $row = ProposalLocation::factory()->create(['program_id' => Program::factory()->create(['name' => 'Harbour Programme'])->id]);
+    $row = ProposalLocation::factory()->create(['program_id' => Program::factory()->create(['name_en' => 'Harbour Programme'])->id]);
     $report = Report::factory()->for(PlanIndicator::factory()->create(['proposal_location_id' => $row->id]))->create();
 
     $this->actingAs($user)

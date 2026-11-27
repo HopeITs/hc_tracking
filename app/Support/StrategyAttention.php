@@ -78,7 +78,7 @@ final class StrategyAttention
         return [[
             'text' => new HtmlString(trans_choice('strategies.attention_programs_behind', $count, ['count' => '<bdi>'.$count.'</bdi>', 'names' => $names])),
             'label' => __('strategies.see_targets'),
-            'href' => route('indicators.index', ['strategy' => $strategyId, 'focus' => 'offtrack']),
+            'href' => route('results.index'),
             'tone' => 'critical',
         ]];
     }

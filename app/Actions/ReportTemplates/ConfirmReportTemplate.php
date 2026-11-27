@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace App\Actions\ReportTemplates;
 
-use App\Actions\Projects\ActivateProject;
+use App\Actions\Locations\ActivateLocation;
 use App\Enums\CollectionFrequency;
 use App\Enums\LineSchedule;
 use App\Enums\ProjectStatus;
@@ -33,11 +33,11 @@ use Illuminate\Validation\ValidationException;
  * `library_default`, a library frequency with automatic months. At least one
  * line must be confirmed once done. The first confirmation moves the template
  * to `confirmed`. An `approved` project is then activated through Team A's
- * ActivateProject in the same transaction (this action never writes a
+ * ActivateLocation in the same transaction (this action never writes a
  * project or proposal status); on an `active` project the newly confirmed
  * lines record `report_template.lines_added` (proposals and month range) for
  * the owner instead. Nothing is retroactive. Notifications,
- * ProjectActivated and, on the first confirmation, ReportTemplateConfirmed
+ * LocationActivated and, on the first confirmation, ReportTemplateConfirmed
  * (which generates the monthly reports) fire after the commit.
  */
 final class ConfirmReportTemplate
@@ -52,7 +52,7 @@ final class ConfirmReportTemplate
         CollectionFrequency::OneTime,
     ];
 
-    public function __construct(private ActivateProject $activateProject, private PlaceBridge $places) {}
+    public function __construct(private ActivateLocation $activateLocation, private PlaceBridge $places) {}
 
     /**
      * @param  list<int>  $lineIds
@@ -70,17 +70,16 @@ final class ConfirmReportTemplate
 
             Gate::authorize('manage', $locked);
 
-            if ($project !== null && ! in_array($project->status, [ProjectStatus::Approved, ProjectStatus::Active], true)) {
-                throw ValidationException::withMessages(['template' => __('projects.activate_not_approved')]);
-            }
-
             $lines = $this->lockLines($locked, $lineIds);
             $this->ensureConfirmable($lines);
             $proposalIds = array_values($lines->pluck('planIndicator')->filter(fn ($target): bool => $target->source_type === 'proposal')
                 ->pluck('source_id')->map(fn ($id): int => (int) $id)->unique()->values()->all());
-            $projects = $this->places->projectsForConfirmation($locked, $proposalIds);
-            foreach ($projects as $confirmationProject) {
-                if (! in_array($confirmationProject->status, [ProjectStatus::Approved, ProjectStatus::Active], true)) {
+            // Y-17: activation belongs to the location row, so the rows of
+            // the template's proposals at its place are what is checked and
+            // activated here.
+            $rows = $this->places->rowsForConfirmation($locked, $proposalIds);
+            foreach ($rows as $row) {
+                if (! in_array($row->status, [ProjectStatus::Approved, ProjectStatus::Active], true)) {
                     throw ValidationException::withMessages(['template' => __('projects.activate_not_approved')]);
                 }
             }
@@ -116,9 +115,9 @@ final class ConfirmReportTemplate
             }
 
             $activated = false;
-            foreach ($projects as $confirmationProject) {
-                if ($confirmationProject->status === ProjectStatus::Approved) {
-                    $this->activateProject->handle($confirmationProject, 'template_confirmation');
+            foreach ($rows as $row) {
+                if ($row->status === ProjectStatus::Approved) {
+                    $this->activateLocation->handle($row, 'template_confirmation');
                     $activated = true;
                 }
             }

@@ -5,10 +5,10 @@ declare(strict_types=1);
 namespace App\Livewire\Concerns\Proposals;
 
 use App\Actions\Targets\ClearLocationTargets;
+use App\Enums\ProjectStatus;
 use App\Models\HrCenter;
 use App\Models\HrCity;
 use App\Models\Program;
-use App\Models\Project;
 use App\Models\Proposal;
 use App\Models\ProposalLocation;
 use App\Support\TargetCounts;
@@ -39,15 +39,12 @@ use Livewire\Attributes\Locked;
  */
 trait EditsProposalLocations
 {
-    /** The program select's value for "a program HR does not have yet". */
-    public const NewProgramValue = 'new';
-
     /**
      * The rows as the form edits them. `key` only keeps wire:key stable and
      * `project` names the linked project of a row that has one; neither is
      * sent.
      *
-     * @var list<array{key: string, city_id: string, program_id: string, responsible_employee_id: string, center_ids: list<string>, city_wide: bool, new_program_name_en: string, new_program_name_ar: string, project: string|null, location_id: int|null}>
+     * @var list<array{key: string, city_id: string, program_id: string, responsible_employee_id: string, center_ids: list<string>, city_wide: bool, is_new: bool, locked: bool, location_id: int|null}>
      */
     public array $locations = [];
 
@@ -141,12 +138,19 @@ trait EditsProposalLocations
     }
 
     /**
-     * Remove a row. A row that stands for a linked project stays: only
-     * unlinking the project on the Projects tab removes it.
+     * Remove a row.
+     *
+     * Y-17: a row is no longer kept by the project it stood for — nothing
+     * links projects. What keeps a row now is its own state: a row that has
+     * been approved is being delivered at, and a place that has started
+     * belongs in the archive, not in the bin. Beyond that,
+     * `ProposalLocationRows::refuseWhenRowInUse()` refuses on save, with
+     * `proposals.location_in_use`, a row that carries targets, risks,
+     * milestones or a report template.
      */
     public function removeLocationRow(int $index): void
     {
-        if (! isset($this->locations[$index]) || $this->locations[$index]['project'] !== null) {
+        if (! isset($this->locations[$index]) || $this->locations[$index]['locked']) {
             return;
         }
 
@@ -279,10 +283,7 @@ trait EditsProposalLocations
             }
         }
 
-        if ($field === 'program_id' && $row['program_id'] !== self::NewProgramValue) {
-            $row['new_program_name_en'] = '';
-            $row['new_program_name_ar'] = '';
-
+        if ($field === 'program_id') {
             $managerId = ctype_digit($row['program_id'])
                 ? Program::query()->whereKey((int) $row['program_id'])->value('manager_id')
                 : null;
@@ -296,13 +297,13 @@ trait EditsProposalLocations
     }
 
     /**
-     * Fill the rows from the edited proposal, its program requests included.
+     * Fill the rows from the edited proposal.
      */
     protected function loadLocationRows(int $proposalId): void
     {
         $rows = ProposalLocation::query()
             ->where('proposal_id', $proposalId)
-            ->with(['centers', 'programRequest', 'project:id,name'])
+            ->with(['centers'])
             ->orderBy('sort')
             ->orderBy('id')
             ->get();
@@ -310,13 +311,14 @@ trait EditsProposalLocations
         $this->locations = array_values($rows->map(fn (ProposalLocation $row): array => [
             'key' => Str::random(8),
             'city_id' => (string) $row->city_id,
-            'program_id' => $row->program_id !== null ? (string) $row->program_id : ($row->is_new ? self::NewProgramValue : ''),
+            'program_id' => $row->program_id !== null ? (string) $row->program_id : '',
             'responsible_employee_id' => $row->responsible_employee_id !== null ? (string) $row->responsible_employee_id : '',
             'center_ids' => array_map('strval', $row->centerIds()),
             'city_wide' => (bool) $row->city_wide,
-            'new_program_name_en' => $row->programRequest->name_en ?? '',
-            'new_program_name_ar' => $row->programRequest->name_ar ?? '',
-            'project' => $row->project?->name,
+            'is_new' => (bool) $row->is_new,
+            // Y-17: an approved row is being delivered at, so its place is
+            // fixed and it cannot be removed from the form.
+            'locked' => $row->status !== ProjectStatus::Draft,
             'location_id' => $row->id,
         ])->all());
 
@@ -342,19 +344,17 @@ trait EditsProposalLocations
      * The rows as SaveProposal's `locations`. A row left completely empty
      * (the one a create starts with, say) is not a place and is not sent.
      *
-     * @return list<array{city_id: string, program_id: string|null, responsible_employee_id: string|null, center_ids: list<string>, city_wide: bool, is_new: bool, new_program_name_en: string, new_program_name_ar: string}>
+     * @return list<array{city_id: string, program_id: string|null, responsible_employee_id: string|null, center_ids: list<string>, city_wide: bool, is_new: bool}>
      */
     protected function locationPayload(): array
     {
         return array_values(array_map(fn (array $row): array => [
             'city_id' => $row['city_id'],
-            'program_id' => $row['program_id'] === '' || $row['program_id'] === self::NewProgramValue ? null : $row['program_id'],
+            'program_id' => $row['program_id'] === '' ? null : $row['program_id'],
             'responsible_employee_id' => $row['responsible_employee_id'] === '' ? null : $row['responsible_employee_id'],
             'center_ids' => $row['city_wide'] ? [] : $row['center_ids'],
             'city_wide' => $row['city_wide'],
-            'is_new' => $row['program_id'] === self::NewProgramValue,
-            'new_program_name_en' => $row['program_id'] === self::NewProgramValue ? $row['new_program_name_en'] : '',
-            'new_program_name_ar' => $row['program_id'] === self::NewProgramValue ? $row['new_program_name_ar'] : '',
+            'is_new' => $row['is_new'] && $row['program_id'] === '',
         ], array_filter($this->locations, fn (array $row): bool => ! $this->isBlankLocationRow($row))));
     }
 
@@ -367,12 +367,11 @@ trait EditsProposalLocations
     }
 
     /**
-     * @param  array{city_id: string, program_id: string, responsible_employee_id: string, center_ids: list<string>, city_wide: bool, new_program_name_en: string, new_program_name_ar: string, project: string|null, location_id?: int|null}  $row
+     * @param  array{city_id: string, program_id: string, responsible_employee_id: string, center_ids: list<string>, city_wide: bool, is_new: bool, locked?: bool, location_id?: int|null}  $row
      */
     private function isBlankLocationRow(array $row): bool
     {
-        return $row['project'] === null
-            && $row['city_id'] === ''
+        return $row['city_id'] === ''
             && $row['program_id'] === ''
             && $row['responsible_employee_id'] === ''
             && $row['center_ids'] === []
@@ -380,7 +379,7 @@ trait EditsProposalLocations
     }
 
     /**
-     * @return array{key: string, city_id: string, program_id: string, responsible_employee_id: string, center_ids: list<string>, city_wide: bool, new_program_name_en: string, new_program_name_ar: string, project: null, location_id: null}
+     * @return array{key: string, city_id: string, program_id: string, responsible_employee_id: string, center_ids: list<string>, city_wide: bool, is_new: bool, locked: false, location_id: null}
      */
     private function blankLocationRow(): array
     {
@@ -391,9 +390,8 @@ trait EditsProposalLocations
             'responsible_employee_id' => '',
             'center_ids' => [],
             'city_wide' => false,
-            'new_program_name_en' => '',
-            'new_program_name_ar' => '',
-            'project' => null,
+            'is_new' => false,
+            'locked' => false,
             'location_id' => null,
         ];
     }
@@ -403,13 +401,14 @@ trait EditsProposalLocations
      * the project page): its city, program, responsible and center. The
      * project is not linked; the row is a place like any other.
      */
-    protected function seedLocationRowFromProject(Project $project): void
+    protected function seedLocationRowFromPlace(ProposalLocation $place): void
     {
         $row = $this->blankLocationRow();
-        $row['city_id'] = (string) $project->city_id;
-        $row['program_id'] = (string) $project->program_id;
-        $row['responsible_employee_id'] = $project->user_id !== null ? (string) $project->user_id : '';
-        $row['center_ids'] = $project->center_id !== null ? [(string) $project->center_id] : [];
+        $row['city_id'] = (string) $place->city_id;
+        $row['program_id'] = $place->program_id !== null ? (string) $place->program_id : '';
+        $row['responsible_employee_id'] = $place->responsible_employee_id !== null ? (string) $place->responsible_employee_id : '';
+        $row['center_ids'] = array_map(strval(...), $place->centerIds());
+        $row['city_wide'] = $place->city_wide;
 
         $this->locations = [$row];
     }

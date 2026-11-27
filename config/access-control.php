@@ -15,7 +15,7 @@ declare(strict_types=1);
 */
 $groups = [
     'access-management' => ['manage-users', 'manage-roles', 'manage-permissions'],
-    'programs' => ['view', 'update'],
+    'programs' => ['view', 'create', 'update'],
     'projects' => ['view', 'create', 'update', 'delete'],
     'indicators' => ['view', 'create', 'update', 'delete', 'record'],
     'indicator-library' => ['view', 'create', 'update', 'delete'],
@@ -36,6 +36,7 @@ $groups = [
     'report-templates' => ['manage'],
     'evidence-types' => ['manage'],
     'narrative-questions' => ['manage'],
+    'stage-task-templates' => ['manage'],
     'tasks' => ['view', 'create', 'update', 'delete'],
     'calendar' => ['view'],
     'accounts' => ['view', 'create', 'update', 'delete'],
@@ -217,8 +218,17 @@ return [
     | it matches this name against job_levels.name_en or name_ar on a
     | normalised string, since HR may store the dash differently. Unrelated to
     | the task_department_* keys above, which scope what a user sees at all.
+    |
+    | The name is what HR stores, not what D-65 writes. The ruling says
+    | "Department Manager – Grade 5"; `hr.job_levels` holds `Department
+    | Manager` with `grade` 5, and the grade is a column, not part of the
+    | name. Matched against the ruling's wording the predicate was true for
+    | 0 of 270 employees, so every department read as having no manager —
+    | W-14's whole scope and W-12's final-report milestone with it. Checked
+    | on the live HR data: this value matches 9 employees, one per department
+    | that has one. Flagged for Dev 1.
     */
-    'department_manager_job_level' => 'Department Manager – Grade 5',
+    'department_manager_job_level' => 'Department Manager',
 
     /*
     |--------------------------------------------------------------------------
@@ -255,6 +265,10 @@ return [
             'funding-agreements.view', 'funding-agreements.create', 'funding-agreements.update',
             'reports.reopen', 'reports.aggregate',
             ...$aiDrafter,
+            // The stage task templates are the PR Manager's list (D-63).
+            'stage-task-templates.manage',
+            // D-68: tracking owns programs, so they are added here, not in HR.
+            'programs.create',
         ],
         'MEAL' => [
             ...$viewEverything, ...$taskWriter, ...$reportWriter, 'reports.approve', 'reports.mark-seen',

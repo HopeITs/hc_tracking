@@ -12,8 +12,8 @@ use App\Enums\FileType;
 use App\Enums\MediaCollection;
 use App\Enums\ProposalStatus;
 use App\Models\Media;
-use App\Models\Project;
 use App\Models\Proposal;
+use App\Models\ProposalLocation;
 use App\Rules\SecureUpload;
 use App\Support\ApprovalResult;
 use Carbon\CarbonImmutable;
@@ -36,7 +36,7 @@ use Throwable;
  *
  * @property-read Proposal|null $approvalSubject  #[Computed] approvalSubject()
  * @property-read array<int, array{name: string, outcome: string}> $approvalPreview  #[Computed] approvalPreview()
- * @property-read array{create: int, link: int, wait: int, warnings: list<string>} $approvalLocations  #[Computed] approvalLocations()
+ * @property-read array{approved: int, waiting: int, wait: int, warnings: list<string>} $approvalLocations  #[Computed] approvalLocations()
  */
 trait ManagesProposalApproval
 {
@@ -109,8 +109,11 @@ trait ManagesProposalApproval
     }
 
     /**
-     * What approving would do to each linked project, as text badges:
-     * funded, waits for the owner, extended or skipped.
+     * What approving would do to each of the proposal's places, as text
+     * badges: funded, waits for its responsible, extended or skipped.
+     *
+     * Y-17: the keys are location row ids, and a row is named by where it
+     * is (`ProposalLocation::label()`).
      *
      * @return array<int, array{name: string, outcome: string}>
      */
@@ -124,11 +127,21 @@ trait ManagesProposalApproval
         }
 
         $outcomes = app(ApproveProposal::class)->preview($subject);
-        $names = Project::query()->whereIn('id', array_keys($outcomes))->pluck('name', 'id');
+
+        if ($outcomes === []) {
+            return [];
+        }
+
+        $names = ProposalLocation::query()
+            ->whereKey(array_keys($outcomes))
+            ->with(['city', 'program', 'centers'])
+            ->get()
+            ->mapWithKeys(fn (ProposalLocation $row): array => [$row->id => $row->label()]);
+
         $preview = [];
 
-        foreach ($outcomes as $projectId => $outcome) {
-            $preview[$projectId] = ['name' => (string) $names->get($projectId), 'outcome' => $outcome];
+        foreach ($outcomes as $locationId => $outcome) {
+            $preview[$locationId] = ['name' => (string) $names->get($locationId), 'outcome' => $outcome];
         }
 
         return $preview;
@@ -139,9 +152,9 @@ trait ManagesProposalApproval
      * approval runs (MaterialiseProposalLocations::preview): projects it will
      * create, open projects it will link instead (with the
      * `location_linked_existing` warning key), rows left waiting for a
-     * program. Nothing is written.
+     * program (Y-17: it creates nothing). Nothing is written.
      *
-     * @return array{create: int, link: int, wait: int, warnings: list<string>}
+     * @return array{approved: int, waiting: int, wait: int, warnings: list<string>}
      */
     #[Computed(persist: true)]
     public function approvalLocations(): array
@@ -149,15 +162,15 @@ trait ManagesProposalApproval
         $subject = $this->approveProposalId === null ? null : Proposal::query()->find($this->approveProposalId);
 
         if ($subject === null || $subject->isPayroll()) {
-            return ['create' => 0, 'link' => 0, 'wait' => 0, 'warnings' => []];
+            return ['approved' => 0, 'waiting' => 0, 'wait' => 0, 'warnings' => []];
         }
 
         $result = app(MaterialiseProposalLocations::class)->preview($subject);
 
         return [
-            'create' => count($result->createdProjectIds),
-            'link' => count($result->linkedProjectIds),
-            'wait' => count($result->waitingLocationIds),
+            'approved' => count($result->approvedLocationIds),
+            'waiting' => count($result->waitingForOwnerLocationIds),
+            'wait' => count($result->waitingForProgramLocationIds),
             'warnings' => $result->warnings,
         ];
     }
@@ -236,9 +249,9 @@ trait ManagesProposalApproval
     }
 
     /**
-     * What the approval did to each project, by name. The dialog's preview
-     * tells funded from extended; a project the approval created from a
-     * location row was not in it, so its outcome comes from the result.
+     * What the approval did to each place, by name. The dialog's preview
+     * tells funded from extended; a row the approval completed after the
+     * preview was read is named from the result.
      *
      * @param  array<int, array{name: string, outcome: string}>  $preview
      * @return list<array{name: string, outcome: string}>
@@ -246,18 +259,23 @@ trait ManagesProposalApproval
     private function approvalOutcomes(array $preview, ApprovalResult $result): array
     {
         $byResult = [
-            ...array_fill_keys($result->approvedProjectIds, ApproveProposal::OutcomeFunded),
-            ...array_fill_keys($result->waitingProjectIds, ApproveProposal::OutcomeWaiting),
-            ...array_fill_keys($result->skippedProjectIds, ApproveProposal::OutcomeSkipped),
+            ...array_fill_keys($result->approvedLocationIds, ApproveProposal::OutcomeFunded),
+            ...array_fill_keys($result->waitingLocationIds, ApproveProposal::OutcomeWaiting),
+            ...array_fill_keys($result->skippedLocationIds, ApproveProposal::OutcomeSkipped),
         ];
-        $names = Project::query()->whereKey(array_keys($byResult))->pluck('name', 'id');
+        $unnamed = array_values(array_diff(array_keys($byResult), array_keys($preview)));
+        $names = $unnamed === [] ? collect() : ProposalLocation::query()
+            ->whereKey($unnamed)
+            ->with(['city', 'program', 'centers'])
+            ->get()
+            ->mapWithKeys(fn (ProposalLocation $row): array => [$row->id => $row->label()]);
         $outcomes = [];
 
-        foreach ($byResult as $projectId => $outcome) {
-            $known = $preview[$projectId]['outcome'] ?? null;
+        foreach ($byResult as $locationId => $outcome) {
+            $known = $preview[$locationId]['outcome'] ?? null;
 
             $outcomes[] = [
-                'name' => (string) $names->get($projectId),
+                'name' => (string) ($preview[$locationId]['name'] ?? $names->get($locationId)),
                 'outcome' => $known === ApproveProposal::OutcomeExtended && $outcome === ApproveProposal::OutcomeFunded ? $known : $outcome,
             ];
         }

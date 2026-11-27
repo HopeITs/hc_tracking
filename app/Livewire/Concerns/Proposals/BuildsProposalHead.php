@@ -100,6 +100,11 @@ trait BuildsProposalHead
                 $add('agreement', __('funding_agreements.record_agreement'), 'openAgreementCreate');
             }
 
+            // Older grants were approved without their actual dates; donor reports need them (SetGrantDates).
+            if ($proposal->status->isApprovedByDonor() && $proposal->lacksGrantDates()) {
+                $add('grant-dates', __('proposals.set_grant_dates'), 'openGrantDatesModal');
+            }
+
             if ($proposal->isOnHold()) {
                 $add('off-hold', __('proposals.take_off_hold'), 'openOffHoldModal');
             } elseif (in_array($proposal->status, [ProposalStatus::Submitted, ProposalStatus::ConceptNoteSubmitted], true)) {

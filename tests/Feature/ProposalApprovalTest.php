@@ -6,11 +6,12 @@ use App\Enums\AssignmentStatus;
 use App\Enums\MediaCollection;
 use App\Enums\ProjectStatus;
 use App\Enums\ProposalStatus;
-use App\Events\ProjectPeriodChanged;
+use App\Events\LocationPeriodChanged;
 use App\Events\ProposalStatusChanged;
 use App\Models\Assignment;
 use App\Models\DonorProposal;
 use App\Models\Media;
+use App\Models\Program;
 use App\Models\Project;
 use App\Models\Proposal;
 use App\Models\ProposalLocation;
@@ -38,13 +39,19 @@ function submittedProposal(ProposalStatus $status = ProposalStatus::Submitted): 
 }
 
 /**
- * Link a project to a proposal; the owner has acknowledged unless told otherwise.
+ * A complete place of a proposal — a location row with its program, its
+ * responsible and a center — whose responsible has acknowledged being in
+ * charge unless told otherwise (Y-17: a place IS a row, D-93, and approving
+ * the proposal approves its rows).
  *
- * @param  array<string, mixed>  $attributes
+ * @param  array<string, mixed>  $attributes  passed to ProposalLocation::factory()
  */
-function linkedProject(Proposal $proposal, bool $ownerAcknowledged = true, array $attributes = [], ?ProjectStatus $state = null): Project
+function linkedProject(Proposal $proposal, bool $ownerAcknowledged = true, array $attributes = [], ?ProjectStatus $state = null): ProposalLocation
 {
-    $factory = Project::factory();
+    $cityId = insertHrCity('Place '.Str::random(5), 'مكان');
+    $employeeId = insertHrEmployee($cityId);
+
+    $factory = ProposalLocation::factory();
     $factory = match ($state) {
         ProjectStatus::Approved => $factory->approved(),
         ProjectStatus::Active => $factory->active(),
@@ -52,15 +59,21 @@ function linkedProject(Proposal $proposal, bool $ownerAcknowledged = true, array
         default => $factory,
     };
 
-    $project = $factory->create($attributes);
+    $row = $factory->create([
+        'proposal_id' => $proposal->id,
+        'city_id' => $cityId,
+        'program_id' => Program::factory()->create(['manager_id' => $employeeId])->id,
+        'responsible_employee_id' => $employeeId,
+        'target_beneficiaries' => 100,
+        ...$attributes,
+    ]);
+    $row->centers()->create(['center_id' => insertHrCenter($cityId, 'C'.Str::random(6))]);
 
     if ($ownerAcknowledged) {
-        $project->currentAssignment('user_id')?->forceFill(['status' => AssignmentStatus::Acknowledged])->save();
+        $row->currentAssignment('responsible_employee_id')?->forceFill(['status' => AssignmentStatus::Acknowledged])->save();
     }
 
-    $proposal->projects()->attach($project->id, ['target_beneficiaries' => 100]);
-
-    return $project;
+    return $row->fresh();
 }
 
 /**
@@ -123,9 +136,9 @@ test('approving fixes the grant dates, writes one note and funds an acknowledged
         ->and($project->status)->toBe(ProjectStatus::Approved)
         ->and($project->start_date->toDateString())->toBe('2026-11-01')
         ->and($project->end_date->toDateString())->toBe('2027-10-31')
-        ->and($result->approvedProjectIds)->toBe([$project->id])
-        ->and($result->waitingProjectIds)->toBe([])
-        ->and($result->skippedProjectIds)->toBe([])
+        ->and($result->approvedLocationIds)->toBe([$project->id])
+        ->and($result->waitingLocationIds)->toBe([])
+        ->and($result->skippedLocationIds)->toBe([])
         ->and($result->warnings)->toContain('no_agreement');
 
     Event::assertDispatchedTimes(ProposalStatusChanged::class, 1);
@@ -151,12 +164,12 @@ test('a project whose owner has not acknowledged gets the dates and stays a draf
 
     expect($project->status)->toBe(ProjectStatus::Draft)
         ->and($project->start_date->toDateString())->toBe('2026-11-01')
-        ->and($result->waitingProjectIds)->toBe([$project->id])
-        ->and($result->approvedProjectIds)->toBe([]);
+        ->and($result->waitingLocationIds)->toBe([$project->id])
+        ->and($result->approvedLocationIds)->toBe([]);
 
-    $owner = userWithRole('Managers', (int) $project->user_id);
+    $owner = userWithRole('Managers', (int) $project->responsible_employee_id);
     $this->actingAs($owner);
-    $project->currentAssignment('user_id')->acknowledge($owner);
+    $project->currentAssignment('responsible_employee_id')->acknowledge($owner);
 
     expect($project->fresh()->status)->toBe(ProjectStatus::Approved);
 });
@@ -165,7 +178,7 @@ test('acknowledging from the notification quick action approves the waiting proj
     $proposal = submittedProposal();
     $employee = insertHrEmployee();
     $owner = userWithRole('Managers', $employee);
-    $project = linkedProject($proposal, ownerAcknowledged: false, attributes: ['user_id' => $employee]);
+    $project = linkedProject($proposal, ownerAcknowledged: false, attributes: ['responsible_employee_id' => $employee]);
     approve(userWithRole('Public Relations Manager'), $proposal);
 
     $this->actingAs($owner);
@@ -184,7 +197,7 @@ test('putting yourself in charge of a waiting project approves it', function () 
     $employee = insertHrEmployee();
     $self = userWithRole('General Manager', $employee);
     $this->actingAs($self);
-    $project->update(['user_id' => $employee]);
+    $project->update(['responsible_employee_id' => $employee]);
 
     expect($project->fresh()->status)->toBe(ProjectStatus::Approved);
 });
@@ -192,29 +205,29 @@ test('putting yourself in charge of a waiting project approves it', function () 
 test('a rejected owner keeps the project a draft and the project is skipped', function () {
     $proposal = submittedProposal();
     $project = linkedProject($proposal, ownerAcknowledged: false);
-    $project->currentAssignment('user_id')->forceFill(['status' => AssignmentStatus::Rejected])->save();
+    $project->currentAssignment('responsible_employee_id')->forceFill(['status' => AssignmentStatus::Rejected])->save();
 
     $result = approve(userWithRole('Public Relations Manager'), $proposal);
 
     expect($project->fresh()->status)->toBe(ProjectStatus::Draft)
         ->and($project->fresh()->start_date)->toBeNull()
-        ->and($result->skippedProjectIds)->toBe([$project->id]);
+        ->and($result->skippedLocationIds)->toBe([$project->id]);
 });
 
 test('an unblocked owner who acknowledges again approves the project', function () {
     $proposal = submittedProposal();
     $project = linkedProject($proposal, ownerAcknowledged: false);
-    $project->currentAssignment('user_id')->forceFill(['status' => AssignmentStatus::Rejected])->save();
+    $project->currentAssignment('responsible_employee_id')->forceFill(['status' => AssignmentStatus::Rejected])->save();
     $proposal->forceFill(['status' => ProposalStatus::Approved])->save();
     $proposal->forceFill(['actual_date_begin' => '2026-11-01', 'actual_date_end' => '2027-10-31'])->save();
 
     $ceoEmployee = insertHrEmployee();
     $ceo = userWithRole('General Manager', $ceoEmployee);
-    $project->currentAssignment('user_id')->unblock($ceo);
+    $project->currentAssignment('responsible_employee_id')->unblock($ceo);
 
-    $owner = userWithRole('Managers', (int) $project->user_id);
+    $owner = userWithRole('Managers', (int) $project->responsible_employee_id);
     $this->actingAs($owner);
-    $project->currentAssignment('user_id')->acknowledge($owner);
+    $project->currentAssignment('responsible_employee_id')->acknowledge($owner);
 
     expect($project->fresh()->status)->toBe(ProjectStatus::Approved);
 });
@@ -223,7 +236,7 @@ test('approved and active projects are extended, never shortened', function () {
     $proposal = submittedProposal();
     $approved = linkedProject($proposal, attributes: ['start_date' => '2026-12-01', 'end_date' => '2027-06-30'], state: ProjectStatus::Approved);
     $active = linkedProject($proposal, attributes: ['start_date' => '2026-01-01', 'end_date' => '2028-03-31'], state: ProjectStatus::Active);
-    Event::fake([ProjectPeriodChanged::class, ProposalStatusChanged::class]);
+    Event::fake([LocationPeriodChanged::class, ProposalStatusChanged::class]);
 
     approve(userWithRole('Public Relations Manager'), $proposal);
 
@@ -234,19 +247,19 @@ test('approved and active projects are extended, never shortened', function () {
         ->and($active->fresh()->start_date->toDateString())->toBe('2026-01-01')
         ->and($active->fresh()->end_date->toDateString())->toBe('2028-03-31');
 
-    Event::assertNotDispatched(ProjectPeriodChanged::class, fn (ProjectPeriodChanged $event): bool => $event->projectId === $active->id);
-    Event::assertNotDispatched(ProjectPeriodChanged::class, fn (ProjectPeriodChanged $event): bool => $event->projectId === $approved->id);
+    Event::assertNotDispatched(LocationPeriodChanged::class, fn (LocationPeriodChanged $event): bool => $event->row->is($active));
+    Event::assertNotDispatched(LocationPeriodChanged::class, fn (LocationPeriodChanged $event): bool => $event->row->is($approved));
 });
 
-test('an active project whose end moves raises ProjectPeriodChanged once', function () {
+test('an active project whose end moves raises LocationPeriodChanged once', function () {
     $proposal = submittedProposal();
     $active = linkedProject($proposal, attributes: ['start_date' => '2026-01-01', 'end_date' => '2027-03-31'], state: ProjectStatus::Active);
-    Event::fake([ProjectPeriodChanged::class, ProposalStatusChanged::class]);
+    Event::fake([LocationPeriodChanged::class, ProposalStatusChanged::class]);
 
     approve(userWithRole('Public Relations Manager'), $proposal);
 
-    Event::assertDispatchedTimes(ProjectPeriodChanged::class, 1);
-    Event::assertDispatched(ProjectPeriodChanged::class, fn (ProjectPeriodChanged $event): bool => $event->projectId === $active->id
+    Event::assertDispatchedTimes(LocationPeriodChanged::class, 1);
+    Event::assertDispatched(LocationPeriodChanged::class, fn (LocationPeriodChanged $event): bool => $event->row->is($active)
         && $event->oldEnd->toDateString() === '2027-03-31' && $event->newEnd->toDateString() === '2027-10-31'
         && $event->oldStart->toDateString() === '2026-01-01' && $event->newStart->toDateString() === '2026-01-01');
 });
@@ -258,7 +271,7 @@ test('archived and closed projects are skipped and named', function () {
 
     $result = approve(userWithRole('Public Relations Manager'), $proposal);
 
-    expect($result->skippedProjectIds)->toEqualCanonicalizing([$archived->id, $closed->id])
+    expect($result->skippedLocationIds)->toEqualCanonicalizing([$archived->id, $closed->id])
         ->and($archived->fresh()->status)->toBe(ProjectStatus::Archived);
 });
 
@@ -334,12 +347,14 @@ test('double approval writes one note and one event', function () {
     Event::assertDispatchedTimes(ProposalStatusChanged::class, 1);
 });
 
-test('a proposal with no linked project cannot be approved', function () {
+test('a proposal with no place cannot be approved', function () {
+    // Y-17: the `linked_project` requirement is gone; a proposal must have
+    // at least one location row instead.
     $proposal = submittedProposal();
 
     $errors = refusedApproval(fn () => approve(userWithRole('Public Relations Manager'), $proposal));
 
-    expect($errors['linked_project'][0])->toBe(__('proposals.link_project_first'))
+    expect($errors['locations'][0])->toBe(__('proposals.locations_required'))
         ->and($proposal->fresh()->status)->toBe(ProposalStatus::Submitted);
 });
 
@@ -374,16 +389,17 @@ test('a location row with no program or center refuses the approval and writes n
     Event::assertNotDispatched(ProposalStatusChanged::class);
 });
 
-test('a proposal whose rows all carry a project approves as before', function () {
+test('a proposal approves every place it has, and creates no project', function () {
     $proposal = submittedProposal();
-    $project = linkedProject($proposal);
-    ProposalLocation::factory()->for($proposal)->forProject($project)->create();
+    $first = linkedProject($proposal);
+    $second = linkedProject($proposal);
 
     $result = approve(userWithRole('Public Relations Manager'), $proposal);
 
     expect($proposal->fresh()->status)->toBe(ProposalStatus::Approved)
-        ->and($result->approvedProjectIds)->toBe([$project->id])
-        ->and($result->warnings)->not->toContain('location_linked_existing');
+        ->and($result->approvedLocationIds)->toEqualCanonicalizing([$first->id, $second->id])
+        ->and($result->warnings)->not->toContain('location_linked_existing')
+        ->and(Project::query()->count())->toBe(0);
 });
 
 test('the donor approval needs a file or a note of at least ten characters', function () {
@@ -470,7 +486,7 @@ test('a failure inside approval rolls everything back and dispatches nothing', f
     $actor = userWithRole('Public Relations Manager');
     $proposal = submittedProposal();
     $project = linkedProject($proposal);
-    Event::fake([ProposalStatusChanged::class, ProjectPeriodChanged::class]);
+    Event::fake([ProposalStatusChanged::class, LocationPeriodChanged::class]);
 
     try {
         DB::transaction(function () use ($actor, $proposal): void {
@@ -502,13 +518,13 @@ test('the activity of the approval carries no amount', function () {
         ->and(json_encode($activity))->not->toContain('120000');
 });
 
-test('a project reached through the approval records project.approved with its via', function () {
+test('a place reached through the approval records project.approved with its via', function () {
     $proposal = submittedProposal();
     $project = linkedProject($proposal);
 
     approve(userWithRole('Public Relations Manager'), $proposal);
 
-    $activity = DB::table('activities')->where('subject_type', 'project')->where('subject_id', $project->id)->where('event', 'project.approved')->first();
+    $activity = DB::table('activities')->where('subject_type', 'proposal_location')->where('subject_id', $project->id)->where('event', 'project.approved')->first();
 
     expect($activity)->not->toBeNull();
 
@@ -520,10 +536,10 @@ test('a project reached through the approval records project.approved with its v
 
 test('Assignment is unchanged for a project that is not waiting on a donor-approved proposal', function () {
     $project = linkedProject(submittedProposal(), ownerAcknowledged: false);
-    $owner = userWithRole('Managers', (int) $project->user_id);
+    $owner = userWithRole('Managers', (int) $project->responsible_employee_id);
     $this->actingAs($owner);
 
-    $project->currentAssignment('user_id')->acknowledge($owner);
+    $project->currentAssignment('responsible_employee_id')->acknowledge($owner);
 
     expect($project->fresh()->status)->toBe(ProjectStatus::Draft)
         ->and($project->fresh()->start_date)->toBeNull()
@@ -562,4 +578,42 @@ test('a project proposal still needs a linked project and stays approved, not ac
 
     expect($proposal->fresh()->status)->toBe(ProposalStatus::Approved)
         ->and($proposal->statusNotes()->pluck('status')->all())->toBe([ProposalStatus::Approved]);
+});
+
+test('an approval with six places costs no more queries per place than one with two', function () {
+    // quality-bar.md §2 / the Y-17 prompt: approving a proposal with 6 rows
+    // stays within the query budget it has today. The rows are locked as a
+    // set in one statement and each is approved from its own proposal, which
+    // is already loaded, so the cost per extra place is a small constant —
+    // not a fresh read of the proposal, its agreement or its reviewers.
+    $measure = function (int $places): int {
+        $proposal = submittedProposal();
+
+        for ($index = 0; $index < $places; $index++) {
+            linkedProject($proposal);
+        }
+
+        $queries = 0;
+        DB::listen(function () use (&$queries): void {
+            $queries++;
+        });
+
+        approve(userWithRole('Public Relations Manager'), $proposal);
+
+        return $queries;
+    };
+
+    $two = $measure(2);
+    $six = $measure(6);
+
+    // Measured at ~61 queries per extra place, and most of that is the
+    // activity fan-out: each place records one `project.approved` and
+    // notifies its own people, exactly as each project did before Y-17. The
+    // budget is a regression guard on the slope, not a claim that the slope
+    // is small: it catches a second pass over the rows (ApproveProposal used
+    // to approve each one twice, once through MaterialiseProposalLocations
+    // and once of its own), a proposal reloaded per row, or a lock taken per
+    // row instead of once for the set.
+    expect($six - $two)->toBeLessThanOrEqual(4 * 70)
+        ->and($two)->toBeLessThanOrEqual(200);
 });

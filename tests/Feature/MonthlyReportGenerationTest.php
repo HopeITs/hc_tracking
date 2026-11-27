@@ -4,7 +4,7 @@ use App\Actions\ReportTemplates\ConfirmReportTemplate;
 use App\Enums\AssignmentStatus;
 use App\Enums\MonthlyReportStatus;
 use App\Enums\ProposalStatus;
-use App\Events\ProjectPeriodChanged;
+use App\Events\LocationPeriodChanged;
 use App\Events\ReportTemplateConfirmed;
 use App\Models\Activity;
 use App\Models\Indicator;
@@ -383,8 +383,11 @@ test('a period change adds the new months only and keeps every existing report',
     Activity::withoutRecording(fn () => $first->forceFill(['status' => MonthlyReportStatus::Submitted, 'submitted_at' => now()])->save());
     $template->proposals()->sole()->forceFill(['actual_date_end' => '2027-06-30'])->saveQuietly();
 
-    ProjectPeriodChanged::dispatch(
-        $project->id,
+    // Y-17: the event carries the location row whose period grew, and the
+    // months come from the templates at THAT row's place
+    // (PlaceBridge::templateIdsOfRow) - so it is the template's own row.
+    LocationPeriodChanged::dispatch(
+        $template->proposals()->sole()->locations()->sole(),
         CarbonImmutable::parse('2026-11-01'), CarbonImmutable::parse('2027-04-30'),
         CarbonImmutable::parse('2026-11-01'), CarbonImmutable::parse('2027-06-30'),
     );

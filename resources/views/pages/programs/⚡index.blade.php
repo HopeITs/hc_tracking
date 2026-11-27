@@ -1,16 +1,16 @@
 <?php
 
+use App\Actions\Programs\SaveProgram;
 use App\Enums\ProjectStatus;
 use App\Support\Like;
 use App\Models\HrEmployee;
-use App\Models\HrProgram;
 use App\Models\Program;
 use App\Models\Strategy;
 use Flux\Flux;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Support\Facades\Gate;
-use Illuminate\Validation\Rule;
+use Illuminate\Validation\ValidationException;
 use Livewire\Attributes\Computed;
 use Livewire\Attributes\Locked;
 use Livewire\Attributes\Layout;
@@ -21,6 +21,16 @@ use Livewire\Component;
 new #[Layout('layouts::desk'), Title('titles.programs')] class extends Component {
     /** The strategy / manager filter value that lists programs with nobody linked. */
     private const Unassigned = 'none';
+
+    /** SaveProgram's field names mapped to this form's properties, for its validation errors. */
+    private const FormFields = [
+        'name_en' => 'nameEn',
+        'name_ar' => 'nameAr',
+        'code' => 'code',
+        'is_active' => 'isActive',
+        'strategy_id' => 'strategyId',
+        'manager_id' => 'managerId',
+    ];
 
     #[Url(except: '')]
     public string $search = '';
@@ -34,16 +44,28 @@ new #[Layout('layouts::desk'), Title('titles.programs')] class extends Component
     #[Url(except: '')]
     public string $gap = '';
 
+    /** '' lists every program; 'active' or 'inactive' narrows to that flag. */
+    #[Url(except: '')]
+    public string $status = '';
+
     public bool $showProgramModal = false;
     #[Locked]
     public ?int $editingProgramId = null;
     public string $editingProgramName = '';
+    public string $nameEn = '';
+    public string $nameAr = '';
+    public string $code = '';
+    public bool $isActive = true;
     public string $strategyId = '';
     public string $managerId = '';
+
+    /**
+     * The form as it was opened, for the modal's discard guard.
+     *
+     * @var array<string, string|bool>
+     */
     #[Locked]
-    public string $originalStrategyId = '';
-    #[Locked]
-    public string $originalManagerId = '';
+    public array $originalForm = [];
 
     public function filterByStrategy(?int $strategyId = null): void
     {
@@ -60,12 +82,18 @@ new #[Layout('layouts::desk'), Title('titles.programs')] class extends Component
         $this->gap = in_array($this->gap, $this->gapValues(), true) ? $this->gap : '';
     }
 
+    public function updatedStatus(): void
+    {
+        $this->status = in_array($this->status, ['active', 'inactive'], true) ? $this->status : '';
+    }
+
     public function clearFilters(): void
     {
         $this->search = '';
         $this->strategy = '';
         $this->manager = '';
         $this->gap = '';
+        $this->status = '';
     }
 
     public function showGap(string $gap): void
@@ -99,7 +127,7 @@ new #[Layout('layouts::desk'), Title('titles.programs')] class extends Component
         ];
 
         return $this->filteredProgramsQuery()
-            ->select(['id', 'strategy_id', 'manager_id', 'updated_at'])
+            ->select(['id', 'name_en', 'name_ar', 'slug', 'is_active', 'strategy_id', 'manager_id', 'updated_at'])
             ->with([
                 'strategy:id,name,start_year,end_year',
                 'manager:id,first_name_en,last_name_en,first_name_ar,last_name_ar',
@@ -135,7 +163,7 @@ new #[Layout('layouts::desk'), Title('titles.programs')] class extends Component
         return Program::query()
             ->when($search !== '', function (Builder $query) use ($search): void {
                 $query->where(Like::everyWord($search, fn (Builder $query, string $word) => $query
-                    ->whereIn('programs.id', HrProgram::idsMatchingName($word, acrossLayouts: false))
+                    ->whereIn('programs.id', Program::idsMatchingName($word, acrossLayouts: false))
                     ->orWhereHas('strategy', Like::word('name', $word))
                     ->orWhereIn('manager_id', HrEmployee::idsMatchingName($word, acrossLayouts: false))));
             })
@@ -143,6 +171,8 @@ new #[Layout('layouts::desk'), Title('titles.programs')] class extends Component
             ->when($this->strategy !== '' && $this->strategy !== self::Unassigned, fn (Builder $query) => $query->where('strategy_id', (int) $this->strategy))
             ->when($this->manager === self::Unassigned, fn (Builder $query) => $query->whereNull('manager_id'))
             ->when($this->manager !== '' && $this->manager !== self::Unassigned, fn (Builder $query) => $query->where('manager_id', (int) $this->manager))
+            ->when($this->status === 'active', fn (Builder $query) => $query->where('is_active', true))
+            ->when($this->status === 'inactive', fn (Builder $query) => $query->where('is_active', false))
             ->when($this->gap === 'no_strategy', fn (Builder $query) => $query->whereNull('strategy_id'))
             ->when($this->gap === 'no_manager', fn (Builder $query) => $query->whereNull('manager_id'))
             ->when($this->gap === 'overdue', fn (Builder $query) => $query->whereHas('locations', fn (Builder $places) => $places
@@ -241,10 +271,19 @@ new #[Layout('layouts::desk'), Title('titles.programs')] class extends Component
         return auth()->user()?->can('proposals.view') === true;
     }
 
+    public function openCreateModal(): void
+    {
+        Gate::authorize('create', Program::class);
+
+        $this->resetProgramForm();
+        $this->rememberOriginalForm();
+        $this->showProgramModal = true;
+    }
+
     public function openEditModal(int $programId): void
     {
         $program = Program::query()
-            ->select(['id', 'strategy_id', 'manager_id'])
+            ->select(['id', 'name_en', 'name_ar', 'code', 'is_active', 'strategy_id', 'manager_id'])
             ->findOrFail($programId);
 
         Gate::authorize('update', $program);
@@ -252,38 +291,47 @@ new #[Layout('layouts::desk'), Title('titles.programs')] class extends Component
         $this->resetValidation();
         $this->editingProgramId = $program->id;
         $this->editingProgramName = $program->name;
-        $this->strategyId = $this->originalStrategyId = (string) $program->strategy_id;
-        $this->managerId = $this->originalManagerId = (string) $program->manager_id;
+        $this->nameEn = (string) $program->name_en;
+        $this->nameAr = (string) $program->name_ar;
+        $this->code = (string) $program->code;
+        $this->isActive = $program->is_active;
+        $this->strategyId = (string) $program->strategy_id;
+        $this->managerId = (string) $program->manager_id;
+        $this->rememberOriginalForm();
         $this->showProgramModal = true;
     }
 
     /**
-     * Link an HR program to a strategy and manager.
-     *
-     * The program itself (its name, whether it exists) belongs to HR, so only
-     * the two tracking-side links are editable, and either may be left empty.
+     * Add a program or save its names, code, active flag, strategy and
+     * manager (D-68: tracking owns programs). SaveProgram checks permission
+     * and validates; its errors are shown on this form's fields.
      */
     public function saveProgram(): void
     {
-        Gate::authorize('update', Program::query()->findOrFail($this->editingProgramId));
+        $creating = $this->editingProgramId === null;
 
-        $validated = $this->validate([
-            'strategyId' => ['nullable', 'integer', Rule::exists(Strategy::class, 'id')],
-            'managerId' => ['nullable', 'integer', Rule::exists(HrEmployee::class, 'id')],
-        ], [
-            'strategyId.exists' => __('programs.the_selected_strategy_is_no_longer_available'),
-            'managerId.exists' => __('programs.the_selected_manager_is_no_longer_available'),
-        ]);
+        try {
+            app(SaveProgram::class)->handle($this->editingProgramId, [
+                'name_en' => $this->nameEn,
+                'name_ar' => $this->nameAr,
+                'code' => $this->code,
+                'is_active' => $this->isActive,
+                'strategy_id' => $this->strategyId,
+                'manager_id' => $this->managerId,
+            ]);
+        } catch (ValidationException $exception) {
+            $this->setErrorBag(collect($exception->errors())
+                ->mapWithKeys(fn (array $messages, string $field): array => [self::FormFields[$field] ?? $field => $messages])
+                ->all());
 
-        Program::query()->findOrFail($this->editingProgramId)->update([
-            'strategy_id' => blank($validated['strategyId']) ? null : (int) $validated['strategyId'],
-            'manager_id' => blank($validated['managerId']) ? null : (int) $validated['managerId'],
-        ]);
+            return;
+        }
 
         $this->showProgramModal = false;
         $this->resetProgramForm();
+        unset($this->programs, $this->programSummary, $this->unassignedCounts, $this->managerOptions);
 
-        Flux::toast(variant: 'success', text: __('programs.program_assignment_updated'));
+        Flux::toast(variant: 'success', text: $creating ? __('programs.program_added') : __('programs.program_saved'));
     }
 
     public function closeProgramModal(): void
@@ -297,22 +345,44 @@ new #[Layout('layouts::desk'), Title('titles.programs')] class extends Component
         $this->resetValidation();
         $this->editingProgramId = null;
         $this->editingProgramName = '';
+        $this->nameEn = '';
+        $this->nameAr = '';
+        $this->code = '';
+        $this->isActive = true;
         $this->strategyId = '';
         $this->managerId = '';
-        $this->originalStrategyId = '';
-        $this->originalManagerId = '';
+        $this->originalForm = [];
+    }
+
+    protected function rememberOriginalForm(): void
+    {
+        $this->originalForm = [
+            'nameEn' => $this->nameEn,
+            'nameAr' => $this->nameAr,
+            'code' => $this->code,
+            'isActive' => $this->isActive,
+            'strategyId' => $this->strategyId,
+            'managerId' => $this->managerId,
+        ];
     }
 };
 ?>
 
 @php
-    $filtersAreActive = $search !== '' || $strategy !== '' || $manager !== '' || $gap !== '';
+    $filtersAreActive = $search !== '' || $strategy !== '' || $manager !== '' || $gap !== '' || $status !== '';
     $summary = $this->programSummary;
     $visiblePrograms = $this->programs;
 @endphp
 
 <x-desk.register class="admin-directory @container/directory" heading-id="program-directory-heading" :title="__('common.programs')" :count="$summary['total']">
-    
+        @can('programs.create')
+        <x-slot:actions>
+            <x-ui.button tone="primary" icon="plus" class="min-h-11 touch-manipulation @sm/directory:min-h-10" wire:click="openCreateModal" data-test="create-program-button" data-quick-create>
+                {{ __('programs.add_program') }}
+            </x-ui.button>
+        </x-slot:actions>
+    @endcan
+
         <x-slot:search>
             <x-desk.register-search id="program-search" data-directory-search :label="__('programs.search_programs')" :placeholder="__('programs.program_strategy_or_manager')" wire:model.live.debounce.300ms="search" />
         </x-slot:search>
@@ -344,12 +414,18 @@ new #[Layout('layouts::desk'), Title('titles.programs')] class extends Component
                 <option value="no_strategy">{{ __('programs.gap_no_strategy') }}</option>
                 <option value="no_manager">{{ __('programs.gap_no_manager') }}</option>
             </x-ui.header-filter-select>
+
+            <x-ui.header-filter-select id="program-status" :label="__('programs.status')" wire:model.live="status" :value="$status">
+                <option value="">{{ __('programs.status_all') }}</option>
+                <option value="active">{{ __('programs.status_active') }}</option>
+                <option value="inactive">{{ __('programs.status_inactive') }}</option>
+            </x-ui.header-filter-select>
         </x-slot:filters>
     
-    <div class="flex justify-end"><span wire:loading.delay.flex wire:target="search,strategy,manager,gap,clearFilters" class="hidden items-center gap-1.5 text-xs text-secondary-medium dark:text-ink-muted"><flux:icon.arrow-path class="size-3.5 animate-spin" /> {{ __('common.updating') }}</span>@if ($filtersAreActive && $visiblePrograms->isNotEmpty())<flux:button size="sm" variant="ghost" wire:click="clearFilters">{{ __('common.reset_filters') }}</flux:button>@endif</div>
+    <div class="flex justify-end"><span wire:loading.delay.flex wire:target="search,strategy,manager,gap,status,clearFilters" class="hidden items-center gap-1.5 text-xs text-secondary-medium dark:text-ink-muted"><flux:icon.arrow-path class="size-3.5 animate-spin" /> {{ __('common.updating') }}</span>@if ($filtersAreActive && $visiblePrograms->isNotEmpty())<flux:button size="sm" variant="ghost" wire:click="clearFilters">{{ __('common.reset_filters') }}</flux:button>@endif</div>
 
         @if ($visiblePrograms->isEmpty())
-            <x-ui.empty-state icon="briefcase" :heading="$filtersAreActive ? __('programs.no_matching_programs') : __('programs.no_programs_from_hr_yet')" :body="$filtersAreActive ? __('common.change_the_search_or_filters_and_try_again') : __('programs.programs_appear_here_once_they_are_added_in_the_hr_system')">
+            <x-ui.empty-state icon="briefcase" :heading="$filtersAreActive ? __('programs.no_matching_programs') : __('programs.no_programs_yet')" :body="$filtersAreActive ? __('common.change_the_search_or_filters_and_try_again') : __('programs.programs_appear_here_once_added')">
                 @if ($filtersAreActive)
                     <x-slot:action>
                         <x-ui.button size="sm" wire:click="clearFilters">{{ __('common.reset_filters') }}</x-ui.button>
@@ -361,7 +437,7 @@ new #[Layout('layouts::desk'), Title('titles.programs')] class extends Component
                 @foreach ($visiblePrograms as $program)
                     <article class="group relative flex min-w-0 flex-col gap-4 rounded-lg border border-secondary-soft bg-white p-4 transition-colors duration-200 hover:border-primary focus-within:border-secondary-medium dark:border-line dark:bg-surface-1 dark:hover:border-primary" wire:key="program-card-{{ $program->id }}">
                         <a href="{{ route('programs.show', $program) }}" wire:navigate class="absolute inset-0 z-0 rounded-lg focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-secondary-medium" tabindex="-1" aria-hidden="true"></a>
-                        <div class="relative z-10 flex items-start justify-between gap-3 pointer-events-none"><div class="flex min-w-0 items-center gap-3"><div class="grid size-10 shrink-0 place-items-center rounded-md bg-primary text-white"><flux:icon.briefcase class="size-5" /></div><div class="min-w-0"><h2 class="line-clamp-2 break-words text-base font-semibold text-secondary-dark dark:text-ink" title="{{ $program->name }}">{{ $program->name }}</h2></div></div><div class="pointer-events-auto flex shrink-0 items-center gap-1"><a href="{{ route('programs.show', $program) }}" wire:navigate class="grid size-11 place-items-center rounded-md border-0! bg-transparent! text-secondary-dark! transition-colors hover:bg-secondary-soft! dark:text-ink! dark:hover:bg-surface-3! focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-secondary-medium @3xl/directory:size-8!" aria-label="{{ __('programs.open_name', ['name' => $program->name]) }}"><flux:icon.eye class="size-4.5" /></a>@can('programs.update')<x-ui.button tone="ghost" size="sm" icon="pencil-square" class="size-11! touch-manipulation hover:bg-secondary-soft! dark:hover:bg-surface-3! @3xl/directory:size-8!" wire:click="openEditModal({{ $program->id }})" aria-label="{{ __('programs.assign_name', ['name' => $program->name]) }}" title="{{ __('programs.link_strategy_and_manager') }}" />@endcan</div></div>
+                        <div class="relative z-10 flex items-start justify-between gap-3 pointer-events-none"><div class="flex min-w-0 items-center gap-3"><div class="grid size-10 shrink-0 place-items-center rounded-md bg-primary text-white"><flux:icon.briefcase class="size-5" /></div><div class="min-w-0"><h2 class="line-clamp-2 break-words text-base font-semibold text-secondary-dark dark:text-ink" title="{{ $program->name }}">{{ $program->name }}</h2>@unless ($program->is_active)<span class="mt-1 inline-flex items-center rounded-full border border-secondary-light px-2 py-0.5 text-[11px] font-semibold leading-4 text-secondary-dark dark:border-line-strong dark:text-ink" data-program-inactive>{{ __('programs.inactive') }}</span>@endunless</div></div><div class="pointer-events-auto flex shrink-0 items-center gap-1"><a href="{{ route('programs.show', $program) }}" wire:navigate class="grid size-11 place-items-center rounded-md border-0! bg-transparent! text-secondary-dark! transition-colors hover:bg-secondary-soft! dark:text-ink! dark:hover:bg-surface-3! focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-secondary-medium @3xl/directory:size-8!" aria-label="{{ __('programs.open_name', ['name' => $program->name]) }}"><flux:icon.eye class="size-4.5" /></a>@can('programs.update')<x-ui.button tone="ghost" size="sm" icon="pencil-square" class="size-11! touch-manipulation hover:bg-secondary-soft! dark:hover:bg-surface-3! @3xl/directory:size-8!" wire:click="openEditModal({{ $program->id }})" aria-label="{{ __('programs.edit_name', ['name' => $program->name]) }}" title="{{ __('programs.edit_program') }}" />@endcan</div></div>
                         <dl class="relative z-10 grid grid-cols-2 gap-4 pointer-events-none"><div class="min-w-0"><dt class="text-[11px] font-semibold uppercase tracking-[0.08em] text-secondary-medium dark:text-ink-muted">{{ __('common.strategy') }}</dt>@if ($program->strategy)<dd class="mt-1 truncate text-sm font-medium text-secondary-dark dark:text-ink" dir="auto" title="{{ $program->strategy->name }}">{{ $program->strategy->name }}</dd>@if (! str_contains($program->strategy->name, (string) $program->strategy->start_year))<p class="text-xs tabular-nums text-secondary-medium dark:text-ink-muted">{{ $program->strategy->start_year }}–{{ $program->strategy->end_year }}</p>@endif @else<dd class="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 text-sm font-medium text-status-warn" data-program-unlinked>{{ __('programs.not_linked_yet') }}@can('programs.update')<button type="button" class="pointer-events-auto inline-flex min-h-11 items-center rounded-md px-2 text-xs font-semibold text-secondary-dark underline underline-offset-2 hover:bg-secondary-soft dark:text-ink dark:hover:bg-surface-3 @3xl/directory:min-h-8" wire:click="openEditModal({{ $program->id }})" aria-label="{{ __('programs.assign_name_short', ['name' => $program->name]) }}">{{ __('programs.assign') }}</button>@endcan</dd>@endif</div><div class="min-w-0"><dt class="text-[11px] font-semibold uppercase tracking-[0.08em] text-secondary-medium dark:text-ink-muted">{{ __('programs.manager') }}</dt><dd class="mt-1">@if ($program->manager)<x-ui.employee-chip :employee="$program->manager" compact />@else<span class="text-sm text-secondary-medium dark:text-ink-muted">{{ __('common.not_assigned') }}</span>@endif</dd></div></dl>
                         <div class="relative z-10 mt-auto grid grid-cols-2 border-t border-secondary-soft pt-3 dark:border-line pointer-events-none"><div><p class="text-[11px] font-semibold uppercase tracking-[0.08em] text-secondary-medium dark:text-ink-muted">{{ __('programs.open_projects') }}</p><p class="mt-1 text-2xl font-bold tabular-nums text-secondary-dark dark:text-ink" data-program-open-projects>{{ $program->open_projects_count }}</p></div><div><p class="text-[11px] font-semibold uppercase tracking-[0.08em] text-secondary-medium dark:text-ink-muted">{{ __('programs.closed_projects') }}</p><p class="mt-1 text-2xl font-bold tabular-nums text-secondary-dark dark:text-ink" data-program-closed-projects>{{ $program->projects_count - $program->open_projects_count }}</p></div></div>
                     </article>
@@ -372,15 +448,21 @@ new #[Layout('layouts::desk'), Title('titles.programs')] class extends Component
     <x-ui.modal
         wire:model="showProgramModal"
         size="md"
-        :title="__('programs.assign_name', ['name' => $editingProgramName])"
-        :description="__('programs.the_program_name_is_managed_in_the_hr_system_link_it_to_a_st')"
+        :title="$editingProgramId === null ? __('programs.add_program') : __('programs.edit_name', ['name' => $editingProgramName])"
+        :description="__('programs.program_form_description')"
         submit="saveProgram"
         close="closeProgramModal"
-        :discard-guard="$showProgramModal ? ['fields' => ['strategyId', 'managerId'], 'original' => ['strategyId' => $originalStrategyId, 'managerId' => $originalManagerId]] : null"
+        :discard-guard="$showProgramModal ? ['fields' => array_keys($originalForm), 'original' => $originalForm] : null"
     >
         @if ($showProgramModal)
             <div class="grid gap-y-4">
-                <x-ui.form-select wire:model="strategyId" :label="__('programs.linked_strategy')" autofocus>
+                <x-ui.form-input wire:model="nameEn" :label="__('programs.name_en')" maxlength="255" required autofocus dir="ltr" />
+                <x-ui.form-input wire:model="nameAr" :label="__('programs.name_ar')" maxlength="255" dir="rtl" />
+                <x-ui.form-input wire:model="code" :label="__('programs.code')" :help="__('programs.code_help')" maxlength="50" dir="ltr" />
+
+                <flux:checkbox wire:model="isActive" :label="__('programs.active')" :description="__('programs.active_help')" data-test="program-active" />
+
+                <x-ui.form-select wire:model="strategyId" :label="__('programs.linked_strategy')">
                     <option value="">{{ __('common.not_assigned') }}</option>
                     @foreach ($this->strategyOptions as $strategyOption)
                         <option value="{{ $strategyOption->id }}">{{ $this->strategyLabel($strategyOption) }}</option>

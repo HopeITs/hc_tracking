@@ -157,4 +157,5 @@ return [
     'to_cancel' => 'للإلغاء',
     'cannot_be_undone' => 'لا يمكن التراجع عن هذا.',
     'type_to_confirm' => 'اكتب :code للتأكيد',
+    'list_separator' => '، ',
 ];

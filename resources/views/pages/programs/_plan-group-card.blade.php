@@ -104,7 +104,7 @@
                         'none' => __('programs.plans_pill_none'),
                         'approved' => trans_choice('programs.plans_pill_approved', $row['approved'], ['count' => $row['approved']]),
                     };
-                    $targetUrl = route('targets.index', ['indicator' => $row['indicator_id']]);
+                    $targetUrl = app(\App\Notifications\SubjectLinks::class)->routeFor('indicator', $row['indicator_id']) ?? route('results.index');
                 @endphp
                 <li class="dk-ppl-row" wire:key="plan-target-{{ $group['key'] }}-{{ $row['id'] }}" data-plan-target="{{ $row['id'] }}">
                     <div class="dk-ppl-line">

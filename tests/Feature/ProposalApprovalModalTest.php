@@ -17,10 +17,13 @@ use Livewire\Livewire;
 beforeEach(fn () => $this->travelTo('2026-10-14 10:00:00'));
 
 /**
- * A submitted proposal planned 2026-11-01 to 2027-10-31, with one project
- * whose owner has acknowledged and one still waiting.
+ * A submitted proposal planned 2026-11-01 to 2027-10-31, with two places of
+ * its own: one whose responsible has acknowledged and one still waiting.
  *
- * @return array{proposal: Proposal, ready: Project, waiting: Project}
+ * Y-17: a place IS a location row of the proposal (D-93), so there is no
+ * project anywhere in this fixture.
+ *
+ * @return array{proposal: Proposal, ready: ProposalLocation, waiting: ProposalLocation}
  */
 function proposalReadyToApprove(): array
 {
@@ -29,10 +32,25 @@ function proposalReadyToApprove(): array
         'planned_date_begin' => '2026-11-01',
         'planned_date_end' => '2027-10-31',
     ]);
-    $ready = Project::factory()->create(['name' => 'Ready project']);
-    $ready->currentAssignment('user_id')->forceFill(['status' => AssignmentStatus::Acknowledged])->save();
-    $waiting = Project::factory()->create(['name' => 'Waiting project']);
-    $proposal->projects()->attach([$ready->id => ['target_beneficiaries' => 10], $waiting->id => ['target_beneficiaries' => 10]]);
+
+    $place = function (string $label) use ($proposal): ProposalLocation {
+        $cityId = insertHrCity($label, 'مكان');
+        $employeeId = insertHrEmployee($cityId);
+        $row = ProposalLocation::factory()->create([
+            'proposal_id' => $proposal->id,
+            'city_id' => $cityId,
+            'program_id' => Program::factory()->create(['manager_id' => $employeeId])->id,
+            'responsible_employee_id' => $employeeId,
+            'target_beneficiaries' => 10,
+        ]);
+        $row->centers()->create(['center_id' => insertHrCenter($cityId, 'C'.Str::random(6))]);
+
+        return $row->fresh();
+    };
+
+    $ready = $place('Ready place');
+    $ready->currentAssignment('responsible_employee_id')->forceFill(['status' => AssignmentStatus::Acknowledged])->save();
+    $waiting = $place('Waiting place');
 
     return ['proposal' => $proposal, 'ready' => $ready, 'waiting' => $waiting];
 }
@@ -75,8 +93,8 @@ test('the dialog pre-fills the planned dates and previews each project in Englis
         ->assertSee(__('proposals.approval_outcome_waiting'));
 
     expect($component->instance()->approvalPreview)->toBe([
-        $ready->id => ['name' => 'Ready project', 'outcome' => 'funded'],
-        $waiting->id => ['name' => 'Waiting project', 'outcome' => 'waiting'],
+        $ready->id => ['name' => $ready->label(), 'outcome' => 'funded'],
+        $waiting->id => ['name' => $waiting->label(), 'outcome' => 'waiting'],
     ]);
 })->with(['en', 'ar']);
 
@@ -167,38 +185,45 @@ test('a proposal that cannot be approved does not open the dialog', function () 
     approveModal('Public Relations Manager', $proposal)->assertSet('showApproveModal', false);
 });
 
-test('the preview names extended and skipped projects too', function () {
+test('the preview names extended and skipped places too', function () {
     ['proposal' => $proposal] = proposalReadyToApprove();
-    $active = Project::factory()->active()->create(['name' => 'Running project']);
-    $archived = Project::factory()->status(ProjectStatus::Archived)->create(['name' => 'Archived project']);
-    $proposal->projects()->attach([$active->id => ['target_beneficiaries' => 10], $archived->id => ['target_beneficiaries' => 10]]);
+
+    $place = function (ProjectStatus $status) use ($proposal): ProposalLocation {
+        $cityId = insertHrCity('Place '.Str::random(5), 'مكان');
+        $row = ProposalLocation::factory()->complete()->create([
+            'proposal_id' => $proposal->id,
+            'city_id' => $cityId,
+            'status' => $status,
+            'start_date' => '2026-11-01',
+            'end_date' => '2027-10-31',
+        ]);
+        $row->centers()->create(['center_id' => insertHrCenter($cityId, 'C'.Str::random(6))]);
+
+        return $row->fresh();
+    };
+
+    $active = $place(ProjectStatus::Active);
+    $archived = $place(ProjectStatus::Archived);
 
     $outcomes = collect(approveModal('Public Relations Manager', $proposal)->instance()->approvalPreview)->pluck('outcome', 'name');
 
-    expect($outcomes['Running project'])->toBe('extended')
-        ->and($outcomes['Archived project'])->toBe('skipped');
+    expect($outcomes[$active->label()])->toBe('extended')
+        ->and($outcomes[$archived->label()])->toBe('skipped');
 });
 
-test('the dialog counts the projects the rows will create, link and leave waiting, with the linked-existing warning', function () {
-    $city = insertHrCity('Idlib', 'إدلب');
-    $employee = insertHrEmployee($city);
-    $program = Program::factory()->create(['manager_id' => $employee]);
-    $centerA = insertHrCenter($city, 'Hope Center Idlib', 'مركز الأمل إدلب');
-    $centerB = insertHrCenter($city, 'Study Zone Idlib', 'ستادي زون إدلب');
-    $proposal = Proposal::factory()->create(['status' => ProposalStatus::Submitted, 'planned_date_begin' => '2026-11-01', 'planned_date_end' => '2027-10-31']);
-
-    $row = ProposalLocation::factory()->create(['proposal_id' => $proposal->id, 'city_id' => $city, 'program_id' => $program->id, 'responsible_employee_id' => $employee, 'sort' => 0]);
-    $row->centers()->create(['center_id' => $centerA]);
-    $row->centers()->create(['center_id' => $centerB]);
-    Project::factory()->create(['city_id' => $city, 'program_id' => $program->id, 'center_id' => $centerB, 'status' => ProjectStatus::Draft]);
-    ProposalLocation::factory()->isNew()->create(['proposal_id' => $proposal->id, 'city_id' => insertHrCity('Homs', 'حمص'), 'sort' => 1]);
+test('the dialog counts the places approved, waiting for their responsible and waiting for a program', function () {
+    // Y-17: approval creates and links nothing, so the preview counts
+    // places, and there is no linked-existing warning to show.
+    ['proposal' => $proposal] = proposalReadyToApprove();
+    ProposalLocation::factory()->isNew()->create(['proposal_id' => $proposal->id, 'city_id' => insertHrCity('Homs', 'حمص'), 'sort' => 2]);
 
     $component = approveModal('Public Relations Manager', $proposal)
         ->assertSeeHtml('data-test="approve-locations-preview"')
-        ->assertSeeHtml('data-test="approve-locations-warning-location_linked_existing"')
-        ->assertSeeText(__('proposals.approval_warning_location_linked_existing'));
+        ->assertSeeHtml('data-test="approve-locations-approved"')
+        ->assertSeeHtml('data-test="approve-locations-waiting"')
+        ->assertDontSeeHtml('data-test="approve-locations-warning-location_linked_existing"');
 
-    expect($component->instance()->approvalLocations)->toMatchArray(['create' => 1, 'link' => 1, 'wait' => 1, 'warnings' => ['location_linked_existing']]);
+    expect($component->instance()->approvalLocations)->toMatchArray(['approved' => 1, 'waiting' => 1, 'wait' => 1, 'warnings' => []]);
 });
 
 test('an approval that fails for a reason other than validation leaves no evidence file behind', function () {

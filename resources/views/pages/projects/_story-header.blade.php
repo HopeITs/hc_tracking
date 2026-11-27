@@ -86,8 +86,8 @@
             @if ($project->status === \App\Enums\ProjectStatus::Draft && ! $project->hasActiveProposal())
                 <span class="dk-pill dk-warn" data-test="no-active-proposal">{{ __('projects.no_active_proposal') }}</span>
             @endif
-            @if ($this->canStartConceptNote && $next['href'] !== route('proposals.index', ['for_project' => $project->project_id]))
-                <a class="dk-btn dk-sm" href="{{ route('proposals.index', ['for_project' => $project->project_id]) }}" wire:navigate data-test="new-concept-note"><x-desk.icon name="plus" />{{ $isClosed ? __('story.acts.new_proposal_reopens') : __('proposals.new_concept_note') }}</a>
+            @if ($this->canStartConceptNote && $next['href'] !== route('proposals.index', ['for_project' => $project->id]))
+                <a class="dk-btn dk-sm" href="{{ route('proposals.index', ['for_project' => $project->id]) }}" wire:navigate data-test="new-concept-note"><x-desk.icon name="plus" />{{ $isClosed ? __('story.acts.new_proposal_reopens') : __('proposals.new_concept_note') }}</a>
             @endif
             @if ($isArchived && $canArchiveProject)
                 <button type="button" class="dk-btn dk-primary dk-sm" wire:click="restoreProject({{ $project->id }})" data-test="restore-project"><x-desk.icon name="undo" />{{ __('story.acts.restore') }}</button>

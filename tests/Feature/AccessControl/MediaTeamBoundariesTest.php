@@ -46,7 +46,9 @@ test('the sidebar hides every money link from Media Team but keeps tasks (MD-02)
 
 test('Media Team cannot create a project or open a logframe create form (MD-03)', function (string $page) {
     Livewire::actingAs(userWithRole('Media Team'))->test($page)->call('openCreateModal')->assertForbidden();
-})->with(['pages::projects.index', 'pages::results.index', 'pages::indicators.index', 'pages::targets.index']);
+    // Y-17: `pages::projects.index` is gone from this list because a project can
+    // no longer be created at all — delivery follows an approved proposal (D-84).
+})->with(['pages::results.index', 'pages::indicators.index', 'pages::targets.index']);
 
 test('Media Team cannot approve another author\'s reviewed report (MD-03)', function () {
     $report = Report::factory()->create(['user_id' => userWithRole('Media Team')->id, 'status' => ReportStatus::Reviewed, 'submit_date' => today()]);

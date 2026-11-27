@@ -197,6 +197,10 @@ return [
         'stalled_report_draft_days' => 7,
         'stalled_report_reviewed_days' => 5,
         'stalled_proposal_days' => 30,
+        // How long before an active proposal ends Finance is told that its
+        // agreement still has funds, so an extension can be asked for in
+        // time (D-60, W-33). Working days, like every count here.
+        'extension_lead_days' => 60,
         'off_track_pace_percent' => 80,
         // Working days after the end of its month a monthly report is due (contracts §13).
         'monthly_report_due_working_days' => 5,
@@ -206,8 +210,6 @@ return [
         'event_overrides' => [],
         // Default proposal reviewers (contracts §9): an HR position id per slot, never a person.
         'proposal_default_reviewers' => ['meal_manager' => null, 'finance_manager' => null, 'fundraising_manager' => null, 'ceo' => null],
-        // HR liaison (contracts §9, W-34a): the HR position told about program requests, never a person.
-        'hr_liaison_position' => null,
     ],
 
 ];

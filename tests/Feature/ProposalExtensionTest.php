@@ -6,7 +6,7 @@ use App\Enums\ProjectStatus;
 use App\Enums\ProposalStatus;
 use App\Enums\ReportTemplateLineStatus;
 use App\Enums\StatusNoteKind;
-use App\Events\ProjectPeriodChanged;
+use App\Events\LocationPeriodChanged;
 use App\Models\Activity;
 use App\Models\Indicator;
 use App\Models\LibraryIndicator;
@@ -15,6 +15,7 @@ use App\Models\MonthlyReport;
 use App\Models\PlanIndicator;
 use App\Models\Project;
 use App\Models\Proposal;
+use App\Models\ProposalLocation;
 use App\Models\ProposalStatusNote;
 use App\Models\ReportTemplate;
 use App\Models\ReportTemplateLine;
@@ -45,19 +46,28 @@ beforeEach(function () {
 /**
  * @param  array<string, mixed>  $attributes
  */
-function extLinkedProject(ProjectStatus $state, array $attributes = []): Project
+function extLinkedProject(ProjectStatus $state, array $attributes = []): ProposalLocation
 {
+    // Y-17: extending widens the proposal's location ROWS, not its projects.
     $factory = match ($state) {
-        ProjectStatus::Active => Project::factory()->active(),
-        ProjectStatus::Approved => Project::factory()->approved(),
-        ProjectStatus::Closed => Project::factory()->closed(),
-        default => Project::factory()->status($state),
+        ProjectStatus::Active => ProposalLocation::factory()->active(),
+        ProjectStatus::Approved => ProposalLocation::factory()->approved(),
+        ProjectStatus::Closed => ProposalLocation::factory()->closed(),
+        default => ProposalLocation::factory()->state(['status' => $state->value]),
     };
 
-    $project = $factory->create(['start_date' => '2026-11-01', 'end_date' => '2027-10-31', ...$attributes]);
-    test()->proposal->projects()->attach($project->id, ['target_beneficiaries' => 100]);
+    $cityId = insertHrCity('Place '.Str::random(5), 'مكان');
+    $row = $factory->complete()->create([
+        'proposal_id' => test()->proposal->id,
+        'city_id' => $cityId,
+        'start_date' => '2026-11-01',
+        'end_date' => '2027-10-31',
+        'target_beneficiaries' => 100,
+        ...$attributes,
+    ]);
+    $row->centers()->create(['center_id' => insertHrCenter($cityId, 'C'.Str::random(6))]);
 
-    return $project;
+    return $row;
 }
 
 /**
@@ -105,9 +115,9 @@ test('the amendment file is optional', function () {
         ->and(Media::query()->count())->toBe(0);
 });
 
-test('an active project that ends earlier is widened and raises ProjectPeriodChanged', function () {
+test('an active project that ends earlier is widened and raises LocationPeriodChanged', function () {
     $project = extLinkedProject(ProjectStatus::Active);
-    Event::fake([ProjectPeriodChanged::class]);
+    Event::fake([LocationPeriodChanged::class]);
 
     extendProposal();
 
@@ -115,70 +125,70 @@ test('an active project that ends earlier is widened and raises ProjectPeriodCha
         ->and($project->fresh()->end_date->toDateString())->toBe('2028-03-31')
         ->and($project->fresh()->status)->toBe(ProjectStatus::Active);
 
-    Event::assertDispatchedTimes(ProjectPeriodChanged::class, 1);
-    Event::assertDispatched(ProjectPeriodChanged::class, fn (ProjectPeriodChanged $event): bool => $event->projectId === $project->id
+    Event::assertDispatchedTimes(LocationPeriodChanged::class, 1);
+    Event::assertDispatched(LocationPeriodChanged::class, fn (LocationPeriodChanged $event): bool => $event->row->is($project)
         && $event->oldEnd->toDateString() === '2027-10-31' && $event->newEnd->toDateString() === '2028-03-31'
         && $event->oldStart->toDateString() === '2026-11-01' && $event->newStart->toDateString() === '2026-11-01');
 });
 
 test('an approved project is widened without the event', function () {
     $project = extLinkedProject(ProjectStatus::Approved);
-    Event::fake([ProjectPeriodChanged::class]);
+    Event::fake([LocationPeriodChanged::class]);
 
     extendProposal();
 
     expect($project->fresh()->end_date->toDateString())->toBe('2028-03-31')
         ->and($project->fresh()->status)->toBe(ProjectStatus::Approved);
 
-    Event::assertNotDispatched(ProjectPeriodChanged::class);
+    Event::assertNotDispatched(LocationPeriodChanged::class);
 });
 
 test('a project that already ends later is left alone', function () {
     $project = extLinkedProject(ProjectStatus::Active, ['end_date' => '2028-09-30']);
-    Event::fake([ProjectPeriodChanged::class]);
+    Event::fake([LocationPeriodChanged::class]);
 
     extendProposal();
 
     expect($project->fresh()->end_date->toDateString())->toBe('2028-09-30');
 
-    Event::assertNotDispatched(ProjectPeriodChanged::class);
+    Event::assertNotDispatched(LocationPeriodChanged::class);
 });
 
 test('closed and archived projects are not touched', function () {
     $closed = extLinkedProject(ProjectStatus::Closed, ['end_date' => '2027-10-31']);
     $archived = extLinkedProject(ProjectStatus::Archived);
-    Event::fake([ProjectPeriodChanged::class]);
+    Event::fake([LocationPeriodChanged::class]);
 
     extendProposal();
 
     expect($closed->fresh()->end_date->toDateString())->toBe('2027-10-31')
         ->and($archived->fresh()->end_date->toDateString())->toBe('2027-10-31');
 
-    Event::assertNotDispatched(ProjectPeriodChanged::class);
+    Event::assertNotDispatched(LocationPeriodChanged::class);
 });
 
 test('only an active proposal can be extended', function (ProposalStatus $status) {
     $this->proposal->forceFill(['status' => $status])->save();
-    Event::fake([ProjectPeriodChanged::class]);
+    Event::fake([LocationPeriodChanged::class]);
 
     expect(fn () => extendProposal(expected: $status))
         ->toThrow(ValidationException::class, __('proposals.extend_only_active'));
     expect(ProposalStatusNote::query()->count())->toBe(0)
         ->and($this->proposal->fresh()->extended_date_end)->toBeNull();
 
-    Event::assertNotDispatched(ProjectPeriodChanged::class);
+    Event::assertNotDispatched(LocationPeriodChanged::class);
 })->with([ProposalStatus::Submitted, ProposalStatus::Approved, ProposalStatus::Completed]);
 
 test('a new end that is not after the current end is refused', function (string $date) {
     extLinkedProject(ProjectStatus::Active);
-    Event::fake([ProjectPeriodChanged::class]);
+    Event::fake([LocationPeriodChanged::class]);
 
     expect(fn () => extendProposal(['new_date_end' => $date]))
         ->toThrow(ValidationException::class, __('proposals.extend_date_after', ['date' => 'Oct 31, 2027']));
     expect(ProposalStatusNote::query()->count())->toBe(0)
         ->and($this->proposal->fresh()->extended_date_end)->toBeNull();
 
-    Event::assertNotDispatched(ProjectPeriodChanged::class);
+    Event::assertNotDispatched(LocationPeriodChanged::class);
 })->with(['2027-10-31', '2027-06-30']);
 
 test('a reason shorter than ten characters is refused', function () {
@@ -223,19 +233,26 @@ test('a second extension must end later than the first and appends a note', func
  * carries a legacy template by its project's proposals, so the template's
  * window (Y-03) follows the extension.
  */
-function extTemplateLine(Project $project, string $to, ?ReportTemplateLineStatus $status = null): ReportTemplateLine
+function extTemplateLine(ProposalLocation $place, string $to, ?ReportTemplateLineStatus $status = null): ReportTemplateLine
 {
-    return Activity::withoutRecording(function () use ($project, $to, $status): ReportTemplateLine {
-        $template = ReportTemplate::query()->where('project_id', $project->id)->first();
+    return Activity::withoutRecording(function () use ($place, $to, $status): ReportTemplateLine {
+        // Y-17: a template names a place (D-75), and the row IS the place.
+        $template = ReportTemplate::query()->where('city_id', $place->city_id)->where('program_id', $place->program_id)->first();
 
         if ($template === null) {
-            $template = ReportTemplate::factory()->confirmed()->create(['project_id' => $project->id]);
+            $template = ReportTemplate::factory()->confirmed()->create([
+                'project_id' => null,
+                'city_id' => $place->city_id,
+                'program_id' => $place->program_id,
+                'center_id' => $place->centerIds()[0] ?? null,
+                'city_wide' => $place->city_wide,
+            ]);
             $template->proposals()->detach();
             $template->proposals()->attach(test()->proposal->id, ['joined_at' => now()]);
         }
 
         $indicator = Indicator::factory()->create(['library_indicator_id' => LibraryIndicator::factory()->create()->id]);
-        $target = PlanIndicator::factory()->forProposal(test()->proposal)->create(['indicator_id' => $indicator->id, 'project_id' => $project->id]);
+        $target = PlanIndicator::factory()->forProposal(test()->proposal)->create(['indicator_id' => $indicator->id, 'proposal_location_id' => $place->id]);
         $line = ReportTemplateLine::factory()->confirmed()->monthly()->create([
             'report_template_id' => $template->id,
             'plan_indicator_id' => $target->id,
@@ -259,7 +276,9 @@ test('extending generates the new monthly reports and runs the template lines to
 
     extendProposal();
 
-    $periods = MonthlyReport::query()->where('project_id', $project->id)->orderBy('period')->get()
+    // Y-17: a report belongs to the template at the place, not to a project.
+    $templateId = ReportTemplate::query()->where('city_id', $project->city_id)->where('program_id', $project->program_id)->value('id');
+    $periods = MonthlyReport::query()->where('report_template_id', $templateId)->orderBy('period')->get()
         ->map(fn (MonthlyReport $report): string => $report->period->format('Y-m'))->all();
 
     expect($periods)->toContain('2027-11', '2028-03')
@@ -270,10 +289,10 @@ test('extending generates the new monthly reports and runs the template lines to
         ->and($ended->fresh()->effective_to->toDateString())->toBe('2027-03-01');
 });
 
-test('the owners of the linked projects hear of the extension, with dates and names only', function () {
+test('the responsibles of the proposal places hear of the extension, with dates and names only', function () {
     $ownerEmployee = insertHrEmployee(firstNameEn: 'Rami');
     $owner = userWithRole('Managers', $ownerEmployee);
-    extLinkedProject(ProjectStatus::Active, ['user_id' => $ownerEmployee]);
+    extLinkedProject(ProjectStatus::Active, ['responsible_employee_id' => $ownerEmployee]);
 
     extendProposal();
 

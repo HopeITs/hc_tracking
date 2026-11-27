@@ -2,19 +2,18 @@
 
 use App\Actions\Donors\ApproveDonor;
 use App\Actions\Proposals\SaveProposal;
-use App\Enums\AssignmentStatus;
 use App\Enums\Currency;
 use App\Enums\DonorApprovalStatus;
 use App\Enums\ProjectStatus;
 use App\Enums\ProposalKind;
 use App\Enums\ProposalStatus;
 use App\Models\Activity;
-use App\Models\Assignment;
 use App\Models\Donor;
 use App\Models\DonorProposal;
 use App\Models\Program;
 use App\Models\Project;
 use App\Models\Proposal;
+use App\Models\ProposalLocation;
 use App\Models\User;
 use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Http\UploadedFile;
@@ -24,20 +23,24 @@ use Livewire\Features\SupportTesting\Testable;
 use Livewire\Livewire;
 
 /**
- * Valid create data for SaveProposal: one donor, the given projects, planned
- * dates and a concept note start.
+ * Valid create data for SaveProposal: one donor, one complete place per
+ * entry of `$places`, planned dates and a concept note start.
  *
- * @param  list<int>  $projectIds
+ * Y-17: a proposal is created with its **places** — location rows — and
+ * links no project, so `projectIds` is gone and the count of `$places` is
+ * what matters, not what is in it.
+ *
+ * @param  list<mixed>  $places  one place per entry (the values are ignored)
  * @param  array<string, mixed>  $overrides
  * @return array<string, mixed>
  */
-function proposalFormData(array $projectIds, array $overrides = []): array
+function proposalFormData(array $places, array $overrides = []): array
 {
     return [
         'name' => 'Winter Shelter Response',
         'internalProjectNumber' => 'HC-2026-951',
         'donorId' => Donor::factory()->create()->id,
-        'projectIds' => $projectIds,
+        'locations' => array_map(fn (): array => placePayload(), $places),
         'beneficiaries' => [],
         'plannedDateBegin' => '2026-11-01',
         'plannedDateEnd' => '2027-10-31',
@@ -112,7 +115,19 @@ function linkedProposal(ProposalStatus $status = ProposalStatus::ConceptNote, in
 {
     return Activity::withoutRecording(function () use ($status, $beneficiaries): Proposal {
         $proposal = Proposal::factory()->create(['requested_budget' => '120000.00', 'requested_currency' => Currency::Usd]);
-        $proposal->projects()->attach(Project::factory()->create(['name' => 'Water Network Rehabilitation'])->id, ['target_beneficiaries' => $beneficiaries]);
+
+        // Y-17: a proposal's place is its own location row, and the
+        // beneficiary figure lives there.
+        $cityId = insertHrCity('Place '.Str::random(5), 'مكان');
+        $employeeId = insertHrEmployee($cityId);
+        $row = ProposalLocation::factory()->create([
+            'proposal_id' => $proposal->id,
+            'city_id' => $cityId,
+            'program_id' => Program::factory()->create(['manager_id' => $employeeId])->id,
+            'responsible_employee_id' => $employeeId,
+            'target_beneficiaries' => $beneficiaries,
+        ]);
+        $row->centers()->create(['center_id' => insertHrCenter($cityId, 'C'.Str::random(6))]);
 
         return placeProposalAt($proposal, $status);
     });
@@ -120,11 +135,9 @@ function linkedProposal(ProposalStatus $status = ProposalStatus::ConceptNote, in
 
 beforeEach(fn () => $this->travelTo('2026-10-14 10:00:00'));
 
-test('creating a proposal stores its donor, projects, beneficiaries and first note', function () {
+test('creating a proposal stores its donor, places and first note, and links no project', function () {
     $actor = userWithRole('Financial');
-    $first = Project::factory()->create();
-    $second = Project::factory()->status(ProjectStatus::Approved)->create();
-    $data = proposalFormData([$second->id, $first->id], ['beneficiaries' => [$first->id => 250, $second->id => '']]);
+    $data = proposalFormData([1, 2]);
 
     $proposal = saveProposal($actor, null, $data);
 
@@ -138,8 +151,10 @@ test('creating a proposal stores its donor, projects, beneficiaries and first no
         ->planned_date_begin->toBe('2026-11-01')
         ->planned_date_end->toBe('2027-10-31')
         ->notes->toBeNull()
-        ->and(DB::table('project_proposal')->where('proposal_id', $proposal->id)->orderBy('project_id')->pluck('target_beneficiaries', 'project_id')->all())
-        ->toBe([$first->id => 250, $second->id => null])
+        // Y-17: the places are the proposal's own rows; nothing is linked.
+        ->and(DB::table('project_proposal')->where('proposal_id', $proposal->id)->count())->toBe(0)
+        ->and($proposal->locations()->count())->toBe(2)
+        ->and(DB::table('projects')->count())->toBe(0)
         ->and($note)
         ->status->toBe('concept note')
         ->context->toBe(__('proposals.proposal_recorded_note'))
@@ -173,58 +188,25 @@ test('skipping the concept note with a reason records the concept note and then 
         ->and($notes->last()->context)->toBe('The donor already asked for the full proposal.');
 });
 
-test('a project that cannot take a proposal is refused and nothing is created', function (Closure $makeProjectId) {
-    $errors = refusedSave(fn () => saveProposal(userWithRole('Financial'), null, proposalFormData([$makeProjectId()])));
+test('a form that still sends projectIds is refused and nothing is created', function () {
+    // Y-17: a proposal links no project, so the key is prohibited outright
+    // and the three "project cannot take a proposal" cases went with it,
+    // along with the two on reopening or refusing a closed project (rule
+    // L94 is withdrawn, D-77). They are named in the Y-17 handoff.
+    $project = Project::factory()->create();
 
-    expect($errors['projectIds'])->toBe([__('proposals.that_project_is_no_longer_available')])
+    $errors = refusedSave(fn () => saveProposal(userWithRole('Financial'), null, proposalFormData([1], ['projectIds' => [$project->id]])));
+
+    expect($errors['projectIds'])->toBe([__('proposals.locations_required')])
         ->and(DB::table('proposals')->count())->toBe(0)
-        ->and(DB::table('proposal_status_notes')->count())->toBe(0);
-})->with([
-    'archived' => fn (): int => Project::factory()->status(ProjectStatus::Archived)->create()->id,
-    'owner rejected' => function (): int {
-        $project = Project::factory()->create();
-        Assignment::query()->create([
-            'assignable_type' => 'project',
-            'assignable_id' => $project->id,
-            'field' => 'user_id',
-            'employee_id' => $project->user_id,
-            'status' => AssignmentStatus::Rejected,
-        ]);
+        ->and(DB::table('proposal_status_notes')->count())->toBe(0)
+        ->and($project->fresh()->status)->toBe(ProjectStatus::Draft);
+});
 
-        return $project->id;
-    },
-    'tampered id' => fn (): int => 999999,
-]);
-
-test('creating a proposal without any project is refused', function () {
+test('creating a proposal without any place is refused', function () {
     $errors = refusedSave(fn () => saveProposal(userWithRole('Financial'), null, proposalFormData([])));
 
-    expect($errors['projectIds'])->toBe([__('proposals.link_at_least_one_project')]);
-});
-
-test('linking a closed project reopens it as a draft without dates', function () {
-    $project = Project::factory()->closed()->create(['center_id' => insertHrCenter(insertHrCity())]);
-
-    $proposal = saveProposal(userWithRole('Financial'), null, proposalFormData([$project->id]));
-
-    expect(DB::table('project_proposal')->where('proposal_id', $proposal->id)->pluck('project_id')->all())->toBe([$project->id])
-        ->and(DB::table('projects')->find($project->id))
-        ->status->toBe('draft')
-        ->start_date->toBeNull()
-        ->end_date->toBeNull();
-});
-
-test('a closed project is refused when its center already has an open project for that program', function () {
-    $centerId = insertHrCenter(insertHrCity());
-    $program = Program::factory()->create();
-    Project::factory()->create(['center_id' => $centerId, 'program_id' => $program->id]);
-    $closed = Project::factory()->closed()->create(['center_id' => $centerId, 'program_id' => $program->id]);
-
-    expect(fn () => saveProposal(userWithRole('Financial'), null, proposalFormData([$closed->id])))
-        ->toThrow(ValidationException::class);
-
-    expect(DB::table('proposals')->count())->toBe(0)
-        ->and(DB::table('projects')->find($closed->id)->status)->toBe('closed');
+    expect($errors['locations'])->toBe([__('proposals.locations_required')]);
 });
 
 test('a user without money access cannot change the budget and the stored one stays', function () {
@@ -288,16 +270,16 @@ test('the donor changes while the concept note is still being written', function
 
 test('zero beneficiaries are refused', function () {
     $proposal = linkedProposal();
-    $projectId = $proposal->projects()->sole()->id;
+    $projectId = $proposal->locations()->sole()->id;
 
     $errors = refusedSave(fn () => saveProposal(userWithRole('Financial'), $proposal, proposalEditData($proposal, ['beneficiaries' => [$projectId => 0]])));
 
     expect($errors["beneficiaries.{$projectId}"])->toBe([__('proposals.enter_at_least_one_beneficiary')]);
 });
 
-test('beneficiaries for a project that is not linked are refused', function () {
+test('beneficiaries for a place that is not the proposal own are refused', function () {
     $proposal = linkedProposal();
-    $foreignId = Project::factory()->create()->id;
+    $foreignId = ProposalLocation::factory()->complete()->create()->id;
 
     $errors = refusedSave(fn () => saveProposal(userWithRole('Financial'), $proposal, proposalEditData($proposal, ['beneficiaries' => [$foreignId => 50]])));
 
@@ -317,27 +299,27 @@ test('beneficiaries for a project outside the chosen ones are refused on create'
 
 test('before approval the beneficiaries change without a reason or a special event', function () {
     $proposal = linkedProposal(ProposalStatus::ProposalDraft);
-    $projectId = $proposal->projects()->sole()->id;
+    $projectId = $proposal->locations()->sole()->id;
 
     saveProposal(userWithRole('Financial'), $proposal, proposalEditData($proposal, ['beneficiaries' => [$projectId => 650]]));
 
-    expect(DB::table('project_proposal')->where('proposal_id', $proposal->id)->value('target_beneficiaries'))->toBe(650)
+    expect(DB::table('proposal_locations')->where('proposal_id', $proposal->id)->value('target_beneficiaries'))->toBe(650)
         ->and(Activity::query()->where('event', 'proposal.beneficiaries_changed')->exists())->toBeFalse();
 });
 
 test('after approval a beneficiary change without a reason is refused', function () {
     $proposal = linkedProposal(ProposalStatus::Approved);
-    $projectId = $proposal->projects()->sole()->id;
+    $projectId = $proposal->locations()->sole()->id;
 
     $errors = refusedSave(fn () => saveProposal(userWithRole('Financial'), $proposal, proposalEditData($proposal, ['beneficiaries' => [$projectId => 650], 'beneficiariesReason' => ' '])));
 
     expect($errors['beneficiariesReason'])->toBe([__('proposals.explain_why_the_beneficiaries_changed')])
-        ->and(DB::table('project_proposal')->where('proposal_id', $proposal->id)->value('target_beneficiaries'))->toBe(400);
+        ->and(DB::table('proposal_locations')->where('proposal_id', $proposal->id)->value('target_beneficiaries'))->toBe(400);
 });
 
 test('after approval a beneficiary change with a reason still needs a change request (Y-09)', function () {
     $proposal = linkedProposal(ProposalStatus::Approved);
-    $project = $proposal->projects()->sole();
+    $project = $proposal->locations()->sole();
 
     $errors = refusedSave(fn () => saveProposal(userWithRole('Financial'), $proposal, proposalEditData($proposal, [
         'beneficiaries' => [$project->id => 650],
@@ -345,7 +327,7 @@ test('after approval a beneficiary change with a reason still needs a change req
     ])));
 
     expect($errors['changeRequest'])->toBe([__('proposals.change_request_required')])
-        ->and(DB::table('project_proposal')->where('proposal_id', $proposal->id)->value('target_beneficiaries'))->toBe(400)
+        ->and(DB::table('proposal_locations')->where('proposal_id', $proposal->id)->value('target_beneficiaries'))->toBe(400)
         ->and(Activity::query()->where('event', 'proposal.beneficiaries_changed')->exists())->toBeFalse();
 });
 
@@ -437,36 +419,47 @@ test('the form offers no free status, only the concept note or a skip to the pro
     expect(DB::table('proposals')->count())->toBe(0);
 });
 
-test('a create opened from a project starts with a row taken from its center, program and city, and links nothing', function () {
+test('a create opened from a place starts with a row taken from it, and links nothing', function () {
+    // Y-17: "New Concept Note" on the Projects screen names a location row,
+    // and the new proposal gets a row of its own at the same place (D-93).
+    // The hosted-project case went with the host column (D-88, Y-16).
     $cityId = insertHrCity('Idlib', 'إدلب');
     $centerId = insertHrCenter($cityId, 'Hope Center Idlib', 'مركز الأمل إدلب');
-    $water = Project::factory()->create(['name' => 'Water Network Rehabilitation', 'city_id' => $cityId, 'center_id' => $centerId]);
-    Project::factory()->create(['name' => 'Bakery Support']);
+    $employeeId = insertHrEmployee($cityId);
+    $place = ProposalLocation::factory()->create([
+        'city_id' => $cityId,
+        'program_id' => Program::factory()->create(['manager_id' => $employeeId])->id,
+        'responsible_employee_id' => $employeeId,
+    ]);
+    $place->centers()->create(['center_id' => $centerId]);
 
     Livewire::actingAs(userWithRole('Financial'))->test('pages::proposals.index')
-        ->call('openCreateModal', $water->id)
+        ->call('openCreateModal', $place->id)
         ->assertSet('locations.0.city_id', (string) $cityId)
-        ->assertSet('locations.0.program_id', (string) $water->program_id)
-        ->assertSet('locations.0.responsible_employee_id', (string) $water->user_id)
+        ->assertSet('locations.0.program_id', (string) $place->program_id)
+        ->assertSet('locations.0.responsible_employee_id', (string) $employeeId)
         ->assertSet('locations.0.center_ids', [(string) $centerId])
         ->assertSet('locations.0.city_wide', false)
-        ->assertSet('locations.0.project', null)
         ->assertDontSeeHtml('data-test="proposal-project-picker"')
         ->assertDontSeeHtml('data-proposal-projects')
-        ->assertSeeText('Hope Center Idlib')
-        ->assertDontSeeText('Bakery Support');
+        ->assertSeeText('Hope Center Idlib');
 });
 
-test('a create opened from a hosted project carries its city and program but no center', function () {
+test('a create opened from a field-work place carries its city and program but no center', function () {
     $idleb = insertHrCity('Idleb', 'إدلب');
-    $host = insertHrCenter(insertHrCity('Aleppo', 'حلب'), 'Head Office Aleppo', 'المكتب الرئيسي حلب');
-    $wells = Project::factory()->hostedBy($host)->create(['name' => 'Wells Idleb', 'city_id' => $idleb]);
+    $employeeId = insertHrEmployee($idleb);
+    $place = ProposalLocation::factory()->cityWide()->create([
+        'city_id' => $idleb,
+        'program_id' => Program::factory()->create(['manager_id' => $employeeId])->id,
+        'responsible_employee_id' => $employeeId,
+    ]);
 
     Livewire::actingAs(userWithRole('Financial'))->test('pages::proposals.index')
-        ->call('openCreateModal', $wells->id)
+        ->call('openCreateModal', $place->id)
         ->assertSet('locations.0.city_id', (string) $idleb)
-        ->assertSet('locations.0.program_id', (string) $wells->program_id)
-        ->assertSet('locations.0.center_ids', []);
+        ->assertSet('locations.0.program_id', (string) $place->program_id)
+        ->assertSet('locations.0.center_ids', [])
+        ->assertSet('locations.0.city_wide', true);
 });
 
 test('a skipped concept note asks for the reason in Arabic and the preset reason saves the proposal draft', function () {
@@ -509,15 +502,15 @@ test('the budget fields are offered only to someone who may see money', function
     'fundraiser without agreements' => [fn () => fundraiserWithoutAgreements(), false],
 ]);
 
-test('New Concept Note opens the create form with its project already chosen', function () {
-    $project = Project::factory()->create();
+test('New Concept Note opens the create form at the place it came from', function () {
+    $place = ProposalLocation::factory()->complete()->create();
 
-    Livewire::withQueryParams(['for_project' => (string) $project->id])
+    Livewire::withQueryParams(['for_project' => (string) $place->id])
         ->actingAs(userWithRole('Financial'))
         ->test('pages::proposals.index')
         ->assertSet('showProposalModal', true)
-        ->assertSet('locations.0.city_id', (string) $project->city_id)
-        ->assertSet('locations.0.program_id', (string) $project->program_id)
+        ->assertSet('locations.0.city_id', (string) $place->city_id)
+        ->assertSet('locations.0.program_id', (string) $place->program_id)
         ->assertSet('forProject', '');
 });
 
@@ -544,13 +537,12 @@ test('New Concept Note opens nothing for a user who cannot create proposals', fu
 
 test('editing from the register asks for a reason, then refuses the direct change after approval', function () {
     $proposal = linkedProposal(ProposalStatus::Approved);
-    $projectId = (int) $proposal->projects()->value('projects.id');
+    $projectId = (int) $proposal->locations()->value('proposal_locations.id');
 
     $form = Livewire::actingAs(userWithRole('Financial'))
         ->test('pages::proposals.index')
         ->call('openEditModal', $proposal->id)
         ->assertSet("beneficiaries.{$projectId}", '400')
-        ->assertSeeText('Water Network Rehabilitation')
         ->assertSeeHtml('wire:model="beneficiariesReason"')
         ->set("beneficiaries.{$projectId}", '450')
         ->call('saveProposal')
@@ -561,7 +553,7 @@ test('editing from the register asks for a reason, then refuses the direct chang
         ->call('saveProposal')
         ->assertHasErrors(['changeRequest']);
 
-    expect(DB::table('project_proposal')->where('proposal_id', $proposal->id)->value('target_beneficiaries'))->toBe(400);
+    expect(DB::table('proposal_locations')->where('proposal_id', $proposal->id)->value('target_beneficiaries'))->toBe(400);
 });
 
 test('a proposal cannot be created for a donor the General Manager has not approved', function () {

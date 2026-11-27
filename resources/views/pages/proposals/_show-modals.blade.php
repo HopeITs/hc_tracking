@@ -1,6 +1,6 @@
 {{--
     Every dialog of proposals/show, in page order: status, proposal form,
-    agreement, tranche, unlink, file, file preview, file delete and add
+    agreement, tranche, file, file preview, file delete and add
     task. Included by ⚡show.blade.php.
 --}}
 @use('App\Enums\FileType')
@@ -109,29 +109,6 @@
         />
     @endcanany
 
-    <x-ui.confirm-modal
-        icon="link-slash"
-        wire:model="showUnlinkModal"
-        tone="neutral"
-        :title="__('proposals.stop_funding_this_project')"
-        :message="$unlinkingProjectId !== null && ($unlinking = $this->projects->firstWhere('project_id', $unlinkingProjectId)) !== null ? __('proposals.unlink_project_consequence', ['name' => $unlinking->headline()]) : null"
-        confirm="unlinkProject"
-        :confirm-label="$this->unlinkDeletesTargets ? __('proposals.unlink_with_targets') : __('proposals.unlink_project')"
-        confirm-test="confirm-unlink-project"
-    >
-        @if ($showUnlinkModal)
-            @if ($unlinkTargets['count'] > 0)
-                <x-proposals.targets-notice
-                    :body="trans_choice('proposals.location_targets_body', $unlinkTargets['count'], ['count' => $unlinkTargets['count']])"
-                    :reported="$unlinkTargets['reported'] > 0 ? trans_choice('proposals.location_targets_reported', $unlinkTargets['reported'], ['count' => $unlinkTargets['reported']]) : null"
-                    :no-right="$unlinkTargets['reported'] === 0 && ! $this->unlinkDeletesTargets ? __('proposals.location_targets_no_right') : null"
-                    :url="route('proposals.show', ['proposal' => $this->proposal, 'tab' => 'targets'])"
-                />
-            @endif
-            <flux:error name="project" />
-        @endif
-    </x-ui.confirm-modal>
-
     <x-ui.modal
         wire:model="showNegotiationModal"
         size="md"
@@ -157,6 +134,28 @@
             <x-ui.button type="submit" tone="primary" wire:loading.attr="disabled" wire:target="negotiationFile,saveNegotiationNote" data-test="save-negotiation-note-button">
                 {{ __('proposals.add_negotiation_note') }}
             </x-ui.button>
+        </x-slot:actions>
+    </x-ui.modal>
+
+    <x-ui.modal
+        wire:model="showGrantDatesModal"
+        size="md"
+        :title="__('proposals.set_grant_dates')"
+        :description="__('proposals.grant_dates_help')"
+        submit="saveGrantDates"
+        close="closeGrantDatesModal"
+        required-note
+        data-test="grant-dates-modal"
+    >
+        @if ($showGrantDatesModal)
+            <div class="grid gap-y-4 @md/modal:grid-cols-2 @md/modal:gap-x-4">
+                <x-ui.form-input wire:model="grantDateBegin" :label="__('proposals.grant_dates_begin')" type="date" required :disabled="$this->proposal->actual_date_begin !== null" data-test="grant-date-begin" />
+                <x-ui.form-input wire:model="grantDateEnd" :label="__('proposals.grant_dates_end')" type="date" required data-test="grant-date-end" />
+            </div>
+        @endif
+
+        <x-slot:actions>
+            <x-ui.button type="submit" tone="primary" wire:loading.attr="disabled" wire:target="saveGrantDates" data-test="save-grant-dates">{{ __('proposals.set_grant_dates') }}</x-ui.button>
         </x-slot:actions>
     </x-ui.modal>
 

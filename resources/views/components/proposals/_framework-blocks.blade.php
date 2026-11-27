@@ -36,6 +36,9 @@
                         <span class="pp-fw-freq">
                             <span class="pp-mini">{{ $indicator['frequency'] }}</span>
                             @if ($indicator['unreported'])<span class="pp-mini pp-mini-red">{{ __('proposals.framework.no_report_yet') }}</span>@endif
+                            @can('indicators.record')
+                                <button type="button" class="pp-link" wire:click.stop="openProgressModal({{ $indicator['id'] }})" data-test="record-indicator-{{ $indicator['id'] }}">{{ __('indicators.log_reading') }}</button>
+                            @endcan
                         </span>
                         @if ($layers['targets'] ?? false)
                             <span class="pp-centre-t pp-fw-centres">
@@ -47,6 +50,22 @@
                                 @if ($canEditTargets)
                                     <button type="button" class="pp-link" wire:click.stop="openCentreTargets({{ $indicator['id'] }})" data-test="edit-centre-targets-{{ $indicator['id'] }}">{{ __('proposals.framework.edit_targets') }}</button>
                                 @endif
+                                @can('targets.create')
+                                    <button type="button" class="pp-link" wire:click.stop="$dispatch('commit-framework-target', { indicatorId: {{ $indicator['id'] }} })">{{ __('targets.commit_target') }}</button>
+                                @endcan
+                                @foreach ($indicator['committedTargets'] as $target)
+                                    <span wire:key="proposal-target-actions-{{ $target['id'] }}">
+                                        <b>{{ $number($target['value']) }}</b>
+                                        @can('targets.update')
+                                            <button type="button" class="pp-link" wire:click.stop="$dispatch('edit-framework-target', { targetId: {{ $target['id'] }} })">{{ __('targets.edit_target') }}</button>
+                                        @endcan
+                                        @can('targets.delete')
+                                            @if ($target['deletable'])
+                                                <button type="button" class="pp-link" wire:click.stop="$dispatch('delete-framework-target', { targetId: {{ $target['id'] }} })">{{ __('targets.delete_target') }}</button>
+                                            @endif
+                                        @endcan
+                                    </span>
+                                @endforeach
                             </span>
                         @endif
                     </div>

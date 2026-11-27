@@ -4,8 +4,6 @@ declare(strict_types=1);
 
 namespace App\Livewire\Concerns\Projects;
 
-use App\Actions\Proposals\LinkProposalProject;
-use App\Actions\Proposals\UnlinkProposalProject;
 use App\Enums\Currency;
 use App\Enums\ProposalPhase;
 use App\Enums\ProposalStatus;
@@ -13,11 +11,8 @@ use App\Models\DonorProposal;
 use App\Models\Project;
 use App\Models\Proposal;
 use App\Models\ProposalLocation;
-use Flux\Flux;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Support\Facades\Auth;
-use Illuminate\Validation\Rule;
-use Illuminate\Validation\ValidationException;
 use Livewire\Attributes\Computed;
 
 /**
@@ -33,8 +28,6 @@ use Livewire\Attributes\Computed;
  */
 trait ReadsProjectFunding
 {
-    public string $proposalToAttach = '';
-
     /**
      * Whether the viewer may see the money on this page: committed and
      * received figures need both the agreements (budgets) and the transfers
@@ -239,32 +232,10 @@ trait ReadsProjectFunding
     }
 
     /**
-     * Proposals this project could be linked to. Linking is a proposal edit,
-     * so the list is offered only to proposals.update holders, and only while
-     * the project itself is linkable (Project::linkableToProposals()).
-     *
-     * @return Collection<int, Proposal>
-     */
-    #[Computed]
-    public function attachableProposals(): Collection
-    {
-        if (! (auth()->user()?->can('proposals.update') ?? false)
-            || ! Project::query()->linkableToProposals()->whereKey($this->location->project_id)->exists()) {
-            return new Collection;
-        }
-
-        return Proposal::query()
-            ->select(['id', 'name', 'internal_project_number', 'status'])
-            ->whereDoesntHave('projects', fn ($query) => $query->whereKey($this->locationId))
-            ->orderBy('name')
-            ->orderBy('id')
-            ->get();
-    }
-
-    /**
      * Whether New Concept Note is offered: the viewer may create proposals
-     * and see projects, and this project may take a proposal
-     * (Project::linkableToProposals()). The proposal form checks both again.
+     * and see the Projects screen. Y-17: the new proposal gets a row of its
+     * own at this place (D-93), so there is no project to check for
+     * linkability — a closed or archived place may still be proposed again.
      */
     #[Computed]
     public function canStartConceptNote(): bool
@@ -273,54 +244,6 @@ trait ReadsProjectFunding
 
         return $user !== null
             && $user->can('create', Proposal::class)
-            && $user->can('projects.view')
-            && Project::query()->linkableToProposals()->whereKey($this->location->project_id)->exists();
-    }
-
-    /**
-     * Link the chosen proposal to this project through LinkProposalProject,
-     * which authorizes on the proposal. A refusal is shown under the picker.
-     */
-    public function attachProposal(): void
-    {
-        $validated = $this->validate([
-            'proposalToAttach' => ['required', 'integer', Rule::exists(Proposal::class, 'id')],
-        ], [
-            'proposalToAttach.required' => __('projects.select_a_proposal_to_link'),
-            'proposalToAttach.integer' => __('common.the_selected_proposal_is_no_longer_available'),
-            'proposalToAttach.exists' => __('common.the_selected_proposal_is_no_longer_available'),
-        ]);
-
-        try {
-            app(LinkProposalProject::class)->handle(Proposal::query()->findOrFail((int) $validated['proposalToAttach']), (int) $this->location->project_id);
-        } catch (ValidationException $exception) {
-            throw ValidationException::withMessages(['proposalToAttach' => $exception->validator->errors()->all()]);
-        }
-
-        $this->proposalToAttach = '';
-        unset($this->location, $this->attachedProposals, $this->attachableProposals);
-
-        Flux::toast(variant: 'success', text: __('projects.proposal_linked_to_this_project'));
-    }
-
-    /**
-     * Unlink a proposal from this project through UnlinkProposalProject. A
-     * refusal (its last project, reported targets) is shown as a toast and
-     * kept in the error bag under `project`.
-     */
-    public function detachProposal(int $proposalId): void
-    {
-        try {
-            app(UnlinkProposalProject::class)->handle(Proposal::query()->findOrFail($proposalId), (int) $this->location->project_id);
-        } catch (ValidationException $exception) {
-            $this->setErrorBag($exception->validator->errors());
-            Flux::toast(variant: 'danger', text: $exception->validator->errors()->first());
-
-            return;
-        }
-
-        unset($this->location, $this->attachedProposals, $this->attachableProposals);
-
-        Flux::toast(variant: 'success', text: __('projects.proposal_unlinked_from_this_project'));
+            && $user->can('projects.view');
     }
 }

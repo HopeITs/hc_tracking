@@ -44,7 +44,7 @@ trait NarrowsTargetFormOptions
             return null;
         }
 
-        return Indicator::query()
+        return $this->targetIndicators()
             ->select(['id', 'name', 'result_id', 'project_id', 'proposal_location_id', 'measure', 'unit', 'frequency'])
             ->with(['result:id,statement,program_id', 'location', 'location.city', 'location.program', 'location.centers'])
             ->find((int) $this->targetIndicatorId);
@@ -89,7 +89,7 @@ trait NarrowsTargetFormOptions
     #[Computed]
     public function indicatorOptions(): Collection
     {
-        return Indicator::query()
+        return $this->targetIndicators()
             ->select(['id', 'name', 'result_id', 'measure'])
             ->with('result:id,statement')
             ->orderBy('name')

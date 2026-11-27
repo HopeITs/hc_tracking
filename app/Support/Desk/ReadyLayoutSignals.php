@@ -276,7 +276,7 @@ class ReadyLayoutSignals
         }
 
         $today = CarbonImmutable::today();
-        $ratings = Indicator::query()->whereNotNull('target')->with('progress:id,indicator_id,date,value')->get(['id', 'baseline', 'target'])
+        $ratings = Indicator::query()->whereNotNull('target')->with(['progress:id,indicator_id,date,value', 'approvedMonthlyMeasurements'])->get(['id', 'baseline', 'target', 'measure'])
             ->map(fn (Indicator $indicator): ?RagStatus => $indicator->ragStatus($today->startOfYear(), $today->endOfYear()));
         $rated = $ratings->filter();
         $total = $rated->count();

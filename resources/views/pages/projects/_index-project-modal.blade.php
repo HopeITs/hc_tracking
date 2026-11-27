@@ -1,92 +1,48 @@
 {{--
-    The create/edit project dialog of projects/index. Included by
-    ⚡index.blade.php, whose top PHP block defines $durationForms and
-    $monthNames for the dialog's live duration hint.
+    The edit dialog of projects/index. Included by ⚡index.blade.php.
+
+    Y-17: a place is a location row of a proposal, so this form changes only
+    what the place DELIVERS — its description, the five beneficiary targets
+    and its sectors (contracts.md §3, SaveLocationDetails). Three things it
+    no longer offers, each on purpose:
+
+    - **No create.** A place exists because a proposal has it (D-84, D-87),
+      so the proposal form is the only way in and nothing is created here
+      (`ProposalLocationPolicy::create()` is false).
+    - **No name.** A place is named by where it is — its program, city and
+      centers — not by a free-text field (`ProposalLocation::label()`).
+    - **No placement, owner or dates.** The city, program, centers and
+      responsible are decided on the proposal, through SaveProposal before
+      approval or a change request afterwards (Y-09); the period comes from
+      the approved grant (ApproveLocationFromProposal).
 --}}
     <x-ui.modal
         wire:model="showProjectModal"
         size="xl"
-        :title="$editingProjectId === null ? __('projects.add_center') : __('projects.edit_project')"
-        :description="__('projects.define_delivery_ownership_lifecycle_schedule_and_beneficiary')"
+        :title="__('projects.edit_project')"
+        :description="__('projects.edit_what_this_place_delivers')"
         submit="saveProject"
         close="closeProjectModal"
         required-note
     >
         @if ($showProjectModal)
-        {{-- One Alpine scope for the live figures: the duration under Details and the breakdown beside Beneficiaries. --}}
+        {{-- One Alpine scope for the live breakdown figure beside Beneficiaries. --}}
         <div
             class="contents"
-            data-name-default
-            x-effect="syncName()"
             x-data="{
-                names: @js($this->nameDefaultLabels),
-                editing: @js($editingProjectId !== null),
-                proposedName: '',
-                get defaultName() {
-                    const program = this.names.programs[$wire.programId];
-                    const place = this.names.centers[$wire.centerId] ?? this.names.cities[$wire.cityId];
-
-                    return program && place ? `${program} — ${place}` : '';
-                },
-                syncName() {
-                    const next = this.defaultName;
-
-                    if (this.editing || next === '' || ($wire.name !== '' && $wire.name !== this.proposedName)) {
-                        return;
-                    }
-
-                    $wire.name = this.proposedName = next;
-                },
-                forms: @js($durationForms),
-                months: @js($monthNames),
-                breakdownTemplate: @js(e(__('projects.broken_down_of_headline', ['breakdown' => '__BREAKDOWN__', 'headline' => '__HEADLINE__']))),
-                get durationDays() {
-                    const start = Date.parse($wire.startDate);
-                    const end = Date.parse($wire.endDate);
-
-                    if (Number.isNaN(start) || Number.isNaN(end)) {
-                        return 0;
-                    }
-
-                    return Math.max(0, Math.floor((end - start) / 86400000) + 1);
-                },
-                get durationLabel() {
-                    const days = this.durationDays;
-
-                    if (days < 1) {
-                        return '';
-                    }
-
-                    const form = days <= 3 ? this.forms[days] : (days <= 10 ? this.forms[3] : this.forms[11]);
-
-                    return form.replace('__N__', days.toLocaleString());
-                },
-                get durationRange() {
-                    if (this.durationDays < 1) {
-                        return '';
-                    }
-
-                    const [startYear, startMonth] = $wire.startDate.split('-').map(Number);
-                    const [endYear, endMonth] = $wire.endDate.split('-').map(Number);
-                    const start = this.months[startMonth - 1];
-                    const end = this.months[endMonth - 1];
-
-                    if (startYear !== endYear) {
-                        return `${start} ${startYear} – ${end} ${endYear}`;
-                    }
-
-                    return startMonth === endMonth ? `${start} ${startYear}` : `${start} – ${end} ${startYear}`;
+                get headline() { return Number($wire.targetBeneficiaries) || 0 },
+                get breakdown() {
+                    return ['targetMen', 'targetWomen', 'targetBoys', 'targetGirls']
+                        .reduce((total, key) => total + (Number($wire[key]) || 0), 0);
                 },
                 get breakdownHint() {
-                    const breakdown = [$wire.targetMen, $wire.targetWomen, $wire.targetBoys, $wire.targetGirls]
-                        .reduce((total, value) => total + (Number(value) || 0), 0);
-                    const headline = Number($wire.targetBeneficiaries) || 0;
+                    const [headline, breakdown] = [this.headline, this.breakdown];
 
-                    if (breakdown === 0 && headline === 0) {
+                    if (breakdown === 0 || headline === 0 || breakdown === headline) {
                         return '';
                     }
 
-                    return this.breakdownTemplate
+                    return @js(e(__('projects.broken_down_of_headline', ['breakdown' => '__BREAKDOWN__', 'headline' => '__HEADLINE__'])))
                         .replace('__BREAKDOWN__', `<b class='form-section-figure'>${breakdown.toLocaleString()}</b>`)
                         .replace('__HEADLINE__', headline.toLocaleString());
                 },
@@ -95,153 +51,30 @@
             <x-ui.form-section
                 :title="__('projects.section_details')"
                 :hint="__('projects.section_details_hint')"
-                :fields="['name', 'startDate', 'endDate', 'description']"
+                :fields="['description']"
             >
                 <div class="grid grid-cols-2 gap-x-4 gap-y-3 @4xl/modal:grid-cols-3">
-                    <x-ui.form-input wire:model.live.debounce.400ms="name" :label="__('projects.project_name')" maxlength="255" required autofocus class="col-span-2" />
+                    {{-- The place and its period are shown, never edited here. --}}
+                    <p class="col-span-2 text-sm text-secondary-medium dark:text-ink-muted @4xl/modal:col-span-3">
+                        <flux:icon name="map-pin" variant="micro" class="inline size-4 align-text-bottom" aria-hidden="true" />
+                        {{ $this->editingPlaceLabel }}
+                    </p>
 
-                    @if ($this->datesEditable())
-                        <x-ui.form-input wire:model="startDate" :label="__('common.start_date')" type="date" />
-                        <x-ui.form-input wire:model="endDate" :label="__('projects.end_date')" type="date" />
+                    <p class="col-span-2 text-sm text-secondary-medium dark:text-ink-muted @4xl/modal:col-span-3">
+                        <flux:icon name="calendar-days" variant="micro" class="inline size-4 align-text-bottom" aria-hidden="true" />
+                        {{ $this->datesEditable() ? __('projects.dates_set_by_the_grant') : __('projects.dates_prohibited_draft') }}
+                    </p>
 
-                        <div class="col-span-2 min-w-0 @4xl/modal:col-span-1">
-                            <span class="form-label">{{ __('projects.duration') }}</span>
-                            <p class="flex min-h-11 flex-wrap items-center gap-x-2 tabular-nums">
-                                <span class="text-lg font-bold text-secondary-dark dark:text-ink" x-text="durationLabel || '—'">—</span>
-                                <span class="text-xs font-medium text-secondary-medium dark:text-ink-muted" x-text="durationRange"></span>
-                            </p>
-                        </div>
-                    @else
-                        {{-- A draft has no dates: they are set when the proposal is approved. --}}
-                        <p class="col-span-2 text-sm text-secondary-medium dark:text-ink-muted @4xl/modal:col-span-3">
-                            <flux:icon name="calendar-days" variant="micro" class="inline size-4 align-text-bottom" aria-hidden="true" />
-                            {{ __('projects.dates_prohibited_draft') }}
-                        </p>
-                        @error('startDate')
-                            <p role="alert" class="col-span-2 text-sm font-medium text-status-critical @4xl/modal:col-span-3">{{ $message }}</p>
-                        @enderror
-                        @error('endDate')
-                            <p role="alert" class="col-span-2 text-sm font-medium text-status-critical @4xl/modal:col-span-3">{{ $message }}</p>
-                        @enderror
-                    @endif
-
-                    <x-ui.form-textarea wire:model="description" :label="__('common.description')" rows="2" class="col-span-2 @4xl/modal:col-span-3" />
+                    <x-ui.form-textarea wire:model="description" :label="__('common.description')" rows="2" autofocus class="col-span-2 @4xl/modal:col-span-3" />
                 </div>
             </x-ui.form-section>
 
-            <x-ui.form-section :title="__('projects.section_placement')" :fields="['cityId', 'programId', 'centerId', 'hostCenterId', 'userId', 'sectorIds']">
+            <x-ui.form-section :title="__('projects.section_placement')" :fields="['sectorIds']">
                 <div class="grid gap-x-4 gap-y-3 @2xl/modal:grid-cols-3">
-                    <x-ui.form-select wire:model.live="cityId" :label="__('common.city')" :placeholder="__('projects.select_a_city')" required data-test="project-city-select">
-                        @foreach ($this->placementCityOptions as $cityOption)
-                            <option value="{{ $cityOption->id }}">{{ $cityOption->name }}</option>
-                        @endforeach
-                    </x-ui.form-select>
-
-                    <x-ui.form-select wire:model.live="programId" :label="__('common.program')" :placeholder="__('projects.select_a_program')" required data-test="project-program-select">
-                        @foreach ($this->programOptions as $programOption)
-                            <option value="{{ $programOption->id }}">{{ $programOption->name }}</option>
-                        @endforeach
-                    </x-ui.form-select>
-
-                    {{-- The physical center is optional and offered from the chosen city's centers (W-02); a city without one is hosted below (D-55). --}}
-                    @php
-                        $centersEmpty = $this->centerOptions->isEmpty();
-                    @endphp
-                    <div class="contents" @if ($centersEmpty) data-center-select-disabled @endif>
-                        <x-ui.form-select
-                            wire:model.live="centerId"
-                            :label="__('projects.center')"
-                            :placeholder="__('projects.select_a_center')"
-                            :disabled="$centersEmpty"
-                            :help="$centersEmpty ? ($cityId === '' ? __('projects.choose_the_city_first') : __('projects.no_centers_in_city')) : null"
-                            data-test="project-center-select"
-                        >
-                            @foreach ($this->centerOptions as $centerOption)
-                                <option value="{{ $centerOption->id }}">{{ $centerOption->name }}@unless ($centerOption->is_active) · {{ __('projects.center_inactive') }}@endunless</option>
-                            @endforeach
-                        </x-ui.form-select>
-                    </div>
-
-                    @if ($centerId === '')
-                        <x-ui.form-select wire:model.live="hostCenterId" :label="__('projects.host_center')" :placeholder="__('projects.select_a_host_center')" :help="__('projects.host_center_help')" required data-test="host-center-select">
-                            @foreach ($this->hostCenterOptions as $hostOption)
-                                <option value="{{ $hostOption->id }}">{{ $hostOption->name }}</option>
-                            @endforeach
-                        </x-ui.form-select>
-                    @else
-                        {{-- The host field is hidden beside a center; a refused host (tampered input) still says why. --}}
-                        @error('hostCenterId')
-                            <p role="alert" class="text-sm font-medium text-status-critical @2xl/modal:col-span-2">{{ $message }}</p>
-                        @enderror
-                    @endif
-
-                    <x-ui.form-select wire:model="userId" :label="__('projects.owner')" :placeholder="__('projects.select_an_owner')" required data-test="project-owner-select">
-                        @foreach ($this->ownerOptions as $userOption)
-                            <option value="{{ $userOption->id }}">{{ $userOption->name }} · {{ $userOption->secondary_name }}</option>
-                        @endforeach
-                    </x-ui.form-select>
-
-                    {{-- Required for a new project (D-47); an older project without sectors can still be saved as it is. --}}
-                    <x-projects.sector-picker wire:model="sectorIds" :required="$editingProjectId === null" class="@2xl/modal:col-span-3" />
+                    {{-- An older place without sectors can still be saved as it is (D-47). --}}
+                    <x-projects.sector-picker wire:model="sectorIds" :required="false" class="@2xl/modal:col-span-3" />
                 </div>
             </x-ui.form-section>
-
-            @if ($editingProjectId === null)
-                @php
-                    $pairProject = $this->existingPairProject;
-                @endphp
-                @if ($pairProject !== null)
-                    <div
-                        class="flex flex-wrap items-center justify-between gap-3 rounded-lg border p-3 text-sm {{ $pairProject['state'] === 'open' ? 'border-status-warn/40 bg-status-warn-soft' : 'border-secondary-soft bg-secondary-soft/40 dark:border-line dark:bg-surface-2' }}"
-                        role="status"
-                        data-test="existing-pair-project"
-                    >
-                        <p class="min-w-0 flex-1 text-secondary-dark dark:text-ink">
-                            <flux:icon name="information-circle" variant="micro" class="inline size-4 align-text-bottom" aria-hidden="true" />
-                            <span dir="auto">{{ match ($pairProject['state']) {
-                                'open' => __('projects.existing_project_open', ['name' => $pairProject['name']]),
-                                'closed' => __('projects.existing_project_closed', ['name' => $pairProject['name']]),
-                                'archived' => __('projects.existing_project_archived', ['name' => $pairProject['name']]),
-                            } }}</span>
-                        </p>
-                        @if ($pairProject['state'] === 'archived')
-                            @if ($pairProject['canRestore'])
-                                <x-ui.button type="button" size="sm" wire:click="restoreExistingProject" wire:loading.attr="disabled" wire:target="restoreExistingProject" data-test="restore-existing-project">
-                                    {{ __('projects.restore_first') }}
-                                </x-ui.button>
-                            @endif
-                        @else
-                            @can('create', \App\Models\Proposal::class)
-                                <x-ui.button :href="route('proposals.index', ['for_project' => $pairProject['id']])" wire:navigate size="sm" tone="primary" data-test="add-proposal-to-existing">
-                                    {{ __('projects.add_proposal_to_it') }}
-                                </x-ui.button>
-                            @endcan
-                        @endif
-                    </div>
-                @endif
-
-                @if ($this->similarProjects !== [])
-                    <div class="rounded-lg border border-secondary-soft bg-secondary-soft/40 dark:border-line dark:bg-surface-2 p-3 text-sm" data-test="similar-projects">
-                        <p class="font-medium text-secondary-dark dark:text-ink">{{ __('projects.similar_projects') }}</p>
-                        <p class="mt-0.5 text-xs text-secondary-medium dark:text-ink-muted">{{ __('projects.similar_projects_hint') }}</p>
-                        <ul class="mt-2 space-y-1">
-                            @foreach ($this->similarProjects as $similar)
-                                <li class="flex flex-wrap items-baseline gap-x-2" wire:key="similar-{{ $similar['id'] }}">
-                                    <span class="font-medium" dir="auto">{{ $similar['name'] }}</span>
-                                    <span class="text-xs text-secondary-medium dark:text-ink-muted" dir="auto">{{ $similar['center'] }} · {{ $similar['program'] }} · {{ $similar['status'] }}</span>
-                                </li>
-                            @endforeach
-                        </ul>
-                        <label class="mt-3 flex items-start gap-2">
-                            <input type="checkbox" wire:model="confirmNewProject" class="mt-0.5" data-test="confirm-new-project">
-                            <span>{{ __('projects.similar_confirm_label') }}</span>
-                        </label>
-                        @error('confirmNewProject')
-                            <p role="alert" class="mt-1 text-sm font-medium text-status-critical">{{ $message }}</p>
-                        @enderror
-                    </div>
-                @endif
-            @endif
 
             <x-ui.form-section
                 :title="__('projects.section_beneficiaries')" :optional="true"
@@ -264,7 +97,7 @@
 
         <x-slot:actions>
             <x-ui.button type="submit" tone="primary" data-test="save-project-button">
-                {{ $editingProjectId === null ? __('projects.add_center') : __('common.save_changes') }}
+                {{ __('common.save_changes') }}
             </x-ui.button>
         </x-slot:actions>
     </x-ui.modal>

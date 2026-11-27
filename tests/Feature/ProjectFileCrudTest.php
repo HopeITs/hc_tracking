@@ -24,7 +24,7 @@ test('uploading a valid file creates a media row and writes the file to disk', f
         ->call('saveFile')
         ->assertHasNoErrors();
 
-    $media = Media::where('mediable_type', 'project')->where('mediable_id', $project->id)->sole();
+    $media = Media::where('mediable_type', 'proposal_location')->where('mediable_id', rowFor($project)->id)->sole();
 
     expect($media->collection)->toBe(MediaCollection::Agreement)
         ->and($media->type)->toBe(FileType::Pdf)
@@ -51,7 +51,7 @@ test('a display name typed without an extension keeps the uploaded files real ex
         ->call('saveFile')
         ->assertHasNoErrors();
 
-    $media = Media::where('mediable_type', 'project')->where('mediable_id', $project->id)->sole();
+    $media = Media::where('mediable_type', 'proposal_location')->where('mediable_id', rowFor($project)->id)->sole();
 
     expect($media->original_name)->toBe('Site visit.jpg');
 });
@@ -74,9 +74,9 @@ test('uploading a file over 5mb is refused on upload and stores no row, disk fil
         ->call('saveFile')
         ->assertHasErrors('newFile');
 
-    expect(Media::where('mediable_type', 'project')->where('mediable_id', $project->id)->count())->toBe(0)
+    expect(Media::where('mediable_type', 'proposal_location')->where('mediable_id', rowFor($project)->id)->count())->toBe(0)
         ->and(Storage::disk('tmp-for-tests')->allFiles())->toBe([]);
-    Storage::disk('local')->assertDirectoryEmpty('media/projects/'.$project->id);
+    Storage::disk('local')->assertDirectoryEmpty('media/locations/'.rowFor($project)->id);
 });
 
 test('uploading a file with a disallowed extension is refused on upload and stores no row or temporary file', function () {
@@ -97,7 +97,7 @@ test('uploading a file with a disallowed extension is refused on upload and stor
         ->call('saveFile')
         ->assertHasErrors('newFile');
 
-    expect(Media::where('mediable_type', 'project')->where('mediable_id', $project->id)->count())->toBe(0)
+    expect(Media::where('mediable_type', 'proposal_location')->where('mediable_id', rowFor($project)->id)->count())->toBe(0)
         ->and(Storage::disk('tmp-for-tests')->allFiles())->toBe([]);
 });
 
@@ -108,7 +108,7 @@ test('editing a file updates its category and display name only', function () {
         'mediable_type' => 'proposal_location',
         'mediable_id' => rowFor($project)->id,
         'original_name' => 'old-name.pdf',
-        'path' => 'media/projects/'.$project->id.'/original-path.pdf',
+        'path' => 'media/locations/'.rowFor($project)->id.'/original-path.pdf',
         'type' => FileType::Pdf,
         'size' => 12345,
     ]);
@@ -126,7 +126,7 @@ test('editing a file updates its category and display name only', function () {
 
     expect($media->collection)->toBe(MediaCollection::Mou)
         ->and($media->original_name)->toBe('New name.pdf')
-        ->and($media->path)->toBe('media/projects/'.$project->id.'/original-path.pdf')
+        ->and($media->path)->toBe('media/locations/'.rowFor($project)->id.'/original-path.pdf')
         ->and($media->disk)->toBe('local')
         ->and($media->size)->toBe(12345);
 });
@@ -156,7 +156,7 @@ test('deleting a file removes the media row and the file from disk', function ()
     Storage::fake('local');
     $user = User::factory()->role('General Manager')->create();
     $project = projectWithRow();
-    $path = 'media/projects/'.$project->id.'/doomed.pdf';
+    $path = 'media/locations/'.rowFor($project)->id.'/doomed.pdf';
     Storage::disk('local')->put($path, 'content');
     $media = Media::factory()->create([
         'mediable_type' => 'proposal_location',
@@ -178,7 +178,7 @@ test('the download route streams a file that belongs to the project in the url',
     Storage::fake('local');
     $user = User::factory()->role('General Manager')->create();
     $project = projectWithRow();
-    $path = 'media/projects/'.$project->id.'/report.pdf';
+    $path = 'media/locations/'.rowFor($project)->id.'/report.pdf';
     Storage::disk('local')->put($path, 'file contents');
     $media = Media::factory()->create([
         'mediable_type' => 'proposal_location',
@@ -200,7 +200,7 @@ test('the download route stops scripted mass downloads but leaves other users un
     $user = User::factory()->role('General Manager')->create();
     $colleague = User::factory()->role('General Manager')->create();
     $project = projectWithRow();
-    $path = 'media/projects/'.$project->id.'/report.pdf';
+    $path = 'media/locations/'.rowFor($project)->id.'/report.pdf';
     Storage::disk('local')->put($path, 'file contents');
     $media = Media::factory()->create([
         'mediable_type' => 'proposal_location',

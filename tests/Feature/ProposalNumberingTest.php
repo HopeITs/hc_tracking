@@ -12,7 +12,7 @@ function numberingInput(Project $project, string $start): array
     return [
         'name' => 'Proposal',
         'donorId' => Donor::factory()->create()->id,
-        'projectIds' => [$project->id],
+        'locations' => [placePayload()],
         'plannedDateBegin' => $start,
         'plannedDateEnd' => $start,
     ];

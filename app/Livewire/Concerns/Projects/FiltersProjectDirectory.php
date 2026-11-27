@@ -7,7 +7,7 @@ namespace App\Livewire\Concerns\Projects;
 use App\Enums\ProjectStatus;
 use App\Models\HrCity;
 use App\Models\HrEmployee;
-use App\Models\HrProgram;
+use App\Models\Program;
 use App\Models\ProposalLocation;
 use App\Models\Sector;
 use App\Support\Desk\ProjectStage;
@@ -270,7 +270,7 @@ trait FiltersProjectDirectory
                     // A row is named by its proposal, its place and its programme.
                     ->whereHas('proposal', fn (Builder $proposal) => $proposal->where(Like::word('proposals.name', $word)))
                     ->orWhereIn('city_id', $matches['cities'][$word] ?? [])
-                    ->orWhereIn('program_id', HrProgram::idsMatchingName($word, acrossLayouts: false))
+                    ->orWhereIn('program_id', Program::idsMatchingName($word, acrossLayouts: false))
                     ->orWhereIn('responsible_employee_id', $matches['owners'][$word] ?? [])));
             })
             ->when($this->city !== '', fn (Builder $query) => $query->where('city_id', (int) $this->city))

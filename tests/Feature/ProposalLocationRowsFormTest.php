@@ -52,16 +52,14 @@ test('a new proposal is created from location rows with their centers, without a
         ->set('locations.0.center_ids', [(string) $this->aleppoCenter, (string) $this->aleppoSecondCenter])
         ->call('addLocationRow')
         ->set('locations.1.city_id', (string) $this->homs)
-        ->set('locations.1.program_id', 'new')
-        ->set('locations.1.new_program_name_en', 'Youth Clubs')
-        ->set('locations.1.new_program_name_ar', 'نوادي الشباب')
+        ->assertDontSeeHtml('<option value="new">')
         ->set('locations.1.center_ids', [(string) $this->homsCenter])
         ->call('saveProposal')
         ->assertHasNoErrors()
         ->assertSet('showProposalModal', false);
 
     $proposal = Proposal::query()->sole();
-    $rows = $proposal->locations()->with(['centers', 'programRequest'])->get();
+    $rows = $proposal->locations()->with('centers')->get();
 
     expect($proposal->status)->toBe(ProposalStatus::ConceptNote)
         ->and(DB::table('project_proposal')->where('proposal_id', $proposal->id)->count())->toBe(0)
@@ -71,7 +69,7 @@ test('a new proposal is created from location rows with their centers, without a
         ->and($rows[0]->responsible_employee_id)->toBe($this->employee)
         ->and($rows[0]->centerIds())->toBe([$this->aleppoCenter, $this->aleppoSecondCenter])
         ->and($rows[1]->program_id)->toBeNull()
-        ->and($rows[1]->programRequest->name_ar)->toBe('نوادي الشباب')
+        ->and($rows[1]->is_new)->toBeFalse()
         ->and($rows[1]->centerIds())->toBe([$this->homsCenter]);
 });
 
@@ -118,16 +116,17 @@ test('a center outside the row city is refused by the save', function () {
     expect(Proposal::query()->count())->toBe(0);
 });
 
-test('an approved proposal row of a linked project takes centers, keeping its city, program and project', function () {
+test('an approved proposal row takes centers, keeping its city and program', function () {
     $project = Project::factory()->create(['city_id' => $this->aleppo, 'program_id' => $this->program->id, 'user_id' => $this->employee]);
     $proposal = Proposal::factory()->create(['status' => ProposalStatus::Approved]);
     $proposal->projects()->attach($project->id, ['target_beneficiaries' => 200]);
-    $row = ProposalLocation::factory()->forProject($project)->create(['proposal_id' => $proposal->id]);
+    // Y-17: approval approves the proposal's rows, so the row of an approved
+    // proposal is approved — which is what locks its place.
+    $row = ProposalLocation::factory()->approved()->forProject($project)->create(['proposal_id' => $proposal->id]);
 
     Livewire::actingAs($this->user)->test('pages::proposals.index')
         ->call('openEditModal', $proposal->id)
-        ->assertSet('locations.0.project', $project->name)
-        ->assertSeeHtml('data-test="location-linked-project"')
+        // Y-17: a row names no project, so the form shows none.
         ->assertDontSeeHtml('data-test="remove-location"')
         ->assertSeeText(__('proposals.location_centers_help_approved'))
         ->assertDontSeeText(__('proposals.location_centers_help'))
@@ -140,7 +139,6 @@ test('an approved proposal row of a linked project takes centers, keeping its ci
     $row->refresh()->load('centers');
 
     expect($row->centerIds())->toBe([$this->aleppoCenter])
-        ->and($row->project_id)->toBe($project->id)
         ->and($row->city_id)->toBe($this->aleppo)
         ->and($row->program_id)->toBe($this->program->id)
         ->and($proposal->locations()->count())->toBe(1)

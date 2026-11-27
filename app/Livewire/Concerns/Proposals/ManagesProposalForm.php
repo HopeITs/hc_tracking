@@ -13,9 +13,10 @@ use App\Enums\ProposalKind;
 use App\Enums\ProposalStatus;
 use App\Models\Donor;
 use App\Models\HrCenter;
-use App\Models\HrProgram;
+use App\Models\Program;
 use App\Models\Project;
 use App\Models\Proposal;
+use App\Models\ProposalLocation;
 use App\Models\Result;
 use App\Models\Task;
 use App\Models\User;
@@ -228,15 +229,14 @@ trait ManagesProposalForm
             return [];
         }
 
-        $projects = Project::query()
-            ->select(['projects.id', 'projects.name', 'projects.center_id', 'projects.host_center_id', 'projects.program_id', 'projects.city_id'])
-            ->whereHas('proposals', fn (Builder $query) => $query->whereKey($this->editingProposalId))
-            ->with('city:id,name_en,name_ar')
-            ->orderBy('projects.name')
-            ->orderBy('projects.id')
+        $rows = ProposalLocation::query()
+            ->where('proposal_id', $this->editingProposalId)
+            ->with(['city:id,name_en,name_ar', 'program', 'centers'])
+            ->orderBy('sort')
+            ->orderBy('id')
             ->get();
 
-        return $this->projectRows($projects);
+        return $this->projectRows($rows);
     }
 
     /**
@@ -301,14 +301,14 @@ trait ManagesProposalForm
             return null;
         }
 
-        $projects = $previous->projects()
-            ->select(['projects.id', 'projects.name', 'projects.center_id', 'projects.host_center_id', 'projects.program_id', 'projects.city_id'])
-            ->with('city:id,name_en,name_ar')
-            ->orderBy('projects.id')
+        $rows = $previous->locations()
+            ->with(['city:id,name_en,name_ar', 'program', 'centers'])
+            ->orderBy('sort')
+            ->orderBy('id')
             ->get();
 
         return [
-            'projects' => $this->projectRows($projects),
+            'projects' => $this->projectRows($rows),
             'results' => Result::query()->where('proposal_id', $previous->id)->count(),
             'tasks' => Task::query()->withoutGlobalScopes()->where('source_type', 'proposal')->where('source_id', $previous->id)->count(),
             'existingDraft' => CloneProposalForRenewal::existingDraftFor($previous)?->internal_project_number,
@@ -361,22 +361,24 @@ trait ManagesProposalForm
     }
 
     /**
-     * Open an empty create form. A project id (New Concept Note on the
-     * project page) is pre-selected only when it may take a proposal; the
-     * save checks it again.
+     * Open an empty create form. A place id (New Concept Note on the Projects
+     * screen) seeds the first location row with that place, so the new
+     * proposal starts where the last one delivered (Y-17: a place is a
+     * location row, and the new proposal gets a row of its own, D-93 — it
+     * does not link anything).
      */
-    public function openCreateModal(?int $projectId = null): void
+    public function openCreateModal(?int $placeId = null): void
     {
         Gate::authorize('create', Proposal::class);
 
         $this->resetProposalForm();
 
-        $project = $projectId !== null && $this->proposalActor()->can('projects.view')
-            ? $this->linkableProjectQuery()->whereKey($projectId)->first()
+        $place = $placeId !== null && $this->proposalActor()->can('projects.view')
+            ? ProposalLocation::query()->with('centers')->find($placeId)
             : null;
 
-        if ($project !== null) {
-            $this->seedLocationRowFromProject($project);
+        if ($place !== null) {
+            $this->seedLocationRowFromPlace($place);
         } else {
             $this->startLocationRows();
         }
@@ -424,10 +426,9 @@ trait ManagesProposalForm
             $this->loadLocationRows($proposal->id);
         }
 
-        foreach ($proposal->projects()->select(['projects.id'])->get() as $project) {
-            /** @var int|string|null $stored */
-            $stored = $project->getRelation('pivot')->getAttribute('target_beneficiaries');
-            $this->beneficiaries[$project->id] = $stored === null ? '' : (string) $stored;
+        // Y-17: the figure lives on the row.
+        foreach ($proposal->locations()->orderBy('sort')->orderBy('id')->get(['id', 'target_beneficiaries']) as $row) {
+            $this->beneficiaries[$row->id] = $row->target_beneficiaries === null ? '' : (string) $row->target_beneficiaries;
         }
 
         $this->showProposalModal = true;
@@ -648,13 +649,13 @@ trait ManagesProposalForm
 
     /**
      * The form as SaveProposal's `$data`. Create sends the location rows and the
-     * starting stage; edit sends the rows (once the proposal has any) and the linked
-     * projects' beneficiaries. The budget is sent only by a money holder.
+     * starting stage; edit sends the rows (once the proposal has any) and its
+     * rows' beneficiaries. The budget is sent only by a money holder.
      *
      * A payroll proposal (W-32) sends its narrative and, on create, its kind;
-     * it never sends projects, beneficiaries or a starting stage.
+     * it never sends places, beneficiaries or a starting stage.
      *
-     * @return array{name: string, internalProjectNumber: string, donorId: string|null, mainPartnerId?: string|null, partnerIds?: list<int|string>, beneficiaries: array<int|string, int|string|null>, beneficiariesReason: string|null, plannedDateBegin: string|null, plannedDateEnd: string|null, notes: string, conceptNote: string|null, narrative?: string|null, kind?: string, locations?: list<array{city_id: string, program_id: string|null, responsible_employee_id: string|null, center_ids: list<string>, city_wide: bool, is_new: bool, new_program_name_en: string, new_program_name_ar: string}>, startingStage?: string, skipReason?: string|null, requestedBudget?: string|null, requestedCurrency?: string|null}
+     * @return array{name: string, internalProjectNumber: string, donorId: string|null, mainPartnerId?: string|null, partnerIds?: list<int|string>, beneficiaries: array<int|string, int|string|null>, beneficiariesReason: string|null, plannedDateBegin: string|null, plannedDateEnd: string|null, notes: string, conceptNote: string|null, narrative?: string|null, kind?: string, locations?: list<array{city_id: string, program_id: string|null, responsible_employee_id: string|null, center_ids: list<string>, city_wide: bool, is_new: bool}>, startingStage?: string, skipReason?: string|null, requestedBudget?: string|null, requestedCurrency?: string|null}
      */
     private function proposalFormData(bool $isCreate): array
     {
@@ -710,47 +711,32 @@ trait ManagesProposalForm
     }
 
     /**
-     * Projects a proposal may be linked to (Project::linkableToProposals()),
-     * with only what the picker shows.
-     *
-     * @return Builder<Project>
-     */
-    private function linkableProjectQuery(): Builder
-    {
-        return Project::query()
-            ->linkableToProposals()
-            ->select(['id', 'name', 'center_id', 'host_center_id', 'program_id', 'city_id', 'user_id'])
-            ->with('city:id,name_en,name_ar')
-            ->orderBy('name')
-            ->orderBy('id');
-    }
-
-    /**
      * Each project as a picker row: its name and where it runs, the HR
      * center, the program and the city. A center or program HR cannot answer
      * for shows its id.
      *
-     * @param  iterable<Project>  $projects
+     * Y-17: these are the proposal's **location rows**. A row has no name of
+     * its own and no host center — it is named by where it is, and a place
+     * with no center is field work across the city (D-88) — so `name` is the
+     * row's own label and `hosted` is always null.
+     *
+     * @param  iterable<ProposalLocation>  $locationRows
      * @return list<array{id: int, name: string, place: string, hosted: ?string, centerInactive: bool}>
      */
-    private function projectRows(iterable $projects): array
+    private function projectRows(iterable $locationRows): array
     {
         $rows = [];
 
-        foreach ($projects as $project) {
-            // A hosted project (W-01) carries its host as a badge instead of a center in the place line.
-            $isHosted = $project->host_center_id !== null;
-
+        foreach ($locationRows as $row) {
             $rows[] = [
-                'id' => $project->id,
-                'name' => $project->name,
+                'id' => $row->id,
+                'name' => $row->label(),
                 'place' => implode(' · ', array_values(array_filter([
-                    $isHosted ? null : $this->centerName($project->center_id),
-                    $this->programName($project->program_id),
-                    $project->city->name ?? __('common.unknown_city'),
+                    $this->programName($row->program_id),
+                    $row->city->name ?? __('common.unknown_city'),
                 ], fn (?string $part): bool => $part !== null))),
-                'hosted' => $isHosted ? $this->centerName($project->host_center_id) : null,
-                'centerInactive' => $project->hasInactiveCenter(),
+                'hosted' => null,
+                'centerInactive' => $row->hasInactiveCenter(),
             ];
         }
 
@@ -770,10 +756,18 @@ trait ManagesProposalForm
         }
     }
 
-    private function programName(int $programId): string
+    /**
+     * Y-17: a row still being filled in has no program yet, and the place then
+     * reads as its city alone.
+     */
+    private function programName(?int $programId): ?string
     {
+        if ($programId === null) {
+            return null;
+        }
+
         try {
-            $name = HrProgram::nameOf($programId);
+            $name = Program::nameOf($programId);
         } catch (QueryException) {
             $name = '';
         }

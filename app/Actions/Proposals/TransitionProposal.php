@@ -165,14 +165,17 @@ final class TransitionProposal
     private function unmetRequirement(Proposal $proposal, string $requirement): ?string
     {
         $isMet = match ($requirement) {
-            'linked_project' => $proposal->projects()->exists(),
             'locations' => $proposal->locations()->exists(),
             'locations_complete' => ProposalLocationRows::incompleteRowIds($proposal) === [],
             'donor' => $proposal->donor_id !== null && ! Donor::query()->pending()->whereKey($proposal->donor_id)->exists(),
             'planned_dates' => $proposal->planned_date_begin !== null && $proposal->planned_date_end !== null,
             'budget' => $proposal->requested_budget !== null && $proposal->requested_currency !== null,
-            'target_beneficiaries' => ! $proposal->projects()
-                ->where(fn ($query) => $query->whereNull('project_proposal.target_beneficiaries')->orWhere('project_proposal.target_beneficiaries', '<', 1))
+            // Y-17: the figure lives on the row, not on the project_proposal
+            // pivot. "On every row" (contracts.md §2) is vacuously true for
+            // a proposal with none — the `locations` key is what refuses
+            // that, and it does so earlier in the table.
+            'target_beneficiaries' => ! $proposal->locations()
+                ->where(fn ($query) => $query->whereNull('target_beneficiaries')->orWhere('target_beneficiaries', '<', 1))
                 ->exists(),
             'final_report' => $this->hasFinalReport($proposal),
             'narrative' => Proposal::isNarrativeComplete($proposal->narrative),
@@ -184,7 +187,6 @@ final class TransitionProposal
         }
 
         return match ($requirement) {
-            'linked_project' => __('proposals.link_project_first'),
             'locations' => __('proposals.locations_required'),
             'locations_complete' => __('proposals.locations_incomplete'),
             'donor' => $proposal->donor_id === null ? __('proposals.choose_the_donor') : __('proposals.donor_request_pending'),
@@ -234,8 +236,9 @@ final class TransitionProposal
             return [];
         }
 
-        $allArchived = $proposal->projects()->exists()
-            && ! $proposal->projects()->where('projects.status', '!=', ProjectStatus::Archived)->exists();
+        // Y-17: auto-archive when every row of the proposal is archived.
+        $allArchived = $proposal->locations()->exists()
+            && ! $proposal->locations()->where('status', '!=', ProjectStatus::Archived->value)->exists();
 
         return $allArchived ? ['all_projects_archived'] : [];
     }

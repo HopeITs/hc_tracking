@@ -10,6 +10,7 @@ use App\Enums\ProposalStatus;
 use App\Enums\ResultType;
 use App\Models\Account;
 use App\Models\Activity;
+use App\Models\Assignment;
 use App\Models\Donor;
 use App\Models\DonorProposal;
 use App\Models\Indicator;
@@ -154,7 +155,7 @@ function insertStrategy(): int
 function insertProgram(int $strategyId, int $managerId, string $name = 'WASH'): int
 {
     return Program::factory()->create([
-        'name' => $name,
+        'name_en' => $name,
         'strategy_id' => $strategyId,
         'manager_id' => $managerId,
     ])->id;
@@ -757,9 +758,60 @@ function proposalPlaceRow(): array
         'responsible_employee_id' => (string) $employeeId,
         'center_ids' => [],
         'city_wide' => true,
-        'new_program_name_en' => '',
-        'new_program_name_ar' => '',
-        'project' => null,
+        'is_new' => false,
+    ];
+}
+
+/**
+ * A complete place of the proposal whose responsible has acknowledged being
+ * in charge — what `ApproveProposal` needs to approve (Y-17).
+ *
+ * @param  array<string, mixed>  $attributes  passed to ProposalLocation::factory()
+ */
+function approvablePlace(Proposal $proposal, array $attributes = []): ProposalLocation
+{
+    $cityId = insertHrCity('Place '.Str::random(5), 'مكان');
+    $employeeId = insertHrEmployee($cityId);
+
+    $row = ProposalLocation::factory()->create([
+        'proposal_id' => $proposal->id,
+        'city_id' => $cityId,
+        'program_id' => Program::factory()->create(['manager_id' => $employeeId])->id,
+        'responsible_employee_id' => $employeeId,
+        'target_beneficiaries' => 10,
+        ...$attributes,
+    ]);
+    $row->centers()->create(['center_id' => insertHrCenter($cityId, 'C'.Str::random(6))]);
+    $row->currentAssignment('responsible_employee_id')?->forceFill([
+        'status' => AssignmentStatus::Acknowledged->value,
+        'responded_at' => now(),
+    ])->save();
+
+    return $row->fresh();
+}
+
+/**
+ * One complete location-row payload for `SaveProposal`'s `locations` key: a
+ * fresh HR city, a program, a responsible who manages it, and a center of
+ * that city.
+ *
+ * Y-17: a proposal is created with its places and links no project, so every
+ * fixture that creates one through SaveProposal sends at least one of these.
+ *
+ * @param  array<string, mixed>  $overrides
+ * @return array<string, mixed>
+ */
+function placePayload(array $overrides = []): array
+{
+    $cityId = insertHrCity('Place '.Str::random(5), 'مكان');
+    $employeeId = insertHrEmployee($cityId);
+
+    return [
+        'city_id' => $cityId,
+        'program_id' => Program::factory()->create(['manager_id' => $employeeId])->id,
+        'responsible_employee_id' => $employeeId,
+        'center_ids' => [insertHrCenter($cityId, 'C'.Str::random(6))],
+        ...$overrides,
     ];
 }
 
@@ -770,8 +822,7 @@ function proposalPlaceRow(): array
  * One line for the tests that navigate to `projects.index` or `projects.show`,
  * composing with any factory state the test already uses. The proposal is
  * approved unless a proposal is given, because a project exists only once
- * one was (D-84), and the row
- * mirrors what Y-11 moved onto it so `locations:verify-mirror` stays happy.
+ * one was (D-84), and the row carries the state the Projects screen shows.
  * The row takes the project's own centre when it has one and is "centre not
  * set" otherwise (D-82) — never a centre invented for it.
  */
@@ -1363,7 +1414,23 @@ function placementFixture(bool $cityWide = false): array
             ]);
             $proposal->projects()->attach($project->id, ['target_beneficiaries' => 100]);
             $row = proposalRowForProject($proposal, $project, $cityWide ? false : $centerId);
-            $row->forceFill(['responsible_employee_id' => $project->user_id])->save();
+            // Y-17: the place is what MEAL confirms a template for, so it
+            // carries the project's approved state, its period and an
+            // acknowledged appointment.
+            $row->forceFill([
+                'responsible_employee_id' => $project->user_id,
+                'status' => $project->status,
+                'start_date' => $project->start_date,
+                'end_date' => $project->end_date,
+            ])->save();
+            Assignment::query()->create([
+                'assignable_type' => 'proposal_location',
+                'assignable_id' => $row->id,
+                'field' => 'responsible_employee_id',
+                'employee_id' => (int) $project->user_id,
+                'status' => AssignmentStatus::Acknowledged->value,
+                'responded_at' => now(),
+            ]);
             $targets[] = donorReportTarget($proposal, $project, $library);
             $proposals[] = $proposal;
         }

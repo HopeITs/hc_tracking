@@ -93,11 +93,11 @@ new class extends Component {
 
         if ($this->canView('targets') && $this->canView('indicators')) {
             $yearStart = $today->startOfYear();
-            $rated = Indicator::query()->whereNotNull('target')->with('progress:id,indicator_id,date,value')->get(['id', 'baseline', 'target'])
+            $rated = Indicator::query()->whereNotNull('target')->with(['progress:id,indicator_id,date,value', 'approvedMonthlyMeasurements'])->get(['id', 'baseline', 'target', 'measure'])
                 ->map(fn (Indicator $indicator): ?RagStatus => $indicator->ragStatus($yearStart, $today->endOfYear()))
                 ->filter();
             $figures[] = [
-                ...$this->figure('targets', $rated->filter(fn (RagStatus $rag): bool => $rag === RagStatus::Green)->count().'/'.$rated->count(), null, upIsGood: true, href: 'targets.index'),
+                ...$this->figure('targets', $rated->filter(fn (RagStatus $rag): bool => $rag === RagStatus::Green)->count().'/'.$rated->count(), null, upIsGood: true, href: 'results.index'),
             ];
         }
 

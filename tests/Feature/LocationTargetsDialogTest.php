@@ -3,13 +3,11 @@
 declare(strict_types=1);
 
 use App\Models\PlanIndicator;
-use App\Models\Project;
 use App\Models\Proposal;
 use App\Models\ProposalLocation;
 use App\Models\Report;
 use App\Models\User;
 use Database\Seeders\RolesAndPermissionsSeeder;
-use Illuminate\Support\Facades\DB;
 use Livewire\Livewire;
 
 beforeEach(function (): void {
@@ -95,49 +93,6 @@ describe('removing a location row in the proposal form', function (): void {
         $form->call('removeLocationRow', ltdFormIndex($form->get('locations'), $this->withTargets))
             ->assertSeeText(trans_choice('proposals.location_targets_reported', 1, ['count' => 1]))
             ->assertDontSee(__('proposals.delete_targets_and_remove'));
-    });
-});
-
-describe('unlinking a project whose location has targets', function (): void {
-    beforeEach(function (): void {
-        $this->project = Project::factory()->create(['name' => 'Latakia Wells']);
-        $other = Project::factory()->create();
-        DB::table('project_proposal')->insert([
-            ['project_id' => $this->project->id, 'proposal_id' => $this->proposal->id],
-            ['project_id' => $other->id, 'proposal_id' => $this->proposal->id],
-        ]);
-        $this->row = proposalRowForProject($this->proposal, $this->project);
-        ltdTargets($this->proposal, $this->row);
-    });
-
-    it('lets a user who may delete targets delete them and unlink in one go', function (): void {
-        $this->actingAs(User::factory()->role('General Manager')->create());
-
-        Livewire::test('pages::proposals.show', ['proposal' => $this->proposal])
-            ->call('confirmUnlinkProject', $this->project->id)
-            ->assertSeeText(trans_choice('proposals.location_targets_body', 2, ['count' => 2]))
-            ->assertSeeHtml('href="'.$this->targetsUrl.'"')
-            ->assertSee(__('proposals.unlink_with_targets'))
-            ->call('unlinkProject')
-            ->assertHasNoErrors();
-
-        expect(DB::table('project_proposal')->where('proposal_id', $this->proposal->id)->where('project_id', $this->project->id)->exists())->toBeFalse()
-            ->and(PlanIndicator::query()->where('source_id', $this->proposal->id)->count())->toBe(0)
-            ->and(ProposalLocation::query()->whereKey($this->row->id)->exists())->toBeFalse();
-    });
-
-    it('keeps the link and says why for a user who cannot delete targets', function (): void {
-        $this->actingAs(User::factory()->role('Financial')->create());
-
-        Livewire::test('pages::proposals.show', ['proposal' => $this->proposal])
-            ->call('confirmUnlinkProject', $this->project->id)
-            ->assertSeeText(__('proposals.location_targets_no_right'))
-            ->assertDontSee(__('proposals.unlink_with_targets'))
-            ->call('unlinkProject')
-            ->assertHasErrors(['project' => __('proposals.location_has_targets')])
-            ->assertSet('showUnlinkModal', true);
-
-        expect(PlanIndicator::query()->where('proposal_location_id', $this->row->id)->count())->toBe(2);
     });
 });
 

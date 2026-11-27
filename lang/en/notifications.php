@@ -202,6 +202,7 @@ return [
         'project_ended' => 'The project “:subject” ended on :date',
         'on_hold_reminder' => 'The proposal “:subject” is on hold and its review date (:date) has come',
         'logframe_confirmed' => 'The logical framework of “:subject” is complete — you can continue with its targets and plan',
+        'ending_with_funds' => 'The proposal “:subject” ends on :date and its agreement still has funds',
         'logframe_missing' => [
             'single' => 'The program “:subject” has no program framework yet — create it',
             'grouped' => 'Programs without a program framework yet: :count — create them',
@@ -273,6 +274,8 @@ return [
         'stalled_report_draft' => 'Report in draft',
         'stalled_report_reviewed' => 'Report awaiting approval',
         'stalled_proposal' => 'Proposal with no status change',
+        'extension_lead' => 'Extension alert',
+        'extension_lead_help' => 'An active proposal whose agreement still has funds warns Finance this many working days before it ends.',
 
         'off_track' => 'Indicator off track below',
         'off_track_hint' => 'Of the progress expected by today.',
@@ -327,6 +330,7 @@ return [
             'transfer_mark_received' => 'Mark received',
             'agreement_record' => 'Record agreement',
             'project_reassign' => 'Reassign',
+            'proposal_request_extension' => 'Request extension',
             'alert_snooze' => 'Snooze reminder',
             'assignment_acknowledge' => 'Acknowledge',
             'assignment_reject' => 'Reject',
@@ -335,6 +339,7 @@ return [
         'snoozed' => 'Reminder snoozed until tomorrow.',
         'opening' => 'Opening the tranche…',
         'opening_record' => 'Opening the record…',
+        'opening_extension' => 'Opening the extension…',
         'already_done' => 'Already done — nothing changed.',
         'already_started' => 'Already started — nothing changed.',
         'forbidden' => 'You are not allowed to do that.',
@@ -421,6 +426,7 @@ return [
             'manager_removed' => ':actor removed :from as manager of “:subject”',
             'manager_and_strategy_changed' => ':actor linked “:subject” to :strategy and made :to its manager',
             'manager_changed_you' => ':actor made you the manager of “:subject”',
+            'renamed' => ':actor renamed the program “:subject”',
             'updated' => ':actor updated the program “:subject”',
             'deleted' => ':actor deleted the program “:subject”',
             'logframe_missing' => [
@@ -622,16 +628,6 @@ return [
             'updated' => ':actor updated the donor “:subject”',
             'deleted' => ':actor deleted the donor “:subject”',
         ],
-        'program_request' => [
-            'opened' => [
-                'title' => 'Program needed in HR',
-                'body' => '“:subject” needs the program “:name” created in HR',
-            ],
-            'linked' => [
-                'title' => 'Program linked',
-                'body' => ':actor linked the HR program “:name” requested by “:subject”',
-            ],
-        ],
         'proposal' => [
             'waiting_on_you' => [
                 'finish_concept_note' => [
@@ -712,6 +708,10 @@ return [
                 'title' => 'Risk removed',
                 'body' => ':actor removed the risk “:value” from “:subject”',
             ],
+            'stage_tasks_created' => [
+                'title' => 'Stage tasks created',
+                'body' => 'Department tasks were created for “:subject”',
+            ],
             'locations_changed' => [
                 'title' => 'Locations changed',
                 'body' => ':actor changed the locations of “:subject”',
@@ -772,9 +772,19 @@ return [
                 'title' => 'Responsible has left',
                 'body' => '“:subject” is still named after somebody who has left',
             ],
+            'ending_with_funds' => [
+                'due' => [
+                    'title' => 'Extension alert',
+                    'body' => '“:subject” ends soon and its agreement still has funds',
+                ],
+            ],
             'targets_saved' => [
                 'title' => 'Targets saved',
                 'body' => ':actor saved the targets of “:subject”',
+            ],
+            'grant_dates_set' => [
+                'title' => 'Grant dates set',
+                'body' => ':actor set the grant dates of “:subject”',
             ],
             'plan_rebased' => [
                 'title' => 'Plan moved to the grant period',

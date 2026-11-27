@@ -15,11 +15,6 @@ return [
         'pending' => 'قيد الموافقة',
         'approved' => 'تمت الموافقة',
     ],
-    'program_request_status' => [
-        'pending' => 'معلّق',
-        'created' => 'أُنشئ',
-        'declined' => 'مرفوض',
-    ],
     'proposal_change_request_status' => [
         'pending' => 'بانتظار القرار',
         'approved' => 'مُعتمد',
@@ -153,6 +148,9 @@ return [
         'acknowledged' => 'تم التأكيد',
         'rejected' => 'مرفوض',
         'superseded' => 'مستبدل',
+    ],
+    'stage_template_creates' => [
+        'task' => 'مهمة قسم',
     ],
     'status_note_kind' => [
         'transition' => 'تغيير حالة',

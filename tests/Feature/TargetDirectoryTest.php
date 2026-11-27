@@ -131,6 +131,21 @@ test('a target with no project reads as organisation wide', function () {
     Livewire::actingAs($user)->test('pages::targets.index')->assertSee('Organisation-wide');
 });
 
+test('the General Manager cannot add or edit a target', function () {
+    $user = User::factory()->role('General Manager')->create();
+    $target = PlanIndicator::factory()->create([
+        'source_type' => 'annual_plan',
+        'source_id' => AnnualPlan::factory()->create()->id,
+    ]);
+    $page = fn () => Livewire::actingAs($user)->test('pages::targets.index');
+
+    $page()->call('openCreateModal')->assertForbidden();
+    $page()->call('saveTarget')->assertForbidden();
+    $page()->call('openEditModal', $target->id)->assertForbidden();
+
+    expect(PlanIndicator::query()->pluck('id')->all())->toBe([$target->id]);
+});
+
 test('an unreported target can be deleted', function () {
     $user = User::factory()->role('General Manager')->create();
     $target = PlanIndicator::factory()->create([
@@ -296,7 +311,7 @@ test('confirming a delete opens the dialog and cancelling closes it', function (
 
 test('a target shows the program behind its plan and the donors behind its proposal', function () {
     $user = User::factory()->role('General Manager')->create();
-    $program = Program::factory()->create(['name' => 'Livelihoods Programme']);
+    $program = Program::factory()->create(['name_en' => 'Livelihoods Programme']);
     $plan = AnnualPlan::factory()->create(['program_id' => $program->id]);
     $proposal = Proposal::factory()->create(['name' => 'Winter Response Proposal']);
     $donor = Donor::factory()->create(['name' => 'Northern Relief Fund']);

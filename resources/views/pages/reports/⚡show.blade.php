@@ -158,12 +158,12 @@ new #[Layout('layouts::desk'), Title('titles.report')] class extends Component {
         [
             'label' => __('common.indicator_name'),
             'value' => $planIndicator->indicator->name,
-            'href' => route('indicators.index', ['inspect' => $planIndicator->indicator_id]),
+            'href' => app(\App\Notifications\SubjectLinks::class)->routeFor('indicator', $planIndicator->indicator_id) ?? route('results.index'),
         ],
         [
             'label' => __('reports.target'),
             'value' => $formatFigure((float) $planIndicator->target).$unit.' · '.$planIndicator->period->label(),
-            'href' => route('targets.index', ['indicator' => $planIndicator->indicator_id]),
+            'href' => app(\App\Notifications\SubjectLinks::class)->routeFor('plan_indicator', $planIndicator->id) ?? route('results.index'),
         ],
         [
             'label' => __('common.project'),

@@ -3,7 +3,6 @@
 use App\Actions\Proposals\ApproveProposal;
 use App\Actions\Proposals\CloneProposalForRenewal;
 use App\Actions\Proposals\CorrectProposalStatus;
-use App\Actions\Proposals\LinkProposalProject;
 use App\Actions\Proposals\RecordFinalReportAcceptance;
 use App\Actions\Proposals\SaveProposal;
 use App\Actions\Proposals\TransitionProposal;
@@ -14,6 +13,7 @@ use App\Enums\ProposalStatus;
 use App\Events\ProposalStatusChanged;
 use App\Models\Donor;
 use App\Models\Media;
+use App\Models\Program;
 use App\Models\Project;
 use App\Models\Proposal;
 use App\Models\ProposalStatusNote;
@@ -143,19 +143,27 @@ test('a payroll proposal needs a narrative of at least 50 characters and writes 
 test('a project proposal is still created at the concept note and keeps the project kind', function () {
     $actor = userWithRole('Financial');
     $this->actingAs($actor);
-    $project = Project::factory()->create();
+    // Y-17: a project proposal comes with its places as location rows; it
+    // links no project, and `projectIds` is refused outright.
+    $cityId = insertHrCity('Aleppo', 'حلب');
 
     $proposal = app(SaveProposal::class)->handle(null, payrollFormData([
         'kind' => null,
         'narrative' => null,
-        'projectIds' => [$project->id],
         'startingStage' => ProposalStatus::ConceptNote->value,
+        'locations' => [[
+            'city_id' => $cityId,
+            'program_id' => Program::factory()->create()->id,
+            'responsible_employee_id' => insertHrEmployee($cityId),
+            'center_ids' => [insertHrCenter($cityId, 'Hope Center Aleppo', 'مركز الأمل حلب')],
+        ]],
     ]), $actor);
 
     expect($proposal->kind)->toBe(ProposalKind::Project)
         ->and($proposal->narrative)->toBeNull()
         ->and($proposal->status)->toBe(ProposalStatus::ConceptNote)
-        ->and($proposal->projects()->count())->toBe(1);
+        ->and($proposal->locations()->count())->toBe(1)
+        ->and($proposal->projects()->count())->toBe(0);
 });
 
 test('an unknown kind is refused', function () {
@@ -207,13 +215,13 @@ test('editing a payroll proposal keeps the narrative rule', function () {
         ->and($proposal->fresh()->narrative)->toBe(payrollNarrative());
 });
 
-test('a payroll proposal never links a project', function () {
+test('a payroll proposal has no place', function () {
+    // Y-17: LinkProposalProject is gone, so there is nothing to refuse; a
+    // payroll proposal simply carries no location row and no project.
     $this->actingAs(userWithRole('Financial'));
     $proposal = payrollProposal();
 
-    $errors = payrollRefusal(fn () => app(LinkProposalProject::class)->handle($proposal, Project::factory()->create()->id, 50));
-
-    expect($errors['projectIds'])->toBe([__('proposals.payroll_has_no_projects')])
+    expect($proposal->locations()->count())->toBe(0)
         ->and($proposal->projects()->count())->toBe(0);
 });
 
@@ -299,9 +307,9 @@ test('approving a payroll proposal makes it active at once with two notes and tw
         ->and($notes->pluck('status')->all())->toBe([ProposalStatus::Approved, ProposalStatus::Active])
         ->and($notes->last()->context)->toBe(__('proposals.payroll_active_on_approval'))
         ->and($notes->every(fn (ProposalStatusNote $note): bool => $note->changed_by === $actor->id))->toBeTrue()
-        ->and($result->approvedProjectIds)->toBe([])
-        ->and($result->waitingProjectIds)->toBe([])
-        ->and($result->skippedProjectIds)->toBe([])
+        ->and($result->approvedLocationIds)->toBe([])
+        ->and($result->waitingLocationIds)->toBe([])
+        ->and($result->skippedLocationIds)->toBe([])
         ->and(Project::query()->count())->toBe(0);
     Event::assertDispatchedTimes(ProposalStatusChanged::class, 2);
     Event::assertDispatched(ProposalStatusChanged::class, fn (ProposalStatusChanged $event): bool => $event->from === ProposalStatus::Submitted && $event->to === ProposalStatus::Approved);

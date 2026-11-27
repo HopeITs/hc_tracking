@@ -3,6 +3,10 @@
 return [
     'proposal_required' => 'Choose an approved proposal.',
     'period_outside_grant' => 'The period is outside the grant.',
+    'grant_has_no_dates' => 'This grant has no actual start or end date, so no report period can be checked against it.',
+    'grant_dates_who' => 'Someone who edits proposals can set them on the proposal page (Set grant dates).',
+    'set_grant_dates_link' => 'Set the grant dates',
+    'new_report' => 'New donor report',
     'responsible_inactive' => 'Choose an active employee.',
     'submitted_in_future' => "The submission date can't be in the future.",
     'file_required' => 'Attach the report file before submitting.',
@@ -31,6 +35,10 @@ return [
     'due_help' => 'Agreed with the donor. Reminders go to the responsible person.',
     'responsible' => 'Responsible',
     'responsible_help' => 'Who delivers the report. They see it in Donor Reports.',
+    'assign' => 'Assign',
+    'change' => 'Change',
+    'assign_title' => 'Who delivers “:title”?',
+    'responsible_saved' => 'Responsible saved.',
     'title' => 'Title',
     'title_help' => 'Leave empty for a title built from the type and period.',
     'notes' => 'Notes',
@@ -152,7 +160,7 @@ return [
 
     // Register
     'search_reports' => 'Search donor reports',
-    'search_by_proposal' => 'Proposal name',
+    'search_by_proposal' => 'Proposal, donor or report',
     'all_proposals' => 'All proposals',
     'all_states' => 'All states',
     'report' => 'Report',

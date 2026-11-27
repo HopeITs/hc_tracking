@@ -1,25 +1,13 @@
 {{--
-    The Projects tab of proposals/show: link a project, and each funded
-    project with its tasks. Included by ⚡show.blade.php,
+    The Projects tab of proposals/show: the places the proposal delivers at,
+    each with its tasks. Y-17: a proposal does not link projects any more,
+    so there is no link form and no unlink button — its places are its own
+    location rows, edited on the proposal form (D-93). Included by ⚡show.blade.php,
     whose top PHP block defines $mutedText, $inkText, $hairline, $amount,
     $term, $chronology and $arrivals.
 --}}
 @use('App\Enums\TaskStatus')
             @include('pages.proposals._show-locations-chapter')
-
-            @can('update', $this->proposal)
-            <form wire:submit="linkProject" class="mb-6 flex flex-col gap-2 @xl/detail:flex-row @xl/detail:items-end" data-link-project>
-                <div class="min-w-0 flex-1">
-                    <x-ui.select wire:model="projectToLink" :label="__('proposals.fund_another_project')">
-                        <flux:select.option value="">{{ __('proposals.select_a_project') }}</flux:select.option>
-                        @foreach ($this->linkableProjects as $linkable)
-                            <flux:select.option :value="$linkable->id" :wire:key="'link-project-'.$linkable->id">{{ $linkable->name }}</flux:select.option>
-                        @endforeach
-                    </x-ui.select>
-                </div>
-                <x-ui.button type="submit" tone="primary" icon="link" class="min-h-10 touch-manipulation" :disabled="$this->linkableProjects->isEmpty()" data-test="link-project">{{ __('proposals.link_project') }}</x-ui.button>
-            </form>
-            @endcan
 
             @if ($this->projects->isEmpty())
                 <x-ui.empty-state icon="rectangle-stack" :heading="__('proposals.no_projects_linked')" :body="__('proposals.projects_this_proposal_funds_will_appear_here')" />
@@ -73,9 +61,6 @@
 
                                 <div class="flex shrink-0 items-center gap-1">
                                     <x-ui.enum-badge :case="$project->status" />
-                                    @can('update', $this->proposal)
-                                    <x-ui.button tone="ghost" size="sm" icon="link-slash" class="size-9! touch-manipulation" wire:click="confirmUnlinkProject({{ $project->project_id }})" :aria-label="__('proposals.unlink_project_name', ['name' => $project->headline()])" data-test="unlink-project-{{ $project->id }}" />
-                                    @endcan
                                 </div>
                             </div>
 

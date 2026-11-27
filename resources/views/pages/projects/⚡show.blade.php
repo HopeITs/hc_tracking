@@ -1,6 +1,6 @@
 <?php
 
-use App\Actions\Projects\CloseProject;
+use App\Actions\Locations\CloseLocation;
 use App\Actions\Targets\ScopeIndicatorToLocation;
 use App\Enums\ProjectStatus;
 use App\Livewire\Concerns\AddsQuickTask;
@@ -138,13 +138,13 @@ new #[Layout('layouts::desk'), Title('titles.project')] class extends Component 
     }
 
     /**
-     * Close the active project (active → closed); the action enforces who may
-     * and that it is still active.
+     * Close the active place (active → closed); the action enforces who may
+     * and that it is still active (Y-17: the row is the writer).
      */
     public function closeProject(): void
     {
         try {
-            app(CloseProject::class)->handle($this->writableProject());
+            app(CloseLocation::class)->handle($this->location);
         } catch (ValidationException $exception) {
             $this->showCloseModal = false;
             Flux::toast(variant: 'danger', text: $exception->validator->errors()->first());
@@ -187,7 +187,7 @@ new #[Layout('layouts::desk'), Title('titles.project')] class extends Component 
      */
     protected function resetPage(): void
     {
-        unset($this->location, $this->story, $this->attachedProposals, $this->fundingHistory, $this->planSummary, $this->canStartConceptNote, $this->embeddedProposalId);
+        unset($this->location, $this->story, $this->fundingHistory, $this->planSummary, $this->canStartConceptNote, $this->embeddedProposalId);
     }
 
     /**
@@ -203,18 +203,6 @@ new #[Layout('layouts::desk'), Title('titles.project')] class extends Component 
         unset($this->projectIndicators);
 
         Flux::toast(variant: 'success', text: __('projects.indicator_scoped'));
-    }
-
-    /**
-     * The project this row still carries, for the write buttons only.
-     *
-     * This slice moves the page's reads to the row; its writes (edit, archive,
-     * restore, close, reopen, files, acknowledge) still call the project
-     * actions and the mirror keeps the row in step. Y-17 flips them.
-     */
-    protected function writableProject(): Project
-    {
-        return Project::query()->findOrFail($this->location->project_id);
     }
 
     /**

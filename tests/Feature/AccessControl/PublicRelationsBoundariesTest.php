@@ -33,7 +33,8 @@ test('the fundraiser moves a proposal from review to submitted (PR-01)', functio
         'requested_currency' => Currency::Usd,
     ]);
     $proposal->projects()->attach(Project::factory()->create()->id, ['target_beneficiaries' => 400]);
-    ProposalLocation::factory()->for($proposal)->complete()->create();
+    // Y-17: the beneficiary figure the transitions require is the row's.
+    ProposalLocation::factory()->for($proposal)->complete()->create(['target_beneficiaries' => 100]);
 
     $this->actingAs($this->fundraiser);
     app(TransitionProposal::class)->handle($proposal, ProposalStatus::Submitted, ProposalStatus::ProposalReview, ['effective_date' => '2026-10-13']);
@@ -70,7 +71,6 @@ test('the fundraiser saves a city-only row, and a new row with no program or cit
     };
 
     expect($refuse(['city_id' => null]))->toHaveKey('locations.0.city_id')
-        ->and($refuse(['city_id' => $city, 'is_new' => true]))->toHaveKey('locations.0.new_program_name_en')
         ->and(Proposal::query()->count())->toBe(1);
 });
 

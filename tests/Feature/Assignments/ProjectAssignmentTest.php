@@ -10,16 +10,22 @@ use App\Models\HrContract;
 use App\Models\Program;
 use App\Models\Project;
 use App\Models\Proposal;
+use App\Models\ProposalLocation;
 use App\Models\User;
 use App\Models\UserNotification;
 use App\Notifications\QuickActions;
 use Livewire\Livewire;
 
 /**
- * A draft project in a program run by a manager, owned by $ownerEmployee,
- * then (re)assigned to $newEmployee by an assigner.
+ * A draft **place** in a program run by a manager, put in the charge of
+ * $ownerEmployee by an assigner.
  *
- * @return array{project: Project, owner: User, assigner: User, programManager: User}
+ * Y-17: the appointment belongs to the location row — `ProposalLocation`
+ * raises it from `responsible_employee_id`, and nothing is asked of a
+ * project any more (`Project::assignmentFields()` is empty). `project` is
+ * the row, so every case below reads the place.
+ *
+ * @return array{project: ProposalLocation, owner: User, assigner: User, programManager: User}
  */
 function projectAssignedToANewOwner(): array
 {
@@ -29,24 +35,26 @@ function projectAssignedToANewOwner(): array
     $owner = userWithRole('Managers', $ownerEmployee);
     $assigner = userWithRole('General Manager', insertHrEmployee(firstNameEn: 'Gina', lastNameEn: 'General'));
 
-    $project = Activity::withoutRecording(fn () => Project::factory()->create([
-        'name' => 'Winter Support',
-        'program_id' => Program::factory()->create(['manager_id' => $managerEmployee])->id,
-        'user_id' => insertHrEmployee(),
-    ]));
+    $row = Activity::withoutRecording(function () use ($managerEmployee): ProposalLocation {
+        $project = Project::factory()->create([
+            'name' => 'Winter Support',
+            'program_id' => Program::factory()->create(['manager_id' => $managerEmployee])->id,
+            'user_id' => insertHrEmployee(),
+        ]);
 
-    Activity::withoutRecording(fn () => rowFor($project));
+        return rowFor($project);
+    });
 
     test()->actingAs($assigner);
-    $project->update(['user_id' => $ownerEmployee]);
+    $row->update(['responsible_employee_id' => $ownerEmployee]);
 
-    return ['project' => $project->fresh(), 'owner' => $owner, 'assigner' => $assigner, 'programManager' => $programManager];
+    return ['project' => $row->fresh(), 'owner' => $owner, 'assigner' => $assigner, 'programManager' => $programManager];
 }
 
 test('putting someone in charge asks them to acknowledge or reject, as important', function () {
     ['project' => $project, 'owner' => $owner, 'assigner' => $assigner] = projectAssignedToANewOwner();
 
-    $assignment = $project->currentAssignment('user_id');
+    $assignment = $project->currentAssignment('responsible_employee_id');
     $notification = UserNotification::query()->forUser($owner)->sole();
 
     expect($assignment->status)->toBe(AssignmentStatus::Pending)
@@ -62,22 +70,22 @@ test('putting yourself in charge needs nobody to agree', function () {
     $self = userWithRole('General Manager', $employee);
     $this->actingAs($self);
 
-    $project = Project::factory()->create(['user_id' => $employee]);
+    $project = ProposalLocation::factory()->complete()->create(['responsible_employee_id' => $employee]);
 
-    expect($project->currentAssignment('user_id')->status)->toBe(AssignmentStatus::Acknowledged)
-        ->and($project->isAssignmentAcknowledged('user_id'))->toBeTrue();
+    expect($project->currentAssignment('responsible_employee_id')->status)->toBe(AssignmentStatus::Acknowledged)
+        ->and($project->isAssignmentAcknowledged('responsible_employee_id'))->toBeTrue();
 });
 
 test('reassigning keeps every row and only the latest one stands', function () {
     ['project' => $project] = projectAssignedToANewOwner();
     $nextEmployee = insertHrEmployee();
 
-    $project->update(['user_id' => $nextEmployee]);
+    $project->update(['responsible_employee_id' => $nextEmployee]);
 
     $rows = $project->assignments()->orderBy('id')->get();
 
     expect($rows->pluck('status')->all())->toBe([AssignmentStatus::Superseded, AssignmentStatus::Pending])
-        ->and($project->currentAssignment('user_id')->employee_id)->toBe($nextEmployee);
+        ->and($project->currentAssignment('responsible_employee_id')->employee_id)->toBe($nextEmployee);
 });
 
 test('bulk loads inside withoutRecording ask nobody', function () {
@@ -90,62 +98,62 @@ test('acknowledging with a note tells the assigner and the program manager', fun
     ['project' => $project, 'owner' => $owner, 'assigner' => $assigner, 'programManager' => $programManager] = projectAssignedToANewOwner();
 
     Livewire::actingAs($owner)
-        ->test('pages::projects.show', ['project' => rowFor($project)->slug])
+        ->test('pages::projects.show', ['project' => $project->slug])
         ->call('openAssignmentModal', 'acknowledge')
         ->set('assignmentNote', 'Accepted, but I am on leave until the 15th')
         ->call('submitAssignment')
         ->assertHasNoErrors();
 
-    $assignment = $project->currentAssignment('user_id');
+    $assignment = $project->currentAssignment('responsible_employee_id');
 
     expect($assignment->status)->toBe(AssignmentStatus::Acknowledged)
         ->and($assignment->response_note)->toBe('Accepted, but I am on leave until the 15th')
         ->and($assignment->responded_by)->toBe($owner->id)
-        ->and($project->fresh()->isAssignmentAcknowledged('user_id'))->toBeTrue()
-        ->and(sentencesFor($assigner))->toContain($owner->name.' acknowledged being the owner of “Winter Support”')
-        ->and(sentencesFor($programManager))->toContain($owner->name.' acknowledged being the owner of “Winter Support”');
+        ->and($project->fresh()->isAssignmentAcknowledged('responsible_employee_id'))->toBeTrue()
+        ->and(sentencesFor($assigner))->toContain($owner->name.' acknowledged being the owner of “'.$project->label().'”')
+        ->and(sentencesFor($programManager))->toContain($owner->name.' acknowledged being the owner of “'.$project->label().'”');
 });
 
 test('opening the project marks the assignment as seen, once', function () {
     ['project' => $project, 'owner' => $owner] = projectAssignedToANewOwner();
 
-    $this->actingAs($owner)->get(route('projects.show', rowFor($project)))->assertOk();
-    $seenAt = $project->currentAssignment('user_id')->seen_at;
+    $this->actingAs($owner)->get(route('projects.show', $project))->assertOk();
+    $seenAt = $project->currentAssignment('responsible_employee_id')->seen_at;
 
     $this->travel(5)->minutes();
-    $this->get(route('projects.show', rowFor($project)))->assertOk();
+    $this->get(route('projects.show', $project))->assertOk();
 
     expect($seenAt)->not->toBeNull()
-        ->and($project->currentAssignment('user_id')->seen_at->equalTo($seenAt))->toBeTrue()
-        ->and($project->currentAssignment('user_id')->status)->toBe(AssignmentStatus::Pending);
+        ->and($project->currentAssignment('responsible_employee_id')->seen_at->equalTo($seenAt))->toBeTrue()
+        ->and($project->currentAssignment('responsible_employee_id')->status)->toBe(AssignmentStatus::Pending);
 });
 
 test('rejecting needs a reason', function () {
     ['project' => $project, 'owner' => $owner] = projectAssignedToANewOwner();
 
     Livewire::actingAs($owner)
-        ->test('pages::projects.show', ['project' => rowFor($project)->slug])
+        ->test('pages::projects.show', ['project' => $project->slug])
         ->call('openAssignmentModal', 'reject')
         ->set('assignmentNote', 'no')
         ->call('submitAssignment')
         ->assertHasErrors('assignmentNote');
 
-    expect($project->currentAssignment('user_id')->status)->toBe(AssignmentStatus::Pending);
+    expect($project->currentAssignment('responsible_employee_id')->status)->toBe(AssignmentStatus::Pending);
 });
 
 test('a rejection reaches the assigner and the program manager with the reason', function () {
     ['project' => $project, 'owner' => $owner, 'assigner' => $assigner, 'programManager' => $programManager] = projectAssignedToANewOwner();
 
     Livewire::actingAs($owner)
-        ->test('pages::projects.show', ['project' => rowFor($project)->slug])
+        ->test('pages::projects.show', ['project' => $project->slug])
         ->call('openAssignmentModal', 'reject')
         ->set('assignmentNote', 'Already running three projects')
         ->call('submitAssignment')
         ->assertHasNoErrors();
 
-    $sentence = $owner->name.' rejected being the owner of “Winter Support”: Already running three projects';
+    $sentence = $owner->name.' rejected being the owner of “'.$project->label().'”: Already running three projects';
 
-    expect($project->currentAssignment('user_id')->status)->toBe(AssignmentStatus::Rejected)
+    expect($project->currentAssignment('responsible_employee_id')->status)->toBe(AssignmentStatus::Rejected)
         ->and(sentencesFor($assigner))->toContain($sentence)
         ->and(sentencesFor($programManager))->toContain($sentence)
         ->and(UserNotification::query()->forUser($programManager)->get()->contains(fn (UserNotification $row): bool => $row->priority === NotificationPriority::Important))->toBeTrue()
@@ -154,12 +162,12 @@ test('a rejection reaches the assigner and the program manager with the reason',
 
 test('only the assignee can respond, and only while it is pending', function () {
     ['project' => $project, 'owner' => $owner, 'assigner' => $assigner] = projectAssignedToANewOwner();
-    $assignment = $project->currentAssignment('user_id');
+    $assignment = $project->currentAssignment('responsible_employee_id');
 
     expect($assigner->can('respond', $assignment))->toBeFalse()
         ->and($owner->can('respond', $assignment))->toBeTrue();
 
-    Livewire::actingAs($assigner)->test('pages::projects.show', ['project' => rowFor($project)->slug])->call('openAssignmentModal', 'reject')->assertForbidden();
+    Livewire::actingAs($assigner)->test('pages::projects.show', ['project' => $project->slug])->call('openAssignmentModal', 'reject')->assertForbidden();
 
     $assignment->acknowledge($owner);
 
@@ -174,9 +182,9 @@ test('the quick actions acknowledge in one click and send rejection to the reaso
     $acknowledge = app(QuickActions::class)->run($owner, $notification, 'assignment.acknowledge');
     $again = app(QuickActions::class)->run($owner, $notification, 'assignment.acknowledge');
 
-    expect($reject['redirect'])->toBe(route('projects.show', rowFor($project)).'?respond=reject')
+    expect($reject['redirect'])->toBe(route('projects.show', $project).'?respond=reject')
         ->and($acknowledge['ok'])->toBeTrue()
-        ->and($project->currentAssignment('user_id')->status)->toBe(AssignmentStatus::Acknowledged)
+        ->and($project->currentAssignment('responsible_employee_id')->status)->toBe(AssignmentStatus::Acknowledged)
         ->and($again['ok'])->toBeFalse()
         ->and($again['message'])->toBe('notifications.quick.already_done');
 });
@@ -187,7 +195,7 @@ test('a rejection locks the project for everyone: no edit, no new owner', functi
 
     expect($assigner->can('update', $project))->toBeTrue();
 
-    $project->currentAssignment('user_id')->reject($owner, 'Already running three projects');
+    $project->currentAssignment('responsible_employee_id')->reject($owner, 'Already running three projects');
     $locked = $project->fresh();
 
     expect($assigner->can('update', $locked))->toBeFalse()
@@ -198,15 +206,15 @@ test('a rejection locks the project for everyone: no edit, no new owner', functi
         ->and($owner->can('update', $locked))->toBeFalse()
         ->and($assigner->can('delete', $locked))->toBeTrue();
 
-    Livewire::actingAs($assigner)->test('pages::projects.index')->call('openEditModal', rowFor($project)->id)->assertForbidden();
+    Livewire::actingAs($assigner)->test('pages::projects.index')->call('openEditModal', $project->id)->assertForbidden();
 });
 
 test('the rejected project tells the assigner that nothing can be done any more', function () {
     ['project' => $project, 'owner' => $owner, 'assigner' => $assigner] = projectAssignedToANewOwner();
-    $project->currentAssignment('user_id')->reject($owner, 'Already running three projects');
+    $project->currentAssignment('responsible_employee_id')->reject($owner, 'Already running three projects');
 
     Livewire::actingAs($assigner)
-        ->test('pages::projects.show', ['project' => rowFor($project)->slug])
+        ->test('pages::projects.show', ['project' => $project->slug])
         ->assertSeeHtml('data-status="rejected"')
         ->assertSee('Already running three projects')
         ->assertSee(__('projects.assignment_rejected_hint'))
@@ -218,7 +226,7 @@ test('the projects page badges a rejected owner and nothing else', function () {
 
     Livewire::actingAs($assigner)->test('pages::projects.index')->assertDontSeeHtml('data-test="owner-rejected-badge"');
 
-    $project->currentAssignment('user_id')->reject($owner, 'Already running three projects');
+    $project->currentAssignment('responsible_employee_id')->reject($owner, 'Already running three projects');
 
     Livewire::actingAs($assigner)->test('pages::projects.index')->assertSeeHtml('data-test="owner-rejected-badge"')->assertSee('Rejected');
 });
@@ -230,28 +238,28 @@ test('a rejected project shows Blocked instead of edit, and only the CEO can unb
     insertHrContract($topEmployee, insertHrPosition($department, 'Chief Executive Officer'));
 
     ['project' => $project, 'owner' => $owner, 'assigner' => $assigner] = projectAssignedToANewOwner();
-    $project->currentAssignment('user_id')->reject($owner, 'Already running three projects');
+    $project->currentAssignment('responsible_employee_id')->reject($owner, 'Already running three projects');
 
     Livewire::actingAs($assigner)->test('pages::projects.index')
         ->assertSeeHtml('data-test="blocked-badge"')
         ->assertDontSeeHtml('data-test="blocked-badge-unblock"')
-        ->assertDontSeeHtml('wire:click="openEditModal('.rowFor($project)->id.')"')
-        ->call('openUnblockModal', rowFor($project)->id)->assertForbidden();
+        ->assertDontSeeHtml('wire:click="openEditModal('.$project->id.')"')
+        ->call('openUnblockModal', $project->id)->assertForbidden();
 
     $rejected = $project->fresh()->ownerAssignment;
     expect($assigner->can('unblock', $rejected))->toBeFalse();
 
     Livewire::actingAs($top)->test('pages::projects.index')
         ->assertSeeHtml('data-test="blocked-badge-unblock"')
-        ->assertDontSeeHtml('wire:click="openEditModal('.rowFor($project)->id.')"')
-        ->call('openUnblockModal', rowFor($project)->id)
+        ->assertDontSeeHtml('wire:click="openEditModal('.$project->id.')"')
+        ->call('openUnblockModal', $project->id)
         ->set('unblockNote', 'Talked to Omar, he will take it')
         ->call('unblockProject')
         ->assertHasNoErrors()
         ->assertDontSeeHtml('data-test="blocked-badge"')
-        ->assertSeeHtml('wire:click="openEditModal('.rowFor($project)->id.')"');
+        ->assertSeeHtml('wire:click="openEditModal('.$project->id.')"');
 
-    $current = $project->fresh()->currentAssignment('user_id');
+    $current = $project->fresh()->currentAssignment('responsible_employee_id');
 
     expect($rejected->fresh()->status)->toBe(AssignmentStatus::Superseded)
         ->and($current->status)->toBe(AssignmentStatus::Pending)
@@ -281,7 +289,7 @@ test('the top level is the holder of the configured position title, and hears on
     // An ordinary owner rejects: the top level is not told.
     ['project' => $first, 'owner' => $owner] = projectAssignedToANewOwner();
     $this->actingAs($owner);
-    $first->currentAssignment('user_id')->reject($owner, 'Already running three projects');
+    $first->currentAssignment('responsible_employee_id')->reject($owner, 'Already running three projects');
 
     expect(sentencesFor($top))->toBe([]);
 
@@ -291,58 +299,48 @@ test('the top level is the holder of the configured position title, and hears on
     $programManager = userWithRole('MEAL', $managerEmployee);
     Activity::withoutRecording(fn () => Program::factory()->create(['manager_id' => $managerEmployee]));
     $assigner = userWithRole('General Manager');
-    $second = Activity::withoutRecording(fn () => Project::factory()->create(['name' => 'Spring Support']));
+    $second = Activity::withoutRecording(fn () => rowFor(Project::factory()->create(['name' => 'Spring Support'])));
     $this->actingAs($assigner);
-    $second->update(['user_id' => $managerEmployee]);
+    $second->update(['responsible_employee_id' => $managerEmployee]);
     $this->actingAs($programManager);
-    $second->currentAssignment('user_id')->acknowledge($programManager);
+    $second->currentAssignment('responsible_employee_id')->acknowledge($programManager);
 
     expect(sentencesFor($top))->toBe([]);
 
     // A program manager rejects: now the top level is told.
-    $third = Activity::withoutRecording(fn () => Project::factory()->create(['name' => 'Summer Support']));
+    $third = Activity::withoutRecording(fn () => rowFor(Project::factory()->create(['name' => 'Summer Support'])));
     $this->actingAs($assigner);
-    $third->update(['user_id' => $managerEmployee]);
+    $third->update(['responsible_employee_id' => $managerEmployee]);
     $this->actingAs($programManager);
-    $third->currentAssignment('user_id')->reject($programManager, 'Already running three projects');
+    $third->currentAssignment('responsible_employee_id')->reject($programManager, 'Already running three projects');
 
-    expect(sentencesFor($top)[0])->toStartWith($programManager->name.' rejected being the owner of “Summer Support”');
+    // A row is named by its place (Y-16), not by the project's name.
+    expect(sentencesFor($top)[0])->toStartWith($programManager->name.' rejected being the owner of “'.$third->fresh()->label().'”');
     expect(sentencesFor($deputy))->toBe([]);
 });
 
-test('a new project starts as a draft whatever the form is sent', function () {
-    $user = userWithRole('General Manager');
-    $owner = insertHrEmployee();
-    $program = Program::factory()->create(['manager_id' => $owner]);
-
-    Livewire::actingAs($user)
-        ->test('pages::projects.index')
-        ->call('openCreateModal')
-        ->set('sectorIds', newProjectSectorIds())
-        ->set('name', 'Draft by default')
-        ->set('centerId', (string) insertHrCenter(insertHrCity()))
-        ->set('programId', (string) $program->id)
-        ->set('userId', (string) $owner)
-        ->call('saveProject')
-        ->assertHasNoErrors();
-
-    expect(Project::query()->where('name', 'Draft by default')->sole()->status)->toBe(ProjectStatus::Draft);
-});
+/*
+| Y-17: three cases went with the create form, which the [contract] removes
+| in §8 — a new project's starting status whatever the form sends, the owner
+| dropdown listing only program managers, and a programme picking its
+| manager. A place is placed and owned on the proposal now. They are named
+| in the Y-17 handoff.
+*/
 
 test('editing a project through the form leaves its status alone', function () {
     ['project' => $project, 'owner' => $owner] = projectAssignedToANewOwner();
-    $project->currentAssignment('user_id')->acknowledge($owner);
+    $project->currentAssignment('responsible_employee_id')->acknowledge($owner);
     $project->update(['status' => ProjectStatus::Active, 'start_date' => '2026-01-01', 'end_date' => '2026-12-31']);
 
     Livewire::actingAs(userWithRole('General Manager'))
         ->test('pages::projects.index')
-        ->call('openEditModal', rowFor($project)->id)
-        ->set('name', 'Renamed through the form')
+        ->call('openEditModal', $project->id)
+        ->set('description', 'Revised through the form')
         ->call('saveProject')
         ->assertHasNoErrors();
 
     expect($project->fresh())
-        ->name->toBe('Renamed through the form')
+        ->description->toBe('Revised through the form')
         ->status->toBe(ProjectStatus::Active);
 });
 
@@ -354,7 +352,7 @@ test('answering on the page reads the notification and takes its buttons away', 
         ->and(array_column($before->data['actions'], 'type'))->toBe(['assignment.acknowledge', 'assignment.reject']);
 
     Livewire::actingAs($owner)
-        ->test('pages::projects.show', ['project' => rowFor($project)->slug])
+        ->test('pages::projects.show', ['project' => $project->slug])
         ->call('openAssignmentModal', 'reject')
         ->set('assignmentNote', 'Already running three projects')
         ->call('submitAssignment');
@@ -368,7 +366,7 @@ test('answering on the page reads the notification and takes its buttons away', 
 test('opening the project reads the assignment notification but keeps its buttons', function () {
     ['project' => $project, 'owner' => $owner] = projectAssignedToANewOwner();
 
-    $this->actingAs($owner)->get(route('projects.show', rowFor($project)))->assertOk();
+    $this->actingAs($owner)->get(route('projects.show', $project))->assertOk();
 
     $row = UserNotification::query()->forUser($owner)->sole();
 
@@ -381,7 +379,7 @@ test('answering from the bell updates an open project page', function () {
     $notification = UserNotification::query()->forUser($owner)->sole();
 
     $page = Livewire::actingAs($owner)
-        ->test('pages::projects.show', ['project' => rowFor($project)->slug])
+        ->test('pages::projects.show', ['project' => $project->slug])
         ->assertSeeHtml('data-status="pending"');
 
     app(QuickActions::class)->run($owner, $notification, 'assignment.acknowledge');
@@ -392,67 +390,23 @@ test('answering from the bell updates an open project page', function () {
 test('reassigning takes the old owner\'s buttons away', function () {
     ['project' => $project, 'owner' => $owner] = projectAssignedToANewOwner();
 
-    $project->update(['user_id' => insertHrEmployee()]);
+    $project->update(['responsible_employee_id' => insertHrEmployee()]);
 
     expect(UserNotification::query()->forUser($owner)->sole()->data['actions'])->toBe([]);
 });
 
-test('the owner dropdown lists only the managers of programs', function () {
-    $managerEmployee = insertHrEmployee(firstNameEn: 'Pam', lastNameEn: 'Programs');
-    $plainEmployee = insertHrEmployee(firstNameEn: 'Paul', lastNameEn: 'Plain');
-    Program::factory()->create(['manager_id' => $managerEmployee]);
-    $unmanaged = Program::factory()->create(['manager_id' => null]);
-
-    $page = Livewire::actingAs(userWithRole('General Manager'))->test('pages::projects.index')->call('openCreateModal');
-
-    expect($page->instance()->ownerOptions->pluck('id')->all())->toBe([$managerEmployee]);
-
-    $page->set('name', 'Wrong owner')
-        ->set('centerId', (string) insertHrCenter(insertHrCity()))
-        ->set('programId', (string) $unmanaged->id)
-        ->set('userId', (string) $plainEmployee)
-        ->call('saveProject')
-        ->assertHasErrors(['userId']);
-});
-
-test('choosing a program picks its manager, who can be swapped for another program manager', function () {
-    $firstManager = insertHrEmployee(firstNameEn: 'Pam', lastNameEn: 'Programs');
-    $secondManager = insertHrEmployee(firstNameEn: 'Sam', lastNameEn: 'Second');
-    $first = Program::factory()->create(['manager_id' => $firstManager]);
-    $second = Program::factory()->create(['manager_id' => $secondManager]);
-    $noManager = Program::factory()->create(['manager_id' => null]);
-
-    $page = Livewire::actingAs(userWithRole('General Manager'))->test('pages::projects.index')
-        ->call('openCreateModal')
-        ->set('sectorIds', newProjectSectorIds())
-        ->set('programId', (string) $first->id)
-        ->assertSet('userId', (string) $firstManager)
-        ->set('programId', (string) $second->id)
-        ->assertSet('userId', (string) $secondManager)
-        ->set('userId', (string) $firstManager)
-        ->assertSet('userId', (string) $firstManager);
-
-    // A program with no manager leaves the choice as it was.
-    $page->set('programId', (string) $noManager->id)->assertSet('userId', (string) $firstManager);
-
-    $page->set('name', 'Swapped owner')
-        ->set('centerId', (string) insertHrCenter(insertHrCity()))
-        ->set('programId', (string) $second->id)
-        ->set('userId', (string) $firstManager)
-        ->call('saveProject')
-        ->assertHasNoErrors();
-
-    expect(Project::query()->where('name', 'Swapped owner')->sole()->user_id)->toBe($firstManager);
-});
-
 test('acknowledging on the project page approves a draft waiting on a donor-approved proposal, and rejecting keeps it a draft', function () {
     ['project' => $project, 'owner' => $owner] = projectAssignedToANewOwner();
-    $proposal = Proposal::factory()->create(['status' => ProposalStatus::Approved, 'actual_date_begin' => '2026-11-01', 'actual_date_end' => '2027-10-31']);
-    $proposal->projects()->attach($project->id, ['target_beneficiaries' => 10]);
+    // D-93: a place is of exactly one proposal, so the funding one is its own.
+    $project->proposal->forceFill([
+        'status' => ProposalStatus::Approved,
+        'actual_date_begin' => '2026-11-01',
+        'actual_date_end' => '2027-10-31',
+    ])->saveQuietly();
     $project->forceFill(['start_date' => '2026-11-01', 'end_date' => '2027-10-31'])->saveQuietly();
 
     Livewire::actingAs($owner)
-        ->test('pages::projects.show', ['project' => rowFor($project)->slug])
+        ->test('pages::projects.show', ['project' => $project->slug])
         ->call('openAssignmentModal', 'reject')
         ->set('assignmentNote', 'I cannot take this project on.')
         ->call('submitAssignment');
@@ -461,10 +415,10 @@ test('acknowledging on the project page approves a draft waiting on a donor-appr
         ->and($project->fresh()->isOwnerRejected())->toBeTrue();
 
     // The top level lifting the block is covered by ProposalApprovalTest; here the same person is asked again.
-    $project->currentAssignment('user_id')->forceFill(['status' => AssignmentStatus::Pending])->save();
+    $project->currentAssignment('responsible_employee_id')->forceFill(['status' => AssignmentStatus::Pending])->save();
 
     Livewire::actingAs($owner)
-        ->test('pages::projects.show', ['project' => rowFor($project)->slug])
+        ->test('pages::projects.show', ['project' => $project->slug])
         ->call('openAssignmentModal', 'acknowledge')
         ->call('submitAssignment');
 

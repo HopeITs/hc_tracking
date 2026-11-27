@@ -82,8 +82,9 @@ test('nudging the holder of the next step reaches them once a day', function () 
         ->call('nudgeNextStep')
         ->call('nudgeNextStep');
 
+    // Y-17: the Story's subject is the location row.
     expect(UserNotification::query()->forUser($owner)->count())->toBe(1)
-        ->and(Activity::query()->where('event', 'nudge.logged')->where('subject_id', $project->id)->count())->toBe(1);
+        ->and(Activity::query()->where('event', 'nudge.logged')->where('subject_id', rowFor($project)->id)->count())->toBe(1);
 });
 
 test('the Story shows money received only to viewers who may see money', function () {
@@ -121,6 +122,7 @@ test('every proposal link opens the proposal page, with the tab and agreement de
     'bare' => [[], null],
     'a tab' => [['tab' => 'plan'], 'plan'],
     'the record-agreement link' => [['record_agreement' => '1'], null],
+    'the set-grant-dates link' => [['grant_dates' => '1'], null],
 ]);
 
 test('a reviewer opening a proposal lands on its own page, on the tab they ask for', function () {

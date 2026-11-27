@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace App\Models;
 
-use App\Actions\Projects\ApproveProjectFromProposal;
 use App\Concerns\HasAssignments;
 use App\Concerns\HasSlug;
 use App\Concerns\RecordsActivity;
@@ -14,7 +13,6 @@ use App\Enums\ProposalPhase;
 use App\Enums\ProposalStatus;
 use App\Notifications\TracksActivity;
 use App\Observers\MediaOwnerObserver;
-use App\Support\Locations\ProjectLocationMirror;
 use Carbon\CarbonImmutable;
 use Database\Factories\ProjectFactory;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
@@ -196,33 +194,6 @@ class Project extends Model implements TracksActivity
     }
 
     /**
-     * The open (draft, approved, active) project already holding a placement
-     * and program, if any: there is at most one per pair (D-30a). The
-     * placement is the center when there is one, else the city of a hosted
-     * project (`center_id IS NULL` in that city, D-55 / W-01).
-     *
-     * Locks the program row first, so a caller inside a transaction holds off
-     * every other create, restore or relink for the same program until it
-     * commits. Call it inside the transaction that writes the project.
-     */
-    public static function openProjectFor(?int $centerId, int $cityId, int $programId, ?int $exceptId = null): ?self
-    {
-        Program::query()->whereKey($programId)->lockForUpdate()->value('id');
-
-        return static::query()
-            ->when(
-                $centerId !== null,
-                fn (Builder $query) => $query->where('center_id', $centerId),
-                fn (Builder $query) => $query->whereNull('center_id')->where('city_id', $cityId),
-            )
-            ->where('program_id', $programId)
-            ->whereIn('status', self::openStatusValues())
-            ->when($exceptId !== null, fn (Builder $query) => $query->whereKeyNot($exceptId))
-            ->orderBy('id')
-            ->first(['id', 'slug', 'name', 'status', 'city_id', 'center_id', 'host_center_id', 'program_id']);
-    }
-
-    /**
      * The status values of a project still being delivered, taken from
      * ProjectStatus::isOpen() so there is one list.
      *
@@ -350,7 +321,7 @@ class Project extends Model implements TracksActivity
 
     /**
      * The sectors this project covers (contracts.md §12.5). Written only
-     * through App\Actions\Projects\SyncProjectSectors.
+     * through App\Actions\Locations\SyncLocationSectors, on the row.
      *
      * @return BelongsToMany<Sector, $this>
      */
@@ -645,36 +616,17 @@ class Project extends Model implements TracksActivity
     }
 
     /**
-     * The owner is asked to acknowledge or reject being put in charge.
+     * Nobody is put in charge of a project any more (Y-17): a place is a
+     * location row, and its responsible is asked there
+     * (`ProposalLocation::assignmentFields()`). Nothing writes this table,
+     * so no assignment is ever raised from here; the standing ones are
+     * history until Y-18 drops the column.
      *
      * @return list<string>
      */
     public function assignmentFields(): array
     {
-        return ['user_id'];
-    }
-
-    /**
-     * The owner acknowledged being in charge: a draft that waits on a
-     * donor-approved proposal becomes approved. A no-op otherwise.
-     */
-    public function assignmentAcknowledged(string $field): void
-    {
-        if ($field === 'user_id') {
-            app(ApproveProjectFromProposal::class)->handle($this, 'owner_acknowledgement');
-        }
-    }
-
-    /**
-     * The owner answered — accepted or rejected. Either way the project's
-     * location rows carry a copy of that decision until Y-17, so the mirror
-     * runs here as well as on the approval path (Y-11 slice 2).
-     */
-    public function assignmentResponded(string $field): void
-    {
-        if ($field === 'user_id') {
-            app(ProjectLocationMirror::class)->syncAcknowledgement($this);
-        }
+        return [];
     }
 
     /**

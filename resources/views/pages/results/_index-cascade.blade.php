@@ -48,7 +48,7 @@
                         @php $freeActivityHeadingShown = true; @endphp
                         <h3 class="type-label text-secondary-medium dark:text-ink-muted" data-test="free-activities-heading">{{ __('results_framework.free_activities') }}</h3>
                     @endif
-                    <x-ui.framework-node :node="$node" :depth="0" :order="$loop->index" :collapsed="! $searching" wire:key="framework-root-{{ $node['result']->id }}-{{ $searching ? 'search' : 'browse' }}" />
+                    <x-ui.framework-node :node="$node" :depth="0" :order="$loop->index" :collapsed="! $searching" :record-readings="true" wire:key="framework-root-{{ $node['result']->id }}-{{ $searching ? 'search' : 'browse' }}" />
                 @endforeach
 
                 @if ($canAddFreeActivity)

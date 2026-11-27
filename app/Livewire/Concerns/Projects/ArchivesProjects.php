@@ -4,8 +4,8 @@ declare(strict_types=1);
 
 namespace App\Livewire\Concerns\Projects;
 
-use App\Actions\Projects\ArchiveProject;
-use App\Actions\Projects\RestoreProject;
+use App\Actions\Locations\ArchiveLocation;
+use App\Actions\Locations\RestoreLocation;
 use App\Models\Project;
 use App\Models\ProposalLocation;
 use Flux\Flux;
@@ -96,15 +96,15 @@ trait ArchivesProjects
             return;
         }
 
-        $project = $this->projectOfRow($this->archivingProjectId);
+        $row = ProposalLocation::query()->find($this->archivingProjectId);
 
-        if ($project === null) {
+        if ($row === null) {
             $this->cancelArchive();
 
             return;
         }
 
-        app(ArchiveProject::class)->handle($project);
+        app(ArchiveLocation::class)->handle($row);
 
         $this->archivingProjectId = null;
         $this->showArchiveModal = false;
@@ -114,20 +114,21 @@ trait ArchivesProjects
     }
 
     /**
-     * Take an archived project out of the archive (D-27): closed when it has
-     * dates, else a draft, and only while no other open project holds its
-     * center and program. RestoreProject enforces both.
+     * Take an archived place out of the archive (D-27): closed when it has
+     * dates, else a draft. RestoreLocation enforces it. The open-project
+     * rule L94 is withdrawn (Y-17), so a second place here is no longer a
+     * reason to refuse.
      */
     public function restoreProject(int $locationId): void
     {
-        $project = $this->projectOfRow($locationId);
+        $row = ProposalLocation::query()->find($locationId);
 
-        if ($project === null) {
+        if ($row === null) {
             return;
         }
 
         try {
-            $status = app(RestoreProject::class)->handle($project);
+            $status = app(RestoreLocation::class)->handle($row);
         } catch (ValidationException $exception) {
             Flux::toast(variant: 'danger', text: $exception->validator->errors()->first());
 
@@ -137,16 +138,5 @@ trait ArchivesProjects
         $this->resetPage();
 
         Flux::toast(variant: 'success', text: __('projects.project_restored_as', ['status' => $status->label()]));
-    }
-
-    /**
-     * The project a row stands for, which the two actions still write
-     * (Y-17 moves them to the row).
-     */
-    private function projectOfRow(int $locationId): ?Project
-    {
-        $projectId = ProposalLocation::query()->whereKey($locationId)->value('project_id');
-
-        return $projectId === null ? null : Project::query()->find((int) $projectId);
     }
 }

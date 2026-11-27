@@ -6,8 +6,8 @@ namespace App\Notifications\Recipients;
 
 use App\Enums\NotificationPriority;
 use App\Models\Activity;
-use App\Models\Project;
 use App\Models\ProposalChangeRequest;
+use App\Models\ProposalLocation;
 use App\Models\ProposalReviewer;
 use App\Models\Role;
 use App\Models\User;
@@ -37,20 +37,15 @@ use App\Support\Slots;
  * proposal's reviewers and the CEO slot holder, besides the usual watchers;
  * the reviewers and the CEO skip the permission check for it.
  *
- * An extension (proposal.extended, W-08, D-60) tells the owners of the linked
- * projects, besides the usual watchers; the owners skip the permission check.
+ * An extension (proposal.extended, W-08, D-60) tells the responsibles of the
+ * proposal's places (Y-17), besides the usual watchers; they skip the
+ * permission check.
  * The activity carries names and dates only.
  *
  * The approval rebase (proposal.plan_rebased, T31) is the system's: it tells
  * the project owners, and only when a task date was cut at the
  * grant end, so they can re-plan it. No watcher hears of it, and the owners
  * (who hold no proposals.view) skip the permission check for it.
- *
- * Program requests (W-34a, contracts §15.2): an opened request reaches the
- * HR liaison slot holder (Slots, contracts §9) directly, beside the Public
- * Relations Manager who watches every proposal event; a linked request
- * reaches the proposal owner. Both may hold no proposals.view, so they skip
- * the permission check for these two events.
  */
 final class ProposalRecipients extends WatcherRecipients
 {
@@ -73,10 +68,6 @@ final class ProposalRecipients extends WatcherRecipients
     private const PlanRebased = 'proposal.plan_rebased';
 
     private const Extended = 'proposal.extended';
-
-    private const ProgramRequestOpened = 'program_request.opened';
-
-    private const ProgramRequestLinked = 'program_request.linked';
 
     /**
      * The proposal's owners are its project managers (2026-11-12): a status
@@ -142,8 +133,6 @@ final class ProposalRecipients extends WatcherRecipients
             ]),
             self::PlanRebased => $this->hasClippedDates($activity) ? $this->projectOwnerIds($activity) : [],
             self::Extended => $this->projectOwnerIds($activity),
-            self::ProgramRequestOpened => $this->uniqueIds([Slots::holderOf(Slots::HrLiaison)]),
-            self::ProgramRequestLinked => $this->projectOwnerIds($activity),
             // A move into a step that waits on the owners already sends them
             // "waiting on you" (ProposalOwnerNotifier); one message, not two.
             self::StatusChanged => array_key_exists((string) $this->changedTo($activity, 'status'), ProposalOwnerNotifier::Steps) ? [] : $this->projectOwnerIds($activity),
@@ -213,10 +202,6 @@ final class ProposalRecipients extends WatcherRecipients
                 ...$this->directUserIds($activity),
                 ...array_values(app(EmployeeRecipients::class)->usersFor($this->directEmployeeIds($activity))),
             ]);
-        }
-
-        if (in_array($activity->event, [self::ProgramRequestOpened, self::ProgramRequestLinked], true)) {
-            return $this->uniqueIds(array_values(app(EmployeeRecipients::class)->usersFor($this->directEmployeeIds($activity))));
         }
 
         if (! in_array($activity->event, self::ReviewEvents, true)) {
@@ -363,9 +348,11 @@ final class ProposalRecipients extends WatcherRecipients
      */
     private function projectOwnerIds(Activity $activity): array
     {
-        return $this->uniqueIds(Project::query()
-            ->whereHas('proposals', fn ($query) => $query->whereKey($activity->subject_id))
-            ->pluck('user_id')
+        // Y-17: the proposal's places are its own location rows (D-93), and
+        // the person answering for a place is the row's responsible.
+        return $this->uniqueIds(ProposalLocation::query()
+            ->where('proposal_id', $activity->subject_id)
+            ->pluck('responsible_employee_id')
             ->all());
     }
 }

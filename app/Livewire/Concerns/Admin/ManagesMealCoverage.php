@@ -9,8 +9,8 @@ use App\Enums\MealCoverageScope;
 use App\Models\HrCenter;
 use App\Models\HrCity;
 use App\Models\HrEmployee;
-use App\Models\HrProgram;
 use App\Models\MealCoverageAssignment;
+use App\Models\Program;
 use App\Models\ProposalLocation;
 use App\Models\ReportTemplate;
 use App\Support\Reporting\ReportPlace;
@@ -35,7 +35,7 @@ use Livewire\Attributes\Computed;
  * @property-read Collection<int, MealCoverageAssignment> $mealCoverages  #[Computed] mealCoverages()
  * @property-read Collection<int, HrEmployee> $mealOfficers  #[Computed] mealOfficers()
  * @property-read array<int, array{name: string, inactive: bool}> $cityOfficers  #[Computed] cityOfficers()
- * @property-read Collection<int, array{id: int, name: string, city: string|null, officer: array{name: string, inactive: bool}|null, inherited: bool}> $placeOfficers  #[Computed] placeOfficers()
+ * @property-read Collection<int, array{id: int, name: string, city: string|null, officer: array{name: string, inactive: bool}|null, inherited: bool, noGovernorate: bool}> $placeOfficers  #[Computed] placeOfficers()
  * @property-read array{name: string, inactiveCity: bool, officer: array{name: string, inactive: bool}|null}|null $mealTarget  #[Computed] mealTarget()
  * @property-read Collection<int, HrEmployee> $eligibleMealOfficers  #[Computed] eligibleMealOfficers()
  */
@@ -137,7 +137,7 @@ trait ManagesMealCoverage
     public function placeOfficers(): Collection
     {
         $places = $this->coveragePlaces;
-        $programs = HrProgram::namesById();
+        $programs = Program::namesById();
         $centers = HrCenter::query()->whereKey($places->pluck('centerId')->filter()->unique()->all())->get()->keyBy('id');
         $cities = $this->allCities->keyBy('id');
         $direct = $this->mealCoverages->where('scope_type', MealCoverageScope::Place)->keyBy('scope_key');
@@ -155,6 +155,7 @@ trait ManagesMealCoverage
                 'city' => $cities->get($place->cityId)?->name,
                 'officer' => $this->officerCard(($assignment ?? $fallback)?->employee_id),
                 'inherited' => $assignment === null && $fallback !== null,
+                'noGovernorate' => $assignment === null && ! $cities->has($place->cityId),
             ];
         })->filter(fn (array $row): bool => $search === '' || mb_stripos($row['name'].' '.$row['city'], $search) !== false)
             ->sortBy(['city', 'name']);

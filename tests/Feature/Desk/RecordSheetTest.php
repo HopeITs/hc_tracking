@@ -34,7 +34,7 @@ test('every record opens as its own full page, not a sheet over its register', f
 ]);
 
 test('a program opens as its own page, not a sheet over the projects register', function () {
-    $program = Program::factory()->create(['name' => 'Children University']);
+    $program = Program::factory()->create(['name_en' => 'Children University']);
 
     $this->actingAs(User::factory()->role('Super Admin')->create())
         ->get(route('programs.show', $program))

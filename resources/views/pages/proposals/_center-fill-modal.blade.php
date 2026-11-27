@@ -59,7 +59,7 @@
 
                             <div class="min-w-0">
                                 <p class="text-xs text-secondary-medium dark:text-ink-muted">{{ __('proposals.location_program') }}</p>
-                                <p class="text-sm text-secondary-dark dark:text-ink" dir="auto">{{ $locationRow['program'] ?? $locationRow['programRequestName'] ?? '—' }}</p>
+                                <p class="text-sm text-secondary-dark dark:text-ink" dir="auto">{{ $locationRow['program'] ?? '—' }}</p>
                             </div>
 
                             <div class="min-w-0">

@@ -144,6 +144,50 @@ final class EmployeeProfile
     }
 
     /**
+     * Who manages a department: the active employee whose current position in
+     * it carries the department-manager job level. Null when it has none.
+     *
+     * The "is this person a department manager" half is W-14's
+     * isDepartmentManager() above and is not repeated here — D-65 has one
+     * definition, and a rule written twice drifts. This adds only the other
+     * half, picking one holder when a department has several, which is
+     * normal: on the live HR data Finance has three. The tie-break is the one
+     * holderOfPosition() already uses, the latest contract start date, and an
+     * ambiguous department is logged rather than resolved silently.
+     *
+     * Reads the lookup already in memory: no extra HR query.
+     */
+    public static function managerOfDepartment(int $departmentId): ?int
+    {
+        $holder = null;
+        $holderStart = '';
+        $candidates = 0;
+
+        foreach (self::rememberedHrLookup(fn (): array => self::load()) as $employeeId => $entry) {
+            if (! is_array($entry) || $entry['department_id'] !== $departmentId || ! self::isDepartmentManager($employeeId)) {
+                continue;
+            }
+
+            $candidates++;
+
+            if ($holder === null || [$entry['start_date'], $employeeId] > [$holderStart, $holder]) {
+                $holder = $employeeId;
+                $holderStart = $entry['start_date'];
+            }
+        }
+
+        if ($candidates > 1) {
+            Log::warning('Several department managers in HR; taking the latest contract.', [
+                'department_id' => $departmentId,
+                'candidates' => $candidates,
+                'chosen_employee_id' => $holder,
+            ]);
+        }
+
+        return $holder;
+    }
+
+    /**
      * The employee currently holding a position (latest start date), null when vacant.
      */
     public static function holderOfPosition(int $positionId): ?int

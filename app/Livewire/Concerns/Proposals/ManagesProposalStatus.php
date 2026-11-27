@@ -11,6 +11,7 @@ use App\Enums\ProposalStatus;
 use App\Enums\ReviewStage;
 use App\Models\HrEmployee;
 use App\Models\Proposal;
+use App\Models\ProposalLocation;
 use App\Models\ProposalReviewer;
 use App\Support\ProposalTransitions;
 use App\Support\TransitionResult;
@@ -177,18 +178,21 @@ trait ManagesProposalStatus
             return [];
         }
 
-        return $subject->projects()
-            ->select(['projects.id', 'projects.name'])
-            ->where(fn ($query) => $query->whereNull('project_proposal.target_beneficiaries')->orWhere('project_proposal.target_beneficiaries', '<', 1))
-            ->orderBy('projects.id')
+        // Y-17: the figure lives on the location row, and a row is named by
+        // its place.
+        return $subject->locations()
+            ->with(['city', 'program', 'centers'])
+            ->where(fn ($query) => $query->whereNull('target_beneficiaries')->orWhere('target_beneficiaries', '<', 1))
+            ->orderBy('sort')
+            ->orderBy('id')
             ->get()
-            ->map(fn ($project): array => ['id' => (int) $project->id, 'name' => (string) $project->name])
+            ->map(fn (ProposalLocation $row): array => ['id' => $row->id, 'name' => $row->label()])
             ->all();
     }
 
     /**
-     * Validate the counts typed for the missing projects and return the
-     * writes to make, project id => count. An empty count, or one that is not
+     * Validate the counts typed for the places still missing one and return the
+     * writes to make, location row id => count. An empty count, or one that is not
      * a whole number of at least 1, stops the move with a field error.
      *
      * @return array<int, int>
@@ -280,8 +284,11 @@ trait ManagesProposalStatus
             // The counts and the move commit together: a refused move keeps
             // none of the counts typed for it.
             $result = DB::transaction(function () use ($proposal, $to, $input, $counts): TransitionResult {
-                foreach ($counts as $projectId => $count) {
-                    $proposal->projects()->updateExistingPivot($projectId, ['target_beneficiaries' => $count]);
+                foreach ($counts as $rowId => $count) {
+                    ProposalLocation::query()
+                        ->where('proposal_id', $proposal->id)
+                        ->whereKey($rowId)
+                        ->update(['target_beneficiaries' => $count]);
                 }
 
                 return app(TransitionProposal::class)->handle($proposal, $to, ProposalStatus::from($this->statusExpectedFrom), $input);
