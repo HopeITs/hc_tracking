@@ -1,4 +1,4 @@
-{{-- "To validate" on ⚡index.blade.php: the MEAL queue (MonthlyReport::validatableBy()) as one calm full-width table, a line per report: program, city, the proposals its template covers (D-76), month, how long it has waited and one Review button. The longest-waiting come first; any heading re-sorts (queueRows()). "Start reviewing" in the register's actions opens the first row, and the report page's "Next report" walks the rest. The filters' one way back is the register bar's Clear. --}}
+{{-- "To validate" on ⚡index.blade.php: the MEAL queue (MonthlyReport::validatableBy()) as one calm full-width table, a line per report: program, city, the proposals its template covers (D-76), month, how long it has waited and one Validate button. The longest-waiting come first; any heading re-sorts (queueRows()). "Validate the oldest" in the register's actions opens the first row, and the report page's "Next report" walks the rest. The filters' way back is Clear, in the bar and in the empty state. --}}
 @use('App\Enums\MonthlyReportStatus')
 @php
     $queueRows = $this->queueRows;
@@ -15,11 +15,22 @@
 
 @if ($queueRows->isEmpty())
     <x-ui.panel>
-        <x-ui.empty-state
-            icon="check-badge"
-            :heading="$filtersAreActive ? __('monthly_reports.empty_filtered') : __('monthly_reports.empty_validate')"
-            :body="$filtersAreActive ? __('common.change_the_filters_and_try_again') : __('monthly_reports.empty_validate_body')"
-        />
+        @if ($filtersAreActive)
+            <x-ui.empty-state icon="check-badge" :heading="__('monthly_reports.empty_filtered')" :body="__('common.change_the_filters_and_try_again')">
+                <x-slot:action>
+                    <x-ui.button size="sm" tone="primary" wire:click="clearFilters" data-empty-action="clear">{{ __('monthly_reports.clear_filters') }}</x-ui.button>
+                </x-slot:action>
+            </x-ui.empty-state>
+        @else
+            <x-ui.empty-state icon="check-badge" :heading="__('monthly_reports.empty_validate')" :body="__('monthly_reports.empty_validate_body')">
+                {{-- Nothing waits, but the validator's earlier work is one step away. --}}
+                @if ($this->validatable->contains(fn ($report): bool => $report->status === MonthlyReportStatus::Validated))
+                    <x-slot:action>
+                        <x-ui.button size="sm" tone="primary" wire:click="$set('status', 'validated')" data-empty-action="show_validated">{{ __('monthly_reports.show_validated') }}</x-ui.button>
+                    </x-slot:action>
+                @endif
+            </x-ui.empty-state>
+        @endif
     </x-ui.panel>
 @else
     <div class="flex flex-col gap-3">

@@ -99,7 +99,7 @@ new #[Layout('layouts::desk'), Title('titles.monthly_reports')] class extends Co
         }
     }
 
-    /** Narrows the validation queue by place or proposal name, in memory. */
+    /** Narrows either tab by place or proposal name, in memory. */
     #[Url(except: '')]
     public string $search = '';
 
@@ -193,7 +193,7 @@ new #[Layout('layouts::desk'), Title('titles.monthly_reports')] class extends Co
         return $this->queueRows->first(fn (array $row): bool => $row['waitingDays'] !== null)['report'] ?? null;
     }
 
-    /** Rows of the validation queue drawn so far; "Show more" adds a page. */
+    /** Rows drawn so far on either tab's table; "Show more" adds a page. */
     public int $queueLimit = 25;
 
     public function showMoreQueue(): void
@@ -473,10 +473,9 @@ new #[Layout('layouts::desk'), Title('titles.monthly_reports')] class extends Co
 
     /**
      * "My reports" narrowed by the extraction filters: each template keeps
-     * the months they select (`months`) and its whole run for the month
-     * strip (`strip`); a template left with no month is dropped.
+     * the months they select; a template left with no month is dropped.
      *
-     * @return list<array{template: ReportTemplate, place: string, proposals: list<array{id: int, slug: string, name: string, number: string|null}>, title: string, hasIndicators: bool, strip: list<array<string, mixed>>, months: list<array{report: MonthlyReport, key: string, state: string, due: ?CarbonImmutable, overdue: bool, blocked: ?string, can_fill: bool}>}>
+     * @return list<array{template: ReportTemplate, place: string, proposals: list<array{id: int, slug: string, name: string, number: string|null}>, title: string, hasIndicators: bool, months: list<array{report: MonthlyReport, key: string, state: string, due: ?CarbonImmutable, overdue: bool, blocked: ?string, can_fill: bool}>}>
      */
     #[Computed]
     public function filteredMonths(): array
@@ -487,41 +486,11 @@ new #[Layout('layouts::desk'), Title('titles.monthly_reports')] class extends Co
             $months = array_values(array_filter($group['months'], fn (array $row): bool => $this->isExtracted($row['report']->id)));
 
             if ($months !== []) {
-                $groups[] = [...$group, 'strip' => $group['months'], 'months' => $months];
+                $groups[] = [...$group, 'months' => $months];
             }
         }
 
         return $groups;
-    }
-
-    /**
-     * The months waiting on the preparer, gathered from every template at
-     * the top of "My reports": the ones they can fill, overdue first, then
-     * oldest first. A reader who cannot fill gets none, so no list.
-     *
-     * @return list<array{group: array<string, mixed>, row: array{report: MonthlyReport, key: string, state: string, due: ?CarbonImmutable, overdue: bool, blocked: ?string, can_fill: bool}}>
-     */
-    #[Computed]
-    public function needsYou(): array
-    {
-        $items = [];
-
-        // A big figure already narrows the list to one kind of month; repeating some of them on top would only blur it.
-        if ($this->show !== '') {
-            return [];
-        }
-
-        foreach ($this->filteredMonths as $group) {
-            foreach ($group['months'] as $row) {
-                if ($row['can_fill']) {
-                    $items[] = ['group' => $group, 'row' => $row];
-                }
-            }
-        }
-
-        usort($items, fn (array $a, array $b): int => [! $a['row']['overdue'], $a['row']['report']->period] <=> [! $b['row']['overdue'], $b['row']['report']->period]);
-
-        return $items;
     }
 
     /**
@@ -565,17 +534,19 @@ new #[Layout('layouts::desk'), Title('titles.monthly_reports')] class extends Co
     }
 
     /**
-     * "My reports" as it is drawn: each template with its months narrowed
-     * to the filters and the big figure picked, the validated months set
-     * apart to fold away (unless "validated" is the figure picked), and
-     * every month kept for the template's month strip. A template left with
-     * no month is dropped.
+     * "My reports" as one table (M-06): a row per month of every template,
+     * narrowed by the filters, the search (place or proposals) and the big
+     * figure picked. What waits on the preparer comes first: overdue, then
+     * what they can fill, then the rest by how far the month still has to
+     * go; then the oldest month, the place and the id, so the order is
+     * stable.
      *
-     * @return list<array{template: ReportTemplate, place: string, proposals: list<array{id: int, slug: string, name: string, number: string|null}>, title: string, hasIndicators: bool, strip: list<array<string, mixed>>, open: list<array<string, mixed>>, folded: list<array<string, mixed>>}>
+     * @return list<array{report: MonthlyReport, key: string, state: string, due: ?CarbonImmutable, overdue: bool, blocked: ?string, can_fill: bool, group: array<string, mixed>}>
      */
     #[Computed]
-    public function visibleGroups(): array
+    public function mineRows(): array
     {
+        $needle = mb_strtolower(trim($this->search));
         $matches = fn (array $row): bool => match ($this->show) {
             'to_fill' => $row['can_fill'],
             'overdue' => $row['overdue'],
@@ -583,30 +554,44 @@ new #[Layout('layouts::desk'), Title('titles.monthly_reports')] class extends Co
             'validated' => in_array($row['state'], ['validated', 'reopen_pending'], true),
             default => true,
         };
-        $groups = [];
+        $rank = fn (array $row): int => match (true) {
+            $row['overdue'] => 0,
+            $row['can_fill'] => 1,
+            in_array($row['state'], ['draft', 'returned'], true) => 2,
+            $row['state'] === 'submitted' => 3,
+            $row['state'] === 'reopen_pending' => 4,
+            $row['state'] === 'upcoming' => 5,
+            default => 6,
+        };
+        $rows = [];
 
         foreach ($this->filteredMonths as $group) {
-            $rows = array_values(array_filter($group['months'], $matches));
-
-            if ($rows === []) {
+            if ($needle !== '' && ! str_contains(mb_strtolower($group['place'].' '.$group['title']), $needle)) {
                 continue;
             }
 
-            $fold = $this->show === '';
-
-            $groups[] = [
-                'template' => $group['template'],
-                'place' => $group['place'],
-                'proposals' => $group['proposals'],
-                'title' => $group['title'],
-                'hasIndicators' => $group['hasIndicators'],
-                'strip' => $group['strip'],
-                'open' => $fold ? array_values(array_filter($rows, fn (array $row): bool => $row['state'] !== 'validated')) : $rows,
-                'folded' => $fold ? array_values(array_filter($rows, fn (array $row): bool => $row['state'] === 'validated')) : [],
-            ];
+            foreach ($group['months'] as $row) {
+                if ($matches($row)) {
+                    $rows[] = [...$row, 'group' => $group];
+                }
+            }
         }
 
-        return $groups;
+        usort($rows, fn (array $a, array $b): int => [$rank($a), $a['report']->period->getTimestamp(), mb_strtolower($a['group']['place']), $a['report']->id]
+            <=> [$rank($b), $b['report']->period->getTimestamp(), mb_strtolower($b['group']['place']), $b['report']->id]);
+
+        return $rows;
+    }
+
+    /**
+     * Whether a filter kept behind "More filters" is set, so the block opens
+     * by itself and the user sees why the list is narrowed.
+     */
+    #[Computed]
+    public function moreFiltersAreActive(): bool
+    {
+        return $this->city !== '' || $this->program !== '' || $this->center !== '' || $this->from !== '' || $this->to !== ''
+            || ($this->tab === 'validate' && $this->status !== 'submitted');
     }
 
     /**
@@ -843,24 +828,14 @@ new #[Layout('layouts::desk'), Title('titles.monthly_reports')] class extends Co
 ?>
 
 @php
-    $extractionFiltersAreActive = $this->extractionFiltersAreActive;
-    $filtersAreActive = $extractionFiltersAreActive || ($tab === 'validate' && ($status !== 'submitted' || $show === 'not_seen' || trim($search) !== ''));
-    $listFilter = $this->extractionFilter;
-    $centerValue = match (true) {
-        $listFilter->cityWide && $listFilter->cityId !== null => 'field-'.$listFilter->cityId,
-        $listFilter->centerUnset => 'unset',
-        $listFilter->centerId !== null => 'c'.$listFilter->centerId,
-        default => '',
-    };
-    $monthFieldClass = 'block h-9 w-full min-w-0 touch-manipulation rounded-[10px] border border-(--line-2) bg-(--paper) px-2.5 text-[12.5px] font-semibold text-(--ink) hover:border-(--ink-3) max-[720px]:h-11 aria-invalid:border-status-critical';
-    $monthLabelClass = 'mb-1.5 block text-[11px] font-semibold uppercase leading-4 tracking-[0.1em] text-secondary-medium dark:text-ink-muted';
+    $filtersAreActive = $this->extractionFiltersAreActive || trim($search) !== '' || ($tab === 'validate' && ($status !== 'submitted' || $show === 'not_seen'));
 @endphp
 
 <x-desk.register
     class="@container/directory"
     heading-id="monthly-reports-heading"
     :title="__('titles.monthly_reports')"
-    :count="$tab === 'validate' ? $this->queueRows->count() : null"
+    :count="$tab === 'validate' ? $this->queueRows->count() : ($this->myMonths === [] ? null : count($this->mineRows))"
     data-monthly-reports-intro
     :view="$tab"
     view-model="tab"
@@ -869,83 +844,25 @@ new #[Layout('layouts::desk'), Title('titles.monthly_reports')] class extends Co
         'validate' => $this->canValidate ? ['icon' => 'check', 'label' => __('monthly_reports.tab_validate')] : null,
     ])"
 >
+    @if ($tab === 'validate' && $this->firstToReview !== null)
+        <x-slot:actions>
+            <a class="dk-btn dk-primary" href="{{ route('monthly-reports.show', $this->firstToReview) }}" wire:navigate data-start-reviewing>{{ __('monthly_reports.start_reviewing') }}<span aria-hidden="true" class="rtl:-scale-x-100">→</span></a>
+        </x-slot:actions>
+    @endif
+
+    <x-slot:search>
         @if ($tab === 'validate')
-            @if ($this->firstToReview !== null)
-                <x-slot:actions>
-                    <a class="dk-btn dk-primary" href="{{ route('monthly-reports.show', $this->firstToReview) }}" wire:navigate data-start-reviewing>{{ __('monthly_reports.start_reviewing') }}<span aria-hidden="true" class="rtl:-scale-x-100">→</span></a>
-                </x-slot:actions>
-            @endif
-
-            <x-slot:search>
-                <x-desk.register-search :label="__('monthly_reports.search_queue')" :placeholder="__('monthly_reports.search_queue')" wire:model.live.debounce.250ms="search" data-queue-search />
-            </x-slot:search>
+            <x-desk.register-search :label="__('monthly_reports.search_queue')" :placeholder="__('monthly_reports.search_queue')" wire:model.live.debounce.250ms="search" data-queue-search />
+        @else
+            <x-desk.register-search :label="__('monthly_reports.search_mine')" :placeholder="__('monthly_reports.search_mine')" wire:model.live.debounce.250ms="search" data-list-search />
         @endif
+    </x-slot:search>
 
-        {{-- The D-79 filters on both tabs (Y-05), read through ReportExtraction like the monthly matrix. --}}
-        <x-slot:filters>
-            <div class="contents" data-list-filters>
-                <x-ui.header-filter-select :label="__('reports.matrix.proposal')" wire:model.live="proposal" :value="(string) ($listFilter->proposalId ?? '')">
-                    <option value="">{{ __('reports.matrix.all_proposals') }}</option>
-                    @foreach ($this->proposalOptions as $option)
-                        <option value="{{ $option->id }}">{{ $option->name }}</option>
-                    @endforeach
-                </x-ui.header-filter-select>
+    <x-slot:filters>
+        @include('pages.monthly-reports._index-filters')
+    </x-slot:filters>
 
-                <x-ui.header-filter-select :label="__('common.city')" wire:model.live="city" :value="(string) ($listFilter->cityId ?? '')">
-                    <option value="">{{ __('monthly_reports.any_city') }}</option>
-                    @foreach ($this->cityOptions as $cityId => $cityName)
-                        <option value="{{ $cityId }}">{{ $cityName }}</option>
-                    @endforeach
-                </x-ui.header-filter-select>
-
-                <x-ui.header-filter-select :label="__('reports.matrix.program')" wire:model.live="program" :value="(string) ($listFilter->programId ?? '')">
-                    <option value="">{{ __('reports.matrix.all_programs') }}</option>
-                    @foreach ($this->programOptions as $programId => $programName)
-                        <option value="{{ $programId }}">{{ $programName }}</option>
-                    @endforeach
-                </x-ui.header-filter-select>
-
-                <x-ui.header-filter-select :label="__('reports.matrix.center')" wire:model.live="center" :value="$centerValue">
-                    <option value="">{{ __('reports.matrix.all_centers') }}</option>
-                    @foreach ($this->centerOptions as $option)
-                        <option value="{{ $option['value'] }}">{{ $option['label'] }}</option>
-                    @endforeach
-                </x-ui.header-filter-select>
-
-                <div class="min-w-0" data-list-from>
-                    <label for="monthly-reports-from" class="{{ $monthLabelClass }}">{{ __('reports.matrix.from') }}</label>
-                    <input id="monthly-reports-from" type="month" wire:model.live="from" class="{{ $monthFieldClass }}" dir="ltr" @error('from') aria-invalid="true" aria-describedby="monthly-reports-from-error" @enderror />
-                    @error('from')
-                        <p id="monthly-reports-from-error" class="mt-1 flex items-center gap-1 text-xs text-status-critical" data-list-from-error>
-                            <flux:icon.exclamation-triangle variant="micro" class="size-4 shrink-0" aria-hidden="true" />
-                            <span>{{ $message }}</span>
-                        </p>
-                    @enderror
-                </div>
-
-                <div class="min-w-0" data-list-to>
-                    <label for="monthly-reports-to" class="{{ $monthLabelClass }}">{{ __('reports.matrix.to') }}</label>
-                    <input id="monthly-reports-to" type="month" wire:model.live="to" class="{{ $monthFieldClass }}" dir="ltr" />
-                </div>
-
-                @if ($tab === 'validate')
-                    <x-ui.header-filter-select :label="__('common.status')" wire:model.live="status" :value="$this->selectedStatus?->value ?? 'all'">
-                        <option value="submitted">{{ __('monthly_reports.status_to_validate') }}</option>
-                        <option value="validated">{{ MonthlyReportStatus::Validated->label() }}</option>
-                        <option value="all">{{ __('monthly_reports.status_all') }}</option>
-                    </x-ui.header-filter-select>
-                @endif
-
-                @if ($filtersAreActive)
-                    <div class="flex items-end">
-                        <button type="button" class="dk-btn dk-ghost dk-sm" wire:click="clearFilters"><x-desk.icon name="x" />{{ __('desk.register.clear') }}</button>
-                    </div>
-                @endif
-            </div>
-        </x-slot:filters>
-
-
-    <div @class(['flex flex-col gap-6', 'max-w-3xl gap-8!' => $tab !== 'validate'])>
+    <div class="flex flex-col gap-6">
         {{-- The headline figures as large type that also filters the list: still type on the page, not stat tiles (.ai/rules/pages.md). --}}
         @if ($this->figures !== [])
             <div class="dk-figs-lg" role="group" aria-label="{{ __('monthly_reports.figures_label') }}" data-figures>

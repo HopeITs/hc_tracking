@@ -1,87 +1,60 @@
-{{-- "My reports" on ⚡index.blade.php: the months waiting on the preparer first ("Needs you"), then one block per report template (D-76): its place, the proposals it covers (so two reports of one place are told apart) and its month strip, its months that still need something, and the validated ones folded away. --}}
+{{-- "My reports" on ⚡index.blade.php (M-06): one table, a row per generated month of the templates the user prepares (D-76), with fixed columns (place and the proposals it covers, month, status, due date, actions). What waits on the preparer comes first (mineRows()). Every empty state offers its one next step. --}}
+@php
+    $mineRows = $this->mineRows;
+    $shownRows = array_slice($mineRows, 0, $queueLimit);
+    $hiddenCount = count($mineRows) - count($shownRows);
+@endphp
+
 @if ($this->myMonths === [])
-    <x-ui.empty-state icon="calendar-days" :heading="__('monthly_reports.empty_mine')" :body="__('monthly_reports.empty_mine_body')" />
-@elseif ($this->visibleGroups === [])
-    {{-- The user prepares templates, but the filters or the figure picked leave no month (Y-05). --}}
-    <x-ui.empty-state icon="calendar-days" :heading="__('monthly_reports.empty_filtered')" :body="__('common.change_the_filters_and_try_again')" />
-@else
-    <div class="flex flex-col gap-10">
-        @if ($this->needsYou !== [])
-            <section class="flex flex-col gap-3" aria-labelledby="needs-you-heading" data-needs-you>
-                <h2 id="needs-you-heading" class="text-lg font-bold">{{ __('monthly_reports.needs_you') }}</h2>
-
-                <x-ui.panel>
-                    <ul class="flex flex-col divide-y divide-secondary-soft dark:divide-line" role="list">
-                        @foreach ($this->needsYou as $item)
-                            @include('pages.monthly-reports._index-month-row', ['row' => $item['row'], 'rowGroup' => $item['group'], 'inThread' => false, 'projectHasIndicators' => true])
-                        @endforeach
-                    </ul>
-                </x-ui.panel>
-            </section>
+    <x-ui.panel>
+        <x-ui.empty-state icon="calendar-days" :heading="__('monthly_reports.empty_mine')" :body="__('monthly_reports.empty_mine_body')">
+            @if ($this->canValidate)
+                <x-slot:action>
+                    <x-ui.button size="sm" tone="primary" wire:click="$set('tab', 'validate')" data-empty-action="validate">{{ __('monthly_reports.go_to_validate') }}</x-ui.button>
+                </x-slot:action>
+            @endif
+        </x-ui.empty-state>
+    </x-ui.panel>
+@elseif ($mineRows === [])
+    <x-ui.panel>
+        @if ($filtersAreActive)
+            <x-ui.empty-state icon="calendar-days" :heading="__('monthly_reports.empty_filtered')" :body="__('common.change_the_filters_and_try_again')">
+                <x-slot:action>
+                    <x-ui.button size="sm" tone="primary" wire:click="clearFilters" data-empty-action="clear">{{ __('monthly_reports.clear_filters') }}</x-ui.button>
+                </x-slot:action>
+            </x-ui.empty-state>
+        @else
+            {{-- Only a big figure narrows the table here: pressing it again lists every month. --}}
+            <x-ui.empty-state icon="calendar-days" :heading="__('monthly_reports.empty_figure')">
+                <x-slot:action>
+                    <x-ui.button size="sm" tone="primary" wire:click="showOnly('{{ $show }}')" data-empty-action="show_all">{{ __('monthly_reports.show_every_month') }}</x-ui.button>
+                </x-slot:action>
+            </x-ui.empty-state>
         @endif
+    </x-ui.panel>
+@else
+    <div class="flex flex-col gap-3">
+        <x-ui.data-table :caption="__('monthly_reports.tab_mine')" data-mine-table>
+            <x-slot:head>
+                <th>{{ __('monthly_reports.col_place') }}</th>
+                <th class="w-40!">{{ __('monthly_reports.month') }}</th>
+                <th class="w-44!">{{ __('monthly_reports.col_status') }}</th>
+                <th>{{ __('monthly_reports.col_due') }}</th>
+                <th class="w-48!"><span class="sr-only">{{ __('common.actions') }}</span></th>
+            </x-slot:head>
 
-        @foreach ($this->visibleGroups as $group)
-            @php
-                $groupKey = $group['template']->id;
-                $stripLabel = collect($group['strip'])
-                    ->map(fn (array $row): string => $row['report']->period->translatedFormat('F Y').': '.($row['overdue'] ? __('monthly_reports.overdue') : __('monthly_reports.states.'.$row['state'])))
-                    ->implode(', ');
-            @endphp
-            <section class="flex flex-col gap-3" aria-labelledby="template-months-{{ $groupKey }}" wire:key="template-months-{{ $groupKey }}" data-template-group="{{ $groupKey }}">
-                <div class="flex flex-wrap items-center justify-between gap-x-4 gap-y-2">
-                    <div class="min-w-0">
-                        <h2 id="template-months-{{ $groupKey }}" class="text-lg font-bold" dir="auto">{{ $group['place'] }}</h2>
-                        @include('pages.monthly-reports._covers-proposals', ['proposals' => $group['proposals']])
-                    </div>
+            @foreach ($shownRows as $row)
+                @include('pages.monthly-reports._index-month-row', ['row' => $row, 'rowGroup' => $row['group']])
+            @endforeach
+        </x-ui.data-table>
 
-                    {{-- The project's year at a glance: one square per generated month, coloured by its state. --}}
-                    <div class="flex flex-wrap items-center gap-1" role="img" aria-label="{{ __('monthly_reports.month_strip_label', ['months' => $stripLabel]) }}" data-month-strip="{{ $groupKey }}">
-                        @foreach ($group['strip'] as $stripRow)
-                            @php
-                                $stripState = $stripRow['overdue'] ? 'overdue' : $stripRow['state'];
-                            @endphp
-                            <span
-                                @class([
-                                    'size-3.5 rounded-[4px]',
-                                    'bg-status-good' => $stripState === 'validated',
-                                    'bg-secondary-dark dark:bg-ink' => $stripState === 'submitted',
-                                    'bg-status-warn' => in_array($stripState, ['returned', 'reopen_pending'], true),
-                                    'bg-primary' => $stripState === 'overdue',
-                                    'border-2 border-secondary-light dark:border-line-strong' => in_array($stripState, ['draft', 'upcoming'], true),
-                                ])
-                                data-strip-month="{{ $stripRow['key'] }}" data-strip-state="{{ $stripState }}"
-                                title="{{ $stripRow['report']->period->translatedFormat('F Y') }}"
-                            ></span>
-                        @endforeach
-                    </div>
-                </div>
-
-                @if (! $group['hasIndicators'])
-                    <p class="type-meta text-secondary-medium dark:text-ink-muted">{{ __('monthly_reports.project_no_indicators') }}</p>
-                @endif
-
-                @if ($group['folded'] !== [])
-                    <details class="group" data-validated-fold="{{ $groupKey }}">
-                        <summary class="inline-flex cursor-pointer list-none items-center gap-1.5 text-sm font-semibold text-secondary-medium hover:text-secondary-dark dark:text-ink-muted dark:hover:text-ink">
-                            <flux:icon.chevron-right variant="micro" class="size-4 transition-transform group-open:rotate-90 rtl:-scale-x-100" aria-hidden="true" />
-                            {{ trans_choice('monthly_reports.validated_months', count($group['folded']), ['count' => count($group['folded'])]) }}
-                        </summary>
-                        <ol class="relative mt-1 flex flex-col before:absolute before:inset-y-3 before:start-[5px] before:w-px before:bg-secondary-soft dark:before:bg-line" role="list">
-                            @foreach ($group['folded'] as $row)
-                                @include('pages.monthly-reports._index-month-row', ['row' => $row, 'rowGroup' => $group, 'inThread' => true, 'projectHasIndicators' => $group['hasIndicators']])
-                            @endforeach
-                        </ol>
-                    </details>
-                @endif
-
-                @if ($group['open'] !== [])
-                    <ol class="relative flex flex-col before:absolute before:inset-y-3 before:start-[5px] before:w-px before:bg-secondary-soft dark:before:bg-line" role="list">
-                        @foreach ($group['open'] as $row)
-                            @include('pages.monthly-reports._index-month-row', ['row' => $row, 'rowGroup' => $group, 'inThread' => true, 'projectHasIndicators' => $group['hasIndicators']])
-                        @endforeach
-                    </ol>
-                @endif
-            </section>
-        @endforeach
+        <div class="flex flex-wrap items-center justify-between gap-3 px-1 text-sm text-secondary-medium dark:text-ink-muted">
+            <span data-mine-count>{{ trans_choice('monthly_reports.month_count', count($mineRows), ['count' => count($mineRows)]) }}</span>
+            @if ($hiddenCount > 0)
+                <button type="button" class="dk-btn dk-ghost dk-sm" wire:click="showMoreQueue" data-mine-more>
+                    {{ __('monthly_reports.show_more', ['count' => min($hiddenCount, 25)]) }}
+                </button>
+            @endif
+        </div>
     </div>
 @endif

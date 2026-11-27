@@ -320,30 +320,35 @@ function mrpPreparerMonths(Project $project): array
     return ['october' => $october, 'november' => $november];
 }
 
-test('"Needs you" lists the months the preparer can fill, overdue first, above the project threads', function () {
+/**
+ * The months "My reports" draws, in table order.
+ *
+ * @return list<string>
+ */
+function mrpMineMonths(string $html): array
+{
+    preg_match_all('/data-month="(\d{4}-\d{2})"/', $html, $matches);
+
+    return $matches[1];
+}
+
+test('"My reports" is one table: what the preparer must fill first, overdue first, the validated months last', function () {
     mrpPreparerMonths(mrpProject($this->aleppo));
 
     $html = Livewire::actingAs($this->owner)->test('pages::monthly-reports.index')
-        ->assertSeeText(__('monthly_reports.needs_you'))
+        ->assertSeeHtml('data-mine-table')
         ->html();
 
-    $october = strpos($html, 'data-needs-you-item="2026-10"');
-    $november = strpos($html, 'data-needs-you-item="2026-11"');
-
-    expect($october)->not->toBeFalse()
-        ->and($november)->not->toBeFalse()
-        ->and($october)->toBeLessThan($november)
-        ->and($html)->not->toContain('data-needs-you-item="2026-09"')
-        ->and($html)->not->toContain('data-needs-you-item="2026-12"')
-        ->and(strpos($html, 'data-needs-you'))->toBeLessThan(strpos($html, 'data-month="2026-08"'));
+    // October is returned and late, November is a draft to fill, September is with MEAL, December has not started, August is validated.
+    expect(mrpMineMonths($html))->toBe(['2026-10', '2026-11', '2026-09', '2026-12', '2026-08']);
 });
 
-test('someone who reads the months but cannot fill them has no "Needs you" list', function () {
+test('someone who reads the months but cannot fill them gets the same table without Fill', function () {
     mrpPreparerMonths(mrpProject($this->aleppo));
 
     Livewire::actingAs(userWithRole('Team Member', $this->ownerEmployee))->test('pages::monthly-reports.index')
         ->assertSeeHtml('data-month="2026-11"')
-        ->assertDontSeeHtml('data-needs-you');
+        ->assertDontSeeHtml('data-fill=');
 });
 
 test('the figures line sums up "My reports"', function () {
@@ -427,25 +432,152 @@ test('the big figures filter "My reports" to the months they count, and a second
         ->assertSeeHtml('data-month="2026-10"')
         ->assertDontSeeHtml('data-month="2026-11"')
         ->assertDontSeeHtml('data-month="2026-08"')
-        ->assertDontSeeHtml('data-needs-you')
         ->call('showOnly', 'overdue')
         ->assertSet('show', '')
         ->assertSeeHtml('data-month="2026-11"');
 });
 
-test('a template shows its months as a strip and folds the validated ones away', function () {
-    $project = mrpProject($this->aleppo);
-    $templateId = mrpPreparerMonths($project)['november']->report_template_id;
+test('the "validated" figure lists only the validated months', function () {
+    mrpPreparerMonths(mrpProject($this->aleppo));
 
-    Livewire::actingAs($this->owner)->test('pages::monthly-reports.index')
-        ->assertSeeHtml('data-month-strip="'.$templateId.'"')
-        ->assertSeeHtml('data-strip-month="2026-08" data-strip-state="validated"')
-        ->assertSeeHtml('data-strip-month="2026-10" data-strip-state="overdue"')
-        ->assertSeeHtml('data-validated-fold="'.$templateId.'"')
+    $html = Livewire::actingAs($this->owner)->test('pages::monthly-reports.index')
         ->call('showOnly', 'validated')
-        ->assertDontSeeHtml('data-validated-fold="'.$templateId.'"')
-        ->assertSeeHtml('data-month="2026-08"');
+        ->html();
+
+    expect(mrpMineMonths($html))->toBe(['2026-08']);
 });
+
+test('"My reports" search narrows the table by place or proposal', function () {
+    $this->travelTo('2026-11-20 10:00:00');
+    $place = mrpPlace($this->aleppo);
+    $education = mrpPlacedTemplate($place, 'Education for All', $this->ownerEmployee);
+    $protection = mrpPlacedTemplate($place, 'Child Protection', $this->ownerEmployee);
+    $templates = fn (string $html): array => array_values(array_unique(mrpRowIds($html, 'data-template')));
+
+    $page = Livewire::actingAs($this->owner)->test('pages::monthly-reports.index')
+        ->assertSeeHtml('data-list-search');
+
+    $page->set('search', 'protection');
+    expect($templates($page->html()))->toBe([$protection['template']->id]);
+
+    $page->set('search', 'zone center');
+    expect($templates($page->html()))->toEqualCanonicalizing([$education['template']->id, $protection['template']->id]);
+
+    $page->set('search', 'nothing like this');
+    expect($templates($page->html()))->toBe([])
+        ->and($page->html())->toContain('data-empty-action="clear"');
+});
+
+/*
+| M-06 (meeting decision 6): one search and one filter stay visible; City,
+| Program, Center, From, To and the queue's Status sit behind "More filters",
+| which opens by itself while one of them is set. Every empty state offers
+| the one step that gets the user going again.
+*/
+
+/**
+ * Whether the filter bound to the property sits inside the "More filters"
+ * block (true), outside it (false) or is not on the page (null). A picker
+ * carries its property as data-model; a month field is found by its id.
+ */
+function mrpFilterIsHidden(string $html, string $property): ?bool
+{
+    $dom = new DOMDocument;
+    @$dom->loadHTML('<?xml encoding="utf-8"?>'.$html, LIBXML_NOERROR);
+    $xpath = new DOMXPath($dom);
+    $bound = '[@data-model="'.$property.'" or @id="monthly-reports-'.$property.'"]';
+
+    if ($xpath->query('//*'.$bound)->length === 0) {
+        return null;
+    }
+
+    return $xpath->query('//*[@data-more-filters-panel]//*'.$bound)->length > 0;
+}
+
+test('M-06: only the search and Proposal stay visible; the other filters sit behind "More filters"', function () {
+    $this->travelTo('2026-11-20 10:00:00');
+    mrpExtractQueue($this->aleppo);
+    $meal = mealManager();
+
+    $queue = Livewire::actingAs($meal)->test('pages::monthly-reports.index')->assertSet('tab', 'validate')
+        ->assertSeeHtml('data-more-filters-button')
+        ->assertSeeHtml('data-more-open="false"')
+        ->html();
+
+    expect(mrpFilterIsHidden($queue, 'proposal'))->toBeFalse()
+        ->and(mrpFilterIsHidden($queue, 'city'))->toBeTrue()
+        ->and(mrpFilterIsHidden($queue, 'program'))->toBeTrue()
+        ->and(mrpFilterIsHidden($queue, 'center'))->toBeTrue()
+        ->and(mrpFilterIsHidden($queue, 'from'))->toBeTrue()
+        ->and(mrpFilterIsHidden($queue, 'to'))->toBeTrue()
+        ->and(mrpFilterIsHidden($queue, 'status'))->toBeTrue();
+
+    $mine = Livewire::actingAs($this->owner)->test('pages::monthly-reports.index')->html();
+    expect(mrpFilterIsHidden($mine, 'proposal'))->toBeFalse()
+        ->and(mrpFilterIsHidden($mine, 'city'))->toBeTrue()
+        ->and(mrpFilterIsHidden($mine, 'status'))->toBeNull();
+
+    // A hidden filter that is set keeps its block open, so the user sees why the list is narrowed.
+    Livewire::withQueryParams(['city' => (string) $this->aleppo])->actingAs($meal)->test('pages::monthly-reports.index')
+        ->assertSeeHtml('data-more-open="true"');
+    Livewire::withQueryParams(['status' => 'all'])->actingAs($meal)->test('pages::monthly-reports.index')
+        ->assertSeeHtml('data-more-open="true"');
+    Livewire::withQueryParams(['proposal' => '1'])->actingAs($meal)->test('pages::monthly-reports.index')
+        ->assertSeeHtml('data-more-open="false"');
+});
+
+test('M-06: every empty state offers its one next step, and the step works', function () {
+    $this->travelTo('2026-11-20 10:00:00');
+    mrpPreparerMonths(mrpProject($this->aleppo));
+
+    // Filters that find nothing: Clear filters.
+    Livewire::actingAs($this->owner)->test('pages::monthly-reports.index')
+        ->set('from', '2025-01')->set('to', '2025-01')
+        ->assertSeeHtml('data-empty-action="clear"')
+        ->call('clearFilters')
+        ->assertSet('from', '')
+        ->assertSeeHtml('data-month="2026-11"');
+
+    // A figure that finds nothing: Show every month.
+    Livewire::withQueryParams(['show' => 'to_fill'])->actingAs(userWithRole('Team Member', $this->ownerEmployee))
+        ->test('pages::monthly-reports.index')
+        ->assertSeeHtml('data-empty-action="show_all"')
+        ->call('showOnly', 'to_fill')
+        ->assertSet('show', '');
+
+    // MEAL prepares nothing but validates: the way to its queue.
+    Livewire::withQueryParams(['tab' => 'mine'])->actingAs(userWithRole('MEAL', insertHrEmployee(firstNameEn: 'Huda', lastNameEn: 'Meal')))
+        ->test('pages::monthly-reports.index')
+        ->assertSet('tab', 'mine')
+        ->assertSeeText(__('monthly_reports.empty_mine'))
+        ->assertSeeHtml('data-empty-action="validate"');
+
+    // Someone who can do nothing about an empty "My reports" is told why, with no button.
+    Livewire::actingAs(userWithRole('Public Relations', insertHrEmployee()))->test('pages::monthly-reports.index')
+        ->assertSeeText(__('monthly_reports.empty_mine'))
+        ->assertDontSeeHtml('data-empty-action');
+});
+
+test('M-06: nothing waits on the validator, but validated reports exist: one button shows them', function () {
+    $this->travelTo('2026-11-20 10:00:00');
+    $validated = mrpMonth(mrpProject($this->aleppo), '2026-09-01', MonthlyReportStatus::Validated);
+
+    Livewire::actingAs(userWithRole('MEAL', insertHrEmployee(firstNameEn: 'Huda', lastNameEn: 'Meal')))
+        ->test('pages::monthly-reports.index')
+        ->assertSeeText(__('monthly_reports.empty_validate'))
+        ->assertSeeHtml('data-empty-action="show_validated"')
+        ->set('status', 'validated')
+        ->assertSeeHtml('data-validate-row="'.$validated->id.'"');
+});
+
+test('M-06: one word per idea in both languages', function (string $locale) {
+    app()->setLocale($locale);
+
+    // The queue's row button says what the report page's own button does.
+    expect(__('monthly_reports.review'))->toBe(__('monthly_reports.validate'))
+        // The marker and its figure name one idea with one word.
+        ->and(mb_strtolower(__('monthly_reports.not_seen_yet')))->toBe(mb_strtolower(__('monthly_reports.figure_not_seen')));
+})->with(['en', 'ar']);
 
 test('a template that lost its proposals has no preparer, so it leaves "My reports"', function () {
     $this->travelTo('2026-11-20 10:00:00');
@@ -487,7 +619,7 @@ test('the validation queue is one table, the longest-waiting first, and its head
         ->call('showOnly', 'waiting')->assertSet('status', 'submitted');
 });
 
-test('"Start reviewing" opens the longest-waiting report, and the search narrows the queue', function () {
+test('"Validate the oldest" opens the longest-waiting report, and the search narrows the queue', function () {
     $this->travelTo('2026-11-20 10:00:00');
     $first = mrpProject($this->aleppo, name: 'Aleppo Center');
     $homs = mrpProject(insertHrCity('Homs'), name: 'Homs Center');
@@ -610,21 +742,21 @@ function mrpPlace(int $cityId, ?int $centerId = null): ReportPlace
     return new ReportPlace($cityId, $programId, $centerId ?? insertHrCenter($cityId, 'Zone Center'), false);
 }
 
-test('two templates of one place are two groups, each naming the proposals it covers', function () {
+test('two templates of one place have their own rows, each naming the proposals it covers', function () {
     $this->travelTo('2026-11-20 10:00:00');
     $place = mrpPlace($this->aleppo);
     $education = mrpPlacedTemplate($place, 'Education for All', $this->ownerEmployee);
     $protection = mrpPlacedTemplate($place, 'Child Protection', $this->ownerEmployee);
 
     $html = Livewire::actingAs($this->owner)->test('pages::monthly-reports.index')
-        ->assertSeeHtml('data-template-group="'.$education['template']->id.'"')
-        ->assertSeeHtml('data-template-group="'.$protection['template']->id.'"')
+        ->assertSeeHtml('data-template="'.$education['template']->id.'"')
+        ->assertSeeHtml('data-template="'.$protection['template']->id.'"')
         ->assertSeeHtml('data-fill="'.$education['november']->id.'"')
         ->assertSeeHtml('data-fill="'.$protection['november']->id.'"')
         ->assertSeeText(['Education for All', 'Child Protection', 'Zone Center'])
         ->html();
 
-    // Each "Needs you" row names its proposals, so the two Novembers are not confused.
+    // Each row names its proposals, so the two Novembers are not confused.
     $educationRow = strpos($html, 'data-row-place="'.$education['template']->id.'"');
     $protectionRow = strpos($html, 'data-row-place="'.$protection['template']->id.'"');
 
@@ -645,11 +777,11 @@ test('a supervisor sees the templates of the people they supervise; a responsibl
     Activity::withoutRecording(fn () => ProposalLocation::factory()->create(['proposal_id' => $report['template']->proposals()->value('proposals.id'), 'city_id' => insertHrCity('Homs'), 'program_id' => $place->programId, 'responsible_employee_id' => $elsewhere]));
 
     Livewire::actingAs(userWithRole('Public Relations', $supervisorEmployee))->test('pages::monthly-reports.index')
-        ->assertSeeHtml('data-template-group="'.$report['template']->id.'"')
+        ->assertSeeHtml('data-template="'.$report['template']->id.'"')
         ->assertSeeHtml('data-fill="'.$report['november']->id.'"');
 
     Livewire::actingAs(userWithRole('Public Relations', $elsewhere))->test('pages::monthly-reports.index')
-        ->assertDontSeeHtml('data-template-group="'.$report['template']->id.'"')
+        ->assertDontSeeHtml('data-template="'.$report['template']->id.'"')
         ->assertSeeText(__('monthly_reports.empty_mine'));
 });
 
@@ -790,7 +922,7 @@ test('Y-05: each filter narrows "My reports", and an open To keeps the months to
     $education = mrpExtractTemplate($aleppoPlace, 'Education for All', $months, $this->ownerEmployee);
     $health = mrpExtractTemplate($homsPlace, 'Health Homs', $months, $this->ownerEmployee);
     $render = fn (array $filters): string => Livewire::withQueryParams($filters)->actingAs($this->owner)->test('pages::monthly-reports.index')->assertSet('tab', 'mine')->html();
-    $groups = fn (array $filters): array => mrpRowIds($render($filters), 'data-template-group');
+    $groups = fn (array $filters): array => array_values(array_unique(mrpRowIds($render($filters), 'data-template')));
 
     expect($groups([]))->toEqualCanonicalizing([$education['template']->id, $health['template']->id])
         // November has not started on 20 Oct: an open To still lists it.

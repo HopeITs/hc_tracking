@@ -964,7 +964,7 @@ return [
         'col_frequency' => 'التكرار',
         'target_label' => 'الهدف :n',
         'no_target_label' => 'بلا هدف',
-        'n_indicators' => '{1} مؤشر واحد|[2,*] :count مؤشرات',
+        'n_indicators' => '{1} مؤشر واحد|{2} مؤشران|[3,10] :count مؤشرات|[11,*] :count مؤشرًا',
         'show_all' => 'عرض الكل (:count)',
         'show_fewer' => 'عرض أقل',
         'risk_score_high' => 'خطر عالٍ (الاحتمال × الشدة)',
