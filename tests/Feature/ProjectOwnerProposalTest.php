@@ -82,10 +82,65 @@ test('the project owner hears when the proposal moves on', function () {
     $actor = userWithRole('Public Relations', insertHrEmployee(firstNameEn: 'Writer'));
     $this->actingAs($actor);
 
-    $this->proposal->forceFill(['status' => ProposalStatus::ProposalReview->value])->save();
+    $this->proposal->forceFill(['status' => ProposalStatus::Submitted->value])->save();
 
     $rows = UserNotification::query()->forUser($this->owner)->get()
         ->filter(fn (UserNotification $row): bool => $row->data['key'] === 'notifications.events.proposal.status_changed');
 
     expect($rows)->toHaveCount(1);
+});
+
+test('a move into a step that waits on the owner tells them once, not twice', function () {
+    Cache::flush();
+    $actor = userWithRole('Public Relations', insertHrEmployee(firstNameEn: 'Writer'));
+    $this->actingAs($actor);
+
+    $this->proposal->forceFill(['status' => ProposalStatus::ProposalReview->value])->save();
+
+    $keys = UserNotification::query()->forUser($this->owner)->get()->map(fn (UserNotification $row): string => $row->data['key']);
+
+    expect($keys)->toContain('notifications.events.proposal.waiting_on_you.send_proposal')
+        ->not->toContain('notifications.events.proposal.status_changed');
+});
+
+test('a proposal sent back and brought to the step again tells the owner again', function () {
+    Cache::flush();
+    $enterReview = fn (string $context) => $this->proposal->statusNotes()->create(['status' => ProposalStatus::ProposalReview, 'context' => $context, 'date' => today()->toDateString(), 'is_correction' => false]);
+
+    $enterReview('First review.');
+    $this->proposal->forceFill(['status' => ProposalStatus::ProposalReview->value])->save();
+
+    expect(ProposalOwnerNotifier::notifyWaiting($this->proposal->fresh()))->toBe(0);
+
+    $enterReview('Back for a second review.');
+
+    expect(ProposalOwnerNotifier::notifyWaiting($this->proposal->fresh()))->toBe(1);
+});
+
+test('a project owner without proposals.update cannot close the proposal as rejected', function () {
+    expect($this->owner->fresh()->can('transition', [$this->proposal, ProposalStatus::Rejected]))->toBeFalse()
+        ->and(userWithRole('Financial')->can('transition', [$this->proposal, ProposalStatus::Rejected]))->toBeTrue();
+});
+
+test('a move that is rolled back tells the owner nothing and can still tell them later', function () {
+    Cache::flush();
+
+    try {
+        DB::transaction(function (): void {
+            $this->proposal->forceFill(['status' => ProposalStatus::ProposalReview->value])->save();
+
+            throw new RuntimeException('The move failed after the save.');
+        });
+    } catch (RuntimeException) {
+    }
+
+    $told = fn (): bool => UserNotification::query()->forUser($this->owner)->get()
+        ->contains(fn (UserNotification $row): bool => $row->data['key'] === 'notifications.events.proposal.waiting_on_you.send_proposal');
+
+    expect($this->proposal->fresh()->status)->toBe(ProposalStatus::ProposalDraft)
+        ->and($told())->toBeFalse();
+
+    $this->proposal->fresh()->forceFill(['status' => ProposalStatus::ProposalReview->value])->save();
+
+    expect($told())->toBeTrue();
 });

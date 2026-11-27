@@ -8,6 +8,7 @@ use App\Enums\MediaCollection;
 use App\Enums\ProjectStatus;
 use App\Enums\ProposalStatus;
 use App\Events\ProposalStatusChanged;
+use App\Models\Activity;
 use App\Models\Proposal;
 use App\Models\ProposalLocation;
 use App\Models\ProposalStatusNote;
@@ -85,7 +86,8 @@ final class ApproveProposal
             // take their dates from it (ApproveLocationFromProposal).
             $this->recordApproval($locked, $expectedFrom, $validated);
 
-            // T07: the proposal's reviewers are told about the approval here.
+            // T07: the proposal's reviewers and owners hear of the approval
+            // through its proposal.approved activity (ProposalRecipients).
 
             // MaterialiseProposalLocations is the one pass over the rows: it
             // calls ApproveLocationFromProposal for each. Approving them a
@@ -161,8 +163,10 @@ final class ApproveProposal
 
         $this->recordApproval($locked, $expectedFrom, $validated);
 
+        // The watchers hear of the approval once; the activation that comes
+        // with it in the same request is kept in its note, not a second message.
         $locked->status = ProposalStatus::Active;
-        $locked->save();
+        Activity::withoutRecording(fn (): bool => $locked->save());
 
         ProposalStatusNote::query()->create([
             'proposal_id' => $locked->id,

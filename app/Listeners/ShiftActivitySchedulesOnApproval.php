@@ -9,7 +9,10 @@ use App\Events\ProposalStatusChanged;
 use App\Models\ActivitySchedule;
 use App\Models\Proposal;
 use Illuminate\Contracts\Queue\ShouldQueue;
+use Illuminate\Queue\InteractsWithQueue;
+use Illuminate\Queue\Jobs\SyncJob;
 use Illuminate\Support\Facades\DB;
+use Throwable;
 
 /**
  * Move a proposal's activity calendar once, when the donor approves it
@@ -21,12 +24,23 @@ use Illuminate\Support\Facades\DB;
  *
  * The shift is recorded in `activity_schedule_shifts` (unique per proposal)
  * in the same transaction, so a retried job, a second event or a later
- * re-approval after a status correction does nothing. Queued after commit;
- * a failure here never touches the approval.
+ * re-approval after a status correction does nothing. Queued after commit,
+ * only for an approval; when the queue runs inline (sync) a failure is
+ * reported and the job failed, never thrown into the approver's request.
  */
 final class ShiftActivitySchedulesOnApproval implements ShouldQueue
 {
+    use InteractsWithQueue;
+
     public int $tries = 3;
+
+    /**
+     * Only an approval is worth a job.
+     */
+    public function shouldQueue(ProposalStatusChanged $event): bool
+    {
+        return $event->to === ProposalStatus::Approved;
+    }
 
     public function handle(ProposalStatusChanged $event): void
     {
@@ -34,6 +48,29 @@ final class ShiftActivitySchedulesOnApproval implements ShouldQueue
             return;
         }
 
+        try {
+            $this->shift($event);
+        } catch (Throwable $exception) {
+            if (! $this->runsInline()) {
+                throw $exception;
+            }
+
+            report($exception);
+            $this->fail($exception);
+        }
+    }
+
+    /**
+     * Whether this runs inside the request that raised the event: the sync
+     * queue, or a direct call.
+     */
+    private function runsInline(): bool
+    {
+        return $this->job === null || $this->job instanceof SyncJob;
+    }
+
+    private function shift(ProposalStatusChanged $event): void
+    {
         DB::transaction(function () use ($event): void {
             $proposal = Proposal::query()
                 ->select(['id', 'planned_date_begin', 'actual_date_begin'])

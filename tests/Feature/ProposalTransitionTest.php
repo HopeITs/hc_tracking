@@ -349,3 +349,34 @@ test('the status modal asks for the missing beneficiaries and the move then goes
     expect($proposal->fresh()->status)->toBe(ProposalStatus::ProposalReview)
         ->and((int) $proposal->locations()->sole()->target_beneficiaries)->toBe(250);
 });
+
+test('a refused move keeps none of the beneficiaries typed for it', function () {
+    $proposal = transitionableProposal(ProposalStatus::ProposalDraft);
+    $project = $proposal->projects()->first();
+    $proposal->projects()->updateExistingPivot($project->id, ['target_beneficiaries' => null]);
+    $proposal->forceFill(['requested_budget' => null])->save();
+
+    Livewire::actingAs(userWithRole('Financial'))
+        ->test('pages::proposals.show', ['proposal' => $proposal])
+        ->call('openStatusModal', $proposal->id)
+        ->set('newStatus', ProposalStatus::ProposalReview->value)
+        ->set('statusBeneficiaries.'.$project->id, '250')
+        ->call('changeStatus');
+
+    expect($proposal->fresh()->status)->toBe(ProposalStatus::ProposalDraft)
+        ->and($proposal->projects()->first()->pivot->target_beneficiaries)->toBeNull();
+});
+
+test('the lifecycle rail shows the latest entry into a step after a send-back', function () {
+    $proposal = transitionableProposal(ProposalStatus::ProposalReview);
+    $proposal->statusNotes()->create(['status' => ProposalStatus::ProposalReview, 'context' => 'First review.', 'date' => '2026-01-05', 'is_correction' => false]);
+    $proposal->statusNotes()->create(['status' => ProposalStatus::ProposalReview, 'context' => 'Second review.', 'date' => '2026-02-10', 'is_correction' => false]);
+
+    $rail = Livewire::actingAs(userWithRole('Financial'))
+        ->test('pages::proposals.show', ['proposal' => $proposal])
+        ->instance()->lifecycle;
+
+    $review = collect($rail)->firstWhere('status', ProposalStatus::ProposalReview);
+
+    expect($review['date']->toDateString())->toBe('2026-02-10');
+});

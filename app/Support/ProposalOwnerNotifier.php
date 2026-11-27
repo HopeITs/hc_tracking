@@ -6,8 +6,8 @@ namespace App\Support;
 
 use App\Enums\NotificationKind;
 use App\Enums\NotificationPriority;
-use App\Enums\ProposalStatus;
 use App\Models\Proposal;
+use App\Models\ProposalStatusNote;
 use App\Models\User;
 use App\Notifications\AppNotification;
 use App\Notifications\NotificationPayload;
@@ -17,7 +17,7 @@ use Illuminate\Support\Facades\Cache;
  * Tells a project owner (the project's project manager, 2026-11-12) that a
  * proposal of their project is waiting on them, with the step to do: finish
  * the concept note, collect its reviews, finish the proposal, or send it to
- * the donor. Once per owner, proposal and status, so a reminder run or a
+ * the donor. Once per owner, proposal and entry into a status, so a reminder run or a
  * repeated save never sends it twice.
  */
 final class ProposalOwnerNotifier
@@ -35,7 +35,7 @@ final class ProposalOwnerNotifier
      */
     public static function notifyWaiting(Proposal $proposal, ?User $actor = null): int
     {
-        $status = $proposal->status instanceof ProposalStatus ? $proposal->status->value : (string) $proposal->status;
+        $status = $proposal->status->value;
         $step = self::Steps[$status] ?? null;
 
         if ($step === null) {
@@ -43,6 +43,14 @@ final class ProposalOwnerNotifier
         }
 
         $ownerIds = Proposal::ownerEmployeeIdsFor([(int) $proposal->id])[(int) $proposal->id] ?? [];
+
+        // Each entry into the status is its own step: a proposal sent back and
+        // brought here again tells its owners again; a reminder run does not.
+        $entryId = (int) ProposalStatusNote::query()
+            ->where('proposal_id', $proposal->id)
+            ->where('status', $status)
+            ->where('is_correction', false)
+            ->max('id');
         $sent = 0;
 
         foreach (User::query()->whereIn('employee_id', $ownerIds)->get() as $user) {
@@ -50,7 +58,7 @@ final class ProposalOwnerNotifier
                 continue;
             }
 
-            if (! Cache::add("proposal-waiting:{$proposal->id}:{$status}:{$user->id}", true, now()->addDays(60))) {
+            if (! Cache::add("proposal-waiting:{$proposal->id}:{$status}:{$entryId}:{$user->id}", true, now()->addDays(60))) {
                 continue;
             }
 
@@ -63,7 +71,7 @@ final class ProposalOwnerNotifier
                 subjectType: 'proposal',
                 subjectId: (int) $proposal->id,
                 actorId: $actor?->id,
-                link: ['route' => 'proposals.show', 'parameters' => [$proposal->slug]],
+                link: ['route' => 'proposals.show', 'parameters' => ['proposal' => $proposal->slug]],
             ))), report: false);
             $sent++;
         }

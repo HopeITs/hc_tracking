@@ -9,6 +9,7 @@ use App\Models\Program;
 use App\Models\Project;
 use App\Models\Proposal;
 use App\Models\ProposalLocation;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
 use Livewire\Features\SupportTesting\Testable;
 use Livewire\Livewire;
@@ -223,4 +224,39 @@ test('the dialog counts the places approved, waiting for their responsible and w
         ->assertDontSeeHtml('data-test="approve-locations-warning-location_linked_existing"');
 
     expect($component->instance()->approvalLocations)->toMatchArray(['approved' => 1, 'waiting' => 1, 'wait' => 1, 'warnings' => []]);
+});
+
+test('an approval that fails for a reason other than validation leaves no evidence file behind', function () {
+    Storage::fake('local');
+    ['proposal' => $proposal] = proposalReadyToApprove();
+    $component = approveModal('Public Relations Manager', $proposal)
+        ->set('approveDecisionDate', '2026-10-13')
+        ->set('approveFile', validUpload('donor-email.pdf', 100));
+
+    Proposal::saving(function (Proposal $saving): void {
+        if ($saving->status === ProposalStatus::Approved) {
+            throw new RuntimeException('Database went away.');
+        }
+    });
+
+    expect(fn () => $component->call('approveProposal'))->toThrow(RuntimeException::class);
+
+    expect($proposal->fresh()->status)->toBe(ProposalStatus::Submitted)
+        ->and(Media::query()->where('mediable_type', 'proposal')->where('mediable_id', $proposal->id)->count())->toBe(0);
+});
+
+test('the dialog preview is worked out once while the dialog stays open', function () {
+    ['proposal' => $proposal] = proposalReadyToApprove();
+    $component = approveModal('Public Relations Manager', $proposal);
+
+    $previewReads = 0;
+    DB::listen(function ($query) use (&$previewReads): void {
+        if (str_contains($query->sql, 'assignable_type')) {
+            $previewReads++;
+        }
+    });
+
+    $component->set('approveEvidenceMode', 'note')->set('approveEvidenceMode', 'file');
+
+    expect($previewReads)->toBe(0);
 });

@@ -7,6 +7,7 @@ namespace App\Observers;
 use App\Exceptions\InvalidParentException;
 use App\Models\Proposal;
 use App\Support\ProposalOwnerNotifier;
+use Illuminate\Support\Facades\DB;
 
 /**
  * Keeps the renewal chain (proposals.previous_proposal_id) free of cycles.
@@ -28,7 +29,11 @@ final class ProposalObserver
     public function saved(Proposal $proposal): void
     {
         if ($proposal->wasChanged('status') || $proposal->wasRecentlyCreated) {
-            ProposalOwnerNotifier::notifyWaiting($proposal, auth()->user());
+            $actor = auth()->user();
+
+            // Only a move that commits is announced: a rolled-back move sends
+            // nothing and leaves no once-only key behind.
+            DB::afterCommit(fn () => ProposalOwnerNotifier::notifyWaiting($proposal->fresh() ?? $proposal, $actor));
         }
     }
 

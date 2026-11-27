@@ -404,3 +404,15 @@ test('a user without proposal permissions sees no edit controls and cannot chang
     expect($this->proposal->fresh()->status)->toBe(ProposalStatus::Active)
         ->and(Media::query()->whereKey($media->id)->exists())->toBeTrue();
 });
+
+test('a holder of proposals.approve without proposals.update still gets the Approve button', function () {
+    $approver = User::factory()->role('Team Member')->create();
+    $approver->givePermissionTo('proposals.approve');
+    $this->proposal->forceFill(['status' => ProposalStatus::Submitted])->save();
+
+    expect($approver->can('update', $this->proposal))->toBeFalse();
+
+    $keys = array_column(Livewire::actingAs($approver)->test('pages::proposals.show', ['proposal' => $this->proposal])->instance()->headActions, 'key');
+
+    expect($keys)->toContain('approve')->not->toContain('reject');
+});

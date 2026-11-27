@@ -52,27 +52,62 @@ new class extends Component {
 @endphp
 
 <x-desk.panel id="tracker" register="active-reports.index" :empty="$nothing" :filterable="false" :health="$late > 0 ? 'critical' : null" :size="$size" :cols="$gridCols" :height="$gridRows" :index="$index" :total="$total" :count="$headline">
+    @php
+        /* Hero + two: My reporting duties is the hero (else the first door); the others sit beside it as compact doors. */
+        $heroKind = in_array('duties', $doors, true) ? 'duties' : ($doors[0] ?? null);
+        $others = array_values(array_filter($doors, fn (string $kind): bool => $kind !== $heroKind));
+    @endphp
     <nav class="dk-trk" data-doors="{{ count($doors) }}" aria-label="{{ __('desk.panel.tracker.title') }}">
-        <ul class="dk-trk-doors">
-            @foreach ($doors as $kind)
-                @php $door = $spec[$kind]; @endphp
-                <li @class(['dk-trk-li', 'is-duties' => $kind === 'duties']) wire:key="trk-{{ $kind }}">
-                    <a href="{{ route('active-reports.index', ['kind' => $kind]) }}" wire:navigate @class(['dk-trk-door', 'is-late' => $door['late'] > 0]) data-tracker-panel-door="{{ $kind }}" data-door-count="{{ $door['big'] }}">
-                        <span class="dk-trk-ic" aria-hidden="true"><x-desk.icon :name="$door['icon']" /></span>
-                        <span class="dk-trk-title">{{ __("active_reports.kind_{$kind}") }}</span>
-                        <span class="dk-trk-big"><b class="dk-num">{{ $door['big'] }}</b><span>{{ $door['word'] }}</span></span>
-                        <span class="dk-trk-stats">
-                            @if ($door['late'] > 0)
-                                <span class="dk-trk-late"><b class="dk-num">{{ $door['late'] }}</b> {{ __('active_reports.stat_late') }}</span>
-                            @endif
-                            @foreach ($door['stats'] as [$figure, $word])
-                                <span><b class="dk-num">{{ $figure }}</b> {{ $word }}</span>
-                            @endforeach
-                        </span>
-                        <span class="dk-trk-go" aria-hidden="true"><x-desk.icon name="arrow" class="dk-flip" /></span>
-                    </a>
-                </li>
-            @endforeach
-        </ul>
+        <div class="dk-trk-in">
+        @if ($heroKind)
+            @php
+                $hero = $spec[$heroKind];
+                $lateShare = $hero['late'] > 0 ? round(min(1, $hero['late'] / max($hero['big'], $hero['late'])) * 100, 1) : 0;
+            @endphp
+            <a href="{{ route('active-reports.index', ['kind' => $heroKind]) }}" wire:navigate wire:key="trk-{{ $heroKind }}" @class(['dk-trk-hero', 'is-late' => $hero['late'] > 0, 'is-zero' => $hero['big'] === 0]) data-tracker-panel-door="{{ $heroKind }}" data-door-count="{{ $hero['big'] }}">
+                <span class="dk-trk-ring" style="--late: {{ $lateShare }}" aria-hidden="true">
+                    <svg viewBox="0 0 40 40"><circle class="dk-trk-ring-track" cx="20" cy="20" r="17" pathLength="100" /><circle class="dk-trk-ring-rest" cx="20" cy="20" r="17" pathLength="100" /><circle class="dk-trk-ring-late" cx="20" cy="20" r="17" pathLength="100" /></svg>
+                    <span class="dk-trk-ring-c"><b class="dk-num">{{ $hero['big'] }}</b><small>{{ $hero['word'] }}</small></span>
+                </span>
+                <span class="dk-trk-hero-body">
+                    <span class="dk-trk-hero-title"><span class="dk-trk-ic"><x-desk.icon :name="$hero['icon']" /></span>{{ __("active_reports.kind_{$heroKind}") }}</span>
+                    <span class="dk-trk-hero-num"><b class="dk-num">{{ $hero['big'] }}</b> {{ $hero['word'] }}</span>
+                    <span class="dk-trk-chips">
+                        @if ($hero['late'] > 0)
+                            <span class="dk-trk-chip is-late"><b class="dk-num">{{ $hero['late'] }}</b> {{ __('active_reports.stat_late') }}</span>
+                        @endif
+                        @foreach ($hero['stats'] as [$figure, $word])
+                            <span class="dk-trk-chip"><b class="dk-num">{{ $figure }}</b> {{ $word }}</span>
+                        @endforeach
+                    </span>
+                </span>
+                <span class="dk-trk-go" aria-hidden="true"><x-desk.icon name="arrow" class="dk-flip" /></span>
+            </a>
+        @endif
+
+        @if ($others !== [])
+            <ul class="dk-trk-side">
+                @foreach ($others as $kind)
+                    @php $door = $spec[$kind]; @endphp
+                    <li wire:key="trk-{{ $kind }}">
+                        <a href="{{ route('active-reports.index', ['kind' => $kind]) }}" wire:navigate @class(['dk-trk-mini', 'is-late' => $door['late'] > 0]) data-tracker-panel-door="{{ $kind }}" data-door-count="{{ $door['big'] }}">
+                            <span class="dk-trk-ic" aria-hidden="true"><x-desk.icon :name="$door['icon']" /></span>
+                            <span class="dk-trk-mini-title">{{ __("active_reports.kind_{$kind}") }}</span>
+                            <span class="dk-trk-mini-stats">
+                                @if ($door['late'] > 0)
+                                    <span class="dk-trk-late"><b class="dk-num">{{ $door['late'] }}</b> {{ __('active_reports.stat_late') }}</span>
+                                @endif
+                                @foreach ($door['stats'] as [$figure, $word])
+                                    <span><b class="dk-num">{{ $figure }}</b> {{ $word }}</span>
+                                @endforeach
+                            </span>
+                            <span class="dk-trk-mini-num"><b class="dk-num">{{ $door['big'] }}</b><small>{{ $door['word'] }}</small></span>
+                            <span class="dk-trk-go" aria-hidden="true"><x-desk.icon name="arrow" class="dk-flip" /></span>
+                        </a>
+                    </li>
+                @endforeach
+            </ul>
+        @endif
+        </div>
     </nav>
 </x-desk.panel>

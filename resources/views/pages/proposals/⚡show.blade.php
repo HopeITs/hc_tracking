@@ -410,7 +410,7 @@ new #[Layout('layouts::desk'), Title('titles.proposal')] class extends Component
             $this->planTaskRows, $this->planGroups, $this->planGanttPayload, $this->planWindow,
             $this->projectFiles, $this->conceptNoteFiles, $this->documents, $this->deadlines, $this->warnings, $this->lifecycle, $this->chronology,
             $this->arrivals, $this->vitals, $this->term, $this->tabs, $this->proposalFiles, $this->reviewStages, $this->needAssessments, $this->approvalSubject, $this->approvalPreview, $this->approvalLocations,
-            $this->canRecordFinalReportAcceptance, $this->finalReportAcceptance,
+            $this->canRecordFinalReportAcceptance, $this->finalReportAcceptance, $this->renewalChain, $this->canDecideChange, $this->latestAmendment, $this->canPlanTasks,
             $this->canFillCenters, $this->centerFillRows, $this->centerFillCentersByCity,
             $this->sections, $this->headActions, $this->attentionItems, $this->hiddenAttentionKeys, $this->cardDates, $this->donorChoices,
             $this->pendingChangeRequestId, $this->changeRequestHistory, $this->changeRequestHistoryLines, $this->decidingChangeRequest, $this->decidingChangeLines, $this->changeReviewSlot,

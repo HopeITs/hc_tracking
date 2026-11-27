@@ -345,8 +345,8 @@ trait ChartsProposalChronology
                 'status' => $isRejectionPoint ? ProposalStatus::Rejected : $stop,
                 'label' => $isRejectionPoint ? ProposalStatus::Rejected->label() : $stop->label(),
                 'date' => $isRejectionPoint
-                    ? $dates->get(ProposalStatus::Rejected->value)?->first()?->date
-                    : $dates->get($stop->value)?->first()?->date,
+                    ? $dates->get(ProposalStatus::Rejected->value)?->last()?->date
+                    : $dates->get($stop->value)?->last()?->date,
                 'state' => match (true) {
                     $isRejectionPoint => 'rejected',
                     ! $isRejected && $index === $reached => 'current',

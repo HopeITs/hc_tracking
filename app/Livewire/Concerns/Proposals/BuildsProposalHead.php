@@ -55,12 +55,15 @@ trait BuildsProposalHead
         $targets = $proposal->transitionTargets();
         $next = $this->forwardTarget($proposal, $targets);
 
-        if ($mayUpdate && $proposal->status === ProposalStatus::Submitted) {
-            if (Gate::forUser($user)->allows('approve', $proposal)) {
+        $mayApprove = $user !== null && Gate::forUser($user)->allows('approve', $proposal);
+
+        if (($mayUpdate || $mayApprove) && $proposal->status === ProposalStatus::Submitted) {
+            // Recording the donor's approval needs proposals.approve only (D-70).
+            if ($mayApprove) {
                 $add('approve', __('proposals.page.approve'), "openApproveModal({$id})", primary: true);
             }
 
-            if (in_array(ProposalStatus::Rejected, $targets, true)) {
+            if ($mayUpdate && in_array(ProposalStatus::Rejected, $targets, true)) {
                 $add('reject', __('proposals.page.reject'), 'openRejectModal', $proposal->isOnHold(), __('proposals.page.why_on_hold'));
             }
         } elseif ($mayUpdate && $next !== null) {
