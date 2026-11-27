@@ -9,6 +9,7 @@ use App\Models\HrProgram;
 use App\Models\Program;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Str;
 use stdClass;
 
 /**
@@ -73,7 +74,7 @@ final class ProgramImport
                     'id' => $program->id,
                     'name_en' => trim((string) $program->name),
                     'code' => trim((string) $program->code),
-                    'slug' => trim((string) $program->slug),
+                    'slug' => trim((string) $program->slug) ?: null,
                     'is_active' => (bool) $program->is_active,
                     'created_at' => $now,
                     'updated_at' => $now,
@@ -83,6 +84,8 @@ final class ProgramImport
             foreach ($updates as $id => $changes) {
                 DB::table('programs')->where('id', $id)->update([...$changes, 'updated_at' => $now]);
             }
+
+            $this->fillMissingSlugs();
         });
 
         Program::forgetLookup();
@@ -123,7 +126,7 @@ final class ProgramImport
                 $changes['code'] = trim((string) $hr->code);
             }
 
-            if ($row->slug === null && trim((string) $hr->slug) !== '') {
+            if (blank($row->slug) && trim((string) $hr->slug) !== '') {
                 $changes['slug'] = trim((string) $hr->slug);
             }
 
@@ -160,6 +163,37 @@ final class ProgramImport
                 'ours' => (string) $row->name_en,
                 'theirs' => trim((string) $hrPrograms->get($row->id)->name),
             ]);
+    }
+
+    /**
+     * Give a slug to every program still without one once HR's are copied:
+     * a program HR has no slug for, or one HR no longer has, would otherwise
+     * have no `programs/{slug}` route and break every page that links it.
+     * Built like HasSlug's — name, then code, then id — and suffixed until
+     * unique; a slug already set is never changed.
+     */
+    private function fillMissingSlugs(): void
+    {
+        $taken = DB::table('programs')->whereNotNull('slug')->where('slug', '!=', '')->pluck('slug')->flip()->all();
+
+        $missing = DB::table('programs')
+            ->where(fn ($query) => $query->whereNull('slug')->orWhere('slug', ''))
+            ->orderBy('id')
+            ->get(['id', 'name_en', 'code']);
+
+        foreach ($missing as $program) {
+            $base = Str::slug((string) $program->name_en) ?: Str::slug((string) $program->code) ?: 'program-'.$program->id;
+            $slug = $base;
+            $suffix = 2;
+
+            while (isset($taken[$slug])) {
+                $slug = $base.'-'.$suffix++;
+            }
+
+            $taken[$slug] = true;
+
+            DB::table('programs')->where('id', $program->id)->update(['slug' => $slug]);
+        }
     }
 
     /**

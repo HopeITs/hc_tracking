@@ -109,3 +109,21 @@ test('a program created after the import gets an id clear of the HR range', func
 
     expect($program->id)->toBeGreaterThan($hopeId + 999);
 })->skip(fn (): bool => DB::connection()->getDriverName() !== 'mysql', 'AUTO_INCREMENT is raised on MySQL only.');
+
+test('apply gives a slug to a program HR has none for', function () {
+    $hopeId = insertHrProgram('Hope Center', code: '001');
+    DB::connection('hr')->table('programs')->where('id', $hopeId)->update(['slug' => '']);
+
+    $this->artisan('programs:import-from-hr', ['--apply' => true])->assertExitCode(0);
+
+    expect(programRow($hopeId)['slug'])->toBe('hope-center');
+});
+
+test('apply gives a slug to a tracking program HR no longer has', function () {
+    insertHrProgram('Hope Center', code: '001');
+    DB::table('programs')->insert(['id' => 4242, 'name_en' => 'Wells', 'code' => '042', 'created_at' => now(), 'updated_at' => now()]);
+
+    $this->artisan('programs:import-from-hr', ['--apply' => true])->assertExitCode(0);
+
+    expect(programRow(4242)['slug'])->toBe('wells');
+});
