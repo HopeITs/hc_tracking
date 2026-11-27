@@ -394,3 +394,10 @@ test('the grid holds a flat query count whatever the number of activities', func
 
     expect($countQueries())->toBe($small);
 });
+
+test('only an approval queues the calendar shift', function () {
+    $listener = new ShiftActivitySchedulesOnApproval;
+
+    expect($listener->shouldQueue(new ProposalStatusChanged($this->proposal->id, ProposalStatus::ProposalDraft, ProposalStatus::ProposalReview, null)))->toBeFalse()
+        ->and($listener->shouldQueue(new ProposalStatusChanged($this->proposal->id, ProposalStatus::Submitted, ProposalStatus::Approved, null)))->toBeTrue();
+});

@@ -9,6 +9,7 @@ use App\Enums\MediaCollection;
 use App\Enums\ProjectStatus;
 use App\Enums\ProposalStatus;
 use App\Events\ProposalStatusChanged;
+use App\Models\Activity;
 use App\Models\Project;
 use App\Models\Proposal;
 use App\Models\ProposalStatusNote;
@@ -83,7 +84,8 @@ final class ApproveProposal
 
             $this->recordApproval($locked, $expectedFrom, $validated);
 
-            // T07: the proposal's reviewers are told about the approval here.
+            // T07: the proposal's reviewers and owners hear of the approval
+            // through its proposal.approved activity (ProposalRecipients).
 
             $moved = $this->approveProjects($projects);
 
@@ -155,8 +157,10 @@ final class ApproveProposal
 
         $this->recordApproval($locked, $expectedFrom, $validated);
 
+        // The watchers hear of the approval once; the activation that comes
+        // with it in the same request is kept in its note, not a second message.
         $locked->status = ProposalStatus::Active;
-        $locked->save();
+        Activity::withoutRecording(fn (): bool => $locked->save());
 
         ProposalStatusNote::query()->create([
             'proposal_id' => $locked->id,

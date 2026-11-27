@@ -13,6 +13,7 @@ use App\Models\Role;
 use App\Models\User;
 use App\Notifications\EmployeeRecipients;
 use App\Support\MealCoverage;
+use App\Support\ProposalOwnerNotifier;
 use App\Support\Slots;
 
 /**
@@ -87,6 +88,12 @@ final class ProposalRecipients extends WatcherRecipients
     private const ProjectLinked = 'proposal.project_linked';
 
     /**
+     * The donor's approval tells the owners and every reviewer of the
+     * proposal (T07), on top of the watchers.
+     */
+    private const Approved = 'proposal.approved';
+
+    /**
      * Change requests (Y-09, D-89a, contracts §15.2): opened → the two
      * review slot holders and the deciders other than the requester; ready
      * (the review that completes the set, `ready` in the activity) → the
@@ -137,7 +144,14 @@ final class ProposalRecipients extends WatcherRecipients
             self::Extended => $this->projectOwnerIds($activity),
             self::ProgramRequestOpened => $this->uniqueIds([Slots::holderOf(Slots::HrLiaison)]),
             self::ProgramRequestLinked => $this->projectOwnerIds($activity),
-            self::StatusChanged, self::ProjectLinked => $this->projectOwnerIds($activity),
+            // A move into a step that waits on the owners already sends them
+            // "waiting on you" (ProposalOwnerNotifier); one message, not two.
+            self::StatusChanged => array_key_exists((string) $this->changedTo($activity, 'status'), ProposalOwnerNotifier::Steps) ? [] : $this->projectOwnerIds($activity),
+            self::ProjectLinked => $this->projectOwnerIds($activity),
+            self::Approved => $this->uniqueIds([
+                ...$this->projectOwnerIds($activity),
+                ...ProposalReviewer::query()->where('proposal_id', $activity->subject_id)->pluck('employee_id')->all(),
+            ]),
             self::ChangeRequested => $this->uniqueIds([Slots::holderOf('finance_manager'), Slots::holderOf('meal_manager')]),
             self::ChangeApproved => $this->changedPlaceEmployeeIds($activity),
             default => [],
@@ -190,8 +204,8 @@ final class ProposalRecipients extends WatcherRecipients
             return $this->uniqueIds(array_values(app(EmployeeRecipients::class)->usersFor($this->projectOwnerIds($activity))));
         }
 
-        if (in_array($activity->event, [self::StatusChanged, self::ProjectLinked], true)) {
-            return $this->uniqueIds(array_values(app(EmployeeRecipients::class)->usersFor($this->projectOwnerIds($activity))));
+        if (in_array($activity->event, [self::StatusChanged, self::ProjectLinked, self::Approved], true)) {
+            return $this->uniqueIds(array_values(app(EmployeeRecipients::class)->usersFor($this->directEmployeeIds($activity))));
         }
 
         if (in_array($activity->event, self::ChangeEvents, true)) {
@@ -280,7 +294,7 @@ final class ProposalRecipients extends WatcherRecipients
         $request = ProposalChangeRequest::query()
             ->with('reviews:id,proposal_change_request_id,reviewed_by')
             ->where('proposal_id', $activity->subject_id)
-            ->find($activity->properties['change_request_id'] ?? null);
+            ->find($this->changeRequestId($activity));
 
         if ($request === null) {
             return [];
@@ -300,7 +314,7 @@ final class ProposalRecipients extends WatcherRecipients
     {
         $request = ProposalChangeRequest::query()
             ->where('proposal_id', $activity->subject_id)
-            ->find($activity->properties['change_request_id'] ?? null);
+            ->find($this->changeRequestId($activity));
 
         if ($request === null) {
             return [];
@@ -331,6 +345,14 @@ final class ProposalRecipients extends WatcherRecipients
     private function hasClippedDates(Activity $activity): bool
     {
         return ($activity->properties['clipped_tasks'] ?? []) !== [];
+    }
+
+    /**
+     * The change request an activity is about; 0 (no row) when it names none.
+     */
+    private function changeRequestId(Activity $activity): int
+    {
+        return (int) ($activity->properties['change_request_id'] ?? 0);
     }
 
     /**

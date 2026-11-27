@@ -156,3 +156,35 @@ test('a rolled-back approval leaves no activity and no notification', function (
     expect(Activity::query()->count())->toBe($before)
         ->and(Activity::query()->where('event', 'like', 'proposal.approved%')->exists())->toBeFalse();
 });
+
+test('the donor approval reaches the project owner and the proposal reviewers', function () {
+    $actor = userWithRole('Public Relations Manager');
+    $ownerEmployee = insertHrEmployee();
+    $reviewerEmployee = insertHrEmployee();
+    $owner = userWithRole('Team Member', $ownerEmployee);
+    $reviewer = userWithRole('Team Member', $reviewerEmployee);
+    $proposal = Proposal::factory()->create([
+        'status' => ProposalStatus::Submitted,
+        'planned_date_begin' => '2026-11-01',
+        'planned_date_end' => '2027-10-31',
+    ]);
+    $project = Project::factory()->create(['user_id' => $ownerEmployee]);
+    $project->currentAssignment('user_id')->forceFill(['status' => AssignmentStatus::Acknowledged])->save();
+    $proposal->projects()->attach($project->id, ['target_beneficiaries' => 10]);
+    DB::table('proposal_reviewers')->insert([
+        'proposal_id' => $proposal->id, 'stage' => 'proposal', 'employee_id' => $reviewerEmployee,
+        'slot' => 'meal_manager', 'created_at' => now(), 'updated_at' => now(),
+    ]);
+
+    $this->actingAs($actor);
+    app(ApproveProposal::class)->handle($proposal, ProposalStatus::Submitted, [
+        'actual_date_begin' => '2026-11-01',
+        'actual_date_end' => '2027-10-31',
+        'decision_date' => '2026-10-13',
+        'approval_note' => 'Donor email confirms the grant.',
+    ]);
+
+    $approved = Activity::query()->where('subject_type', 'proposal')->where('subject_id', $proposal->id)->where('event', 'proposal.approved')->sole();
+
+    expect(approvalRecipients($approved))->toContain($owner->id, $reviewer->id);
+});

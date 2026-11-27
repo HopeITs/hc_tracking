@@ -60,11 +60,17 @@ class ProposalPolicy
     /**
      * Determine whether the user can move the proposal to a status.
      *
-     * The transition table, not this ability, decides which moves exist.
+     * The transition table, not this ability, decides which moves exist. A
+     * project owner may carry the proposal along its steps, but closing it as
+     * rejected stays with the holders of proposals.update.
      */
     public function transition(User $user, Proposal $proposal, ProposalStatus $to): bool
     {
-        return $user->can('proposals.update') || $this->ownsAProject($user, $proposal);
+        if ($user->can('proposals.update')) {
+            return true;
+        }
+
+        return $to !== ProposalStatus::Rejected && $this->ownsAProject($user, $proposal);
     }
 
     /**
@@ -206,7 +212,7 @@ class ProposalPolicy
         static $cache = [];
         $request = spl_object_id(request());
 
-        return $cache[$request][$proposalId] ??= array_values(Proposal::ownerEmployeeIdsFor([$proposalId])[$proposalId] ?? []);
+        return $cache[$request][$proposalId] ??= Proposal::ownerEmployeeIdsFor([$proposalId])[$proposalId] ?? [];
     }
 
     /**

@@ -439,3 +439,19 @@ test('payroll renewals count on their own YY-NNN sequence and leave the HC- numb
 
     expect($fresh->internal_project_number)->toBe("HC-{$year}-001");
 });
+
+test('a payroll approval tells the watchers once, not once for approved and again for active', function () {
+    $this->actingAs(userWithRole('Public Relations Manager'));
+    $proposal = payrollProposal(ProposalStatus::Submitted);
+
+    app(ApproveProposal::class)->handle($proposal, ProposalStatus::Submitted, [
+        'decision_date' => '2026-10-13',
+        'approval_note' => 'The donor confirmed the payroll grant by email.',
+    ]);
+
+    $events = DB::table('activities')->where('subject_type', 'proposal')->where('subject_id', $proposal->id)->pluck('event')->all();
+
+    expect($proposal->fresh()->status)->toBe(ProposalStatus::Active)
+        ->and(array_count_values($events)['proposal.approved'] ?? 0)->toBe(1)
+        ->and($events)->not->toContain('proposal.status_changed');
+});

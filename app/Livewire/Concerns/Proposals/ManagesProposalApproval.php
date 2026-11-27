@@ -15,6 +15,7 @@ use App\Models\Media;
 use App\Models\Project;
 use App\Models\Proposal;
 use App\Rules\SecureUpload;
+use App\Support\ApprovalResult;
 use Carbon\CarbonImmutable;
 use Flux\Flux;
 use Illuminate\Support\Facades\Gate;
@@ -22,6 +23,7 @@ use Illuminate\Validation\ValidationException;
 use Livewire\Attributes\Computed;
 use Livewire\Attributes\Locked;
 use Livewire\Features\SupportFileUploads\TemporaryUploadedFile;
+use Throwable;
 
 /**
  * The Approve Proposal dialog of proposals/show (T08).
@@ -98,7 +100,7 @@ trait ManagesProposalApproval
     /**
      * The proposal the open dialog is about.
      */
-    #[Computed]
+    #[Computed(persist: true)]
     public function approvalSubject(): ?Proposal
     {
         return $this->approveProposalId === null
@@ -112,7 +114,7 @@ trait ManagesProposalApproval
      *
      * @return array<int, array{name: string, outcome: string}>
      */
-    #[Computed]
+    #[Computed(persist: true)]
     public function approvalPreview(): array
     {
         $subject = $this->approvalSubject;
@@ -141,7 +143,7 @@ trait ManagesProposalApproval
      *
      * @return array{create: int, link: int, wait: int, warnings: list<string>}
      */
-    #[Computed]
+    #[Computed(persist: true)]
     public function approvalLocations(): array
     {
         $subject = $this->approveProposalId === null ? null : Proposal::query()->find($this->approveProposalId);
@@ -182,7 +184,7 @@ trait ManagesProposalApproval
         $savedFile = $isFile && $this->approveFile !== null ? $this->saveEvidenceFile($proposal) : null;
 
         try {
-            app(ApproveProposal::class)->handle($proposal, ProposalStatus::from($this->approveExpectedFrom), [
+            $result = app(ApproveProposal::class)->handle($proposal, ProposalStatus::from($this->approveExpectedFrom), [
                 'actual_date_begin' => $this->approveBegin,
                 'actual_date_end' => $this->approveEnd,
                 'decision_date' => $this->approveDecisionDate,
@@ -197,6 +199,13 @@ trait ManagesProposalApproval
             $this->showApprovalErrors($exception, $isFile);
 
             return;
+        } catch (Throwable $exception) {
+            // Any other refusal (a gate, the database) leaves no evidence file behind either.
+            if ($savedFile !== null) {
+                rescue(fn () => app(DeleteProposalFile::class)->handle($proposal, $savedFile), report: false);
+            }
+
+            throw $exception;
         }
 
         $this->closeApproveModal();
@@ -211,8 +220,10 @@ trait ManagesProposalApproval
             'skipped' => fn (string $names): string => __('proposals.approval_result_skipped', ['names' => $names]),
         ];
 
+        $outcomes = $this->approvalOutcomes($preview, $result);
+
         foreach ($summaries as $outcome => $summary) {
-            $names = collect($preview)->where('outcome', $outcome)->pluck('name')->implode(', ');
+            $names = collect($outcomes)->where('outcome', $outcome)->pluck('name')->implode(', ');
 
             if ($names !== '') {
                 Flux::toast(variant: $outcome === 'skipped' ? 'warning' : 'success', text: $summary($names));
@@ -222,6 +233,36 @@ trait ManagesProposalApproval
         if (! $proposal->donorProposals()->exists()) {
             Flux::toast(variant: 'warning', text: __('proposals.approval_warning_no_agreement'));
         }
+    }
+
+    /**
+     * What the approval did to each project, by name. The dialog's preview
+     * tells funded from extended; a project the approval created from a
+     * location row was not in it, so its outcome comes from the result.
+     *
+     * @param  array<int, array{name: string, outcome: string}>  $preview
+     * @return list<array{name: string, outcome: string}>
+     */
+    private function approvalOutcomes(array $preview, ApprovalResult $result): array
+    {
+        $byResult = [
+            ...array_fill_keys($result->approvedProjectIds, ApproveProposal::OutcomeFunded),
+            ...array_fill_keys($result->waitingProjectIds, ApproveProposal::OutcomeWaiting),
+            ...array_fill_keys($result->skippedProjectIds, ApproveProposal::OutcomeSkipped),
+        ];
+        $names = Project::query()->whereKey(array_keys($byResult))->pluck('name', 'id');
+        $outcomes = [];
+
+        foreach ($byResult as $projectId => $outcome) {
+            $known = $preview[$projectId]['outcome'] ?? null;
+
+            $outcomes[] = [
+                'name' => (string) $names->get($projectId),
+                'outcome' => $known === ApproveProposal::OutcomeExtended && $outcome === ApproveProposal::OutcomeFunded ? $known : $outcome,
+            ];
+        }
+
+        return $outcomes;
     }
 
     public function closeApproveModal(): void

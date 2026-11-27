@@ -13,7 +13,9 @@ use App\Models\HrEmployee;
 use App\Models\Proposal;
 use App\Models\ProposalReviewer;
 use App\Support\ProposalTransitions;
+use App\Support\TransitionResult;
 use Flux\Flux;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Validation\ValidationException;
 use Livewire\Attributes\Computed;
@@ -185,16 +187,18 @@ trait ManagesProposalStatus
     }
 
     /**
-     * Validate and save the counts typed for the missing projects. An empty
-     * count, or one that is not a whole number of at least 1, stops the move
-     * with a field error.
+     * Validate the counts typed for the missing projects and return the
+     * writes to make, project id => count. An empty count, or one that is not
+     * a whole number of at least 1, stops the move with a field error.
+     *
+     * @return array<int, int>
      */
-    private function saveMissingBeneficiaries(Proposal $proposal): void
+    private function validatedMissingBeneficiaries(): array
     {
         $missing = $this->statusMissingBeneficiaries;
 
         if ($missing === []) {
-            return;
+            return [];
         }
 
         $rules = [];
@@ -205,9 +209,13 @@ trait ManagesProposalStatus
 
         $this->validate($rules, [], collect($missing)->mapWithKeys(fn (array $row): array => ['statusBeneficiaries.'.$row['id'] => $row['name']])->all());
 
+        $counts = [];
+
         foreach ($missing as $row) {
-            $proposal->projects()->updateExistingPivot($row['id'], ['target_beneficiaries' => (int) $this->statusBeneficiaries[$row['id']]]);
+            $counts[(int) $row['id']] = (int) $this->statusBeneficiaries[$row['id']];
         }
+
+        return $counts;
     }
 
     /**
@@ -266,17 +274,26 @@ trait ManagesProposalStatus
             'meeting_at' => in_array('meeting_at', $fields, true) && trim($this->statusMeetingAt) !== '' ? $this->statusMeetingAt : null,
         ], fn (?string $value): bool => $value !== null);
 
-        $this->saveMissingBeneficiaries($proposal);
-        unset($this->statusMissingBeneficiaries);
+        $counts = $this->validatedMissingBeneficiaries();
 
         try {
-            $result = app(TransitionProposal::class)->handle($proposal, $to, ProposalStatus::from($this->statusExpectedFrom), $input);
+            // The counts and the move commit together: a refused move keeps
+            // none of the counts typed for it.
+            $result = DB::transaction(function () use ($proposal, $to, $input, $counts): TransitionResult {
+                foreach ($counts as $projectId => $count) {
+                    $proposal->projects()->updateExistingPivot($projectId, ['target_beneficiaries' => $count]);
+                }
+
+                return app(TransitionProposal::class)->handle($proposal, $to, ProposalStatus::from($this->statusExpectedFrom), $input);
+            });
         } catch (ValidationException $exception) {
+            unset($this->statusMissingBeneficiaries);
             $this->showStatusErrors($exception, ['status' => 'newStatus', 'reason' => 'statusContext', 'effective_date' => 'statusDate', 'meeting_at' => 'statusMeetingAt'], 'statusGate');
 
             return;
         }
 
+        unset($this->statusMissingBeneficiaries);
         $this->closeStatusModal();
         $this->forgetReadings();
 
