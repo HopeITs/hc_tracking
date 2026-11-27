@@ -398,6 +398,8 @@ test('the query count does not grow with the number of reports', function (strin
         arpDonorReport('Extra donor '.$name, ['due_on' => '2026-12-01']);
     }
 
+    $count(); // Warm again: saving the new programs cleared the once-per-request program lookup.
+
     expect($count())->toBe($few);
 })->with(['doors' => [''], 'monthly' => ['monthly'], 'duties' => ['duties'], 'donor' => ['donor']]);
 
