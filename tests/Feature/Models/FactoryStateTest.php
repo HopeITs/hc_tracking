@@ -1,11 +1,13 @@
 <?php
 
 use App\Enums\ArStatus;
+use App\Enums\AssignmentStatus;
 use App\Enums\ProjectStatus;
 use App\Models\Account;
 use App\Models\DonorReport;
 use App\Models\Project;
 use App\Models\Proposal;
+use App\Models\ProposalLocation;
 use App\Models\Report;
 use App\Models\Strategy;
 use App\Models\TransfersTracking;
@@ -127,3 +129,63 @@ test('the dated project states end after the start passed in', function (string 
     expect($project->status)->toBe(ProjectStatus::from($state))
         ->and($project->end_date->toDateString())->toBeGreaterThan('2030-05-01');
 })->with(['approved', 'active', 'closed']);
+
+test('the dated location-row states keep the status they name', function (string $state) {
+    $row = ProposalLocation::factory()->{$state}()->create()->fresh();
+
+    expect($row->status)->toBe(ProjectStatus::from($state))
+        ->and($row->start_date->toDateString())->toBe('2026-01-01')
+        ->and($row->end_date->toDateString())->toBe('2026-12-31');
+})->with(['approved', 'active', 'closed', 'archived']);
+
+test('a location row delivers at as many centers as it was asked for', function (int $count) {
+    $row = ProposalLocation::factory()->withCenters($count)->create()->fresh();
+
+    expect($row->centers()->count())->toBe($count)
+        ->and($row->city_wide)->toBeFalse()
+        ->and(array_unique($row->centerIds()))->toHaveCount($count);
+})->with([1, 2, 3]);
+
+test('a rejected row keeps its responsible and carries their refusal', function () {
+    $row = ProposalLocation::factory()->ownerRejected()->create()->fresh();
+
+    expect($row->responsible_employee_id)->not->toBeNull()
+        ->and($row->currentAssignment('responsible_employee_id')?->status)->toBe(AssignmentStatus::Rejected);
+});
+
+test('a location row without demographics keeps its headline target', function () {
+    $row = ProposalLocation::factory()->approved()->withoutDemographics()->create()->fresh();
+
+    expect($row->target_beneficiaries)->toBe(400)
+        ->and($row->target_men)->toBeNull()
+        ->and($row->target_women)->toBeNull()
+        ->and($row->target_boys)->toBeNull()
+        ->and($row->target_girls)->toBeNull();
+});
+
+test('a place row stands on its own proposal with no project behind it', function () {
+    $row = placeRow();
+
+    expect($row->project_id)->toBeNull()
+        ->and($row->proposal_id)->not->toBeNull()
+        ->and($row->program_id)->not->toBeNull()
+        ->and($row->responsible_employee_id)->not->toBeNull()
+        ->and($row->centers()->count())->toBe(1)
+        ->and($row->city_wide)->toBeFalse()
+        ->and(Project::query()->count())->toBe(0);
+});
+
+test('a field-work place row has no center and says so', function () {
+    $row = placeRow(['city_wide' => true]);
+
+    expect($row->city_wide)->toBeTrue()
+        ->and($row->centers()->count())->toBe(0);
+});
+
+test('a place row takes the status and dates it is given', function () {
+    $row = placeRow(['status' => ProjectStatus::Active->value, 'start_date' => '2030-05-01', 'end_date' => '2030-11-30']);
+
+    expect($row->status)->toBe(ProjectStatus::Active)
+        ->and($row->start_date->toDateString())->toBe('2030-05-01')
+        ->and($row->end_date->toDateString())->toBe('2030-11-30');
+});

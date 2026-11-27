@@ -5,7 +5,6 @@ use App\Models\Account;
 use App\Models\Donor;
 use App\Models\DonorProposal;
 use App\Models\Media;
-use App\Models\Project;
 use App\Models\Proposal;
 use App\Models\TransfersTracking;
 use Illuminate\Support\Facades\Storage;
@@ -202,10 +201,8 @@ function seedProposalPaperwork(): array
 {
     Storage::fake('local');
     ['proposal' => $proposal] = seedMoneyPagesFixture();
-    $project = Project::factory()->create();
-    $proposal->projects()->attach($project);
     // Y-16 (D-93): grant paper is filed on the place the proposal pays for.
-    $row = proposalRowForProject($proposal, $project);
+    $row = placeRow(['proposal_id' => $proposal->id]);
 
     $file = fn (string $mediableType, int $mediableId, MediaCollection $collection, string $name): Media => Media::factory()->create([
         'mediable_type' => $mediableType,

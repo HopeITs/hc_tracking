@@ -57,6 +57,7 @@ test('a dependency takes the row of its successor', function () {
 
     $dependency = ScheduleDependency::factory()->create([
         'project_id' => $project->id,
+        'proposal_location_id' => null,
         'predecessor_type' => 'task',
         'predecessor_id' => $predecessor->id,
         'successor_type' => 'task',
@@ -79,6 +80,7 @@ test('a dependency whose ends land on different rows is deleted and listed', fun
 
     $dependency = ScheduleDependency::factory()->create([
         'project_id' => $project->id,
+        'proposal_location_id' => null,
         'predecessor_type' => 'task',
         'predecessor_id' => $predecessor->id,
         'successor_type' => 'task',
@@ -98,6 +100,7 @@ test('a dependency with an end that is not a task is listed and left alone', fun
 
     $dependency = ScheduleDependency::factory()->create([
         'project_id' => $project->id,
+        'proposal_location_id' => null,
         // The dead `milestone` type: its table was dropped on 17 Nov.
         'predecessor_type' => 'milestone',
         'predecessor_id' => 999,
@@ -115,10 +118,10 @@ test('a dependency with an end that is not a task is listed and left alone', fun
 test('a baseline takes the row its own date picks', function () {
     [$project, $earlier, $later] = scheduleProject();
 
-    $old = ScheduleBaseline::factory()->create(['project_id' => $project->id]);
+    $old = ScheduleBaseline::factory()->create(['project_id' => $project->id, 'proposal_location_id' => null]);
     DB::table('schedule_baselines')->where('id', $old->id)->update(['created_at' => '2025-06-01 09:00:00']);
 
-    $new = ScheduleBaseline::factory()->create(['project_id' => $project->id]);
+    $new = ScheduleBaseline::factory()->create(['project_id' => $project->id, 'proposal_location_id' => null]);
     DB::table('schedule_baselines')->where('id', $new->id)->update(['created_at' => '2026-06-01 09:00:00']);
 
     $counts = app(ScheduleRowBackfill::class)->run(apply: true);
@@ -132,7 +135,7 @@ test('a baseline takes the row its own date picks', function () {
 test('a baseline item whose task is on another row is dropped and counted', function () {
     [$project, $earlier, $later] = scheduleProject();
 
-    $baseline = ScheduleBaseline::factory()->create(['project_id' => $project->id]);
+    $baseline = ScheduleBaseline::factory()->create(['project_id' => $project->id, 'proposal_location_id' => null]);
     DB::table('schedule_baselines')->where('id', $baseline->id)->update(['created_at' => '2026-06-01 09:00:00']);
 
     $onRow = rowTask($later);
@@ -162,6 +165,7 @@ test('the dry run writes nothing and reports the same counts', function () {
     [$project, $earlier, $later] = scheduleProject();
     $dependency = ScheduleDependency::factory()->create([
         'project_id' => $project->id,
+        'proposal_location_id' => null,
         'predecessor_type' => 'task',
         'predecessor_id' => rowTask($earlier)->id,
         'successor_type' => 'task',
@@ -182,6 +186,7 @@ test('a second run writes nothing more', function () {
     [$project, , $later] = scheduleProject();
     ScheduleDependency::factory()->create([
         'project_id' => $project->id,
+        'proposal_location_id' => null,
         'predecessor_type' => 'task',
         'predecessor_id' => rowTask($later)->id,
         'successor_type' => 'task',

@@ -2,7 +2,6 @@
 
 use App\Enums\TaskPriority;
 use App\Enums\TaskStatus;
-use App\Models\Project;
 use App\Models\Role;
 use App\Models\Task;
 use App\Models\User;
@@ -63,7 +62,7 @@ test('the task being deleted cannot be swapped from the browser', function () {
 });
 
 test('adding a task on a project needs tasks.create', function () {
-    $slug = rowFor(Project::factory()->create())->slug;
+    $slug = placeRow()->slug;
 
     Livewire::actingAs($this->assignee)->test('pages::projects.show', ['project' => $slug])->call('openAddTaskModal')->assertForbidden();
     Livewire::actingAs(userWithRole('Media Team'))->test('pages::projects.show', ['project' => $slug])->call('openAddTaskModal')->assertOk();

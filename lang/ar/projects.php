@@ -277,5 +277,11 @@ return [
         'verify_mirror_hint' => 'أصلح الكاتب لا البيانات: الأمر locations:backfill-from-projects --apply يخفي المشكلة فقط.',
         'verify_mirror_nothing' => 'لا صف موقع يحمل مشروعًا بعد؛ لا شيء للفحص.',
         'location_backfill_none' => 'لا شيء',
+        'retire_audit_columns' => 'أعمدة project_id القديمة: صفوف ما زالت تشير إلى مشروع ولا شيء غيره',
+        'retire_audit_morphs' => 'أعمدة الربط المتعدد التي ما زالت تسمّي مفتاح المشروع',
+        'retire_audit_orphans' => 'مشاريع لا يحملها أي صف موقع',
+        'retire_audit_clean' => 'لم يبقَ شيء مرتبطًا بمشروع. يمكن المضي في الحذف.',
+        'retire_audit_dirty' => 'ما زال :count صفًا مرتبطًا بمشروع. لا يجوز تنفيذ الحذف.',
+        'retire_audit_hint' => 'كل صف أكبر من صفر قرار لـ Dev 1 (Y-18): لا خلَف لهذه البيانات، ولا يجوز لأي ترحيل أن يخمّنه.',
     ],
 ];

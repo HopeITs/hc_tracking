@@ -4,7 +4,6 @@ use App\Models\AnnualPlan;
 use App\Models\Donor;
 use App\Models\DonorProposal;
 use App\Models\Program;
-use App\Models\Project;
 use App\Models\Proposal;
 use App\Models\Report;
 use App\Models\Strategy;
@@ -20,7 +19,7 @@ dataset('module pages', [
     'annual plans' => [fn (): string => route('annual-plans.index')],
     'annual plan' => [fn (): string => route('annual-plans.show', AnnualPlan::factory()->create())],
     'projects' => [fn (): string => route('projects.index')],
-    'project' => [fn (): string => route('projects.show', rowFor(Project::factory()->create()))],
+    'project' => [fn (): string => route('projects.show', placeRow())],
     'risks' => [fn (): string => route('risks.index')],
     'results' => [fn (): string => route('results.index')],
     'tasks' => [fn (): string => route('tasks.index')],

@@ -6,7 +6,7 @@ namespace Database\Factories;
 
 use App\Models\ActivityPlan;
 use App\Models\PlanUpdate;
-use App\Models\Project;
+use App\Models\ProposalLocation;
 use Illuminate\Database\Eloquent\Factories\Factory;
 
 /**
@@ -15,7 +15,8 @@ use Illuminate\Database\Eloquent\Factories\Factory;
 class PlanUpdateFactory extends Factory
 {
     /**
-     * A draft update of an approved plan for a new centre.
+     * A draft update of an approved plan for a new centre, at one place
+     * (Y-12, D-93).
      *
      * @return array<string, mixed>
      */
@@ -23,7 +24,7 @@ class PlanUpdateFactory extends Factory
     {
         return [
             'activity_plan_id' => ActivityPlan::factory()->approved(),
-            'project_id' => Project::factory(),
+            'proposal_location_id' => ProposalLocation::factory(),
             'month' => '2027-01-01',
         ];
     }

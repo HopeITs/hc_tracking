@@ -4,7 +4,6 @@ use App\Actions\Proposals\TransitionProposal;
 use App\Enums\Currency;
 use App\Enums\ProposalStatus;
 use App\Models\Donor;
-use App\Models\Project;
 use App\Models\Proposal;
 use App\Models\ProposalLocation;
 use App\Models\Role;
@@ -36,7 +35,6 @@ test('the fundraiser moves a concept note to review, which needs proposals.updat
         'requested_budget' => '120000.00',
         'requested_currency' => Currency::Usd,
     ]);
-    $proposal->projects()->attach(Project::factory()->create()->id, ['target_beneficiaries' => 400]);
     ProposalLocation::factory()->for($proposal)->complete()->create();
 
     $this->actingAs($this->fundraiser);

@@ -277,5 +277,11 @@ return [
         'verify_mirror_hint' => 'Fix the writer, not the data: locations:backfill-from-projects --apply only hides this.',
         'verify_mirror_nothing' => 'No location row carries a project yet; nothing to check.',
         'location_backfill_none' => 'none',
+        'retire_audit_columns' => 'Legacy project_id columns: rows that still point at a project and nowhere else',
+        'retire_audit_morphs' => 'Morph columns still naming the project key',
+        'retire_audit_orphans' => 'Projects no location row carries',
+        'retire_audit_clean' => 'Nothing is attached to a project any more. The drop may go ahead.',
+        'retire_audit_dirty' => ':count row(s) are still attached to a project. The drop must not run.',
+        'retire_audit_hint' => 'Every row above zero is a decision for Dev 1 (Y-18): the data has no successor, so no migration may guess one.',
     ],
 ];

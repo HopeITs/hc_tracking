@@ -3,16 +3,16 @@
 use App\Enums\FileType;
 use App\Enums\MediaCollection;
 use App\Models\Media;
-use App\Models\Project;
+use App\Models\ProposalLocation;
 use App\Models\User;
 use Illuminate\Support\Facades\DB;
 
 test('a file resolves its owner through the morph map', function () {
-    $project = Project::factory()->create();
-    $media = Media::factory()->create(['mediable_type' => 'project', 'mediable_id' => $project->id]);
+    $row = placeRow();
+    $media = Media::factory()->create(['mediable_type' => 'proposal_location', 'mediable_id' => $row->id]);
 
-    expect($media->mediable)->toBeInstanceOf(Project::class)
-        ->and($media->mediable->id)->toBe($project->id);
+    expect($media->mediable)->toBeInstanceOf(ProposalLocation::class)
+        ->and($media->mediable->id)->toBe($row->id);
 });
 
 test('a file casts its collection and type to enums', function () {
@@ -30,35 +30,35 @@ test('a file reports its uploader', function () {
 });
 
 test('the collection scope narrows to one kind of file', function () {
-    $project = Project::factory()->create();
+    $row = placeRow();
 
     Media::factory()->inCollection(MediaCollection::Agreement)->create([
-        'mediable_type' => 'project',
-        'mediable_id' => $project->id,
+        'mediable_type' => 'proposal_location',
+        'mediable_id' => $row->id,
     ]);
     Media::factory()->inCollection(MediaCollection::Photo)->create([
-        'mediable_type' => 'project',
-        'mediable_id' => $project->id,
+        'mediable_type' => 'proposal_location',
+        'mediable_id' => $row->id,
     ]);
 
     expect(Media::query()->inCollection(MediaCollection::Photo)->count())->toBe(1);
 });
 
-test('deleting a project through Eloquent removes its files', function () {
-    $project = Project::factory()->create();
-    Media::factory(2)->create(['mediable_type' => 'project', 'mediable_id' => $project->id]);
+test('deleting a place through Eloquent removes its files', function () {
+    $row = placeRow();
+    Media::factory(2)->create(['mediable_type' => 'proposal_location', 'mediable_id' => $row->id]);
 
-    $project->delete();
+    $row->delete();
 
-    expect(DB::table('media')->where('mediable_type', 'project')->count())->toBe(0);
+    expect(DB::table('media')->where('mediable_type', 'proposal_location')->count())->toBe(0);
 });
 
-test('deleting one project leaves another project files alone', function () {
-    $subject = Project::factory()->create();
-    $other = Project::factory()->create();
+test('deleting one place leaves another place files alone', function () {
+    $subject = placeRow();
+    $other = placeRow();
 
-    Media::factory()->create(['mediable_type' => 'project', 'mediable_id' => $subject->id]);
-    Media::factory()->create(['mediable_type' => 'project', 'mediable_id' => $other->id]);
+    Media::factory()->create(['mediable_type' => 'proposal_location', 'mediable_id' => $subject->id]);
+    Media::factory()->create(['mediable_type' => 'proposal_location', 'mediable_id' => $other->id]);
 
     $subject->delete();
 

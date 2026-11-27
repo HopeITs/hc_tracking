@@ -4,7 +4,6 @@ namespace Database\Factories;
 
 use App\Enums\Period;
 use App\Models\Indicator;
-use App\Models\Project;
 use App\Models\Result;
 use Illuminate\Database\Eloquent\Factories\Factory;
 

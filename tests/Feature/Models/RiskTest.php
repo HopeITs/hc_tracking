@@ -3,7 +3,6 @@
 use App\Models\MonthlyReport;
 use App\Models\MonthlyReportRisk;
 use App\Models\Program;
-use App\Models\Project;
 use App\Models\Proposal;
 use App\Models\ProposalLocation;
 use App\Models\Risk;
@@ -11,12 +10,13 @@ use App\Models\RiskLibrary;
 use App\Support\DefaultRiskLibrary;
 use Illuminate\Database\QueryException;
 
-test('a risk belongs to a project', function () {
-    $project = Project::factory()->create();
-    $risk = Risk::factory()->create(['project_id' => $project->id]);
+test('a register risk belongs to the location row that owns it', function () {
+    $row = placeRow();
+    $risk = Risk::factory()->onRow($row)->create();
 
-    expect($risk->project)->toBeInstanceOf(Project::class)
-        ->and($risk->project->id)->toBe($project->id);
+    expect($risk->location)->toBeInstanceOf(ProposalLocation::class)
+        ->and($risk->location->id)->toBe($row->id)
+        ->and($risk->proposal_id)->toBe($row->proposal_id);
 });
 
 test('a risk casts happened to a boolean', function () {

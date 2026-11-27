@@ -3,7 +3,6 @@
 use App\Models\AnnualPlan;
 use App\Models\HrEmployee;
 use App\Models\Program;
-use App\Models\Project;
 use App\Models\Result;
 use App\Models\Strategy;
 
@@ -22,15 +21,16 @@ test('a program belongs to a strategy and an hr employee manager', function () {
         ->and($program->manager->id)->toBe($managerId);
 });
 
-test('a program has its projects, annual plans and results', function () {
+test('a program has its places, annual plans and results', function () {
     $program = Program::factory()->create();
 
-    Project::factory(2)->create(['program_id' => $program->id]);
+    placeRow(['program_id' => $program->id]);
+    placeRow(['program_id' => $program->id]);
     AnnualPlan::factory()->create(['program_id' => $program->id, 'year' => 2026]);
     AnnualPlan::factory()->create(['program_id' => $program->id, 'year' => 2027]);
     Result::factory()->create(['program_id' => $program->id]);
 
-    expect($program->projects)->toHaveCount(2)
+    expect($program->locations)->toHaveCount(2)
         ->and($program->annualPlans)->toHaveCount(2)
         ->and($program->results)->toHaveCount(1);
 });

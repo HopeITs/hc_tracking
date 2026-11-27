@@ -16,7 +16,6 @@ use App\Models\MonthlyReportLineBreakdown;
 use App\Models\MonthlyReportLineShare;
 use App\Models\MonthlyReportReopenRequest;
 use App\Models\PlanIndicator;
-use App\Models\Project;
 use App\Models\ProjectActivityStatus;
 use App\Models\Report;
 use App\Models\ReportTemplate;
@@ -60,9 +59,8 @@ test('a monthly report casts its period, status and people', function () {
         ->and($fresh->seen_by_meal_at)->toBeNull();
 });
 
-test('the slug is the template and the month, never the project (Y-03)', function () {
-    $project = Activity::withoutRecording(fn () => Project::factory()->create(['name' => 'Water Network Expansion']));
-    $report = Activity::withoutRecording(fn () => MonthlyReport::factory()->for($project)->create(['period' => '2026-10-01']));
+test('the slug is the template and the month, never the place (Y-03)', function () {
+    $report = reportAtRow(placeRow(), ['period' => '2026-10-01']);
 
     expect($report->slug)->toBe('report-'.$report->report_template_id.'-2026-10')
         ->and($report->getRouteKeyName())->toBe('slug');
@@ -79,23 +77,20 @@ test('a slug made before Y-03 never changes, and its URL still finds the report'
         ->and(MonthlyReport::query()->where('slug', 'water-network-expansion-2026-10')->value('id'))->toBe($report->id);
 });
 
-test('the activity label names the proposals and the place, not the project', function () {
-    $project = Activity::withoutRecording(fn () => Project::factory()->create(['name' => 'Water Network Expansion']));
-    $report = Activity::withoutRecording(fn () => MonthlyReport::factory()->for($project)->create(['period' => '2026-10-01']));
-    DB::table('projects')->where('id', $project->id)->update(['name' => 'Renamed Project']);
+test('the activity label names the proposals and the place', function () {
+    $report = reportAtRow(placeRow(), ['period' => '2026-10-01']);
     DB::table('proposals')->whereIn('id', $report->template->proposals()->pluck('proposals.id'))->update(['name' => 'Clean Water Proposal']);
 
     expect($report->activityLabel())->toStartWith('Clean Water Proposal · ')
-        ->and($report->activityLabel())->toEndWith(' · 2026-10')
-        ->and($report->activityLabel())->not->toContain('Renamed Project');
+        ->and($report->activityLabel())->toEndWith(' · 2026-10');
 });
 
 test('a new monthly report defaults to draft at the database', function () {
-    $projectId = Activity::withoutRecording(fn () => Project::factory()->create()->id);
-    $templateId = Activity::withoutRecording(fn () => ReportTemplate::factory()->create(['project_id' => $projectId])->id);
+    $row = placeRow();
+    $templateId = Activity::withoutRecording(fn () => ReportTemplate::factory()->forPlace($row->place(), $row->proposal)->create()->id);
 
     $id = DB::table('monthly_reports')->insertGetId([
-        'slug' => 'raw-2026-10', 'project_id' => $projectId, 'report_template_id' => $templateId, 'period' => '2026-10-01',
+        'slug' => 'raw-2026-10', 'report_template_id' => $templateId, 'period' => '2026-10-01',
     ]);
 
     expect(DB::table('monthly_reports')->find($id)->status)->toBe('draft');
@@ -211,9 +206,9 @@ test('a project activity status is one per location row and activity', function 
 
     expect($fresh->status)->toBe(ActivityStatus::Ongoing)
         ->and($fresh->monthlyReport)->toBeInstanceOf(MonthlyReport::class)
-        ->and($fresh->location?->project_id)->toBe($status->project_id)
+        ->and($fresh->location?->id)->toBe($status->proposal_location_id)
         ->and(fn () => DB::table('project_activity_statuses')->insert([
-            'project_id' => $status->project_id, 'proposal_location_id' => $status->proposal_location_id, 'result_id' => $status->result_id, 'status' => 'started', 'monthly_report_id' => $status->monthly_report_id,
+            'proposal_location_id' => $status->proposal_location_id, 'result_id' => $status->result_id, 'status' => 'started', 'monthly_report_id' => $status->monthly_report_id,
         ]))->toThrow(UniqueConstraintViolationException::class);
 });
 

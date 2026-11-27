@@ -23,7 +23,13 @@ use Illuminate\Support\Facades\DB;
  */
 function legacyPlanUpdate(ActivityPlan $plan, Project $project): int
 {
-    return PlanUpdate::factory()->create(['activity_plan_id' => $plan->id, 'project_id' => $project->id])->id;
+    // The row is nulled on purpose: this is the shape the backfill is
+    // asked to move, and since Y-18 the factory places an update itself.
+    return PlanUpdate::factory()->create([
+        'activity_plan_id' => $plan->id,
+        'project_id' => $project->id,
+        'proposal_location_id' => null,
+    ])->id;
 }
 
 /**

@@ -825,6 +825,9 @@ function placePayload(array $overrides = []): array
  * one was (D-84), and the row carries the state the Projects screen shows.
  * The row takes the project's own centre when it has one and is "centre not
  * set" otherwise (D-82) — never a centre invented for it.
+ *
+ * @deprecated Y-18: a row needs no project. `placeRow()` is the replacement;
+ *             this stays while the fixtures are converted folder by folder.
  */
 function rowFor(Project $project, ?Proposal $proposal = null): ProposalLocation
 {
@@ -889,13 +892,18 @@ function reportAtRow(ProposalLocation $row, array $attributes = []): MonthlyRepo
             ->first();
 
         if ($template === null) {
-            $template = ReportTemplate::factory()->create([
-                'project_id' => $row->project_id,
-                'city_id' => $row->city_id,
-                'program_id' => $row->program_id,
-                'center_id' => $row->centerIds()[0] ?? null,
-                'city_wide' => $row->city_wide,
-            ]);
+            // A row with no project (Y-18) gets a template of the Y-02 kind,
+            // carried by the row's own proposal; `forPlace()` attaches it,
+            // which the legacy branch leaves to ReportTemplateFactory.
+            $template = $row->project_id === null
+                ? ReportTemplate::factory()->forPlace($row->place(), $row->proposal)->create()
+                : ReportTemplate::factory()->create([
+                    'project_id' => $row->project_id,
+                    'city_id' => $row->city_id,
+                    'program_id' => $row->program_id,
+                    'center_id' => $row->centerIds()[0] ?? null,
+                    'city_wide' => $row->city_wide,
+                ]);
 
             ProposalLocation::query()
                 ->where('city_id', $row->city_id)
@@ -917,6 +925,9 @@ function reportAtRow(ProposalLocation $row, array $attributes = []): MonthlyRepo
  * state (Y-16).
  *
  * @param  array<string, mixed>  $attributes  passed to Project::factory()
+ *
+ * @deprecated Y-18: use `placeRow()`, which needs no project at all. Kept
+ *             while the fixtures are converted folder by folder.
  */
 function projectWithRow(array $attributes = []): Project
 {
@@ -927,11 +938,44 @@ function projectWithRow(array $attributes = []): Project
 }
 
 /**
+ * One place of its own proposal, with no project behind it (Y-18).
+ *
+ * The row-first replacement for `projectWithRow()`: what a fixture needs when
+ * it wants "a place on the Projects screen" and nothing about a project. The
+ * row is complete — a program and a responsible employee — and delivers at one
+ * HR center of its city, unless `city_wide` is passed, because a row is either
+ * tied to centers or field work (D-88).
+ *
+ * The proposal is running unless one is given: a place exists only once a
+ * proposal was approved (D-84, D-87). Pass any factory state's columns through
+ * `$attributes` (`status`, the dates, the five targets).
+ *
+ * @param  array<string, mixed>  $attributes  passed to ProposalLocation::factory()
+ */
+function placeRow(array $attributes = []): ProposalLocation
+{
+    return Activity::withoutRecording(function () use ($attributes): ProposalLocation {
+        $attributes['proposal_id'] ??= Proposal::factory()->running()->create()->id;
+
+        $factory = ProposalLocation::factory()->complete();
+
+        if (($attributes['city_wide'] ?? false) === false) {
+            $factory = $factory->withCenters();
+        }
+
+        return $factory->create($attributes)->fresh();
+    });
+}
+
+/**
  * A location row of the proposal that carries the project (Y-02): the
  * project's city and program, and one center (a new HR center of the city
  * unless one is given; `null` makes the row city-wide).
  *
  * @param  int|false|null  $centerId  false = city-wide, null = a new center
+ *
+ * @deprecated Y-18: use `placeRow()`. Kept while the fixtures that still
+ *             build a project are converted folder by folder.
  */
 function proposalRowForProject(Proposal $proposal, Project $project, int|false|null $centerId = null): ProposalLocation
 {

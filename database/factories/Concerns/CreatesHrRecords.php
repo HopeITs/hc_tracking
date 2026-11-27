@@ -39,6 +39,19 @@ trait CreatesHrRecords
     }
 
     /**
+     * Insert an HR center of a city and return its id.
+     */
+    protected function createHrCenter(int $cityId): int
+    {
+        return DB::connection('hr')->table('centers')->insertGetId([
+            'name_en' => fake()->company(),
+            'name_ar' => fake()->company(),
+            'city_id' => $cityId,
+            'is_active' => true,
+        ]);
+    }
+
+    /**
      * Insert an HR employee and return its id.
      */
     protected function createHrEmployee(): int

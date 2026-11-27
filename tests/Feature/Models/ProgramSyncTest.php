@@ -3,7 +3,7 @@
 use App\Http\Middleware\SyncProgramsFromHr;
 use App\Models\HrProgram;
 use App\Models\Program;
-use App\Models\Project;
+use App\Models\ProposalLocation;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
@@ -65,12 +65,12 @@ test('a renamed HR program does not rename ours: the name is tracking-owned', fu
 
 test('a program removed from hr keeps the delivery under it', function () {
     $program = Program::factory()->create();
-    Project::factory()->create(['program_id' => $program->id]);
+    placeRow(['program_id' => $program->id]);
 
     Program::syncFromHr();
 
     expect(Program::query()->find($program->id))->not->toBeNull()
-        ->and(Project::query()->where('program_id', $program->id)->count())->toBe(1);
+        ->and(ProposalLocation::query()->where('program_id', $program->id)->count())->toBe(1);
 });
 
 test('syncing never writes to hr', function () {

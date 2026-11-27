@@ -7,7 +7,6 @@ use App\Enums\Currency;
 use App\Enums\ProposalStatus;
 use App\Enums\StatusNoteKind;
 use App\Models\Donor;
-use App\Models\Project;
 use App\Models\Proposal;
 use App\Models\ProposalLocation;
 use Illuminate\Support\Facades\DB;
@@ -32,7 +31,6 @@ test('the fundraiser moves a proposal from review to submitted (PR-01)', functio
         'requested_budget' => '120000.00',
         'requested_currency' => Currency::Usd,
     ]);
-    $proposal->projects()->attach(Project::factory()->create()->id, ['target_beneficiaries' => 400]);
     // Y-17: the beneficiary figure the transitions require is the row's.
     ProposalLocation::factory()->for($proposal)->complete()->create(['target_beneficiaries' => 100]);
 

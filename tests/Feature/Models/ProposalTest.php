@@ -3,7 +3,6 @@
 use App\Models\Donor;
 use App\Models\DonorProposal;
 use App\Models\PlanIndicator;
-use App\Models\Project;
 use App\Models\Proposal;
 use App\Models\ProposalStatusNote;
 use App\Models\Task;
@@ -24,14 +23,14 @@ test('a proposal has its funding agreements and donors', function () {
         ->and($proposal->donors()->sole()->id)->toBe($donor->id);
 });
 
-test('a proposal has its projects, tasks and status notes', function () {
+test('a proposal has its places, tasks and status notes', function () {
     $proposal = Proposal::factory()->create();
 
-    $proposal->projects()->attach(Project::factory()->create());
+    placeRow(['proposal_id' => $proposal->id]);
     Task::factory(2)->create(['source_type' => 'proposal', 'source_id' => $proposal->id]);
     ProposalStatusNote::factory()->create(['proposal_id' => $proposal->id]);
 
-    expect($proposal->projects)->toHaveCount(1)
+    expect($proposal->locations)->toHaveCount(1)
         ->and($proposal->tasks)->toHaveCount(2)
         ->and($proposal->statusNotes)->toHaveCount(1);
 });

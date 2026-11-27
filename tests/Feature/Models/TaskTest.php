@@ -2,7 +2,6 @@
 
 use App\Enums\TaskStatus;
 use App\Models\HrEmployee;
-use App\Models\Project;
 use App\Models\ProposalLocation;
 use App\Models\Task;
 use App\Models\TaskAttachment;
@@ -10,25 +9,25 @@ use App\Models\User;
 use Carbon\CarbonImmutable;
 
 test('a task resolves its polymorphic source', function () {
-    $sourceProject = Project::factory()->create();
+    $source = placeRow();
 
     $task = Task::factory()->create([
-        'source_type' => 'project',
-        'source_id' => $sourceProject->id,
+        'source_type' => 'proposal_location',
+        'source_id' => $source->id,
     ]);
 
-    expect($task->source)->toBeInstanceOf(Project::class)
-        ->and($task->source->id)->toBe($sourceProject->id)
-        ->and($task->sourceLabel())->toBe($sourceProject->name);
+    expect($task->source)->toBeInstanceOf(ProposalLocation::class)
+        ->and($task->source->id)->toBe($source->id)
+        ->and($task->sourceLabel())->toBe($source->fresh()->load(['city', 'program', 'centers'])->label());
 });
 
 test('a task sourceLabel falls back to no source when the source no longer exists', function () {
-    $sourceProject = Project::factory()->create();
+    $source = placeRow();
     $task = Task::factory()->create([
-        'source_type' => 'project',
-        'source_id' => $sourceProject->id,
+        'source_type' => 'proposal_location',
+        'source_id' => $source->id,
     ]);
-    $sourceProject->delete();
+    $source->delete();
 
     expect($task->fresh()->sourceLabel())->toBe(__('tasks.no_source'));
 });
@@ -88,14 +87,14 @@ test('a task can have subtasks and each resolves its parent', function () {
 });
 
 test('a subtask inherits its parent source through the factory helper', function () {
-    $sourceProject = Project::factory()->create();
-    $parent = Task::factory()->create(['source_type' => 'project', 'source_id' => $sourceProject->id]);
+    $source = placeRow();
+    $parent = Task::factory()->create(['source_type' => 'proposal_location', 'source_id' => $source->id]);
 
     $subtask = Task::factory()->subtaskOf($parent)->create();
 
     expect($subtask->parent_task_id)->toBe($parent->id)
-        ->and($subtask->source_type)->toBe('project')
-        ->and($subtask->source_id)->toBe($sourceProject->id);
+        ->and($subtask->source_type)->toBe('proposal_location')
+        ->and($subtask->source_id)->toBe($source->id);
 });
 
 test('a task assignee resolves its task and its hr employee', function () {
